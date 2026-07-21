@@ -1385,9 +1385,7 @@ html[data-xagent-webui="gateway"] .external-link-modal-panel {
   will-change: opacity, transform;
 }
 
-html[data-xagent-webui="gateway"]
-  .settings-modal-overlay[data-state="open"]
-  .settings-modal-panel,
+html[data-xagent-webui="gateway"] .settings-modal-overlay[data-state="open"] .settings-modal-panel,
 html[data-xagent-webui="gateway"]
   .history-share-modal-overlay[data-state="open"]
   .history-share-modal-panel,
