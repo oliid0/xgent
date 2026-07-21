@@ -1,5 +1,5 @@
-import { prepareUpstreamProxyRequest } from "./providers/proxy";
 import { isBrowserRuntime } from "@xagent/runtime";
+import { prepareUpstreamProxyRequest } from "./providers/proxy";
 
 // Hub（Skills / MCP 商店）浏览类请求的出网适配层：
 // - 桌面端：一律改经本地反代并声明 use-system-proxy，应用代理启用时经代理出网、

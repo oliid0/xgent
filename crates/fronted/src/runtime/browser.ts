@@ -59,7 +59,8 @@ function gatewayConnection() {
   const configuredUrl = typeof remote.gatewayUrl === "string" ? remote.gatewayUrl.trim() : "";
   const gatewayUrl = (configuredUrl || globalThis.location?.origin || "").replace(/\/$/, "");
   const configuredToken = typeof remote.token === "string" ? remote.token.trim() : "";
-  const token = configuredToken || globalThis.localStorage?.getItem(GATEWAY_TOKEN_KEY)?.trim() || "";
+  const token =
+    configuredToken || globalThis.localStorage?.getItem(GATEWAY_TOKEN_KEY)?.trim() || "";
   return { gatewayUrl, token };
 }
 

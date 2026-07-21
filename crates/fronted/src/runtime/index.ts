@@ -14,9 +14,7 @@ type TauriWindow = Window & {
 export function isTauriRuntime() {
   if (typeof window === "undefined") return false;
   const runtimeWindow = window as TauriWindow;
-  return (
-    runtimeWindow.__TAURI__ !== undefined || runtimeWindow.__TAURI_INTERNALS__ !== undefined
-  );
+  return runtimeWindow.__TAURI__ !== undefined || runtimeWindow.__TAURI_INTERNALS__ !== undefined;
 }
 
 export function isBrowserRuntime() {
