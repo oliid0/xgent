@@ -1,12 +1,8 @@
-# buf 代码生成配置（v2 schema）。Go 插件用 mise 固定版本、`module=` 与历史 protoc 一致，
-# 输出 internal/proto/；TS 插件 protoc-gen-es 由 web/node_modules 锁定，输出 web/src/lib/proto/gen/。
+# Gateway 只生成 Go 协议代码。浏览器与 Tauri 共享 crates/fronted，Gateway 不再拥有或生成前端源码。
 version: v2
 plugins:
   - local: protoc-gen-go
     out: .
     opt: module=github.com/xagent/agent-gateway
-  - local: web/node_modules/.bin/protoc-gen-es
-    out: web/src/lib/proto/gen
-    opt: target=ts
 inputs:
   - directory: .
