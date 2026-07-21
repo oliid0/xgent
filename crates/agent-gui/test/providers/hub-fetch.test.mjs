@@ -124,7 +124,7 @@ test("hubFetch 在 Gateway WebUI 运行时直连、不改写地址不加反代�
     return { ok: true, status: 200 };
   };
   // 模拟 web main.tsx 在渲染前写入的运行时标记。
-  globalThis.document = { documentElement: { dataset: { liveagentWebui: "gateway" } } };
+  globalThis.document = { documentElement: { dataset: { xagentWebui: "gateway" } } };
   try {
     await hubFetchModule.hubFetch("https://clawhub.ai/api/v1/skills?limit=24", {
       headers: { Accept: "application/json" },

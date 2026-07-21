@@ -177,7 +177,7 @@ docker run -d \
   --name xagent-gateway \
   --restart unless-stopped \
   -p 3000:8080 \
-  -e LIVEAGENT_GATEWAY_TOKEN=your-token \
+  -e XAGENT_GATEWAY_TOKEN=your-token \
   ghcr.io/ohi01/xagent-gateway:latest
 ```
 
@@ -190,7 +190,7 @@ docker pull ghcr.io/ohi01/xagent-gateway:latest \
     --name xagent-gateway \
     --restart unless-stopped \
     -p 3000:8080 \
-    -e LIVEAGENT_GATEWAY_TOKEN=your-token \
+    -e XAGENT_GATEWAY_TOKEN=your-token \
     ghcr.io/ohi01/xagent-gateway:latest \
   && docker image prune -f
 ```

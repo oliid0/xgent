@@ -997,7 +997,7 @@ fn soffice_candidate_names() -> &'static [&'static str] {
 
 #[cfg(not(target_os = "macos"))]
 fn find_soffice_binary() -> Option<PathBuf> {
-    if let Ok(raw) = std::env::var("LIVEAGENT_SOFFICE_PATH") {
+    if let Ok(raw) = std::env::var("XAGENT_SOFFICE_PATH") {
         let trimmed = raw.trim().trim_matches('"');
         if !trimmed.is_empty() {
             let path = expand_tilde_path(trimmed);
@@ -1129,7 +1129,7 @@ fn run_soffice_document_conversion(
 #[cfg(not(target_os = "macos"))]
 fn convert_document_to_html_preview(target: &Path) -> Result<Vec<u8>, String> {
     let soffice = find_soffice_binary().ok_or_else(|| {
-        "Legacy Word/RTF preview conversion requires LibreOffice; install it or set LIVEAGENT_SOFFICE_PATH to the soffice binary".to_string()
+        "Legacy Word/RTF preview conversion requires LibreOffice; install it or set XAGENT_SOFFICE_PATH to the soffice binary".to_string()
     })?;
 
     let nanos = std::time::SystemTime::now()
@@ -4582,7 +4582,7 @@ mod tests {
     }
 
     fn png_like_bytes() -> Vec<u8> {
-        b"\x89PNG\r\n\x1a\nliveagent-test".to_vec()
+        b"\x89PNG\r\n\x1a\nxagent-test".to_vec()
     }
 
     fn svg_text() -> &'static str {

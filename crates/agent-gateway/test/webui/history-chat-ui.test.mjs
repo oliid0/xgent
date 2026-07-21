@@ -96,8 +96,8 @@ test("parseHistoryMessagesJson preserves upload display text and checkpoint meta
     {
       role: "user",
       content: "internal content with upload instruction",
-      liveAgentDisplayContent: "please inspect notes",
-      liveAgentAttachments: [
+      xagentDisplayContent: "please inspect notes",
+      xagentAttachments: [
         {
           relativePath: "uploads/notes.txt",
           fileName: "notes.txt",
@@ -105,7 +105,7 @@ test("parseHistoryMessagesJson preserves upload display text and checkpoint meta
           sizeBytes: 42,
         },
       ],
-      liveAgentHistoryRef: {
+      xagentHistoryRef: {
         segmentIndex: 1,
         messageIndex: 2,
         segmentId: "segment-1",

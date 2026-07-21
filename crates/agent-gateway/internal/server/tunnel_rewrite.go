@@ -221,9 +221,9 @@ func tunnelShimScriptBody(rw tunnelRewrite) string {
 		return ""
 	}
 	return `(function(config){` +
-		`if(window.__LIVEAGENT_TUNNEL__&&window.__LIVEAGENT_TUNNEL__.installed)return;` +
+		`if(window.__XAGENT_TUNNEL__&&window.__XAGENT_TUNNEL__.installed)return;` +
 		`var base=String(config.basePath||"").replace(/\/+$/,"");` +
-		`window.__LIVEAGENT_TUNNEL__={basePath:base,installed:true};` +
+		`window.__XAGENT_TUNNEL__={basePath:base,installed:true};` +
 		`function rw(input){if(input==null||!base)return input;var raw=input instanceof URL?input.href:String(input);var u;try{u=new URL(raw,location.href)}catch(_){return input}` +
 		`if(u.host!==location.host||!/^(http:|https:|ws:|wss:)$/i.test(u.protocol))return input;` +
 		`if(u.pathname===base||u.pathname.indexOf(base+"/")===0)return u.href;` +

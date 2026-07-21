@@ -375,7 +375,7 @@ export function createShellTools(params: {
   const platformLabel = runtimePlatformLabel(runtimePlatform);
   const shellPolicy =
     runtimePlatform === "windows"
-      ? "Windows runs Bash commands with Git Bash (POSIX semantics) when available, falling back to pwsh, then Windows PowerShell, then cmd only if Git Bash is not installed. Write POSIX/bash syntax by default: `export NAME=value`, `&&`, `/dev/null`, forward-slash paths. If the result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing on this machine — switch to PowerShell syntax and suggest installing Git for Windows or setting LIVEAGENT_GIT_BASH_PATH."
+      ? "Windows runs Bash commands with Git Bash (POSIX semantics) when available, falling back to pwsh, then Windows PowerShell, then cmd only if Git Bash is not installed. Write POSIX/bash syntax by default: `export NAME=value`, `&&`, `/dev/null`, forward-slash paths. If the result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing on this machine — switch to PowerShell syntax and suggest installing Git for Windows or setting XAGENT_GIT_BASH_PATH."
       : runtimePlatform === "macos"
         ? "macOS runs Bash commands with POSIX shell syntax: zsh first, then Bash, then sh."
         : "Linux runs Bash commands with POSIX shell syntax: Bash first, then zsh, then sh.";
@@ -578,7 +578,7 @@ export function createShellTools(params: {
       hints.push(
         `Hint: Git Bash was not found, so this command ran under ${
           params.shellFamily === "cmd" ? "cmd" : "PowerShell"
-        } where POSIX syntax like \`export\`, \`nohup\`, and \`/dev/null\` fails. Rewrite the command in PowerShell syntax for now, and suggest installing Git for Windows or setting LIVEAGENT_GIT_BASH_PATH to restore Bash semantics.`,
+        } where POSIX syntax like \`export\`, \`nohup\`, and \`/dev/null\` fails. Rewrite the command in PowerShell syntax for now, and suggest installing Git for Windows or setting XAGENT_GIT_BASH_PATH to restore Bash semantics.`,
       );
     }
 

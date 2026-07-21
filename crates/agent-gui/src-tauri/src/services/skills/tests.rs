@@ -246,7 +246,7 @@ fn builtin_seed_backs_up_invalid_target_before_writing() {
 }
 
 #[test]
-fn builtin_seed_installs_liveagent_code_review_workflow() {
+fn builtin_seed_installs_xagent_code_review_workflow() {
     let tmp = TempDir::new("xagent-code-review-seed-test").expect("temp dir");
     let root = tmp.path().join("skills");
 
@@ -264,7 +264,7 @@ fn builtin_seed_installs_liveagent_code_review_workflow() {
     assert!(content.contains("mode=readonly"));
     assert!(content.contains("current local branch"));
     assert!(content.contains("Never write to GitHub"));
-    assert!(skill_dir.join("_liveagent_builtin.json").is_file());
+    assert!(skill_dir.join("_xagent_builtin.json").is_file());
     let validation = validate_skill_dir(&skill_dir);
     assert!(validation.ok, "{:?}", validation.errors);
 
@@ -300,7 +300,7 @@ fn builtin_seed_preserves_unmanaged_code_review_collision() {
         fs::read_to_string(skill_dir.join("notes.txt")).expect("read preserved user file"),
         "keep me\n"
     );
-    assert!(!skill_dir.join("_liveagent_builtin.json").exists());
+    assert!(!skill_dir.join("_xagent_builtin.json").exists());
 
     let (skills, invalid) = list_installed_skills(&root).expect("list preserved skills");
     assert!(invalid.is_empty(), "{invalid:?}");

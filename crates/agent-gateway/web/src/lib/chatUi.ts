@@ -90,7 +90,7 @@ type StoredMessage = {
   usage?: unknown;
   timestamp?: unknown;
   summaryMeta?: unknown;
-  liveAgentHistoryRef?: unknown;
+  xagentHistoryRef?: unknown;
 };
 
 function readMessageTimestamp(value: unknown): number | undefined {
@@ -725,7 +725,7 @@ export function parseHistoryMessagesJson(raw: string): ChatEntry[] {
       const userRecord = asUploadedFilesUserMessage(message);
       const text = getUserMessageDisplayText(userRecord);
       const attachments = getUserMessageAttachments(userRecord);
-      const messageRef = readHistoryMessageRef(userRecord.liveAgentHistoryRef);
+      const messageRef = readHistoryMessageRef(userRecord.xagentHistoryRef);
       if (text.trim() || attachments.length > 0) {
         const baseId = messageRef ? `hu:${messageRef.messageId}` : `hu:~${hashText(text)}`;
         const occurrence = usedUserIds.get(baseId) ?? 0;

@@ -11029,7 +11029,7 @@ var File_proto_v1_gateway_proto protoreflect.FileDescriptor
 
 const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\n" +
-	"\x16proto/v1/gateway.proto\x12\x14liveagent.gateway.v1\"c\n" +
+	"\x16proto/v1/gateway.proto\x12\x11xagent.gateway.v1\"c\n" +
 	"\vAuthRequest\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x19\n" +
 	"\bagent_id\x18\x02 \x01(\tR\aagentId\x12#\n" +
@@ -11038,130 +11038,130 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x03 \x01(\tR\tsessionId\"\xb8\x1f\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\"\xae\x1e\n" +
 	"\x0fGatewayEnvelope\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1c\n" +
-	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12M\n" +
+	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12J\n" +
 	"\fchat_command\x18\n" +
-	" \x01(\v2(.xagent.gateway.v1.ChatCommandRequestH\x00R\vchatCommand\x12J\n" +
-	"\vcron_manage\x18\x14 \x01(\v2'.xagent.gateway.v1.CronManageRequestH\x00R\n" +
-	"cronManage\x12M\n" +
-	"\fhistory_list\x18\x1e \x01(\v2(.xagent.gateway.v1.HistoryListRequestH\x00R\vhistoryList\x12J\n" +
-	"\vhistory_get\x18\x1f \x01(\v2'.xagent.gateway.v1.HistoryGetRequestH\x00R\n" +
-	"historyGet\x12S\n" +
-	"\x0ehistory_rename\x18  \x01(\v2*.xagent.gateway.v1.HistoryRenameRequestH\x00R\rhistoryRename\x12S\n" +
-	"\x0ehistory_delete\x18! \x01(\v2*.xagent.gateway.v1.HistoryDeleteRequestH\x00R\rhistoryDelete\x12S\n" +
-	"\x0ehistory_prefix\x18\" \x01(\v2*.xagent.gateway.v1.HistoryPrefixRequestH\x00R\rhistoryPrefix\x12J\n" +
-	"\vhistory_pin\x18# \x01(\v2'.xagent.gateway.v1.HistoryPinRequestH\x00R\n" +
-	"historyPin\x12Z\n" +
-	"\x11history_share_get\x18$ \x01(\v2,.xagent.gateway.v1.HistoryShareGetRequestH\x00R\x0fhistoryShareGet\x12Z\n" +
-	"\x11history_share_set\x18% \x01(\v2,.xagent.gateway.v1.HistoryShareSetRequestH\x00R\x0fhistoryShareSet\x12f\n" +
-	"\x15history_share_resolve\x18& \x01(\v20.xagent.gateway.v1.HistoryShareResolveRequestH\x00R\x13historyShareResolve\x12Y\n" +
-	"\x10history_workdirs\x18' \x01(\v2,.xagent.gateway.v1.HistoryWorkdirsRequestH\x00R\x0fhistoryWorkdirs\x12P\n" +
-	"\rprovider_list\x18( \x01(\v2).xagent.gateway.v1.ProviderListRequestH\x00R\fproviderList\x12M\n" +
-	"\fsettings_get\x18) \x01(\v2(.xagent.gateway.v1.SettingsGetRequestH\x00R\vsettingsGet\x12V\n" +
-	"\x0fsettings_update\x18* \x01(\v2+.xagent.gateway.v1.SettingsUpdateRequestH\x00R\x0esettingsUpdate\x12W\n" +
-	"\x10skill_files_list\x18+ \x01(\v2+.xagent.gateway.v1.SkillFilesListRequestH\x00R\x0eskillFilesList\x12`\n" +
-	"\x13skill_metadata_read\x18, \x01(\v2..xagent.gateway.v1.SkillMetadataReadRequestH\x00R\x11skillMetadataRead\x12T\n" +
-	"\x0fskill_text_read\x18- \x01(\v2*.xagent.gateway.v1.SkillTextReadRequestH\x00R\rskillTextRead\x12Z\n" +
-	"\x11file_mention_list\x18. \x01(\v2,.xagent.gateway.v1.FileMentionListRequestH\x00R\x0ffileMentionList\x12f\n" +
-	"\x15upload_readable_files\x18/ \x01(\v20.xagent.gateway.v1.UploadReadableFilesRequestH\x00R\x13uploadReadableFiles\x12A\n" +
-	"\bfs_roots\x180 \x01(\v2$.xagent.gateway.v1.FsRootsRequestH\x00R\afsRoots\x12K\n" +
-	"\ffs_list_dirs\x181 \x01(\v2'.xagent.gateway.v1.FsListDirsRequestH\x00R\n" +
-	"fsListDirs\x127\n" +
-	"\x04ping\x182 \x01(\v2!.xagent.gateway.v1.PingRequestH\x00R\x04ping\x12i\n" +
-	"\x16uploaded_image_preview\x183 \x01(\v21.xagent.gateway.v1.UploadedImagePreviewRequestH\x00R\x14uploadedImagePreview\x12P\n" +
-	"\rmemory_manage\x184 \x01(\v2).xagent.gateway.v1.MemoryManageRequestH\x00R\fmemoryManage\x12M\n" +
-	"\fskill_manage\x185 \x01(\v2(.xagent.gateway.v1.SkillManageRequestH\x00R\vskillManage\x12m\n" +
-	"\x18fs_create_project_folder\x186 \x01(\v22.xagent.gateway.v1.FsCreateProjectFolderRequestH\x00R\x15fsCreateProjectFolder\x12R\n" +
-	"\x10terminal_request\x187 \x01(\v2%.xagent.gateway.v1.TerminalRequestH\x00R\x0fterminalRequest\x12>\n" +
-	"\afs_list\x188 \x01(\v2#.xagent.gateway.v1.FsListRequestH\x00R\x06fsList\x12N\n" +
-	"\rfs_write_text\x189 \x01(\v2(.xagent.gateway.v1.FsWriteTextRequestH\x00R\vfsWriteText\x12N\n" +
-	"\rfs_create_dir\x18: \x01(\v2(.xagent.gateway.v1.FsCreateDirRequestH\x00R\vfsCreateDir\x12D\n" +
-	"\tfs_rename\x18; \x01(\v2%.xagent.gateway.v1.FsRenameRequestH\x00R\bfsRename\x12D\n" +
-	"\tfs_delete\x18< \x01(\v2%.xagent.gateway.v1.FsDeleteRequestH\x00R\bfsDelete\x12C\n" +
-	"\vgit_request\x18= \x01(\v2 .xagent.gateway.v1.GitRequestH\x00R\n" +
-	"gitRequest\x12d\n" +
-	"\x15fs_read_editable_text\x18> \x01(\v2/.xagent.gateway.v1.FsReadEditableTextRequestH\x00R\x12fsReadEditableText\x12j\n" +
-	"\x17fs_read_workspace_image\x18? \x01(\v21.xagent.gateway.v1.FsReadWorkspaceImageRequestH\x00R\x14fsReadWorkspaceImage\x12F\n" +
-	"\fsftp_request\x18@ \x01(\v2!.xagent.gateway.v1.SftpRequestH\x00R\vsftpRequest\x12V\n" +
-	"\x0fprovider_models\x18A \x01(\v2+.xagent.gateway.v1.ProviderModelsRequestH\x00R\x0eproviderModels\x12z\n" +
-	"\x1dsettings_reset_ssh_known_host\x18H \x01(\v26.xagent.gateway.v1.SettingsResetSshKnownHostRequestH\x00R\x19settingsResetSshKnownHost\x12G\n" +
+	" \x01(\v2%.xagent.gateway.v1.ChatCommandRequestH\x00R\vchatCommand\x12G\n" +
+	"\vcron_manage\x18\x14 \x01(\v2$.xagent.gateway.v1.CronManageRequestH\x00R\n" +
+	"cronManage\x12J\n" +
+	"\fhistory_list\x18\x1e \x01(\v2%.xagent.gateway.v1.HistoryListRequestH\x00R\vhistoryList\x12G\n" +
+	"\vhistory_get\x18\x1f \x01(\v2$.xagent.gateway.v1.HistoryGetRequestH\x00R\n" +
+	"historyGet\x12P\n" +
+	"\x0ehistory_rename\x18  \x01(\v2'.xagent.gateway.v1.HistoryRenameRequestH\x00R\rhistoryRename\x12P\n" +
+	"\x0ehistory_delete\x18! \x01(\v2'.xagent.gateway.v1.HistoryDeleteRequestH\x00R\rhistoryDelete\x12P\n" +
+	"\x0ehistory_prefix\x18\" \x01(\v2'.xagent.gateway.v1.HistoryPrefixRequestH\x00R\rhistoryPrefix\x12G\n" +
+	"\vhistory_pin\x18# \x01(\v2$.xagent.gateway.v1.HistoryPinRequestH\x00R\n" +
+	"historyPin\x12W\n" +
+	"\x11history_share_get\x18$ \x01(\v2).xagent.gateway.v1.HistoryShareGetRequestH\x00R\x0fhistoryShareGet\x12W\n" +
+	"\x11history_share_set\x18% \x01(\v2).xagent.gateway.v1.HistoryShareSetRequestH\x00R\x0fhistoryShareSet\x12c\n" +
+	"\x15history_share_resolve\x18& \x01(\v2-.xagent.gateway.v1.HistoryShareResolveRequestH\x00R\x13historyShareResolve\x12V\n" +
+	"\x10history_workdirs\x18' \x01(\v2).xagent.gateway.v1.HistoryWorkdirsRequestH\x00R\x0fhistoryWorkdirs\x12M\n" +
+	"\rprovider_list\x18( \x01(\v2&.xagent.gateway.v1.ProviderListRequestH\x00R\fproviderList\x12J\n" +
+	"\fsettings_get\x18) \x01(\v2%.xagent.gateway.v1.SettingsGetRequestH\x00R\vsettingsGet\x12S\n" +
+	"\x0fsettings_update\x18* \x01(\v2(.xagent.gateway.v1.SettingsUpdateRequestH\x00R\x0esettingsUpdate\x12T\n" +
+	"\x10skill_files_list\x18+ \x01(\v2(.xagent.gateway.v1.SkillFilesListRequestH\x00R\x0eskillFilesList\x12]\n" +
+	"\x13skill_metadata_read\x18, \x01(\v2+.xagent.gateway.v1.SkillMetadataReadRequestH\x00R\x11skillMetadataRead\x12Q\n" +
+	"\x0fskill_text_read\x18- \x01(\v2'.xagent.gateway.v1.SkillTextReadRequestH\x00R\rskillTextRead\x12W\n" +
+	"\x11file_mention_list\x18. \x01(\v2).xagent.gateway.v1.FileMentionListRequestH\x00R\x0ffileMentionList\x12c\n" +
+	"\x15upload_readable_files\x18/ \x01(\v2-.xagent.gateway.v1.UploadReadableFilesRequestH\x00R\x13uploadReadableFiles\x12>\n" +
+	"\bfs_roots\x180 \x01(\v2!.xagent.gateway.v1.FsRootsRequestH\x00R\afsRoots\x12H\n" +
+	"\ffs_list_dirs\x181 \x01(\v2$.xagent.gateway.v1.FsListDirsRequestH\x00R\n" +
+	"fsListDirs\x124\n" +
+	"\x04ping\x182 \x01(\v2\x1e.xagent.gateway.v1.PingRequestH\x00R\x04ping\x12f\n" +
+	"\x16uploaded_image_preview\x183 \x01(\v2..xagent.gateway.v1.UploadedImagePreviewRequestH\x00R\x14uploadedImagePreview\x12M\n" +
+	"\rmemory_manage\x184 \x01(\v2&.xagent.gateway.v1.MemoryManageRequestH\x00R\fmemoryManage\x12J\n" +
+	"\fskill_manage\x185 \x01(\v2%.xagent.gateway.v1.SkillManageRequestH\x00R\vskillManage\x12j\n" +
+	"\x18fs_create_project_folder\x186 \x01(\v2/.xagent.gateway.v1.FsCreateProjectFolderRequestH\x00R\x15fsCreateProjectFolder\x12O\n" +
+	"\x10terminal_request\x187 \x01(\v2\".xagent.gateway.v1.TerminalRequestH\x00R\x0fterminalRequest\x12;\n" +
+	"\afs_list\x188 \x01(\v2 .xagent.gateway.v1.FsListRequestH\x00R\x06fsList\x12K\n" +
+	"\rfs_write_text\x189 \x01(\v2%.xagent.gateway.v1.FsWriteTextRequestH\x00R\vfsWriteText\x12K\n" +
+	"\rfs_create_dir\x18: \x01(\v2%.xagent.gateway.v1.FsCreateDirRequestH\x00R\vfsCreateDir\x12A\n" +
+	"\tfs_rename\x18; \x01(\v2\".xagent.gateway.v1.FsRenameRequestH\x00R\bfsRename\x12A\n" +
+	"\tfs_delete\x18< \x01(\v2\".xagent.gateway.v1.FsDeleteRequestH\x00R\bfsDelete\x12@\n" +
+	"\vgit_request\x18= \x01(\v2\x1d.xagent.gateway.v1.GitRequestH\x00R\n" +
+	"gitRequest\x12a\n" +
+	"\x15fs_read_editable_text\x18> \x01(\v2,.xagent.gateway.v1.FsReadEditableTextRequestH\x00R\x12fsReadEditableText\x12g\n" +
+	"\x17fs_read_workspace_image\x18? \x01(\v2..xagent.gateway.v1.FsReadWorkspaceImageRequestH\x00R\x14fsReadWorkspaceImage\x12C\n" +
+	"\fsftp_request\x18@ \x01(\v2\x1e.xagent.gateway.v1.SftpRequestH\x00R\vsftpRequest\x12S\n" +
+	"\x0fprovider_models\x18A \x01(\v2(.xagent.gateway.v1.ProviderModelsRequestH\x00R\x0eproviderModels\x12w\n" +
+	"\x1dsettings_reset_ssh_known_host\x18H \x01(\v23.xagent.gateway.v1.SettingsResetSshKnownHostRequestH\x00R\x19settingsResetSshKnownHost\x12D\n" +
 	"\n" +
-	"chat_queue\x18I \x01(\v2&.xagent.gateway.v1.ChatQueueRequestH\x00R\tchatQueue\x12N\n" +
-	"\ftunnel_state\x18P \x01(\v2).xagent.gateway.v1.TunnelStateSnapshotH\x00R\vtunnelState\x12O\n" +
-	"\x0ftunnel_mutation\x18Q \x01(\v2$.xagent.gateway.v1.TunnelMutationH\x00R\x0etunnelMutation\x12F\n" +
-	"\ftunnel_frame\x18R \x01(\v2!.xagent.gateway.v1.TunnelFrameH\x00R\vtunnelFrame\x12V\n" +
-	"\x0fworkspace_watch\x18Z \x01(\v2+.xagent.gateway.v1.WorkspaceWatchRequestH\x00R\x0eworkspaceWatch\x12e\n" +
-	"\x17managed_process_request\x18[ \x01(\v2+.xagent.gateway.v1.ManagedProcessRequestH\x00R\x15managedProcessRequest\x12S\n" +
-	"\x0ehistory_branch\x18\\ \x01(\v2*.xagent.gateway.v1.HistoryBranchRequestH\x00R\rhistoryBranchB\t\n" +
-	"\apayloadJ\x04\bC\x10DJ\x04\bD\x10EJ\x04\bE\x10FJ\x04\bJ\x10K\"\xbe)\n" +
+	"chat_queue\x18I \x01(\v2#.xagent.gateway.v1.ChatQueueRequestH\x00R\tchatQueue\x12K\n" +
+	"\ftunnel_state\x18P \x01(\v2&.xagent.gateway.v1.TunnelStateSnapshotH\x00R\vtunnelState\x12L\n" +
+	"\x0ftunnel_mutation\x18Q \x01(\v2!.xagent.gateway.v1.TunnelMutationH\x00R\x0etunnelMutation\x12C\n" +
+	"\ftunnel_frame\x18R \x01(\v2\x1e.xagent.gateway.v1.TunnelFrameH\x00R\vtunnelFrame\x12S\n" +
+	"\x0fworkspace_watch\x18Z \x01(\v2(.xagent.gateway.v1.WorkspaceWatchRequestH\x00R\x0eworkspaceWatch\x12b\n" +
+	"\x17managed_process_request\x18[ \x01(\v2(.xagent.gateway.v1.ManagedProcessRequestH\x00R\x15managedProcessRequest\x12P\n" +
+	"\x0ehistory_branch\x18\\ \x01(\v2'.xagent.gateway.v1.HistoryBranchRequestH\x00R\rhistoryBranchB\t\n" +
+	"\apayloadJ\x04\bC\x10DJ\x04\bD\x10EJ\x04\bE\x10FJ\x04\bJ\x10K\"\x93(\n" +
 	"\rAgentEnvelope\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1c\n" +
-	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12@\n" +
+	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x12=\n" +
 	"\n" +
 	"chat_event\x18\n" +
-	" \x01(\v2\x1f.xagent.gateway.v1.ChatEventH\x00R\tchatEvent\x12T\n" +
-	"\x10cron_manage_resp\x18\x14 \x01(\v2(.xagent.gateway.v1.CronManageResponseH\x00R\x0ecronManageResp\x12W\n" +
-	"\x11history_list_resp\x18\x1e \x01(\v2).xagent.gateway.v1.HistoryListResponseH\x00R\x0fhistoryListResp\x12T\n" +
-	"\x10history_get_resp\x18\x1f \x01(\v2(.xagent.gateway.v1.HistoryGetResponseH\x00R\x0ehistoryGetResp\x12]\n" +
-	"\x13history_rename_resp\x18  \x01(\v2+.xagent.gateway.v1.HistoryRenameResponseH\x00R\x11historyRenameResp\x12]\n" +
-	"\x13history_delete_resp\x18! \x01(\v2+.xagent.gateway.v1.HistoryDeleteResponseH\x00R\x11historyDeleteResp\x12K\n" +
-	"\fhistory_sync\x18\" \x01(\v2&.xagent.gateway.v1.HistorySyncEventH\x00R\vhistorySync\x12]\n" +
-	"\x13history_prefix_resp\x18# \x01(\v2+.xagent.gateway.v1.HistoryPrefixResponseH\x00R\x11historyPrefixResp\x12T\n" +
-	"\x10history_pin_resp\x18$ \x01(\v2(.xagent.gateway.v1.HistoryPinResponseH\x00R\x0ehistoryPinResp\x12d\n" +
-	"\x16history_share_get_resp\x18% \x01(\v2-.xagent.gateway.v1.HistoryShareGetResponseH\x00R\x13historyShareGetResp\x12d\n" +
-	"\x16history_share_set_resp\x18& \x01(\v2-.xagent.gateway.v1.HistoryShareSetResponseH\x00R\x13historyShareSetResp\x12p\n" +
-	"\x1ahistory_share_resolve_resp\x18' \x01(\v21.xagent.gateway.v1.HistoryShareResolveResponseH\x00R\x17historyShareResolveResp\x12c\n" +
-	"\x15history_workdirs_resp\x188 \x01(\v2-.xagent.gateway.v1.HistoryWorkdirsResponseH\x00R\x13historyWorkdirsResp\x12Z\n" +
-	"\x12provider_list_resp\x18( \x01(\v2*.xagent.gateway.v1.ProviderListResponseH\x00R\x10providerListResp\x12W\n" +
-	"\x11settings_get_resp\x18) \x01(\v2).xagent.gateway.v1.SettingsGetResponseH\x00R\x0fsettingsGetResp\x12`\n" +
-	"\x14settings_update_resp\x18* \x01(\v2,.xagent.gateway.v1.SettingsUpdateResponseH\x00R\x12settingsUpdateResp\x12N\n" +
-	"\rsettings_sync\x18+ \x01(\v2'.xagent.gateway.v1.SettingsSyncEventH\x00R\fsettingsSync\x12a\n" +
-	"\x15skill_files_list_resp\x18, \x01(\v2,.xagent.gateway.v1.SkillFilesListResponseH\x00R\x12skillFilesListResp\x12j\n" +
-	"\x18skill_metadata_read_resp\x18- \x01(\v2/.xagent.gateway.v1.SkillMetadataReadResponseH\x00R\x15skillMetadataReadResp\x12^\n" +
-	"\x14skill_text_read_resp\x18. \x01(\v2+.xagent.gateway.v1.SkillTextReadResponseH\x00R\x11skillTextReadResp\x12d\n" +
-	"\x16file_mention_list_resp\x18/ \x01(\v2-.xagent.gateway.v1.FileMentionListResponseH\x00R\x13fileMentionListResp\x12p\n" +
-	"\x1aupload_readable_files_resp\x180 \x01(\v21.xagent.gateway.v1.UploadReadableFilesResponseH\x00R\x17uploadReadableFilesResp\x12K\n" +
-	"\rfs_roots_resp\x181 \x01(\v2%.xagent.gateway.v1.FsRootsResponseH\x00R\vfsRootsResp\x128\n" +
-	"\x04pong\x182 \x01(\v2\".xagent.gateway.v1.PongResponseH\x00R\x04pong\x12U\n" +
-	"\x11fs_list_dirs_resp\x183 \x01(\v2(.xagent.gateway.v1.FsListDirsResponseH\x00R\x0efsListDirsResp\x12s\n" +
-	"\x1buploaded_image_preview_resp\x184 \x01(\v22.xagent.gateway.v1.UploadedImagePreviewResponseH\x00R\x18uploadedImagePreviewResp\x12Z\n" +
-	"\x12memory_manage_resp\x185 \x01(\v2*.xagent.gateway.v1.MemoryManageResponseH\x00R\x10memoryManageResp\x12W\n" +
-	"\x11skill_manage_resp\x186 \x01(\v2).xagent.gateway.v1.SkillManageResponseH\x00R\x0fskillManageResp\x12w\n" +
-	"\x1dfs_create_project_folder_resp\x187 \x01(\v23.xagent.gateway.v1.FsCreateProjectFolderResponseH\x00R\x19fsCreateProjectFolderResp\x12U\n" +
-	"\x11terminal_response\x189 \x01(\v2&.xagent.gateway.v1.TerminalResponseH\x00R\x10terminalResponse\x12L\n" +
-	"\x0eterminal_event\x18: \x01(\v2#.xagent.gateway.v1.TerminalEventH\x00R\rterminalEvent\x12H\n" +
-	"\ffs_list_resp\x18; \x01(\v2$.xagent.gateway.v1.FsListResponseH\x00R\n" +
-	"fsListResp\x12X\n" +
-	"\x12fs_write_text_resp\x18< \x01(\v2).xagent.gateway.v1.FsWriteTextResponseH\x00R\x0ffsWriteTextResp\x12X\n" +
-	"\x12fs_create_dir_resp\x18= \x01(\v2).xagent.gateway.v1.FsCreateDirResponseH\x00R\x0ffsCreateDirResp\x12N\n" +
-	"\x0efs_rename_resp\x18> \x01(\v2&.xagent.gateway.v1.FsRenameResponseH\x00R\ffsRenameResp\x12N\n" +
-	"\x0efs_delete_resp\x18? \x01(\v2&.xagent.gateway.v1.FsDeleteResponseH\x00R\ffsDeleteResp\x12F\n" +
-	"\fgit_response\x18@ \x01(\v2!.xagent.gateway.v1.GitResponseH\x00R\vgitResponse\x12n\n" +
-	"\x1afs_read_editable_text_resp\x18A \x01(\v20.xagent.gateway.v1.FsReadEditableTextResponseH\x00R\x16fsReadEditableTextResp\x12t\n" +
-	"\x1cfs_read_workspace_image_resp\x18B \x01(\v22.xagent.gateway.v1.FsReadWorkspaceImageResponseH\x00R\x18fsReadWorkspaceImageResp\x12I\n" +
-	"\rsftp_response\x18I \x01(\v2\".xagent.gateway.v1.SftpResponseH\x00R\fsftpResponse\x12@\n" +
+	" \x01(\v2\x1c.xagent.gateway.v1.ChatEventH\x00R\tchatEvent\x12Q\n" +
+	"\x10cron_manage_resp\x18\x14 \x01(\v2%.xagent.gateway.v1.CronManageResponseH\x00R\x0ecronManageResp\x12T\n" +
+	"\x11history_list_resp\x18\x1e \x01(\v2&.xagent.gateway.v1.HistoryListResponseH\x00R\x0fhistoryListResp\x12Q\n" +
+	"\x10history_get_resp\x18\x1f \x01(\v2%.xagent.gateway.v1.HistoryGetResponseH\x00R\x0ehistoryGetResp\x12Z\n" +
+	"\x13history_rename_resp\x18  \x01(\v2(.xagent.gateway.v1.HistoryRenameResponseH\x00R\x11historyRenameResp\x12Z\n" +
+	"\x13history_delete_resp\x18! \x01(\v2(.xagent.gateway.v1.HistoryDeleteResponseH\x00R\x11historyDeleteResp\x12H\n" +
+	"\fhistory_sync\x18\" \x01(\v2#.xagent.gateway.v1.HistorySyncEventH\x00R\vhistorySync\x12Z\n" +
+	"\x13history_prefix_resp\x18# \x01(\v2(.xagent.gateway.v1.HistoryPrefixResponseH\x00R\x11historyPrefixResp\x12Q\n" +
+	"\x10history_pin_resp\x18$ \x01(\v2%.xagent.gateway.v1.HistoryPinResponseH\x00R\x0ehistoryPinResp\x12a\n" +
+	"\x16history_share_get_resp\x18% \x01(\v2*.xagent.gateway.v1.HistoryShareGetResponseH\x00R\x13historyShareGetResp\x12a\n" +
+	"\x16history_share_set_resp\x18& \x01(\v2*.xagent.gateway.v1.HistoryShareSetResponseH\x00R\x13historyShareSetResp\x12m\n" +
+	"\x1ahistory_share_resolve_resp\x18' \x01(\v2..xagent.gateway.v1.HistoryShareResolveResponseH\x00R\x17historyShareResolveResp\x12`\n" +
+	"\x15history_workdirs_resp\x188 \x01(\v2*.xagent.gateway.v1.HistoryWorkdirsResponseH\x00R\x13historyWorkdirsResp\x12W\n" +
+	"\x12provider_list_resp\x18( \x01(\v2'.xagent.gateway.v1.ProviderListResponseH\x00R\x10providerListResp\x12T\n" +
+	"\x11settings_get_resp\x18) \x01(\v2&.xagent.gateway.v1.SettingsGetResponseH\x00R\x0fsettingsGetResp\x12]\n" +
+	"\x14settings_update_resp\x18* \x01(\v2).xagent.gateway.v1.SettingsUpdateResponseH\x00R\x12settingsUpdateResp\x12K\n" +
+	"\rsettings_sync\x18+ \x01(\v2$.xagent.gateway.v1.SettingsSyncEventH\x00R\fsettingsSync\x12^\n" +
+	"\x15skill_files_list_resp\x18, \x01(\v2).xagent.gateway.v1.SkillFilesListResponseH\x00R\x12skillFilesListResp\x12g\n" +
+	"\x18skill_metadata_read_resp\x18- \x01(\v2,.xagent.gateway.v1.SkillMetadataReadResponseH\x00R\x15skillMetadataReadResp\x12[\n" +
+	"\x14skill_text_read_resp\x18. \x01(\v2(.xagent.gateway.v1.SkillTextReadResponseH\x00R\x11skillTextReadResp\x12a\n" +
+	"\x16file_mention_list_resp\x18/ \x01(\v2*.xagent.gateway.v1.FileMentionListResponseH\x00R\x13fileMentionListResp\x12m\n" +
+	"\x1aupload_readable_files_resp\x180 \x01(\v2..xagent.gateway.v1.UploadReadableFilesResponseH\x00R\x17uploadReadableFilesResp\x12H\n" +
+	"\rfs_roots_resp\x181 \x01(\v2\".xagent.gateway.v1.FsRootsResponseH\x00R\vfsRootsResp\x125\n" +
+	"\x04pong\x182 \x01(\v2\x1f.xagent.gateway.v1.PongResponseH\x00R\x04pong\x12R\n" +
+	"\x11fs_list_dirs_resp\x183 \x01(\v2%.xagent.gateway.v1.FsListDirsResponseH\x00R\x0efsListDirsResp\x12p\n" +
+	"\x1buploaded_image_preview_resp\x184 \x01(\v2/.xagent.gateway.v1.UploadedImagePreviewResponseH\x00R\x18uploadedImagePreviewResp\x12W\n" +
+	"\x12memory_manage_resp\x185 \x01(\v2'.xagent.gateway.v1.MemoryManageResponseH\x00R\x10memoryManageResp\x12T\n" +
+	"\x11skill_manage_resp\x186 \x01(\v2&.xagent.gateway.v1.SkillManageResponseH\x00R\x0fskillManageResp\x12t\n" +
+	"\x1dfs_create_project_folder_resp\x187 \x01(\v20.xagent.gateway.v1.FsCreateProjectFolderResponseH\x00R\x19fsCreateProjectFolderResp\x12R\n" +
+	"\x11terminal_response\x189 \x01(\v2#.xagent.gateway.v1.TerminalResponseH\x00R\x10terminalResponse\x12I\n" +
+	"\x0eterminal_event\x18: \x01(\v2 .xagent.gateway.v1.TerminalEventH\x00R\rterminalEvent\x12E\n" +
+	"\ffs_list_resp\x18; \x01(\v2!.xagent.gateway.v1.FsListResponseH\x00R\n" +
+	"fsListResp\x12U\n" +
+	"\x12fs_write_text_resp\x18< \x01(\v2&.xagent.gateway.v1.FsWriteTextResponseH\x00R\x0ffsWriteTextResp\x12U\n" +
+	"\x12fs_create_dir_resp\x18= \x01(\v2&.xagent.gateway.v1.FsCreateDirResponseH\x00R\x0ffsCreateDirResp\x12K\n" +
+	"\x0efs_rename_resp\x18> \x01(\v2#.xagent.gateway.v1.FsRenameResponseH\x00R\ffsRenameResp\x12K\n" +
+	"\x0efs_delete_resp\x18? \x01(\v2#.xagent.gateway.v1.FsDeleteResponseH\x00R\ffsDeleteResp\x12C\n" +
+	"\fgit_response\x18@ \x01(\v2\x1e.xagent.gateway.v1.GitResponseH\x00R\vgitResponse\x12k\n" +
+	"\x1afs_read_editable_text_resp\x18A \x01(\v2-.xagent.gateway.v1.FsReadEditableTextResponseH\x00R\x16fsReadEditableTextResp\x12q\n" +
+	"\x1cfs_read_workspace_image_resp\x18B \x01(\v2/.xagent.gateway.v1.FsReadWorkspaceImageResponseH\x00R\x18fsReadWorkspaceImageResp\x12F\n" +
+	"\rsftp_response\x18I \x01(\v2\x1f.xagent.gateway.v1.SftpResponseH\x00R\fsftpResponse\x12=\n" +
 	"\n" +
-	"sftp_event\x18J \x01(\v2\x1f.xagent.gateway.v1.SftpEventH\x00R\tsftpEvent\x12Q\n" +
-	"\x0fchat_queue_resp\x18K \x01(\v2'.xagent.gateway.v1.ChatQueueResponseH\x00R\rchatQueueResp\x12P\n" +
-	"\x10chat_queue_event\x18L \x01(\v2$.xagent.gateway.v1.ChatQueueEventH\x00R\x0echatQueueEvent\x12K\n" +
-	"\fchat_control\x18F \x01(\v2&.xagent.gateway.v1.ChatControlEventH\x00R\vchatControl\x12Q\n" +
-	"\x0eruntime_status\x18G \x01(\v2(.xagent.gateway.v1.RuntimeStatusEventH\x00R\rruntimeStatus\x12\x84\x01\n" +
-	"\"settings_reset_ssh_known_host_resp\x18H \x01(\v27.xagent.gateway.v1.SettingsResetSshKnownHostResponseH\x00R\x1dsettingsResetSshKnownHostResp\x12_\n" +
-	"\x15chat_runtime_snapshot\x18M \x01(\v2).xagent.gateway.v1.ChatRuntimeSnapshotH\x00R\x13chatRuntimeSnapshot\x12`\n" +
-	"\x14provider_models_resp\x18O \x01(\v2,.xagent.gateway.v1.ProviderModelsResponseH\x00R\x12providerModelsResp\x12Q\n" +
-	"\x0etunnel_desired\x18P \x01(\v2(.xagent.gateway.v1.TunnelDesiredStateH\x00R\rtunnelDesired\x12b\n" +
-	"\x16tunnel_mutation_result\x18Q \x01(\v2*.xagent.gateway.v1.TunnelMutationResultH\x00R\x14tunnelMutationResult\x12F\n" +
-	"\ftunnel_frame\x18R \x01(\v2!.xagent.gateway.v1.TunnelFrameH\x00R\vtunnelFrame\x12Y\n" +
-	"\x13tunnel_probe_report\x18S \x01(\v2'.xagent.gateway.v1.TunnelProbeReportH\x00R\x11tunnelProbeReport\x12]\n" +
-	"\x12workspace_activity\x18Z \x01(\v2,.xagent.gateway.v1.WorkspaceActivityEventH\x00R\x11workspaceActivity\x12h\n" +
-	"\x18managed_process_response\x18[ \x01(\v2,.xagent.gateway.v1.ManagedProcessResponseH\x00R\x16managedProcessResponse\x12h\n" +
-	"\x18managed_process_snapshot\x18\\ \x01(\v2,.xagent.gateway.v1.ManagedProcessSnapshotH\x00R\x16managedProcessSnapshot\x12]\n" +
-	"\x13history_branch_resp\x18] \x01(\v2+.xagent.gateway.v1.HistoryBranchResponseH\x00R\x11historyBranchResp\x12;\n" +
-	"\x05error\x18c \x01(\v2#.xagent.gateway.v1.ErrorResponseH\x00R\x05errorB\t\n" +
+	"sftp_event\x18J \x01(\v2\x1c.xagent.gateway.v1.SftpEventH\x00R\tsftpEvent\x12N\n" +
+	"\x0fchat_queue_resp\x18K \x01(\v2$.xagent.gateway.v1.ChatQueueResponseH\x00R\rchatQueueResp\x12M\n" +
+	"\x10chat_queue_event\x18L \x01(\v2!.xagent.gateway.v1.ChatQueueEventH\x00R\x0echatQueueEvent\x12H\n" +
+	"\fchat_control\x18F \x01(\v2#.xagent.gateway.v1.ChatControlEventH\x00R\vchatControl\x12N\n" +
+	"\x0eruntime_status\x18G \x01(\v2%.xagent.gateway.v1.RuntimeStatusEventH\x00R\rruntimeStatus\x12\x81\x01\n" +
+	"\"settings_reset_ssh_known_host_resp\x18H \x01(\v24.xagent.gateway.v1.SettingsResetSshKnownHostResponseH\x00R\x1dsettingsResetSshKnownHostResp\x12\\\n" +
+	"\x15chat_runtime_snapshot\x18M \x01(\v2&.xagent.gateway.v1.ChatRuntimeSnapshotH\x00R\x13chatRuntimeSnapshot\x12]\n" +
+	"\x14provider_models_resp\x18O \x01(\v2).xagent.gateway.v1.ProviderModelsResponseH\x00R\x12providerModelsResp\x12N\n" +
+	"\x0etunnel_desired\x18P \x01(\v2%.xagent.gateway.v1.TunnelDesiredStateH\x00R\rtunnelDesired\x12_\n" +
+	"\x16tunnel_mutation_result\x18Q \x01(\v2'.xagent.gateway.v1.TunnelMutationResultH\x00R\x14tunnelMutationResult\x12C\n" +
+	"\ftunnel_frame\x18R \x01(\v2\x1e.xagent.gateway.v1.TunnelFrameH\x00R\vtunnelFrame\x12V\n" +
+	"\x13tunnel_probe_report\x18S \x01(\v2$.xagent.gateway.v1.TunnelProbeReportH\x00R\x11tunnelProbeReport\x12Z\n" +
+	"\x12workspace_activity\x18Z \x01(\v2).xagent.gateway.v1.WorkspaceActivityEventH\x00R\x11workspaceActivity\x12e\n" +
+	"\x18managed_process_response\x18[ \x01(\v2).xagent.gateway.v1.ManagedProcessResponseH\x00R\x16managedProcessResponse\x12e\n" +
+	"\x18managed_process_snapshot\x18\\ \x01(\v2).xagent.gateway.v1.ManagedProcessSnapshotH\x00R\x16managedProcessSnapshot\x12Z\n" +
+	"\x13history_branch_resp\x18] \x01(\v2(.xagent.gateway.v1.HistoryBranchResponseH\x00R\x11historyBranchResp\x128\n" +
+	"\x05error\x18c \x01(\v2 .xagent.gateway.v1.ErrorResponseH\x00R\x05errorB\t\n" +
 	"\apayloadJ\x04\bC\x10DJ\x04\bD\x10EJ\x04\bE\x10FJ\x04\bN\x10O\"|\n" +
 	"\x11ChatSelectedModel\x12,\n" +
 	"\x12custom_provider_id\x18\x01 \x01(\tR\x10customProviderId\x12\x14\n" +
@@ -11181,12 +11181,12 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\x12UploadReadableFile\x12\x1b\n" +
 	"\tfile_name\x18\x01 \x01(\tR\bfileName\x12\x1b\n" +
 	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x18\n" +
-	"\acontent\x18\x03 \x01(\fR\acontent\"v\n" +
+	"\acontent\x18\x03 \x01(\fR\acontent\"s\n" +
 	"\x1aUploadReadableFilesRequest\x12\x18\n" +
-	"\aworkdir\x18\x01 \x01(\tR\aworkdir\x12>\n" +
-	"\x05files\x18\x02 \x03(\v2(.xagent.gateway.v1.UploadReadableFileR\x05files\"u\n" +
-	"\x1bUploadReadableFilesResponse\x12<\n" +
-	"\x05files\x18\x01 \x03(\v2&.xagent.gateway.v1.ChatUploadedFileR\x05files\x12\x18\n" +
+	"\aworkdir\x18\x01 \x01(\tR\aworkdir\x12;\n" +
+	"\x05files\x18\x02 \x03(\v2%.xagent.gateway.v1.UploadReadableFileR\x05files\"r\n" +
+	"\x1bUploadReadableFilesResponse\x129\n" +
+	"\x05files\x18\x01 \x03(\v2#.xagent.gateway.v1.ChatUploadedFileR\x05files\x12\x18\n" +
 	"\askipped\x18\x02 \x03(\tR\askipped\"\\\n" +
 	"\x1bUploadedImagePreviewRequest\x12\x18\n" +
 	"\aworkdir\x18\x01 \x01(\tR\aworkdir\x12#\n" +
@@ -11203,9 +11203,9 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"target_url\x18\x04 \x01(\tR\ttargetUrl\x12\x1d\n" +
 	"\n" +
 	"expires_at\x18\x05 \x01(\x03R\texpiresAt\x12(\n" +
-	"\x10project_path_key\x18\x06 \x01(\tR\x0eprojectPathKey\"l\n" +
-	"\x12TunnelDesiredState\x12:\n" +
-	"\atunnels\x18\x01 \x03(\v2 .xagent.gateway.v1.TunnelSpecR\atunnels\x12\x1a\n" +
+	"\x10project_path_key\x18\x06 \x01(\tR\x0eprojectPathKey\"i\n" +
+	"\x12TunnelDesiredState\x127\n" +
+	"\atunnels\x18\x01 \x03(\v2\x1d.xagent.gateway.v1.TunnelSpecR\atunnels\x12\x1a\n" +
 	"\brevision\x18\x02 \x01(\x04R\brevision\"\x93\x01\n" +
 	"\fTunnelHealth\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1f\n" +
@@ -11214,7 +11214,7 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\x05error\x18\x03 \x01(\tR\x05error\x12\x1d\n" +
 	"\n" +
 	"checked_at\x18\x04 \x01(\x03R\tcheckedAt\x12\x15\n" +
-	"\x06rtt_ms\x18\x05 \x01(\rR\x05rttMs\"\xd7\x02\n" +
+	"\x06rtt_ms\x18\x05 \x01(\rR\x05rttMs\"\xd4\x02\n" +
 	"\fTunnelStatus\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04slug\x18\x02 \x01(\tR\x04slug\x12\x12\n" +
@@ -11228,14 +11228,14 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\n" +
 	"expires_at\x18\a \x01(\x03R\texpiresAt\x12-\n" +
 	"\x12active_connections\x18\b \x01(\rR\x11activeConnections\x12(\n" +
-	"\x10project_path_key\x18\t \x01(\tR\x0eprojectPathKey\x128\n" +
+	"\x10project_path_key\x18\t \x01(\tR\x0eprojectPathKey\x125\n" +
 	"\x05local\x18\n" +
-	" \x01(\v2\".xagent.gateway.v1.TunnelHealthR\x05local\"\xcc\x01\n" +
-	"\x13TunnelStateSnapshot\x12<\n" +
-	"\atunnels\x18\x01 \x03(\v2\".xagent.gateway.v1.TunnelStatusR\atunnels\x12\x1a\n" +
+	" \x01(\v2\x1f.xagent.gateway.v1.TunnelHealthR\x05local\"\xc6\x01\n" +
+	"\x13TunnelStateSnapshot\x129\n" +
+	"\atunnels\x18\x01 \x03(\v2\x1f.xagent.gateway.v1.TunnelStatusR\atunnels\x12\x1a\n" +
 	"\brevision\x18\x02 \x01(\x04R\brevision\x12!\n" +
-	"\fagent_online\x18\x03 \x01(\bR\vagentOnline\x128\n" +
-	"\x05relay\x18\x04 \x01(\v2\".xagent.gateway.v1.TunnelHealthR\x05relay\"\xd8\x01\n" +
+	"\fagent_online\x18\x03 \x01(\bR\vagentOnline\x125\n" +
+	"\x05relay\x18\x04 \x01(\v2\x1f.xagent.gateway.v1.TunnelHealthR\x05relay\"\xd8\x01\n" +
 	"\x0eTunnelMutation\x12\x16\n" +
 	"\x06action\x18\x01 \x01(\tR\x06action\x12\x1b\n" +
 	"\ttunnel_id\x18\x02 \x01(\tR\btunnelId\x12\x1d\n" +
@@ -11250,28 +11250,28 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\ttunnel_id\x18\x01 \x01(\tR\btunnelId\x12\x1d\n" +
 	"\n" +
 	"error_code\x18\x02 \x01(\tR\terrorCode\x12#\n" +
-	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\"j\n" +
+	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\"g\n" +
 	"\x11TunnelProbeResult\x12\x1b\n" +
-	"\ttunnel_id\x18\x01 \x01(\tR\btunnelId\x128\n" +
-	"\x05local\x18\x02 \x01(\v2\".xagent.gateway.v1.TunnelHealthR\x05local\"V\n" +
-	"\x11TunnelProbeReport\x12A\n" +
-	"\aresults\x18\x01 \x03(\v2'.xagent.gateway.v1.TunnelProbeResultR\aresults\"8\n" +
+	"\ttunnel_id\x18\x01 \x01(\tR\btunnelId\x125\n" +
+	"\x05local\x18\x02 \x01(\v2\x1f.xagent.gateway.v1.TunnelHealthR\x05local\"S\n" +
+	"\x11TunnelProbeReport\x12>\n" +
+	"\aresults\x18\x01 \x03(\v2$.xagent.gateway.v1.TunnelProbeResultR\aresults\"8\n" +
 	"\fTunnelHeader\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\"\xf6\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\xed\x03\n" +
 	"\vTunnelFrame\x12\x1b\n" +
-	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x129\n" +
-	"\x04kind\x18\x02 \x01(\x0e2%.xagent.gateway.v1.TunnelFrameKindR\x04kind\x12\x1d\n" +
+	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x126\n" +
+	"\x04kind\x18\x02 \x01(\x0e2\".xagent.gateway.v1.TunnelFrameKindR\x04kind\x12\x1d\n" +
 	"\n" +
 	"target_url\x18\x03 \x01(\tR\ttargetUrl\x12\x16\n" +
 	"\x06method\x18\x04 \x01(\tR\x06method\x12\x12\n" +
-	"\x04path\x18\x05 \x01(\tR\x04path\x12<\n" +
-	"\aheaders\x18\x06 \x03(\v2\".xagent.gateway.v1.TunnelHeaderR\aheaders\x12\x16\n" +
+	"\x04path\x18\x05 \x01(\tR\x04path\x129\n" +
+	"\aheaders\x18\x06 \x03(\v2\x1f.xagent.gateway.v1.TunnelHeaderR\aheaders\x12\x16\n" +
 	"\x06status\x18\a \x01(\rR\x06status\x12\x12\n" +
 	"\x04body\x18\b \x01(\fR\x04body\x12\x14\n" +
-	"\x05error\x18\t \x01(\tR\x05error\x12Q\n" +
+	"\x05error\x18\t \x01(\tR\x05error\x12N\n" +
 	"\x0fws_message_type\x18\n" +
-	" \x01(\x0e2).xagent.gateway.v1.TunnelWsMessageTypeR\rwsMessageType\x12%\n" +
+	" \x01(\x0e2&.xagent.gateway.v1.TunnelWsMessageTypeR\rwsMessageType\x12%\n" +
 	"\x0ews_subprotocol\x18\v \x01(\tR\rwsSubprotocol\x12\"\n" +
 	"\rws_close_code\x18\f \x01(\rR\vwsCloseCode\x12&\n" +
 	"\x0fws_close_reason\x18\r \x01(\tR\rwsCloseReason\"3\n" +
@@ -11303,18 +11303,18 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\brestored\x18\r \x01(\bR\brestoredB\x0e\n" +
 	"\f_finished_atB\f\n" +
 	"\n" +
-	"_exit_code\"~\n" +
-	"\x16ManagedProcessSnapshot\x12H\n" +
-	"\tprocesses\x18\x01 \x03(\v2*.xagent.gateway.v1.ManagedProcessRecordR\tprocesses\x12\x1a\n" +
+	"_exit_code\"{\n" +
+	"\x16ManagedProcessSnapshot\x12E\n" +
+	"\tprocesses\x18\x01 \x03(\v2'.xagent.gateway.v1.ManagedProcessRecordR\tprocesses\x12\x1a\n" +
 	"\brevision\x18\x02 \x01(\x04R\brevision\"k\n" +
 	"\x15ManagedProcessRequest\x12\x16\n" +
 	"\x06action\x18\x01 \x01(\tR\x06action\x12\x1d\n" +
 	"\n" +
 	"process_id\x18\x02 \x01(\tR\tprocessId\x12\x1b\n" +
-	"\tmax_bytes\x18\x03 \x01(\rR\bmaxBytes\"\xf5\x01\n" +
+	"\tmax_bytes\x18\x03 \x01(\rR\bmaxBytes\"\xf2\x01\n" +
 	"\x16ManagedProcessResponse\x12\x16\n" +
-	"\x06action\x18\x01 \x01(\tR\x06action\x12H\n" +
-	"\bsnapshot\x18\x02 \x01(\v2,.xagent.gateway.v1.ManagedProcessSnapshotR\bsnapshot\x12\x1f\n" +
+	"\x06action\x18\x01 \x01(\tR\x06action\x12E\n" +
+	"\bsnapshot\x18\x02 \x01(\v2).xagent.gateway.v1.ManagedProcessSnapshotR\bsnapshot\x12\x1f\n" +
 	"\vlog_content\x18\x03 \x01(\tR\n" +
 	"logContent\x12\x19\n" +
 	"\blog_path\x18\x04 \x01(\tR\alogPath\x12#\n" +
@@ -11345,7 +11345,7 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\x0etrust_host_key\x18\x0e \x01(\bR\ftrustHostKey\x12!\n" +
 	"\fsftp_enabled\x18\x0f \x01(\bR\vsftpEnabled\x12\x15\n" +
 	"\x06tab_id\x18\x10 \x01(\tR\x05tabId\x12\x19\n" +
-	"\btab_kind\x18\x11 \x01(\tR\atabKind\"\xaa\x03\n" +
+	"\btab_kind\x18\x11 \x01(\tR\atabKind\"\xa7\x03\n" +
 	"\x0fTerminalSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12(\n" +
 	"\x10project_path_key\x18\x02 \x01(\tR\x0eprojectPathKey\x12\x10\n" +
@@ -11364,8 +11364,8 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"finishedAt\x12\x1b\n" +
 	"\texit_code\x18\f \x01(\x05R\bexitCode\x12\x18\n" +
 	"\arunning\x18\r \x01(\bR\arunning\x12\x12\n" +
-	"\x04kind\x18\x0e \x01(\tR\x04kind\x12;\n" +
-	"\x03ssh\x18\x0f \x01(\v2).xagent.gateway.v1.TerminalSshMetadataR\x03ssh\"\xca\x02\n" +
+	"\x04kind\x18\x0e \x01(\tR\x04kind\x128\n" +
+	"\x03ssh\x18\x0f \x01(\v2&.xagent.gateway.v1.TerminalSshMetadataR\x03ssh\"\xca\x02\n" +
 	"\x13TerminalSshMetadata\x12\x17\n" +
 	"\ahost_id\x18\x01 \x01(\tR\x06hostId\x12\x1b\n" +
 	"\thost_name\x18\x02 \x01(\tR\bhostName\x12\x1a\n" +
@@ -11423,17 +11423,17 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	" \x01(\rR\tfilesDone\x12\x1f\n" +
 	"\vfiles_total\x18\v \x01(\rR\n" +
 	"filesTotal\x12\x14\n" +
-	"\x05error\x18\f \x01(\tR\x05error\"\x84\x02\n" +
+	"\x05error\x18\f \x01(\tR\x05error\"\xfb\x01\n" +
 	"\fSftpResponse\x12\x16\n" +
 	"\x06action\x18\x01 \x01(\tR\x06action\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\x129\n" +
-	"\aentries\x18\x03 \x03(\v2\x1f.xagent.gateway.v1.SftpEntryR\aentries\x125\n" +
-	"\x05entry\x18\x04 \x01(\v2\x1f.xagent.gateway.v1.SftpEntryR\x05entry\x12\x16\n" +
-	"\x06exists\x18\x05 \x01(\bR\x06exists\x12>\n" +
-	"\btransfer\x18\x06 \x01(\v2\".xagent.gateway.v1.SftpTransferR\btransfer\"_\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x126\n" +
+	"\aentries\x18\x03 \x03(\v2\x1c.xagent.gateway.v1.SftpEntryR\aentries\x122\n" +
+	"\x05entry\x18\x04 \x01(\v2\x1c.xagent.gateway.v1.SftpEntryR\x05entry\x12\x16\n" +
+	"\x06exists\x18\x05 \x01(\bR\x06exists\x12;\n" +
+	"\btransfer\x18\x06 \x01(\v2\x1f.xagent.gateway.v1.SftpTransferR\btransfer\"\\\n" +
 	"\tSftpEvent\x12\x12\n" +
-	"\x04kind\x18\x01 \x01(\tR\x04kind\x12>\n" +
-	"\btransfer\x18\x02 \x01(\v2\".xagent.gateway.v1.SftpTransferR\btransfer\"\x9a\x02\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12;\n" +
+	"\btransfer\x18\x02 \x01(\v2\x1f.xagent.gateway.v1.SftpTransferR\btransfer\"\x9a\x02\n" +
 	"\x11TerminalSshPrompt\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x17\n" +
@@ -11460,37 +11460,37 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\x04R\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\x04R\tupdatedAt\"\x9f\x01\n" +
+	"updated_at\x18\x06 \x01(\x04R\tupdatedAt\"\x9c\x01\n" +
 	"\x17TerminalSshTabsSnapshot\x12(\n" +
-	"\x10project_path_key\x18\x01 \x01(\tR\x0eprojectPathKey\x128\n" +
-	"\x04tabs\x18\x02 \x03(\v2$.xagent.gateway.v1.TerminalSshTabR\x04tabs\x12\x1a\n" +
-	"\brevision\x18\x04 \x01(\x04R\brevisionJ\x04\b\x03\x10\x04\"\xe6\x04\n" +
+	"\x10project_path_key\x18\x01 \x01(\tR\x0eprojectPathKey\x125\n" +
+	"\x04tabs\x18\x02 \x03(\v2!.xagent.gateway.v1.TerminalSshTabR\x04tabs\x12\x1a\n" +
+	"\brevision\x18\x04 \x01(\x04R\brevisionJ\x04\b\x03\x10\x04\"\xd7\x04\n" +
 	"\x10TerminalResponse\x12\x16\n" +
-	"\x06action\x18\x01 \x01(\tR\x06action\x12A\n" +
-	"\bsessions\x18\x02 \x03(\v2%.xagent.gateway.v1.TerminalSessionR\bsessions\x12?\n" +
-	"\asession\x18\x03 \x01(\v2%.xagent.gateway.v1.TerminalSessionR\asession\x12\x16\n" +
+	"\x06action\x18\x01 \x01(\tR\x06action\x12>\n" +
+	"\bsessions\x18\x02 \x03(\v2\".xagent.gateway.v1.TerminalSessionR\bsessions\x12<\n" +
+	"\asession\x18\x03 \x01(\v2\".xagent.gateway.v1.TerminalSessionR\asession\x12\x16\n" +
 	"\x06output\x18\x04 \x01(\fR\x06output\x12\x1c\n" +
-	"\ttruncated\x18\x05 \x01(\bR\ttruncated\x12N\n" +
-	"\rshell_options\x18\x06 \x03(\v2).xagent.gateway.v1.TerminalShellOptionR\fshellOptions\x12#\n" +
+	"\ttruncated\x18\x05 \x01(\bR\ttruncated\x12K\n" +
+	"\rshell_options\x18\x06 \x03(\v2&.xagent.gateway.v1.TerminalShellOptionR\fshellOptions\x12#\n" +
 	"\rdefault_shell\x18\a \x01(\tR\fdefaultShell\x12.\n" +
 	"\x13output_start_offset\x18\b \x01(\x04R\x11outputStartOffset\x12*\n" +
-	"\x11output_end_offset\x18\t \x01(\x04R\x0foutputEndOffset\x12F\n" +
+	"\x11output_end_offset\x18\t \x01(\x04R\x0foutputEndOffset\x12C\n" +
 	"\n" +
 	"ssh_prompt\x18\n" +
-	" \x01(\v2'.xagent.gateway.v1.TerminalSshPromptR\tsshPrompt\x12\x1d\n" +
+	" \x01(\v2$.xagent.gateway.v1.TerminalSshPromptR\tsshPrompt\x12\x1d\n" +
 	"\n" +
-	"latency_ms\x18\v \x01(\rR\tlatencyMs\x12H\n" +
-	"\bssh_tabs\x18\f \x01(\v2-.xagent.gateway.v1.TerminalSshTabsSnapshotR\asshTabs\"\xe7\x02\n" +
+	"latency_ms\x18\v \x01(\rR\tlatencyMs\x12E\n" +
+	"\bssh_tabs\x18\f \x01(\v2*.xagent.gateway.v1.TerminalSshTabsSnapshotR\asshTabs\"\xe1\x02\n" +
 	"\rTerminalEvent\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x12(\n" +
-	"\x10project_path_key\x18\x03 \x01(\tR\x0eprojectPathKey\x12?\n" +
-	"\asession\x18\x04 \x01(\v2%.xagent.gateway.v1.TerminalSessionR\asession\x12\x12\n" +
+	"\x10project_path_key\x18\x03 \x01(\tR\x0eprojectPathKey\x12<\n" +
+	"\asession\x18\x04 \x01(\v2\".xagent.gateway.v1.TerminalSessionR\asession\x12\x12\n" +
 	"\x04data\x18\x05 \x01(\fR\x04data\x12.\n" +
 	"\x13output_start_offset\x18\x06 \x01(\x04R\x11outputStartOffset\x12*\n" +
-	"\x11output_end_offset\x18\a \x01(\x04R\x0foutputEndOffset\x12H\n" +
-	"\bssh_tabs\x18\b \x01(\v2-.xagent.gateway.v1.TerminalSshTabsSnapshotR\asshTabs\"\xb1\x03\n" +
+	"\x11output_end_offset\x18\a \x01(\x04R\x0foutputEndOffset\x12E\n" +
+	"\bssh_tabs\x18\b \x01(\v2*.xagent.gateway.v1.TerminalSshTabsSnapshotR\asshTabs\"\xae\x03\n" +
 	"\x13TerminalStreamFrame\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x1b\n" +
 	"\tstream_id\x18\x02 \x01(\tR\bstreamId\x12\x1d\n" +
@@ -11506,8 +11506,8 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\tmax_bytes\x18\n" +
 	" \x01(\rR\bmaxBytes\x12\x1c\n" +
 	"\ttruncated\x18\v \x01(\bR\ttruncated\x12\x14\n" +
-	"\x05error\x18\f \x01(\tR\x05error\x12?\n" +
-	"\asession\x18\r \x01(\v2%.xagent.gateway.v1.TerminalSessionR\asession\x12\x12\n" +
+	"\x05error\x18\f \x01(\tR\x05error\x12<\n" +
+	"\asession\x18\r \x01(\v2\".xagent.gateway.v1.TerminalSessionR\asession\x12\x12\n" +
 	"\x04data\x18\x0e \x01(\fR\x04data\"[\n" +
 	"\n" +
 	"GitRequest\x12\x16\n" +
@@ -11517,17 +11517,17 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\vGitResponse\x12\x16\n" +
 	"\x06action\x18\x01 \x01(\tR\x06action\x12\x1f\n" +
 	"\vresult_json\x18\x02 \x01(\tR\n" +
-	"resultJson\"\x89\x04\n" +
+	"resultJson\"\x80\x04\n" +
 	"\vChatRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12N\n" +
-	"\x0eselected_model\x18\x03 \x01(\v2'.xagent.gateway.v1.ChatSelectedModelR\rselectedModel\x12%\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12K\n" +
+	"\x0eselected_model\x18\x03 \x01(\v2$.xagent.gateway.v1.ChatSelectedModelR\rselectedModel\x12%\n" +
 	"\x0eexecution_mode\x18\x04 \x01(\tR\rexecutionMode\x12\x18\n" +
 	"\aworkdir\x18\x05 \x01(\tR\aworkdir\x122\n" +
-	"\x15selected_system_tools\x18\x06 \x03(\tR\x13selectedSystemTools\x12M\n" +
-	"\x0euploaded_files\x18\a \x03(\v2&.xagent.gateway.v1.ChatUploadedFileR\ruploadedFiles\x12*\n" +
-	"\x11client_request_id\x18\b \x01(\tR\x0fclientRequestId\x12T\n" +
-	"\x10runtime_controls\x18\t \x01(\v2).xagent.gateway.v1.ChatRuntimeControlsR\x0fruntimeControls\x12!\n" +
+	"\x15selected_system_tools\x18\x06 \x03(\tR\x13selectedSystemTools\x12J\n" +
+	"\x0euploaded_files\x18\a \x03(\v2#.xagent.gateway.v1.ChatUploadedFileR\ruploadedFiles\x12*\n" +
+	"\x11client_request_id\x18\b \x01(\tR\x0fclientRequestId\x12Q\n" +
+	"\x10runtime_controls\x18\t \x01(\v2&.xagent.gateway.v1.ChatRuntimeControlsR\x0fruntimeControls\x12!\n" +
 	"\fqueue_policy\x18\n" +
 	" \x01(\tR\vqueuePolicy\"\xcf\x01\n" +
 	"\x0eChatMessageRef\x12#\n" +
@@ -11541,12 +11541,12 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\fcontent_hash\x18\x06 \x01(\tR\vcontentHash\"S\n" +
 	"\x11CancelChatRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x15\n" +
-	"\x06run_id\x18\x02 \x01(\tR\x05runId\"\xf6\x01\n" +
+	"\x06run_id\x18\x02 \x01(\tR\x05runId\"\xed\x01\n" +
 	"\x12ChatCommandRequest\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\x12;\n" +
-	"\arequest\x18\x02 \x01(\v2!.xagent.gateway.v1.ChatRequestR\arequest\x12N\n" +
-	"\x10base_message_ref\x18\x03 \x01(\v2$.xagent.gateway.v1.ChatMessageRefR\x0ebaseMessageRef\x12?\n" +
-	"\x06cancel\x18\x04 \x01(\v2'.xagent.gateway.v1.CancelChatRequestR\x06cancel\"\x98\x02\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x128\n" +
+	"\arequest\x18\x02 \x01(\v2\x1e.xagent.gateway.v1.ChatRequestR\arequest\x12K\n" +
+	"\x10base_message_ref\x18\x03 \x01(\v2!.xagent.gateway.v1.ChatMessageRefR\x0ebaseMessageRef\x12<\n" +
+	"\x06cancel\x18\x04 \x01(\v2$.xagent.gateway.v1.CancelChatRequestR\x06cancel\"\x98\x02\n" +
 	"\x10ChatQueueRequest\x12\x16\n" +
 	"\x06action\x18\x01 \x01(\tR\x06action\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x17\n" +
@@ -11568,9 +11568,9 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\x0eChatQueueEvent\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12#\n" +
 	"\rsnapshot_json\x18\x02 \x01(\tR\fsnapshotJson\x12\x1a\n" +
-	"\brevision\x18\x03 \x01(\x04R\brevision\"\xa1\x02\n" +
-	"\tChatEvent\x12A\n" +
-	"\x04type\x18\x01 \x01(\x0e2-.xagent.gateway.v1.ChatEvent.ChatEventTypeR\x04type\x12'\n" +
+	"\brevision\x18\x03 \x01(\x04R\brevision\"\x9e\x02\n" +
+	"\tChatEvent\x12>\n" +
+	"\x04type\x18\x01 \x01(\x0e2*.xagent.gateway.v1.ChatEvent.ChatEventTypeR\x04type\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x12\n" +
 	"\x04data\x18\x03 \x01(\tR\x04data\"\x93\x01\n" +
 	"\rChatEventType\x12\t\n" +
@@ -11609,16 +11609,16 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\vtool_status\x18\n" +
 	" \x01(\tR\n" +
 	"toolStatus\x129\n" +
-	"\x19tool_status_is_compaction\x18\v \x01(\bR\x16toolStatusIsCompaction\"\xb9\x02\n" +
+	"\x19tool_status_is_compaction\x18\v \x01(\bR\x16toolStatusIsCompaction\"\xb3\x02\n" +
 	"\x12RuntimeStatusEvent\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x14\n" +
 	"\x05state\x18\x02 \x01(\tR\x05state\x12\x18\n" +
 	"\avisible\x18\x03 \x01(\bR\avisible\x12(\n" +
 	"\x10active_run_count\x18\x04 \x01(\rR\x0eactiveRunCount\x12\x1c\n" +
-	"\ttimestamp\x18\x05 \x01(\x03R\ttimestamp\x12D\n" +
-	"\vactive_runs\x18\x06 \x03(\v2#.xagent.gateway.v1.ChatRunReportR\n" +
-	"activeRuns\x12H\n" +
-	"\rfinished_runs\x18\a \x03(\v2#.xagent.gateway.v1.ChatRunReportR\ffinishedRuns\"\xbd\x01\n" +
+	"\ttimestamp\x18\x05 \x01(\x03R\ttimestamp\x12A\n" +
+	"\vactive_runs\x18\x06 \x03(\v2 .xagent.gateway.v1.ChatRunReportR\n" +
+	"activeRuns\x12E\n" +
+	"\rfinished_runs\x18\a \x03(\v2 .xagent.gateway.v1.ChatRunReportR\ffinishedRuns\"\xbd\x01\n" +
 	"\rChatRunReport\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x14\n" +
@@ -11640,9 +11640,9 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\x04page\x18\x01 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x10\n" +
 	"\x03cwd\x18\x03 \x01(\tR\x03cwd\x12\x1b\n" +
-	"\tcwd_empty\x18\x04 \x01(\bR\bcwdEmpty\"\x87\x01\n" +
-	"\x13HistoryListResponse\x12O\n" +
-	"\rconversations\x18\x01 \x03(\v2).xagent.gateway.v1.ConversationSummaryR\rconversations\x12\x1f\n" +
+	"\tcwd_empty\x18\x04 \x01(\bR\bcwdEmpty\"\x84\x01\n" +
+	"\x13HistoryListResponse\x12L\n" +
+	"\rconversations\x18\x01 \x03(\v2&.xagent.gateway.v1.ConversationSummaryR\rconversations\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
 	"totalCount\"\x8d\x03\n" +
 	"\x13ConversationSummary\x12\x0e\n" +
@@ -11666,40 +11666,40 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\x13selected_model_json\x18\r \x01(\tR\x11selectedModelJson\"_\n" +
 	"\x11HistoryGetRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12!\n" +
-	"\fmax_messages\x18\x02 \x01(\x05R\vmaxMessages\"\xb2\x02\n" +
+	"\fmax_messages\x18\x02 \x01(\x05R\vmaxMessages\"\xaf\x02\n" +
 	"\x12HistoryGetResponse\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12#\n" +
 	"\rmessages_json\x18\x02 \x01(\tR\fmessagesJson\x12.\n" +
 	"\x13total_message_count\x18\x03 \x01(\x05R\x11totalMessageCount\x124\n" +
 	"\x16returned_message_count\x18\x04 \x01(\x05R\x14returnedMessageCount\x12\x19\n" +
-	"\bhas_more\x18\x05 \x01(\bR\ahasMore\x12M\n" +
-	"\fconversation\x18\x06 \x01(\v2).xagent.gateway.v1.ConversationSummaryR\fconversation\"\xb2\x01\n" +
+	"\bhas_more\x18\x05 \x01(\bR\ahasMore\x12J\n" +
+	"\fconversation\x18\x06 \x01(\v2&.xagent.gateway.v1.ConversationSummaryR\fconversation\"\xaf\x01\n" +
 	"\x14HistoryPrefixRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12!\n" +
-	"\fmax_messages\x18\x02 \x01(\x05R\vmaxMessages\x12N\n" +
-	"\x10base_message_ref\x18\x03 \x01(\v2$.xagent.gateway.v1.ChatMessageRefR\x0ebaseMessageRef\"\xb5\x02\n" +
+	"\fmax_messages\x18\x02 \x01(\x05R\vmaxMessages\x12K\n" +
+	"\x10base_message_ref\x18\x03 \x01(\v2!.xagent.gateway.v1.ChatMessageRefR\x0ebaseMessageRef\"\xb2\x02\n" +
 	"\x15HistoryPrefixResponse\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12#\n" +
 	"\rmessages_json\x18\x02 \x01(\tR\fmessagesJson\x12.\n" +
 	"\x13total_message_count\x18\x03 \x01(\x05R\x11totalMessageCount\x124\n" +
 	"\x16returned_message_count\x18\x04 \x01(\x05R\x14returnedMessageCount\x12\x19\n" +
-	"\bhas_more\x18\x05 \x01(\bR\ahasMore\x12M\n" +
-	"\fconversation\x18\x06 \x01(\v2).xagent.gateway.v1.ConversationSummaryR\fconversation\"U\n" +
+	"\bhas_more\x18\x05 \x01(\bR\ahasMore\x12J\n" +
+	"\fconversation\x18\x06 \x01(\v2&.xagent.gateway.v1.ConversationSummaryR\fconversation\"U\n" +
 	"\x14HistoryRenameRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x14\n" +
-	"\x05title\x18\x02 \x01(\tR\x05title\"f\n" +
-	"\x15HistoryRenameResponse\x12M\n" +
-	"\fconversation\x18\x01 \x01(\v2).xagent.gateway.v1.ConversationSummaryR\fconversation\"\x8f\x01\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\"c\n" +
+	"\x15HistoryRenameResponse\x12J\n" +
+	"\fconversation\x18\x01 \x01(\v2&.xagent.gateway.v1.ConversationSummaryR\fconversation\"\x8c\x01\n" +
 	"\x14HistoryBranchRequest\x12'\n" +
-	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12N\n" +
-	"\x10base_message_ref\x18\x02 \x01(\v2$.xagent.gateway.v1.ChatMessageRefR\x0ebaseMessageRef\"f\n" +
-	"\x15HistoryBranchResponse\x12M\n" +
-	"\fconversation\x18\x01 \x01(\v2).xagent.gateway.v1.ConversationSummaryR\fconversation\"Y\n" +
+	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12K\n" +
+	"\x10base_message_ref\x18\x02 \x01(\v2!.xagent.gateway.v1.ChatMessageRefR\x0ebaseMessageRef\"c\n" +
+	"\x15HistoryBranchResponse\x12J\n" +
+	"\fconversation\x18\x01 \x01(\v2&.xagent.gateway.v1.ConversationSummaryR\fconversation\"Y\n" +
 	"\x11HistoryPinRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x1b\n" +
-	"\tis_pinned\x18\x02 \x01(\bR\bisPinned\"c\n" +
-	"\x12HistoryPinResponse\x12M\n" +
-	"\fconversation\x18\x01 \x01(\v2).xagent.gateway.v1.ConversationSummaryR\fconversation\"\xdb\x01\n" +
+	"\tis_pinned\x18\x02 \x01(\bR\bisPinned\"`\n" +
+	"\x12HistoryPinResponse\x12J\n" +
+	"\fconversation\x18\x01 \x01(\v2&.xagent.gateway.v1.ConversationSummaryR\fconversation\"\xdb\x01\n" +
 	"\x12HistoryShareStatus\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x18\n" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x12\x14\n" +
@@ -11710,38 +11710,38 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"updated_at\x18\x05 \x01(\x03R\tupdatedAt\x12.\n" +
 	"\x13redact_tool_content\x18\x06 \x01(\bR\x11redactToolContent\"A\n" +
 	"\x16HistoryShareGetRequest\x12'\n" +
-	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\"Y\n" +
-	"\x17HistoryShareGetResponse\x12>\n" +
-	"\x05share\x18\x01 \x01(\v2(.xagent.gateway.v1.HistoryShareStatusR\x05share\"\xa8\x01\n" +
+	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\"V\n" +
+	"\x17HistoryShareGetResponse\x12;\n" +
+	"\x05share\x18\x01 \x01(\v2%.xagent.gateway.v1.HistoryShareStatusR\x05share\"\xa8\x01\n" +
 	"\x16HistoryShareSetRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x18\n" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x123\n" +
 	"\x13redact_tool_content\x18\x03 \x01(\bH\x00R\x11redactToolContent\x88\x01\x01B\x16\n" +
-	"\x14_redact_tool_content\"Y\n" +
-	"\x17HistoryShareSetResponse\x12>\n" +
-	"\x05share\x18\x01 \x01(\v2(.xagent.gateway.v1.HistoryShareStatusR\x05share\"2\n" +
+	"\x14_redact_tool_content\"V\n" +
+	"\x17HistoryShareSetResponse\x12;\n" +
+	"\x05share\x18\x01 \x01(\v2%.xagent.gateway.v1.HistoryShareStatusR\x05share\"2\n" +
 	"\x1aHistoryShareResolveRequest\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\"\x9a\x02\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"\x97\x02\n" +
 	"\x1bHistoryShareResolveResponse\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12#\n" +
 	"\rmessages_json\x18\x02 \x01(\tR\fmessagesJson\x12.\n" +
-	"\x13total_message_count\x18\x03 \x01(\x05R\x11totalMessageCount\x12M\n" +
-	"\fconversation\x18\x04 \x01(\v2).xagent.gateway.v1.ConversationSummaryR\fconversation\x12.\n" +
+	"\x13total_message_count\x18\x03 \x01(\x05R\x11totalMessageCount\x12J\n" +
+	"\fconversation\x18\x04 \x01(\v2&.xagent.gateway.v1.ConversationSummaryR\fconversation\x12.\n" +
 	"\x13redact_tool_content\x18\x05 \x01(\bR\x11redactToolContent\"\x18\n" +
 	"\x16HistoryWorkdirsRequest\"y\n" +
 	"\x15HistoryWorkdirSummary\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12-\n" +
 	"\x12conversation_count\x18\x02 \x01(\x05R\x11conversationCount\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\x03 \x01(\x03R\tupdatedAt\"b\n" +
-	"\x17HistoryWorkdirsResponse\x12G\n" +
-	"\bworkdirs\x18\x01 \x03(\v2+.xagent.gateway.v1.HistoryWorkdirSummaryR\bworkdirs\"?\n" +
+	"updated_at\x18\x03 \x01(\x03R\tupdatedAt\"_\n" +
+	"\x17HistoryWorkdirsResponse\x12D\n" +
+	"\bworkdirs\x18\x01 \x03(\v2(.xagent.gateway.v1.HistoryWorkdirSummaryR\bworkdirs\"?\n" +
 	"\x14HistoryDeleteRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\"\x17\n" +
-	"\x15HistoryDeleteResponse\"\x9e\x01\n" +
+	"\x15HistoryDeleteResponse\"\x9b\x01\n" +
 	"\x10HistorySyncEvent\x12\x12\n" +
-	"\x04kind\x18\x01 \x01(\tR\x04kind\x12M\n" +
-	"\fconversation\x18\x02 \x01(\v2).xagent.gateway.v1.ConversationSummaryR\fconversation\x12'\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12J\n" +
+	"\fconversation\x18\x02 \x01(\v2&.xagent.gateway.v1.ConversationSummaryR\fconversation\x12'\n" +
 	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\"\x15\n" +
 	"\x13ProviderListRequest\"=\n" +
 	"\x14ProviderListResponse\x12%\n" +
@@ -11794,18 +11794,18 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\x10FileMentionEntry\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x16\n" +
-	"\x06hidden\x18\x03 \x01(\bR\x06hidden\"y\n" +
-	"\x17FileMentionListResponse\x12@\n" +
-	"\aentries\x18\x01 \x03(\v2&.xagent.gateway.v1.FileMentionEntryR\aentries\x12\x1c\n" +
+	"\x06hidden\x18\x03 \x01(\bR\x06hidden\"v\n" +
+	"\x17FileMentionListResponse\x12=\n" +
+	"\aentries\x18\x01 \x03(\v2#.xagent.gateway.v1.FileMentionEntryR\aentries\x12\x1c\n" +
 	"\ttruncated\x18\x02 \x01(\bR\ttruncated\"V\n" +
 	"\x06FsRoot\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x12\n" +
 	"\x04kind\x18\x03 \x01(\tR\x04kind\x12\x14\n" +
 	"\x05label\x18\x04 \x01(\tR\x05label\"\x10\n" +
-	"\x0eFsRootsRequest\"E\n" +
-	"\x0fFsRootsResponse\x122\n" +
-	"\x05roots\x18\x01 \x03(\v2\x1c.xagent.gateway.v1.FsRootR\x05roots\"H\n" +
+	"\x0eFsRootsRequest\"B\n" +
+	"\x0fFsRootsResponse\x12/\n" +
+	"\x05roots\x18\x01 \x03(\v2\x19.xagent.gateway.v1.FsRootR\x05roots\"H\n" +
 	"\x11FsListDirsRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1f\n" +
 	"\vmax_results\x18\x02 \x01(\rR\n" +
@@ -11813,10 +11813,10 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\n" +
 	"FsDirEntry\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\x82\x01\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x7f\n" +
 	"\x12FsListDirsResponse\x12\x12\n" +
-	"\x04path\x18\x01 \x01(\tR\x04path\x12:\n" +
-	"\aentries\x18\x02 \x03(\v2 .xagent.gateway.v1.FsDirEntryR\aentries\x12\x1c\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x127\n" +
+	"\aentries\x18\x02 \x03(\v2\x1d.xagent.gateway.v1.FsDirEntryR\aentries\x12\x1c\n" +
 	"\ttruncated\x18\x03 \x01(\bR\ttruncated\"J\n" +
 	"\x1cFsCreateProjectFolderRequest\x12\x16\n" +
 	"\x06parent\x18\x01 \x01(\tR\x06parent\x12\x12\n" +
@@ -11836,7 +11836,7 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\vFsListEntry\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x16\n" +
-	"\x06hidden\x18\x03 \x01(\bR\x06hidden\"\xfc\x01\n" +
+	"\x06hidden\x18\x03 \x01(\bR\x06hidden\"\xf9\x01\n" +
 	"\x0eFsListResponse\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x19\n" +
 	"\bhas_path\x18\x02 \x01(\bR\ahasPath\x12\x14\n" +
@@ -11845,8 +11845,8 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\vmax_results\x18\x05 \x01(\rR\n" +
 	"maxResults\x12\x14\n" +
 	"\x05total\x18\x06 \x01(\rR\x05total\x12\x19\n" +
-	"\bhas_more\x18\a \x01(\bR\ahasMore\x12;\n" +
-	"\aentries\x18\b \x03(\v2!.xagent.gateway.v1.FsListEntryR\aentries\"I\n" +
+	"\bhas_more\x18\a \x01(\bR\ahasMore\x128\n" +
+	"\aentries\x18\b \x03(\v2\x1e.xagent.gateway.v1.FsListEntryR\aentries\"I\n" +
 	"\x19FsReadEditableTextRequest\x12\x18\n" +
 	"\aworkdir\x18\x01 \x01(\tR\aworkdir\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\"\xc8\x01\n" +
@@ -11944,7 +11944,7 @@ const file_proto_v1_gateway_proto_rawDesc = "" +
 	"\x13TunnelWsMessageType\x12&\n" +
 	"\"TUNNEL_WS_MESSAGE_TYPE_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bTUNNEL_WS_MESSAGE_TYPE_TEXT\x10\x01\x12!\n" +
-	"\x1dTUNNEL_WS_MESSAGE_TYPE_BINARY\x10\x02B@Z>github.com/xagent/agent-gateway/internal/proto/v1;gatewayv1b\x06proto3"
+	"\x1dTUNNEL_WS_MESSAGE_TYPE_BINARY\x10\x02B=Z;github.com/xagent/agent-gateway/internal/proto/v1;gatewayv1b\x06proto3"
 
 var (
 	file_proto_v1_gateway_proto_rawDescOnce sync.Once

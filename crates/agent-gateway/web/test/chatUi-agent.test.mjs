@@ -220,7 +220,7 @@ test("deriveFileChangeStats derives collapsed-bar line counts", () => {
       arguments: {
         old_string: "o".repeat(4000),
         new_string: "n".repeat(4000),
-        __liveagent_stream_preview: {
+        __xagent_stream_preview: {
           v: 2,
           progress: 17_000,
           fields: {
@@ -250,7 +250,7 @@ test("deriveFileChangeStats derives collapsed-bar line counts", () => {
       name: "Write",
       arguments: {
         content: "preview…",
-        __liveagent_stream_preview: {
+        __xagent_stream_preview: {
           v: 2,
           progress: 12_000,
           fields: { content: { chars: 12_000, lines: 800, truncated: true } },

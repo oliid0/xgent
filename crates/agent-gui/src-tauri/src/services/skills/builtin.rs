@@ -18,7 +18,7 @@ pub(crate) struct BuiltinSkill {
     pub(crate) ownership_marker: Option<(&'static str, &'static str)>,
 }
 
-const CODE_REVIEW_OWNERSHIP_MARKER_PATH: &str = "_liveagent_builtin.json";
+const CODE_REVIEW_OWNERSHIP_MARKER_PATH: &str = "_xagent_builtin.json";
 const CODE_REVIEW_OWNERSHIP_MARKER_CONTENT: &str =
     "{\"schemaVersion\":1,\"owner\":\"XAgent\",\"skill\":\"xagent-code-review\"}\n";
 

@@ -42,9 +42,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     needs: release-metadata
     env:
-      LIVEAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
-      LIVEAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
-      LIVEAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+      XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
+      XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
+      XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
     strategy:
       fail-fast: false
       matrix:
@@ -68,7 +68,7 @@ jobs:
 
       - name: Prepare release version config
         working-directory: crates/agent-gui
-        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$LIVEAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
 
       - name: Install pnpm
         run: npm install -g pnpm@10.32.1
@@ -131,8 +131,8 @@ jobs:
           DESKTOP_MACOS_TARGET: ${{ matrix.target }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          LIVEAGENT_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
-          LIVEAGENT_UPDATE_REPOSITORY: ${{ github.repository }}
+          XAGENT_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+          XAGENT_UPDATE_REPOSITORY: ${{ github.repository }}
         run: make desktop-build-macos-release
 
       - name: Stage macOS artifact
@@ -144,9 +144,9 @@ jobs:
           test -n "$dmg_path"
           test -n "$updater_path"
           test -f "$updater_path.sig"
-          cp "$dmg_path" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-macOS-${{ matrix.suffix }}.dmg"
-          cp "$updater_path" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-macOS-${{ matrix.suffix }}.app.tar.gz"
-          cp "$updater_path.sig" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-macOS-${{ matrix.suffix }}.app.tar.gz.sig"
+          cp "$dmg_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-macOS-${{ matrix.suffix }}.dmg"
+          cp "$updater_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-macOS-${{ matrix.suffix }}.app.tar.gz"
+          cp "$updater_path.sig" "dist/XAgent-${XAGENT_RELEASE_TAG}-macOS-${{ matrix.suffix }}.app.tar.gz.sig"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -159,9 +159,9 @@ jobs:
     runs-on: windows-latest
     needs: release-metadata
     env:
-      LIVEAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
-      LIVEAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
-      LIVEAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+      XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
+      XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
+      XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -174,7 +174,7 @@ jobs:
       - name: Prepare release version config
         shell: bash
         working-directory: crates/agent-gui
-        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$LIVEAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
 
       - name: Install pnpm
         run: npm install -g pnpm@10.32.1
@@ -200,9 +200,9 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          LIVEAGENT_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
-          LIVEAGENT_UPDATE_REPOSITORY: ${{ github.repository }}
-        run: pnpm tauri build --config src-tauri/tauri.windows.release.conf.json --config "$LIVEAGENT_TAURI_VERSION_CONFIG" --target x86_64-pc-windows-msvc
+          XAGENT_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+          XAGENT_UPDATE_REPOSITORY: ${{ github.repository }}
+        run: pnpm tauri build --config src-tauri/tauri.windows.release.conf.json --config "$XAGENT_TAURI_VERSION_CONFIG" --target x86_64-pc-windows-msvc
 
       - name: Stage Windows artifacts
         shell: bash
@@ -217,13 +217,13 @@ jobs:
           test -n "$portable_exe_path"
           test -f "$msi_path.sig"
           test -f "$exe_path.sig"
-          cp "$msi_path" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-Windows-x64.msi"
-          cp "$msi_path.sig" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-Windows-x64.msi.sig"
-          cp "$exe_path" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-Windows-x64-Setup.exe"
-          cp "$exe_path.sig" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-Windows-x64-Setup.exe.sig"
+          cp "$msi_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-Windows-x64.msi"
+          cp "$msi_path.sig" "dist/XAgent-${XAGENT_RELEASE_TAG}-Windows-x64.msi.sig"
+          cp "$exe_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-Windows-x64-Setup.exe"
+          cp "$exe_path.sig" "dist/XAgent-${XAGENT_RELEASE_TAG}-Windows-x64-Setup.exe.sig"
           mkdir -p dist/portable/XAgent
           cp "$portable_exe_path" dist/portable/XAgent/XAgent.exe
-          portable_zip="dist/XAgent-${LIVEAGENT_RELEASE_TAG}-Windows-x64-portable.zip"
+          portable_zip="dist/XAgent-${XAGENT_RELEASE_TAG}-Windows-x64-portable.zip"
           powershell -NoProfile -Command "Compress-Archive -Path 'dist/portable/XAgent/*' -DestinationPath '$portable_zip' -Force"
           rm -rf dist/portable
           test "$(find dist -type f | wc -l)" -gt 0
@@ -239,9 +239,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: release-metadata
     env:
-      LIVEAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
-      LIVEAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
-      LIVEAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+      XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
+      XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
+      XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -253,7 +253,7 @@ jobs:
 
       - name: Prepare release version config
         working-directory: crates/agent-gui
-        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$LIVEAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
 
       - name: Install pnpm
         run: npm install -g pnpm@10.32.1
@@ -290,9 +290,9 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          LIVEAGENT_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
-          LIVEAGENT_UPDATE_REPOSITORY: ${{ github.repository }}
-        run: pnpm tauri build --config src-tauri/tauri.linux.release.conf.json --config "$LIVEAGENT_TAURI_VERSION_CONFIG" --target x86_64-unknown-linux-gnu --bundles appimage deb rpm
+          XAGENT_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+          XAGENT_UPDATE_REPOSITORY: ${{ github.repository }}
+        run: pnpm tauri build --config src-tauri/tauri.linux.release.conf.json --config "$XAGENT_TAURI_VERSION_CONFIG" --target x86_64-unknown-linux-gnu --bundles appimage deb rpm
 
       - name: Strip bundled Wayland libraries and re-sign AppImage
         env:
@@ -321,12 +321,12 @@ jobs:
           test -f "$appimage_path.sig"
           test -f "$deb_path.sig"
           test -f "$rpm_path.sig"
-          cp "$appimage_path" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-Linux-x86_64.AppImage"
-          cp "$appimage_path.sig" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-Linux-x86_64.AppImage.sig"
-          cp "$deb_path" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-Linux-x86_64.deb"
-          cp "$deb_path.sig" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-Linux-x86_64.deb.sig"
-          cp "$rpm_path" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-Linux-x86_64.rpm"
-          cp "$rpm_path.sig" "dist/XAgent-${LIVEAGENT_RELEASE_TAG}-Linux-x86_64.rpm.sig"
+          cp "$appimage_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-Linux-x86_64.AppImage"
+          cp "$appimage_path.sig" "dist/XAgent-${XAGENT_RELEASE_TAG}-Linux-x86_64.AppImage.sig"
+          cp "$deb_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-Linux-x86_64.deb"
+          cp "$deb_path.sig" "dist/XAgent-${XAGENT_RELEASE_TAG}-Linux-x86_64.deb.sig"
+          cp "$rpm_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-Linux-x86_64.rpm"
+          cp "$rpm_path.sig" "dist/XAgent-${XAGENT_RELEASE_TAG}-Linux-x86_64.rpm.sig"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -343,9 +343,9 @@ jobs:
       - windows
       - linux
     env:
-      LIVEAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
-      LIVEAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
-      LIVEAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+      XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
+      XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
+      XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -367,7 +367,7 @@ jobs:
           AI_RELEASE_NOTES_MODEL: ${{ vars.AI_RELEASE_NOTES_MODEL }}
         run: |
           set -euo pipefail
-          is_prerelease="$LIVEAGENT_IS_PRERELEASE"
+          is_prerelease="$XAGENT_IS_PRERELEASE"
 
           github_notes_path="$RUNNER_TEMP/xagent-github-release-notes.md"
           notes_path="$RUNNER_TEMP/xagent-release-notes.md"

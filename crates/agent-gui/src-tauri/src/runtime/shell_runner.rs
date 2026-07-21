@@ -332,7 +332,7 @@ fn is_windows_system32_dir(dir: &Path) -> bool {
 /// Git Bash 解析（对标 Claude Code）：env 覆盖 → PATH → Git for Windows 默认安装路径。
 #[cfg(windows)]
 fn find_git_bash() -> Option<PathBuf> {
-    for var in ["LIVEAGENT_GIT_BASH_PATH", "CLAUDE_CODE_GIT_BASH_PATH"] {
+    for var in ["XAGENT_GIT_BASH_PATH", "CLAUDE_CODE_GIT_BASH_PATH"] {
         if let Ok(raw) = std::env::var(var) {
             let trimmed = raw.trim().trim_matches('"');
             if !trimmed.is_empty() {
@@ -579,7 +579,7 @@ where
             stdio_factory().map_err(|err| format!("Failed to prepare shell stdio: {err}"))?;
         let mut c = Command::new(&candidate.program);
         c.args(&candidate.args);
-        // 系统代理 env 先注入，调用方 envs（如 LIVEAGENT_HOOK_*）后写保持更高优先级。
+        // 系统代理 env 先注入，调用方 envs（如 XAGENT_HOOK_*）后写保持更高优先级。
         for (key, value) in &system_proxy_envs {
             c.env(key, value);
         }
@@ -870,26 +870,26 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn find_git_bash_env_override_prefers_liveagent_var() {
+    fn find_git_bash_env_override_prefers_xagent_var() {
         // 单个测试函数串行覆盖所有 env 场景，避免并行 env 竞态。
         let dir = tempfile::tempdir().expect("tempdir");
-        let liveagent_bash = dir.path().join("xagent-bash.exe");
+        let xagent_bash = dir.path().join("xagent-bash.exe");
         let claude_bash = dir.path().join("claude-bash.exe");
-        fs::write(&liveagent_bash, b"").unwrap();
+        fs::write(&xagent_bash, b"").unwrap();
         fs::write(&claude_bash, b"").unwrap();
 
-        std::env::set_var("LIVEAGENT_GIT_BASH_PATH", &liveagent_bash);
+        std::env::set_var("XAGENT_GIT_BASH_PATH", &xagent_bash);
         std::env::set_var("CLAUDE_CODE_GIT_BASH_PATH", &claude_bash);
-        assert_eq!(super::find_git_bash(), Some(liveagent_bash.clone()));
+        assert_eq!(super::find_git_bash(), Some(xagent_bash.clone()));
 
         // XAGENT 指向不存在的文件时回退 CLAUDE_CODE。
         std::env::set_var(
-            "LIVEAGENT_GIT_BASH_PATH",
+            "XAGENT_GIT_BASH_PATH",
             dir.path().join("missing-bash.exe"),
         );
         assert_eq!(super::find_git_bash(), Some(claude_bash.clone()));
 
-        std::env::remove_var("LIVEAGENT_GIT_BASH_PATH");
+        std::env::remove_var("XAGENT_GIT_BASH_PATH");
         std::env::remove_var("CLAUDE_CODE_GIT_BASH_PATH");
     }
 

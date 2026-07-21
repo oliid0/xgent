@@ -142,7 +142,7 @@ test("parseHistoryMessagesJson yields identical ids across reparses", () => {
       role: "user",
       id: "m1",
       content: "问题",
-      liveAgentHistoryRef: {
+      xagentHistoryRef: {
         segmentIndex: 0,
         messageIndex: 0,
         segmentId: "seg-1",

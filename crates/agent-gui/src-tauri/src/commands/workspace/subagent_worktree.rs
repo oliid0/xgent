@@ -456,14 +456,14 @@ fn collect_worktree_paths(cwd: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(paths)
 }
 
-fn is_liveagent_subagent_worktree(path: &Path) -> bool {
+fn is_xagent_subagent_worktree(path: &Path) -> bool {
     path.components().any(|component| match component {
         Component::Normal(name) => name == ".xagent-subagents",
         _ => false,
     })
 }
 
-fn normalize_liveagent_subagent_branch(branch_name: Option<&str>) -> Option<String> {
+fn normalize_xagent_subagent_branch(branch_name: Option<&str>) -> Option<String> {
     let branch = branch_name?.trim();
     if branch.starts_with("xagent/subagent/") {
         Some(branch.to_string())
@@ -928,7 +928,7 @@ fn cleanup_worktree_target_blocking(
             return item;
         }
     };
-    if !is_liveagent_subagent_worktree(&worktree_root) {
+    if !is_xagent_subagent_worktree(&worktree_root) {
         item.error = Some(format!(
             "refusing to cleanup non-XAgent subagent worktree: {}",
             display_path(&worktree_root)
@@ -985,7 +985,7 @@ fn cleanup_worktree_target_blocking(
     }
 
     if delete_branch {
-        if let Some(branch) = normalize_liveagent_subagent_branch(branch_name.as_deref()) {
+        if let Some(branch) = normalize_xagent_subagent_branch(branch_name.as_deref()) {
             if let Some(repo_cwd) = repo_cwd {
                 match run_git_owned(
                     &repo_cwd,
@@ -1015,7 +1015,7 @@ fn cleanup_worktree_target_blocking(
             }
         } else if branch_name.is_some() {
             item.skipped_reason
-                .get_or_insert_with(|| "branch_delete_not_liveagent_branch".to_string());
+                .get_or_insert_with(|| "branch_delete_not_xagent_branch".to_string());
         }
     }
 
@@ -1394,7 +1394,7 @@ mod tests {
     }
 
     #[test]
-    fn subagent_worktree_cleanup_removes_liveagent_worktree_and_branch() -> Result<(), String> {
+    fn subagent_worktree_cleanup_removes_xagent_worktree_and_branch() -> Result<(), String> {
         let root = temp_root("cleanup-worktree");
         let repo = root.join("repo");
         let worktree = root

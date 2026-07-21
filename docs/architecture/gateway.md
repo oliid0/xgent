@@ -108,5 +108,5 @@ Terminal metadata 事件通过 `/ws/v2` 广播臂（`terminal_event`）同步 `c
 | Chat run 终态信号丢失 | run 已在桌面端结束但网关 activity 未清除 | 桌面端 `ChatRunLedger` 先记账再发送，5s sweeper 重发未送达终态；心跳 `RuntimeStatusEvent.active_runs/finished_runs` 驱动网关对账：finished 报告按真实终态收养，active 报告逐 run 续命，缺席且无事件/续命超过 `runReportLostTimeout`（15s）判 `failed/desktop_run_lost`。 |
 | Chat run 卡死兜底 | 桌面端不再上报某 run | 在线走 `staleRunTimeout`（10min，逐 run 续命，单会话忙碌不屏蔽他会话）；离线走 `offlineRunTimeout`（30min）判 `failed/agent_offline`。 |
 | Chat run 重复提交 | 同一 Gateway 进程内，同一 `client_request_id` 重复 | 24 小时进程级原子去重返回 canonical run；用于覆盖 WebSocket ACK 丢失的一次同 ID 重试。 |
-| Chat command 未进入运行态 | 事件流只到 accepted/delivered 后不继续 | command path 使用默认 5 秒 `LIVEAGENT_GATEWAY_CHAT_START_TIMEOUT` 加 10 秒 `LIVEAGENT_GATEWAY_CHAT_RENDER_START_TIMEOUT` watchdog 写入 `run.failed`，避免 WebUI 无限等待。 |
+| Chat command 未进入运行态 | 事件流只到 accepted/delivered 后不继续 | command path 使用默认 5 秒 `XAGENT_GATEWAY_CHAT_START_TIMEOUT` 加 10 秒 `XAGENT_GATEWAY_CHAT_RENDER_START_TIMEOUT` watchdog 写入 `run.failed`，避免 WebUI 无限等待。 |
 | 服务退出 | Ctrl+C 后 HTTP graceful shutdown | `cmd/gateway/main.go` 控制退出与超时。 |

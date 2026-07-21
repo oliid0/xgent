@@ -8,6 +8,6 @@ export const GATEWAY_WEBUI_MARKER = "gateway";
 export function isGatewayWebuiRuntime() {
   return (
     typeof document !== "undefined" &&
-    document.documentElement.dataset.liveagentWebui === GATEWAY_WEBUI_MARKER
+    document.documentElement.dataset.xagentWebui === GATEWAY_WEBUI_MARKER
   );
 }

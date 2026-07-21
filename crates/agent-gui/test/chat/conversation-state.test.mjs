@@ -200,8 +200,8 @@ test("uploaded file metadata is stripped from request context but preserved for 
     role: "user",
     content: "Please inspect file.txt\n\nSelected files are available...",
     timestamp: 1,
-    liveAgentDisplayContent: "Please inspect file.txt",
-    liveAgentAttachments: [
+    xagentDisplayContent: "Please inspect file.txt",
+    xagentAttachments: [
       {
         relativePath: "file.txt",
         fileName: "file.txt",
@@ -218,8 +218,8 @@ test("uploaded file metadata is stripped from request context but preserved for 
   assert.equal(state.historyRenderItems[0].attachments[0].relativePath, "file.txt");
 
   const requestContext = conversationState.buildRequestContext(state);
-  assert.equal(requestContext.messages[0].liveAgentDisplayContent, undefined);
-  assert.equal(requestContext.messages[0].liveAgentAttachments, undefined);
+  assert.equal(requestContext.messages[0].xagentDisplayContent, undefined);
+  assert.equal(requestContext.messages[0].xagentAttachments, undefined);
   assert.equal(requestContext.messages[0].content, uploadedMessage.content);
 });
 

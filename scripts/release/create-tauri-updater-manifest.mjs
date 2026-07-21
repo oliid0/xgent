@@ -16,7 +16,7 @@ if (!assetDir || !outputPath) {
 let releaseVersion;
 try {
   releaseVersion = parseReleaseVersion(
-    process.env.LIVEAGENT_RELEASE_TAG || process.env.RELEASE_TAG,
+    process.env.XAGENT_RELEASE_TAG || process.env.RELEASE_TAG,
   );
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));

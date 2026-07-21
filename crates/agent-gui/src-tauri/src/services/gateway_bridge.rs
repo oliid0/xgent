@@ -1378,7 +1378,7 @@ fn flatten_history_messages_json_window(
                 if let Some(history_ref) =
                     build_history_message_ref_json(parsed.segment, message_index, item)
                 {
-                    object.insert("liveAgentHistoryRef".to_string(), history_ref);
+                    object.insert("xagentHistoryRef".to_string(), history_ref);
                 }
             }
             merged.push(cloned);
@@ -1660,7 +1660,7 @@ mod tests {
                     "role":"user",
                     "id":"user-old-2",
                     "content":"old-2",
-                    "liveAgentHistoryRef":{
+                    "xagentHistoryRef":{
                         "segmentIndex":4,
                         "messageIndex":2,
                         "segmentId":"segment-a",
@@ -1678,7 +1678,7 @@ mod tests {
                     "role":"user",
                     "id":"user-new-1",
                     "content":"new-1",
-                    "liveAgentHistoryRef":{
+                    "xagentHistoryRef":{
                         "segmentIndex":5,
                         "messageIndex":1,
                         "segmentId":"segment-b",

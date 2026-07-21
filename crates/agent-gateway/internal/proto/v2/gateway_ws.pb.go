@@ -2594,10 +2594,10 @@ var File_proto_v2_gateway_ws_proto protoreflect.FileDescriptor
 
 const file_proto_v2_gateway_ws_proto_rawDesc = "" +
 	"\n" +
-	"\x19proto/v2/gateway_ws.proto\x12\x14liveagent.gateway.v2\x1a\x16proto/v1/gateway.proto\"\x8c\x02\n" +
+	"\x19proto/v2/gateway_ws.proto\x12\x11xagent.gateway.v2\x1a\x16proto/v1/gateway.proto\"\x89\x02\n" +
 	"\vClientHello\x12)\n" +
-	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x124\n" +
-	"\x04role\x18\x02 \x01(\x0e2 .xagent.gateway.v2.ClientRoleR\x04role\x12\x14\n" +
+	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x121\n" +
+	"\x04role\x18\x02 \x01(\x0e2\x1d.xagent.gateway.v2.ClientRoleR\x04role\x12\x14\n" +
 	"\x05token\x18\x03 \x01(\tR\x05token\x12\x19\n" +
 	"\bagent_id\x18\x04 \x01(\tR\aagentId\x12#\n" +
 	"\ragent_version\x18\x05 \x01(\tR\fagentVersion\x12\x1f\n" +
@@ -2618,69 +2618,69 @@ const file_proto_v2_gateway_ws_proto_rawDesc = "" +
 	"\tPongFrame\x12\x1c\n" +
 	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\"\x1b\n" +
 	"\tAckResult\x12\x0e\n" +
-	"\x02ok\x18\x01 \x01(\bR\x02ok\"\xb7\a\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\"\x96\a\n" +
 	"\x0eWebClientFrame\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\x129\n" +
-	"\x05hello\x18\x02 \x01(\v2!.xagent.gateway.v2.ClientHelloH\x00R\x05hello\x12L\n" +
-	"\ragent_request\x18\x03 \x01(\v2%.xagent.gateway.v1.GatewayEnvelopeH\x00R\fagentRequest\x12G\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x126\n" +
+	"\x05hello\x18\x02 \x01(\v2\x1e.xagent.gateway.v2.ClientHelloH\x00R\x05hello\x12I\n" +
+	"\ragent_request\x18\x03 \x01(\v2\".xagent.gateway.v1.GatewayEnvelopeH\x00R\fagentRequest\x12D\n" +
 	"\n" +
-	"status_get\x18\x04 \x01(\v2&.xagent.gateway.v2.StatusGetRequestH\x00R\tstatusGet\x12M\n" +
-	"\fchat_command\x18\x05 \x01(\v2(.xagent.gateway.v1.ChatCommandRequestH\x00R\vchatCommand\x12M\n" +
-	"\fchat_prepare\x18\x06 \x01(\v2(.xagent.gateway.v2.ChatPrepareRequestH\x00R\vchatPrepare\x12S\n" +
-	"\x0echat_subscribe\x18\a \x01(\v2*.xagent.gateway.v2.ChatSubscribeRequestH\x00R\rchatSubscribe\x12Y\n" +
-	"\x10chat_unsubscribe\x18\b \x01(\v2,.xagent.gateway.v2.ChatUnsubscribeRequestH\x00R\x0fchatUnsubscribe\x12V\n" +
-	"\x0fchat_activities\x18\t \x01(\v2+.xagent.gateway.v2.ChatActivitiesRequestH\x00R\x0echatActivities\x12b\n" +
+	"status_get\x18\x04 \x01(\v2#.xagent.gateway.v2.StatusGetRequestH\x00R\tstatusGet\x12J\n" +
+	"\fchat_command\x18\x05 \x01(\v2%.xagent.gateway.v1.ChatCommandRequestH\x00R\vchatCommand\x12J\n" +
+	"\fchat_prepare\x18\x06 \x01(\v2%.xagent.gateway.v2.ChatPrepareRequestH\x00R\vchatPrepare\x12P\n" +
+	"\x0echat_subscribe\x18\a \x01(\v2'.xagent.gateway.v2.ChatSubscribeRequestH\x00R\rchatSubscribe\x12V\n" +
+	"\x10chat_unsubscribe\x18\b \x01(\v2).xagent.gateway.v2.ChatUnsubscribeRequestH\x00R\x0fchatUnsubscribe\x12S\n" +
+	"\x0fchat_activities\x18\t \x01(\v2(.xagent.gateway.v2.ChatActivitiesRequestH\x00R\x0echatActivities\x12_\n" +
 	"\x13workspace_subscribe\x18\n" +
-	" \x01(\v2/.xagent.gateway.v2.WorkspaceSubscribeRequestH\x00R\x12workspaceSubscribe\x12h\n" +
-	"\x15workspace_unsubscribe\x18\v \x01(\v21.xagent.gateway.v2.WorkspaceUnsubscribeRequestH\x00R\x14workspaceUnsubscribe\x125\n" +
-	"\x04pong\x18\f \x01(\v2\x1f.xagent.gateway.v2.PongFrameH\x00R\x04pongB\t\n" +
-	"\apayload\"\xe5\r\n" +
+	" \x01(\v2,.xagent.gateway.v2.WorkspaceSubscribeRequestH\x00R\x12workspaceSubscribe\x12e\n" +
+	"\x15workspace_unsubscribe\x18\v \x01(\v2..xagent.gateway.v2.WorkspaceUnsubscribeRequestH\x00R\x14workspaceUnsubscribe\x122\n" +
+	"\x04pong\x18\f \x01(\v2\x1c.xagent.gateway.v2.PongFrameH\x00R\x04pongB\t\n" +
+	"\apayload\"\xa3\r\n" +
 	"\x0eWebServerFrame\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\x129\n" +
-	"\x05hello\x18\x02 \x01(\v2!.xagent.gateway.v2.ServerHelloH\x00R\x05hello\x12L\n" +
-	"\x0eagent_response\x18\x03 \x01(\v2#.xagent.gateway.v1.AgentEnvelopeH\x00R\ragentResponse\x12F\n" +
-	"\vlocal_error\x18\x04 \x01(\v2#.xagent.gateway.v1.ErrorResponseH\x00R\n" +
-	"localError\x125\n" +
-	"\x04ping\x18\x05 \x01(\v2\x1f.xagent.gateway.v2.PingFrameH\x00R\x04ping\x12;\n" +
-	"\x06status\x18\x06 \x01(\v2!.xagent.gateway.v2.StatusEventH\x00R\x06status\x12T\n" +
-	"\x0fchat_subscribed\x18\a \x01(\v2).xagent.gateway.v2.ChatSubscribeResultH\x00R\x0echatSubscribed\x12P\n" +
-	"\rchat_accepted\x18\b \x01(\v2).xagent.gateway.v2.ChatCommandAcceptedH\x00R\fchatAccepted\x12U\n" +
-	"\x0fchat_activities\x18\t \x01(\v2*.xagent.gateway.v2.ChatActivitiesResultH\x00R\x0echatActivities\x12F\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x126\n" +
+	"\x05hello\x18\x02 \x01(\v2\x1e.xagent.gateway.v2.ServerHelloH\x00R\x05hello\x12I\n" +
+	"\x0eagent_response\x18\x03 \x01(\v2 .xagent.gateway.v1.AgentEnvelopeH\x00R\ragentResponse\x12C\n" +
+	"\vlocal_error\x18\x04 \x01(\v2 .xagent.gateway.v1.ErrorResponseH\x00R\n" +
+	"localError\x122\n" +
+	"\x04ping\x18\x05 \x01(\v2\x1c.xagent.gateway.v2.PingFrameH\x00R\x04ping\x128\n" +
+	"\x06status\x18\x06 \x01(\v2\x1e.xagent.gateway.v2.StatusEventH\x00R\x06status\x12Q\n" +
+	"\x0fchat_subscribed\x18\a \x01(\v2&.xagent.gateway.v2.ChatSubscribeResultH\x00R\x0echatSubscribed\x12M\n" +
+	"\rchat_accepted\x18\b \x01(\v2&.xagent.gateway.v2.ChatCommandAcceptedH\x00R\fchatAccepted\x12R\n" +
+	"\x0fchat_activities\x18\t \x01(\v2'.xagent.gateway.v2.ChatActivitiesResultH\x00R\x0echatActivities\x12C\n" +
 	"\n" +
 	"chat_event\x18\n" +
-	" \x01(\v2%.xagent.gateway.v2.ChatStreamEventH\x00R\tchatEvent\x12Y\n" +
-	"\x13chat_command_update\x18\v \x01(\v2'.xagent.gateway.v2.ChatCommandUpdateH\x00R\x11chatCommandUpdate\x12e\n" +
-	"\x17chat_subscription_reset\x18\f \x01(\v2+.xagent.gateway.v2.ChatSubscriptionResetH\x00R\x15chatSubscriptionReset\x12N\n" +
-	"\rchat_activity\x18\r \x01(\v2'.xagent.gateway.v2.ChatActivityEventH\x00R\fchatActivity\x123\n" +
-	"\x03ack\x18\x0e \x01(\v2\x1f.xagent.gateway.v2.AckResultH\x00R\x03ack\x12O\n" +
-	"\x0echat_cancelled\x18\x0f \x01(\v2&.xagent.gateway.v2.ChatCancelResultH\x00R\rchatCancelled\x12M\n" +
-	"\rhistory_event\x18\x14 \x01(\v2&.xagent.gateway.v1.HistorySyncEventH\x00R\fhistoryEvent\x12P\n" +
-	"\x0esettings_event\x18\x15 \x01(\v2'.xagent.gateway.v1.SettingsSyncEventH\x00R\rsettingsEvent\x12L\n" +
-	"\x0eterminal_event\x18\x16 \x01(\v2#.xagent.gateway.v1.TerminalEventH\x00R\rterminalEvent\x12@\n" +
+	" \x01(\v2\".xagent.gateway.v2.ChatStreamEventH\x00R\tchatEvent\x12V\n" +
+	"\x13chat_command_update\x18\v \x01(\v2$.xagent.gateway.v2.ChatCommandUpdateH\x00R\x11chatCommandUpdate\x12b\n" +
+	"\x17chat_subscription_reset\x18\f \x01(\v2(.xagent.gateway.v2.ChatSubscriptionResetH\x00R\x15chatSubscriptionReset\x12K\n" +
+	"\rchat_activity\x18\r \x01(\v2$.xagent.gateway.v2.ChatActivityEventH\x00R\fchatActivity\x120\n" +
+	"\x03ack\x18\x0e \x01(\v2\x1c.xagent.gateway.v2.AckResultH\x00R\x03ack\x12L\n" +
+	"\x0echat_cancelled\x18\x0f \x01(\v2#.xagent.gateway.v2.ChatCancelResultH\x00R\rchatCancelled\x12J\n" +
+	"\rhistory_event\x18\x14 \x01(\v2#.xagent.gateway.v1.HistorySyncEventH\x00R\fhistoryEvent\x12M\n" +
+	"\x0esettings_event\x18\x15 \x01(\v2$.xagent.gateway.v1.SettingsSyncEventH\x00R\rsettingsEvent\x12I\n" +
+	"\x0eterminal_event\x18\x16 \x01(\v2 .xagent.gateway.v1.TerminalEventH\x00R\rterminalEvent\x12=\n" +
 	"\n" +
-	"sftp_event\x18\x17 \x01(\v2\x1f.xagent.gateway.v1.SftpEventH\x00R\tsftpEvent\x12P\n" +
-	"\x10chat_queue_event\x18\x18 \x01(\v2$.xagent.gateway.v1.ChatQueueEventH\x00R\x0echatQueueEvent\x12N\n" +
-	"\ftunnel_state\x18\x19 \x01(\v2).xagent.gateway.v1.TunnelStateSnapshotH\x00R\vtunnelState\x12S\n" +
-	"\rprocess_state\x18\x1a \x01(\v2,.xagent.gateway.v1.ManagedProcessSnapshotH\x00R\fprocessState\x12]\n" +
-	"\x12workspace_activity\x18\x1b \x01(\v2,.xagent.gateway.v1.WorkspaceActivityEventH\x00R\x11workspaceActivityB\t\n" +
-	"\apayload\"\x9b\x01\n" +
-	"\x10AgentClientFrame\x129\n" +
-	"\x05hello\x18\x01 \x01(\v2!.xagent.gateway.v2.ClientHelloH\x00R\x05hello\x12A\n" +
-	"\benvelope\x18\x02 \x01(\v2#.xagent.gateway.v1.AgentEnvelopeH\x00R\benvelopeB\t\n" +
-	"\apayload\"\x9d\x01\n" +
-	"\x10AgentServerFrame\x129\n" +
-	"\x05hello\x18\x01 \x01(\v2!.xagent.gateway.v2.ServerHelloH\x00R\x05hello\x12C\n" +
-	"\benvelope\x18\x02 \x01(\v2%.xagent.gateway.v1.GatewayEnvelopeH\x00R\benvelopeB\t\n" +
-	"\apayload\"\x9e\x01\n" +
-	"\x13TerminalClientFrame\x129\n" +
-	"\x05hello\x18\x01 \x01(\v2!.xagent.gateway.v2.ClientHelloH\x00R\x05hello\x12A\n" +
-	"\x05frame\x18\x02 \x01(\v2).xagent.gateway.v1.TerminalStreamFrameH\x00R\x05frameB\t\n" +
-	"\apayload\"\x9e\x01\n" +
-	"\x13TerminalServerFrame\x129\n" +
-	"\x05hello\x18\x01 \x01(\v2!.xagent.gateway.v2.ServerHelloH\x00R\x05hello\x12A\n" +
-	"\x05frame\x18\x02 \x01(\v2).xagent.gateway.v1.TerminalStreamFrameH\x00R\x05frameB\t\n" +
+	"sftp_event\x18\x17 \x01(\v2\x1c.xagent.gateway.v1.SftpEventH\x00R\tsftpEvent\x12M\n" +
+	"\x10chat_queue_event\x18\x18 \x01(\v2!.xagent.gateway.v1.ChatQueueEventH\x00R\x0echatQueueEvent\x12K\n" +
+	"\ftunnel_state\x18\x19 \x01(\v2&.xagent.gateway.v1.TunnelStateSnapshotH\x00R\vtunnelState\x12P\n" +
+	"\rprocess_state\x18\x1a \x01(\v2).xagent.gateway.v1.ManagedProcessSnapshotH\x00R\fprocessState\x12Z\n" +
+	"\x12workspace_activity\x18\x1b \x01(\v2).xagent.gateway.v1.WorkspaceActivityEventH\x00R\x11workspaceActivityB\t\n" +
+	"\apayload\"\x95\x01\n" +
+	"\x10AgentClientFrame\x126\n" +
+	"\x05hello\x18\x01 \x01(\v2\x1e.xagent.gateway.v2.ClientHelloH\x00R\x05hello\x12>\n" +
+	"\benvelope\x18\x02 \x01(\v2 .xagent.gateway.v1.AgentEnvelopeH\x00R\benvelopeB\t\n" +
+	"\apayload\"\x97\x01\n" +
+	"\x10AgentServerFrame\x126\n" +
+	"\x05hello\x18\x01 \x01(\v2\x1e.xagent.gateway.v2.ServerHelloH\x00R\x05hello\x12@\n" +
+	"\benvelope\x18\x02 \x01(\v2\".xagent.gateway.v1.GatewayEnvelopeH\x00R\benvelopeB\t\n" +
+	"\apayload\"\x98\x01\n" +
+	"\x13TerminalClientFrame\x126\n" +
+	"\x05hello\x18\x01 \x01(\v2\x1e.xagent.gateway.v2.ClientHelloH\x00R\x05hello\x12>\n" +
+	"\x05frame\x18\x02 \x01(\v2&.xagent.gateway.v1.TerminalStreamFrameH\x00R\x05frameB\t\n" +
+	"\apayload\"\x98\x01\n" +
+	"\x13TerminalServerFrame\x126\n" +
+	"\x05hello\x18\x01 \x01(\v2\x1e.xagent.gateway.v2.ServerHelloH\x00R\x05hello\x12>\n" +
+	"\x05frame\x18\x02 \x01(\v2&.xagent.gateway.v1.TerminalStreamFrameH\x00R\x05frameB\t\n" +
 	"\apayload\"\x12\n" +
 	"\x10StatusGetRequest\"\x8c\x04\n" +
 	"\vStatusEvent\x12\x16\n" +
@@ -2725,22 +2725,22 @@ const file_proto_v2_gateway_ws_proto_rawDesc = "" +
 	"\vtool_status\x18\x04 \x01(\tR\n" +
 	"toolStatus\x129\n" +
 	"\x19tool_status_is_compaction\x18\x05 \x01(\bR\x16toolStatusIsCompaction\x12\x1a\n" +
-	"\tas_of_seq\x18\x06 \x01(\x03R\aasOfSeq\"\xbd\x02\n" +
+	"\tas_of_seq\x18\x06 \x01(\x03R\aasOfSeq\"\xb7\x02\n" +
 	"\x13ChatSubscribeResult\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12!\n" +
 	"\fstream_epoch\x18\x02 \x01(\tR\vstreamEpoch\x12\x1d\n" +
 	"\n" +
 	"latest_seq\x18\x03 \x01(\x03R\tlatestSeq\x12\x14\n" +
-	"\x05reset\x18\x04 \x01(\bR\x05reset\x12A\n" +
-	"\bactivity\x18\x05 \x01(\v2%.xagent.gateway.v2.ChatRunActivityR\bactivity\x12A\n" +
-	"\bsnapshot\x18\x06 \x01(\v2%.xagent.gateway.v2.ChatRunSnapshotR\bsnapshot\x12\x1f\n" +
+	"\x05reset\x18\x04 \x01(\bR\x05reset\x12>\n" +
+	"\bactivity\x18\x05 \x01(\v2\".xagent.gateway.v2.ChatRunActivityR\bactivity\x12>\n" +
+	"\bsnapshot\x18\x06 \x01(\v2\".xagent.gateway.v2.ChatRunSnapshotR\bsnapshot\x12\x1f\n" +
 	"\vevents_json\x18\a \x03(\fR\n" +
 	"eventsJson\"A\n" +
 	"\x16ChatUnsubscribeRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\"\x17\n" +
-	"\x15ChatActivitiesRequest\"r\n" +
-	"\x14ChatActivitiesResult\x12Z\n" +
-	"\x15running_conversations\x18\x01 \x03(\v2%.xagent.gateway.v2.ChatRunActivityR\x14runningConversations\"o\n" +
+	"\x15ChatActivitiesRequest\"o\n" +
+	"\x14ChatActivitiesResult\x12W\n" +
+	"\x15running_conversations\x18\x01 \x03(\v2\".xagent.gateway.v2.ChatRunActivityR\x14runningConversations\"o\n" +
 	"\x0fChatStreamEvent\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x10\n" +
 	"\x03seq\x18\x02 \x01(\x03R\x03seq\x12!\n" +
@@ -2780,7 +2780,7 @@ const file_proto_v2_gateway_ws_proto_rawDesc = "" +
 	"ClientRole\x12\x1b\n" +
 	"\x17CLIENT_ROLE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13CLIENT_ROLE_BROWSER\x10\x01\x12\x15\n" +
-	"\x11CLIENT_ROLE_AGENT\x10\x02B@Z>github.com/xagent/agent-gateway/internal/proto/v2;gatewayv2b\x06proto3"
+	"\x11CLIENT_ROLE_AGENT\x10\x02B=Z;github.com/xagent/agent-gateway/internal/proto/v2;gatewayv2b\x06proto3"
 
 var (
 	file_proto_v2_gateway_ws_proto_rawDescOnce sync.Once

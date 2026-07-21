@@ -298,7 +298,7 @@ export function buildToolsSuffix(
             `- Current platform: ${platformLabel}. Bash runs through Git Bash with POSIX semantics; pwsh, Windows PowerShell, and cmd are fallbacks used only when Git Bash is not installed.`,
             "- Write POSIX/bash-compatible commands by default: `export`, `&&`, `/dev/null`, forward-slash paths.",
             "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xagent-task.log 2>&1 < /dev/null &`.",
-            "- If a Bash result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing: switch to PowerShell syntax and suggest installing Git for Windows or setting `LIVEAGENT_GIT_BASH_PATH`.",
+            "- If a Bash result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing: switch to PowerShell syntax and suggest installing Git for Windows or setting `XAGENT_GIT_BASH_PATH`.",
           ]
         : [
             `- Current platform: ${platformLabel}. Bash runs through POSIX shells.`,

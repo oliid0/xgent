@@ -79,7 +79,7 @@ export function AboutSection(props: AboutSectionProps) {
     latestResult?.channel === "prerelease"
       ? t("settings.aboutChannelPrerelease")
       : t("settings.aboutChannelStable");
-  const currentVersion = latestResult?.currentVersion || __LIVEAGENT_APP_VERSION__;
+  const currentVersion = latestResult?.currentVersion || __XAGENT_APP_VERSION__;
   const nextVersion = latestResult?.version || latestResult?.releaseTag || "";
   const releaseDate = formatReleaseDate(latestResult?.date);
   const checking = checkState.status === "checking";

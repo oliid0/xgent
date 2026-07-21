@@ -391,7 +391,7 @@ test("Bash tool hints about missing Git Bash when Windows falls back to PowerShe
 
   assert.equal(result.isError, true);
   assert.match(result.content[0].text, /Git Bash was not found/);
-  assert.match(result.content[0].text, /LIVEAGENT_GIT_BASH_PATH/);
+  assert.match(result.content[0].text, /XAGENT_GIT_BASH_PATH/);
 });
 
 test("Bash tool does not hint about Git Bash when a Windows failure ran under Git Bash", async () => {

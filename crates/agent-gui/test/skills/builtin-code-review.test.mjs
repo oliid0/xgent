@@ -33,7 +33,7 @@ test("built-in code review skill covers PR and local review without remote write
 });
 
 test("built-in code review seeding requires an ownership marker", () => {
-  assert.match(builtinRegistrySource, /_liveagent_builtin\.json/);
+  assert.match(builtinRegistrySource, /_xagent_builtin\.json/);
   assert.match(builtinRegistrySource, /conflict_preserved/);
   assert.match(builtinRegistrySource, /builtin_skill_owns_target/);
 });

@@ -70,10 +70,10 @@ test("release version script writes GitHub env, outputs, and Tauri config", () =
       `version script failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
     );
 
-    assert.match(readFileSync(envPath, "utf8"), /^LIVEAGENT_APP_VERSION=1\.2\.3$/m);
+    assert.match(readFileSync(envPath, "utf8"), /^XAGENT_APP_VERSION=1\.2\.3$/m);
     assert.match(
       readFileSync(envPath, "utf8"),
-      new RegExp(`^LIVEAGENT_TAURI_VERSION_CONFIG=${escapeRegExp(tauriConfigPath)}$`, "m"),
+      new RegExp(`^XAGENT_TAURI_VERSION_CONFIG=${escapeRegExp(tauriConfigPath)}$`, "m"),
     );
     assert.match(readFileSync(outputPath, "utf8"), /^release_tag=v1\.2\.3$/m);
     assert.match(readFileSync(outputPath, "utf8"), /^is_prerelease=false$/m);

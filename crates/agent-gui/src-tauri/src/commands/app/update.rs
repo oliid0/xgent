@@ -66,18 +66,18 @@ fn current_version(app: &AppHandle) -> String {
 }
 
 fn update_repository() -> String {
-    std::env::var("LIVEAGENT_UPDATE_REPOSITORY")
+    std::env::var("XAGENT_UPDATE_REPOSITORY")
         .ok()
-        .or_else(|| option_env!("LIVEAGENT_UPDATE_REPOSITORY").map(str::to_string))
+        .or_else(|| option_env!("XAGENT_UPDATE_REPOSITORY").map(str::to_string))
         .map(|value| value.trim().trim_matches('/').to_string())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| DEFAULT_UPDATE_REPOSITORY.to_string())
 }
 
 fn updater_public_key_override() -> Option<String> {
-    std::env::var("LIVEAGENT_UPDATER_PUBLIC_KEY")
+    std::env::var("XAGENT_UPDATER_PUBLIC_KEY")
         .ok()
-        .or_else(|| option_env!("LIVEAGENT_UPDATER_PUBLIC_KEY").map(str::to_string))
+        .or_else(|| option_env!("XAGENT_UPDATER_PUBLIC_KEY").map(str::to_string))
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
 }

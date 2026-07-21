@@ -131,7 +131,7 @@ pub(crate) fn create_zsh_prompt_overlay(prompt: &str) -> Option<PathBuf> {
     let user_zshenv = home.join(".zshenv");
 
     let zshenv_content = format!(
-        "export _LIVEAGENT_REAL_ZDOTDIR=\"$HOME\"\n\
+        "export _XAGENT_REAL_ZDOTDIR=\"$HOME\"\n\
          [[ -f \"{}\" ]] && source \"{}\"\n",
         user_zshenv.display(),
         user_zshenv.display(),

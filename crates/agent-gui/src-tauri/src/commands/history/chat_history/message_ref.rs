@@ -53,7 +53,7 @@ pub(crate) fn history_message_content_hash(message: &Value) -> String {
 
     if role == "user" {
         let display_text = object
-            .and_then(|object| object.get("liveAgentDisplayContent"))
+            .and_then(|object| object.get("xagentDisplayContent"))
             .and_then(Value::as_str)
             .map(str::to_string)
             .unwrap_or_else(|| {
@@ -62,7 +62,7 @@ pub(crate) fn history_message_content_hash(message: &Value) -> String {
         append_hash_part(&mut parts, display_text);
 
         let attachments = object
-            .and_then(|object| object.get("liveAgentAttachments"))
+            .and_then(|object| object.get("xagentAttachments"))
             .and_then(Value::as_array);
         let valid_attachments = attachments
             .map(|attachments| {
