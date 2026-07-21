@@ -1,31 +1,12 @@
-# agent-gateway tests
+# Gateway tests
 
-All project-level gateway tests live under `crates/gateway/test` and are split by boundary:
+Project-level Gateway tests live under `crates/gateway/test` and cover the pure Go service boundary.
 
 | Directory | Coverage |
-| --- | --- |
-| `auth/` | HTTP bearer parsing and gRPC interceptor auth behavior |
-| `http/` | Gateway HTTP route auth, `/api/status`, and SPA fallback |
-| `upload/` | `/api/files/import` validation, multipart parsing, and agent forwarding |
-| `websocket/` | WebSocket auth, request forwarding, chat streaming, and cancellation-facing events |
-| `webui/` | Browser-side WebUI helpers, auth, upload normalization, history state, live stream state, and WebSocket client behavior |
-| `../web/test/` | WebUI source-adjacent module tests for chat transcript, history scope, and live conversation commit helpers |
-| `helpers/` | Shared Node test module loader for WebUI TypeScript modules |
+|---|---|
+| `auth/` | HTTP bearer authentication. |
+| `http/` | Health, API auth/status, uploads, shares, and API-only 404 behavior. |
+| `upload/` | `/api/files/import` validation and Agent forwarding. |
+| `websocket/` | Browser/Agent/terminal WebSocket protocol, routing, streaming, and cancellation. |
 
-Run Go-side tests from `crates/gateway`:
-
-```sh
-go test ./...
-```
-
-Run WebUI Node tests from `crates/gateway`:
-
-```sh
-node --test test/webui/*.test.mjs web/test/*.test.mjs
-```
-
-Run the WebUI type/build gate separately from `crates/gateway/web`:
-
-```sh
-pnpm build
-```
+The Gateway does not contain frontend tests or frontend build helpers. All React tests live under `crates/fronted/test` and run in the Unified Frontend CI job.

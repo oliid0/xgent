@@ -117,7 +117,7 @@ XAgent 是一个 **本地优先** 的 AI Agent 桌面客户端。它将大语言
 
 ### 🌐 远程 Gateway
 
-- **浏览器随处访问** — Go 网关(WebSocket + Protobuf),WebUI 远程操控本地 Agent
+- **浏览器随处访问** — 同一套 React 前端以 Web 运行时连接 Go Gateway,远程操控本地 Agent
 - **断线可恢复** — 有界 seq window 补齐短时断线,桌面端持久化兜底
 
 ---
@@ -163,49 +163,30 @@ XAgent 是一个 **本地优先** 的 AI Agent 桌面客户端。它将大语言
 | DEB | Debian / Ubuntu 系 | `sudo dpkg -i XAgent-<版本>-Linux-x86_64.deb` |
 | RPM | Fedora / openSUSE 系 | `sudo rpm -i XAgent-<版本>-Linux-x86_64.rpm` |
 
-### 需要远程访问? 部署 Gateway
+### 需要远程访问? 部署 Gateway 与 Web 前端
 
-桌面端开箱即用,不依赖任何服务端。只有想 **在浏览器里远程操控本地 Agent** 时,才需要部署 Gateway。
-
-**注意：在部署并使用Nginx反向代理后，设置中Remote页面Gateway地址填写Https地址，端口号填写443。**
+桌面端开箱即用,不依赖任何服务端。浏览器访问使用 `crates/fronted` 的同一套 React 源码；`crates/gateway` 是纯 Go API/WebSocket 服务,不包含、不嵌入前端,当前也不发布容器镜像。
 
 ```bash
-# 拉取镜像(GitHub Actions 自动构建,multi-arch: amd64 / arm64)
-docker pull ghcr.io/ohi01/xagent-gateway:latest
+# 构建纯 Go Gateway
+make gateway-build
 
-# 后台运行(HTTP/WebSocket → 宿主机 3000)
-docker run -d \
-  --name xagent-gateway \
-  --restart unless-stopped \
-  -p 3000:8080 \
-  -e XAGENT_GATEWAY_TOKEN=your-token \
-  ghcr.io/ohi01/xagent-gateway:latest
+# 用同一套 React 源码构建 Web 静态文件
+make web
 ```
 
-**一键升级到最新版** — 拉取新镜像 → 删除旧容器 → 以相同参数重建(若你修改过端口映射或 token,请同步替换下方参数):
-
-```bash
-docker pull ghcr.io/ohi01/xagent-gateway:latest \
-  && docker rm -f xagent-gateway \
-  && docker run -d \
-    --name xagent-gateway \
-    --restart unless-stopped \
-    -p 3000:8080 \
-    -e XAGENT_GATEWAY_TOKEN=your-token \
-    ghcr.io/ohi01/xagent-gateway:latest \
-  && docker image prune -f
-```
+将 `crates/fronted/dist` 部署到静态站点,并单独运行 `crates/gateway/bin/xagent-gateway`。生产环境应让静态站点与 Gateway 的 API/WebSocket 使用同一 HTTPS 域名,Remote 设置中的端口填写 `443`。
 
 <details>
 <summary><b>Nginx 反向代理配置</b> — 自建域名 / TLS 时参考</summary>
 
-> 自 v2 协议起,WebUI、HTTP API 以及浏览器端和桌面端的 WebSocket 链路全部走同一个 HTTP 端口(默认 3000)。
+> Gateway 只处理 API 与 WebSocket。Nginx 负责提供 `crates/fronted/dist` 生成的静态文件,并将后端路径代理到 Gateway。
 >
 > WebSocket 升级发生在多个路径上(`/ws/v2`、`/ws/v2/agent`、`/ws/v2/terminal`,以及 `/t/` 下的隧道),最省事且正确的做法是在整个 vhost 上启用升级:
 
 ```nginx
-# WebUI SPA/静态资源/API + 全部 WebSocket 链路(浏览器端与桌面端)
-location / {
+# Gateway API 与 WebSocket
+location ~ ^/(api|ws|t)/ {
     proxy_pass http://127.0.0.1:3000;
     proxy_http_version 1.1;
 
@@ -225,9 +206,15 @@ location / {
     proxy_send_timeout 300s;
     proxy_buffering off;
 }
+
+# 同一套 React 前端的 Web 构建产物
+location / {
+    root /srv/xagent/fronted;
+    try_files $uri $uri/ /index.html;
+}
 ```
 
-> 上游端口与上方 `docker run` 的宿主机映射对应:HTTP/WebSocket 3000(容器内 HTTP 实际监听 `PORT=8080`)。server 块需要 `listen 443 ssl;`,并把 `client_max_body_size` 调大到足够容纳附件上传(如 `100m`)。
+> 示例假定 Gateway 监听 `127.0.0.1:3000`,Web 构建产物复制到 `/srv/xagent/fronted`。server 块需要 `listen 443 ssl;`,并把 `client_max_body_size` 调大到足够容纳附件上传(如 `100m`)。
 
 </details>
 
@@ -246,19 +233,19 @@ location / {
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                        Browser WebUI                          │
-│              React + Vite + WebSocket + Gateway API           │
+│               XAgent 统一 React 前端源码                      │
+│            Web · Tauri Desktop · Tauri Mobile                │
 └────────────────────────────┬─────────────────────────────────┘
                              │ WebSocket / HTTP
 ┌────────────────────────────▼─────────────────────────────────┐
 │                       Agent Gateway                           │
 │    Go · WebSocket · HTTP · Session Manager · Event Store     │
-│                    (Railway / Docker / 自部署)                 │
+│                  纯 Go API / WebSocket 服务                   │
 └────────────────────────────┬─────────────────────────────────┘
                              │ WebSocket v2 (双向流)
 ┌────────────────────────────▼─────────────────────────────────┐
-│                        Agent GUI                              │
-│                   Tauri 2 · React 19 · Rust                  │
+│                    Tauri 2 系统运行时                         │
+│                         Rust                                 │
 ├──────────┬───────────┬───────────┬───────────┬───────────────┤
 │ 模型协议  │ Agent运行时 │  工具执行   │  Skills   │  Memory/Cron  │
 │ pi-ai    │ 多轮循环   │ FS/Bash/  │  渐进披露  │  SQLite+MD    │
@@ -270,16 +257,15 @@ location / {
 
 | 组件 | 技术 |
 |---|---|
-| **Agent GUI** · 框架 | Tauri 2 + React 19 + TypeScript 6 |
-| **Agent GUI** · 构建 | Vite 8 + pnpm |
-| **Agent GUI** · 样式 | Tailwind CSS 4 + Radix UI |
-| **Agent GUI** · 渲染 | streamdown + KaTeX + Mermaid + Monaco Editor |
-| **Agent GUI** · 后端 | Rust + Tokio + SQLite (rusqlite) + WebSocket (tokio-tungstenite) |
-| **Agent GUI** · LLM | @earendil-works/pi-ai · @openai/codex-sdk · claude-agent-sdk |
+| **统一前端** · 框架 | Tauri 2 + React 19 + TypeScript 7 |
+| **统一前端** · 构建 | Vite 8 + pnpm(Web/PC/移动端共享源码) |
+| **统一前端** · 样式 | Tailwind CSS 4 + Base UI |
+| **统一前端** · 渲染 | streamdown + KaTeX + Mermaid + Monaco Editor |
+| **Tauri** · 后端 | Rust + Tokio + SQLite (rusqlite) + WebSocket (tokio-tungstenite) |
+| **Agent** · LLM | @earendil-works/pi-ai |
 | **Gateway** · 语言 | Go 1.25 |
 | **Gateway** · 协议 | WebSocket + Protobuf + HTTP |
-| **Gateway** · Web UI | React + Vite + Tailwind CSS(嵌入式) |
-| **Gateway** · 部署 | Docker multi-stage · Railway CI/CD |
+| **Gateway** · 边界 | 纯 Go API/WebSocket,不包含前端与容器配置 |
 
 </details>
 
@@ -291,10 +277,9 @@ location / {
 | `make dev` | 启动 Tauri 开发环境 |
 | `make build` | 构建桌面应用 |
 | `make dev-gateway` | 启动 Gateway 开发服务 |
-| `make dev-webui` | 启动 WebUI 开发服务 |
+| `make dev-web` | 从统一前端源码启动 Web 开发服务 |
 | `make gateway-build` | 构建 Gateway 二进制 |
-| `make gateway-docker-build` | 构建 Docker 镜像 |
-| `make gateway-docker-smoke` | 构建 + 健康检查 |
+| `make web` | 从统一前端源码构建 Web 静态文件 |
 | `make desktop-build-macos-release` | macOS 签名发布构建 |
 | `make build-linux` | Linux amd64 网关 |
 | `make build-linux-arm` | Linux arm64 网关 |
@@ -309,7 +294,7 @@ location / {
 ```
 XAgent/
 ├── crates/
-│   ├── agent-gui/                # 桌面客户端
+│   ├── fronted/                  # Web/PC/移动端统一前端
 │   │   ├── src/                  # React 前端
 │   │   │   ├── components/       #   UI 组件
 │   │   │   ├── lib/              #   核心逻辑 (chat, tools, skills, memory)
@@ -318,11 +303,10 @@ XAgent/
 │   │   │   └── prompt/           #   System Prompt 模板
 │   │   └── src-tauri/            # Rust 后端 (Tauri)
 │   │
-│   └── agent-gateway/            # Go 网关服务
+│   └── gateway/                  # 纯 Go 网关服务
 │       ├── cmd/gateway/          #   入口
 │       ├── internal/             #   核心实现
-│       ├── proto/v1/             #   Protobuf 定义
-│       └── web/                  #   嵌入式 WebUI
+│       └── proto/                #   Protobuf 定义
 │
 ├── docs/                         # 项目文档
 │   ├── architecture/             #   架构设计
@@ -330,8 +314,7 @@ XAgent/
 │   └── operations/               #   运维部署
 │
 ├── scripts/release/              # 发布自动化
-├── .github/workflows/            # CI/CD (CI + Desktop Release + Gateway Docker)
-├── Dockerfile                    # Gateway 容器镜像
+├── .github/workflows/            # CI/CD (CI + Desktop Release)
 ├── Makefile                      # 构建命令集
 └── Cargo.toml                    # Rust workspace
 ```
@@ -388,12 +371,12 @@ XAgent/
 **Gateway · `crates/gateway`(如有改动)**
 
 1. Go 单元测试通过:`go test ./...`
-2. WebUI 构建 / Lint / 测试通过:`pnpm build && pnpm lint && pnpm test`(在 `web/` 目录执行)
-3. Proto 变更后重新生成并提交产物:`make proto`
+2. Proto 变更后重新生成并提交 Go 产物:`make proto`
 
-**跨端一致性**
+**单前端边界**
 
-- GUI 与 WebUI 的镜像文件必须逐字节一致:`node scripts/check-mirror.mjs`
+- Web/PC/移动端都从 `crates/fronted` 构建,平台差异只允许进入 `src/runtime` 或 Tauri 系统边界。
+- `crates/gateway` 只保留 Go API/WebSocket/proto,不得新增前端或静态资源嵌入。
 - 保持 diff 干净 (无行尾空白):`git diff --check`
 
 ---

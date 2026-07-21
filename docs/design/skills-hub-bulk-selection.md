@@ -1,7 +1,6 @@
 # Skills Hub 批量选择交互规格 v2
 
-适用范围：`crates/fronted/src/pages/skills-hub/SkillsHubPage.tsx` 与
-`crates/gateway/web/src/pages/skills-hub/SkillsHubPage.tsx`（两端 UI 必须保持一致）。
+适用范围：`crates/fronted/src/pages/skills-hub/SkillsHubPage.tsx`。Web、PC 与移动端共享这一个实现。
 
 ## 0. 核心原则
 
@@ -74,7 +73,7 @@
 2. Undo 只覆盖启用/禁用，不给删除提供伪撤销暗示。
 3. 触屏（webui 移动端）无 hover：复选框常驻可点，浮动栏不遮挡最后一行卡片（列表底部留 padding）。
 4. lockedByChatMode 时批量入口整体隐藏（保留现状）。
-5. agent-gui 与 agent-gateway/web 两份 SkillsHubPage 行为、样式、i18n 全部对齐。
+5. Web、PC 与移动端从同一 SkillsHubPage、样式和 i18n 构建。
 
 ## 8. WebView2 渲染规约
 
@@ -89,8 +88,7 @@ Skills Hub 在 Windows WebView2 中必须遵守以下合成约束：
 3. **backdrop-filter 仅允许用于背后内容完全静态的场景。**
    例如页面顶部 HubHeader 或仅覆盖静态 HubBackdrop 的面板。若调用方可能覆盖列表、
    滚动区域或动画内容，应默认不用 backdrop-filter。
-4. **两端必须同步。**任何相关样式调整都要同时检查 agent-gui 与
-   agent-gateway/web，避免一个端重新引入独立合成层。
+4. **单源实现。**任何相关样式调整都必须留在统一前端，禁止为某个平台复制组件或样式树。
 
 案例依据：
 

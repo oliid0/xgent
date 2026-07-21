@@ -25,7 +25,7 @@ Go 网关：
 - [x] 移除 `.golangci.yml` 中 v1 路径的 SA1019 豁免
 - [x] 移除 `observability/protousage.go` 中全部 v1 计数器（`protocol_usage`
       只余 v2 键）
-- [x] Makefile/CI/Dockerfile/mise 移除 gRPC 端口、`protoc-gen-go-grpc` 钉栓
+- [x] Makefile/CI/构建配置移除 gRPC 端口、`protoc-gen-go-grpc` 钉栓
 
 桌面端 Rust：
 

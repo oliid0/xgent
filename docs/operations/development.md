@@ -1,95 +1,60 @@
 # 开发与运行
 
+## 仓库边界
+
+| 目录 | 职责 |
+|---|---|
+| `crates/fronted` | 唯一 React 前端源码，以及 Tauri 2 Rust 系统层。Web、PC、移动端从这里构建。 |
+| `crates/gateway` | 纯 Go API/WebSocket/proto 服务。不包含前端、静态资源嵌入或容器配置。 |
+
+平台差异必须进入 `crates/fronted/src/runtime` 或 `src-tauri` 的系统能力边界，页面、组件、状态模型与 i18n 保持单份源码。
+
 ## 根目录命令
 
 | 命令 | 作用 |
 |---|---|
-| `make dev` | 启动桌面 GUI 开发模式。 |
-| `make build` | 构建桌面 GUI。 |
-| `make desktop-build-macos` | macOS 普通桌面打包。 |
-| `make desktop-build-macos-release` | macOS Developer ID 签名、公证相关 release 打包。 |
-| `make desktop-build-macos-intel` | Intel macOS 目标构建。 |
-| `make desktop-build-macos-m` | Apple Silicon macOS 目标构建。 |
-| `make desktop-build-windows` | Windows 桌面目标构建。 |
-| `make desktop-build-linux` | Linux 桌面目标构建。 |
-| `make dev-gateway` | 本地启动 Go Gateway 开发服务。 |
-| `make dev-webui` | 本地启动 Gateway WebUI Vite 开发服务。 |
-| `make proto` | 生成 Gateway proto。 |
-| `make webui` | 构建 Gateway WebUI 静态资源。 |
-| `make gateway-build` | proto + webui + Gateway 构建。 |
+| `make dev` | 启动 Tauri 开发模式。 |
+| `make build` | 构建当前桌面平台。 |
+| `make dev-web` | 从统一前端源码启动 Web 开发服务。 |
+| `make web` | 从统一前端源码构建 Web 静态文件。 |
+| `make dev-gateway` | 启动纯 Go Gateway。 |
+| `make gateway-build` | 生成 proto 并构建 Gateway 二进制。 |
+| `make proto` | 生成 Gateway Go protobuf。 |
+| `make proto-check` | 执行 buf lint 与 breaking-change 检查。 |
+| `make desktop-build-macos-release` | macOS 签名、公证 release 打包。 |
+| `make desktop-build-windows` | Windows 桌面构建。 |
+| `make desktop-build-linux` | Linux 桌面构建。 |
 
-## 包管理与子项目
+## GitHub Actions 验证
 
-| 子项目 | Manifest | 说明 |
-|---|---|---|
-| Rust workspace | `Cargo.toml` | 根工作区，包含 Tauri/Rust crate。 |
-| GUI frontend | `crates/fronted/package.json` | 桌面 React/Tauri 前端依赖与脚本。 |
-| Gateway | `crates/gateway/go.mod` | Go Gateway 依赖。 |
-| Gateway WebUI | `crates/gateway/web/package.json` | 浏览器 WebUI 依赖与构建脚本。 |
+当前项目以 GitHub Actions 为构建和测试事实来源。`.github/workflows/ci.yml` 包含：
 
-## 常用检查命令
-
-| 场景 | 命令 |
+| Job | 覆盖内容 |
 |---|---|
-| GUI build | `pnpm -C crates/fronted build` |
-| WebUI build | `pnpm -C crates/gateway/web build` |
-| Gateway tests | `cd crates/gateway && go test ./...` |
-| Gateway lint | `cd crates/gateway && golangci-lint run ./...` |
-| Proto 检查 | `make proto-check`（buf lint + 对 origin/main 的 breaking 检查） |
-| Tauri/Rust tests | `cargo test --manifest-path crates/fronted/src-tauri/Cargo.toml` |
-| 前端专项测试 | `pnpm -C crates/fronted test:frontend` |
-| diff 空白检查 | `git diff --check` |
-| 当前改动 | `git status --short` |
+| Gateway | buf lint/breaking、Go protobuf 生成一致性、golangci-lint、Go tests。 |
+| Unified Frontend | TypeScript 7 + Web build、Biome、前端模块测试、release 脚本测试。 |
+| Tauri Rust Check | Linux Tauri 依赖、Rust tests 编译、history migration tests。 |
+| Architecture Guard | 单前端、纯 Go Gateway、无旧目录/镜像脚本/Docker 配置、运行时导入边界。 |
+| Diff Hygiene | 行尾与空白检查。 |
 
-工具链版本由根 `mise.toml` 固定（git 跟踪），`mise install` 一键对齐，CI 使用相同版本。
-
-实际脚本名称可能随 package.json 调整，运行前以当前 manifest 为准。
-
-## 运行时路径
-
-| 路径 | 说明 |
-|---|---|
-| `~/.xagent/config.sqlite` | 桌面端 settings 数据库。 |
-| `~/.xagent/chat-history.sqlite3` | Chat history 数据库。 |
-| `~/.xagent/memory/` | Memory Markdown 根目录与 `memory-index.sqlite3`。 |
-| `~/.xagent/skills` | Skills runtime root。 |
-| `~/.xagent/default-project` | 首次安装/空 workdir 时的默认项目目录。 |
-| `~/.xagent/debug/*.jsonl` | debug JSONL 日志。 |
-
-## Gateway 开发关注点
-
-| 项 | 说明 |
-|---|---|
-| HTTP | `internal/server/http.go` 注册 `/ws/v2*` 三链路、`/api/status`、`/api/files/import`、public share 和静态资源。 |
-| Proto | 改 `proto/v1|v2/*.proto` 后执行 `make proto`（buf 生成 Go+TS），生成物随源同 PR 提交；`make proto-check` 把关破坏性变更。 |
-| Shutdown | `make dev-gateway` 应支持 Ctrl+C 后 HTTP 干净退出。 |
-| WebUI embed | Gateway build 通常依赖 `make webui` 先产出静态资源。 |
-| 新增桌面端能力 | v1 envelope 加臂（编号只增不改）→ `make proto` → v2 直通白名单（`internal/protocol/pbws/guard.go`）放行 → 各端生成物随源同 PR 提交；新增网关本地操作则在 v2 帧（`proto/v2/gateway_ws.proto`）加臂。 |
-| 弃用惯例 | Go `// Deprecated: <原因；替代物；删除条件>`、Rust `#[deprecated]`、TS `@deprecated`、proto `option deprecated`；弃用代码原地保留只修 bug，删除前先经使用打点观察（v1 协议已按此流程移除，记录见 [protocol-v2-migration.md](../architecture/protocol-v2-migration.md)）。 |
-
-## Gateway 分层（新代码放哪里）
+## Gateway 分层
 
 | 代码类型 | 位置 |
 |---|---|
-| 传输机制（写泵/背压/心跳，帧格式无关） | `internal/transport/wscore` |
+| 传输机制（写泵/背压/心跳） | `internal/transport/wscore` |
 | v2 协议编解码/握手/直通/扇出 | `internal/protocol/pbws` |
-| 跨协议域逻辑（终端门控、Origin 校验等） | `internal/protocol/shared` |
+| 跨协议域逻辑 | `internal/protocol/shared` |
 | chat 命令编排 | `internal/chatcmd` |
-| 会话状态与关联路由（transport 无关） | `internal/session` |
-| 日志装置与协议使用打点 | `internal/observability` |
-| HTTP 入口与 public share | `internal/server` |
+| 会话状态与关联路由 | `internal/session` |
+| 日志与协议使用观测 | `internal/observability` |
+| HTTP/API/WebSocket 入口 | `internal/server` |
 
-## GUI/WebUI 双端改造检查
+修改 proto 后只生成 Go 产物。浏览器运行时属于统一前端，不由 Gateway 的 buf 配置向另一个前端目录生成代码。
 
-| 改动类型 | 需要同步检查 |
-|---|---|
-| Settings 子页面 | `crates/fronted/src/pages/settings/*` 与 `crates/gateway/web/src/pages/settings/*`。 |
-| Chat 气泡/侧边栏/上传 | GUI `src/pages/chat`/`src/components/chat` 与 WebUI 对应 copy。 |
-| Skills Hub | GUI/WebUI `pages/skills-hub`、`lib/skills`、i18n。 |
-| MCP Hub | GUI/WebUI `pages/mcp-hub`、`lib/mcpRegistry`、i18n。 |
-| Provider 设置 | GUI/WebUI settings、Rust settings、Gateway redaction、模型请求层。 |
-| Memory | Rust MemoryStore、GUI/WebUI MemoryPanel、Gateway memory.manage、MemoryManager tool。 |
+## 统一前端检查
 
-## 文档任务边界
-
-本文档树只描述当前架构，不要求启动 dev server 或跑 build。若后续文档改动伴随代码改动，应按触达模块补充对应 build/test。
+- 不新增 `crates/gateway/web` 或其他第二前端目录。
+- 不复制页面、组件、store、i18n 或测试来区分 Web/PC/移动端。
+- 共享源码只通过 `@xagent/runtime` 使用 invoke/event/path/opener 等平台能力。
+- 浏览器不支持的本地能力由明确的 runtime adapter 表达，不能通过 Vite alias 伪装 Tauri 包。
+- Gateway 不 serve SPA、不 `go:embed` 前端、不参与 Web 静态资源构建。

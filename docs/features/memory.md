@@ -2,7 +2,7 @@
 
 ## 总体模型
 
-XAgent 的记忆系统由 Rust `MemoryStore` 作为本地真相源；前端 TypeScript 记忆域集中在 `src/lib/memory/`，提供 Settings 管理、Chat prompt 注入、`MemoryManager` 工具、回合后静默提取与离线组织器。Gateway/WebUI 不拥有独立记忆库，只把 WebUI 的 memory 请求转发到桌面端；共享逻辑文件由 `scripts/mirror-manifest.json` 强制双端逐字节镜像。
+XAgent 的记忆系统由 Rust `MemoryStore` 作为本地真相源；前端 TypeScript 记忆域集中在 `src/lib/memory/`，提供 Settings 管理、Chat prompt 注入、`MemoryManager` 工具、回合后静默提取与离线组织器。浏览器运行时不拥有独立记忆库，只通过 Gateway 把 memory 请求转发到 Tauri Agent；Web、PC 和移动端共享同一套前端逻辑。
 
 | 层 | 路径 | 职责 |
 |---|---|---|

@@ -5,12 +5,12 @@
 | 路径 | 说明 |
 |---|---|
 | `README.md` | 项目根说明。 |
-| `Makefile` | 桌面、Gateway、WebUI、proto、release 常用命令。 |
+| `Makefile` | 统一前端、Tauri、Gateway、proto、release 常用命令。 |
 | `Cargo.toml` | Rust workspace。 |
 | `doc/` | 历史专项文档。 |
 | `docs/` | 当前架构总览文档。 |
 
-## GUI Frontend
+## Unified Frontend
 
 | 功能 | 路径 |
 |---|---|
@@ -29,7 +29,7 @@
 | Shared hub chrome | `crates/fronted/src/components/hub/HubChrome.tsx` |
 | i18n | `crates/fronted/src/i18n/*` |
 
-## GUI Libraries
+## Shared Frontend Libraries
 
 | 功能 | 路径 |
 |---|---|
@@ -89,26 +89,15 @@
 | Proto source | `crates/gateway/proto/v1/gateway.proto`（业务消息）、`proto/v2/gateway_ws.proto`（v2 帧壳） |
 | Generated proto | `crates/gateway/internal/proto/v1/*`、`internal/proto/v2/*` |
 
-## WebUI
+## Runtime Boundary
 
 | 功能 | 路径 |
 |---|---|
-| WebUI entry | `crates/gateway/web/src/main.tsx` |
-| App shell | `crates/gateway/web/src/App.tsx` |
-| Gateway socket | `crates/gateway/web/src/lib/gatewaySocket.ts` |
-| Conversation stream client | `crates/gateway/web/src/lib/chat/stream/conversationStreamClient.ts` |
-| Terminal stream client | `crates/gateway/web/src/lib/terminal/gatewayTerminalStreamClient.ts` |
-| Gateway types | `crates/gateway/web/src/lib/gatewayTypes.ts` |
-| Web settings | `crates/gateway/web/src/lib/webSettings.ts`、`web/src/lib/settings/*` |
-| History sync/parser | `crates/gateway/web/src/lib/historySync.ts`、`historyParser.ts` |
-| Upload | `crates/gateway/web/src/lib/uploadReadableFiles.ts` |
-| Transcript | `crates/gateway/web/src/components/GatewayTranscript.tsx` |
-| Chat UI | `crates/gateway/web/src/pages/chat/*` |
-| Settings | `crates/gateway/web/src/pages/SettingsPage.tsx`、`web/src/pages/settings/*` |
-| Skills Hub | `crates/gateway/web/src/pages/skills-hub/*` |
-| MCP Hub | `crates/gateway/web/src/pages/mcp-hub/*` |
-| Tauri shims | `crates/gateway/web/src/shims/*` |
-| WebUI i18n | `crates/gateway/web/src/i18n/*` |
+| Runtime interface | `crates/fronted/src/runtime/types.ts` |
+| Runtime selection | `crates/fronted/src/runtime/index.ts` |
+| Tauri adapter | `crates/fronted/src/runtime/tauri.ts` |
+| Browser adapter | `crates/fronted/src/runtime/browser.ts` |
+| Web build | `crates/fronted/package.json` 的 `build:web` |
 
 ## 资料与设计
 

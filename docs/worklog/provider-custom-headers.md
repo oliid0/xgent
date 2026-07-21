@@ -2,12 +2,12 @@
 
 ## Goal
 
-Add ordered custom HTTP headers to `CustomProvider` in both mirrored TypeScript frontends, inject them safely into LLM and model-discovery requests, redact header values in debug logs, and expose an editable settings UI.
+Add ordered custom HTTP headers to `CustomProvider` in the unified TypeScript frontend, inject them safely into LLM and model-discovery requests, redact header values in debug logs, and expose an editable settings UI.
 
 ## Constraints
 
 - Branch: `feat/provider-custom-headers`, based on `upstream/main` at `b11a0a5`.
-- Keep `crates/fronted` and `crates/gateway/web` mirrored.
+- Keep runtime differences behind `@xagent/runtime`.
 - Do not commit, push, or create a PR before manual Tauri validation.
 - Do not change Rust unless the gateway model-discovery path proves it is required and the user approves.
 

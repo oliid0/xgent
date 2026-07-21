@@ -116,7 +116,7 @@ XAgent is a **local-first** AI agent desktop client. It deeply integrates large 
 
 ### 🌐 Remote Gateway
 
-- **Access from any browser** — Go gateway (WebSocket + Protobuf) with a WebUI for remotely controlling the local agent
+- **Access from any browser** — the same React frontend connects to the Go Gateway through its browser runtime
 - **Disconnect recovery** — a bounded seq window replays short outages, with desktop-side persistence as the safety net
 
 ---
@@ -162,49 +162,30 @@ Choose by distribution from [Releases](https://github.com/Ohi01/XAgent/releases/
 | DEB | Debian / Ubuntu family | `sudo dpkg -i XAgent-<version>-Linux-x86_64.deb` |
 | RPM | Fedora / openSUSE family | `sudo rpm -i XAgent-<version>-Linux-x86_64.rpm` |
 
-### Need Remote Access? Deploy the Gateway
+### Need Remote Access? Deploy the Gateway and Web Frontend
 
-The desktop app works out of the box and depends on no server. Deploy the Gateway only if you want to **control your local agent from a browser**.
-
-**Note: when deployed behind an Nginx reverse proxy, set the Gateway address on the Settings → Remote page to the HTTPS URL and use port 443.**
+The desktop app works without a server. Browser access uses the same React source under `crates/fronted`; `crates/gateway` is a pure Go API/WebSocket service and neither contains frontend assets nor publishes a container image.
 
 ```bash
-# Pull the image (built by GitHub Actions, multi-arch: amd64 / arm64)
-docker pull ghcr.io/ohi01/xagent-gateway:latest
+# Build the pure Go Gateway
+make gateway-build
 
-# Run in the background (HTTP/WebSocket → host 3000)
-docker run -d \
-  --name xagent-gateway \
-  --restart unless-stopped \
-  -p 3000:8080 \
-  -e XAGENT_GATEWAY_TOKEN=your-token \
-  ghcr.io/ohi01/xagent-gateway:latest
+# Build static Web assets from the shared React source
+make web
 ```
 
-**One-command upgrade to the latest version** — pull the new image → remove the old container → recreate it with the same arguments (if you changed the port mappings or token, adjust the arguments below accordingly):
-
-```bash
-docker pull ghcr.io/ohi01/xagent-gateway:latest \
-  && docker rm -f xagent-gateway \
-  && docker run -d \
-    --name xagent-gateway \
-    --restart unless-stopped \
-    -p 3000:8080 \
-    -e XAGENT_GATEWAY_TOKEN=your-token \
-    ghcr.io/ohi01/xagent-gateway:latest \
-  && docker image prune -f
-```
+Deploy `crates/fronted/dist` to a static host and run `crates/gateway/bin/xagent-gateway` separately. In production, expose the static frontend and Gateway API/WebSocket routes through the same HTTPS origin; use port `443` in Remote settings.
 
 <details>
 <summary><b>Nginx reverse proxy configuration</b> — reference for custom domains / TLS</summary>
 
-> Since protocol v2, all traffic — the WebUI, the HTTP API, and the WebSocket links of both the browser and the desktop app — goes through the single HTTP port (default 3000).
+> The Gateway handles API and WebSocket traffic only. Nginx serves the files generated from `crates/fronted/dist` and proxies backend routes to the Gateway.
 >
 > WebSocket upgrades happen on several paths (`/ws/v2`, `/ws/v2/agent`, `/ws/v2/terminal`, and tunnels under `/t/`), so the simplest correct setup enables the upgrade on the whole vhost:
 
 ```nginx
-# WebUI SPA/static/API + every WebSocket link (browser and desktop)
-location / {
+# Gateway API and WebSocket routes
+location ~ ^/(api|ws|t)/ {
     proxy_pass http://127.0.0.1:3000;
     proxy_http_version 1.1;
 
@@ -225,9 +206,15 @@ location / {
     proxy_send_timeout 300s;
     proxy_buffering off;
 }
+
+# Web build from the shared React frontend
+location / {
+    root /srv/xagent/fronted;
+    try_files $uri $uri/ /index.html;
+}
 ```
 
-> The upstream port maps to the host port from the `docker run` above: HTTP/WebSocket 3000 (inside the container, HTTP actually listens on `PORT=8080`). The server block needs `listen 443 ssl;` and a `client_max_body_size` large enough for attachment uploads (e.g. `100m`).
+> This example assumes the Gateway listens on `127.0.0.1:3000` and the Web build is copied to `/srv/xagent/fronted`. The server block needs `listen 443 ssl;` and a `client_max_body_size` large enough for attachment uploads (e.g. `100m`).
 
 </details>
 
@@ -246,19 +233,19 @@ Expand the Development Guide below for the full set of Make commands.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                        Browser WebUI                          │
-│              React + Vite + WebSocket + Gateway API           │
+│                  Shared XAgent React Source                  │
+│            Web · Tauri Desktop · Tauri Mobile               │
 └────────────────────────────┬─────────────────────────────────┘
                              │ WebSocket / HTTP
 ┌────────────────────────────▼─────────────────────────────────┐
 │                       Agent Gateway                           │
 │    Go · WebSocket · HTTP · Session Manager · Event Store     │
-│               (Railway / Docker / self-hosted)                │
+│                  Pure Go API / WebSocket                     │
 └────────────────────────────┬─────────────────────────────────┘
                              │ WebSocket v2 (bidirectional stream)
 ┌────────────────────────────▼─────────────────────────────────┐
-│                        Agent GUI                              │
-│                   Tauri 2 · React 19 · Rust                  │
+│                    Tauri 2 System Runtime                    │
+│                          Rust                                │
 ├──────────┬────────────┬───────────┬────────────┬─────────────┤
 │ Models   │ Runtime    │ Tools     │ Skills     │ Memory/Cron │
 │ pi-ai    │ multi-turn │ FS/Bash/  │ progressive│ SQLite+MD   │
@@ -270,16 +257,15 @@ Expand the Development Guide below for the full set of Make commands.
 
 | Component | Technology |
 |---|---|
-| **Agent GUI** · Framework | Tauri 2 + React 19 + TypeScript 6 |
-| **Agent GUI** · Build | Vite 8 + pnpm |
-| **Agent GUI** · Styling | Tailwind CSS 4 + Radix UI |
-| **Agent GUI** · Rendering | streamdown + KaTeX + Mermaid + Monaco Editor |
-| **Agent GUI** · Backend | Rust + Tokio + SQLite (rusqlite) + WebSocket (tokio-tungstenite) |
-| **Agent GUI** · LLM | @earendil-works/pi-ai · @openai/codex-sdk · claude-agent-sdk |
+| **Unified frontend** · Framework | Tauri 2 + React 19 + TypeScript 7 |
+| **Unified frontend** · Build | Vite 8 + pnpm (shared by Web/PC/mobile) |
+| **Unified frontend** · Styling | Tailwind CSS 4 + Base UI |
+| **Unified frontend** · Rendering | streamdown + KaTeX + Mermaid + Monaco Editor |
+| **Tauri** · Backend | Rust + Tokio + SQLite (rusqlite) + WebSocket (tokio-tungstenite) |
+| **Agent** · LLM | @earendil-works/pi-ai |
 | **Gateway** · Language | Go 1.25 |
 | **Gateway** · Protocols | WebSocket + Protobuf + HTTP |
-| **Gateway** · Web UI | React + Vite + Tailwind CSS (embedded) |
-| **Gateway** · Deployment | Docker multi-stage · Railway CI/CD |
+| **Gateway** · Boundary | Pure Go API/WebSocket; no frontend or container config |
 
 </details>
 
@@ -291,10 +277,9 @@ Expand the Development Guide below for the full set of Make commands.
 | `make dev` | Start the Tauri development environment |
 | `make build` | Build the desktop app |
 | `make dev-gateway` | Start the Gateway dev server |
-| `make dev-webui` | Start the WebUI dev server |
+| `make dev-web` | Start Web development from the unified frontend |
 | `make gateway-build` | Build the Gateway binary |
-| `make gateway-docker-build` | Build the Docker image |
-| `make gateway-docker-smoke` | Build + health check |
+| `make web` | Build Web assets from the unified frontend |
 | `make desktop-build-macos-release` | macOS signed release build |
 | `make build-linux` | Linux amd64 gateway |
 | `make build-linux-arm` | Linux arm64 gateway |
@@ -309,7 +294,7 @@ Expand the Development Guide below for the full set of Make commands.
 ```
 XAgent/
 ├── crates/
-│   ├── agent-gui/                # Desktop client
+│   ├── fronted/                  # Unified Web/PC/mobile frontend
 │   │   ├── src/                  # React frontend
 │   │   │   ├── components/       #   UI components
 │   │   │   ├── lib/              #   Core logic (chat, tools, skills, memory)
@@ -318,11 +303,10 @@ XAgent/
 │   │   │   └── prompt/           #   System prompt templates
 │   │   └── src-tauri/            # Rust backend (Tauri)
 │   │
-│   └── agent-gateway/            # Go gateway service
+│   └── gateway/                  # Pure Go gateway service
 │       ├── cmd/gateway/          #   Entry point
 │       ├── internal/             #   Core implementation
-│       ├── proto/v1/             #   Protobuf definitions
-│       └── web/                  #   Embedded WebUI
+│       └── proto/                #   Protobuf definitions
 │
 ├── docs/                         # Project docs
 │   ├── architecture/             #   Architecture design
@@ -330,8 +314,7 @@ XAgent/
 │   └── operations/               #   Operations & deployment
 │
 ├── scripts/release/              # Release automation
-├── .github/workflows/            # CI/CD (CI + Desktop Release + Gateway Docker)
-├── Dockerfile                    # Gateway container image
+├── .github/workflows/            # CI/CD (CI + Desktop Release)
 ├── Makefile                      # Build commands
 └── Cargo.toml                    # Rust workspace
 ```
@@ -388,12 +371,12 @@ Before submitting a PR, make sure all of the following checks pass (they match t
 **Gateway · `crates/gateway` (if changed)**
 
 1. Go unit tests pass: `go test ./...`
-2. WebUI build / lint / tests pass: `pnpm build && pnpm lint && pnpm test` (run in `web/`)
-3. Regenerate and commit artifacts after proto changes: `make proto`
+2. Regenerate and commit Go artifacts after proto changes: `make proto`
 
-**Cross-frontend consistency**
+**Single-frontend boundary**
 
-- Mirrored files between GUI and WebUI must be byte-identical: `node scripts/check-mirror.mjs`
+- Web, PC, and mobile builds all come from `crates/fronted`; platform differences belong in `src/runtime` or the Tauri system boundary.
+- `crates/gateway` contains only Go API/WebSocket/proto code and must not gain a frontend or static asset embedding.
 - Keep the diff clean (no trailing whitespace): `git diff --check`
 
 ---
