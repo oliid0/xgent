@@ -393,17 +393,3 @@ for (const [surface, graph] of Object.entries(graphModules)) {
     ]);
   });
 }
-
-test("GUI and WebUI git graph modules stay in parity", () => {
-  const commits = [
-    { sha: "m", parents: ["a", "b"] },
-    { sha: "a", parents: ["r"] },
-    { sha: "b", parents: ["r"] },
-    { sha: "r", parents: [] },
-  ];
-
-  assert.deepEqual(
-    graphModules.gui.computeGitGraph(commits),
-    graphModules.web.computeGitGraph(commits),
-  );
-});

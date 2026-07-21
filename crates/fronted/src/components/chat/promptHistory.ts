@@ -9,8 +9,7 @@
  * inside multi-line drafts; any edit must reset the session because cursor
  * and stash are only meaningful while the recalled text is untouched.
  *
- * Byte-identical between agent-gui and agent-gateway/web
- * (scripts/mirror-manifest.json).
+ * Kept transport-agnostic so the same implementation runs in every frontend target.
  */
 
 export type PromptHistoryStash<TPaste> = {

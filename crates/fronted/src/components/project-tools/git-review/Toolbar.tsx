@@ -2,10 +2,8 @@
 // mode/pane switchers) plus the modal dialogs and the operation toast shared
 // by the status and history views.
 //
-// MIRROR NOTICE: every file under components/project-tools/git-review exists
-// byte-for-byte in both frontends (crates/fronted/src and
-// crates/gateway/web/src). Keep changes in sync on both ends; only
-// relative or @xagent/runtime imports are allowed here.
+// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// are allowed here.
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";

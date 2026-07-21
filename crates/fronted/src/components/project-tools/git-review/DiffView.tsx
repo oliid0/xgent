@@ -2,10 +2,8 @@
 // context menu, selection autoscroll, horizontal scrollbar) and the
 // DiffReviewCard wrapper used by the changes view.
 //
-// MIRROR NOTICE: every file under components/project-tools/git-review exists
-// byte-for-byte in both frontends (crates/fronted/src and
-// crates/gateway/web/src). Keep changes in sync on both ends; only
-// relative or @xagent/runtime imports are allowed here.
+// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// are allowed here.
 
 import { DiffFile } from "@git-diff-view/file";
 import { DiffModeEnum, DiffView } from "@git-diff-view/react";

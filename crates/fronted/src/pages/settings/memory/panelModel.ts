@@ -2,10 +2,8 @@
 // filters, type labels, organizer status/risk labels, quota fallbacks and
 // summary text derivation. No React, no platform imports.
 //
-// MIRROR NOTICE: every file in pages/settings/memory except platform.tsx
-// exists byte-for-byte in both frontends (crates/fronted/src and
-// crates/gateway/web/src). Keep changes in sync on both ends; platform
-// differences belong in ./platform, never here.
+// Shared by every frontend runtime. Platform differences belong in the
+// runtime boundary, never in this model.
 
 import type {
   MemoryListResponse,

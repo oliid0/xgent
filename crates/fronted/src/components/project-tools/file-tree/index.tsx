@@ -1,10 +1,8 @@
 // Right-dock file tree panel: virtualized tree over the useFileTreeData
 // layer, reading its wiring from the right-dock tool context.
 //
-// MIRROR NOTICE: every file under components/project-tools/file-tree/ exists
-// byte-for-byte in both frontends (crates/fronted/src and
-// crates/gateway/web/src). Keep changes in sync on both ends; only
-// relative, npm-package, or @xagent/runtime imports are allowed here.
+// Shared by every frontend runtime; only relative, npm-package, or
+// @xagent/runtime imports are allowed here.
 
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {

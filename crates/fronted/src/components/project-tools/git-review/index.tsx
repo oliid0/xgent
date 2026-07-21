@@ -2,10 +2,8 @@
 // layout/presentation state shared across views and composes the toolbar,
 // status view and history view around the data layer.
 //
-// MIRROR NOTICE: every file under components/project-tools/git-review exists
-// byte-for-byte in both frontends (crates/fronted/src and
-// crates/gateway/web/src). Keep changes in sync on both ends; only
-// relative or @xagent/runtime imports are allowed here.
+// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// are allowed here.
 
 import { memo, useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useLocale } from "../../../i18n";

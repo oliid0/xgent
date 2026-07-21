@@ -9,6 +9,8 @@ const errors = [];
 const removedBrand = ["live", "agent"].join("");
 const removedSpacedBrand = ["live", "agent"].join(" ");
 const removedBrandPattern = new RegExp(`${removedBrand}|${removedSpacedBrand}`, "i");
+const removedFrontendLayoutPattern =
+  /agent-gui|agent-gateway\/web|crates\/gateway\/web|scripts\/(?:check-mirror|mirror-manifest)/i;
 
 function relative(absolutePath) {
   return path.relative(repoRoot, absolutePath).replaceAll(path.sep, "/");
@@ -71,6 +73,9 @@ for (const file of walkFiles(sourceRoot)) {
   const filePath = relative(file);
   if (removedBrandPattern.test(source)) {
     errors.push(`${filePath}: contains a removed legacy brand reference`);
+  }
+  if (removedFrontendLayoutPattern.test(source)) {
+    errors.push(`${filePath}: refers to the removed duplicate frontend layout`);
   }
   if (
     source.includes("@tauri-apps/") &&

@@ -1,9 +1,7 @@
 // GitReview transient overlay scrollbar system.
 //
-// MIRROR NOTICE: every file under components/project-tools/git-review exists
-// byte-for-byte in both frontends (crates/fronted/src and
-// crates/gateway/web/src). Keep changes in sync on both ends; only
-// relative or @xagent/runtime imports are allowed here.
+// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// are allowed here.
 //
 // Scroll containers opt in via GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS plus the
 // onScroll handler returned by useOverlayScrollbar(). The overlay thumbs are

@@ -2,9 +2,8 @@ import type { SystemToolRuntimeScope } from "./systemToolOptions";
 
 /**
  * Display-only catalog of the built-in tools registered by the agent runtime.
- * This file is mirrored byte-for-byte between agent-gui and agent-gateway/web
- * (see scripts/mirror-manifest.json), so it must stay pure data: no runtime
- * bundle imports (the WebUI tree does not have them). It is intentionally
+ * This catalog is shared by every runtime target, so it must stay pure data
+ * with no platform bundle imports. It is intentionally
  * separate from SYSTEM_TOOL_OPTIONS, which doubles as the persistence
  * whitelist for selectedSystemTools.
  */

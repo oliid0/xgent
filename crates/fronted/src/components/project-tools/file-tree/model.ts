@@ -1,10 +1,8 @@
 // Pure model helpers for the right-dock file tree panel.
 //
-// MIRROR NOTICE: every file under components/project-tools/file-tree/ exists
-// byte-for-byte in both frontends (crates/fronted/src and
-// crates/gateway/web/src). Keep changes in sync on both ends; only
-// relative, npm-package, or @xagent/runtime imports are allowed here. Platform
-// differences are resolved at runtime (see FILE_TREE_HAS_OS_INTEGRATION).
+// Shared by every frontend runtime; only relative, npm-package, or
+// @xagent/runtime imports are allowed here. Platform differences are resolved
+// at runtime (see FILE_TREE_HAS_OS_INTEGRATION).
 
 import type { WorkspaceActivityEventPayload } from "../../../lib/workspace-activity/types";
 

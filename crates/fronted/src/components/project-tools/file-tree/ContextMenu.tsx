@@ -1,9 +1,7 @@
 // Context menu for the right-dock file tree panel.
 //
-// MIRROR NOTICE: every file under components/project-tools/file-tree/ exists
-// byte-for-byte in both frontends (crates/fronted/src and
-// crates/gateway/web/src). Keep changes in sync on both ends; only
-// relative, npm-package, or @xagent/runtime imports are allowed here.
+// Shared by every frontend runtime; only relative, npm-package, or
+// @xagent/runtime imports are allowed here.
 // Desktop-only entries are gated at runtime via FILE_TREE_HAS_OS_INTEGRATION.
 
 import {

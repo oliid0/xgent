@@ -3,10 +3,8 @@
 // unchanged; pre-v4 runs degrade to a read-only legacy view (summaries and
 // review notes only: no decisions, no manual apply).
 //
-// MIRROR NOTICE: every file in pages/settings/memory except platform.tsx
-// exists byte-for-byte in both frontends (crates/fronted/src and
-// crates/gateway/web/src). Keep changes in sync on both ends; platform
-// differences belong in ./platform, never here.
+// Shared by every frontend runtime. Platform differences belong in the
+// runtime boundary, never in this modal.
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";

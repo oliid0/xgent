@@ -1,9 +1,8 @@
 /**
  * Subagent UI wire protocol.
  *
- * This file is mirrored byte-for-byte between agent-gui and agent-gateway/web
- * (see scripts/mirror-manifest.json). It must stay dependency-free: both
- * frontends render subagent tool calls purely from these shapes, which travel
+ * It must stay dependency-free: every runtime renders subagent tool calls
+ * purely from these shapes, which travel
  * inside tool_call/tool_result payloads.
  */
 
@@ -121,7 +120,7 @@ export type SubagentMessageDetails = {
 
 /**
  * Synthetic-card tool-call arguments. Cards use tool name "Agent" and the
- * `subagent_card: true` flag so both frontends can tell them apart from the
+ * `subagent_card: true` flag so every runtime can tell them apart from the
  * (suppressed) parent Agent call. `index` is 1-based for display.
  */
 export type SubagentCardArguments = {

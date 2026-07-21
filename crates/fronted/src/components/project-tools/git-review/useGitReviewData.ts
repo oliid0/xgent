@@ -9,10 +9,8 @@
 // when no activity client exists (no-push environment) does a low-frequency
 // fallback poll run while the panel is active.
 //
-// MIRROR NOTICE: every file under components/project-tools/git-review exists
-// byte-for-byte in both frontends (crates/fronted/src and
-// crates/gateway/web/src). Keep changes in sync on both ends; only
-// relative or @xagent/runtime imports are allowed here.
+// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// are allowed here.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale } from "../../../i18n";

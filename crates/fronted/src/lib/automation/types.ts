@@ -1,6 +1,6 @@
 // Wire types for the automation domain (cron tasks + conversation hooks).
 // Mirrors src-tauri/src/services/automation/types.rs — the Rust side is the
-// single source of truth; both frontends consume these shapes verbatim.
+// single source of truth; every frontend runtime consumes these shapes verbatim.
 
 export type CronTaskType = "bash" | "http" | "prompt";
 

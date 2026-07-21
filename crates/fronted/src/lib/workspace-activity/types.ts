@@ -1,9 +1,7 @@
 // Workspace activity invalidation types.
 //
-// MIRROR NOTICE: this file exists byte-for-byte in both frontends
-// (crates/fronted/src/lib/workspace-activity/ and
-// crates/gateway/web/src/lib/workspace-activity/). Keep changes in sync
-// on both ends; only relative or @xagent/runtime imports are allowed here.
+// Shared by every frontend runtime. Keep it transport-agnostic; only relative
+// or @xagent/runtime imports are allowed here.
 
 export type WorkspaceActivity = {
   workdir: string;

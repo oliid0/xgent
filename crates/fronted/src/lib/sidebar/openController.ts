@@ -2,8 +2,7 @@
 // fast (active segment / message tail, or a synchronous cache hit), then
 // hydrate the full transcript at idle. The switch overlay appears only after
 // overlayDelayMs of still-loading — there is no minimum overlay duration, so
-// cache hits switch synchronously with no flash. Byte-mirrored between
-// agent-gui and agent-gateway/web.
+// cache hits switch synchronously with no flash.
 
 export type ConversationOpenPhase = "idle" | "opening" | "hydrating" | "ready" | "failed";
 

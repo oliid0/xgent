@@ -1,10 +1,8 @@
 // GitReview history view: commit graph list (virtualized), commit detail pane
 // and the history context menus.
 //
-// MIRROR NOTICE: every file under components/project-tools/git-review exists
-// byte-for-byte in both frontends (crates/fronted/src and
-// crates/gateway/web/src). Keep changes in sync on both ends; only
-// relative or @xagent/runtime imports are allowed here.
+// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// are allowed here.
 
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { openUrl } from "@xagent/runtime";
