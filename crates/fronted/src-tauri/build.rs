@@ -25,12 +25,12 @@ fn main() {
         });
     println!("cargo:rustc-env=XAGENT_APP_VERSION={app_version}");
 
-    // v1/v2 proto 共用 agent-gateway 目录为 include 根，import 路径与 Go 侧 buf 模块一致；
+    // v1/v2 proto 共用 Gateway 目录为 include 根，import 路径与 Go 侧 buf 模块一致；
     // v2 经该路径 import v1 复用其消息。
     let gateway_root = std::path::Path::new(&manifest_dir)
         .join("..")
         .join("..")
-        .join("agent-gateway");
+        .join("gateway");
     let proto_v1 = gateway_root.join("proto").join("v1").join("gateway.proto");
     let proto_v2 = gateway_root
         .join("proto")

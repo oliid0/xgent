@@ -1,15 +1,9 @@
 import assert from "node:assert/strict";
-import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
-const guiRoot = fileURLToPath(new URL("../..", import.meta.url));
 const graphModules = {
-  gui: createTsModuleLoader().loadModule("src/lib/git/gitGraph.ts"),
-  web: createTsModuleLoader({
-    rootDir: path.resolve(guiRoot, "..", "agent-gateway", "web"),
-  }).loadModule("src/lib/git/gitGraph.ts"),
+  unified: createTsModuleLoader().loadModule("src/lib/git/gitGraph.ts"),
 };
 
 function simplifyRows(rows) {

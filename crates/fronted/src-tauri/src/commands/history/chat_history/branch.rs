@@ -1,7 +1,7 @@
 // 分支会话：从源会话按锚点（用户消息）截取前缀——含该轮完整的助手回复——
 // 复制为一条全新会话。所有写入都在同一个 SQLite 事务内完成。
 
-/// Must match BRANCH_CONVERSATION_DEFAULT_TITLE in agent-gui src/lib/chat/page/chatPageHelpers.ts.
+/// Must match BRANCH_CONVERSATION_DEFAULT_TITLE in src/lib/chat/page/chatPageHelpers.ts.
 pub(crate) const BRANCH_DEFAULT_TITLE: &str = "新分支";
 
 #[derive(Debug, Clone, Deserialize)]
