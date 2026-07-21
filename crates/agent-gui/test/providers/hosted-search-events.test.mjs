@@ -274,7 +274,7 @@ test("hosted search aggregation accumulates an Anthropic query streamed as parti
   anthropic.accept({
     type: "content_block_delta",
     index: 0,
-    delta: { type: "input_json_delta", partial_json: 'ry": "LiveAg' },
+    delta: { type: "input_json_delta", partial_json: 'ry": "XAg' },
   });
   assert.deepEqual(anthropic.getBlocks(), []);
 
