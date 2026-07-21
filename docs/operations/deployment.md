@@ -16,7 +16,7 @@
 
 | 阶段 | 内容 |
 |---|---|
-| `webui` | 用 Node 22 和 pnpm 构建 `crates/agent-gateway/web/dist`。 |
+| `webui` | 用 Node 22 和 pnpm 构建 `crates/gateway/web/dist`。 |
 | `gateway-builder` | 用 Go 编译 `cmd/gateway`，WebUI 静态资源通过 `go:embed` 打进二进制。 |
 | `runtime` | Debian slim + CA certificates + `xagent-gateway`，非 root 用户运行。 |
 
@@ -128,7 +128,7 @@ Keychain 中必须是带私钥的 `Developer ID Application` identity。若 macO
 
 ## 桌面版本号来源
 
-本地开发和普通本机构建只维护一个默认版本源：`crates/agent-gui/package.json`。Tauri 默认配置、前端 About 页和 Rust 运行时代码都会从这里读取版本，因此日常开发不需要到多个文件里同步版本号。
+本地开发和普通本机构建只维护一个默认版本源：`crates/fronted/package.json`。Tauri 默认配置、前端 About 页和 Rust 运行时代码都会从这里读取版本，因此日常开发不需要到多个文件里同步版本号。
 
 正式发布时不依赖人工修改 `package.json`。`desktop-release.yml` 会先在 `Release Metadata` job 中解析 release tag：
 

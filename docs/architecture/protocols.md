@@ -17,7 +17,7 @@ v1 双协议（浏览器 JSON WebSocket + 桌面端 gRPC）**已整体移除**�
 
 ## v2 统一线协议
 
-权威定义：`crates/agent-gateway/proto/v2/gateway_ws.proto`（帧壳），业务消息
+权威定义：`crates/gateway/proto/v2/gateway_ws.proto`（帧壳），业务消息
 全部复用 `proto/v1/gateway.proto`（`GatewayEnvelope`/`AgentEnvelope`/
 `TerminalStreamFrame` 等——单一事实源，三端 Go/Rust/TS 均由它生成）。
 

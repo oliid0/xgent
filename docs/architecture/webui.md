@@ -8,7 +8,7 @@ WebUI 是 Gateway 承载的浏览器端操作台。它复用/复制了大量 GUI
 
 | 模块 | 路径 | 职责 |
 |---|---|---|
-| App shell | `crates/agent-gateway/web/src/App.tsx` | 登录、socket 生命周期、settings/history/chat 状态、页面切换、composer/transcript。 |
+| App shell | `crates/gateway/web/src/App.tsx` | 登录、socket 生命周期、settings/history/chat 状态、页面切换、composer/transcript。 |
 | Socket client | `web/src/lib/gatewaySocket.ts` | v2 WebSocket（Protobuf 帧）请求/响应、广播监听、连接超时、原生 Chat Runtime 唤醒、Chat command ACK 恢复与错误处理；proto 生成代码位于 `web/src/lib/proto/gen/`。 |
 | Conversation stream | `web/src/lib/chat/stream/conversationStreamClient.ts` | 按会话持久订阅注册表：维护 `after_seq`/`stream_epoch` 游标、重连自动重订阅、gap resync 与有界退避重试。 |
 | Gateway types | `web/src/lib/gatewayTypes.ts` | WebUI 侧协议类型。 |

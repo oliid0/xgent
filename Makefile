@@ -1,8 +1,7 @@
 .DEFAULT_GOAL := dev
 
-AGENT_GUI_DIR := crates/agent-gui
-AGENT_GATEWAY_DIR := crates/agent-gateway
-AGENT_GATEWAY_WEB_DIR := $(AGENT_GATEWAY_DIR)/web
+FRONTEND_DIR := crates/fronted
+GATEWAY_DIR := crates/gateway
 
 HOST_ARCH := $(shell uname -m)
 
@@ -25,29 +24,27 @@ DESKTOP_RELEASE_TAURI_CONFIG_FLAGS ?= --config $(DESKTOP_RELEASE_TAURI_CONFIG) $
 
 DEV_GATEWAY_TOKEN ?= dev-token
 DEV_GATEWAY_HTTP_ADDR ?= :50052
-DEV_WEBUI_PROXY_API ?= http://localhost:50052
-GATEWAY_DOCKER_IMAGE ?= xagent-gateway:local
 RELEASE_TAG ?=
 
 .PHONY: all dev build desktop-build-macos desktop-build-macos-release desktop-build-macos-intel desktop-build-macos-m desktop-build-windows desktop-build-linux github-release-main check-github-release-tag help
-.PHONY: dev-gateway dev-webui
-.PHONY: proto proto-check webui gateway-build gateway-docker-build gateway-docker-run gateway-docker-smoke build-linux build-linux-amd build-linux-arm
+.PHONY: dev-gateway dev-web
+.PHONY: proto proto-check web gateway-build build-linux build-linux-amd build-linux-arm
 .PHONY: clean check-rust-target-% check-macos-signing-identity check-macos-notary-profile desktop-store-macos-notary-profile desktop-wait-macos-notary desktop-staple-macos desktop-verify-macos
 
 all: build gateway-build
 
 ## Desktop app
 dev:
-	pnpm --dir $(AGENT_GUI_DIR) tauri dev
+	pnpm --dir $(FRONTEND_DIR) tauri dev
 
 build:
-	pnpm --dir $(AGENT_GUI_DIR) tauri build
+	pnpm --dir $(FRONTEND_DIR) tauri build
 
 desktop-build-macos: check-rust-target-$(DESKTOP_MACOS_TARGET)
-	pnpm --dir $(AGENT_GUI_DIR) tauri build --config $(DESKTOP_MACOS_TAURI_CONFIG) --target $(DESKTOP_MACOS_TARGET)
+	pnpm --dir $(FRONTEND_DIR) tauri build --config $(DESKTOP_MACOS_TAURI_CONFIG) --target $(DESKTOP_MACOS_TARGET)
 
 desktop-build-macos-release: check-rust-target-$(DESKTOP_MACOS_TARGET) check-macos-signing-identity check-macos-notary-profile
-	env -u APPLE_ID -u APPLE_PASSWORD -u APPLE_API_ISSUER -u APPLE_API_KEY -u APPLE_API_KEY_PATH APPLE_SIGNING_IDENTITY="$(APPLE_SIGNING_IDENTITY)" pnpm --dir $(AGENT_GUI_DIR) tauri build $(DESKTOP_RELEASE_TAURI_CONFIG_FLAGS) --target $(DESKTOP_MACOS_TARGET)
+	env -u APPLE_ID -u APPLE_PASSWORD -u APPLE_API_ISSUER -u APPLE_API_KEY -u APPLE_API_KEY_PATH APPLE_SIGNING_IDENTITY="$(APPLE_SIGNING_IDENTITY)" pnpm --dir $(FRONTEND_DIR) tauri build $(DESKTOP_RELEASE_TAURI_CONFIG_FLAGS) --target $(DESKTOP_MACOS_TARGET)
 	@set -e; \
 	app_path="target/$(DESKTOP_MACOS_TARGET)/release/bundle/macos/$(DESKTOP_MACOS_APP_NAME).app"; \
 	dmg_path="$$(find "target/$(DESKTOP_MACOS_TARGET)/release/bundle/dmg" -maxdepth 1 -name '$(DESKTOP_MACOS_APP_NAME)_*.dmg' -print -quit)"; \
@@ -63,16 +60,16 @@ desktop-build-macos-release: check-rust-target-$(DESKTOP_MACOS_TARGET) check-mac
 	echo "macOS release dmg is ready: $$dmg_path"
 
 desktop-build-macos-intel: check-rust-target-$(DESKTOP_MACOS_INTEL_TARGET)
-	pnpm --dir $(AGENT_GUI_DIR) tauri build --config $(DESKTOP_MACOS_TAURI_CONFIG) --target $(DESKTOP_MACOS_INTEL_TARGET)
+	pnpm --dir $(FRONTEND_DIR) tauri build --config $(DESKTOP_MACOS_TAURI_CONFIG) --target $(DESKTOP_MACOS_INTEL_TARGET)
 
 desktop-build-macos-m: check-rust-target-$(DESKTOP_MACOS_M_TARGET)
-	pnpm --dir $(AGENT_GUI_DIR) tauri build --config $(DESKTOP_MACOS_TAURI_CONFIG) --target $(DESKTOP_MACOS_M_TARGET)
+	pnpm --dir $(FRONTEND_DIR) tauri build --config $(DESKTOP_MACOS_TAURI_CONFIG) --target $(DESKTOP_MACOS_M_TARGET)
 
 desktop-build-windows: check-rust-target-$(DESKTOP_WINDOWS_TARGET)
-	pnpm --dir $(AGENT_GUI_DIR) tauri build --config $(DESKTOP_WINDOWS_TAURI_CONFIG) --target $(DESKTOP_WINDOWS_TARGET)
+	pnpm --dir $(FRONTEND_DIR) tauri build --config $(DESKTOP_WINDOWS_TAURI_CONFIG) --target $(DESKTOP_WINDOWS_TARGET)
 
 desktop-build-linux: check-rust-target-$(DESKTOP_LINUX_TARGET)
-	pnpm --dir $(AGENT_GUI_DIR) tauri build --target $(DESKTOP_LINUX_TARGET) --bundles $(DESKTOP_LINUX_BUNDLES)
+	pnpm --dir $(FRONTEND_DIR) tauri build --target $(DESKTOP_LINUX_TARGET) --bundles $(DESKTOP_LINUX_BUNDLES)
 
 github-release-main: check-github-release-tag
 	git fetch origin --tags
@@ -94,9 +91,9 @@ github-release-main: check-github-release-tag
 		echo "Release tag already exists on origin: $(RELEASE_TAG)"; \
 		exit 1; \
 	fi
-	pnpm --dir $(AGENT_GUI_DIR) install --frozen-lockfile
-	pnpm --dir $(AGENT_GUI_DIR) test:release
-	cargo check --manifest-path $(AGENT_GUI_DIR)/src-tauri/Cargo.toml --tests
+	pnpm --dir $(FRONTEND_DIR) install --frozen-lockfile
+	pnpm --dir $(FRONTEND_DIR) test:release
+	cargo check --manifest-path $(FRONTEND_DIR)/src-tauri/Cargo.toml --tests
 	node scripts/release/prepare-app-version-from-tag.mjs "$(RELEASE_TAG)" --json
 	git tag -a "$(RELEASE_TAG)" -m "XAgent $(RELEASE_TAG)"
 	git push origin "$(RELEASE_TAG)"
@@ -107,70 +104,46 @@ check-github-release-tag:
 
 ## Gateway development
 dev-gateway:
-	go -C $(AGENT_GATEWAY_DIR) run ./cmd/gateway --token=$(DEV_GATEWAY_TOKEN) --http-addr=$(DEV_GATEWAY_HTTP_ADDR)
+	go -C $(GATEWAY_DIR) run ./cmd/gateway --token=$(DEV_GATEWAY_TOKEN) --http-addr=$(DEV_GATEWAY_HTTP_ADDR)
 
-dev-webui:
-	npm_config_proxy_api=$(DEV_WEBUI_PROXY_API) pnpm --dir $(AGENT_GATEWAY_WEB_DIR) dev
+dev-web:
+	pnpm --dir $(FRONTEND_DIR) dev:web
 
 ## Gateway build and generated assets
 proto:
 	@command -v buf >/dev/null || (echo "buf is required. Run: mise install" && exit 1)
-	cd $(AGENT_GATEWAY_DIR) && buf generate
+	cd $(GATEWAY_DIR) && buf generate
 
 # buf breaking 的对比基线（本地默认与当前 HEAD 对比；CI 覆写为 origin/main）。
-BUF_BREAKING_AGAINST ?= ../../.git#subdir=$(AGENT_GATEWAY_DIR)
+BUF_BREAKING_AGAINST ?= ../../.git#subdir=$(GATEWAY_DIR)
 
 proto-check:
 	@command -v buf >/dev/null || (echo "buf is required. Run: mise install" && exit 1)
-	cd $(AGENT_GATEWAY_DIR) && buf lint
-	cd $(AGENT_GATEWAY_DIR) && buf breaking --against '$(BUF_BREAKING_AGAINST)'
+	cd $(GATEWAY_DIR) && buf lint
+	cd $(GATEWAY_DIR) && buf breaking --against '$(BUF_BREAKING_AGAINST)'
 
-webui:
-	pnpm --dir $(AGENT_GATEWAY_WEB_DIR) install --offline
-	pnpm --dir $(AGENT_GATEWAY_WEB_DIR) build
+web:
+	pnpm --dir $(FRONTEND_DIR) build:web
 
-gateway-build: proto webui
-	CGO_ENABLED=0 go -C $(AGENT_GATEWAY_DIR) build -o bin/xagent-gateway ./cmd/gateway
+gateway-build: proto
+	CGO_ENABLED=0 go -C $(GATEWAY_DIR) build -o bin/xagent-gateway ./cmd/gateway
 
-gateway-docker-build:
-	docker build -t $(GATEWAY_DOCKER_IMAGE) .
-
-gateway-docker-run:
-	docker run --rm -p 8080:8080 -e XAGENT_GATEWAY_TOKEN=$(DEV_GATEWAY_TOKEN) $(GATEWAY_DOCKER_IMAGE)
-
-gateway-docker-smoke: gateway-docker-build
-	@set -e; \
-	name="xagent-gateway-smoke"; \
-	docker rm -f "$$name" >/dev/null 2>&1 || true; \
-	docker run -d --name "$$name" -p 18080:8080 -e XAGENT_GATEWAY_TOKEN=$(DEV_GATEWAY_TOKEN) $(GATEWAY_DOCKER_IMAGE) >/dev/null; \
-	trap 'docker rm -f "$$name" >/dev/null 2>&1 || true' EXIT; \
-	for _ in $$(seq 1 30); do \
-		if curl -fsS http://127.0.0.1:18080/healthz | grep -q '"ok":true'; then \
-			echo "Gateway Docker smoke test passed: http://127.0.0.1:18080/healthz"; \
-			exit 0; \
-		fi; \
-		sleep 1; \
-	done; \
-	echo "Gateway Docker smoke test failed; container logs:"; \
-	docker logs "$$name" || true; \
-	exit 1
-
-build-linux: proto webui
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C $(AGENT_GATEWAY_DIR) build -o bin/xagent-gateway-linux-amd64 ./cmd/gateway
+build-linux: proto
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C $(GATEWAY_DIR) build -o bin/xagent-gateway-linux-amd64 ./cmd/gateway
 
 build-linux-amd: build-linux
 
-build-linux-arm: proto webui
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go -C $(AGENT_GATEWAY_DIR) build -o bin/xagent-gateway-linux-arm64 ./cmd/gateway
+build-linux-arm: proto
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go -C $(GATEWAY_DIR) build -o bin/xagent-gateway-linux-arm64 ./cmd/gateway
 
-build-windows: proto webui
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go -C $(AGENT_GATEWAY_DIR) build -o bin/xagent-gateway-windows-amd64.exe ./cmd/gateway
+build-windows: proto
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go -C $(GATEWAY_DIR) build -o bin/xagent-gateway-windows-amd64.exe ./cmd/gateway
 
 gateway-build-windows: build-windows
 
 ## Maintenance
 clean:
-	rm -rf $(AGENT_GATEWAY_DIR)/bin/ $(AGENT_GATEWAY_WEB_DIR)/dist/
+	rm -rf $(GATEWAY_DIR)/bin/ $(FRONTEND_DIR)/dist/
 
 check-rust-target-%:
 	@rustup target list --installed | grep -qx "$*" || (echo "Rust target $* is not installed. Run: rustup target add $*" && exit 1)
@@ -228,14 +201,11 @@ help:
 	@printf "  %-34s %s\n" "make github-release-main RELEASE_TAG=vX.Y.Z" "从 main 打 tag 并触发 GitHub Release"
 	@printf "\n%s\n" "Gateway development"
 	@printf "  %-34s %s\n" "make dev-gateway" "启动 agent-gateway Go 服务"
-	@printf "  %-34s %s\n" "make dev-webui" "启动 agent-gateway Web UI 开发服务"
+	@printf "  %-34s %s\n" "make dev-web" "用唯一前端源码启动 Web 开发服务"
 	@printf "\n%s\n" "Gateway build"
 	@printf "  %-34s %s\n" "make proto" "生成 agent-gateway protobuf 代码"
-	@printf "  %-34s %s\n" "make webui" "构建 agent-gateway Web UI"
+	@printf "  %-34s %s\n" "make web" "从 crates/fronted 构建 Web"
 	@printf "  %-34s %s\n" "make gateway-build" "构建 agent-gateway 本地二进制"
-	@printf "  %-34s %s\n" "make gateway-docker-build" "构建 agent-gateway Docker 镜像"
-	@printf "  %-34s %s\n" "make gateway-docker-run" "本地运行 agent-gateway Docker 镜像"
-	@printf "  %-34s %s\n" "make gateway-docker-smoke" "构建并健康检查 agent-gateway Docker 镜像"
 	@printf "  %-34s %s\n" "make build-linux" "构建 agent-gateway Linux amd64 二进制"
 	@printf "  %-34s %s\n" "make build-linux-arm" "构建 agent-gateway Linux arm64 二进制"
 	@printf "  %-34s %s\n" "make build-windows" "构建 agent-gateway Windows amd64 二进制"

@@ -1,7 +1,7 @@
 # Skills Hub 批量选择交互规格 v2
 
-适用范围：`crates/agent-gui/src/pages/skills-hub/SkillsHubPage.tsx` 与
-`crates/agent-gateway/web/src/pages/skills-hub/SkillsHubPage.tsx`（两端 UI 必须保持一致）。
+适用范围：`crates/fronted/src/pages/skills-hub/SkillsHubPage.tsx` 与
+`crates/gateway/web/src/pages/skills-hub/SkillsHubPage.tsx`（两端 UI 必须保持一致）。
 
 ## 0. 核心原则
 

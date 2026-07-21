@@ -19,20 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          fetch-depth: 0
           # buf breaking 需要完整历史以对比 origin/main 的 proto 契约。
           fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: crates/agent-gateway/go.mod
-          cache-dependency-path: crates/agent-gateway/go.sum
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install pnpm
-        run: npm install -g pnpm@10.32.1
+          go-version-file: crates/gateway/go.mod
+          cache-dependency-path: crates/gateway/go.sum
 
       - name: Install buf
         uses: bufbuild/buf-action@v1
@@ -45,32 +39,26 @@ jobs:
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - name: Build embedded Gateway WebUI
-        working-directory: crates/agent-gateway/web
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm build
-
       - name: Proto lint and breaking-change check
-        run: make proto-check BUF_BREAKING_AGAINST='../../.git#branch=origin/main,subdir=crates/agent-gateway'
+        run: make proto-check BUF_BREAKING_AGAINST='../../.git#branch=origin/main,subdir=crates/gateway'
 
       - name: Check generated protobuf
         run: |
           make proto
-          git diff --exit-code -- crates/agent-gateway/internal/proto
+          git diff --exit-code -- crates/gateway/internal/proto
 
       - name: Lint gateway
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.12.2
-          working-directory: crates/agent-gateway
+          working-directory: crates/gateway
 
       - name: Test gateway
-        working-directory: crates/agent-gateway
+        working-directory: crates/gateway
         run: go test ./...
 
-  webui:
-    name: Gateway WebUI
+  frontend:
+    name: Unified Frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -83,52 +71,23 @@ jobs:
         run: npm install -g pnpm@10.32.1
 
       - name: Install dependencies
-        working-directory: crates/agent-gateway/web
+        working-directory: crates/fronted
         run: pnpm install --frozen-lockfile
 
-      - name: Build WebUI
-        working-directory: crates/agent-gateway/web
-        run: pnpm build
+      - name: Typecheck and build Web frontend
+        working-directory: crates/fronted
+        run: pnpm build:web
 
-      - name: Lint WebUI
-        working-directory: crates/agent-gateway/web
-        run: pnpm lint
-
-      - name: Test WebUI modules
-        working-directory: crates/agent-gateway/web
-        run: pnpm test
-
-  gui:
-    name: GUI
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install pnpm
-        run: npm install -g pnpm@10.32.1
-
-      - name: Install dependencies
-        working-directory: crates/agent-gui
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck and build GUI frontend
-        working-directory: crates/agent-gui
-        run: pnpm build
-
-      - name: Lint GUI frontend
-        working-directory: crates/agent-gui
+      - name: Lint unified frontend
+        working-directory: crates/fronted
         run: pnpm lint
 
       - name: Test frontend modules
-        working-directory: crates/agent-gui
+        working-directory: crates/fronted
         run: pnpm test:frontend
 
       - name: Test release scripts
-        working-directory: crates/agent-gui
+        working-directory: crates/fronted
         run: pnpm test:release
 
   tauri-rust:
@@ -152,20 +111,20 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: crates/agent-gui/src-tauri
+          workspaces: crates/fronted/src-tauri
 
       - name: Check Tauri backend tests
         env:
           CARGO_TERM_COLOR: always
-        run: cargo check --manifest-path crates/agent-gui/src-tauri/Cargo.toml --tests
+        run: cargo check --manifest-path crates/fronted/src-tauri/Cargo.toml --tests
 
       - name: Test Tauri history migrations
         env:
           CARGO_TERM_COLOR: always
-        run: cargo test --manifest-path crates/agent-gui/src-tauri/Cargo.toml chat_history --lib
+        run: cargo test --manifest-path crates/fronted/src-tauri/Cargo.toml chat_history --lib
 
-  mirror:
-    name: GUI/WebUI Mirror Check
+  architecture:
+    name: Architecture Guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -174,8 +133,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Check mirrored files are byte-identical
-        run: node scripts/check-mirror.mjs
+      - name: Check single-frontend boundaries
+        run: node scripts/check-architecture.mjs
 
   whitespace:
     name: Diff Hygiene

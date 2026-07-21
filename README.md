@@ -378,14 +378,14 @@ Issues and pull requests are welcome! See the [Development Guide](docs/operation
 
 Before submitting a PR, make sure all of the following checks pass (they match the CI gates):
 
-**Desktop client · `crates/agent-gui`**
+**Desktop client · `crates/fronted`**
 
 1. Type check & build pass: `pnpm build`
 2. Lint passes: `pnpm lint`
 3. Frontend unit tests pass: `pnpm test:frontend` (also run `pnpm test:release` when touching release scripts)
-4. Rust backend check passes: `cargo check --manifest-path crates/agent-gui/src-tauri/Cargo.toml --tests` (run from the repo root)
+4. Rust backend check passes: `cargo check --manifest-path crates/fronted/src-tauri/Cargo.toml --tests` (run from the repo root)
 
-**Gateway · `crates/agent-gateway` (if changed)**
+**Gateway · `crates/gateway` (if changed)**
 
 1. Go unit tests pass: `go test ./...`
 2. WebUI build / lint / tests pass: `pnpm build && pnpm lint && pnpm test` (run in `web/`)

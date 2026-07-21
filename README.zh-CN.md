@@ -378,14 +378,14 @@ XAgent/
 
 提交 PR 前,请确保以下检查全部通过(与 CI 门禁一致):
 
-**桌面客户端 · `crates/agent-gui`**
+**桌面客户端 · `crates/fronted`**
 
 1. 类型检查与构建通过:`pnpm build`
 2. 代码规范检查通过:`pnpm lint`
 3. 前端单元测试通过:`pnpm test:frontend`(改动发布脚本时另跑 `pnpm test:release`)
-4. Rust 后端检查通过:`cargo check --manifest-path crates/agent-gui/src-tauri/Cargo.toml --tests`(仓库根目录执行)
+4. Rust 后端检查通过:`cargo check --manifest-path crates/fronted/src-tauri/Cargo.toml --tests`(仓库根目录执行)
 
-**Gateway · `crates/agent-gateway`(如有改动)**
+**Gateway · `crates/gateway`(如有改动)**
 
 1. Go 单元测试通过:`go test ./...`
 2. WebUI 构建 / Lint / 测试通过:`pnpm build && pnpm lint && pnpm test`(在 `web/` 目录执行)
