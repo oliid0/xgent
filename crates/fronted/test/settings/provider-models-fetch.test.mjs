@@ -276,9 +276,7 @@ test("fetchModelsFromApi retries claude_code with official anthropic headers", a
 });
 
 test("gateway WebUI forwards the system proxy choice to desktop model fetching", async () => {
-  const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
-  globalThis.document = { documentElement: { dataset: { xagentWebui: "gateway" } } };
   globalThis.window = {
     localStorage: {
       getItem(key) {
@@ -307,8 +305,6 @@ test("gateway WebUI forwards the system proxy choice to desktop model fetching",
       },
     ]);
   } finally {
-    if (previousDocument === undefined) delete globalThis.document;
-    else globalThis.document = previousDocument;
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;
   }

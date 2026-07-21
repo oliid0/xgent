@@ -19,8 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0
-          # buf breaking 需要完整历史以对比 origin/main 的 proto 契约。
+          # Buf breaking needs the complete history to compare origin/main.
           fetch-depth: 0
 
       - uses: actions/setup-go@v5

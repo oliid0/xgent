@@ -45,26 +45,8 @@ const guiCronViewSource = readFileSync(
   new URL("../../src/pages/settings/CronTaskViewModal.tsx", import.meta.url),
   "utf8",
 );
-const webCronViewSource = readFileSync(
-  new URL(
-    "../../../agent-gateway/web/src/pages/settings/CronTaskViewModal.tsx",
-    import.meta.url,
-  ),
-  "utf8",
-);
-const webAutomationBackendSource = readFileSync(
-  new URL("../../../agent-gateway/web/src/lib/automation/backend.ts", import.meta.url),
-  "utf8",
-);
 const guiCronModalSource = readFileSync(
   new URL("../../src/pages/settings/CronTaskModal.tsx", import.meta.url),
-  "utf8",
-);
-const webCronModalSource = readFileSync(
-  new URL(
-    "../../../agent-gateway/web/src/pages/settings/CronTaskModal.tsx",
-    import.meta.url,
-  ),
   "utf8",
 );
 const cronToolsSource = readFileSync(
@@ -124,8 +106,8 @@ test("Cron manual run uses the task-scoped run-now command", async () => {
   ]);
 });
 
-test("Cron manual run stays wired across GUI and WebUI", () => {
-  for (const source of [guiCronViewSource, webCronViewSource]) {
+test("Cron manual run stays wired in the unified frontend", () => {
+  for (const source of [guiCronViewSource]) {
     assert.match(source, /const response = await runCronNow\(selectedTaskId\)/);
     assert.match(source, /disabled=\{isRunningNow\}/);
     assert.match(source, /if \(runNowLockRef\.current\) return/);
@@ -134,10 +116,6 @@ test("Cron manual run stays wired across GUI and WebUI", () => {
     assert.match(source, /settings\.cronViewRunNow/);
     assert.match(source, /<Play className="h-3\.5 w-3\.5" \/>/);
   }
-  assert.match(
-    webAutomationBackendSource,
-    /return cronManage<CronRunNowResponse>\("run_now", taskId\)/,
-  );
 });
 
 test("Cron manual run remains locked until its non-skip run reaches a terminal state", () => {
@@ -183,8 +161,8 @@ test("Auto Prompt run prefers the queue-time workdir with a global fallback", ()
   );
 });
 
-test("Cron workspace pin stays wired across GUI and WebUI", () => {
-  for (const source of [guiCronModalSource, webCronModalSource]) {
+test("Cron workspace pin stays wired in the unified frontend", () => {
+  for (const source of [guiCronModalSource]) {
     // Radix SelectItem rejects empty-string values, so "follow active" must
     // go through the sentinel and map back to "" on save; the custom-path
     // mode keeps arbitrary (tool-pinned) paths visible and editable.
@@ -216,7 +194,7 @@ test("Cron workspace pin stays wired across GUI and WebUI", () => {
     );
     assert.match(source, /: findWorkspaceOptionByPath\(workspaceOptions, workdir\)/);
   }
-  for (const source of [guiCronViewSource, webCronViewSource]) {
+  for (const source of [guiCronViewSource]) {
     assert.match(source, /\{task\.workdir \? \(/);
   }
 });

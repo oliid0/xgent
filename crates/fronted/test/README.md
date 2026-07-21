@@ -1,4 +1,4 @@
-# agent-gui tests
+# Unified frontend tests
 
 All new project-level tests live under `crates/fronted/test` and are split by feature area:
 

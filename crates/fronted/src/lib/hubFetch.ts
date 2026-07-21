@@ -1,5 +1,5 @@
 import { prepareUpstreamProxyRequest } from "./providers/proxy";
-import { isGatewayWebuiRuntime } from "./runtimeEnv";
+import { isBrowserRuntime } from "@xagent/runtime";
 
 // Hub（Skills / MCP 商店）浏览类请求的出网适配层：
 // - 桌面端：一律改经本地反代并声明 use-system-proxy，应用代理启用时经代理出网、
@@ -10,7 +10,7 @@ import { isGatewayWebuiRuntime } from "./runtimeEnv";
 // 签名有意窄于 typeof fetch：桌面分支需要重写请求地址，无法保真转发 Request
 // 对象自带的 method/headers/body，收窄为 string | URL 让编译器直接拒绝该用法。
 export async function hubFetch(input: string | URL, init?: RequestInit): Promise<Response> {
-  if (isGatewayWebuiRuntime()) {
+  if (isBrowserRuntime()) {
     return fetch(input, init);
   }
   const prepared = await prepareUpstreamProxyRequest(

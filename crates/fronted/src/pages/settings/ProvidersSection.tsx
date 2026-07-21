@@ -74,7 +74,7 @@ import {
   buildProviderModelsFetchKey,
   createDraftModelConfig,
   fetchModelsFromApi,
-  isGatewayWebuiRuntime,
+  isBrowserRuntime,
   mergeFetchedModels,
   normalizeFetchedModels,
   sortModelsBySelection,
@@ -222,10 +222,10 @@ function formatTokenCount(value: number): string {
 }
 function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProps) {
   const { t } = useLocale();
-  const isGatewayWebui = isGatewayWebuiRuntime();
+  const isBrowser = isBrowserRuntime();
   const initialApiKey = initialData?.apiKey ?? "";
   const initialUsesRedactedApiKey =
-    isGatewayWebui && initialApiKey.trim() === "" && initialData?.apiKeyConfigured === true;
+    isBrowser && initialApiKey.trim() === "" && initialData?.apiKeyConfigured === true;
   const [name, setName] = useState(initialData?.name ?? "");
   const [baseUrl, setBaseUrl] = useState(initialData?.baseUrl ?? "");
   const [apiKey, setApiKey] = useState(
@@ -505,7 +505,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
       apiKeyConfigured:
         nextApiKey.length > 0 ||
         apiKeyIsRedactedDisplay ||
-        (isGatewayWebui && initialData?.apiKeyConfigured === true),
+        (isBrowser && initialData?.apiKeyConfigured === true),
       customHeaders,
       models,
       activeModels: Array.from(activeModels),
@@ -761,7 +761,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                       size="sm"
                       className="h-9 gap-1.5 max-[720px]:h-10 max-[720px]:flex-1"
                       onClick={handleRefresh}
-                      disabled={fetchingModels || (isGatewayWebui && !canFetchModels)}
+                      disabled={fetchingModels || (isBrowser && !canFetchModels)}
                     >
                       <RefreshCw className={cn("h-3.5 w-3.5", fetchingModels && "animate-spin")} />
                       {fetchingModels ? t("settings.fetching") : t("settings.refreshModels")}

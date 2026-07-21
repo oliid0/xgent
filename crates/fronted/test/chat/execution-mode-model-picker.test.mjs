@@ -7,10 +7,6 @@ const headerSources = [
     new URL("../../src/pages/chat/components/ChatHeader.tsx", import.meta.url),
     "utf8",
   ),
-  readFileSync(
-    new URL("../../../agent-gateway/web/src/pages/chat/ChatHeader.tsx", import.meta.url),
-    "utf8",
-  ),
 ];
 
 test("model pickers use popover semantics instead of menu semantics", () => {

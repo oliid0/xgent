@@ -243,6 +243,28 @@ export function createTsModuleLoader(options = {}) {
 
   function resolveMock(specifier, parentDir) {
     if (specifier.startsWith("~icons/")) return createIconModuleMock(specifier);
+    if (specifier === "@xagent/runtime") {
+      const core = mocks.get("@tauri-apps/api/core") ?? {};
+      const events = mocks.get("@tauri-apps/api/event") ?? {};
+      const paths = mocks.get("@tauri-apps/api/path") ?? {};
+      return {
+        invoke:
+          core.invoke ??
+          (() => {
+            throw new Error("runtime invoke mock was not expected to be called");
+          }),
+        listen: events.listen ?? (async () => () => {}),
+        homeDir: paths.homeDir ?? (async () => ""),
+        openUrl: async () => {},
+        revealItemInDir: async () => {},
+        listenFileDrop: async () => () => {},
+        isTauriRuntime: () => true,
+        isBrowserRuntime: () =>
+          typeof globalThis.window !== "undefined" &&
+          globalThis.window.__TAURI__ === undefined &&
+          globalThis.window.__TAURI_INTERNALS__ === undefined,
+      };
+    }
     if (mocks.has(specifier)) return mocks.get(specifier);
     if (specifier.startsWith(".") || path.isAbsolute(specifier)) {
       const resolved = resolveLocal(specifier, parentDir);

@@ -118,23 +118,23 @@ test("hubFetch 桌面端透传 init 的 method/body/signal", async () => {
 test("hubFetch 在 Gateway WebUI 运行时直连、不改写地址不加反代头", async () => {
   const calls = [];
   const originalFetch = globalThis.fetch;
-  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
   globalThis.fetch = async (url, init) => {
     calls.push({ url: String(url), init });
     return { ok: true, status: 200 };
   };
   // 模拟 web main.tsx 在渲染前写入的运行时标记。
-  globalThis.document = { documentElement: { dataset: { xagentWebui: "gateway" } } };
+  globalThis.window = {};
   try {
     await hubFetchModule.hubFetch("https://clawhub.ai/api/v1/skills?limit=24", {
       headers: { Accept: "application/json" },
     });
   } finally {
     globalThis.fetch = originalFetch;
-    if (originalDocument === undefined) {
-      delete globalThis.document;
+    if (originalWindow === undefined) {
+      delete globalThis.window;
     } else {
-      globalThis.document = originalDocument;
+      globalThis.window = originalWindow;
     }
   }
 

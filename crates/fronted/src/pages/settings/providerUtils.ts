@@ -1,6 +1,5 @@
-import { invoke } from "@xagent/runtime";
+import { invoke, isBrowserRuntime } from "@xagent/runtime";
 import { prepareProxyRequest } from "../../lib/providers/proxy";
-import { isGatewayWebuiRuntime } from "../../lib/runtimeEnv";
 import {
   createProviderModelConfig,
   normalizeProviderModelConfigs,
@@ -14,8 +13,8 @@ const CODEX_MODELS_SUFFIXES = ["/chat/completions", "/responses", "/response"];
 const GEMINI_GENERATE_SUFFIXES = [":streamGenerateContent", ":generateContent"];
 const ANTHROPIC_API_VERSION = "2023-06-01";
 
-// Gateway WebUI 判定移至 lib/runtimeEnv 单一真源；此处再导出保持既有调用方不变。
-export { isGatewayWebuiRuntime };
+// Re-export the shared runtime predicate for the provider dialog.
+export { isBrowserRuntime };
 
 function normalizeModelBaseUrl(type: ProviderId, baseUrl: string) {
   let normalizedUrl = normalizeBaseUrl(baseUrl);
@@ -341,7 +340,7 @@ export async function fetchModelsFromApi(
 ): Promise<ProviderModelConfig[]> {
   const normalizedUrl = normalizeModelBaseUrl(type, baseUrl);
   const normalizedApiKey = apiKey.trim();
-  if (isGatewayWebuiRuntime()) {
+  if (isBrowserRuntime()) {
     return fetchModelsThroughGateway(
       type,
       normalizedUrl,

@@ -47,10 +47,14 @@ forbidPath("crates/gateway/web", "the Go gateway must not contain a frontend");
 forbidPath("crates/gateway/test/webui", "frontend tests belong to the unified frontend");
 forbidPath("crates/gateway/test/helpers", "frontend test loaders belong to the unified frontend");
 forbidPath("crates/fronted/src/platforms", "platform adapters must not duplicate React pages");
+forbidPath("crates/fronted/src/lib/runtimeEnv.ts", "runtime detection belongs to the shared runtime boundary");
 forbidPath("crates/gateway/embed.go", "the Go gateway is API-only and must not embed frontend assets");
 forbidPath("crates/gateway/embed_test.go", "embedded frontend assets are no longer part of gateway tests");
 forbidPath("scripts/check-mirror.mjs", "there is no second frontend tree to mirror");
 forbidPath("scripts/mirror-manifest.json", "there is no second frontend tree to mirror");
+forbidPath("scripts/consolidate-frontend.mjs", "the frontend has already been consolidated");
+forbidPath("Dockerfile", "container packaging is outside the current project architecture");
+forbidPath("railway.json", "the removed Docker deployment must not be restored indirectly");
 
 const frontendPackagePath = path.join(repoRoot, "crates/fronted/package.json");
 if (existsSync(frontendPackagePath)) {

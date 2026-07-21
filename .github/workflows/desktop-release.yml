@@ -7,8 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to publish, for example v0.1.0
+        description: Version used for package names, for example v0.1.0
         required: true
+      publish:
+        description: Create or update the GitHub Release after all packages succeed
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -24,8 +29,11 @@ jobs:
       app_version: ${{ steps.version.outputs.app_version }}
       is_prerelease: ${{ steps.version.outputs.is_prerelease }}
       release_tag: ${{ steps.version.outputs.release_tag }}
+      release_sha: ${{ steps.source.outputs.release_sha }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
@@ -36,6 +44,19 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: node scripts/release/prepare-app-version-from-tag.mjs "$RELEASE_TAG" --github-output "$GITHUB_OUTPUT" --json
+
+      - name: Resolve immutable release source
+        id: source
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if git rev-parse --verify --quiet "refs/tags/$RELEASE_TAG" >/dev/null; then
+            release_sha="$(git rev-list -n 1 "refs/tags/$RELEASE_TAG")"
+          else
+            release_sha="$(git rev-parse HEAD)"
+          fi
+          echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
 
   macos:
     name: macOS ${{ matrix.name }}
@@ -60,7 +81,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.release-metadata.outputs.release_tag }}
+          ref: ${{ needs.release-metadata.outputs.release_sha }}
 
       - uses: actions/setup-node@v6
         with:
@@ -165,7 +186,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.release-metadata.outputs.release_tag }}
+          ref: ${{ needs.release-metadata.outputs.release_sha }}
 
       - uses: actions/setup-node@v6
         with:
@@ -245,7 +266,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.release-metadata.outputs.release_tag }}
+          ref: ${{ needs.release-metadata.outputs.release_sha }}
 
       - uses: actions/setup-node@v6
         with:
@@ -336,6 +357,7 @@ jobs:
 
   publish:
     name: Publish GitHub Release
+    if: ${{ github.event_name == 'push' || inputs.publish }}
     runs-on: ubuntu-latest
     needs:
       - release-metadata
@@ -349,6 +371,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ needs.release-metadata.outputs.release_sha }}
           fetch-depth: 0
 
       - uses: actions/download-artifact@v8
@@ -361,6 +384,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+          RELEASE_SHA: ${{ needs.release-metadata.outputs.release_sha }}
           PACKYCODE_API_KEY: ${{ secrets.PACKYCODE_API_KEY }}
           AI_RELEASE_NOTES_API_KEY: ${{ secrets.AI_RELEASE_NOTES_API_KEY }}
           AI_RELEASE_NOTES_BASE_URL: ${{ vars.AI_RELEASE_NOTES_BASE_URL }}
@@ -394,7 +418,7 @@ jobs:
             fi
             gh release edit "$RELEASE_TAG" "${edit_args[@]}"
           else
-            create_args=(--verify-tag --title "XAgent $RELEASE_TAG" --notes-file "$notes_path")
+            create_args=(--target "$RELEASE_SHA" --title "XAgent $RELEASE_TAG" --notes-file "$notes_path")
             if [ "$is_prerelease" = true ]; then
               create_args+=(--prerelease)
             fi

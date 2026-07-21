@@ -19,6 +19,10 @@ export function isTauriRuntime() {
   );
 }
 
+export function isBrowserRuntime() {
+  return typeof window !== "undefined" && !isTauriRuntime();
+}
+
 let runtimePromise: Promise<XAgentRuntime> | undefined;
 
 function loadRuntime(): Promise<XAgentRuntime> {

@@ -1,24 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 const implementations = [
   {
-    label: "GUI",
+    label: "Unified frontend",
     loader: createTsModuleLoader(),
     page: new URL("../../src/pages/skills-hub/SkillsHubPage.tsx", import.meta.url),
-  },
-  {
-    label: "WebUI",
-    loader: createTsModuleLoader({
-      rootDir: fileURLToPath(new URL("../../../agent-gateway/web/", import.meta.url)),
-    }),
-    page: new URL(
-      "../../../agent-gateway/web/src/pages/skills-hub/SkillsHubPage.tsx",
-      import.meta.url,
-    ),
   },
 ];
 
