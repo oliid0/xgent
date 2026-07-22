@@ -99,7 +99,10 @@ function previousTagFor(releaseCommit) {
 }
 
 function collectContext() {
-  const releaseCommit = runGit(["rev-list", "-n", "1", releaseVersion.releaseTag]);
+  const requestedReleaseCommit = process.env.RELEASE_SHA?.trim();
+  const releaseCommit = requestedReleaseCommit
+    ? runGit(["rev-parse", "--verify", `${requestedReleaseCommit}^{commit}`])
+    : runGit(["rev-list", "-n", "1", releaseVersion.releaseTag]);
   const previousTag = previousTagFor(releaseCommit);
   const range = previousTag ? `${previousTag}..${releaseCommit}` : releaseCommit;
   const repository = process.env.GITHUB_REPOSITORY?.trim() || "Ohi01/XAgent";
@@ -139,6 +142,7 @@ function buildPrompt(context) {
     `Repository: ${context.repository}`,
     `Release tag: ${context.releaseTag}`,
     `App version: ${context.appVersion}`,
+    `Release commit: ${context.releaseCommit}`,
     `Previous tag: ${context.previousTag || "none"}`,
     `Commit range: ${context.range}`,
     "",

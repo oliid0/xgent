@@ -92,6 +92,7 @@ test("only the publish job receives repository write permission", () => {
   );
   assert.match(publish, /create_args=\(--draft --target "\$RELEASE_SHA"/);
   assert.match(publish, /publish_args=\(--draft=false/);
+  assert.match(publish, /-f target_commitish="\$RELEASE_SHA"/);
   assert.match(publish, /if \[ "\$SIGNED_RELEASE" = true \]; then/);
   assert.match(publish, /gh release delete-asset "\$RELEASE_TAG" latest\.json --yes/);
 });

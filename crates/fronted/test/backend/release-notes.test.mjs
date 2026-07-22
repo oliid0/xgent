@@ -59,6 +59,7 @@ function runGit(args, cwd) {
     0,
     `git ${args.join(" ")} failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
   );
+  return result.stdout.trim();
 }
 
 function initTaggedRepo(dir, tag) {
@@ -147,6 +148,8 @@ test("AI release notes script calls Chat Completions API and writes markdown", a
   try {
     const address = await listen(server);
     initTaggedRepo(dir, "v0.1.6");
+    const releaseSha = runGit(["rev-parse", "HEAD"], dir);
+    runGit(["tag", "--delete", "v0.1.6"], dir);
     const outputPath = path.join(dir, "notes.md");
     const fallbackPath = path.join(dir, "fallback.md");
     writeFileSync(fallbackPath, "## What's Changed\n\n- GitHub fallback notes.\n");
@@ -158,6 +161,7 @@ test("AI release notes script calls Chat Completions API and writes markdown", a
       AI_RELEASE_NOTES_TIMEOUT_MS: "2000",
       PACKYCODE_API_KEY: "",
       OPENAI_API_KEY: "",
+      RELEASE_SHA: releaseSha,
     }, { cwd: dir });
 
     assert.equal(
@@ -170,6 +174,7 @@ test("AI release notes script calls Chat Completions API and writes markdown", a
     assert.equal(requestJson.model, "gpt-test");
     assert.equal(requestJson.reasoning_effort, undefined);
     assert.match(JSON.stringify(requestJson.messages), /Release tag: v0\.1\.6/);
+    assert.match(JSON.stringify(requestJson.messages), new RegExp(`Release commit: ${releaseSha}`));
     assert.match(readFileSync(outputPath, "utf8"), /^# XAgent v0\.1\.6/);
     assert.match(readFileSync(outputPath, "utf8"), /cleaner release notes/);
   } finally {

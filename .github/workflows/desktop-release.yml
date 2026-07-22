@@ -507,6 +507,7 @@ jobs:
           notes_path="$RUNNER_TEMP/xagent-release-notes.md"
           if ! gh api "repos/$GH_REPO/releases/generate-notes" \
             -f tag_name="$RELEASE_TAG" \
+            -f target_commitish="$RELEASE_SHA" \
             --jq ".body" > "$github_notes_path"; then
             printf 'XAgent %s\n' "$RELEASE_TAG" > "$github_notes_path"
           fi
