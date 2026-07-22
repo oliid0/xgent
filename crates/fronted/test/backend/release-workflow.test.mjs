@@ -78,6 +78,12 @@ test("every platform has signed and package-only build paths", () => {
     assert.match(source, /if: env\.SIGNED_RELEASE == 'true'/);
     assert.match(source, /if: env\.SIGNED_RELEASE != 'true'/);
   }
+
+  assert.match(
+    linux,
+    /bash scripts\/release\/postprocess-linux-appimage\.sh/,
+    "Linux post-processing must not depend on the checkout preserving executable bits",
+  );
 });
 
 test("only the publish job receives repository write permission", () => {
