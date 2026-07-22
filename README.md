@@ -123,7 +123,7 @@ XAgent is a **local-first** AI agent desktop client. It deeply integrates large 
 
 ## Download & Deployment
 
-Installers are automatically built, signed, and published by GitHub Actions — grab the latest version from [**GitHub Releases**](https://github.com/Ohi01/XAgent/releases/latest).
+Installers are automatically built and published by GitHub Actions — grab the latest version from [**GitHub Releases**](https://github.com/Ohi01/XAgent/releases/latest). Developer ID signing and notarization are release-specific; unsigned releases remain installable.
 
 ### System Requirements
 
@@ -140,7 +140,7 @@ Download the DMG matching your chip from [Releases](https://github.com/Ohi01/XAg
 - Apple Silicon (M-series): `XAgent-<version>-macOS-aarch64.dmg`
 - Intel: `XAgent-<version>-macOS-x64.dmg`
 
-> The installer is signed and notarized by Apple — no manual security override is needed on first launch.
+> For a release without Developer ID signing, macOS blocks the first direct launch. Control-click XAgent in Finder and choose Open, or allow it under System Settings → Privacy & Security. Once approved, the app runs normally. Signed and notarized releases do not need this override.
 
 ### Windows
 

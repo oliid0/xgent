@@ -22,6 +22,7 @@ XAgent 是一个由单份 React 源码覆盖 Web、PC 和移动端的 Agent 应�
 | [features/history-compaction.md](features/history-compaction.md) | V3 历史分段、FTS、分享、上下文压缩 checkpoint | 历史与上下文开发 |
 | [operations/development.md](operations/development.md) | 本地开发、构建、测试、端口、运行路径 | 日常开发 |
 | [operations/deployment.md](operations/deployment.md) | CI/CD、纯 Go Gateway/Web 分离部署、桌面 Release | 发布维护 |
+| [operations/macos-release-signing.md](operations/macos-release-signing.md) | 可选的 Developer ID 证书、Apple 公证与 GitHub Actions 配置 | macOS 签名发布维护 |
 | [reference/source-map.md](reference/source-map.md) | 按功能域列出的源码路径索引 | 快速定位源码 |
 
 ## 架构阅读顺序

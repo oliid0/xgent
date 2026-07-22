@@ -10,7 +10,12 @@ on:
         description: Version used for package names, for example v0.1.0
         required: true
       publish:
-        description: Create or update the GitHub Release after all packages succeed
+        description: Publish the packages as a GitHub Release
+        required: false
+        type: boolean
+        default: false
+      sign:
+        description: Apple-sign/notarize macOS and sign Tauri updater artifacts (requires release settings)
         required: false
         type: boolean
         default: false
@@ -30,6 +35,8 @@ jobs:
       is_prerelease: ${{ steps.version.outputs.is_prerelease }}
       release_tag: ${{ steps.version.outputs.release_tag }}
       release_sha: ${{ steps.source.outputs.release_sha }}
+      publish_release: ${{ steps.mode.outputs.publish_release }}
+      signed_release: ${{ steps.mode.outputs.signed_release }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -45,6 +52,15 @@ jobs:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: node scripts/release/prepare-app-version-from-tag.mjs "$RELEASE_TAG" --github-output "$GITHUB_OUTPUT" --json
 
+      - name: Resolve release mode
+        id: mode
+        env:
+          PUBLISH_RELEASE: ${{ github.event_name == 'push' || inputs.publish }}
+          SIGNED_RELEASE: ${{ inputs.sign || (github.event_name == 'push' && vars.RELEASE_SIGNED == 'true') }}
+        run: |
+          echo "publish_release=$PUBLISH_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "signed_release=$SIGNED_RELEASE" >> "$GITHUB_OUTPUT"
+
       - name: Resolve immutable release source
         id: source
         env:
@@ -58,15 +74,56 @@ jobs:
           fi
           echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
 
+  release-preflight:
+    name: Release Preflight
+    runs-on: ubuntu-latest
+    needs: release-metadata
+    env:
+      SIGNED_RELEASE: ${{ needs.release-metadata.outputs.signed_release }}
+      APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_ID: ${{ vars.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+    steps:
+      - name: Explain package-only mode
+        if: env.SIGNED_RELEASE != 'true'
+        run: echo "Unsigned mode uses ad-hoc macOS signing and requires no release settings."
+
+      - name: Validate release secrets
+        if: env.SIGNED_RELEASE == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in \
+            APPLE_CERTIFICATE_P12_BASE64 \
+            APPLE_CERTIFICATE_PASSWORD \
+            APPLE_ID \
+            APPLE_TEAM_ID \
+            APPLE_APP_SPECIFIC_PASSWORD \
+            TAURI_SIGNING_PRIVATE_KEY \
+            TAURI_UPDATER_PUBLIC_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error title=Missing release setting::$name is required for signed publishing. Add it under Settings > Secrets and variables > Actions."
+              missing=1
+            fi
+          done
+          test "$missing" -eq 0
+
   macos:
     name: macOS ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    needs: release-metadata
+    needs:
+      - release-metadata
+      - release-preflight
     env:
       XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
       XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
       XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
-      SIGNED_RELEASE: ${{ github.event_name == 'push' || inputs.publish }}
+      SIGNED_RELEASE: ${{ needs.release-metadata.outputs.signed_release }}
     strategy:
       fail-fast: false
       matrix:
@@ -131,12 +188,19 @@ jobs:
           security list-keychains -d user -s "$KEYCHAIN_PATH"
           security default-keychain -s "$KEYCHAIN_PATH"
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          identity_count="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -c '"Developer ID Application:' || true)"
+          if [ "$identity_count" -ne 1 ]; then
+            echo "::error title=Invalid Apple certificate::Expected exactly one Developer ID Application identity in the imported .p12, found $identity_count."
+            exit 1
+          fi
+          signing_identity="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep '"Developer ID Application:' | sed -E 's/.*"([^"]+)".*/\1/')"
+          echo "APPLE_SIGNING_IDENTITY=$signing_identity" >> "$GITHUB_ENV"
 
       - name: Store notarization profile
         if: env.SIGNED_RELEASE == 'true'
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ vars.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
           set -euo pipefail
@@ -152,11 +216,10 @@ jobs:
       - name: Build signed and notarized DMG
         if: env.SIGNED_RELEASE == 'true'
         env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           DESKTOP_MACOS_TARGET: ${{ matrix.target }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          XAGENT_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+          XAGENT_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
           XAGENT_UPDATE_REPOSITORY: ${{ github.repository }}
         run: make desktop-build-macos-release
 
@@ -192,12 +255,14 @@ jobs:
   windows:
     name: Windows x64
     runs-on: windows-latest
-    needs: release-metadata
+    needs:
+      - release-metadata
+      - release-preflight
     env:
       XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
       XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
       XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
-      SIGNED_RELEASE: ${{ github.event_name == 'push' || inputs.publish }}
+      SIGNED_RELEASE: ${{ needs.release-metadata.outputs.signed_release }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -237,7 +302,7 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          XAGENT_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+          XAGENT_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
           XAGENT_UPDATE_REPOSITORY: ${{ github.repository }}
         run: pnpm tauri build --config src-tauri/tauri.windows.release.conf.json --config "$XAGENT_TAURI_VERSION_CONFIG" --target x86_64-pc-windows-msvc
 
@@ -282,12 +347,14 @@ jobs:
   linux:
     name: Linux x64
     runs-on: ubuntu-latest
-    needs: release-metadata
+    needs:
+      - release-metadata
+      - release-preflight
     env:
       XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
       XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
       XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
-      SIGNED_RELEASE: ${{ github.event_name == 'push' || inputs.publish }}
+      SIGNED_RELEASE: ${{ needs.release-metadata.outputs.signed_release }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -337,7 +404,7 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          XAGENT_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+          XAGENT_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
           XAGENT_UPDATE_REPOSITORY: ${{ github.repository }}
         run: pnpm tauri build --config src-tauri/tauri.linux.release.conf.json --config "$XAGENT_TAURI_VERSION_CONFIG" --target x86_64-unknown-linux-gnu --bundles appimage deb rpm
 
@@ -397,7 +464,7 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    if: ${{ github.event_name == 'push' || inputs.publish }}
+    if: ${{ needs.release-metadata.outputs.publish_release == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -410,6 +477,7 @@ jobs:
       XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
       XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
       XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+      SIGNED_RELEASE: ${{ needs.release-metadata.outputs.signed_release }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -451,6 +519,7 @@ jobs:
             printf 'XAgent %s\n' "$RELEASE_TAG" > "$notes_path"
           fi
 
+          created_draft=false
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             edit_args=(--title "XAgent $RELEASE_TAG" --notes-file "$notes_path")
             if [ "$is_prerelease" = true ]; then
@@ -460,11 +529,12 @@ jobs:
             fi
             gh release edit "$RELEASE_TAG" "${edit_args[@]}"
           else
-            create_args=(--target "$RELEASE_SHA" --title "XAgent $RELEASE_TAG" --notes-file "$notes_path")
+            create_args=(--draft --target "$RELEASE_SHA" --title "XAgent $RELEASE_TAG" --notes-file "$notes_path")
             if [ "$is_prerelease" = true ]; then
               create_args+=(--prerelease)
             fi
             gh release create "$RELEASE_TAG" "${create_args[@]}"
+            created_draft=true
           fi
 
           mapfile -t signature_assets < <(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name | select(endswith(".sig"))')
@@ -484,5 +554,19 @@ jobs:
           fi
           gh release upload "$RELEASE_TAG" "${public_assets[@]}" --clobber
 
-          node scripts/release/create-tauri-updater-manifest.mjs release-artifacts release-artifacts/latest.json "$notes_path"
-          gh release upload "$RELEASE_TAG" release-artifacts/latest.json --clobber
+          if [ "$SIGNED_RELEASE" = true ]; then
+            node scripts/release/create-tauri-updater-manifest.mjs release-artifacts release-artifacts/latest.json "$notes_path"
+            gh release upload "$RELEASE_TAG" release-artifacts/latest.json --clobber
+          elif gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | grep -Fxq latest.json; then
+            gh release delete-asset "$RELEASE_TAG" latest.json --yes
+          fi
+
+          if [ "$created_draft" = true ]; then
+            publish_args=(--draft=false --title "XAgent $RELEASE_TAG" --notes-file "$notes_path")
+            if [ "$is_prerelease" = true ]; then
+              publish_args+=(--prerelease)
+            else
+              publish_args+=(--prerelease=false --latest)
+            fi
+            gh release edit "$RELEASE_TAG" "${publish_args[@]}"
+          fi

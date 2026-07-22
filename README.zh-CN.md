@@ -124,7 +124,7 @@ XAgent 是一个 **本地优先** 的 AI Agent 桌面客户端。它将大语言
 
 ## 下载与部署
 
-安装包由 GitHub Actions 自动构建、签名并发布,请前往 [**GitHub Releases**](https://github.com/Ohi01/XAgent/releases/latest) 获取最新版本。
+安装包由 GitHub Actions 自动构建并发布,请前往 [**GitHub Releases**](https://github.com/Ohi01/XAgent/releases/latest) 获取最新版本。Release 是否带 Developer ID/公证以该版本说明为准；无证书版本同样可以安装。
 
 ### 系统要求
 
@@ -141,7 +141,7 @@ XAgent 是一个 **本地优先** 的 AI Agent 桌面客户端。它将大语言
 - Apple Silicon(M 系列):`XAgent-<版本>-macOS-aarch64.dmg`
 - Intel:`XAgent-<版本>-macOS-x64.dmg`
 
-> 安装包已签名并通过 Apple 公证,首次启动无需在安全设置中手动放行。
+> 无 Developer ID 的版本首次打开时，macOS 会阻止直接启动。请在 Finder 中按住 Control 点击 XAgent 并选择“打开”，或前往“系统设置 → 隐私与安全性”选择仍要打开；授权后可正常使用。带签名/公证的版本不需要此操作。
 
 ### Windows 用户
 
