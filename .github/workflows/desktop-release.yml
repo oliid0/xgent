@@ -272,7 +272,7 @@ jobs:
       - name: Prepare release version config
         shell: bash
         working-directory: crates/fronted
-        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json --tauri-platform windows
 
       - name: Install pnpm
         run: npm install -g pnpm@10.32.1

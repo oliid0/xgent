@@ -1,3 +1,10 @@
 [workspace]
 resolver = "2"
 members = ["crates/fronted/src-tauri", "crates/mobile-execution"]
+
+[patch.crates-io]
+# Tauri 2.11 currently resolves Swift packages through swift-rs 1.0.7,
+# which does not pass an iOS destination triple to SwiftPM. The adapter
+# keeps swift-rs' public crate identity while forwarding to the audited
+# XCFramework-aware implementation.
+swift-rs = { path = "crates/swift-rs-xcframework" }

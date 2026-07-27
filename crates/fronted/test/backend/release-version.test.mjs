@@ -91,3 +91,50 @@ test("release version script rejects non-semver tags", () => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /semver tag like v0\.1\.3/);
 });
+
+test("release version script maps named prereleases to MSI-compatible numeric versions", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "xagent-version-windows-"));
+  try {
+    const tauriConfigPath = path.join(dir, "tauri.version.generated.conf.json");
+    const result = runVersionScript([
+      "v0.1.0-mobile.4",
+      "--tauri-config",
+      tauriConfigPath,
+      "--tauri-platform",
+      "windows",
+    ]);
+
+    assert.equal(
+      result.status,
+      0,
+      `version script failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
+    assert.deepEqual(JSON.parse(readFileSync(tauriConfigPath, "utf8")), {
+      version: "0.1.0-4",
+    });
+  } finally {
+    rmSync(dir, { force: true, recursive: true });
+  }
+});
+
+test("Windows prerelease tags require a bounded numeric identifier", () => {
+  const missingNumber = runVersionScript([
+    "v1.2.3-beta",
+    "--tauri-config",
+    "unused.json",
+    "--tauri-platform",
+    "windows",
+  ]);
+  assert.notEqual(missingNumber.status, 0);
+  assert.match(missingNumber.stderr, /must contain a numeric identifier/);
+
+  const outOfRange = runVersionScript([
+    "v1.2.3-beta.65536",
+    "--tauri-config",
+    "unused.json",
+    "--tauri-platform",
+    "windows",
+  ]);
+  assert.notEqual(outOfRange.status, 0);
+  assert.match(outOfRange.stderr, /cannot be greater than 65535/);
+});

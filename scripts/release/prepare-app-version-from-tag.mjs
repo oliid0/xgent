@@ -12,6 +12,7 @@ function usage() {
     "  --github-env <path>      Append XAGENT_* variables for later workflow steps.",
     "  --github-output <path>   Append release metadata as GitHub Action step outputs.",
     "  --tauri-config <path>    Write a generated Tauri config overlay with the app version.",
+    "  --tauri-platform <name>  Version rules for default or windows bundlers.",
     "  --json                   Print metadata as JSON.",
   ].join("\n");
 }
@@ -31,6 +32,7 @@ function parseArgs(argv) {
     json: false,
     releaseTag: undefined,
     tauriConfigPath: undefined,
+    tauriPlatform: "default",
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -59,6 +61,12 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (arg === "--tauri-platform") {
+      options.tauriPlatform = readValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
     if (arg === "--json") {
       options.json = true;
       continue;
@@ -82,9 +90,9 @@ function appendLines(path, lines) {
   appendFileSync(path, `${lines.join("\n")}\n`);
 }
 
-function writeTauriConfig(path, appVersion) {
+function writeTauriConfig(path, appVersion, platform) {
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(tauriVersionConfig(appVersion), null, 2)}\n`);
+  writeFileSync(path, `${JSON.stringify(tauriVersionConfig(appVersion, platform), null, 2)}\n`);
 }
 
 try {
@@ -94,7 +102,7 @@ try {
   );
 
   if (options.tauriConfigPath) {
-    writeTauriConfig(options.tauriConfigPath, metadata.appVersion);
+    writeTauriConfig(options.tauriConfigPath, metadata.appVersion, options.tauriPlatform);
   }
 
   if (options.githubEnvPath) {
@@ -127,6 +135,7 @@ try {
         {
           ...metadata,
           tauriVersionConfig: options.tauriConfigPath,
+          tauriPlatform: options.tauriPlatform,
         },
         null,
         2,

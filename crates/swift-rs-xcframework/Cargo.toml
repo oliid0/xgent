@@ -1,0 +1,18 @@
+[package]
+name = "swift-rs"
+version = "1.0.7"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "Workspace adapter for XCFramework-aware Swift package linking"
+
+[lib]
+name = "swift_rs"
+path = "src/lib.rs"
+
+[dependencies]
+swift_rs_xcframework_impl = { package = "swift-rs-leap", version = "=1.0.9", default-features = false }
+
+[features]
+default = []
+build = ["swift_rs_xcframework_impl/build"]

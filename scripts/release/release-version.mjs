@@ -31,12 +31,53 @@ export function parseReleaseVersion(input) {
   };
 }
 
-export function tauriVersionConfig(appVersion) {
+export function windowsInstallerVersion(appVersion) {
   if (!SEMVER_PATTERN.test(appVersion)) {
     throw new Error(`App version must be a valid semver string. Received: ${appVersion}`);
   }
 
+  const versionWithoutBuildMetadata = appVersion.split("+", 1)[0];
+  const prereleaseSeparator = versionWithoutBuildMetadata.indexOf("-");
+  if (prereleaseSeparator === -1) {
+    return versionWithoutBuildMetadata;
+  }
+
+  const baseVersion = versionWithoutBuildMetadata.slice(0, prereleaseSeparator);
+  const prerelease = versionWithoutBuildMetadata.slice(prereleaseSeparator + 1);
+  const identifiers = prerelease.split(".");
+  const numericIdentifier = [...identifiers]
+    .reverse()
+    .find((identifier) => /^\d+$/.test(identifier));
+
+  if (numericIdentifier === undefined) {
+    throw new Error(
+      `Windows prerelease tags must contain a numeric identifier, for example ${baseVersion}-beta.1. Received: ${appVersion}`,
+    );
+  }
+
+  const numericValue = Number.parseInt(numericIdentifier, 10);
+  if (numericValue > 65_535) {
+    throw new Error(
+      `Windows prerelease identifier cannot be greater than 65535. Received: ${numericIdentifier}`,
+    );
+  }
+
+  // MSI accepts an optional prerelease component only when it is numeric.
+  // Keep the complete semver in the release tag/artifact name while giving
+  // Tauri's Windows bundlers the representable installer version.
+  return `${baseVersion}-${numericValue}`;
+}
+
+export function tauriVersionConfig(appVersion, platform = "default") {
+  if (!SEMVER_PATTERN.test(appVersion)) {
+    throw new Error(`App version must be a valid semver string. Received: ${appVersion}`);
+  }
+
+  if (!["default", "windows"].includes(platform)) {
+    throw new Error(`Unsupported Tauri version platform: ${platform}`);
+  }
+
   return {
-    version: appVersion,
+    version: platform === "windows" ? windowsInstallerVersion(appVersion) : appVersion,
   };
 }
