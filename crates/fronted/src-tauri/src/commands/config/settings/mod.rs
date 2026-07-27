@@ -4,10 +4,12 @@ use serde_json::{json, Map, Number, Value};
 use std::{
     collections::{HashMap, HashSet},
     fs,
-    path::{Path, PathBuf},
-    sync::Arc,
+    path::PathBuf,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+
+#[cfg(desktop)]
+use std::{path::Path, sync::Arc};
 
 use crate::runtime::project_path::project_path_key as normalize_project_path_key;
 #[cfg(desktop)]
@@ -157,6 +159,7 @@ include!("agents.rs");
 include!("system.rs");
 include!("mcp.rs");
 include!("memory_settings.rs");
+#[cfg(desktop)]
 include!("local_access_snapshot.rs");
 include!("ssh/mod.rs");
 include!("commands.rs");
