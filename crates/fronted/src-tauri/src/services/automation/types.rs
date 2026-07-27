@@ -9,7 +9,7 @@ pub const PROMPT_PENDING_EVENT: &str = "automation:prompt-pending";
 pub const PROMPT_EXPIRED_EVENT: &str = "automation:prompt-expired";
 
 /// Sentinel written in place of HTTP header values when a snapshot leaves the
-/// desktop (gateway sync / web clients). Apply ops carrying this sentinel keep
+/// desktop (local-access web clients). Apply ops carrying this sentinel keep
 /// the currently stored value, so remote clients can edit a request without
 /// ever seeing or re-sending the secret.
 pub const MASKED_HEADER_VALUE: &str = "__xagent-masked__";
@@ -131,7 +131,7 @@ pub struct HooksSnapshot {
     pub hooks: Vec<HookDef>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationSnapshot {
     pub cron: CronSnapshot,
@@ -164,14 +164,14 @@ pub struct AutomationApplyInput {
     pub ops: Vec<AutomationOp>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CronApplyResponse {
     pub status: ApplyStatus,
     pub cron: CronSnapshot,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HooksApplyResponse {
     pub status: ApplyStatus,

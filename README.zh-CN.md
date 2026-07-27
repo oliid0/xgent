@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Your Local-First AI Agent Desktop</strong><br/>
-  多模型接入 · 本地工具执行 · MCP & Skills 生态 · 远程 Gateway
+  多模型接入 · 本地工具执行 · MCP & Skills · Web/PC/移动端
 </p>
 
 <p align="center">
@@ -14,11 +14,10 @@
 </p>
 
 <p align="center">
-  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blueviolet" />
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Web%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Android%20%7C%20iOS-blueviolet" />
   <img alt="Tauri" src="https://img.shields.io/badge/built%20with-Tauri%202-FFC131?logo=tauri&logoColor=white" />
   <img alt="React" src="https://img.shields.io/badge/React-19-087EA4?logo=react&logoColor=white" />
   <img alt="Rust" src="https://img.shields.io/badge/Rust-stable-B7410E?logo=rust&logoColor=white" />
-  <img alt="Go" src="https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white" />
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
 </p>
 
@@ -79,11 +78,12 @@
 
 ## 为什么是 XAgent?
 
-XAgent 是一个 **本地优先** 的 AI Agent 桌面客户端。它将大语言模型的推理能力与本地系统工具深度整合,让 AI 能够真正操作你的文件系统、执行命令、管理定时任务,同时通过 Gateway 实现远程访问与协作。
+XAgent 是一个覆盖 Web、桌面和移动端的 **本地优先** AI Agent。它将大语言模型推理与本地系统工具深度整合，让 AI 能够操作文件、执行命令、调用 MCP 与 Skills，并管理定时任务。
 
 - **真正动手的 Agent** — 不止于对话:读写文件、精确编辑、执行 Bash、托管长驻进程
 - **生态完全开放** — MCP 协议桥接任意外部工具,Skills 技能包按需加载
-- **本地与远程兼得** — 桌面端独立可用,部署 Gateway 后浏览器随处操控
+- **一套前端覆盖全部平台** — 同一份 React/Tauri 源码运行于 Web、macOS、Windows、Linux、Android 与 iOS
+- **局域网控制与便携执行** — 通过 `28367` 端口让浏览器或手机配对桌面端；电脑不可用时可选择移动端或 GitHub Actions 执行环境
 
 ---
 
@@ -103,7 +103,7 @@ XAgent 是一个 **本地优先** 的 AI Agent 桌面客户端。它将大语言
 - **文件系统全能力** — `Read` / `Write` / `Edit` / `Delete` 精确读写,`Glob` / `Grep` 模式与正则搜索
 - **Bash 与长驻进程** — 非交互式命令执行(cwd / timeout),`ManagedProcess` 托管 dev server 等常驻任务
 - **Sub-Agent 委派** — 独立子代理并行执行,worktree 隔离,自动合并
-- **隧道暴露** — `TunnelManager` 一键将本地服务暴露公网
+- **跨平台执行后端** — 桌面系统工具、Android PRoot、iOS a-Shell 与可选 GitHub Actions 共用同一能力模型
 
 ### 🧩 MCP 与 Skills 生态
 
@@ -115,16 +115,17 @@ XAgent 是一个 **本地优先** 的 AI Agent 桌面客户端。它将大语言
 - **持久化记忆** — Markdown + SQLite FTS 全文检索,跨会话知识管理
 - **定时任务** — bash / http / prompt 三种 Cron 任务类型,后台自动执行
 
-### 🌐 远程 Gateway
+### 🌐 本地 WebUI 与移动端
 
-- **浏览器随处访问** — 同一套 React 前端以 Web 运行时连接 Go Gateway,远程操控本地 Agent
-- **断线可恢复** — 有界 seq window 补齐短时断线,桌面端持久化兜底
+- **局域网配对访问** — 在桌面端设置中开启 WebUI，从其他设备打开 `http://<电脑IP>:28367`
+- **无需第二套前端或服务端部署** — Tauri 桌面端直接托管同一份 React 应用，并暴露经过认证和权限控制的本地 API
+- **移动端独立模式** — Android 与 iOS 可执行其支持的本地任务；明确启用云端执行后可生成跨平台产物
 
 ---
 
 ## 下载与部署
 
-安装包由 GitHub Actions 自动构建并发布,请前往 [**GitHub Releases**](https://github.com/Ohi01/XAgent/releases/latest) 获取最新版本。Release 是否带 Developer ID/公证以该版本说明为准；无证书版本同样可以安装。
+安装包由 GitHub Actions 自动构建并发布,请前往 [**GitHub Releases**](https://github.com/oliid0/xgent/releases/latest) 获取最新版本。Release 是否带 Developer ID/公证以该版本说明为准；无证书版本同样可以安装。
 
 ### 系统要求
 
@@ -133,10 +134,12 @@ XAgent 是一个 **本地优先** 的 AI Agent 桌面客户端。它将大语言
 | macOS | Intel(x64)与 Apple Silicon(aarch64)双架构 |
 | Windows | x64,需 WebView2 运行时(Windows 11 已内置) |
 | Linux | x86_64,需 WebKitGTK 4.1(Ubuntu 22.04+ / Debian 12+ 等) |
+| Android | arm64 或 x86_64；可选 PRoot 环境在首次使用时准备 |
+| iOS / iPadOS | arm64；未签名 IPA 安装前需要重新签名 |
 
 ### macOS 用户
 
-从 [Releases](https://github.com/Ohi01/XAgent/releases/latest) 下载对应芯片的 DMG,打开后将 XAgent 拖入「应用程序」:
+从 [Releases](https://github.com/oliid0/xgent/releases/latest) 下载对应芯片的 DMG,打开后将 XAgent 拖入「应用程序」:
 
 - Apple Silicon(M 系列):`XAgent-<版本>-macOS-aarch64.dmg`
 - Intel:`XAgent-<版本>-macOS-x64.dmg`
@@ -145,7 +148,7 @@ XAgent 是一个 **本地优先** 的 AI Agent 桌面客户端。它将大语言
 
 ### Windows 用户
 
-从 [Releases](https://github.com/Ohi01/XAgent/releases/latest) 按需选择一种安装方式:
+从 [Releases](https://github.com/oliid0/xgent/releases/latest) 按需选择一种安装方式:
 
 | 方式 | 文件 | 适合 |
 |---|---|---|
@@ -155,7 +158,7 @@ XAgent 是一个 **本地优先** 的 AI Agent 桌面客户端。它将大语言
 
 ### Linux 用户
 
-从 [Releases](https://github.com/Ohi01/XAgent/releases/latest) 按发行版选择:
+从 [Releases](https://github.com/oliid0/xgent/releases/latest) 按发行版选择:
 
 | 格式 | 适用发行版 | 安装方式 |
 |---|---|---|
@@ -163,60 +166,14 @@ XAgent 是一个 **本地优先** 的 AI Agent 桌面客户端。它将大语言
 | DEB | Debian / Ubuntu 系 | `sudo dpkg -i XAgent-<版本>-Linux-x86_64.deb` |
 | RPM | Fedora / openSUSE 系 | `sudo rpm -i XAgent-<版本>-Linux-x86_64.rpm` |
 
-### 需要远程访问? 部署 Gateway 与 Web 前端
+### 在局域网使用 WebUI
 
-桌面端开箱即用,不依赖任何服务端。浏览器访问使用 `crates/fronted` 的同一套 React 源码；`crates/gateway` 是纯 Go API/WebSocket 服务,不包含、不嵌入前端,当前也不发布容器镜像。
+1. 在桌面客户端打开 **设置 → 访问**。
+2. 开启 **WebUI**，保留默认端口 `28367`，并选择局域网或仅本机范围。
+3. 生成六位配对码。
+4. 在手机、平板或其他浏览器打开界面显示的地址并输入配对码。
 
-```bash
-# 构建纯 Go Gateway
-make gateway-build
-
-# 用同一套 React 源码构建 Web 静态文件
-make web
-```
-
-将 `crates/fronted/dist` 部署到静态站点,并单独运行 `crates/gateway/bin/xagent-gateway`。生产环境应让静态站点与 Gateway 的 API/WebSocket 使用同一 HTTPS 域名,Remote 设置中的端口填写 `443`。
-
-<details>
-<summary><b>Nginx 反向代理配置</b> — 自建域名 / TLS 时参考</summary>
-
-> Gateway 只处理 API 与 WebSocket。Nginx 负责提供 `crates/fronted/dist` 生成的静态文件,并将后端路径代理到 Gateway。
->
-> WebSocket 升级发生在多个路径上(`/ws/v2`、`/ws/v2/agent`、`/ws/v2/terminal`,以及 `/t/` 下的隧道),最省事且正确的做法是在整个 vhost 上启用升级:
-
-```nginx
-# Gateway API 与 WebSocket
-location ~ ^/(api|ws|t)/ {
-    proxy_pass http://127.0.0.1:3000;
-    proxy_http_version 1.1;
-
-    # WebSocket 升级
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-
-    # 必须透传:Gateway 的同源校验会拿浏览器的 Origin 头
-    # 与 X-Forwarded-Proto + Host 做比对
-    proxy_set_header Host $host;
-    proxy_set_header Authorization $http_authorization;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-
-    # Gateway 每 15s 主动向每条 WebSocket 连接发 Ping,超时给足冗余即可
-    proxy_read_timeout 300s;
-    proxy_send_timeout 300s;
-    proxy_buffering off;
-}
-
-# 同一套 React 前端的 Web 构建产物
-location / {
-    root /srv/xagent/fronted;
-    try_files $uri $uri/ /index.html;
-}
-```
-
-> 示例假定 Gateway 监听 `127.0.0.1:3000`,Web 构建产物复制到 `/srv/xagent/fronted`。server 块需要 `listen 443 ssl;`,并把 `client_max_body_size` 调大到足够容纳附件上传(如 `100m`)。
-
-</details>
+桌面客户端需要保持运行。配对会话可以随时撤销，终端、SSH、Git 和文件写入分别受权限开关控制，模型、SSH 与 GitHub 凭据不会返回到浏览器。普通 HTTP 仅适合可信局域网。
 
 
 
@@ -234,15 +191,9 @@ location / {
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │               XAgent 统一 React 前端源码                      │
-│            Web · Tauri Desktop · Tauri Mobile                │
+│              Web · 桌面端 · Android · iOS                    │
 └────────────────────────────┬─────────────────────────────────┘
-                             │ WebSocket / HTTP
-┌────────────────────────────▼─────────────────────────────────┐
-│                       Agent Gateway                           │
-│    Go · WebSocket · HTTP · Session Manager · Event Store     │
-│                  纯 Go API / WebSocket 服务                   │
-└────────────────────────────┬─────────────────────────────────┘
-                             │ WebSocket v2 (双向流)
+                             │ Tauri IPC 或配对 HTTP/SSE
 ┌────────────────────────────▼─────────────────────────────────┐
 │                    Tauri 2 系统运行时                         │
 │                         Rust                                 │
@@ -251,6 +202,10 @@ location / {
 │ pi-ai    │ 多轮循环   │ FS/Bash/  │  渐进披露  │  SQLite+MD    │
 │ + Codex  │ + SubAgent │ MCP桥接   │  + Hub    │  FTS索引      │
 └──────────┴───────────┴───────────┴───────────┴───────────────┘
+                             │ 可选执行后端
+              ┌──────────────┼──────────────┐
+              ▼              ▼              ▼
+        Android PRoot    iOS a-Shell   GitHub Actions
 ```
 
 **技术栈**
@@ -261,11 +216,10 @@ location / {
 | **统一前端** · 构建 | Vite 8 + pnpm(Web/PC/移动端共享源码) |
 | **统一前端** · 样式 | Tailwind CSS 4 + Base UI |
 | **统一前端** · 渲染 | streamdown + KaTeX + Mermaid + Monaco Editor |
-| **Tauri** · 后端 | Rust + Tokio + SQLite (rusqlite) + WebSocket (tokio-tungstenite) |
+| **Tauri** · 后端 | Rust + Tokio + SQLite (rusqlite) + 本地 Axum WebUI |
 | **Agent** · LLM | @earendil-works/pi-ai |
-| **Gateway** · 语言 | Go 1.25 |
-| **Gateway** · 协议 | WebSocket + Protobuf + HTTP |
-| **Gateway** · 边界 | 纯 Go API/WebSocket,不包含前端与容器配置 |
+| **移动端执行** | Android PRoot + Alpine；iOS a-Shell 命令运行时 |
+| **云端执行** | 用户自有公开 `agent-temp` 仓库 + GitHub Actions |
 
 </details>
 
@@ -276,14 +230,9 @@ location / {
 |---|---|
 | `make dev` | 启动 Tauri 开发环境 |
 | `make build` | 构建桌面应用 |
-| `make dev-gateway` | 启动 Gateway 开发服务 |
 | `make dev-web` | 从统一前端源码启动 Web 开发服务 |
-| `make gateway-build` | 构建 Gateway 二进制 |
 | `make web` | 从统一前端源码构建 Web 静态文件 |
 | `make desktop-build-macos-release` | macOS 签名发布构建 |
-| `make build-linux` | Linux amd64 网关 |
-| `make build-linux-arm` | Linux arm64 网关 |
-| `make proto` | 重新生成 Protobuf 代码 |
 | `make clean` | 清理构建产物 |
 
 </details>
@@ -294,7 +243,7 @@ location / {
 ```
 XAgent/
 ├── crates/
-│   ├── fronted/                  # Web/PC/移动端统一前端
+│   ├── fronted/                  # Web/PC/移动端统一应用
 │   │   ├── src/                  # React 前端
 │   │   │   ├── components/       #   UI 组件
 │   │   │   ├── lib/              #   核心逻辑 (chat, tools, skills, memory)
@@ -303,10 +252,7 @@ XAgent/
 │   │   │   └── prompt/           #   System Prompt 模板
 │   │   └── src-tauri/            # Rust 后端 (Tauri)
 │   │
-│   └── gateway/                  # 纯 Go 网关服务
-│       ├── cmd/gateway/          #   入口
-│       ├── internal/             #   核心实现
-│       └── proto/                #   Protobuf 定义
+│   └── mobile-execution/         # Android PRoot 与 iOS a-Shell 插件
 │
 ├── docs/                         # 项目文档
 │   ├── architecture/             #   架构设计
@@ -328,14 +274,14 @@ XAgent/
 <details>
 <summary><b>API Key 会离开本机吗?</b></summary>
 
-不会。秘钥仅保存在桌面端本地,Gateway 只做协议中继 — 不访问文件系统、不存储任何凭据。
+不会。模型与 SSH 凭据保留在原生宿主中，配对浏览器只会收到脱敏设置并通过本地认证代理访问模型。云端执行使用的 GitHub PAT 保存在原生加密保险库中。
 
 </details>
 
 <details>
-<summary><b>必须部署 Gateway 吗?</b></summary>
+<summary><b>浏览器访问需要部署服务端吗?</b></summary>
 
-不需要。桌面客户端可独立使用全部本地能力;只有需要从浏览器远程访问本地 Agent 时,才部署 Gateway。
+不需要。在桌面客户端开启 WebUI 后，内置 Tauri 服务会在 `28367` 端口托管同一份 React 前端。
 
 </details>
 
@@ -349,7 +295,7 @@ XAgent/
 <details>
 <summary><b>长对话 / 断线后上下文会丢吗?</b></summary>
 
-不会。桌面端以 Segment + Summary Checkpoint 持久化完整历史;Gateway 通过有界 seq window 补齐短时断线,重连后自动收敛。
+不会。原生宿主以 Segment + Summary Checkpoint 持久化完整历史；配对客户端读取同一份 SQLite 历史并订阅允许的运行事件。
 
 </details>
 
@@ -368,15 +314,10 @@ XAgent/
 3. 前端单元测试通过:`pnpm test:frontend`(改动发布脚本时另跑 `pnpm test:release`)
 4. Rust 后端检查通过:`cargo check --manifest-path crates/fronted/src-tauri/Cargo.toml --tests`(仓库根目录执行)
 
-**Gateway · `crates/gateway`(如有改动)**
-
-1. Go 单元测试通过:`go test ./...`
-2. Proto 变更后重新生成并提交 Go 产物:`make proto`
-
 **单前端边界**
 
 - Web/PC/移动端都从 `crates/fronted` 构建,平台差异只允许进入 `src/runtime` 或 Tauri 系统边界。
-- `crates/gateway` 只保留 Go API/WebSocket/proto,不得新增前端或静态资源嵌入。
+- 本地浏览器访问由 Tauri 宿主负责，不得新增第二套前端或独立网关。
 - 保持 diff 干净 (无行尾空白):`git diff --check`
 
 ---
@@ -385,7 +326,7 @@ XAgent/
 
 感谢所有为 XAgent 做出贡献的朋友们！
 
-<a href="https://github.com/Ohi01/XAgent/graphs/contributors">
+<a href="https://github.com/oliid0/xgent/graphs/contributors">
   <img src="docs/images/contributors.svg" alt="Contributors" />
 </a>
 
@@ -393,7 +334,7 @@ XAgent/
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=Ohi01%2FXAgent&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=oliid0%2Fxgent&type=date&legend=top-left">
 
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="docs/images/star-history-dark.svg" />
@@ -406,4 +347,4 @@ XAgent/
 
 ## License
 
-MIT © StackCairn
+MIT © Oliid0

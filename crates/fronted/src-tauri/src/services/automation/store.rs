@@ -5,19 +5,16 @@ use serde_json::Value;
 use tauri::Emitter;
 use uuid::Uuid;
 
-use crate::services::gateway::GatewayController;
-
 use super::db;
 use super::scheduler::AutomationScheduler;
 use super::types::*;
 use super::validate;
 
 /// Fan-out target for store mutations. All change notifications originate
-/// here so every writer (UI apply, LLM tool, gateway relay, executor
-/// decrement) produces exactly the same broadcast.
+/// here so every writer (UI apply, LLM tool, executor decrement) produces
+/// exactly the same broadcast.
 pub struct AutomationNotifier {
     pub app_handle: tauri::AppHandle,
-    pub gateway: Weak<GatewayController>,
     pub scheduler: Weak<AutomationScheduler>,
 }
 
@@ -29,14 +26,12 @@ impl AutomationNotifier {
         if let Some(scheduler) = self.scheduler.upgrade() {
             scheduler.request_reload();
         }
-        self.refresh_gateway();
     }
 
     fn hooks_changed(&self, snapshot: &HooksSnapshot) {
         if let Err(error) = self.app_handle.emit(HOOKS_CHANGED_EVENT, snapshot) {
             eprintln!("emit {HOOKS_CHANGED_EVENT} failed: {error}");
         }
-        self.refresh_gateway();
     }
 
     fn prompt_pending(&self) {
@@ -51,16 +46,6 @@ impl AutomationNotifier {
         }
     }
 
-    fn refresh_gateway(&self) {
-        let Some(gateway) = self.gateway.upgrade() else {
-            return;
-        };
-        tauri::async_runtime::spawn(async move {
-            if let Err(error) = gateway.refresh_settings_sync_from_db().await {
-                eprintln!("refresh gateway settings sync after automation change failed: {error}");
-            }
-        });
-    }
 }
 
 enum CronMutationEffect {

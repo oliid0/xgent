@@ -378,9 +378,15 @@ export function createShellTools(params: {
       ? "Windows runs Bash commands with Git Bash (POSIX semantics) when available, falling back to pwsh, then Windows PowerShell, then cmd only if Git Bash is not installed. Write POSIX/bash syntax by default: `export NAME=value`, `&&`, `/dev/null`, forward-slash paths. If the result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing on this machine — switch to PowerShell syntax and suggest installing Git for Windows or setting XAGENT_GIT_BASH_PATH."
       : runtimePlatform === "macos"
         ? "macOS runs Bash commands with POSIX shell syntax: zsh first, then Bash, then sh."
-        : "Linux runs Bash commands with POSIX shell syntax: Bash first, then zsh, then sh.";
+        : runtimePlatform === "android"
+          ? "Android runs commands inside XAgent's Alpine PRoot environment. Use POSIX shell syntax and install only the named capability packs exposed by the mobile environment manager."
+          : runtimePlatform === "ios"
+            ? "iOS/iPadOS runs a restricted a-Shell-compatible native command set. Use POSIX syntax, do not assume Linux process APIs, Node.js, npm, arbitrary native packages, or arbitrary WASI execution, and inspect the reported mobile capabilities before choosing tools."
+            : "Linux runs Bash commands with POSIX shell syntax: Bash first, then zsh, then sh.";
   const backgroundPolicy =
-    "Background commands using `&` must detach stdout and stderr first, for example `nohup command > /tmp/xagent-task.log 2>&1 < /dev/null &`; otherwise the tool rejects them because inherited pipes can keep Bash running forever. Prefer ManagedProcess for dev servers, watchers, or anything long-running.";
+    runtimePlatform === "android" || runtimePlatform === "ios"
+      ? "Mobile operating systems can suspend XAgent; keep commands foreground and bounded, and do not start detached services or background jobs."
+      : "Background commands using `&` must detach stdout and stderr first, for example `nohup command > /tmp/xagent-task.log 2>&1 < /dev/null &`; otherwise the tool rejects them because inherited pipes can keep Bash running forever. Prefer ManagedProcess for dev servers, watchers, or anything long-running.";
   const workdir = params.workdir;
   const allowSkillsRoot = params.skillsRootEnabled === true;
   const allowManagedProcess = params.managedProcessEnabled !== false;

@@ -25,29 +25,8 @@ fn main() {
         });
     println!("cargo:rustc-env=XAGENT_APP_VERSION={app_version}");
 
-    // v1/v2 proto 共用 Gateway 目录为 include 根，import 路径与 Go 侧 buf 模块一致；
-    // v2 经该路径 import v1 复用其消息。
-    let gateway_root = std::path::Path::new(&manifest_dir)
-        .join("..")
-        .join("..")
-        .join("gateway");
-    let proto_v1 = gateway_root.join("proto").join("v1").join("gateway.proto");
-    let proto_v2 = gateway_root
-        .join("proto")
-        .join("v2")
-        .join("gateway_ws.proto");
-
-    println!("cargo:rerun-if-changed={}", proto_v1.display());
-    println!("cargo:rerun-if-changed={}", proto_v2.display());
-
-    tonic_prost_build::configure()
-        .build_server(false)
-        // v1 gRPC 服务已随 v1 协议移除，proto 只含消息；桌面端仅消费消息类型。
-        .build_client(false)
-        .compile_protos(&[proto_v1, proto_v2], &[gateway_root])
-        .expect("compile gateway protos");
-
-    let is_windows_msvc = std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")
+    let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    let is_windows_msvc = target_os == "windows"
         && std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc");
     if is_windows_msvc {
         let manifest_path = std::path::Path::new(

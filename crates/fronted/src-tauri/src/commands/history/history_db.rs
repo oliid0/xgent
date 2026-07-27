@@ -2,13 +2,12 @@ use rusqlite::{Connection, OptionalExtension};
 use std::{collections::HashSet, fs, path::PathBuf, sync::Mutex, time::Duration};
 
 const DB_FILENAME: &str = "chat-history.sqlite3";
-const HISTORY_DB_SCHEMA_VERSION: i64 = 2;
+const HISTORY_DB_SCHEMA_VERSION: i64 = 3;
 
 static HISTORY_DB_MIGRATION_LOCK: Mutex<()> = Mutex::new(());
 
 fn history_db_dir() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or_else(|| "无法定位用户目录".to_string())?;
-    let dir = home.join(format!(".{}", env!("CARGO_PKG_NAME")));
+    let dir = crate::services::app_paths::app_storage_dir()?;
     fs::create_dir_all(&dir).map_err(|e| format!("创建历史目录失败：{e}"))?;
     Ok(dir)
 }
@@ -88,6 +87,11 @@ fn migrate_history_db_inner(conn: &Connection) -> Result<(), String> {
         set_user_version(conn, 2)?;
     }
 
+    if current_version < 3 {
+        migrate_to_v3(conn)?;
+        set_user_version(conn, 3)?;
+    }
+
     // The subagent schema is versioned independently via subagentMeta and is
     // safe to (re)ensure on every startup.
     ensure_subagent_schema(conn)?;
@@ -105,6 +109,13 @@ fn migrate_to_v1(conn: &Connection) -> Result<(), String> {
 fn migrate_to_v2(conn: &Connection) -> Result<(), String> {
     ensure_chat_history_schema(conn)?;
     Ok(())
+}
+
+// v3 removes the retired public-history sharing feature. Dropping its
+// independent table is safe because conversation history never depended on it.
+fn migrate_to_v3(conn: &Connection) -> Result<(), String> {
+    conn.execute_batch("DROP TABLE IF EXISTS chatHistoryShare;")
+        .map_err(|e| format!("移除已废弃的聊天历史分享表失败：{e}"))
 }
 
 fn read_table_columns(
@@ -195,22 +206,12 @@ fn ensure_chat_history_schema(conn: &Connection) -> Result<(), String> {
             FOREIGN KEY (conversation_id) REFERENCES chatHistory(id) ON DELETE CASCADE
         );
 
-        CREATE TABLE IF NOT EXISTS chatHistoryShare (
-            conversation_id TEXT PRIMARY KEY,
-            token TEXT UNIQUE,
-            enabled INTEGER NOT NULL DEFAULT 0,
-            redact_tool_content INTEGER NOT NULL DEFAULT 0,
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL,
-            FOREIGN KEY (conversation_id) REFERENCES chatHistory(id) ON DELETE CASCADE
-        );
         ",
     )
     .map_err(|e| format!("初始化聊天历史表失败：{e}"))?;
 
     ensure_chat_history_columns(conn)?;
     ensure_chat_history_segment_columns(conn)?;
-    ensure_chat_history_share_columns(conn)?;
     conn.execute_batch(
         "
         CREATE INDEX IF NOT EXISTS idx_chatHistory_updated_at
@@ -219,8 +220,6 @@ fn ensure_chat_history_schema(conn: &Connection) -> Result<(), String> {
             ON chatHistorySegment(conversation_id, updated_at DESC);
         CREATE INDEX IF NOT EXISTS idx_chatHistory_pinned
             ON chatHistory(is_pinned DESC, pinned_at DESC, updated_at DESC);
-        CREATE INDEX IF NOT EXISTS idx_chatHistoryShare_token
-            ON chatHistoryShare(token);
         ",
     )
     .map_err(|e| format!("初始化聊天历史索引失败：{e}"))?;
@@ -404,59 +403,6 @@ fn ensure_chat_history_segment_columns(conn: &Connection) -> Result<(), String> 
         ",
     )
     .map_err(|e| format!("修复聊天历史分段表默认字段失败：{e}"))?;
-
-    Ok(())
-}
-
-fn ensure_chat_history_share_columns(conn: &Connection) -> Result<(), String> {
-    ensure_table_columns(
-        conn,
-        "chatHistoryShare",
-        "聊天历史分享表",
-        &[
-            (
-                "token",
-                "ALTER TABLE chatHistoryShare ADD COLUMN token TEXT;",
-            ),
-            (
-                "enabled",
-                "ALTER TABLE chatHistoryShare ADD COLUMN enabled INTEGER NOT NULL DEFAULT 0;",
-            ),
-            (
-                "redact_tool_content",
-                "ALTER TABLE chatHistoryShare ADD COLUMN redact_tool_content INTEGER NOT NULL DEFAULT 0;",
-            ),
-            (
-                "created_at",
-                "ALTER TABLE chatHistoryShare ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;",
-            ),
-            (
-                "updated_at",
-                "ALTER TABLE chatHistoryShare ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;",
-            ),
-        ],
-    )?;
-
-    conn.execute_batch(
-        "
-        UPDATE chatHistoryShare
-        SET enabled = 0
-        WHERE enabled IS NULL;
-
-        UPDATE chatHistoryShare
-        SET redact_tool_content = 0
-        WHERE redact_tool_content IS NULL;
-
-        UPDATE chatHistoryShare
-        SET created_at = 0
-        WHERE created_at IS NULL;
-
-        UPDATE chatHistoryShare
-        SET updated_at = created_at
-        WHERE updated_at IS NULL;
-        ",
-    )
-    .map_err(|e| format!("修复聊天历史分享表默认字段失败：{e}"))?;
 
     Ok(())
 }
@@ -744,7 +690,6 @@ mod tests {
         for table_name in [
             "chatHistory",
             "chatHistorySegment",
-            "chatHistoryShare",
             "chatHistoryFtsSegmentIndex",
             "subagentMeta",
             "subagentIdentity",
@@ -761,6 +706,15 @@ mod tests {
                 .expect("query table existence");
             assert_eq!(exists, 1, "{table_name} should exist");
         }
+
+        let retired_share_table_exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'chatHistoryShare'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("query retired share table existence");
+        assert_eq!(retired_share_table_exists, 0);
     }
 
     #[test]

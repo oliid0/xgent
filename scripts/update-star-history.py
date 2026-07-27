@@ -104,7 +104,7 @@ def render_chart(entries, dark):
         [
             f'<rect x="{legend_x}" y="{legend_y}" width="188" height="32" rx="5" fill="{background}" fill-opacity="0.9" stroke="{foreground}" stroke-width="2"/>',
             f'<rect x="{legend_x + 7}" y="{legend_y + 12}" width="8" height="8" rx="2" fill="{line_color}"/>',
-            f'<text x="{legend_x + 21}" y="{legend_y + 25}" fill="{foreground}" font-size="15">ohi01/xagent</text>',
+            f'<text x="{legend_x + 21}" y="{legend_y + 25}" fill="{foreground}" font-size="15">oliid0/xgent</text>',
             f'<text x="50%" y="{HEIGHT - 10}" fill="{foreground}" font-size="17" text-anchor="middle">Date</text>',
             f'<text x="20" y="{(PLOT_TOP + PLOT_BOTTOM) / 2:.2f}" fill="{foreground}" font-size="17" text-anchor="middle" transform="rotate(-90 20 {(PLOT_TOP + PLOT_BOTTOM) / 2:.2f})">GitHub Stars</text>',
             "</svg>",

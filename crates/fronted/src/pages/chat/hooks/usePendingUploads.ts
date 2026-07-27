@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke, isTauriRuntime } from "@xagent/runtime";
 import { type MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
 
 import type { MentionComposerHandle } from "../../../components/chat/MentionComposer";
@@ -33,6 +33,7 @@ type UsePendingUploadsParams = {
   composerRef: MutableRefObject<MentionComposerHandle | null>;
   setErrorMessage: (message: string | null) => void;
   addNotify: (type: NotifyItem["type"], message: string) => void;
+  nativeMobileRuntime?: boolean;
 };
 
 export const MAX_UPLOAD_FILES = 9;
@@ -56,6 +57,31 @@ async function fileToUploadInput(file: File): Promise<SystemUploadedReadableFile
   };
 }
 
+function pickFilesFromWebView(): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.tabIndex = -1;
+    input.style.position = "fixed";
+    input.style.inset = "0 auto auto -10000px";
+
+    let settled = false;
+    const finish = (files: File[]) => {
+      if (settled) return;
+      settled = true;
+      input.remove();
+      resolve(files);
+    };
+    input.addEventListener("change", () => finish(Array.from(input.files ?? [])), {
+      once: true,
+    });
+    input.addEventListener("cancel", () => finish([]), { once: true });
+    document.body.appendChild(input);
+    input.click();
+  });
+}
+
 export function usePendingUploads(params: UsePendingUploadsParams) {
   const {
     isAgentMode,
@@ -65,6 +91,7 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
     composerRef,
     setErrorMessage,
     addNotify,
+    nativeMobileRuntime = false,
   } = params;
   const [pendingUploadedFiles, setPendingUploadedFiles] = useState<PendingUploadedFile[]>([]);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
@@ -285,20 +312,6 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
     ],
   );
 
-  const pickReadableFiles = useCallback(
-    () =>
-      runUploadTask({
-        emptySelectionMessage: "所选文件均不受当前 Read 支持",
-        errorFallback: "导入文件失败",
-        importer: ({ targetWorkdir, remainingFileSlots }) =>
-          invoke<SystemPickReadableFilesResponse>("system_pick_readable_files", {
-            workdir: targetWorkdir,
-            maxFiles: remainingFileSlots,
-          }),
-      }),
-    [runUploadTask],
-  );
-
   const importReadableFilePaths = useCallback(
     async (paths: string[]) => {
       if (paths.length === 0) return;
@@ -342,6 +355,23 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
     },
     [addNotify, runUploadTask],
   );
+
+  const pickReadableFiles = useCallback(async () => {
+    if (nativeMobileRuntime || !isTauriRuntime()) {
+      const files = await pickFilesFromWebView();
+      await importReadableFiles(files);
+      return;
+    }
+    await runUploadTask({
+      emptySelectionMessage: "所选文件均不受当前 Read 支持",
+      errorFallback: "导入文件失败",
+      importer: ({ targetWorkdir, remainingFileSlots }) =>
+        invoke<SystemPickReadableFilesResponse>("system_pick_readable_files", {
+          workdir: targetWorkdir,
+          maxFiles: remainingFileSlots,
+        }),
+    });
+  }, [importReadableFiles, nativeMobileRuntime, runUploadTask]);
 
   const removePendingUpload = useCallback(
     (relativePath: string) => {

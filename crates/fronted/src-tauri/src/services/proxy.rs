@@ -61,6 +61,12 @@ pub struct ProxyServerState {
     client: reqwest::Client,
 }
 
+impl ProxyServerState {
+    pub fn info(&self) -> ProxyServerInfo {
+        self.info.clone()
+    }
+}
+
 #[derive(Deserialize)]
 struct ProxyRoutePath {
     provider: String,
@@ -88,9 +94,14 @@ pub fn start_proxy_server() -> Result<Arc<ProxyServerState>, String> {
         .local_addr()
         .map_err(|err| format!("读取本地代理地址失败：{err}"))?;
 
+    #[cfg(mobile)]
+    let proxy_base_url = format!("http://localhost:{}", addr.port());
+    #[cfg(desktop)]
+    let proxy_base_url = format!("http://{addr}");
+
     let state = Arc::new(ProxyServerState {
         info: ProxyServerInfo {
-            base_url: format!("http://{addr}"),
+            base_url: proxy_base_url,
             token: Uuid::new_v4().to_string(),
         },
         client: reqwest::Client::builder()

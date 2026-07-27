@@ -1,7 +1,5 @@
-// Thin, fully-typed invoke bindings over the Rust MemoryStore commands.
-// On the gateway web build the same file works unchanged: the Tauri `invoke`
-// shim intercepts every `memory_*` command and forwards it over the websocket
-// to the connected desktop agent.
+// Thin, fully typed bindings over the Rust MemoryStore commands. Browser
+// runtimes use the same API through the authenticated local-access RPC bridge.
 
 import { invoke } from "@xagent/runtime";
 import type {

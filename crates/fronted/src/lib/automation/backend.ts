@@ -1,7 +1,6 @@
-// Desktop (Tauri) transport for the automation store: direct invoke calls
-// plus change events emitted by the Rust AutomationStore notifier. This file
-// is the per-platform adapter — the web frontend ships its own copy speaking
-// the gateway cron.manage protocol.
+// Unified transport for the automation store. Native windows invoke Tauri
+// directly; the paired WebUI uses the same command/event API through the
+// authenticated local-access bridge.
 
 import { invoke, listen } from "@xagent/runtime";
 

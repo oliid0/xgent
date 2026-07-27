@@ -197,7 +197,7 @@ test("agent turn preserves suppressed parent Agent trace for cancellation persis
     createdAt: 1,
     titlePromise: null,
     transcriptStore: {},
-    gatewayBridgeEvents: {
+    conversationEvents: {
       queueToken: noOp,
       queueEvent: noOp,
       queueToolStatus: noOp,

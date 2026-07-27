@@ -12,7 +12,7 @@ import type {
 } from "../../../lib/chat/conversation/liveTranscriptStore";
 import type {
   ConversationHookLifecycle,
-  GatewayBridgeEventController,
+  ConversationEventController,
 } from "../../../lib/chat/conversation/run";
 import type { TurnCancellation } from "../../../lib/chat/conversation/turnCancellation";
 import { memoryExtraction } from "../../../lib/chat/memory/extractionController";
@@ -75,7 +75,7 @@ export type RunTextConversationTurnParams = {
   createdAt: number;
   titlePromise: Promise<string | null> | null;
   transcriptStore: LiveTranscriptStore;
-  gatewayBridgeEvents: GatewayBridgeEventController;
+  conversationEvents: ConversationEventController;
   hookLifecycle: ConversationHookLifecycle;
   conversationDebugLogger: StreamDebugLogger;
   recoveryDebugLogger: StreamDebugLogger;
@@ -94,7 +94,7 @@ export type RunTextConversationTurnParams = {
     updater: (prev: LiveRound[]) => LiveRound[],
     store: LiveTranscriptStore,
   ) => void;
-  updateGatewayBridgeToolStatus: (status: string | null, isCompaction?: boolean) => void;
+  updateConversationEventToolStatus: (status: string | null, isCompaction?: boolean) => void;
   updateRetryAttempts: (attempts: RetryAttemptRecord[], store: LiveTranscriptStore) => void;
   commitVisibleAbortedConversation: () => boolean;
   updateConversationRuntimeEntry: (
@@ -121,7 +121,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
     createdAt,
     titlePromise,
     transcriptStore,
-    gatewayBridgeEvents,
+    conversationEvents,
     hookLifecycle,
     conversationDebugLogger,
     recoveryDebugLogger,
@@ -133,7 +133,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
     resetLiveTranscript,
     appendDraftAssistantText,
     batchLiveRoundsUpdate,
-    updateGatewayBridgeToolStatus,
+    updateConversationEventToolStatus,
     updateRetryAttempts,
     commitVisibleAbortedConversation,
     updateConversationRuntimeEntry,
@@ -154,7 +154,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
   let protectionCompactionDisabled = false;
 
   function commitAssistantRoundMeta(assistant: AssistantMessage, round: number) {
-    gatewayBridgeEvents.queueToken("", {
+    conversationEvents.queueToken("", {
       round,
       provider: assistant.provider,
       model: assistant.model,
@@ -201,7 +201,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
   function updateHostedSearch(hostedSearch: HostedSearchBlock, round: number, existingText = "") {
     const shouldSeedExistingText = !textModeUsesLiveRounds && existingText.length > 0;
     ensureTextLiveRound(round);
-    gatewayBridgeEvents.queueEvent({
+    conversationEvents.queueEvent({
       type: "hosted_search",
       id: hostedSearch.id,
       provider: hostedSearch.provider,
@@ -263,7 +263,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
       const scope = cancellation.deriveScope();
       const nativeWebSearchStatusController = createDeferredProviderNativeWebSearchStatus({
         status: nativeWebSearchStatus,
-        onStatus: (status) => updateGatewayBridgeToolStatus(status),
+        onStatus: (status) => updateConversationEventToolStatus(status),
       });
       const retryAttemptsForAttempt: RetryAttemptRecord[] = [];
       updateRetryAttempts(retryAttemptsForAttempt, transcriptStore);
@@ -278,7 +278,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
           nativeWebSearch: nativeWebSearchEnabled,
           onTextDelta: (delta) => {
             nativeWebSearchStatusController.noteVisibleActivity();
-            gatewayBridgeEvents.queueToken(delta, { round: textRound });
+            conversationEvents.queueToken(delta, { round: textRound });
             if (textModeUsesLiveRounds) {
               batchLiveRoundsUpdate(
                 (prev) =>
@@ -312,12 +312,12 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
           signal: scope.controller.signal,
           debugLogger: streamAttempt === 0 ? conversationDebugLogger : recoveryDebugLogger,
           onRetryStatus: (attempt, maxAttempts, errorMessage) => {
-            updateGatewayBridgeToolStatus(`连接已断开，正在重试 (${attempt}/${maxAttempts})...`);
+            updateConversationEventToolStatus(`连接已断开，正在重试 (${attempt}/${maxAttempts})...`);
             retryAttemptsForAttempt.push({ attempt, maxAttempts, errorMessage });
             updateRetryAttempts(retryAttemptsForAttempt.slice(), transcriptStore);
           },
           onRetryRecovered: () => {
-            updateGatewayBridgeToolStatus(null);
+            updateConversationEventToolStatus(null);
           },
         });
         nativeWebSearchStatusController.finish();
@@ -385,9 +385,9 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
     hookLifecycle.endTurn(textRound);
   }
 
-  const gatewayAssistantText = assistantMessageToText(finalAssistant);
-  if (!gatewayBridgeEvents.hasForwardedText() && gatewayAssistantText.length > 0) {
-    gatewayBridgeEvents.queueToken(gatewayAssistantText, { round: textRound });
+  const finalAssistantText = assistantMessageToText(finalAssistant);
+  if (!conversationEvents.hasForwardedText() && finalAssistantText.length > 0) {
+    conversationEvents.queueToken(finalAssistantText, { round: textRound });
   }
   const finalState = appendMessagesToConversation(getNextConversationState(), [finalAssistant]);
   const shouldRunMemoryExtraction =
@@ -411,11 +411,11 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
     createdAt,
     titlePromise,
   });
-  gatewayBridgeEvents.queueEvent({
+  conversationEvents.queueEvent({
     type: "done",
     conversation_id: conversationId,
   });
-  gatewayBridgeEvents.close();
+  conversationEvents.close();
   if (shouldRunMemoryExtraction) {
     const currentMemoryExtractionModel: MemoryExtractionModelConfig = {
       providerId,

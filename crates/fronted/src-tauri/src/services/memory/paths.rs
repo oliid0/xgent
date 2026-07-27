@@ -226,8 +226,7 @@ fn collect_organize_snapshot_dirs(root: &Path) -> Vec<PathBuf> {
 }
 
 fn memory_root_dir() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or_else(|| "无法定位用户目录".to_string())?;
-    Ok(home.join(MEMORY_DIR_NAME).join(MEMORY_ROOT_DIR))
+    Ok(crate::services::app_paths::app_storage_dir()?.join(MEMORY_ROOT_DIR))
 }
 
 fn ensure_root_dirs(root: &Path) -> Result<(), String> {

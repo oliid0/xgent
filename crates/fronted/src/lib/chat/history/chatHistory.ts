@@ -23,17 +23,7 @@ export type ChatHistorySummary = {
   updatedAt: number;
   isPinned?: boolean;
   pinnedAt?: number | null;
-  isShared?: boolean;
   isPending?: boolean;
-};
-
-export type ChatHistoryShareStatus = {
-  conversationId: string;
-  enabled: boolean;
-  token?: string;
-  createdAt?: number;
-  updatedAt?: number;
-  redactToolContent?: boolean;
 };
 
 export type ChatHistoryListPage = {
@@ -202,7 +192,6 @@ function normalizeWireRecord(
     updatedAt: record.updatedAt,
     isPinned: record.isPinned,
     pinnedAt: record.pinnedAt,
-    isShared: record.isShared,
     state,
   };
 }
@@ -222,10 +211,6 @@ export async function listChatHistory(
 
 export async function listChatHistoryWorkdirs() {
   return invoke<ChatHistoryWorkdirsResponse>("chat_history_workdirs");
-}
-
-export async function listSharedChatHistory(page: number, pageSize: number) {
-  return invoke<ChatHistoryListPage>("chat_history_shared_list", { page, pageSize });
 }
 
 export async function getChatHistory(id: string, fallbackSystemPrompt?: string) {
@@ -254,7 +239,6 @@ export async function getChatHistoryActiveSegment(id: string, fallbackSystemProm
     updatedAt: record.updatedAt,
     isPinned: record.isPinned,
     pinnedAt: record.pinnedAt,
-    isShared: record.isShared,
     meta: parseStoredChatContextMeta(record.contextMetaJson, fallbackSystemPrompt),
     activeSegment: parseStoredSegment(record.activeSegment),
   } satisfies ChatHistoryActiveSegmentRecord;
@@ -370,24 +354,6 @@ export async function setChatHistoryPinned(id: string, isPinned: boolean) {
 export async function setChatHistoryModel(id: string, selectedModelJson: string) {
   return withConversationWriteLock(id, () =>
     invoke<ChatHistorySummary>("chat_history_set_model", { id, selectedModelJson }),
-  );
-}
-
-export async function getChatHistoryShare(id: string) {
-  return invoke<ChatHistoryShareStatus>("chat_history_share_get", { id });
-}
-
-export async function setChatHistoryShare(
-  id: string,
-  enabled: boolean,
-  options?: { redactToolContent?: boolean },
-) {
-  return withConversationWriteLock(id, () =>
-    invoke<ChatHistoryShareStatus>("chat_history_share_set", {
-      id,
-      enabled,
-      redactToolContent: options?.redactToolContent,
-    }),
   );
 }
 

@@ -9,7 +9,7 @@ const uiMessages = loader.loadModule("src/lib/chat/messages/uiMessages.ts");
 const hostedSearch = loader.loadModule("src/lib/chat/messages/hostedSearch.ts");
 const seedToolCalls = loader.loadModule("src/lib/chat/runner/seedToolCalls.ts");
 const chatHelpers = loader.loadModule("src/lib/chat/page/chatPageHelpers.ts");
-const gatewayToolPreview = loader.loadModule("src/pages/chat/turns/gatewayToolPreview.ts");
+const toolCallPreview = loader.loadModule("src/pages/chat/turns/toolCallPreview.ts");
 const toolPreview = loader.loadModule("src/lib/chat/messages/toolPreview.ts");
 
 const fileA = {
@@ -37,7 +37,7 @@ test("gateway tool preview keeps Write payloads small while preserving full metr
     `line-${index.toString().padStart(3, "0")} ${"x".repeat(24)}`,
   ).join("\n");
 
-  const args = gatewayToolPreview.buildGatewayToolCallPreviewArguments({
+  const args = toolCallPreview.buildToolCallPreviewArguments({
     name: "Write",
     arguments: {
       path: "src/generated.txt",
@@ -77,7 +77,7 @@ test("gateway tool preview handles empty and short Write content without false t
   assert.equal(partialPreview.content.lines, 0);
   assert.equal(partialPreview.content.truncated, false);
 
-  const args = gatewayToolPreview.buildGatewayToolCallPreviewArguments({
+  const args = toolCallPreview.buildToolCallPreviewArguments({
     name: "Write",
     arguments: {
       path: "src/small.txt",
@@ -108,7 +108,7 @@ test("gateway tool preview keeps Edit old/new payloads small with independent me
     "\n",
   );
 
-  const args = gatewayToolPreview.buildGatewayToolCallPreviewArguments({
+  const args = toolCallPreview.buildToolCallPreviewArguments({
     name: "Edit",
     arguments: {
       path: "src/app.ts",
@@ -145,7 +145,7 @@ test("gateway tool preview covers NotebookEdit new_source", () => {
   const newSource = Array.from({ length: 400 }, (_, index) => `cell-${index} ${"c".repeat(20)}`).join(
     "\n",
   );
-  const args = gatewayToolPreview.buildGatewayToolCallPreviewArguments({
+  const args = toolCallPreview.buildToolCallPreviewArguments({
     name: "NotebookEdit",
     arguments: {
       notebook_path: "notebooks/analysis.ipynb",
@@ -169,11 +169,11 @@ test("gateway tool preview covers NotebookEdit new_source", () => {
 
 test("tool args progress is monotonic across streaming prefixes and representations", () => {
   const fullContent = "x".repeat(9000);
-  const prefixArgs = gatewayToolPreview.buildGatewayToolCallPreviewArguments({
+  const prefixArgs = toolCallPreview.buildToolCallPreviewArguments({
     name: "Write",
     arguments: { path: "a.txt", content: fullContent.slice(0, 4500) },
   });
-  const fullArgs = gatewayToolPreview.buildGatewayToolCallPreviewArguments({
+  const fullArgs = toolCallPreview.buildToolCallPreviewArguments({
     name: "Write",
     arguments: { path: "a.txt", content: fullContent },
   });

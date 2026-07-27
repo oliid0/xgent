@@ -20,7 +20,7 @@ import {
   type SkillsSettings,
   type Theme,
 } from "./index";
-import { buildGatewaySettingsSyncPayload, buildGatewaySettingsSyncUpdatePayload } from "./sync";
+import { buildSshSettingsPatch } from "./sshPatch";
 
 const LOCAL_UI_SETTINGS_STORAGE_KEY = "xagent.ui-settings.v1";
 
@@ -30,7 +30,7 @@ type PersistedSettingsResponse = {
   mcp?: unknown | null;
   agents?: unknown | null;
   ssh?: unknown | null;
-  remote?: unknown | null;
+  access?: unknown | null;
   memory?: unknown | null;
   defaultWorkdir?: unknown | null;
 };
@@ -208,7 +208,7 @@ export async function loadPersistedSettingsWithDefaults(): Promise<PersistedSett
     mcp: (persisted?.mcp ?? defaults.mcp) as AppSettings["mcp"],
     agents: (persisted?.agents ?? defaults.agents) as AppSettings["agents"],
     ssh: (persisted?.ssh ?? defaults.ssh) as AppSettings["ssh"],
-    remote: (persisted?.remote ?? defaults.remote) as AppSettings["remote"],
+    access: (persisted?.access ?? defaults.access) as AppSettings["access"],
     memory: (persisted?.memory ?? defaults.memory) as AppSettings["memory"],
     skills: localUi.skills,
     chatRuntimeControls: localUi.chatRuntimeControls,
@@ -273,9 +273,7 @@ export async function persistSettings(
   }
 
   if (hasChanged(prev.ssh, next.ssh)) {
-    const update = buildGatewaySettingsSyncUpdatePayload(prev, next, {
-      includeProviderApiKeyUpdates: true,
-    });
+    const update = buildSshSettingsPatch(prev.ssh, next.ssh);
     tasks.push(
       invoke<SshPatchApplyResponse>("settings_apply_ssh_patch", {
         payload: {
@@ -294,10 +292,10 @@ export async function persistSettings(
     );
   }
 
-  if (hasChanged(prev.remote, next.remote)) {
+  if (hasChanged(prev.access, next.access)) {
     tasks.push(
-      invoke("settings_save_remote", {
-        payload: next.remote,
+      invoke("settings_save_access", {
+        payload: next.access,
       } as any),
     );
   }
@@ -334,10 +332,4 @@ export async function persistSettings(
 
   await Promise.all(tasks);
   return result;
-}
-
-export async function publishGatewaySettingsSync(settings: AppSettings): Promise<void> {
-  await invoke("gateway_publish_settings_sync", {
-    payload: buildGatewaySettingsSyncPayload(settings),
-  } as any);
 }

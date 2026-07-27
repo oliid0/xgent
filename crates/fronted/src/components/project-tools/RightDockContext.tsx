@@ -12,12 +12,10 @@ import type {
 import type { TerminalClient, TerminalSession, TerminalSnapshot } from "../../lib/terminal/types";
 import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types";
 import type { GitCommitContextPayload, GitFileContextPayload } from "./git-review";
-import type { LocalTunnelClient } from "./LocalTunnelPanel";
 
 export type RightDockToolClients = {
   terminal: TerminalClient;
   git?: GitClient | null;
-  tunnel?: LocalTunnelClient | null;
   workspaceActivity?: WorkspaceActivityClient | null;
 };
 
@@ -28,9 +26,6 @@ export type RightDockToolCapabilities = {
   terminalDisabledMessage?: string;
   gitWriteEnabled: boolean;
   gitDisabledMessage?: string;
-  tunnelEnabled: boolean;
-  tunnelDisabledMessage?: string;
-  tunnelPublicBaseUrl: string;
 };
 
 export type RightDockFileTreeContext = {

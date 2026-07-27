@@ -1,3 +1,4 @@
+import { isBrowserRuntime } from "@xagent/runtime";
 import { type FormEvent, memo, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -396,6 +397,7 @@ export function McpServerEditModal(props: {
 }) {
   const { mode, initialServer, existingServers, onClose, onSave } = props;
   const { t } = useLocale();
+  const browser = isBrowserRuntime();
   const { modalState, requestClose } = useModalMotion(onClose);
 
   const existingIdsExcludingCurrent = useMemo(() => {
@@ -574,6 +576,7 @@ export function McpServerEditModal(props: {
                   <Textarea
                     id="mcp-edit-env"
                     value={draft.envText}
+                    disabled={browser}
                     placeholder={"BRAVE_API_KEY=...\nHTTP_PROXY=..."}
                     className="min-h-[92px] font-mono text-[12.5px]"
                     onChange={(event) => updateDraft({ envText: event.currentTarget.value })}
@@ -619,6 +622,7 @@ export function McpServerEditModal(props: {
                   <Textarea
                     id="mcp-edit-headers"
                     value={draft.headersText}
+                    disabled={browser}
                     placeholder={"Authorization=Bearer ...\nX-API-Key=..."}
                     className="min-h-[92px] font-mono text-[12.5px]"
                     onChange={(event) => updateDraft({ headersText: event.currentTarget.value })}

@@ -14,11 +14,15 @@ pub mod runtime_commands;
 pub mod workspace_commands;
 
 pub use app_commands::app;
+#[cfg(desktop)]
 pub use app_commands::custom_tools;
 pub use app_commands::system;
+#[cfg(desktop)]
 pub use app_commands::update;
 
+#[cfg(desktop)]
 pub use automation_commands::cron;
+#[cfg(desktop)]
 pub use automation_commands::hook;
 
 pub use config_commands::settings;
@@ -27,15 +31,23 @@ pub use history_commands::chat_history;
 pub use history_commands::history_db;
 pub use history_commands::subagent_store;
 
-pub use integration_commands::gateway;
+pub use integration_commands::cloud;
+#[cfg(desktop)]
+pub use integration_commands::local_access;
+#[cfg(desktop)]
 pub use integration_commands::mcp;
 pub use integration_commands::memory;
 
+#[cfg(desktop)]
 pub use runtime_commands::process;
+#[cfg(desktop)]
 pub use runtime_commands::sftp;
 pub use runtime_commands::shell;
+#[cfg(desktop)]
 pub use runtime_commands::terminal;
 
 pub use workspace_commands::fs;
+#[cfg(desktop)]
 pub use workspace_commands::git;
+#[cfg(desktop)]
 pub use workspace_commands::subagent_worktree;

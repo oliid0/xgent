@@ -6,10 +6,10 @@
 |---|---|---|
 | builtin source | `crates/fronted/src-tauri/prompt/skills/<skill-name>` | 内置 skills 源文件。 |
 | runtime root | `~/.xagent/skills` | 用户运行时 skills 根目录。 |
-| Rust service | `src-tauri/src/services/skills/*` | seed builtin、list/read/manage/install/create/validate/package/ClawHub。写侧由进程级 `skills_write_guard()` 串行化（agent 调用、gateway 转发、UI 后台安装线程、builtin seeding 四路写者）；安装走 stage-then-swap：内容（含 `_meta.json`）先在 `<root>/.staging/` 完整构建，再原子 rename 入位，读者永远看不到半成品。 |
-| Frontend lib | `src/lib/skills/*`、WebUI copy | discover skills（仅 managed list，经 `SkillsManager list`）、build prompt、ClawHub client、install status。 |
+| Rust service | `src-tauri/src/services/skills/*` | seed builtin、list/read/manage/install/create/validate/package/ClawHub。写侧由进程级 `skills_write_guard()` 串行化；安装走 stage-then-swap，读者永远看不到半成品。 |
+| Frontend lib | `src/lib/skills/*` | discover skills、build prompt、ClawHub client、install status。 |
 | Tool | `src/lib/tools/skillTools.ts` | `SkillsManager`。 |
-| Hub UI | `src/pages/skills-hub/SkillsHubPage.tsx`、WebUI mirror | Installed/Store 两个视图，选择、扫描、预览、安装。 |
+| Hub UI | `src/pages/skills-hub/SkillsHubPage.tsx` | Installed/Store 两个视图，选择、扫描、预览、安装。 |
 
 ## Builtin Skills
 
@@ -49,7 +49,7 @@
 
 | 阶段 | 说明 |
 |---|---|
-| 扫描 | `discoverSkills()` 调用 Tauri 或 Gateway skill APIs，读取 runtime root 中的 Skill metadata。 |
+| 扫描 | `discoverSkills()` 通过共享 runtime API 读取原生 Skill metadata。 |
 | 选择 | Settings/Skills Hub 管理 `settings.skills.selected`，builtin always-on 自动合并。 |
 | 注入 | Chat tools 模式下，`useChatSkills` 和 `lib/skills/index.ts` 生成当前对话可见 skills prompt。 |
 | 访问 | 模型对 Skill 内文件的维护应通过 FS tools 的 skills root 能力和 `SkillsManager` 配合完成。 |
@@ -88,12 +88,12 @@
 
 Registry card 会被归一化为统一的 `McpRegistryCard`，其中 `installDraft` 表示可直接生成 server config，`manualDraft` 表示需要用户手工补全。
 
-## GUI/WebUI Parity 要点
+## 多端一致性要点
 
 | 区域 | 注意事项 |
 |---|---|
-| Skills Hub | GUI/WebUI 都有 installed/store、preview drawer、install job 状态，并以 `ownerHandle + slug` 推导 ClawHub 安装身份。 |
-| MCP Hub | GUI/WebUI 都有 server form、registry browser、preview drawer、install draft。 |
-| i18n | 双端有各自 `i18n/config.ts`，新增文案要同步。 |
-| settings sync | Skills/MCP settings 从 GUI 经 Gateway 同步到 WebUI，WebUI 修改再回写 GUI。 |
-| shims | WebUI 的 Tauri invoke 实际走 Gateway，不应假设浏览器有本地权限。 |
+| Skills Hub | 所有目标共用 installed/store、preview drawer 与 install job 状态。 |
+| MCP Hub | 所有目标共用 server form、registry browser、preview drawer 与 install draft。 |
+| i18n | 只有一个 `i18n/config.ts`。 |
+| settings | 配对 WebUI 读取脱敏设置，写入通过本地访问 sanitizer 合并。 |
+| runtime | 浏览器 invoke 走本地访问 RPC，不得假设浏览器有系统权限。 |

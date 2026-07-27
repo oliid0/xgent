@@ -6,8 +6,7 @@ fn now_ms() -> i64 {
 }
 
 fn config_dir() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or_else(|| "无法定位用户目录".to_string())?;
-    let dir = home.join(format!(".{}", env!("CARGO_PKG_NAME")));
+    let dir = crate::services::app_paths::app_storage_dir()?;
     fs::create_dir_all(&dir).map_err(|e| format!("创建配置目录失败：{e}"))?;
     Ok(dir)
 }
@@ -85,18 +84,25 @@ pub(crate) fn initialize_schema(conn: &Connection) -> Result<(), String> {
             updated_at INTEGER NOT NULL,
             PRIMARY KEY (host, port)
         );
-        CREATE TABLE IF NOT EXISTS remote_settings (
+        CREATE TABLE IF NOT EXISTS access_settings (
             config_id TEXT PRIMARY KEY,
             payload_json TEXT NOT NULL,
             updated_at INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS local_access_devices (
+            device_id TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            session_hash TEXT NOT NULL UNIQUE,
+            csrf_hash TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            last_seen_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
+            revoked_at INTEGER
+        );
+        CREATE INDEX IF NOT EXISTS idx_local_access_devices_session
+            ON local_access_devices(session_hash, revoked_at, expires_at);
         CREATE TABLE IF NOT EXISTS memory_settings (
             config_id TEXT PRIMARY KEY,
-            payload_json TEXT NOT NULL,
-            updated_at INTEGER NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS tunnel_settings (
-            tunnel_id TEXT PRIMARY KEY,
             payload_json TEXT NOT NULL,
             updated_at INTEGER NOT NULL
         );

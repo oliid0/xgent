@@ -63,16 +63,6 @@ Summary 的 `<artifacts>` 段由模型生成，会漏、会幻觉。为此每个
 | time filter | 支持按时间窗口过滤，并有 time-window fallback。 |
 | 去重 | FTS 结果需去除重复 segment rows，避免 UI 重复匹配。 |
 
-## 分享历史
-
-| 能力 | 说明 |
-|---|---|
-| enable share | 为 conversation 生成 token 并写 `chatHistoryShare`。 |
-| disable share | 关闭 token，旧 token 不再 resolve。 |
-| redaction | 可配置是否隐藏 tool content。 |
-| public resolve | Gateway `/api/public/history-shares/{token}` 返回只读 transcript 数据。 |
-| UI | GUI/WebUI sidebar 和 shared history manager 显示分享状态。 |
-
 ## Pin 与 Sidebar 排序
 
 | 字段 | 说明 |
@@ -81,29 +71,23 @@ Summary 的 `<artifacts>` 段由模型生成，会漏、会幻觉。为此每个
 | `pinned_at` | 置顶时间，用于置顶分组排序。 |
 | `updated_at` | 非置顶或同组内 fallback 排序。 |
 
-GUI/WebUI 的 sidebar 都依赖 summary 中的 pin/share 字段，因此新增历史字段时必须同步 Rust summary、proto、Gateway payload 和两端 UI。
+所有平台的 sidebar 都依赖同一个 SQLite summary，因此新增历史字段时必须同步 Rust wire record、TypeScript 类型和脱敏 WebUI 投影。
 
-## WebUI 大历史优化
+## 配对 WebUI
 
-| 优化 | 说明 |
-|---|---|
-| `max_messages` | WebUI `history.get` 可只请求 tail window。 |
-| `has_more` | 响应中标记是否还有更早消息。 |
-| `total_message_count` / `returned_message_count` | 让 UI 明确当前窗口范围。 |
-| worker parser | 大 `messages_json` 在 WebUI 可交给 worker 解析，减少主线程卡顿。 |
+配对浏览器通过本地访问 RPC 调用与桌面相同的 `chat_history_*` 命令。首次打开优先读取 active segment，再在空闲阶段补齐完整 transcript；SQLite 始终是事实源。
 
 ## 改造注意事项
 
 | 改动 | 必查 |
 |---|---|
-| 修改 history schema | 迁移兼容、测试、Gateway proto、WebUI type。 |
+| 修改 history schema | 迁移兼容、测试、Rust wire record、WebUI 脱敏 type。 |
 | 修改 compaction 格式 | `summary_json` 读写、checkpoint UI、resume context、历史旧数据兼容。 |
 | 修改 truncate/edit resend | active segment、FTS 清理、subagent parent tool call 保留。 |
-| 修改 share | public API、read-only transcript、redaction、sidebar share flag。 |
 
 ### Schema 兼容约束
 
-- 新增 `chatHistory`、`chatHistorySegment`、`chatHistoryShare`、`chatHistoryFtsSegmentIndex` 列时，必须同步更新 `src-tauri/src/commands/chat_history.rs` 中对应的 `ensure_*_columns` 迁移逻辑。
+- 新增 `chatHistory`、`chatHistorySegment`、`chatHistoryFtsSegmentIndex` 列时，必须同步更新 history DB 中对应的 `ensure_*_columns` 迁移逻辑。旧 `chatHistoryShare` 只保留删除迁移，不得恢复产品功能。
 - `CREATE TABLE IF NOT EXISTS` 只覆盖新库，不会补齐已有旧库字段；新增列不能只改建表 SQL。
 - 新增 `NOT NULL` 字段必须提供 `DEFAULT`，并在迁移后回填旧行的空值。
 - 索引创建应放在列迁移之后，避免旧库缺索引依赖列时初始化失败。

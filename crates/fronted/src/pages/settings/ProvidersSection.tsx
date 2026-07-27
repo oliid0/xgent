@@ -48,6 +48,10 @@ import {
 import { useLocale } from "../../i18n";
 import { buildModelOptions } from "../../lib/chat/page/chatPageHelpers";
 import {
+  isLocalAccessSecretSentinel,
+  LOCAL_ACCESS_SECRET_SENTINEL,
+} from "../../lib/localAccessSecrets";
+import {
   getCustomHeaderKeyPresets,
   isReservedCustomHeaderKey,
   isValidCustomHeaderKey,
@@ -225,7 +229,9 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
   const isBrowser = isBrowserRuntime();
   const initialApiKey = initialData?.apiKey ?? "";
   const initialUsesRedactedApiKey =
-    isBrowser && initialApiKey.trim() === "" && initialData?.apiKeyConfigured === true;
+    isBrowser &&
+    initialData?.apiKeyConfigured === true &&
+    (initialApiKey.trim() === "" || isLocalAccessSecretSentinel(initialApiKey));
   const [name, setName] = useState(initialData?.name ?? "");
   const [baseUrl, setBaseUrl] = useState(initialData?.baseUrl ?? "");
   const [apiKey, setApiKey] = useState(
@@ -271,7 +277,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
   const headerKeyRefs = useRef<Array<HTMLInputElement | null>>([]);
   const headerValueRefs = useRef<Array<HTMLInputElement | null>>([]);
   const apiKeyIsRedactedDisplay = initialUsesRedactedApiKey && apiKey === REDACTED_API_KEY_DISPLAY;
-  const apiKeyForRequest = apiKeyIsRedactedDisplay ? "" : apiKey.trim();
+  const apiKeyForRequest = apiKeyIsRedactedDisplay ? LOCAL_ACCESS_SECRET_SENTINEL : apiKey.trim();
   const canFetchModels = baseUrl.trim().length > 0 && apiKeyForRequest.length > 0;
 
   const doFetch = useCallback(
@@ -496,7 +502,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
       focusCustomHeader(invalidHeaderIndex, "key");
       return;
     }
-    const nextApiKey = apiKeyIsRedactedDisplay ? "" : apiKey.trim();
+    const nextApiKey = apiKeyIsRedactedDisplay ? LOCAL_ACCESS_SECRET_SENTINEL : apiKey.trim();
     onSave({
       name: name.trim(),
       type: providerType,
@@ -682,6 +688,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                         id="modal-apikey"
                         type={showApiKey ? "text" : "password"}
                         value={apiKey}
+                        disabled={isBrowser}
                         className="pr-10"
                         onChange={(event) => setApiKey(event.currentTarget.value)}
                         onFocus={(event) => {
@@ -694,6 +701,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                         size="icon"
                         className="absolute right-0 top-0 h-10 w-10 text-muted-foreground hover:bg-transparent hover:text-foreground"
                         onClick={() => setShowApiKey((prev) => !prev)}
+                        disabled={isBrowser}
                         title={showApiKey ? t("settings.hideApiKey") : t("settings.showApiKey")}
                         aria-label={
                           showApiKey ? t("settings.hideApiKey") : t("settings.showApiKey")
@@ -1090,6 +1098,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                     size="sm"
                     className="h-8 shrink-0 gap-1.5 max-[720px]:h-10"
                     onClick={() => addCustomHeader()}
+                    disabled={isBrowser}
                   >
                     <Plus className="h-3.5 w-3.5" />
                     {t("settings.addCustomHeader")}
@@ -1101,6 +1110,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                     type="button"
                     className="mt-3 flex w-full flex-col items-center gap-1 rounded-xl border border-dashed px-4 py-8 text-center transition-colors hover:border-primary/50 hover:bg-accent/20"
                     onClick={() => addCustomHeader()}
+                    disabled={isBrowser}
                   >
                     <List className="h-5 w-5 text-muted-foreground/60" />
                     <span className="mt-1 text-xs font-medium text-muted-foreground">
@@ -1145,6 +1155,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                                 headerKeyRefs.current[index] = element;
                               }}
                               value={header.key}
+                              disabled={isBrowser}
                               className={cn(
                                 "h-10 w-[210px] shrink-0 rounded-none border-0 border-r bg-muted/30 px-3 font-mono text-xs shadow-none focus-visible:ring-0 max-[720px]:w-full max-[720px]:border-b max-[720px]:border-r-0 max-[720px]:bg-muted/40",
                                 issue && "text-destructive",
@@ -1208,6 +1219,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                                 }}
                                 type={valueVisible ? "text" : "password"}
                                 value={header.value}
+                                disabled={isBrowser}
                                 className="h-10 w-full rounded-none border-0 bg-transparent pl-3 pr-[4.5rem] font-mono text-xs shadow-none focus-visible:ring-0"
                                 placeholder={t("settings.customHeaderValue")}
                                 aria-label={t("settings.customHeaderValue")}
@@ -1230,6 +1242,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                                   size="icon"
                                   className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground"
                                   onClick={() => toggleCustomHeaderValue(index)}
+                                  disabled={isBrowser}
                                   title={
                                     valueVisible
                                       ? t("settings.hideCustomHeaderValue")
@@ -1253,6 +1266,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                                   size="icon"
                                   className="h-7 w-7 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                   onClick={() => removeCustomHeader(index)}
+                                  disabled={isBrowser}
                                   title={t("settings.removeCustomHeader")}
                                   aria-label={t("settings.removeCustomHeader")}
                                 >
@@ -1922,6 +1936,7 @@ function ProviderList(props: {
   onRefreshThirdPartyProviders: () => void;
   onOpenCcsImport: () => void;
   onOpenCherryImport: () => void;
+  thirdPartyImportEnabled: boolean;
 }) {
   const { t } = useLocale();
   const {
@@ -1942,6 +1957,7 @@ function ProviderList(props: {
     onRefreshThirdPartyProviders,
     onOpenCcsImport,
     onOpenCherryImport,
+    thirdPartyImportEnabled,
   } = props;
   const [syncMenuOpen, setSyncMenuOpen] = useState(false);
   const filtered = providers.filter((provider) => provider.type === type);
@@ -1999,6 +2015,7 @@ function ProviderList(props: {
             <Plus className="h-3.5 w-3.5" />
             {t("settings.addProvider")}
           </Button>
+          {thirdPartyImportEnabled ? (
           <DropdownMenu open={syncMenuOpen} onOpenChange={handleSyncMenuOpenChange}>
             <DropdownMenuTrigger
               render={
@@ -2101,6 +2118,7 @@ function ProviderList(props: {
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
+          ) : null}
         </div>
       </div>
 
@@ -2176,8 +2194,11 @@ function ProviderList(props: {
   );
 }
 
-export function ProvidersSection(props: SettingsSectionProps) {
+export function ProvidersSection(
+  props: SettingsSectionProps & { thirdPartyImportEnabled?: boolean },
+) {
   const { settings, setSettings } = props;
+  const thirdPartyImportEnabled = props.thirdPartyImportEnabled !== false;
   const { t } = useLocale();
 
   const [activeTab, setActiveTab] = useState<ProviderId>("claude_code");
@@ -2196,6 +2217,7 @@ export function ProvidersSection(props: SettingsSectionProps) {
   const [cherryDataPath, setCherryDataPath] = useState<string | null>(readCherryDataPath);
 
   async function refreshThirdPartyProviders() {
+    if (!thirdPartyImportEnabled) return;
     setCcsLoading(true);
     setCherryLoading(true);
     const [ccsResult, cherryResult] = await withScanFeedback(
@@ -2233,6 +2255,7 @@ export function ProvidersSection(props: SettingsSectionProps) {
   }
 
   async function chooseCherryDataDirectory() {
+    if (!thirdPartyImportEnabled) return;
     const selected = await invoke<string | null>("system_pick_folder", {
       initial_workdir: cherryDataPath ?? cherryProviders?.dataPath ?? undefined,
     });
@@ -2259,6 +2282,7 @@ export function ProvidersSection(props: SettingsSectionProps) {
   }
 
   function resetCherryDataDirectory() {
+    if (!thirdPartyImportEnabled) return;
     localStorage.removeItem(CHERRY_DATA_PATH_STORAGE_KEY);
     setCherryDataPath(null);
     // Keep the stale provider list while rescanning: the import modal renders
@@ -2278,6 +2302,7 @@ export function ProvidersSection(props: SettingsSectionProps) {
   }
 
   function ensureThirdPartyScan() {
+    if (!thirdPartyImportEnabled) return;
     if ((!ccsProviders || !cherryProviders) && !ccsLoading && !cherryLoading) {
       void refreshThirdPartyProviders();
     }
@@ -2625,6 +2650,7 @@ export function ProvidersSection(props: SettingsSectionProps) {
                 onRefreshThirdPartyProviders={() => void refreshThirdPartyProviders()}
                 onOpenCcsImport={() => setCcsImportType(tab)}
                 onOpenCherryImport={() => setCherryImportType(tab)}
+                thirdPartyImportEnabled={thirdPartyImportEnabled}
               />
             </div>
           ))}
@@ -2639,7 +2665,7 @@ export function ProvidersSection(props: SettingsSectionProps) {
           onClose={closeModal}
         />
       ) : null}
-      {ccsImportType ? (
+      {thirdPartyImportEnabled && ccsImportType ? (
         <CcsImportModal
           initialType={ccsImportType}
           items={ccsProviders?.providers ?? []}
@@ -2648,7 +2674,7 @@ export function ProvidersSection(props: SettingsSectionProps) {
           onClose={() => setCcsImportType(null)}
         />
       ) : null}
-      {cherryImportType && cherryProviders ? (
+      {thirdPartyImportEnabled && cherryImportType && cherryProviders ? (
         <CherryStudioImportModal
           initialType={cherryImportType}
           response={cherryProviders}

@@ -1,3 +1,4 @@
+import { isBrowserRuntime } from "@xagent/runtime";
 import { useState } from "react";
 import {
   CheckCircle2,
@@ -43,6 +44,7 @@ const FONT_SCALE_OPTIONS = [0.9, 1, 1.1, 1.2] as const;
 export function SystemSettingsForm(props: SettingsSectionProps) {
   const { settings, setSettings } = props;
   const { t } = useLocale();
+  const browser = isBrowserRuntime();
 
   const executionMode = settings.system.executionMode;
   const isClassicAgentMode = executionMode === "tools";
@@ -454,6 +456,7 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
             <Input
               id="system-proxy-password"
               type="password"
+              disabled={browser}
               value={proxyPasswordDraft ?? systemProxy.password}
               onChange={(event) => setProxyPasswordDraft(event.currentTarget.value)}
               onBlur={commitProxyPasswordDraft}
@@ -465,6 +468,7 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
                 <button
                   type="button"
                   className="underline-offset-2 hover:text-foreground hover:underline"
+                  disabled={browser}
                   onClick={() => {
                     setProxyPasswordDraft(null);
                     patchSystemProxy({ password: "", passwordConfigured: false });

@@ -9,13 +9,45 @@ pub async fn settings_load_all() -> Result<SettingsLoadResponse, String> {
             mcp: load_mcp(&conn)?,
             agents: load_agents(&conn)?,
             ssh: load_ssh(&conn)?,
-            remote: load_remote(&conn)?,
+            access: load_access(&conn)?,
             memory: load_memory(&conn)?,
             default_workdir,
         })
     })
     .await
     .map_err(|e| format!("settings_load_all join 失败：{e}"))?
+}
+
+#[tauri::command]
+#[cfg(desktop)]
+pub async fn settings_save_access(
+    payload: Value,
+    local_access_controller: tauri::State<'_, Arc<crate::services::local_access::LocalAccessController>>,
+) -> Result<(), String> {
+    let normalized = parse_access_settings_payload(payload)?;
+    let persisted = serde_json::to_value(&normalized)
+        .map_err(|error| format!("serialize {ACCESS_SETTINGS_TABLE} failed: {error}"))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut conn = open_db()?;
+        save_access(&mut conn, persisted)
+    })
+    .await
+    .map_err(|error| format!("settings_save_access join failed: {error}"))??;
+    local_access_controller.apply_config(normalized)
+}
+
+#[tauri::command]
+#[cfg(mobile)]
+pub async fn settings_save_access(payload: Value) -> Result<(), String> {
+    let normalized = parse_access_settings_payload(payload)?;
+    let persisted = serde_json::to_value(&normalized)
+        .map_err(|error| format!("serialize {ACCESS_SETTINGS_TABLE} failed: {error}"))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut conn = open_db()?;
+        save_access(&mut conn, persisted)
+    })
+    .await
+    .map_err(|error| format!("settings_save_access join failed: {error}"))?
 }
 
 #[tauri::command]
@@ -29,6 +61,7 @@ pub async fn settings_save_providers(payload: Value) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[cfg(desktop)]
 pub async fn settings_save_system(
     payload: Value,
     automation_scheduler: tauri::State<'_, Arc<AutomationScheduler>>,
@@ -48,6 +81,18 @@ pub async fn settings_save_system(
 }
 
 #[tauri::command]
+#[cfg(mobile)]
+pub async fn settings_save_system(payload: Value) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut conn = open_db()?;
+        save_system(&mut conn, payload)?;
+        refresh_system_proxy_state(&conn)
+    })
+    .await
+    .map_err(|error| format!("settings_save_system join failed: {error}"))?
+}
+
+#[tauri::command]
 pub async fn settings_save_mcp(payload: Value) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut conn = open_db()?;
@@ -55,23 +100,6 @@ pub async fn settings_save_mcp(payload: Value) -> Result<(), String> {
     })
     .await
     .map_err(|e| format!("settings_save_mcp join 失败：{e}"))?
-}
-
-#[tauri::command]
-pub async fn settings_save_remote(
-    payload: Value,
-    gateway_controller: tauri::State<'_, Arc<GatewayController>>,
-) -> Result<(), String> {
-    let normalized = parse_remote_settings_payload(payload)?;
-    let persisted = serde_json::to_value(&normalized)
-        .map_err(|e| format!("序列化 {REMOTE_SETTINGS_TABLE} 失败：{e}"))?;
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut conn = open_db()?;
-        save_remote(&mut conn, persisted)
-    })
-    .await
-    .map_err(|e| format!("settings_save_remote join 失败：{e}"))??;
-    gateway_controller.apply_config(normalized)
 }
 
 #[tauri::command]
@@ -126,4 +154,3 @@ pub async fn settings_reset_ssh_known_host(
     .await
     .map_err(|e| format!("settings_reset_ssh_known_host join 失败：{e}"))?
 }
-

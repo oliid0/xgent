@@ -29,7 +29,7 @@ mod tests {
             MCP_SETTINGS_TABLE,
             AGENT_PROMPT_TEMPLATES_TABLE,
             SSH_SETTINGS_TABLE,
-            REMOTE_SETTINGS_TABLE,
+            ACCESS_SETTINGS_TABLE,
             MEMORY_SETTINGS_TABLE,
             SSH_PROJECT_HOST_ASSOCIATIONS_TABLE,
             SSH_KNOWN_HOSTS_TABLE,
@@ -100,32 +100,9 @@ mod tests {
             load_memory(&conn).expect("load memory settings"),
             Some(payload.clone())
         );
-        let snapshot =
-            load_gateway_settings_sync_snapshot(&conn).expect("load gateway settings snapshot");
+        let snapshot = load_local_access_settings_snapshot(&conn)
+            .expect("load local access settings snapshot");
         assert_eq!(snapshot["memory"], payload);
-    }
-
-    #[test]
-    fn normalize_remote_settings_repairs_single_slash_gateway_url() {
-        let normalized = normalize_remote_settings_payload(RemoteSettingsPayload {
-            enabled: true,
-            gateway_url: " https:/agent.cnweb.org/ ".to_string(),
-            grpc_port: 443,
-            grpc_endpoint: " tcp.proxy.rlwy.net:12345/ ".to_string(),
-            token: " agent-token-dev ".to_string(),
-            agent_id: " mac-mini ".to_string(),
-            auto_reconnect: true,
-            heartbeat_interval: 30,
-            enable_web_terminal: false,
-            enable_web_ssh_terminal: false,
-            enable_web_git: false,
-            enable_web_tunnels: false,
-        });
-
-        assert_eq!(normalized.gateway_url, "https://agent.cnweb.org");
-        assert_eq!(normalized.grpc_endpoint, "tcp.proxy.rlwy.net:12345");
-        assert_eq!(normalized.token, "agent-token-dev");
-        assert_eq!(normalized.agent_id, "mac-mini");
     }
 
     #[test]
@@ -158,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn gateway_settings_snapshot_redacts_provider_api_keys() {
+    fn local_access_snapshot_redacts_provider_api_keys() {
         let mut conn = open_memory_db();
         save_providers(
             &mut conn,
@@ -179,8 +156,8 @@ mod tests {
         )
         .expect("save providers");
 
-        let snapshot =
-            load_gateway_settings_sync_snapshot(&conn).expect("load gateway settings snapshot");
+        let snapshot = load_local_access_settings_snapshot(&conn)
+            .expect("load local access settings snapshot");
         assert_eq!(snapshot["customProviders"][0]["apiKey"], Value::Null);
         assert_eq!(snapshot["customProviders"][0]["apiKeyConfigured"], true);
         assert_eq!(snapshot["customProviders"][1]["apiKey"], Value::Null);
@@ -341,8 +318,8 @@ mod tests {
             }))
         );
 
-        let snapshot =
-            load_gateway_settings_sync_snapshot(&conn).expect("load gateway settings snapshot");
+        let snapshot = load_local_access_settings_snapshot(&conn)
+            .expect("load local access settings snapshot");
         assert_eq!(snapshot["ssh"]["hosts"][0]["password"], Value::Null);
         assert_eq!(snapshot["ssh"]["hosts"][0]["privateKey"], Value::Null);
         assert_eq!(
@@ -437,8 +414,8 @@ mod tests {
         assert_eq!(host["privateKeyPassphraseConfigured"], false);
         assert_eq!(host["proxy"]["passwordConfigured"], true);
 
-        let snapshot =
-            load_gateway_settings_sync_snapshot(&conn).expect("load gateway settings snapshot");
+        let snapshot = load_local_access_settings_snapshot(&conn)
+            .expect("load local access settings snapshot");
         assert_eq!(snapshot["ssh"]["hosts"][0]["password"], Value::Null);
         assert_eq!(snapshot["ssh"]["hosts"][0]["passwordConfigured"], false);
         assert_eq!(snapshot["ssh"]["hosts"][0]["privateKeyConfigured"], false);

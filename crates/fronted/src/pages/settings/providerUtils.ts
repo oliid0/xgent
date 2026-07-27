@@ -1,4 +1,4 @@
-import { invoke, isBrowserRuntime } from "@xagent/runtime";
+import { isBrowserRuntime } from "@xagent/runtime";
 import { prepareProxyRequest } from "../../lib/providers/proxy";
 import {
   createProviderModelConfig,
@@ -8,7 +8,6 @@ import {
 } from "../../lib/settings";
 import { normalizeBaseUrl } from "../../lib/settings/normalize";
 
-const GATEWAY_TOKEN_STORAGE_KEY = "xagent.gateway.token";
 const CODEX_MODELS_SUFFIXES = ["/chat/completions", "/responses", "/response"];
 const GEMINI_GENERATE_SUFFIXES = [":streamGenerateContent", ":generateContent"];
 const ANTHROPIC_API_VERSION = "2023-06-01";
@@ -190,43 +189,6 @@ async function readFetchError(response: Response, fallback: string) {
   }
 }
 
-async function fetchModelsThroughGateway(
-  type: ProviderId,
-  baseUrl: string,
-  apiKey: string,
-  useSystemProxy: boolean,
-): Promise<ProviderModelConfig[]> {
-  const token =
-    typeof window !== "undefined"
-      ? (window.localStorage.getItem(GATEWAY_TOKEN_STORAGE_KEY) ?? "").trim()
-      : "";
-  if (!token) {
-    throw new Error("Gateway token is required");
-  }
-
-  const data = await invoke<unknown>("gateway_provider_models", {
-    type,
-    base_url: baseUrl,
-    api_key: apiKey,
-    use_system_proxy: useSystemProxy,
-  });
-
-  const items = extractModelListItems(data);
-  if (items !== null) {
-    return normalizeFetchedModels(items, type);
-  }
-
-  const maybeError =
-    data && typeof data === "object" && "error" in (data as Record<string, unknown>)
-      ? (data as Record<string, unknown>).error
-      : null;
-  if (typeof maybeError === "string" && maybeError.trim() !== "") {
-    throw new Error(maybeError);
-  }
-
-  return [];
-}
-
 export function normalizeFetchedModels(
   items: unknown,
   providerType: ProviderId,
@@ -340,15 +302,6 @@ export async function fetchModelsFromApi(
 ): Promise<ProviderModelConfig[]> {
   const normalizedUrl = normalizeModelBaseUrl(type, baseUrl);
   const normalizedApiKey = apiKey.trim();
-  if (isBrowserRuntime()) {
-    return fetchModelsThroughGateway(
-      type,
-      normalizedUrl,
-      normalizedApiKey,
-      options?.useSystemProxy === true,
-    );
-  }
-
   const attempts = buildProviderModelsAttempts(type, normalizedUrl, normalizedApiKey);
   const failures: ProviderModelsFailure[] = [];
   let emptyResult: ProviderModelConfig[] | null = null;

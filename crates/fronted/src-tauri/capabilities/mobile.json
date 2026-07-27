@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile-execution",
+  "description": "Capability used only by the bundled Android and iOS application.",
+  "windows": ["main"],
+  "platforms": ["iOS", "android"],
+  "permissions": ["mobile-execution:default"]
+}

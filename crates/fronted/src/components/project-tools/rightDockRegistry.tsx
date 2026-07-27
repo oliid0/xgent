@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
-import { FolderTree, GitBranch, Globe, Key } from "../icons";
+import { FolderTree, GitBranch, Key } from "../icons";
 import { FileTreePanel } from "./file-tree";
 import { GitReviewPanel } from "./git-review";
-import { LocalTunnelPanel } from "./LocalTunnelPanel";
 import { type RightDockToolContextValue, useRightDockToolContext } from "./RightDockContext";
 import type { RightDockSingletonTabKind } from "./rightDockModel";
 import { SshTunnelPanel } from "./SshTunnelPanel";
@@ -43,22 +42,6 @@ function GitReviewTool(props: RightDockToolRenderInput) {
   // The panel reads everything else (clients, capabilities, git callbacks)
   // from the right-dock tool context itself.
   return <GitReviewPanel key={`${context.projectPathKey}:git-review`} active={active} />;
-}
-
-function TunnelTool(props: RightDockToolRenderInput) {
-  const { active } = props;
-  const context = useRightDockToolContext();
-  return (
-    <LocalTunnelPanel
-      active={active}
-      client={context.clients.tunnel ?? null}
-      enabled={context.capabilities.tunnelEnabled}
-      disabledMessage={context.capabilities.tunnelDisabledMessage}
-      projectPathKey={context.projectPathKey}
-      publicBaseUrl={context.capabilities.tunnelPublicBaseUrl}
-      onOpenExternal={context.openExternal}
-    />
-  );
 }
 
 function SshTunnelTool(props: RightDockToolRenderInput) {
@@ -113,18 +96,6 @@ export const RIGHT_DOCK_TOOL_DEFINITIONS: readonly RightDockToolDefinition[] = [
     containerActiveClassName: "flex flex-col",
     isAvailable: projectToolAvailable,
     render: (input) => <GitReviewTool active={input.active} />,
-  },
-  {
-    kind: "tunnel",
-    titleKey: "projectTools.tunnelTitle",
-    createTitleKey: "projectTools.newTunnel",
-    descriptionKey: "projectTools.tunnelDescription",
-    closeKey: "projectTools.closeTunnelTab",
-    projectRequired: false,
-    icon: (className) => <Globe className={className} />,
-    containerActiveClassName: "flex flex-col",
-    isAvailable: (context) => Boolean(context.clients.tunnel),
-    render: (input) => <TunnelTool active={input.active} />,
   },
   {
     kind: "sshTunnel",

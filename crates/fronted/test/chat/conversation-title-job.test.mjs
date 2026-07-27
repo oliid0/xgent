@@ -72,7 +72,7 @@ test("conversation title job disables thinking, caching, and native web search",
     content: "Please build a fast settings drawer.",
     sidebarStore,
     titleJobRef,
-    gatewayBridgeEvents: {
+    conversationEvents: {
       queueTitle: (nextTitle) => forwardedTitles.push(nextTitle),
     },
   });

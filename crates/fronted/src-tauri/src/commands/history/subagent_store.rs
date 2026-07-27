@@ -5,10 +5,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::commands::{
-    history_db,
-    subagent_worktree::{self, SubagentWorktreeCleanupTarget},
-};
+use crate::commands::history_db;
 
 const SUBAGENT_MODES: [&str; 2] = ["readonly", "worktree"];
 const SUBAGENT_RUN_STATUSES: [&str; 4] = ["running", "completed", "failed", "cancelled"];
@@ -20,6 +17,14 @@ const RUN_LIST_DEFAULT_LIMIT: i64 = 64;
 const RUN_LIST_MAX_LIMIT: i64 = 256;
 const MESSAGE_LIST_DEFAULT_LIMIT: i64 = 80;
 const MESSAGE_LIST_MAX_LIMIT: i64 = 400;
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubagentWorktreeCleanupTarget {
+    pub run_id: Option<String>,
+    pub worktree_root: String,
+    pub branch_name: Option<String>,
+}
 
 // ---------------------------------------------------------------------------
 // Records
@@ -1086,8 +1091,17 @@ pub(crate) fn cleanup_pruned_worktrees(result: &mut SubagentPruneResult) {
     if result.cleanup_targets.is_empty() {
         return;
     }
+    #[cfg(mobile)]
+    {
+        result.cleanup_targets.clear();
+        return;
+    }
+    #[cfg(desktop)]
+    {
     let targets = std::mem::take(&mut result.cleanup_targets);
-    let cleanup = subagent_worktree::cleanup_worktree_targets_blocking(targets, false, true, true);
+    let cleanup = crate::commands::subagent_worktree::cleanup_worktree_targets_blocking(
+        targets, false, true, true,
+    );
     result.worktree_cleanup_errors = cleanup
         .items
         .into_iter()
@@ -1098,6 +1112,7 @@ pub(crate) fn cleanup_pruned_worktrees(result: &mut SubagentPruneResult) {
             })
         })
         .collect();
+    }
 }
 
 fn prune_subagent_runs(input: SubagentRunPruneInput) -> Result<SubagentPruneResult, String> {

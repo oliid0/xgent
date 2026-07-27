@@ -1,57 +1,33 @@
-# XAgent 架构文档
+# XAgent 文档
 
-本文档树从当前实现出发，系统梳理 XAgent 的统一 React 前端、Tauri 系统层与纯 Go Gateway。Web、PC、移动端共享 `crates/fronted`，平台差异由 runtime adapter 表达。
+XAgent 使用一份 React/Tauri 源码覆盖 Web、桌面和移动端。Rust/Tauri 负责本地持久化与系统能力；桌面端可在 `28367` 端口托管同一份 WebUI，移动端还可以选择本机执行或 GitHub Actions 云端执行。
 
-## 项目一句话
+## 架构
 
-XAgent 是一个由单份 React 源码覆盖 Web、PC 和移动端的 Agent 应用：Tauri/Rust 负责本地系统能力与持久化，Go Gateway 只负责远程 API/WebSocket 中继。
-
-## 文档目录
-
-| 文档 | 覆盖范围 | 推荐读者 |
-|---|---|---|
-| [architecture/overview.md](architecture/overview.md) | 系统总览、进程边界、数据流、持久化地图 | 新接手项目者 |
-| [architecture/frontend.md](architecture/frontend.md) | 单前端目录、Web/Tauri runtime adapter、跨平台边界 | 前端开发 |
-| [architecture/gui.md](architecture/gui.md) | Tauri commands/services、设置与本地执行 | Tauri 开发 |
-| [architecture/gateway.md](architecture/gateway.md) | Go Gateway 的 HTTP/WebSocket（v2）、Session Manager、缓冲与认证 | Gateway 开发与排障 |
-| [architecture/protocols.md](architecture/protocols.md) | 浏览器/Tauri runtime 与 Gateway 的协议合同 | 联调与协议改造 |
-| [features/chat-runtime.md](features/chat-runtime.md) | 对话运行时、模型层、流式、压缩、hooks、上传与重发 | Chat 功能开发 |
-| [features/tools.md](features/tools.md) | builtin tools、MCP 动态工具、subagent（Agent/SendMessage）、工具执行边界 | 工具系统开发 |
-| [features/memory.md](features/memory.md) | MemoryStore、MemoryManager、Settings Memory、自动学习与召回 | 记忆系统开发 |
-| [features/skills-and-mcp.md](features/skills-and-mcp.md) | Skills root/builtin/ClawHub 与 MCP Hub/registry/runtime | Skills/MCP 开发 |
-| [features/history-compaction.md](features/history-compaction.md) | V3 历史分段、FTS、分享、上下文压缩 checkpoint | 历史与上下文开发 |
-| [operations/development.md](operations/development.md) | 本地开发、构建、测试、端口、运行路径 | 日常开发 |
-| [operations/deployment.md](operations/deployment.md) | CI/CD、纯 Go Gateway/Web 分离部署、桌面 Release | 发布维护 |
-| [operations/macos-release-signing.md](operations/macos-release-signing.md) | 可选的 Developer ID 证书、Apple 公证与 GitHub Actions 配置 | macOS 签名发布维护 |
-| [reference/source-map.md](reference/source-map.md) | 按功能域列出的源码路径索引 | 快速定位源码 |
-
-## 架构阅读顺序
-
-| 顺序 | 目标 | 文档 |
-|---:|---|---|
-| 1 | 先建立整体进程和边界模型 | [architecture/overview.md](architecture/overview.md) |
-| 2 | 理解单前端与 runtime adapter | [architecture/frontend.md](architecture/frontend.md) |
-| 3 | 理解远程访问如何转发到桌面端 | [architecture/gateway.md](architecture/gateway.md)、[architecture/protocols.md](architecture/protocols.md) |
-| 4 | 理解 Tauri 为什么是本地执行真相源 | [architecture/gui.md](architecture/gui.md) |
-| 5 | 按功能域深入 Chat、Tools、Memory、Skills/MCP、History/Compaction | `features/` |
-| 6 | 需要动手时查运行命令和源码索引 | [operations/development.md](operations/development.md)、[reference/source-map.md](reference/source-map.md) |
-
-## 当前实现的核心边界
-
-| 边界 | 当前结论 |
+| 文档 | 内容 |
 |---|---|
-| Agent 执行位置 | Tauri 本地执行模型请求、工具调用、文件系统、Shell、MCP、Skills、Memory、Cron prompt。 |
-| Gateway 职责 | 认证、连接保持、请求路由、事件广播、有界 Chat relay window；不承载前端静态资源。 |
-| 浏览器职责 | 运行与 PC/移动端相同的 React 源码，通过 browser runtime 和 Gateway 请求本地 Agent。 |
-| 设置同步 | Tauri 是真实设置来源；浏览器只保存脱敏快照和用户显式输入的新值。 |
-| 历史同步 | Tauri 写 SQLite 历史，Gateway 只转发 history request 与 sync event。 |
-| 文档来源 | 本文档基于当前 checkout 的源码路径、入口文件、协议定义与运行脚本整理。 |
+| [architecture/overview.md](architecture/overview.md) | 总体分层、运行环境和数据所有权 |
+| [architecture/frontend.md](architecture/frontend.md) | 单前端边界与运行时适配 |
+| [architecture/gui.md](architecture/gui.md) | React 与 Tauri 模块边界 |
+| [architecture/local-access.md](architecture/local-access.md) | WebUI 配对、RPC/SSE、安全与移动/云端后端 |
 
-## 与 `doc/` 的关系
+## 功能
 
-| 目录 | 定位 |
+| 文档 | 内容 |
 |---|---|
-| `docs/` | 当前实现的全局架构说明、模块地图、运行说明和源码索引。 |
-| `doc/` | 既有专项文档与历史设计资料，例如 memory 方案、Gateway 协议草案、上下文压缩策略等。 |
+| [features/chat-runtime.md](features/chat-runtime.md) | 对话运行时与上下文构造 |
+| [features/history-compaction.md](features/history-compaction.md) | SQLite 历史、Segment 与 Summary Checkpoint |
+| [features/memory.md](features/memory.md) | Memory 存储、召回与整理 |
+| [features/skills-and-mcp.md](features/skills-and-mcp.md) | Skills、MCP 与动态工具 |
+| [features/tools.md](features/tools.md) | 内置工具和执行边界 |
 
-后续如果某个专项文档已经稳定成为当前实现的一部分，可以在 `docs/` 中建立摘要与导航，但不建议把 `doc/` 直接重命名为 `docs/`，以免丢失历史上下文。
+## 开发与发布
+
+| 文档 | 内容 |
+|---|---|
+| [operations/development.md](operations/development.md) | 目录、命令与 GitHub Actions 门禁 |
+| [operations/deployment.md](operations/deployment.md) | 五平台 Release 与本地 WebUI |
+| [operations/macos-release-signing.md](operations/macos-release-signing.md) | 可选 macOS 签名与公证 |
+| [reference/source-map.md](reference/source-map.md) | 当前源码入口索引 |
+
+仓库不包含第二套前端、独立网关或容器部署链。WebUI 是桌面 Tauri 宿主的本地能力。

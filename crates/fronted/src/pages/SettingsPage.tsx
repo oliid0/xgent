@@ -21,7 +21,7 @@ import { CronSection } from "./settings/CronSection";
 import { HooksSection } from "./settings/HooksSection";
 import { MemoryPanel } from "./settings/memory/MemoryPanel";
 import { ProvidersSection } from "./settings/ProvidersSection";
-import { RemoteSection } from "./settings/RemoteSection";
+import { AccessSection } from "./settings/AccessSection";
 import { SshSection } from "./settings/SshSection";
 import { SystemSettingsForm } from "./settings/SystemSettingsForm";
 import { SystemToolsSection } from "./settings/SystemToolsSection";
@@ -116,7 +116,7 @@ const NAV_GROUPS: NavGroup[] = [
     labelKey: "settings.groupConnectivity",
     items: [
       { id: "ssh", icon: <Key className="h-3.5 w-3.5" /> },
-      { id: "remote", icon: <Cloud className="h-3.5 w-3.5" /> },
+      { id: "access", icon: <Cloud className="h-3.5 w-3.5" /> },
     ],
   },
   {
@@ -133,6 +133,7 @@ export function SettingsPage(props: SettingsPageProps) {
     onBack,
     initialSection = "system",
     hiddenSections = [],
+    nativeMobile = false,
     appUpdate,
   } = props;
   const { t } = useLocale();
@@ -147,7 +148,7 @@ export function SettingsPage(props: SettingsPageProps) {
     memory: t("settings.navMemory"),
     hooks: t("settings.navHooks"),
     cron: t("settings.navCron"),
-    remote: t("settings.navRemote"),
+    access: t("settings.navAccess"),
     about: t("settings.navAbout"),
   };
 
@@ -179,7 +180,13 @@ export function SettingsPage(props: SettingsPageProps) {
   const sectionContent = (() => {
     switch (section) {
       case "providers":
-        return <ProvidersSection settings={settings} setSettings={setSettings} />;
+        return (
+          <ProvidersSection
+            settings={settings}
+            setSettings={setSettings}
+            thirdPartyImportEnabled={!nativeMobile}
+          />
+        );
       case "system":
         return <SystemSettingsForm settings={settings} setSettings={setSettings} />;
       case "systemTools":
@@ -192,8 +199,8 @@ export function SettingsPage(props: SettingsPageProps) {
         return <AgentsSection settings={settings} setSettings={setSettings} />;
       case "ssh":
         return <SshSection settings={settings} setSettings={setSettings} />;
-      case "remote":
-        return <RemoteSection settings={settings} setSettings={setSettings} />;
+      case "access":
+        return <AccessSection settings={settings} setSettings={setSettings} />;
       case "memory":
         return (
           <MemoryPanel

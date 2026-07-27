@@ -1,13 +1,23 @@
-import { invoke } from "@xagent/runtime";
+import { invoke, isTauriRuntime } from "@xagent/runtime";
 
-export type RuntimePlatform = "windows" | "macos" | "linux";
+export type RuntimePlatform = "windows" | "macos" | "linux" | "android" | "ios";
 
 type RuntimePlatformResponse = {
   platform?: unknown;
 };
 
+let resolvedRuntimePlatform: RuntimePlatform | undefined;
+
 export function normalizeRuntimePlatform(value: unknown): RuntimePlatform | undefined {
-  if (value === "windows" || value === "macos" || value === "linux") return value;
+  if (
+    value === "windows" ||
+    value === "macos" ||
+    value === "linux" ||
+    value === "android" ||
+    value === "ios"
+  ) {
+    return value;
+  }
   return undefined;
 }
 
@@ -16,22 +26,39 @@ export function inferRuntimePlatform(): RuntimePlatform {
     typeof navigator !== "undefined"
       ? `${navigator.userAgent || ""} ${navigator.platform || ""}`
       : "";
+  if (/Android/i.test(nav)) return "android";
+  if (/iPhone|iPad|iPod/i.test(nav)) return "ios";
   if (/\bWindows\b|Win32|Win64|WOW64/i.test(nav)) return "windows";
-  if (/Mac|iPhone|iPad|iPod/i.test(nav)) return "macos";
+  if (/Mac/i.test(nav)) return "macos";
   return "linux";
 }
 
 export function runtimePlatformLabel(platform: RuntimePlatform) {
   if (platform === "windows") return "Windows";
   if (platform === "macos") return "macOS";
+  if (platform === "android") return "Android";
+  if (platform === "ios") return "iOS/iPadOS";
   return "Linux";
 }
 
 export async function resolveRuntimePlatform(): Promise<RuntimePlatform> {
   try {
     const response = await invoke<RuntimePlatformResponse>("app_runtime_platform");
-    return normalizeRuntimePlatform(response?.platform) ?? inferRuntimePlatform();
+    resolvedRuntimePlatform =
+      normalizeRuntimePlatform(response?.platform) ?? inferRuntimePlatform();
   } catch {
-    return inferRuntimePlatform();
+    resolvedRuntimePlatform = inferRuntimePlatform();
   }
+  return resolvedRuntimePlatform;
+}
+
+/**
+ * Distinguishes an installed Android/iOS shell from the browser Web UI.
+ * A mobile browser remains a remote view of the desktop host and therefore
+ * retains the host's capabilities.
+ */
+export function isNativeMobileRuntime() {
+  if (!isTauriRuntime()) return false;
+  const platform = resolvedRuntimePlatform ?? inferRuntimePlatform();
+  return platform === "android" || platform === "ios";
 }

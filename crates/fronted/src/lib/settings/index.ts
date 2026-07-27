@@ -78,7 +78,7 @@ export type ChatSidebarSettings = {
   recentCollapsed: boolean;
 };
 
-export const RIGHT_DOCK_TOOL_KINDS = ["fileTree", "gitReview", "tunnel", "sshTunnel"] as const;
+export const RIGHT_DOCK_TOOL_KINDS = ["fileTree", "gitReview", "sshTunnel"] as const;
 
 export type RightDockToolKind = (typeof RIGHT_DOCK_TOOL_KINDS)[number];
 
@@ -291,19 +291,22 @@ export const CLOSE_WINDOW_BEHAVIOR_OPTIONS = [
 
 const SYSTEM_THEME_MEDIA_QUERY = "(prefers-color-scheme: dark)";
 
-export type RemoteSettings = {
-  enabled: boolean;
-  gatewayUrl: string;
-  grpcPort: number;
-  grpcEndpoint: string;
-  token: string;
-  agentId: string;
-  autoReconnect: boolean;
-  heartbeatInterval: number;
-  enableWebTerminal: boolean;
-  enableWebSshTerminal: boolean;
-  enableWebGit: boolean;
-  enableWebTunnels: boolean;
+export type WebUiScope = "lan" | "loopback";
+
+export type AccessSettings = {
+  webUiEnabled: boolean;
+  webUiScope: WebUiScope;
+  webUiPort: number;
+  allowTerminal: boolean;
+  allowSsh: boolean;
+  allowGit: boolean;
+  allowFileWrite: boolean;
+  cloudExecutionEnabled: boolean;
+  githubOwner: string;
+  githubRepository: string;
+  cloudArtifactRetentionDays: number;
+  androidProotEnabled: boolean;
+  iosAShellEnabled: boolean;
 };
 
 export type AppSettings = {
@@ -312,7 +315,7 @@ export type AppSettings = {
   mcp: McpSettings;
   agents: AgentPromptTemplate[];
   ssh: SshSettings;
-  remote: RemoteSettings;
+  access: AccessSettings;
   memory: MemorySettings;
   customSettings: CustomSettings;
   updates: UpdateSettings;
@@ -998,28 +1001,22 @@ function normalizeIntegerInRange(
   return Math.min(max, Math.max(min, value));
 }
 
-function normalizeGrpcEndpoint(input: unknown): string {
-  const value = normalizeOptionalText(input);
-  if (!value) return "";
-  if (/^https?:/i.test(value)) return normalizeBaseUrl(value);
-  return value.endsWith("/") ? value.slice(0, -1) : value;
-}
-
-export function normalizeRemoteSettings(input: unknown): RemoteSettings {
+export function normalizeAccessSettings(input: unknown): AccessSettings {
   const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   return {
-    enabled: obj.enabled === true,
-    gatewayUrl: normalizeBaseUrl(typeof obj.gatewayUrl === "string" ? obj.gatewayUrl : ""),
-    grpcPort: normalizeIntegerInRange(obj.grpcPort, 1, 65_535, 443),
-    grpcEndpoint: normalizeGrpcEndpoint(obj.grpcEndpoint),
-    token: normalizeApiKey(typeof obj.token === "string" ? obj.token : ""),
-    agentId: normalizeOptionalText(obj.agentId),
-    autoReconnect: obj.autoReconnect !== false,
-    heartbeatInterval: normalizePositiveInteger(obj.heartbeatInterval, 30),
-    enableWebTerminal: obj.enableWebTerminal === true,
-    enableWebSshTerminal: obj.enableWebSshTerminal === true,
-    enableWebGit: obj.enableWebGit === true,
-    enableWebTunnels: obj.enableWebTunnels === true,
+    webUiEnabled: obj.webUiEnabled === true,
+    webUiScope: obj.webUiScope === "loopback" ? "loopback" : "lan",
+    webUiPort: normalizeIntegerInRange(obj.webUiPort, 1, 65_535, 28_367),
+    allowTerminal: obj.allowTerminal === true,
+    allowSsh: obj.allowSsh === true,
+    allowGit: obj.allowGit === true,
+    allowFileWrite: obj.allowFileWrite === true,
+    cloudExecutionEnabled: obj.cloudExecutionEnabled === true,
+    githubOwner: normalizeOptionalText(obj.githubOwner),
+    githubRepository: normalizeOptionalText(obj.githubRepository) || "agent-temp",
+    cloudArtifactRetentionDays: normalizeIntegerInRange(obj.cloudArtifactRetentionDays, 1, 90, 7),
+    androidProotEnabled: obj.androidProotEnabled === true,
+    iosAShellEnabled: obj.iosAShellEnabled === true,
   };
 }
 
@@ -1756,7 +1753,6 @@ export function normalizeMemorySettings(
 export const RIGHT_DOCK_SINGLETON_TAB_IDS = {
   fileTree: "tool:fileTree",
   gitReview: "tool:gitReview",
-  tunnel: "tool:tunnel",
   sshTunnel: "tool:sshTunnel",
 } as const satisfies Record<RightDockToolKind, string>;
 
@@ -2009,20 +2005,7 @@ export function getDefaultSettings(): AppSettings {
       hosts: [],
       projectHostAssociations: {},
     },
-    remote: {
-      enabled: false,
-      gatewayUrl: "",
-      grpcPort: 443,
-      grpcEndpoint: "",
-      token: "",
-      agentId: "",
-      autoReconnect: true,
-      heartbeatInterval: 30,
-      enableWebTerminal: false,
-      enableWebSshTerminal: false,
-      enableWebGit: false,
-      enableWebTunnels: false,
-    },
+    access: normalizeAccessSettings({}),
     memory: normalizeMemorySettings({}, customProviders),
     customSettings: normalizeCustomSettings({}, customProviders),
     updates: normalizeUpdateSettings({}),
@@ -2055,7 +2038,7 @@ export function normalizeSettings(input?: Partial<AppSettings> | null): AppSetti
     mcp: normalizeMcpSettings(obj.mcp ?? defaults.mcp),
     agents: normalizeAgentPromptTemplates(obj.agents ?? defaults.agents),
     ssh: normalizeSshSettings(obj.ssh ?? defaults.ssh),
-    remote: normalizeRemoteSettings(obj.remote ?? defaults.remote),
+    access: normalizeAccessSettings(obj.access ?? defaults.access),
     memory: normalizeMemorySettings(obj.memory ?? defaults.memory, customProviders),
     customSettings: normalizeCustomSettings(
       obj.customSettings ?? defaults.customSettings,

@@ -724,8 +724,7 @@ export function installMemoryOrganizerService(service: MemoryOrganizerService | 
   activeService = service;
 }
 
-/** Run Now entry. Returns false when no organizer runs in this frontend (the
- *  gateway web build ships a platform stub that always returns false). */
+/** Run Now entry. Returns false when this runtime has no organizer service. */
 export function pokeMemoryOrganizer(): boolean {
   if (!activeService) return false;
   activeService.poke();

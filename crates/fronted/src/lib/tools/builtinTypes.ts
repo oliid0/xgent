@@ -14,7 +14,8 @@ export type BuiltinToolGroupId =
   | "system"
   | "mcp"
   | "subagent"
-  | "memory";
+  | "memory"
+  | "cloud";
 
 export type BuiltinToolDisplayCategory =
   | "file"

@@ -43,7 +43,7 @@ export type CompactionSinks = {
   // 运行中换底：apply + 清空 live transcript（压缩/prune 结果落地后旧流式内容已过期）。
   applyStateMidRun?: (state: ConversationViewState) => void;
   publishStatus?: (status: CompactionStatus) => void;
-  setBridgeToolStatus?: (status: string | null, isCompaction?: boolean) => void;
+  setLiveToolStatus?: (status: string | null, isCompaction?: boolean) => void;
   queueCheckpoint?: (state: ConversationViewState) => void;
   persist?: (state: ConversationViewState) => Promise<unknown>;
   restoreComposer?: (
@@ -229,7 +229,7 @@ export class CompactionController {
       if (fallback.applied) {
         binding.sinks.applyState?.(presend.composeAppliedState(fallback.state));
         this.settleFailed("pre-send", PRUNE_FALLBACK_NOTICE);
-        binding.sinks.setBridgeToolStatus?.(buildPruneFallbackStatus(fallback.prunedMessageCount));
+        binding.sinks.setLiveToolStatus?.(buildPruneFallbackStatus(fallback.prunedMessageCount));
         return true;
       }
       console.warn("发送前上下文压缩失败，继续使用原始上下文", error);
@@ -238,7 +238,7 @@ export class CompactionController {
     } finally {
       scope.release();
       this.inFlight = false;
-      this.binding?.sinks.setBridgeToolStatus?.(null);
+      this.binding?.sinks.setLiveToolStatus?.(null);
     }
   }
 
@@ -355,7 +355,7 @@ export class CompactionController {
       if (fallback.applied) {
         binding.sinks.applyStateMidRun?.(fallback.state);
         this.settleFailed(params.trigger, PRUNE_FALLBACK_NOTICE);
-        binding.sinks.setBridgeToolStatus?.(buildPruneFallbackStatus(fallback.prunedMessageCount));
+        binding.sinks.setLiveToolStatus?.(buildPruneFallbackStatus(fallback.prunedMessageCount));
         return {
           context: buildFallbackContext(fallback.state),
           shouldDisableProtection: false,
@@ -374,7 +374,7 @@ export class CompactionController {
     } finally {
       scope.release();
       this.inFlight = false;
-      this.binding?.sinks.setBridgeToolStatus?.(null);
+      this.binding?.sinks.setLiveToolStatus?.(null);
     }
   }
 
@@ -394,7 +394,7 @@ export class CompactionController {
     }
 
     binding.sinks.applyStateMidRun?.(snapshot.state);
-    binding.sinks.setBridgeToolStatus?.(null, false);
+    binding.sinks.setLiveToolStatus?.(null, false);
     this.publishStatus({ phase: "idle" });
     binding.sinks.restoreComposer?.(snapshot.composerText, snapshot.uploadedFiles ?? []);
     if (snapshot.persistOnRollback) {
@@ -475,7 +475,7 @@ export class CompactionController {
       startedAt: Date.now(),
       sourceSegmentIndex,
     });
-    this.binding?.sinks.setBridgeToolStatus?.(
+    this.binding?.sinks.setLiveToolStatus?.(
       buildCompactionRunningStatus(decision, this.pressure),
       true,
     );

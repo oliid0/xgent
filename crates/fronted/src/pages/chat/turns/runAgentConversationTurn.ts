@@ -23,7 +23,7 @@ import type {
 } from "../../../lib/chat/conversation/liveTranscriptStore";
 import type {
   ConversationHookLifecycle,
-  GatewayBridgeEventController,
+  ConversationEventController,
 } from "../../../lib/chat/conversation/run";
 import type { TurnCancellation } from "../../../lib/chat/conversation/turnCancellation";
 import { memoryExtraction } from "../../../lib/chat/memory/extractionController";
@@ -73,13 +73,12 @@ import { createFileToolState } from "../../../lib/tools/fileToolState";
 import type { SkillAccessPolicy } from "../../../lib/tools/skillAccessPolicy";
 import type { SshManagerSessionChange } from "../../../lib/tools/sshManagerTools";
 import { getOrCreateTodoToolState } from "../../../lib/tools/todoTools";
-import type { TunnelManagerChange } from "../../../lib/tools/tunnelManagerTools";
 import {
   appendSystemPrompt,
   buildPartialAssistantMessage,
   type ConversationRuntimeEntry,
 } from "../runtime/chatPageRuntime";
-import { buildGatewayToolCallPreviewArguments } from "./gatewayToolPreview";
+import { buildToolCallPreviewArguments } from "./toolCallPreview";
 
 export type RuntimeModel = {
   api: AssistantMessage["api"];
@@ -222,11 +221,10 @@ export type RunAgentConversationTurnParams = {
   }) => void | Promise<void>;
   agentTemplates: AppSettings["agents"];
   selectedSystemToolIds: SystemToolId[];
+  cloudExecution?: AppSettings["access"];
+  nativeMobileRuntime?: boolean;
   getMcpSettings: () => AppSettings["mcp"];
   applyMcpOps?: (ops: McpSettingsOp[]) => void;
-  remoteWebTunnelsEnabled?: boolean;
-  tunnelPublicBaseUrl?: string;
-  onTunnelsChanged?: (change: TunnelManagerChange) => void;
   sshHosts?: SshHostConfig[];
   associatedSshHostIds?: string[];
   sshManagerRemoteAllowed?: boolean;
@@ -238,7 +236,7 @@ export type RunAgentConversationTurnParams = {
   createdAt: number;
   titlePromise: Promise<string | null> | null;
   transcriptStore: LiveTranscriptStore;
-  gatewayBridgeEvents: GatewayBridgeEventController;
+  conversationEvents: ConversationEventController;
   hookLifecycle: ConversationHookLifecycle;
   conversationDebugLogger: StreamDebugLogger;
   subagentStore?: SubagentConversationStore;
@@ -288,11 +286,10 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     onManagedSkillsChanged,
     agentTemplates,
     selectedSystemToolIds,
+    cloudExecution,
+    nativeMobileRuntime,
     getMcpSettings,
     applyMcpOps,
-    remoteWebTunnelsEnabled,
-    tunnelPublicBaseUrl,
-    onTunnelsChanged,
     sshHosts,
     associatedSshHostIds,
     sshManagerRemoteAllowed,
@@ -304,7 +301,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     createdAt,
     titlePromise,
     transcriptStore,
-    gatewayBridgeEvents,
+    conversationEvents,
     hookLifecycle,
     conversationDebugLogger,
     subagentStore,
@@ -399,6 +396,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     workdir: effectiveWorkdir,
     providerId,
     runtimePlatform,
+    nativeMobileRuntime,
     fileState,
     todoState,
     skillsEnabled: effectiveSkillsEnabled,
@@ -408,16 +406,14 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     runtimeScope: "chat",
     currentChatModel: selectedModel,
     selectedSystemToolIds,
+    cloudExecution,
     getMcpSettings,
     applyMcpOps,
-    remoteWebTunnelsEnabled,
-    tunnelProjectPathKey: workspaceProjectPathKey(effectiveWorkdir),
-    tunnelPublicBaseUrl,
+    projectPathKey: workspaceProjectPathKey(effectiveWorkdir),
     sshHosts,
     associatedSshHostIds,
     sshManagerRemoteAllowed,
     onSshSessionsChanged,
-    onTunnelsChanged,
     onMcpLoadError: (message) => {
       const warning = `MCP 工具加载失败，已跳过并继续对话：${message || "未知错误"}`;
       console.warn(warning);
@@ -522,7 +518,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
   }
 
   function commitAssistantRoundMeta(assistant: AssistantMessage, round: number) {
-    gatewayBridgeEvents.queueToken("", {
+    conversationEvents.queueToken("", {
       round,
       provider: assistant.provider,
       model: assistant.model,
@@ -548,7 +544,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
   }
 
   function updateHostedSearch(hostedSearch: HostedSearchBlock, round: number) {
-    gatewayBridgeEvents.queueEvent({
+    conversationEvents.queueEvent({
       type: "hosted_search",
       id: hostedSearch.id,
       provider: hostedSearch.provider,
@@ -594,11 +590,11 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     pendingToolCallDeltas.clear();
 
     for (const { round, toolCall } of deltas) {
-      gatewayBridgeEvents.queueEvent({
+      conversationEvents.queueEvent({
         type: "tool_call_delta",
         id: toolCall.id,
         name: toolCall.name,
-        arguments: buildGatewayToolCallPreviewArguments(toolCall),
+        arguments: buildToolCallPreviewArguments(toolCall),
         round,
         conversation_id: conversationId,
       });
@@ -691,7 +687,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           );
         },
         onTextDelta: (delta, round) => {
-          gatewayBridgeEvents.queueToken(delta, { round });
+          conversationEvents.queueToken(delta, { round });
           streamedAgentText += delta;
           streamedAgentTokenUnits += estimateTextTokenUnits(delta);
           batchLiveRoundsUpdate(
@@ -720,7 +716,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           scope.controller.abort();
         },
         onThinkingDelta: (delta, round) => {
-          gatewayBridgeEvents.queueEvent({
+          conversationEvents.queueEvent({
             type: "thinking",
             text: delta,
             round,
@@ -742,11 +738,11 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           sawToolCallInRound = true;
           discardPendingToolCallDelta(toolCall, round);
           if (!shouldShowToolEvent(toolCall)) return;
-          gatewayBridgeEvents.queueEvent({
+          conversationEvents.queueEvent({
             type: "tool_call",
             id: toolCall.id,
             name: toolCall.name,
-            arguments: buildGatewayToolCallPreviewArguments(toolCall),
+            arguments: buildToolCallPreviewArguments(toolCall),
             round,
             conversation_id: conversationId,
           });
@@ -771,11 +767,11 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
             hookLifecycle.toolExecutionStarted();
           }
           if (!shouldShowToolEvent(toolCall)) return;
-          gatewayBridgeEvents.queueEvent({
+          conversationEvents.queueEvent({
             type: "tool_call",
             id: toolCall.id,
             name: toolCall.name,
-            arguments: buildGatewayToolCallPreviewArguments(toolCall),
+            arguments: buildToolCallPreviewArguments(toolCall),
             round,
             conversation_id: conversationId,
           });
@@ -795,11 +791,11 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
             hookLifecycle.toolResultReceived(round);
           }
           if (!shouldShowToolEvent(toolCall, toolResult)) return;
-          gatewayBridgeEvents.queueEvent({
+          conversationEvents.queueEvent({
             type: "tool_result",
             id: toolCall.id,
             name: toolCall.name,
-            arguments: buildGatewayToolCallPreviewArguments(toolCall),
+            arguments: buildToolCallPreviewArguments(toolCall),
             content: toolResult.content,
             details: toolResult.details,
             isError: toolResult.isError ?? false,
@@ -836,7 +832,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           commitAssistantRoundMeta(assistant, round);
         },
         onToolStatus: (s) => {
-          gatewayBridgeEvents.queueToolStatus(s, false);
+          conversationEvents.queueToolStatus(s, false);
           updateToolStatus(s, transcriptStore);
         },
         onRetryAttempts: (_round, attempts) => {
@@ -955,9 +951,9 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     result.emittedMessages,
   );
   let completedState = finalState;
-  const gatewayAssistantText = assistantMessageToText(result.assistant);
-  if (!gatewayBridgeEvents.hasForwardedText() && gatewayAssistantText.length > 0) {
-    gatewayBridgeEvents.queueToken(gatewayAssistantText, {
+  const finalAssistantText = assistantMessageToText(result.assistant);
+  if (!conversationEvents.hasForwardedText() && finalAssistantText.length > 0) {
+    conversationEvents.queueToken(finalAssistantText, {
       round: activeAgentRound || 1,
     });
   }
@@ -1010,7 +1006,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
         );
       },
       onTextDelta: (delta, round) => {
-        gatewayBridgeEvents.queueToken(delta, { round });
+        conversationEvents.queueToken(delta, { round });
         batchLiveRoundsUpdate(
           (prev) =>
             updateLiveRound(prev, round, (target) =>
@@ -1020,7 +1016,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
         );
       },
       onThinkingDelta: (delta, round) => {
-        gatewayBridgeEvents.queueEvent({
+        conversationEvents.queueEvent({
           type: "thinking",
           text: delta,
           round,
@@ -1037,7 +1033,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       },
       onToolCall: (toolCall, round) => {
         if (!shouldShowToolEvent(toolCall)) return;
-        gatewayBridgeEvents.queueEvent({
+        conversationEvents.queueEvent({
           type: "tool_call",
           id: toolCall.id,
           name: toolCall.name,
@@ -1056,7 +1052,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       },
       onToolExecutionStart: (toolCall, round) => {
         if (!shouldShowToolEvent(toolCall)) return;
-        gatewayBridgeEvents.queueEvent({
+        conversationEvents.queueEvent({
           type: "tool_call",
           id: toolCall.id,
           name: toolCall.name,
@@ -1075,7 +1071,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       },
       onToolResult: (toolCall, toolResult, round) => {
         if (!shouldShowToolEvent(toolCall)) return;
-        gatewayBridgeEvents.queueEvent({
+        conversationEvents.queueEvent({
           type: "tool_result",
           id: toolCall.id,
           name: toolCall.name,
@@ -1107,7 +1103,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       },
       onAssistantMessage: commitAssistantRoundMeta,
       onToolStatus: (s) => {
-        gatewayBridgeEvents.queueToolStatus(s, false);
+        conversationEvents.queueToolStatus(s, false);
         updateToolStatus(s, transcriptStore);
       },
     });
@@ -1142,11 +1138,11 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     createdAt,
     titlePromise,
   });
-  gatewayBridgeEvents.queueEvent({
+  conversationEvents.queueEvent({
     type: "done",
     conversation_id: conversationId,
   });
-  gatewayBridgeEvents.close();
+  conversationEvents.close();
   if (!showSilentMemoryExtraction && shouldRunMemoryExtraction) {
     void runPostTurnMemoryExtraction();
   }

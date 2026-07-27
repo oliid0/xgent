@@ -6,9 +6,40 @@ pub struct SettingsLoadResponse {
     pub mcp: Option<Value>,
     pub agents: Option<Value>,
     pub ssh: Option<Value>,
-    pub remote: Option<Value>,
+    pub access: Option<Value>,
     pub memory: Option<Value>,
     pub default_workdir: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AccessSettingsPayload {
+    #[serde(default)]
+    pub web_ui_enabled: bool,
+    #[serde(default = "default_web_ui_scope")]
+    pub web_ui_scope: String,
+    #[serde(default = "default_web_ui_port")]
+    pub web_ui_port: u16,
+    #[serde(default)]
+    pub allow_terminal: bool,
+    #[serde(default)]
+    pub allow_ssh: bool,
+    #[serde(default)]
+    pub allow_git: bool,
+    #[serde(default)]
+    pub allow_file_write: bool,
+    #[serde(default)]
+    pub cloud_execution_enabled: bool,
+    #[serde(default)]
+    pub github_owner: String,
+    #[serde(default = "default_github_repository")]
+    pub github_repository: String,
+    #[serde(default = "default_cloud_artifact_retention_days")]
+    pub cloud_artifact_retention_days: u16,
+    #[serde(default)]
+    pub android_proot_enabled: bool,
+    #[serde(default)]
+    pub ios_a_shell_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -18,34 +49,6 @@ pub struct SshPatchApplyResponse {
     pub conflict: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct RemoteSettingsPayload {
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default)]
-    pub gateway_url: String,
-    #[serde(default = "default_remote_grpc_port")]
-    pub grpc_port: u16,
-    #[serde(default)]
-    pub grpc_endpoint: String,
-    #[serde(default)]
-    pub token: String,
-    #[serde(default)]
-    pub agent_id: String,
-    #[serde(default = "default_remote_auto_reconnect")]
-    pub auto_reconnect: bool,
-    #[serde(default = "default_remote_heartbeat_interval")]
-    pub heartbeat_interval: u64,
-    #[serde(default)]
-    pub enable_web_terminal: bool,
-    #[serde(default)]
-    pub enable_web_ssh_terminal: bool,
-    #[serde(default)]
-    pub enable_web_git: bool,
-    #[serde(default)]
-    pub enable_web_tunnels: bool,
-}
 #[derive(Debug, Clone)]
 pub(crate) struct RuntimeSshProxyConfig {
     pub proxy_type: String,

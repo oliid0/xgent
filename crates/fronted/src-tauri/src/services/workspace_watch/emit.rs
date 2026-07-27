@@ -1,12 +1,7 @@
-//! Dual emit sinks for workspace activity: the local webview event is
-//! unconditional; the gateway envelope goes out only for workdirs the gateway
-//! declared interest in, and only best-effort (never blocking a watcher
-//! thread — a dropped event is healed by the next change).
+//! Emits workspace activity to every frontend connected to the Tauri runtime.
 
 use serde::Serialize;
 use tauri::Emitter;
-
-use crate::services::gateway::{now_unix_seconds, proto};
 
 use super::{WorkspaceWatchService, WORKSPACE_ACTIVITY_EVENT};
 
@@ -48,29 +43,5 @@ impl WorkspaceWatchService {
         {
             eprintln!("emit workspace activity failed: {error}");
         }
-
-        if !self.workdir_in_gateway_set(workdir) {
-            return;
-        }
-        let Some(controller) = self.current_gateway() else {
-            return;
-        };
-        let Ok(sender) = controller.current_outbound_sender() else {
-            return;
-        };
-        let _ = sender.try_send(proto::AgentEnvelope {
-            request_id: format!("workspace-activity-{}", uuid::Uuid::new_v4()),
-            timestamp: now_unix_seconds(),
-            payload: Some(proto::agent_envelope::Payload::WorkspaceActivity(
-                proto::WorkspaceActivityEvent {
-                    workdir: payload.workdir,
-                    revision: payload.revision,
-                    fs: payload.fs,
-                    git: payload.git,
-                    changed_paths: payload.changed_paths,
-                    truncated: payload.truncated,
-                },
-            )),
-        });
     }
 }

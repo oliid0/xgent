@@ -3165,6 +3165,7 @@ checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 name = "xagent"
 version = "0.0.0-dev"
 dependencies = [
+ "argon2",
  "axum",
  "base64 0.22.1",
  "chrono",
@@ -3194,6 +3195,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-mcp-bridge",
+ "tauri-plugin-mobile-execution",
  "tauri-plugin-opener",
  "tauri-plugin-updater",
  "tempfile",
@@ -6332,6 +6334,16 @@ dependencies = [
  "webview2-com",
  "windows 0.61.3",
  "windows-core 0.61.2",
+]
+
+[[package]]
+name = "tauri-plugin-mobile-execution"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

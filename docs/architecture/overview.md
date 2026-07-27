@@ -2,51 +2,36 @@
 
 ## 系统分层
 
-| 层级 | 主要路径 | 技术栈 | 核心职责 |
-|---|---|---|---|
-| 统一前端 | `crates/fronted/src` | React 19、TypeScript 7、Vite 8、Tauri 2 | Web/PC/移动端共享 UI、Chat runtime、Settings、Skills/MCP/Memory。 |
-| 平台运行时 | `crates/fronted/src/runtime` | TypeScript adapters | 将共享业务代码映射到 Tauri 或浏览器能力。 |
-| Tauri 系统层 | `crates/fronted/src-tauri` | Rust、Tokio、SQLite | 文件/Shell/进程、MCP、Memory、Cron、历史、Gateway Agent bridge。 |
-| Gateway | `crates/gateway` | Go、HTTP、WebSocket、Protobuf | 认证、连接与会话路由、远程请求中继、有界事件恢复。 |
+| 层 | 路径 | 职责 |
+|---|---|---|
+| React 应用 | `crates/fronted/src` | Web、桌面和移动端共用页面、Agent loop、工具与设置 |
+| Runtime 边界 | `crates/fronted/src/runtime` | Tauri IPC 与配对浏览器 HTTP RPC/SSE |
+| Tauri 系统层 | `crates/fronted/src-tauri` | SQLite、文件、Shell、Git、MCP、Memory、Skills、WebUI、云端任务 |
+| 移动执行插件 | `crates/mobile-execution` | Android PRoot/Alpine 与 iOS a-Shell 命令执行 |
+| GitHub Actions | 用户 `agent-temp` | 可选跨平台构建与 artifact 生成 |
 
-Gateway 不执行本地工具、不保存真实 provider key、不包含前端源码、不 serve SPA，也不参与 Web 静态资源构建。
+仓库只有一个前端和一个 Rust workspace，不包含独立网关或第二份 WebUI。
 
 ## 运行环境
 
-| 环境 | React 入口 | 系统能力 | 网络角色 |
-|---|---|---|---|
-| Web | `crates/fronted/src/main.tsx` | `browserRuntime` | 通过 Gateway API/WebSocket 请求在线 Tauri Agent。 |
-| Desktop | 同一入口 | `tauriRuntime` + Rust | 本地执行真相源，也可连接 Gateway。 |
-| Mobile | 同一入口 | `tauriRuntime` + Android/iOS Tauri | 使用移动平台可用的 Tauri command/plugin。 |
-| Gateway | 无 React 入口 | 纯 Go | 在浏览器与 Tauri Agent 之间路由。 |
-
-## 核心数据流
-
-```text
-Shared React UI
-  ├─ browserRuntime ── HTTP/WebSocket ──┐
-  └─ tauriRuntime ── invoke/event ── Tauri Rust
-                                       │
-                                       └── Agent WebSocket ── Go Gateway
-```
-
-桌面和移动端的本地能力由 Tauri Rust 实现。浏览器对同一业务动作使用 Gateway transport；权限不足的能力必须明确返回 unsupported/permission error，不能静默伪造成功。
-
-## 持久化所有权
-
-| 数据 | 所有者 | 位置 |
+| 目标 | 入口 | 系统能力 |
 |---|---|---|
-| 应用设置 | Tauri Rust | `~/.xagent/config.sqlite` |
-| Chat 历史 | Tauri Rust | `~/.xagent/chat-history.sqlite3` |
-| Memory | Tauri Rust | `~/.xagent/memory` 与索引 SQLite |
-| Skills | Tauri Rust + shared frontend | `~/.xagent/skills` |
-| 浏览器连接/UI 状态 | browser runtime | localStorage |
-| relay window/幂等记录 | Gateway | 进程内有界状态 |
+| Windows/macOS/Linux | `main.tsx` + `tauriRuntime` | 完整桌面能力 |
+| 配对浏览器 | 同一 `main.tsx` + `browserRuntime` | 经 `28367` 桌面宿主授权的能力 |
+| Android | 同一 React/Tauri 应用 | App sandbox + 可选 PRoot |
+| iOS/iPadOS | 同一 React/Tauri 应用 | App sandbox + a-Shell/ios_system |
+
+## 数据所有权
+
+- 设置、历史、Memory、Skills metadata 与设备会话由原生 SQLite/文件存储持有。
+- 模型和 SSH 凭据不返回浏览器。
+- GitHub PAT 只存入 Stronghold 加密保险库。
+- 云端 task 源码和输入属于公开仓库内容；Actions Secret/Variable 承载运行时环境值。
+- Release artifact 由 GitHub Actions 生成并发布。
 
 ## 设计原则
 
-- 单份 React 业务源码，adapter 表达平台差异。
-- Tauri 是本地执行和持久化真相源。
-- Gateway 是 API/WebSocket 中继，不是前端宿主。
-- 协议编号只增不改；恢复依赖桌面历史 snapshot 与 Gateway 有界 seq window。
-- CI 的 architecture guard 防止旧目录、镜像脚本、静态资源嵌入与越界 Tauri imports 回归。
+- 页面、Agent loop 和工具协议跨平台复用。
+- 能力必须由运行时清单明确声明，不能静默伪造成功。
+- LAN 桌面能力优先于移动端有限环境；云端执行必须由用户开启。
+- 所有远程输入经过认证、allowlist、大小限制与权限开关。

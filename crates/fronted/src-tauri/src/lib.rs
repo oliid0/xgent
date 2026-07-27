@@ -2,23 +2,38 @@ mod commands;
 mod runtime;
 mod services;
 
+#[cfg(desktop)]
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+#[cfg(desktop)]
+use std::sync::Mutex;
+#[cfg(desktop)]
 use std::time::{Duration, Instant};
 
+#[cfg(desktop)]
 use tauri::menu::{Menu, MenuItem};
+#[cfg(desktop)]
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+#[cfg(desktop)]
 use tauri::Emitter;
 use tauri::Manager;
+#[cfg(desktop)]
 use tauri::WindowEvent;
 
+#[cfg(desktop)]
 const MAIN_WINDOW_LABEL: &str = "main";
+#[cfg(desktop)]
 const TRAY_SHOW_ID: &str = "tray-show";
+#[cfg(desktop)]
 const TRAY_QUIT_ID: &str = "tray-quit";
+#[cfg(desktop)]
 const TRAY_DOUBLE_CLICK_INTERVAL_MS: u64 = 500;
+#[cfg(desktop)]
 const TRAY_SHOW_MENU_ON_LEFT_CLICK: bool = !cfg!(target_os = "windows");
+#[cfg(desktop)]
 const TERMINAL_EXIT_REQUESTED_EVENT: &str = "terminal:exit-requested";
 
+#[cfg(desktop)]
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct TerminalExitRequestedEvent {
@@ -29,13 +44,13 @@ pub fn app_version() -> &'static str {
     env!("XAGENT_APP_VERSION")
 }
 
+#[cfg(desktop)]
 macro_rules! app_invoke_handler {
     () => {
         tauri::generate_handler![
             // Chat history
             commands::chat_history::chat_history_list,
             commands::chat_history::chat_history_workdirs,
-            commands::chat_history::chat_history_shared_list,
             commands::chat_history::chat_history_search,
             commands::chat_history::chat_history_get,
             commands::chat_history::chat_history_get_active_segment,
@@ -46,8 +61,6 @@ macro_rules! app_invoke_handler {
             commands::chat_history::chat_history_branch,
             commands::chat_history::chat_history_set_pinned,
             commands::chat_history::chat_history_set_model,
-            commands::chat_history::chat_history_share_get,
-            commands::chat_history::chat_history_share_set,
             commands::chat_history::chat_history_delete,
             // Subagent store
             commands::subagent_store::subagent_identity_upsert,
@@ -122,9 +135,9 @@ macro_rules! app_invoke_handler {
             commands::settings::settings_save_mcp,
             commands::settings::settings_save_agents,
             commands::settings::settings_save_ssh,
+            commands::settings::settings_save_access,
             commands::settings::settings_apply_ssh_patch,
             commands::settings::settings_reset_ssh_known_host,
-            commands::settings::settings_save_remote,
             commands::settings::settings_save_memory,
             commands::update::app_update_check,
             commands::update::app_update_install,
@@ -231,36 +244,134 @@ macro_rules! app_invoke_handler {
             commands::system::system_begin_power_activity,
             commands::system::system_end_power_activity,
             commands::custom_tools::system_http_get_test,
-            commands::gateway::gateway_connect,
-            commands::gateway::gateway_disconnect,
-            commands::gateway::gateway_status,
-            commands::gateway::gateway_nudge_connection,
-            commands::gateway::gateway_send_chat_event,
-            commands::gateway::gateway_chat_claim_next,
-            commands::gateway::gateway_chat_mark_started,
-            commands::gateway::gateway_chat_mark_local_started,
-            commands::gateway::gateway_chat_mark_queued_in_gui,
-            commands::gateway::gateway_chat_complete,
-            commands::gateway::gateway_chat_fail,
-            commands::gateway::gateway_chat_cancel_request,
-            commands::gateway::gateway_chat_heartbeat,
-            commands::gateway::gateway_chat_runtime_heartbeat,
-            commands::gateway::gateway_chat_release_lease,
-            commands::gateway::gateway_chat_queue_respond,
-            commands::gateway::gateway_publish_chat_queue_event,
-            commands::gateway::gateway_publish_chat_runtime_snapshot,
-            commands::gateway::gateway_publish_settings_sync,
-            commands::gateway::gateway_tunnel_state,
-            commands::gateway::gateway_tunnel_create,
-            commands::gateway::gateway_tunnel_update,
-            commands::gateway::gateway_tunnel_close,
-            commands::gateway::gateway_tunnel_check,
-            commands::gateway::workspace_watch_set,
+            commands::cloud::cloud_secret_vault_status,
+            commands::cloud::cloud_secret_vault_unlock,
+            commands::cloud::cloud_secret_vault_lock,
+            commands::cloud::cloud_secret_vault_set_github_token,
+            commands::cloud::cloud_secret_vault_remove_github_token,
+            commands::cloud::cloud_task_start,
+            commands::cloud::cloud_task_status,
+            commands::cloud::cloud_task_wait,
+            commands::cloud::cloud_task_failure_log,
+            commands::cloud::cloud_task_download_artifact,
+            commands::local_access::local_access_status,
+            commands::local_access::local_access_rotate_pairing_code,
+            commands::local_access::local_access_revoke_all_devices,
+            commands::local_access::local_access_rpc_respond,
+            commands::local_access::local_access_event_publish,
+            commands::local_access::local_access_broadcast_event,
+            commands::local_access::workspace_watch_set,
             services::proxy::proxy_get_server_info,
         ]
     };
 }
 
+#[cfg(mobile)]
+macro_rules! app_invoke_handler {
+    () => {
+        tauri::generate_handler![
+            commands::chat_history::chat_history_list,
+            commands::chat_history::chat_history_workdirs,
+            commands::chat_history::chat_history_search,
+            commands::chat_history::chat_history_get,
+            commands::chat_history::chat_history_get_active_segment,
+            commands::chat_history::chat_history_upsert,
+            commands::chat_history::chat_history_upsert_active_segment,
+            commands::chat_history::chat_history_append_segment,
+            commands::chat_history::chat_history_rename,
+            commands::chat_history::chat_history_branch,
+            commands::chat_history::chat_history_set_pinned,
+            commands::chat_history::chat_history_set_model,
+            commands::chat_history::chat_history_delete,
+            commands::subagent_store::subagent_identity_upsert,
+            commands::subagent_store::subagent_identity_list,
+            commands::subagent_store::subagent_run_save,
+            commands::subagent_store::subagent_run_list,
+            commands::subagent_store::subagent_run_load,
+            commands::subagent_store::subagent_run_prune,
+            commands::subagent_store::subagent_message_append,
+            commands::subagent_store::subagent_message_list,
+            commands::fs::fs_read_text,
+            commands::fs::fs_read_editable_text,
+            commands::fs::fs_path_status,
+            commands::fs::fs_read_image_source,
+            commands::fs::fs_read_workspace_image,
+            commands::fs::fs_write_text,
+            commands::fs::fs_edit_text,
+            commands::fs::fs_delete,
+            commands::fs::fs_open_workspace_path,
+            commands::fs::fs_create_dir,
+            commands::fs::fs_rename,
+            commands::fs::fs_roots,
+            commands::fs::fs_list_dirs,
+            commands::fs::fs_list,
+            commands::fs::fs_glob,
+            commands::fs::fs_grep,
+            commands::fs::fs_mention_list,
+            commands::memory::memory_list,
+            commands::memory::memory_read,
+            commands::memory::memory_search,
+            commands::memory::memory_write,
+            commands::memory::memory_update,
+            commands::memory::memory_delete,
+            commands::memory::memory_delete_project,
+            commands::memory::memory_accept,
+            commands::memory::memory_apply_batch,
+            commands::memory::memory_organize_run_create,
+            commands::memory::memory_organize_run_update,
+            commands::memory::memory_organize_run_list,
+            commands::memory::memory_organize_run_read,
+            commands::memory::memory_organize_run_clear_history,
+            commands::memory::memory_organize_due_claim,
+            commands::memory::memory_organize_due_complete,
+            commands::memory::memory_index_overview,
+            commands::memory::memory_paths_info,
+            commands::memory::memory_recent_rejections,
+            commands::memory::memory_today_local_date,
+            commands::memory::memory_today_daily,
+            commands::memory::memory_quota_summary,
+            commands::memory::memory_wipe_all,
+            commands::settings::settings_load_all,
+            commands::settings::settings_save_providers,
+            commands::settings::settings_save_system,
+            commands::settings::settings_save_mcp,
+            commands::settings::settings_save_agents,
+            commands::settings::settings_save_ssh,
+            commands::settings::settings_save_access,
+            commands::settings::settings_apply_ssh_patch,
+            commands::settings::settings_reset_ssh_known_host,
+            commands::settings::settings_save_memory,
+            commands::cloud::cloud_secret_vault_status,
+            commands::cloud::cloud_secret_vault_unlock,
+            commands::cloud::cloud_secret_vault_lock,
+            commands::cloud::cloud_secret_vault_set_github_token,
+            commands::cloud::cloud_secret_vault_remove_github_token,
+            commands::cloud::cloud_task_start,
+            commands::cloud::cloud_task_status,
+            commands::cloud::cloud_task_wait,
+            commands::cloud::cloud_task_failure_log,
+            commands::cloud::cloud_task_download_artifact,
+            commands::shell::shell_run,
+            commands::shell::shell_cancel,
+            commands::app::app_runtime_platform,
+            commands::system::system_create_project_folder,
+            commands::system::system_import_readable_file_paths,
+            commands::system::system_import_uploaded_readable_files,
+            commands::system::system_import_pasted_texts,
+            commands::system::system_read_uploaded_image_preview,
+            commands::system::system_read_uploaded_native_attachment,
+            commands::system::system_list_skill_files,
+            commands::system::system_ensure_builtin_skills,
+            commands::system::system_read_skill_metadata,
+            commands::system::system_read_skill_text,
+            commands::system::system_manage_skill,
+            commands::system::system_append_debug_jsonl,
+            services::proxy::proxy_get_server_info,
+        ]
+    };
+}
+
+#[cfg(desktop)]
 fn show_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
         window.show()?;
@@ -271,6 +382,7 @@ fn show_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+#[cfg(desktop)]
 fn request_app_exit(
     app: &tauri::AppHandle,
     allow_exit: &AtomicBool,
@@ -294,6 +406,7 @@ fn request_app_exit(
     app.exit(0);
 }
 
+#[cfg(desktop)]
 fn record_tray_left_click(last_click_at: &Mutex<Option<Instant>>) -> bool {
     let now = Instant::now();
     let mut last_click_at = last_click_at.lock().unwrap();
@@ -306,6 +419,7 @@ fn record_tray_left_click(last_click_at: &Mutex<Option<Instant>>) -> bool {
     is_double_click
 }
 
+#[cfg(desktop)]
 fn configure_system_tray(
     app: &tauri::App,
     allow_exit: Arc<AtomicBool>,
@@ -387,7 +501,7 @@ fn configure_system_tray(
     Ok(())
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(desktop, target_os = "windows"))]
 fn configure_windows_window_chrome(app: &tauri::App) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
         window.set_decorations(false)?;
@@ -396,7 +510,7 @@ fn configure_windows_window_chrome(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[cfg(desktop)]
 pub fn run() {
     let automation_store = Arc::new(
         services::automation::AutomationStore::open()
@@ -422,6 +536,7 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_mobile_execution::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_mcp_bridge::init())
         .manage(Arc::new(commands::mcp::McpRuntimeManager::default()))
@@ -453,46 +568,52 @@ pub fn run() {
                 if let Err(error) = commands::settings::initialize_system_proxy_from_db() {
                     eprintln!("failed to initialize system proxy state: {error}");
                 }
-                app.manage(services::proxy::start_proxy_server()?);
+                let app_data_dir = app
+                    .path()
+                    .app_data_dir()
+                    .map_err(|error| format!("resolve app data directory failed: {error}"))?;
+                let cloud_secret_vault = Arc::new(
+                    services::cloud_secret_vault::CloudSecretVault::new(app_data_dir.clone())?,
+                );
+                app.manage(cloud_secret_vault);
+                app.manage(Arc::new(
+                    services::cloud_execution::CloudExecutionService::new(app_data_dir)?,
+                ));
+                let proxy_server = services::proxy::start_proxy_server()?;
+                app.manage(Arc::clone(&proxy_server));
+                let local_access_controller = Arc::new(
+                    services::local_access::LocalAccessController::new(
+                        app.handle().clone(),
+                        proxy_server.info(),
+                    ),
+                );
+                app.manage(Arc::clone(&local_access_controller));
+                let workspace_watch = Arc::new(
+                    services::workspace_watch::WorkspaceWatchService::new(app.handle().clone()),
+                );
+                app.manage(workspace_watch);
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = local_access_controller.reload_from_db().await {
+                        eprintln!("failed to load local access settings: {error}");
+                    }
+                });
                 if let Err(error) = services::skills::ensure_builtin_agent_skills_sync() {
                     eprintln!("failed to seed builtin skills: {error}");
                 }
                 terminal_registry.attach_app_handle(app.handle().clone());
                 sftp_registry.attach_app_handle(app.handle().clone());
-                let gateway_controller = Arc::new(services::gateway::GatewayController::new(
-                    app.handle().clone(),
-                    Arc::clone(&automation_store),
-                    Arc::clone(&memory_store),
-                    Arc::clone(&terminal_registry),
-                    Arc::clone(&sftp_registry),
-                    Arc::clone(&managed_process_registry),
-                ));
                 managed_process_registry.set_notifier(
                     runtime::managed_process::ManagedProcessNotifier {
                         app_handle: app.handle().clone(),
-                        gateway: Arc::downgrade(&gateway_controller),
                     },
                 );
                 managed_process_registry.spawn_startup_reconcile();
                 managed_process_registry.spawn_monitor();
                 automation_store.set_notifier(services::automation::AutomationNotifier {
                     app_handle: app.handle().clone(),
-                    gateway: Arc::downgrade(&gateway_controller),
                     scheduler: Arc::downgrade(&automation_scheduler),
                 });
                 Arc::clone(&automation_scheduler).start();
-                app.manage(Arc::clone(&gateway_controller));
-                if let Err(error) = gateway_controller.start() {
-                    eprintln!("failed to start remote gateway controller: {error}");
-                }
-                tauri::async_runtime::spawn({
-                    let gateway_controller = Arc::clone(&gateway_controller);
-                    async move {
-                        if let Err(error) = gateway_controller.reload_from_db().await {
-                            eprintln!("failed to load remote gateway settings: {error}");
-                        }
-                    }
-                });
                 Ok(())
             }
         })
@@ -520,15 +641,6 @@ pub fn run() {
         .expect("error while building tauri application");
 
     app.run(move |_app, event| match event {
-        tauri::RunEvent::Resumed => {
-            if let Some(gateway_controller) =
-                _app.try_state::<Arc<services::gateway::GatewayController>>()
-            {
-                if let Err(error) = gateway_controller.nudge_connection("app_resumed", true) {
-                    eprintln!("failed to nudge gateway connection after app resume: {error}");
-                }
-            }
-        }
         #[cfg(target_os = "macos")]
         tauri::RunEvent::Reopen { .. } => {
             if let Err(error) = show_main_window(_app) {
@@ -561,4 +673,42 @@ pub fn run() {
         }
         _ => {}
     });
+}
+
+#[cfg(mobile)]
+#[tauri::mobile_entry_point]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_mobile_execution::init())
+        .setup(|app| {
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|error| format!("resolve app data directory failed: {error}"))?;
+            services::app_paths::initialize(app_data_dir.clone())?;
+            commands::history_db::initialize_history_db()?;
+            if let Err(error) = commands::settings::initialize_system_proxy_from_db() {
+                eprintln!("failed to initialize system proxy state: {error}");
+            }
+            let memory_store = Arc::new(
+                services::memory::MemoryStore::open()
+                    .map_err(|error| format!("initialize XAgent memory store failed: {error}"))?,
+            );
+            app.manage(memory_store);
+            app.manage(Arc::new(
+                services::cloud_secret_vault::CloudSecretVault::new(app_data_dir.clone())?,
+            ));
+            app.manage(Arc::new(
+                services::cloud_execution::CloudExecutionService::new(app_data_dir)?,
+            ));
+            app.manage(services::proxy::start_proxy_server()?);
+            if let Err(error) = services::skills::ensure_builtin_agent_skills_sync() {
+                eprintln!("failed to seed builtin skills: {error}");
+            }
+            Ok(())
+        })
+        .invoke_handler(app_invoke_handler!())
+        .run(tauri::generate_context!())
+        .expect("error while running XAgent mobile application");
 }

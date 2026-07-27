@@ -167,11 +167,9 @@ function LeftPanel({
                   <Play className="h-3.5 w-3.5" />
                 )}
               </button>
-              {/* Desktop keeps the close button in the logs header (the modal's
-                  top-right corner there). On the stacked mobile layout the
-                  gateway CSS shows this hero copy right of run-now instead and
-                  hides the logs-header one (settings-cron-view-hero-close /
-                  settings-cron-logs-close). */}
+              {/* Desktop keeps the close button in the logs header. The compact
+                  mobile layout places this copy beside run-now and hides the
+                  logs-header copy. */}
               <button
                 type="button"
                 onClick={onClose}

@@ -24,7 +24,6 @@ type UseRightDockProjectTabsOptions = {
   projectPathKey: string;
   projectState: RightDockProjectState;
   sessionsLoaded: boolean;
-  tunnelAvailable: boolean;
   onProjectStateChange: (
     updater: (current: RightDockProjectState) => RightDockProjectState,
   ) => void;
@@ -38,12 +37,10 @@ export function useRightDockProjectTabs(options: UseRightDockProjectTabsOptions)
     projectPathKey,
     projectState,
     sessionsLoaded,
-    tunnelAvailable,
   } = options;
   const [draftTabOrder, setDraftTabOrder] = useState<string[] | null>(null);
   const fileTreeInitialized = Boolean(projectPathKey && projectState.tools.fileTree);
   const gitReviewInitialized = Boolean(projectPathKey && projectState.tools.gitReview);
-  const tunnelInitialized = Boolean(projectState.tools.tunnel && tunnelAvailable);
   const sshTunnelInitialized = Boolean(projectPathKey && projectState.tools.sshTunnel);
   const visibleTabs = useMemo(
     () =>
@@ -52,9 +49,8 @@ export function useRightDockProjectTabs(options: UseRightDockProjectTabsOptions)
         localSessions,
         projectPathKey,
         projectState,
-        tunnelAvailable,
       }),
-    [backgroundTasksVisible, localSessions, projectPathKey, projectState, tunnelAvailable],
+    [backgroundTasksVisible, localSessions, projectPathKey, projectState],
   );
   const effectiveTabOrder = draftTabOrder ?? projectState.tabOrder;
   const orderedProjectTabs = useMemo(
@@ -151,6 +147,5 @@ export function useRightDockProjectTabs(options: UseRightDockProjectTabsOptions)
     orderedProjectTabs,
     setDraftTabOrder,
     sshTunnelInitialized,
-    tunnelInitialized,
   };
 }

@@ -31,9 +31,9 @@
 
 | 端 | 是否执行工具 | 说明 |
 |---|---|---|
-| GUI 本地 Chat | 是 | 工具在桌面端运行，直接调用 Tauri invoke 或前端本地逻辑。 |
-| WebUI Chat | 间接执行 | WebUI 发 Chat Command 到 Gateway，实际工具仍在桌面 GUI/Tauri 运行。 |
-| Gateway | 否 | Gateway 不执行业务工具，只转发 request/event 并维护 buffer。 |
+| 桌面 Chat | 是 | 前端 Agent loop 调用本地 Tauri 命令。 |
+| 配对 WebUI | 是 | 同一 Agent loop 通过认证的本地访问 RPC 使用桌面 Tauri 命令。 |
+| Android/iOS | 按能力 | 只注册移动插件真实上报的工具；LAN 桌面与云端可作为其他后端。 |
 
 ## MCP 动态工具
 
@@ -94,6 +94,6 @@
 |---|---|
 | 新增 builtin tool | schema、executor、metadata、UI trace details、agent-dev 可观测性。 |
 | 新增 Tauri-backed tool | Rust invoke command、前端 invoke 参数、错误消息、权限边界。 |
-| 修改 MCP 配置 | GUI/WebUI Settings/MCP Hub 两端、Gateway settings sync redaction。工具侧写入必须走 `settings/mcpOps.ts` 的 `McpSettingsOp` id 级合并（`applyMcpOps`），禁止全量替换 `settings.mcp`；读取必须走 `getMcpSettings` 实时 getter（权威 `settingsRef`），禁止 turn 级快照；读改写决策与提交必须在同一同步段内（await 之后重读）。 |
+| 修改 MCP 配置 | Settings/MCP Hub 与本地访问脱敏写回。工具侧写入必须走 `settings/mcpOps.ts` 的 `McpSettingsOp` id 级合并（`applyMcpOps`），禁止全量替换 `settings.mcp`；读取必须走 `getMcpSettings` 实时 getter。 |
 | 修改 Skills 行为 | services/skills/*、lib/skills 双端复制、Skills Hub installed 状态。所有对 skills 根目录活动目标的落盘必须持 `skills_write_guard()`，安装走 stage-then-swap（`<root>/.staging` 构建 + `fs::rename` 原子入位），禁止直接向活动目录逐文件写。 |
-| 修改 Memory 行为 | MemoryStore、MemoryManager、Settings Memory 双端、Gateway memory.manage。 |
+| 修改 Memory 行为 | MemoryStore、MemoryManager、Settings Memory 与本地访问 allowlist。 |

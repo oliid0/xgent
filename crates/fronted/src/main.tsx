@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { LocalAccessPairingGate } from "./components/local-access/LocalAccessPairingGate";
 import "./index.css";
 import "katex/dist/katex.min.css";
 import "streamdown/styles.css";
@@ -15,6 +16,8 @@ if (import.meta.env.DEV) {
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <App />
+    <LocalAccessPairingGate>
+      <App />
+    </LocalAccessPairingGate>
   </React.StrictMode>,
 );

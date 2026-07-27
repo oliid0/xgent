@@ -158,14 +158,6 @@ mod tests {
 
         assert_eq!(is_pinned_exists, 1);
         assert_eq!(pinned_at_exists, 1);
-        let share_table_exists: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'chatHistoryShare'",
-                [],
-                |row| row.get(0),
-            )
-            .expect("query share table");
-        assert_eq!(share_table_exists, 1);
     }
 
     #[test]
@@ -315,7 +307,6 @@ mod tests {
         for table_name in [
             "chatHistory",
             "chatHistorySegment",
-            "chatHistoryShare",
             "chatHistoryFtsSegmentIndex",
         ] {
             assert_eq!(
@@ -324,6 +315,15 @@ mod tests {
                 "migrated {table_name} columns should match fresh schema"
             );
         }
+
+        let retired_share_table_exists: i64 = legacy
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'chatHistoryShare'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("query retired share table existence");
+        assert_eq!(retired_share_table_exists, 0);
 
         let summaries =
             list_chat_history_sync(&legacy, 1, 20).expect("list minimal migrated history");
@@ -484,30 +484,6 @@ mod tests {
     }
 
     #[test]
-    fn list_shared_history_returns_enabled_shares_only() {
-        let conn = open_test_db().expect("open test db");
-        for index in 0..4 {
-            let mut conversation = sample_conversation();
-            conversation.id = format!("conv-{index}");
-            conversation.updated_at = 1_700_000_000_000 + index;
-            upsert_chat_history_header(&conn, &conversation).expect("upsert header");
-        }
-
-        set_chat_history_share_enabled_sync(&conn, "conv-0", true, None).expect("share conv-0");
-        set_chat_history_share_enabled_sync(&conn, "conv-2", true, None).expect("share conv-2");
-        set_chat_history_share_enabled_sync(&conn, "conv-3", true, None).expect("share conv-3");
-        set_chat_history_share_enabled_sync(&conn, "conv-3", false, None)
-            .expect("disable conv-3 share");
-
-        let page = list_shared_chat_history_sync(&conn, 1, 1).expect("list shared history");
-
-        assert_eq!(page.total_count, 2);
-        assert_eq!(page.items.len(), 1);
-        assert_eq!(page.items[0].id, "conv-2");
-        assert!(page.items[0].is_shared);
-    }
-
-    #[test]
     fn upsert_header_preserves_existing_pin_state() {
         let conn = open_test_db().expect("open test db");
         let mut conversation = sample_conversation();
@@ -640,110 +616,6 @@ mod tests {
         assert!(renamed.is_pinned);
         assert_eq!(renamed.pinned_at, Some(pinned_at));
         assert_eq!(renamed.title, "Renamed Conversation");
-    }
-
-    #[test]
-    fn share_status_is_disabled_by_default() {
-        let conn = open_test_db().expect("open test db");
-        let conversation = sample_conversation();
-        upsert_chat_history_header(&conn, &conversation).expect("upsert header");
-
-        let status = get_chat_history_share_status_sync(&conn, "conv-1").expect("get share status");
-        let summary = get_summary_by_id(&conn, "conv-1").expect("get summary");
-
-        assert_eq!(status.conversation_id, "conv-1");
-        assert!(!status.enabled);
-        assert_eq!(status.token, None);
-        assert!(!status.redact_tool_content);
-        assert!(!summary.is_shared);
-    }
-
-    #[test]
-    fn share_enable_disable_and_reenable_rotates_token() {
-        let conn = open_test_db().expect("open test db");
-        let conversation = sample_conversation();
-        upsert_chat_history_header(&conn, &conversation).expect("upsert header");
-
-        let enabled =
-            set_chat_history_share_enabled_sync(&conn, "conv-1", true, None).expect("enable share");
-        let first_token = enabled.token.clone().expect("share token");
-        assert!(enabled.enabled);
-        assert_eq!(first_token.len(), 9);
-        assert!(first_token.chars().all(|ch| ch.is_ascii_alphanumeric()));
-
-        let enabled_again = set_chat_history_share_enabled_sync(&conn, "conv-1", true, None)
-            .expect("enable share again");
-        assert_eq!(enabled_again.token.as_deref(), Some(first_token.as_str()));
-        assert!(
-            get_summary_by_id(&conn, "conv-1")
-                .expect("get enabled summary")
-                .is_shared
-        );
-
-        let disabled = set_chat_history_share_enabled_sync(&conn, "conv-1", false, None)
-            .expect("disable share");
-        assert!(!disabled.enabled);
-        assert_eq!(disabled.token, None);
-        assert!(
-            !get_summary_by_id(&conn, "conv-1")
-                .expect("get disabled summary")
-                .is_shared
-        );
-        assert!(resolve_chat_history_share_sync(&conn, &first_token).is_err());
-
-        let reenabled = set_chat_history_share_enabled_sync(&conn, "conv-1", true, None)
-            .expect("reenable share");
-        let second_token = reenabled.token.expect("share token");
-        assert!(reenabled.enabled);
-        assert_ne!(first_token, second_token);
-        assert!(resolve_chat_history_share_sync(&conn, &first_token).is_err());
-    }
-
-    #[test]
-    fn share_redact_tool_content_can_be_updated_independently() {
-        let conn = open_test_db().expect("open test db");
-        let conversation = sample_conversation();
-        upsert_chat_history_header(&conn, &conversation).expect("upsert header");
-
-        let enabled = set_chat_history_share_enabled_sync(&conn, "conv-1", true, Some(true))
-            .expect("enable share with redaction");
-        let token = enabled.token.clone().expect("share token");
-        assert!(enabled.enabled);
-        assert!(enabled.redact_tool_content);
-
-        let enabled_again = set_chat_history_share_enabled_sync(&conn, "conv-1", true, None)
-            .expect("enable share without changing redaction");
-        assert_eq!(enabled_again.token.as_deref(), Some(token.as_str()));
-        assert!(enabled_again.redact_tool_content);
-
-        let updated = set_chat_history_share_enabled_sync(&conn, "conv-1", true, Some(false))
-            .expect("disable share redaction");
-        assert_eq!(updated.token.as_deref(), Some(token.as_str()));
-        assert!(!updated.redact_tool_content);
-
-        let disabled = set_chat_history_share_enabled_sync(&conn, "conv-1", false, Some(true))
-            .expect("disable share and preserve redaction preference");
-        assert!(!disabled.enabled);
-        assert_eq!(disabled.token, None);
-        assert!(disabled.redact_tool_content);
-    }
-
-    #[test]
-    fn share_rows_are_removed_with_conversation() {
-        let conn = open_test_db().expect("open test db");
-        let conversation = sample_conversation();
-        upsert_chat_history_header(&conn, &conversation).expect("upsert header");
-        set_chat_history_share_enabled_sync(&conn, "conv-1", true, None).expect("enable share");
-
-        conn.execute("DELETE FROM chatHistory WHERE id = ?1", params!["conv-1"])
-            .expect("delete parent conversation");
-
-        let share_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM chatHistoryShare", [], |row| {
-                row.get(0)
-            })
-            .expect("count share rows");
-        assert_eq!(share_count, 0);
     }
 
     #[test]
@@ -893,41 +765,6 @@ mod tests {
                 .unwrap_or_else(|error| panic!("count {table_name}: {error}"));
             assert_eq!(count, 0, "{table_name} should be empty after delete");
         }
-    }
-
-    #[test]
-    fn resolve_share_returns_full_conversation_segments() {
-        let conn = open_test_db().expect("open test db");
-        let conversation = sample_conversation();
-        upsert_chat_history_header(&conn, &conversation).expect("upsert header");
-        upsert_single_segment(
-            &conn,
-            "conv-1",
-            &ChatHistorySegmentInput {
-                segment_index: 0,
-                segment_id: "segment-0".to_string(),
-                summary_json: None,
-                messages_json:
-                    r#"[{"role":"user","content":"hello"},{"role":"assistant","content":"world"}]"#
-                        .to_string(),
-                message_count: 2,
-                start_message_id: Some("m-1".to_string()),
-                end_message_id: Some("m-2".to_string()),
-                created_at: 1_700_000_000_000,
-                updated_at: 1_700_000_000_100,
-            },
-        )
-        .expect("upsert segment");
-        let status =
-            set_chat_history_share_enabled_sync(&conn, "conv-1", true, None).expect("enable share");
-        let token = status.token.expect("share token");
-
-        let record = resolve_chat_history_share_sync(&conn, &token).expect("resolve share");
-
-        assert_eq!(record.id, "conv-1");
-        assert_eq!(record.segments.len(), 1);
-        assert_eq!(record.segments[0].message_count, 2);
-        assert!(record.segments[0].messages_json.contains("hello"));
     }
 
     #[test]
@@ -1397,21 +1234,6 @@ mod tests {
     }
 
     #[test]
-    fn resolve_share_allows_empty_persisted_history() {
-        let conn = open_test_db().expect("open test db");
-        let conversation = sample_conversation();
-        upsert_chat_history_header(&conn, &conversation).expect("upsert header");
-        let status =
-            set_chat_history_share_enabled_sync(&conn, "conv-1", true, None).expect("enable share");
-        let token = status.token.expect("share token");
-
-        let record = resolve_chat_history_share_sync(&conn, &token).expect("resolve share");
-
-        assert_eq!(record.id, "conv-1");
-        assert!(record.segments.is_empty());
-    }
-
-    #[test]
     fn subagent_prune_uses_initialized_history_schema() {
         let conn = open_test_db().expect("open test db");
         let before: Option<String> = conn
@@ -1783,7 +1605,6 @@ mod tests {
         assert_eq!(summary.cwd.as_deref(), Some("/tmp"));
         assert_eq!(summary.session_id, None);
         assert!(!summary.is_pinned);
-        assert!(!summary.is_shared);
 
         let record = get_record_by_id(&conn, &summary.id).expect("load branch record");
         assert_eq!(record.provider_id, "codex");

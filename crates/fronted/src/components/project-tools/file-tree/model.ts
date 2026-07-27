@@ -30,9 +30,8 @@ export type FileTreeRowModel =
 export const ROOT_PATH = "";
 
 // Desktop-only OS integration (`fs_open_workspace_path`) exists only behind
-// the Tauri bridge; the gateway web shim has no equivalent command. Probing
-// the bridge at runtime keeps this mirrored source byte-identical on both
-// ends while the desktop-only menu entries stay hidden on the web.
+// the Tauri bridge. Runtime probing keeps desktop-only menu entries hidden in
+// paired browsers without branching the shared component tree.
 export const FILE_TREE_HAS_OS_INTEGRATION =
   typeof window !== "undefined" &&
   "__TAURI_INTERNALS__" in (window as unknown as Record<string, unknown>);

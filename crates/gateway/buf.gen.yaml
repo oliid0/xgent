@@ -1,8 +1,0 @@
-# Gateway 只生成 Go 协议代码。浏览器与 Tauri 共享 crates/fronted，Gateway 不再拥有或生成前端源码。
-version: v2
-plugins:
-  - local: protoc-gen-go
-    out: .
-    opt: module=github.com/xagent/agent-gateway
-inputs:
-  - directory: .

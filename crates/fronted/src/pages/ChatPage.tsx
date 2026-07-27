@@ -15,7 +15,6 @@ import {
   type ChangedFilesActions,
   ChangedFilesActionsProvider,
 } from "../components/chat/ChangedFilesCard";
-import { HistoryShareModal } from "../components/chat/HistoryShareModal";
 import type {
   MentionComposerCommitMention,
   MentionComposerDraft,
@@ -24,7 +23,6 @@ import type {
   MentionComposerLargePaste,
 } from "../components/chat/MentionComposer";
 import { type NotifyItem, NotifyToast } from "../components/chat/NotifyToast";
-import { SharedHistoryManagerModal } from "../components/chat/SharedHistoryManagerModal";
 import { Ban, PanelRightClose, PanelRightOpen, Terminal, Upload } from "../components/icons";
 import { MacOsTitleBarSpacer, MacOsTitleBarToggle } from "../components/MacOsTitleBarSpacer";
 import type {
@@ -61,20 +59,15 @@ import {
 import type { LiveTranscriptStore } from "../lib/chat/conversation/liveTranscriptStore";
 import {
   createConversationHookLifecycle,
-  createGatewayBridgeEventController,
+  createConversationEventController,
 } from "../lib/chat/conversation/run";
 import { createTurnCancellation } from "../lib/chat/conversation/turnCancellation";
 import {
   branchChatHistory,
-  type ChatHistoryShareStatus,
-  type ChatHistorySummary,
   deleteChatHistory,
   getChatHistory,
-  getChatHistoryShare,
   listChatHistory,
-  listSharedChatHistory,
   setChatHistoryModel,
-  setChatHistoryShare,
 } from "../lib/chat/history/chatHistory";
 import { memoryExtraction } from "../lib/chat/memory/extractionController";
 import type { MemoryExtractionStatusKey } from "../lib/chat/memory/extractionEngine";
@@ -115,6 +108,10 @@ import {
   isThinkingAlwaysOnForModel,
   toModelValue,
 } from "../lib/providers/llm";
+import {
+  isCompactViewport,
+  useCompactViewport,
+} from "../lib/responsive/compactViewport";
 import {
   type AppSettings,
   applyMcpOpsToAppSettings,
@@ -164,7 +161,6 @@ import {
   type ConversationOpenState,
   createConversationOpenController,
 } from "../lib/sidebar/openController";
-import { sortSidebarConversations } from "../lib/sidebar/reconcile";
 import { conversationMatchesScope, sidebarScopeKey } from "../lib/sidebar/scope";
 import { selectConversations } from "../lib/sidebar/selectors";
 import { createSidebarStore } from "../lib/sidebar/store";
@@ -190,12 +186,6 @@ import type { TerminalSession } from "../lib/terminal/types";
 import { invokeFs } from "../lib/tools/fsBackend";
 import type { SkillAccessPolicy } from "../lib/tools/skillAccessPolicy";
 import { disposeTodoToolState } from "../lib/tools/todoTools";
-import type {
-  LocalTunnelClient,
-  TunnelCreateInput,
-  TunnelStateSnapshot,
-  TunnelUpdateInput,
-} from "../lib/tunnels/constants";
 import { tauriWorkspaceActivityClient } from "../lib/workspace-activity/tauriWorkspaceActivityClient";
 import {
   fallbackWorkspaceProjectName,
@@ -203,7 +193,6 @@ import {
   mergeWorkspaceProjectsWithHistory,
 } from "../lib/workspaceProjects";
 import {
-  type ActiveGatewayBridgeRequest,
   buildErrorAssistantMessage,
   buildPreparedContext as buildPreparedConversationContext,
   buildResumeContext as buildResumeConversationContext,
@@ -214,7 +203,6 @@ import {
   createChatRuntimeHost,
   createConversationRuntimeEntry,
   type EffectiveChatModelSelection,
-  type EnsureGatewayBridgeConversationReadyOptions,
   formatHookWarningMessage,
   MAX_UPLOAD_FILES,
   pruneIdleConversationRuntimeCaches,
@@ -228,20 +216,14 @@ import {
   useChatSkills,
   useConversationHistoryActions,
   useEditResend,
-  useGatewayBridgeBatcher,
-  useGatewayBridgeListeners,
+  useConversationEventPublisher,
   useLiveTranscriptController,
   usePendingUploads,
 } from "./chat";
 import {
-  buildGatewayRuntimeSnapshotEntries,
-  type GatewayRuntimeSnapshotState,
-} from "./chat/gateway/chatRuntimeSnapshot";
-import {
-  type GatewayChatClaimedRequest,
-  normalizeGatewayExecutionMode,
-  normalizeGatewayWorkdir,
-} from "./chat/gateway/gatewayBridgeTypes";
+  buildConversationRuntimeSnapshotEntries,
+  type ConversationRuntimeSnapshotState,
+} from "./chat/local-access/conversationRuntimeSnapshot";
 import {
   appendQueuedChatTurn,
   buildQueuedChatTurnPreview,
@@ -288,7 +270,7 @@ const WorkspaceSshTerminalOverlay = lazy(async () => {
   };
 });
 
-function createLocalGatewayChatRunId(conversationId: string) {
+function createConversationRunId(conversationId: string) {
   return `conversation-live-${conversationId}-${createUuid()}`;
 }
 
@@ -302,54 +284,24 @@ type ChatPageProps = {
   onOpenSettings: (section?: SectionId) => void;
   onToggleTheme: () => void;
   appUpdate?: AppUpdateController;
+  desktopBridgeEnabled: boolean;
 };
 
-type GatewayRuntimeStatus = {
-  online: boolean;
-  enabled: boolean;
-  configured: boolean;
-  gatewayUrl?: string | null;
-  sessionId?: string | null;
-  connectedSince?: number | null;
-  lastHeartbeat?: number | null;
-  lastError?: string | null;
-};
-
-function isRemoteSettingsConfigured(remote: AppSettings["remote"]) {
-  return remote.gatewayUrl.trim() !== "" && remote.token.trim() !== "";
-}
-
-function buildFallbackGatewayStatus(remote: AppSettings["remote"]): GatewayRuntimeStatus {
-  return {
-    online: false,
-    enabled: remote.enabled,
-    configured: isRemoteSettingsConfigured(remote),
-    gatewayUrl: remote.gatewayUrl.trim(),
-    sessionId: null,
-    connectedSince: null,
-    lastHeartbeat: null,
-    lastError: null,
-  };
-}
-
-type ActiveGatewayRuntimeRun = {
+type ActiveConversationRuntimeRun = {
   conversationId: string;
   runId: string;
-  clientRequestId?: string;
-  workerId?: string;
   cwd?: string;
   revision: number;
-  state: GatewayRuntimeSnapshotState;
+  state: ConversationRuntimeSnapshotState;
   userMessage: Message;
   transcriptStore: LiveTranscriptStore;
   toolStatusIsCompaction: boolean;
 };
 
 const PROJECT_HISTORY_DELETE_PAGE_SIZE = 200;
-const SHARED_HISTORY_LIST_PAGE_SIZE = 200;
-const GATEWAY_RUNTIME_SNAPSHOT_DEBOUNCE_MS = 300;
+const CONVERSATION_RUNTIME_SNAPSHOT_DEBOUNCE_MS = 300;
 // Must stay well below the desktop run ledger's 5-minute active TTL.
-const GATEWAY_RUNTIME_RUN_KEEPALIVE_MS = 60_000;
+const CONVERSATION_RUNTIME_RUN_KEEPALIVE_MS = 60_000;
 
 function appendManagedSkillSelections(current: readonly string[], names: readonly string[]) {
   const out = mergeAlwaysEnabledSkillNames(current);
@@ -622,6 +574,7 @@ export function ChatPage(props: ChatPageProps) {
     onOpenSettings,
     onToggleTheme,
     appUpdate,
+    desktopBridgeEnabled,
   } = props;
   // Monaco reads NLS globals while the lazy editor module imports monaco-editor.
   setPreferredMonacoNlsLocale(settings.locale);
@@ -742,7 +695,15 @@ export function ChatPage(props: ChatPageProps) {
     sidebarStore.setScope(sidebarScope);
   }, [sidebarScope, sidebarStore]);
   const historyScopeKey = sidebarScopeKey(sidebarScope);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const compactViewport = useCompactViewport();
+  const [sidebarOpen, setSidebarOpen] = useState(() => !isCompactViewport());
+  const previousCompactViewportRef = useRef(compactViewport);
+  useEffect(() => {
+    if (compactViewport && !previousCompactViewportRef.current) {
+      setSidebarOpen(false);
+    }
+    previousCompactViewportRef.current = compactViewport;
+  }, [compactViewport]);
   const [activeView, setActiveView] = useState<"chat" | "skills-hub" | "mcp-hub">("chat");
   const [rightDockOpen, setRightDockOpen] = useState(false);
   const previousRightDockFileTreeOpenRef = useRef(false);
@@ -765,92 +726,10 @@ export function ChatPage(props: ChatPageProps) {
   const workspaceSshTerminalRequestIdRef = useRef(0);
   const [terminalSessions, setTerminalSessions] = useState<TerminalSession[]>([]);
   const [terminalSessionsLoaded, setTerminalSessionsLoaded] = useState(false);
-  const [remoteRuntimeStatus, setRemoteRuntimeStatus] = useState<GatewayRuntimeStatus>(() =>
-    buildFallbackGatewayStatus(settings.remote),
-  );
-  const tauriTunnelClient = useMemo<LocalTunnelClient>(() => {
-    const listeners = new Set<(snapshot: TunnelStateSnapshot) => void>();
-    let unlistenPromise: Promise<() => void> | null = null;
-    const normalizeSnapshot = (payload: unknown): TunnelStateSnapshot => {
-      const raw = (payload ?? {}) as Partial<TunnelStateSnapshot>;
-      return {
-        revision: raw.revision ?? 0,
-        agentOnline: raw.agentOnline === true,
-        relay: raw.relay ?? null,
-        tunnels: raw.tunnels ?? [],
-        gatewayUnsupported: raw.gatewayUnsupported === true,
-      };
-    };
-    return {
-      subscribeTunnelState: (listener) => {
-        listeners.add(listener);
-        if (!unlistenPromise) {
-          unlistenPromise = listen<TunnelStateSnapshot>("gateway:tunnel-state", (event) => {
-            const snapshot = normalizeSnapshot(event.payload);
-            for (const subscriber of [...listeners]) {
-              subscriber(snapshot);
-            }
-          });
-        }
-        void invoke<TunnelStateSnapshot>("gateway_tunnel_state")
-          .then((payload) => {
-            if (listeners.has(listener)) {
-              listener(normalizeSnapshot(payload));
-            }
-          })
-          .catch(() => {});
-        return () => {
-          listeners.delete(listener);
-          if (listeners.size === 0 && unlistenPromise) {
-            const pending = unlistenPromise;
-            unlistenPromise = null;
-            void pending.then((unlisten) => unlisten()).catch(() => {});
-          }
-        };
-      },
-      createTunnel: (input: TunnelCreateInput) => invoke<void>("gateway_tunnel_create", { input }),
-      updateTunnel: (input: TunnelUpdateInput) => invoke<void>("gateway_tunnel_update", { input }),
-      closeTunnel: (id: string) => invoke<void>("gateway_tunnel_close", { tunnel_id: id }),
-      checkTunnel: (id?: string) => invoke<void>("gateway_tunnel_check", { tunnel_id: id }),
-    };
-  }, []);
-
   // The only page-level subscription to the sidebar list: ChatPage's own
   // render needs (draft detection, pending-item effect, workspace root).
   const historyItems = useSidebarSelector(sidebarStore, selectConversations);
   const sidebarConversationsById = useSidebarSelector(sidebarStore, (s) => s.byId);
-  const [shareConversation, setShareConversation] = useState<ChatHistorySummary | null>(null);
-  const [shareStatus, setShareStatus] = useState<ChatHistoryShareStatus | null>(null);
-  const [shareLoading, setShareLoading] = useState(false);
-  const [shareUpdating, setShareUpdating] = useState(false);
-  const [shareError, setShareError] = useState<string | null>(null);
-  const [sharedManagerOpen, setSharedManagerOpen] = useState(false);
-  const [sharedManagerStatuses, setSharedManagerStatuses] = useState<
-    Record<string, ChatHistoryShareStatus | undefined>
-  >({});
-  const [sharedManagerLoadingIds, setSharedManagerLoadingIds] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
-  const [sharedManagerUpdatingIds, setSharedManagerUpdatingIds] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
-  const [sharedManagerErrors, setSharedManagerErrors] = useState<
-    Record<string, string | undefined>
-  >({});
-  const [sharedManagerGatewayUrl, setSharedManagerGatewayUrl] = useState("");
-  const [sharedManagerGatewayUrlLoading, setSharedManagerGatewayUrlLoading] = useState(false);
-  const [sharedHistoryItems, setSharedHistoryItems] = useState<ChatHistorySummary[]>([]);
-  const sharedHistoryItemsRef = useRef<ChatHistorySummary[]>([]);
-  const sharedHistoryListRequestRef = useRef<Promise<ChatHistorySummary[]> | null>(null);
-  const sharedManagerShareOrigin = useMemo(() => {
-    const statusGatewayUrl = remoteRuntimeStatus.gatewayUrl?.trim() ?? "";
-    const runtimeGatewayUrl = sharedManagerGatewayUrl.trim();
-    return statusGatewayUrl || runtimeGatewayUrl || settings.remote.gatewayUrl;
-  }, [remoteRuntimeStatus.gatewayUrl, settings.remote.gatewayUrl, sharedManagerGatewayUrl]);
-  const canShareHistory =
-    remoteRuntimeStatus.online === true &&
-    remoteRuntimeStatus.enabled === true &&
-    remoteRuntimeStatus.configured === true;
 
   const setWorkspaceProjectDirectoryMissing = useCallback(
     (project: WorkspaceProject, missing: boolean) => {
@@ -1002,8 +881,11 @@ export function ChatPage(props: ChatPageProps) {
         return;
       }
       activateWorkspaceProject(project);
+      if (compactViewport) {
+        setSidebarOpen(false);
+      }
     },
-    [activateWorkspaceProject, checkWorkspaceProjectDirectory],
+    [activateWorkspaceProject, checkWorkspaceProjectDirectory, compactViewport],
   );
 
   const handleNewConversationForProject = useCallback(
@@ -1013,8 +895,11 @@ export function ChatPage(props: ChatPageProps) {
       }
       setActiveView("chat");
       activateWorkspaceProject(project, { startConversation: true });
+      if (compactViewport) {
+        setSidebarOpen(false);
+      }
     },
-    [activateWorkspaceProject, checkWorkspaceProjectDirectory],
+    [activateWorkspaceProject, checkWorkspaceProjectDirectory, compactViewport],
   );
 
   const handleBrowseWorkspaceProjectInFileTree = useCallback(
@@ -1033,17 +918,6 @@ export function ChatPage(props: ChatPageProps) {
       setSettings((prev) => openRightDockSingletonTab(prev, pathKey, "fileTree"));
     },
     [activateWorkspaceProject, checkWorkspaceProjectDirectory, setSettings],
-  );
-
-  const ensureTunnelToolTab = useCallback(
-    (projectPathKey?: string) => {
-      const targetProjectPathKey =
-        workspaceProjectPathKey(projectPathKey) ||
-        workspaceProjectPathKey(activeWorkspaceProjectPath);
-      if (!targetProjectPathKey) return;
-      setSettings((prev) => openRightDockSingletonTab(prev, targetProjectPathKey, "tunnel"));
-    },
-    [activeWorkspaceProjectPath, setSettings],
   );
 
   const ensureSshTunnelToolTab = useCallback(
@@ -1073,6 +947,7 @@ export function ChatPage(props: ChatPageProps) {
   );
 
   const handleOpenCreateWorkspaceProject = useCallback(async () => {
+    if (!desktopBridgeEnabled) return;
     try {
       const picked = await invoke<string | null>("system_pick_folder", {
         initial_workdir: activeWorkspaceProjectPath || workdir,
@@ -1083,7 +958,7 @@ export function ChatPage(props: ChatPageProps) {
     } catch (error) {
       setErrorMessage(asErrorMessage(error, "选择项目目录失败"));
     }
-  }, [activateWorkspaceProject, activeWorkspaceProjectPath, workdir]);
+  }, [activateWorkspaceProject, activeWorkspaceProjectPath, desktopBridgeEnabled, workdir]);
 
   const commitWorkspaceProjectRename = useCallback(
     (project: WorkspaceProject, nextNameInput: string) => {
@@ -1222,70 +1097,6 @@ export function ChatPage(props: ChatPageProps) {
     [setSettings],
   );
 
-  useEffect(() => {
-    let cancelled = false;
-
-    void invoke<GatewayRuntimeStatus>("gateway_status")
-      .then((status) => {
-        if (!cancelled) {
-          setRemoteRuntimeStatus(status);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setRemoteRuntimeStatus(buildFallbackGatewayStatus(settings.remote));
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    settings.remote.agentId,
-    settings.remote.autoReconnect,
-    settings.remote.enabled,
-    settings.remote.gatewayUrl,
-    settings.remote.grpcPort,
-    settings.remote.heartbeatInterval,
-    settings.remote.token,
-  ]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let dispose: (() => void) | null = null;
-
-    void listen<GatewayRuntimeStatus>("gateway:status", (event) => {
-      if (!cancelled) {
-        setRemoteRuntimeStatus(event.payload);
-      }
-    })
-      .then((unlisten) => {
-        if (cancelled) {
-          unlisten();
-          return;
-        }
-        dispose = unlisten;
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setRemoteRuntimeStatus(buildFallbackGatewayStatus(settings.remote));
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      dispose?.();
-    };
-  }, [
-    settings.remote.agentId,
-    settings.remote.autoReconnect,
-    settings.remote.enabled,
-    settings.remote.gatewayUrl,
-    settings.remote.grpcPort,
-    settings.remote.heartbeatInterval,
-    settings.remote.token,
-  ]);
-
   const { availableSkills, skillsRootDir, refreshSkills } = useChatSkills({
     skillsEnabled,
     selectedSkillNames,
@@ -1360,7 +1171,6 @@ export function ChatPage(props: ChatPageProps) {
   const previousHistoryScopeKeyRef = useRef(historyScopeKey);
   const currentConversationHistoryUpdatedAtRef = useRef<number | null>(null);
   const locallySyncedHistoryUpdatedAtRef = useRef(new Map<string, number>());
-  const gatewayBridgeHistorySummaryRef = useRef(new Map<string, ChatHistorySummary>());
   const startNewConversationActionRef = useRef<(options?: { workdir?: string }) => void>(
     () => undefined,
   );
@@ -1384,9 +1194,6 @@ export function ChatPage(props: ChatPageProps) {
     [],
   );
   const sendActionRef = useRef<SendChatAction>(async () => false);
-  const ensureGatewayBridgeConversationReadyRef = useRef<
-    (id: string, options?: EnsureGatewayBridgeConversationReadyOptions) => Promise<string>
-  >(async (id) => id.trim());
   const stopSendingActionRef = useRef<() => void>(() => undefined);
   const hydratingConversationIdRef = useRef<string | null>(hydratingConversationId);
   const hydrationFailedConversationIdRef = useRef<string | null>(hydrationFailedConversationId);
@@ -1418,7 +1225,8 @@ export function ChatPage(props: ChatPageProps) {
   } = useLiveTranscriptController({
     currentConversationId,
   });
-  const { queueGatewayBridgeEventForRequest } = useGatewayBridgeBatcher();
+  const { queueConversationEventForRequest } =
+    useConversationEventPublisher(desktopBridgeEnabled);
   const {
     currentConversationIdRef,
     conversationRuntimeCacheRef,
@@ -1508,10 +1316,6 @@ export function ChatPage(props: ChatPageProps) {
     : !terminalProjectPath
       ? "Select a project to use project tools."
       : undefined;
-  const tunnelEnabled = settings.remote.enableWebTunnels === true;
-  const tunnelDisabledMessage = !settings.remote.enableWebTunnels
-    ? t("projectTools.tunnelWebDisabled")
-    : undefined;
   // RightDockPanel is memo'd: every callback handed to it must be stable or
   // the memo boundary is void (see the panel-side context useMemo).
   const handleRightDockWidthChange = useCallback(
@@ -1752,6 +1556,11 @@ export function ChatPage(props: ChatPageProps) {
   ]);
   useEffect(() => {
     setTerminalSessionsLoaded(false);
+    if (!desktopBridgeEnabled) {
+      setTerminalSessions([]);
+      setTerminalSessionsLoaded(true);
+      return;
+    }
     if (!terminalProjectPathKey) {
       setTerminalSessions([]);
       return;
@@ -1777,15 +1586,16 @@ export function ChatPage(props: ChatPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [terminalProjectPathKey]);
+  }, [desktopBridgeEnabled, terminalProjectPathKey]);
   useEffect(() => {
-    if (!terminalProjectPathKey) return;
+    if (!desktopBridgeEnabled || !terminalProjectPathKey) return;
     return tauriTerminalClient.subscribe((event) => {
       if (event.kind === "output") return;
       setTerminalSessions((current) => applyTerminalEventToSessions(current, event));
     });
-  }, [terminalProjectPathKey]);
+  }, [desktopBridgeEnabled, terminalProjectPathKey]);
   useEffect(() => {
+    if (!desktopBridgeEnabled) return;
     let cancelled = false;
     let unlisten: (() => void) | null = null;
 
@@ -1847,7 +1657,7 @@ export function ChatPage(props: ChatPageProps) {
       cancelled = true;
       unlisten?.();
     };
-  }, [requestConfirmDialog, t]);
+  }, [desktopBridgeEnabled, requestConfirmDialog, t]);
   // Local runner running-state → sidebar store: diff transitions so sidebar
   // dots (and running workdir keys) include local runs immediately; remote
   // runs arrive through the store's own event subscription.
@@ -1897,6 +1707,7 @@ export function ChatPage(props: ChatPageProps) {
     composerRef,
     setErrorMessage,
     addNotify,
+    nativeMobileRuntime: !desktopBridgeEnabled,
   });
   const [isFileDropActive, setIsFileDropActive] = useState(false);
   const [composerOverlayHeight, setComposerOverlayHeight] = useState(0);
@@ -1911,25 +1722,14 @@ export function ChatPage(props: ChatPageProps) {
         workdir: string;
         selectedSystemToolIds: SystemToolId[];
         runtimeControls: ChatRuntimeControls;
-        gatewayRequest?: QueuedChatTurn["gatewayRequest"];
       })
     | null
   >(null);
   const chatQueueRevisionRef = useRef(0);
   const chatQueueKnownConversationIdsRef = useRef(new Set<string>());
-  const remoteQueuedChatTurnEditSlotsRef = useRef<
-    Map<
-      string,
-      {
-        item: QueuedChatTurn;
-        slot: QueuedChatTurnEditSlot;
-        revision: number;
-      }
-    >
-  >(new Map());
-  const activeGatewayRuntimeRunsRef = useRef(new Map<string, ActiveGatewayRuntimeRun>());
-  const gatewayRuntimeSnapshotChainsRef = useRef(new Map<string, Promise<void>>());
-  const gatewayRuntimeSnapshotTimersRef = useRef(new Map<string, number>());
+  const activeConversationRuntimeRunsRef = useRef(new Map<string, ActiveConversationRuntimeRun>());
+  const conversationRuntimeSnapshotChainsRef = useRef(new Map<string, Promise<void>>());
+  const conversationRuntimeSnapshotTimersRef = useRef(new Map<string, number>());
   const previousRunningConversationIdsRef = useRef<ReadonlySet<string>>(new Set());
 
   function buildChatQueueSnapshot(
@@ -1947,7 +1747,7 @@ export function ChatPage(props: ChatPageProps) {
           previewText: buildQueuedChatTurnPreview(item.draft),
           fileCount: item.uploadedFiles.length,
           createdAt: item.createdAt,
-          source: item.gatewayRequest ? "webui" : "gui",
+          source: "gui",
           editable: true,
         })),
     };
@@ -1959,7 +1759,7 @@ export function ChatPage(props: ChatPageProps) {
       previewText: buildQueuedChatTurnPreview(item.draft),
       fileCount: item.uploadedFiles.length,
       createdAt: item.createdAt,
-      source: item.gatewayRequest ? ("webui" as const) : ("gui" as const),
+      source: "gui" as const,
       editable: true,
     };
     return {
@@ -1997,19 +1797,17 @@ export function ChatPage(props: ChatPageProps) {
     conversationId: string,
     queue: readonly QueuedChatTurn[] = queuedChatTurnsRef.current,
   ) {
+    if (!desktopBridgeEnabled) return;
     const targetConversationId = rememberChatQueueConversationId(conversationId);
     if (!targetConversationId) {
       return;
     }
     const snapshot = buildChatQueueSnapshot(targetConversationId, queue);
-    void invoke("gateway_publish_chat_queue_event", {
-      input: {
-        conversationId: snapshot.conversationId,
-        snapshotJson: JSON.stringify(snapshot),
-        revision: snapshot.revision,
-      },
+    void invoke("local_access_broadcast_event", {
+      event: "xagent:chat-queue",
+      payload: snapshot,
     } as any).catch((error) => {
-      console.warn("gateway_publish_chat_queue_event failed", error);
+      console.warn("local chat queue broadcast failed", error);
     });
   }
 
@@ -2037,7 +1835,7 @@ export function ChatPage(props: ChatPageProps) {
       publishChatQueueSnapshots(conversationIds, next);
       return next;
     },
-    [],
+    [desktopBridgeEnabled],
   );
 
   const queuedChatTurnsForCurrentConversation = useMemo<ChatQueueTurnPreview[]>(
@@ -2061,7 +1859,6 @@ export function ChatPage(props: ChatPageProps) {
         composerDraftOwnerRef.current = "";
       }
       locallySyncedHistoryUpdatedAtRef.current.delete(key);
-      gatewayBridgeHistorySummaryRef.current.delete(key);
       setPendingUploadsForConversation(key, []);
       memoryExtraction.dispose(key);
       deleteConversationArtifacts(key);
@@ -2295,7 +2092,6 @@ export function ChatPage(props: ChatPageProps) {
       selectedSystemToolIds: editSlot?.selectedSystemToolIds ?? settings.system.selectedSystemTools,
       runtimeControls: editSlot?.runtimeControls ?? settings.chatRuntimeControls,
       createdAt: editSlot?.createdAt,
-      gatewayRequest: editSlot?.gatewayRequest,
     });
 
     setQueuedChatTurnsState((current) => {
@@ -2340,34 +2136,6 @@ export function ChatPage(props: ChatPageProps) {
         const queuedTurn = taken.item;
         inFlightQueuedTurn = queuedTurn;
         setQueuedChatTurnsState(() => taken.queue);
-        const gatewayRequest = queuedTurn.gatewayRequest;
-        const gatewayWorkerId = gatewayRequest?.workerId?.trim() || "gui-queue";
-        const gatewayBridgeRequest: ActiveGatewayBridgeRequest | null = gatewayRequest
-          ? {
-              requestId: gatewayRequest.requestId,
-              conversationId: targetConversationId,
-              clientRequestId: gatewayRequest.clientRequestId,
-              workerId: gatewayWorkerId,
-              startedAt: Date.now(),
-              selectedModelOverride: gatewayRequest.selectedModel,
-              runtimeControlsOverride: gatewayRequest.runtimeControls
-                ? normalizeChatRuntimeControls(gatewayRequest.runtimeControls)
-                : queuedTurn.runtimeControls,
-              executionModeOverride: queuedTurn.executionMode,
-              workdirOverride: queuedTurn.workdir,
-              selectedSystemToolIdsOverride: queuedTurn.selectedSystemToolIds,
-            }
-          : null;
-        const markGatewayStarted =
-          gatewayRequest && gatewayBridgeRequest
-            ? async () => {
-                await invoke("gateway_chat_mark_started", {
-                  request_id: gatewayRequest.requestId,
-                  conversation_id: targetConversationId,
-                  worker_id: gatewayWorkerId,
-                } as any);
-              }
-            : undefined;
         const accepted = await sendActionRef.current({
           composerDraftOverride: queuedTurn.draft,
           uploadedFilesOverride: queuedTurn.uploadedFiles,
@@ -2376,24 +2144,13 @@ export function ChatPage(props: ChatPageProps) {
           workdirOverride: queuedTurn.workdir,
           selectedSystemToolIdsOverride: queuedTurn.selectedSystemToolIds,
           runtimeControlsOverride: queuedTurn.runtimeControls,
-          gatewayBridgeRequestOverride: gatewayBridgeRequest,
           preserveComposerOnStart: true,
-          beforeRuntimeStart: markGatewayStarted,
-          afterInitialHistoryPersist: markGatewayStarted,
         });
         if (!accepted) {
           setQueuedChatTurnsState((current) =>
             promoteQueuedChatTurn(appendQueuedChatTurn(current, queuedTurn), queuedTurn.id),
           );
           inFlightQueuedTurn = null;
-        } else if (gatewayRequest) {
-          void invoke("gateway_chat_complete", {
-            request_id: gatewayRequest.requestId,
-            conversation_id: targetConversationId,
-            worker_id: gatewayWorkerId,
-          } as any).catch((error) => {
-            console.warn("gateway_chat_complete failed", error);
-          });
         }
         return accepted;
       })
@@ -2489,7 +2246,6 @@ export function ChatPage(props: ChatPageProps) {
       workdir: queuedTurn.workdir,
       selectedSystemToolIds: queuedTurn.selectedSystemToolIds.slice(),
       runtimeControls: { ...queuedTurn.runtimeControls },
-      gatewayRequest: queuedTurn.gatewayRequest ? { ...queuedTurn.gatewayRequest } : undefined,
     };
     setQueuedChatTurnsState((current) => removeQueuedChatTurn(current, key));
     composerRef.current?.setDraft(queuedTurn.draft);
@@ -2499,336 +2255,8 @@ export function ChatPage(props: ChatPageProps) {
   }
 
   function removeQueuedTurn(id: string) {
-    const queuedTurn = queuedChatTurnsRef.current.find((item) => item.id === id.trim());
     setQueuedChatTurnsState((current) => removeQueuedChatTurn(current, id));
-    const gatewayRequest = queuedTurn?.gatewayRequest;
-    if (gatewayRequest) {
-      void invoke("gateway_chat_cancel_request", {
-        request_id: gatewayRequest.requestId,
-        conversation_id: queuedTurn?.conversationId,
-        worker_id: gatewayRequest.workerId ?? "gui-queue",
-      } as any).catch((error) => {
-        console.warn("gateway_chat_cancel_request failed", error);
-      });
-    }
   }
-
-  function createTextComposerDraft(text: string): MentionComposerDraft {
-    return {
-      segments: text ? [{ type: "text", text }] : [],
-      text,
-      textWithoutLargePastes: text,
-      largePastes: [],
-      skillMentions: [],
-      commitMentions: [],
-      gitFileMentions: [],
-      codeMentions: [],
-      isEmpty: text.trim().length === 0,
-    };
-  }
-
-  function shouldQueueGatewayChatRequest(
-    conversationId: string,
-    queuePolicy: "auto" | "append" | "interrupt",
-  ) {
-    const key = conversationId.trim();
-    if (!key) return false;
-    return (
-      queuePolicy === "append" ||
-      queuePolicy === "interrupt" ||
-      queuedChatTurnsRef.current.some((item) => item.conversationId === key) ||
-      isQueuedChatTurnEditBlockingProcessing(key)
-    );
-  }
-
-  async function enqueueGatewayChatRequest(
-    claimed: GatewayChatClaimedRequest,
-    conversationId: string,
-  ) {
-    const payload = claimed.request;
-    const requestId = payload.requestId.trim();
-    const targetConversationId = conversationId.trim();
-    const message = payload.message ?? "";
-    const uploadedFiles = Array.isArray(payload.uploadedFiles) ? payload.uploadedFiles : [];
-    if (!requestId || !targetConversationId || (!message.trim() && uploadedFiles.length === 0)) {
-      return false;
-    }
-
-    const executionMode =
-      normalizeGatewayExecutionMode(payload.executionMode) ?? settings.system.executionMode;
-    const workdir =
-      normalizeGatewayWorkdir(payload.workdir) ??
-      conversationRuntimeCacheRef.current.get(targetConversationId)?.workdir ??
-      displayedConversationWorkdir ??
-      settings.system.workdir;
-    const runtimeControls = payload.runtimeControls
-      ? normalizeChatRuntimeControls(payload.runtimeControls)
-      : settings.chatRuntimeControls;
-    const selectedSystemToolIds = normalizeSystemToolSelection(payload.selectedSystemTools);
-    const queuedTurn = createQueuedChatTurn({
-      id: `gateway-${requestId}`,
-      conversationId: targetConversationId,
-      draft: createTextComposerDraft(message),
-      uploadedFiles,
-      executionMode,
-      workdir: isAgentExecutionMode(executionMode) ? workdir : "",
-      selectedSystemToolIds:
-        selectedSystemToolIds.length > 0
-          ? selectedSystemToolIds
-          : settings.system.selectedSystemTools,
-      runtimeControls,
-      gatewayRequest: {
-        requestId,
-        clientRequestId:
-          payload.clientRequestId?.trim() || claimed.clientRequestId?.trim() || undefined,
-        workerId: "gui-queue",
-        queuePolicy:
-          payload.queuePolicy === "append" || payload.queuePolicy === "interrupt"
-            ? payload.queuePolicy
-            : "auto",
-        selectedModel: payload.selectedModel,
-        runtimeControls: payload.runtimeControls,
-      },
-    });
-
-    setQueuedChatTurnsState((current) => {
-      const appended = appendQueuedChatTurn(current, queuedTurn);
-      return payload.queuePolicy === "interrupt"
-        ? promoteQueuedChatTurn(appended, queuedTurn.id)
-        : appended;
-    });
-    if (payload.queuePolicy === "interrupt") {
-      stopConversation(targetConversationId);
-    }
-    return true;
-  }
-
-  useEffect(() => {
-    let disposed = false;
-    let unlisten: (() => void) | null = null;
-    type GatewayChatQueueRequestEvent = {
-      requestId: string;
-      action: string;
-      conversationId?: string;
-      itemId?: string;
-      direction?: "up" | "down" | string;
-      revision?: number;
-      draftJson?: string;
-      uploadedFilesJson?: string;
-    };
-
-    const respond = (requestId: string, response: Record<string, unknown>) => {
-      if (!requestId.trim()) return;
-      void invoke("gateway_chat_queue_respond", {
-        input: {
-          requestId,
-          accepted: response.accepted === true,
-          message: typeof response.message === "string" ? response.message : "",
-          snapshotJson: typeof response.snapshotJson === "string" ? response.snapshotJson : "",
-          itemJson: typeof response.itemJson === "string" ? response.itemJson : "",
-          errorCode: typeof response.errorCode === "string" ? response.errorCode : "",
-          revision: chatQueueRevisionRef.current,
-        },
-      } as any).catch((error) => {
-        console.warn("gateway_chat_queue_respond failed", error);
-      });
-    };
-
-    const snapshotJson = (conversationId: string) =>
-      JSON.stringify(buildChatQueueSnapshot(conversationId));
-
-    void listen<GatewayChatQueueRequestEvent>("gateway:chat-queue-request", (event) => {
-      if (disposed) return;
-      const request = event.payload;
-      const requestId = request.requestId?.trim() ?? "";
-      const action = request.action?.trim() ?? "";
-      const conversationId =
-        request.conversationId?.trim() || currentConversationIdRef.current.trim();
-      const itemId = request.itemId?.trim() ?? "";
-
-      const fail = (message: string, errorCode = "invalid_request") => {
-        respond(requestId, {
-          accepted: false,
-          message,
-          errorCode,
-          snapshotJson: conversationId ? snapshotJson(conversationId) : "",
-        });
-      };
-
-      if (!requestId) return;
-      if (!conversationId && action !== "get") {
-        fail("conversation_id is required");
-        return;
-      }
-
-      if (action === "get") {
-        respond(requestId, {
-          accepted: true,
-          snapshotJson: snapshotJson(conversationId),
-        });
-        return;
-      }
-
-      const item = queuedChatTurnsRef.current.find(
-        (candidate) => candidate.id === itemId && candidate.conversationId === conversationId,
-      );
-
-      if (action === "get_item") {
-        if (!item) {
-          fail("queued item not found", "not_found");
-          return;
-        }
-        respond(requestId, {
-          accepted: true,
-          itemJson: JSON.stringify(buildChatQueueItemDetail(item)),
-          snapshotJson: snapshotJson(conversationId),
-        });
-        return;
-      }
-
-      if (action === "run_now") {
-        if (!item) {
-          fail("queued item not found", "not_found");
-          return;
-        }
-        runQueuedTurnNow(item.id);
-        respond(requestId, { accepted: true, snapshotJson: snapshotJson(conversationId) });
-        return;
-      }
-
-      if (action === "move") {
-        if (!item) {
-          fail("queued item not found", "not_found");
-          return;
-        }
-        const direction = request.direction === "down" ? "down" : "up";
-        setQueuedChatTurnsState((current) => moveQueuedChatTurn(current, item.id, direction));
-        respond(requestId, { accepted: true, snapshotJson: snapshotJson(conversationId) });
-        return;
-      }
-
-      if (action === "remove") {
-        if (!item) {
-          fail("queued item not found", "not_found");
-          return;
-        }
-        removeQueuedTurn(item.id);
-        respond(requestId, { accepted: true, snapshotJson: snapshotJson(conversationId) });
-        return;
-      }
-
-      if (action === "edit_begin") {
-        if (!item) {
-          fail("queued item not found", "not_found");
-          return;
-        }
-        const sameConversationQueue = queuedChatTurnsRef.current.filter(
-          (candidate) => candidate.conversationId === conversationId,
-        );
-        const sameConversationIndex = sameConversationQueue.findIndex(
-          (candidate) => candidate.id === item.id,
-        );
-        const slot: QueuedChatTurnEditSlot = {
-          conversationId,
-          previousId:
-            sameConversationIndex > 0
-              ? (sameConversationQueue[sameConversationIndex - 1]?.id ?? null)
-              : null,
-          nextId:
-            sameConversationIndex >= 0
-              ? (sameConversationQueue[sameConversationIndex + 1]?.id ?? null)
-              : null,
-          index: sameConversationIndex >= 0 ? sameConversationIndex : undefined,
-        };
-        remoteQueuedChatTurnEditSlotsRef.current.set(item.id, {
-          item,
-          slot,
-          revision: chatQueueRevisionRef.current,
-        });
-        const detail = buildChatQueueItemDetail(item);
-        setQueuedChatTurnsState((current) => removeQueuedChatTurn(current, item.id));
-        respond(requestId, {
-          accepted: true,
-          itemJson: JSON.stringify(detail),
-          snapshotJson: snapshotJson(conversationId),
-        });
-        return;
-      }
-
-      if (action === "edit_cancel") {
-        const session = remoteQueuedChatTurnEditSlotsRef.current.get(itemId);
-        if (!session) {
-          fail("queued edit session not found", "not_found");
-          return;
-        }
-        if (session.slot.conversationId !== conversationId) {
-          fail("queued edit session conversation mismatch", "not_found");
-          return;
-        }
-        remoteQueuedChatTurnEditSlotsRef.current.delete(itemId);
-        setQueuedChatTurnsState((current) =>
-          insertQueuedChatTurnAtSlot(current, session.item, session.slot),
-        );
-        respond(requestId, { accepted: true, snapshotJson: snapshotJson(conversationId) });
-        return;
-      }
-
-      if (action === "edit_commit") {
-        const session = remoteQueuedChatTurnEditSlotsRef.current.get(itemId);
-        if (!session) {
-          fail("queued edit session not found", "not_found");
-          return;
-        }
-        if (session.slot.conversationId !== conversationId) {
-          fail("queued edit session conversation mismatch", "not_found");
-          return;
-        }
-        if (
-          typeof request.revision === "number" &&
-          request.revision > 0 &&
-          request.revision < chatQueueRevisionRef.current
-        ) {
-          fail("queued edit revision conflict", "conflict");
-          return;
-        }
-        let draft: MentionComposerDraft;
-        let uploadedFiles: PendingUploadedFile[];
-        try {
-          draft = JSON.parse(request.draftJson || "") as MentionComposerDraft;
-          uploadedFiles = JSON.parse(request.uploadedFilesJson || "[]") as PendingUploadedFile[];
-        } catch {
-          fail("invalid queued edit payload", "invalid_payload");
-          return;
-        }
-        const nextItem = createQueuedChatTurn({
-          ...session.item,
-          draft,
-          uploadedFiles: Array.isArray(uploadedFiles) ? uploadedFiles : [],
-          id: session.item.id,
-          createdAt: session.item.createdAt,
-        });
-        remoteQueuedChatTurnEditSlotsRef.current.delete(itemId);
-        setQueuedChatTurnsState((current) =>
-          insertQueuedChatTurnAtSlot(current, nextItem, session.slot),
-        );
-        respond(requestId, { accepted: true, snapshotJson: snapshotJson(conversationId) });
-        return;
-      }
-
-      fail(`unsupported chat queue action: ${action}`, "unsupported_action");
-    }).then((dispose) => {
-      if (disposed) {
-        dispose();
-        return;
-      }
-      unlisten = dispose;
-    });
-
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, []);
 
   const {
     startNewConversation,
@@ -2966,7 +2394,8 @@ export function ChatPage(props: ChatPageProps) {
             return;
           }
 
-          const terminalSessions = pathKey ? await tauriTerminalClient.list(pathKey) : [];
+          const terminalSessions =
+            desktopBridgeEnabled && pathKey ? await tauriTerminalClient.list(pathKey) : [];
           const runningTerminalCount = terminalSessions.filter((session) => session.running).length;
           if (runningTerminalCount > 0) {
             const confirmed = await requestConfirmDialog({
@@ -3009,11 +2438,6 @@ export function ChatPage(props: ChatPageProps) {
             for (const conversationId of deletedConversationIds) {
               sidebarStore.removeLocal(conversationId);
             }
-            setSharedHistoryItems((current) => {
-              const next = current.filter((item) => !deletedConversationIds.has(item.id));
-              sharedHistoryItemsRef.current = next;
-              return next;
-            });
             for (const conversationId of deletedConversationIds) {
               persistedConversationStateRef.current.delete(conversationId);
               conversationRuntimeCacheRef.current.delete(conversationId);
@@ -3022,7 +2446,7 @@ export function ChatPage(props: ChatPageProps) {
               subagentStoresRef.current.dispose(conversationId);
             }
           }
-          if (terminalSessions.length > 0) {
+          if (desktopBridgeEnabled && terminalSessions.length > 0) {
             await tauriTerminalClient.closeProject(pathKey);
             setTerminalSessions((current) =>
               current.filter((session) => !terminalSessionBelongsToProject(session, pathKey)),
@@ -3060,6 +2484,7 @@ export function ChatPage(props: ChatPageProps) {
     },
     [
       deleteConversationLocalCaches,
+      desktopBridgeEnabled,
       displayedConversationWorkdir,
       isConversationRunning,
       removeWorkspaceProjectFromSettings,
@@ -3177,6 +2602,7 @@ export function ChatPage(props: ChatPageProps) {
   ]);
 
   useEffect(() => {
+    if (!desktopBridgeEnabled) return;
     const previous = previousSubagentRuntimeConversationRef.current;
     if (previous && previous !== currentConversationId) {
       subagentStoresRef.current.dispose(previous);
@@ -3195,7 +2621,7 @@ export function ChatPage(props: ChatPageProps) {
     if (subagentWarmupSignatureRef.current === warmupSignature) return;
     subagentWarmupSignatureRef.current = warmupSignature;
     subagentStoresRef.current.warmup(currentConversationId);
-  }, [currentConversationId, historyItems, settings.agents]);
+  }, [currentConversationId, desktopBridgeEnabled, historyItems, settings.agents]);
 
   useEffect(
     () => () => {
@@ -3213,25 +2639,26 @@ export function ChatPage(props: ChatPageProps) {
     return await persistConversation(params);
   }
 
-  function clearGatewayRuntimeSnapshotTimer(conversationId: string) {
+  function clearConversationRuntimeSnapshotTimer(conversationId: string) {
     const targetConversationId = conversationId.trim();
     if (!targetConversationId) {
       return;
     }
-    const timerId = gatewayRuntimeSnapshotTimersRef.current.get(targetConversationId);
+    const timerId = conversationRuntimeSnapshotTimersRef.current.get(targetConversationId);
     if (timerId === undefined) {
       return;
     }
     window.clearTimeout(timerId);
-    gatewayRuntimeSnapshotTimersRef.current.delete(targetConversationId);
+    conversationRuntimeSnapshotTimersRef.current.delete(targetConversationId);
   }
 
-  async function publishGatewayRuntimeSnapshot(
-    run: ActiveGatewayRuntimeRun,
-    state: GatewayRuntimeSnapshotState = run.state,
+  async function publishConversationRuntimeSnapshot(
+    run: ActiveConversationRuntimeRun,
+    state: ConversationRuntimeSnapshotState = run.state,
   ) {
+    if (!desktopBridgeEnabled) return;
     const liveTranscript = run.transcriptStore.getSnapshot();
-    const entries = buildGatewayRuntimeSnapshotEntries({
+    const entries = buildConversationRuntimeSnapshotEntries({
       userMessage: run.userMessage,
       liveTranscript,
     });
@@ -3240,49 +2667,49 @@ export function ChatPage(props: ChatPageProps) {
     const toolStatus = liveTranscript.toolStatus?.trim() || "";
 
     try {
-      await invoke("gateway_publish_chat_runtime_snapshot", {
-        input: {
+      await invoke("local_access_broadcast_event", {
+        event: "xagent:chat-runtime",
+        payload: {
           conversationId: run.conversationId,
           runId: run.runId,
-          clientRequestId: run.clientRequestId ?? "",
-          workerId: run.workerId ?? "",
           state,
           cwd: run.cwd ?? "",
           updatedAt: Date.now(),
           revision: run.revision,
-          entriesJson: JSON.stringify(entries),
+          entries,
           toolStatus,
           toolStatusIsCompaction: Boolean(toolStatus) && run.toolStatusIsCompaction,
         },
       } as any);
     } catch (error) {
-      console.warn("gateway_publish_chat_runtime_snapshot failed", error);
+      console.warn("local chat runtime broadcast failed", error);
     }
   }
 
-  function queueGatewayRuntimeSnapshotForRun(
-    run: ActiveGatewayRuntimeRun,
-    options?: { state?: GatewayRuntimeSnapshotState; force?: boolean },
+  function queueConversationRuntimeSnapshotForRun(
+    run: ActiveConversationRuntimeRun,
+    options?: { state?: ConversationRuntimeSnapshotState; force?: boolean },
   ) {
+    if (!desktopBridgeEnabled) return Promise.resolve();
     const state = options?.state ?? run.state;
     run.state = state;
     if (options?.force) {
-      clearGatewayRuntimeSnapshotTimer(run.conversationId);
-    } else if (gatewayRuntimeSnapshotTimersRef.current.has(run.conversationId)) {
-      return gatewayRuntimeSnapshotChainsRef.current.get(run.conversationId) ?? Promise.resolve();
+      clearConversationRuntimeSnapshotTimer(run.conversationId);
+    } else if (conversationRuntimeSnapshotTimersRef.current.has(run.conversationId)) {
+      return conversationRuntimeSnapshotChainsRef.current.get(run.conversationId) ?? Promise.resolve();
     }
 
     const publish = () => {
-      gatewayRuntimeSnapshotTimersRef.current.delete(run.conversationId);
+      conversationRuntimeSnapshotTimersRef.current.delete(run.conversationId);
       const previous =
-        gatewayRuntimeSnapshotChainsRef.current.get(run.conversationId) ?? Promise.resolve();
+        conversationRuntimeSnapshotChainsRef.current.get(run.conversationId) ?? Promise.resolve();
       const next = previous
         .catch(() => undefined)
-        .then(() => publishGatewayRuntimeSnapshot(run, state));
-      gatewayRuntimeSnapshotChainsRef.current.set(run.conversationId, next);
+        .then(() => publishConversationRuntimeSnapshot(run, state));
+      conversationRuntimeSnapshotChainsRef.current.set(run.conversationId, next);
       void next.finally(() => {
-        if (gatewayRuntimeSnapshotChainsRef.current.get(run.conversationId) === next) {
-          gatewayRuntimeSnapshotChainsRef.current.delete(run.conversationId);
+        if (conversationRuntimeSnapshotChainsRef.current.get(run.conversationId) === next) {
+          conversationRuntimeSnapshotChainsRef.current.delete(run.conversationId);
         }
       });
       return next;
@@ -3292,251 +2719,62 @@ export function ChatPage(props: ChatPageProps) {
       return publish();
     }
 
-    const timerId = window.setTimeout(publish, GATEWAY_RUNTIME_SNAPSHOT_DEBOUNCE_MS);
-    gatewayRuntimeSnapshotTimersRef.current.set(run.conversationId, timerId);
-    return gatewayRuntimeSnapshotChainsRef.current.get(run.conversationId) ?? Promise.resolve();
+    const timerId = window.setTimeout(publish, CONVERSATION_RUNTIME_SNAPSHOT_DEBOUNCE_MS);
+    conversationRuntimeSnapshotTimersRef.current.set(run.conversationId, timerId);
+    return conversationRuntimeSnapshotChainsRef.current.get(run.conversationId) ?? Promise.resolve();
   }
 
-  function queueGatewayRuntimeSnapshot(
+  function queueConversationRuntimeSnapshot(
     conversationId: string,
-    options?: { state?: GatewayRuntimeSnapshotState; force?: boolean },
+    options?: { state?: ConversationRuntimeSnapshotState; force?: boolean },
   ) {
     const targetConversationId = conversationId.trim();
     if (!targetConversationId) {
       return Promise.resolve();
     }
-    const run = activeGatewayRuntimeRunsRef.current.get(targetConversationId);
+    const run = activeConversationRuntimeRunsRef.current.get(targetConversationId);
     if (!run) {
       return Promise.resolve();
     }
-    return queueGatewayRuntimeSnapshotForRun(run, options);
+    return queueConversationRuntimeSnapshotForRun(run, options);
   }
 
-  function registerActiveGatewayRuntimeRun(run: ActiveGatewayRuntimeRun) {
-    activeGatewayRuntimeRunsRef.current.set(run.conversationId, run);
+  function registerActiveConversationRuntimeRun(run: ActiveConversationRuntimeRun) {
+    activeConversationRuntimeRunsRef.current.set(run.conversationId, run);
     return run;
   }
 
-  function finishActiveGatewayRuntimeRun(
+  function finishActiveConversationRuntimeRun(
     conversationId: string,
-    state: GatewayRuntimeSnapshotState,
+    state: ConversationRuntimeSnapshotState,
   ) {
     const targetConversationId = conversationId.trim();
     if (!targetConversationId) {
       return;
     }
-    const run = activeGatewayRuntimeRunsRef.current.get(targetConversationId);
+    const run = activeConversationRuntimeRunsRef.current.get(targetConversationId);
     if (!run) {
       return;
     }
-    void queueGatewayRuntimeSnapshotForRun(run, { state, force: true }).finally(() => {
-      if (activeGatewayRuntimeRunsRef.current.get(targetConversationId) === run) {
-        activeGatewayRuntimeRunsRef.current.delete(targetConversationId);
+    void queueConversationRuntimeSnapshotForRun(run, { state, force: true }).finally(() => {
+      if (activeConversationRuntimeRunsRef.current.get(targetConversationId) === run) {
+        activeConversationRuntimeRunsRef.current.delete(targetConversationId);
       }
-      clearGatewayRuntimeSnapshotTimer(targetConversationId);
+      clearConversationRuntimeSnapshotTimer(targetConversationId);
     });
   }
 
   useEffect(
     () => () => {
-      for (const timerId of gatewayRuntimeSnapshotTimersRef.current.values()) {
+      for (const timerId of conversationRuntimeSnapshotTimersRef.current.values()) {
         window.clearTimeout(timerId);
       }
-      gatewayRuntimeSnapshotTimersRef.current.clear();
-      activeGatewayRuntimeRunsRef.current.clear();
+      conversationRuntimeSnapshotTimersRef.current.clear();
+      activeConversationRuntimeRunsRef.current.clear();
     },
     [],
   );
 
-  useEffect(() => {
-    if (!canShareHistory) {
-      return;
-    }
-    publishChatQueueSnapshots(
-      collectChatQueueSnapshotConversationIds(queuedChatTurnsRef.current, [
-        currentConversationIdRef.current,
-      ]),
-    );
-    for (const run of activeGatewayRuntimeRunsRef.current.values()) {
-      void queueGatewayRuntimeSnapshotForRun(run, { state: run.state, force: true });
-    }
-  }, [canShareHistory, remoteRuntimeStatus.connectedSince, remoteRuntimeStatus.sessionId]);
-
-  // Keep-alive: a long silent tool call produces no chat events, and the
-  // desktop run ledger treats an untouched run as lost after its active TTL
-  // (which would surface a spurious failure on remote clients). Re-publishing
-  // the running snapshot refreshes both the ledger and the gateway activity.
-  useEffect(() => {
-    if (!canShareHistory) {
-      return;
-    }
-    const timerId = window.setInterval(() => {
-      for (const run of activeGatewayRuntimeRunsRef.current.values()) {
-        if (run.state === "running") {
-          void queueGatewayRuntimeSnapshotForRun(run, { state: run.state });
-        }
-      }
-    }, GATEWAY_RUNTIME_RUN_KEEPALIVE_MS);
-    return () => {
-      window.clearInterval(timerId);
-    };
-  }, [canShareHistory]);
-
-  function applyGatewayBridgeRebase(conversationId: string, baseMessageRef: HistoryMessageRef) {
-    const targetConversationId = conversationId.trim();
-    if (!targetConversationId) {
-      throw new Error("Remote edit_resend requires conversation_id.");
-    }
-    const sourceEntry =
-      conversationRuntimeCacheRef.current.get(targetConversationId) ??
-      (targetConversationId === currentConversationIdRef.current
-        ? buildRuntimeEntryFromVisibleState()
-        : null);
-    if (!sourceEntry) {
-      throw new Error(`Conversation is not available for edit_resend: ${targetConversationId}`);
-    }
-    const nextState = truncateConversationFromMessage(sourceEntry.state, baseMessageRef);
-    const nextEntry = createConversationRuntimeEntry({
-      ...sourceEntry,
-      state: nextState,
-    });
-    setConversationRuntimeCacheEntry(
-      conversationRuntimeCacheRef.current,
-      targetConversationId,
-      nextEntry,
-    );
-    persistedConversationStateRef.current.delete(targetConversationId);
-    if (currentConversationIdRef.current === targetConversationId) {
-      syncVisibleConversationRuntime(targetConversationId, nextEntry);
-    }
-
-    const keepParentToolCallIds = collectRetainedSubagentParentToolCallIds(nextState);
-    subagentStoresRef.current.invalidate(targetConversationId);
-    void pruneSubagentRunsForConversation({
-      parentConversationId: targetConversationId,
-      keepParentToolCallIds,
-    }).catch((error) => {
-      console.warn("gateway edit_resend subagent prune failed", error);
-    });
-  }
-
-  async function ensureGatewayBridgeConversationReady(
-    targetConversationId: string,
-    options?: EnsureGatewayBridgeConversationReadyOptions,
-  ) {
-    const requestedConversationId = targetConversationId.trim();
-    const baseMessageRef = options?.baseMessageRef;
-    const rebased = options?.rebased === true || Boolean(baseMessageRef);
-    if (!requestedConversationId) {
-      const nextIdentity = createConversationIdentity();
-      setConversationRuntimeCacheEntry(
-        conversationRuntimeCacheRef.current,
-        nextIdentity.conversationId,
-        createConversationRuntimeEntry({
-          state: createConversationStateFromContext({
-            tools: conversationState.meta.tools,
-            messages: [],
-          }),
-          sessionId: nextIdentity.sessionId,
-          createdAt: nextIdentity.createdAt,
-        }),
-      );
-      return nextIdentity.conversationId;
-    }
-
-    const knownConversation =
-      requestedConversationId === currentConversationIdRef.current ||
-      conversationRuntimeCacheRef.current.has(requestedConversationId) ||
-      Boolean(sidebarStore.peek(requestedConversationId)) ||
-      gatewayBridgeHistorySummaryRef.current.has(requestedConversationId);
-    if (isConversationRunning(requestedConversationId)) {
-      throw new Error(`Conversation is already running: ${requestedConversationId}`);
-    }
-
-    const cached = conversationRuntimeCacheRef.current.get(requestedConversationId);
-    if (
-      rebased &&
-      baseMessageRef &&
-      (cached || requestedConversationId === currentConversationIdRef.current) &&
-      cached?.isSending !== true &&
-      hydratingConversationIdRef.current !== requestedConversationId &&
-      hydrationFailedConversationIdRef.current !== requestedConversationId
-    ) {
-      try {
-        applyGatewayBridgeRebase(requestedConversationId, baseMessageRef);
-        return requestedConversationId;
-      } catch (error) {
-        console.warn("gateway edit_resend cached rebase failed; hydrating history", error);
-      }
-    }
-    if (rebased) {
-      persistedConversationStateRef.current.delete(requestedConversationId);
-    }
-    const isPendingHistoryItem = sidebarStore.peek(requestedConversationId)?.isPending === true;
-    const shouldHydrateFromHistory =
-      !knownConversation ||
-      rebased ||
-      hydratingConversationIdRef.current === requestedConversationId ||
-      hydrationFailedConversationIdRef.current === requestedConversationId ||
-      !cached ||
-      (!persistedConversationStateRef.current.has(requestedConversationId) &&
-        !cached.isSending &&
-        !isPendingHistoryItem);
-
-    if (!shouldHydrateFromHistory) {
-      if (rebased && baseMessageRef) {
-        applyGatewayBridgeRebase(requestedConversationId, baseMessageRef);
-      }
-      return requestedConversationId;
-    }
-
-    const record = await getChatHistory(requestedConversationId);
-    const nextEntry = createConversationRuntimeEntry({
-      state: record.state,
-      sessionId: record.sessionId ?? record.id,
-      createdAt: record.createdAt,
-      compactionStatus: cached?.compactionStatus,
-      isSending: cached?.isSending,
-      workdir: record.cwd,
-      selectedModel: normalizeSelectedModelForProviders(
-        parseSelectedModelJson(record.selectedModelJson),
-        settings.customProviders,
-      ),
-    });
-    const historySummary: ChatHistorySummary = {
-      id: record.id,
-      title: record.title,
-      providerId: record.providerId,
-      model: record.model,
-      sessionId: record.sessionId,
-      cwd: record.cwd,
-      selectedModelJson: record.selectedModelJson,
-      messageCount: record.state.meta.totalMessageCount,
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-      isPinned: record.isPinned,
-      pinnedAt: record.pinnedAt,
-    };
-    setConversationRuntimeCacheEntry(conversationRuntimeCacheRef.current, record.id, nextEntry);
-    persistedConversationStateRef.current.set(record.id, record.state);
-    gatewayBridgeHistorySummaryRef.current.set(record.id, historySummary);
-    sidebarStore.upsertLocal(historySummary);
-    if (currentConversationIdRef.current === record.id) {
-      syncVisibleConversationRuntime(record.id, nextEntry);
-    }
-    if (hydratingConversationIdRef.current === record.id) {
-      setHydratingConversationId(null);
-    }
-    if (hydrationFailedConversationIdRef.current === record.id) {
-      setHydrationFailedConversationId(null);
-    }
-    if (rebased && baseMessageRef) {
-      applyGatewayBridgeRebase(record.id, baseMessageRef);
-    }
-    return record.id;
-  }
-
-  ensureGatewayBridgeConversationReadyRef.current = ensureGatewayBridgeConversationReady;
 
   useEffect(() => {
     currentConversationIdRef.current = currentConversationId;
@@ -3681,18 +2919,6 @@ export function ChatPage(props: ChatPageProps) {
     setContext(currentRequestContext);
   }, [currentRequestContext, setContext]);
 
-  useGatewayBridgeListeners({
-    currentConversationIdRef,
-    conversationRuntimeCacheRef,
-    ensureGatewayBridgeConversationReadyRef,
-    sendActionRef,
-    queueGatewayBridgeEventForRequest,
-    shouldQueueGatewayChatRequest,
-    enqueueGatewayChatRequest,
-    isConversationRunning,
-    getConversationAbortController,
-  });
-
   const enableManagedSkills = useCallback(
     (names: readonly string[]) => {
       const normalizedNames = names.map((name) => String(name).trim()).filter(Boolean);
@@ -3715,9 +2941,7 @@ export function ChatPage(props: ChatPageProps) {
     workdirOverride?: string;
     selectedSystemToolIdsOverride?: SystemToolId[];
     runtimeControlsOverride?: ChatRuntimeControls;
-    gatewayBridgeRequestOverride?: ActiveGatewayBridgeRequest | null;
     preserveComposerOnStart?: boolean;
-    beforeRuntimeStart?: () => Promise<void>;
     afterInitialHistoryPersist?: () => Promise<void>;
     editResendBaseMessageRef?: HistoryMessageRef;
   }) {
@@ -3733,21 +2957,15 @@ export function ChatPage(props: ChatPageProps) {
         ? buildRuntimeEntryFromVisibleState()
         : null);
 
-    const gatewayBridgeRequest = overrides?.gatewayBridgeRequestOverride ?? null;
     const effectiveExecutionMode =
-      overrides?.executionModeOverride ??
-      gatewayBridgeRequest?.executionModeOverride ??
-      settings.system.executionMode;
+      overrides?.executionModeOverride ?? settings.system.executionMode;
     const effectiveIsAgentMode = isAgentExecutionMode(effectiveExecutionMode);
     const effectiveWorkdir = (
       overrides?.workdirOverride ??
-      gatewayBridgeRequest?.workdirOverride ??
       (effectiveIsAgentMode ? (runtimeEntry?.workdir ?? settings.system.workdir) : "")
     ).trim();
     const effectiveSelectedSystemToolIds =
-      overrides?.selectedSystemToolIdsOverride ??
-      gatewayBridgeRequest?.selectedSystemToolIdsOverride ??
-      settings.system.selectedSystemTools;
+      overrides?.selectedSystemToolIdsOverride ?? settings.system.selectedSystemTools;
     const effectiveProjectPathKey = workspaceProjectPathKey(effectiveWorkdir);
     const effectiveAssociatedSshHostIds = getSshProjectHostIds(
       settings.ssh,
@@ -3755,41 +2973,30 @@ export function ChatPage(props: ChatPageProps) {
     );
     const effectiveIsAgentDevExecutionMode = isAgentDevMode(effectiveExecutionMode);
     const effectiveSkillsEnabled = settings.skills.enabled && effectiveIsAgentMode;
-    const hasRemoteGatewayTarget =
-      settings.remote.enabled &&
-      settings.remote.gatewayUrl.trim() !== "" &&
-      settings.remote.token.trim() !== "";
-    const mirrorsLocalRunToGateway = !gatewayBridgeRequest && hasRemoteGatewayTarget;
-    const gatewayBridgeRequestId =
-      gatewayBridgeRequest?.requestId ?? createLocalGatewayChatRunId(conversationId);
-    const gatewayBridgeWorkerId =
-      gatewayBridgeRequest?.workerId ?? (mirrorsLocalRunToGateway ? "gui-live" : undefined);
-    const gatewayBridgeEvents = createGatewayBridgeEventController({
+    const conversationRunId = createConversationRunId(conversationId);
+    const conversationEvents = createConversationEventController({
       conversationId,
-      requestId: gatewayBridgeRequestId,
-      workerId: gatewayBridgeWorkerId,
-      enabled: Boolean(gatewayBridgeRequest) || hasRemoteGatewayTarget,
-      sendEvent: (requestId, event, options) => {
-        const result = queueGatewayBridgeEventForRequest(requestId, event, options);
-        void queueGatewayRuntimeSnapshot(conversationId);
+      requestId: conversationRunId,
+      enabled: desktopBridgeEnabled,
+      sendEvent: (requestId, event) => {
+        const result = queueConversationEventForRequest(requestId, event);
+        void queueConversationRuntimeSnapshot(conversationId);
         return result;
       },
-      resolveErrorConversationId: () =>
-        gatewayBridgeRequest?.conversationId ?? currentConversationIdRef.current,
+      resolveErrorConversationId: () => currentConversationIdRef.current,
     });
-    const updateGatewayBridgeToolStatus = (status: string | null, isCompaction = false) => {
-      gatewayBridgeEvents.queueToolStatus(status, isCompaction);
+    const updateConversationEventToolStatus = (status: string | null, isCompaction = false) => {
+      conversationEvents.queueToolStatus(status, isCompaction);
       updateToolStatus(status, transcriptStore);
-      const run = activeGatewayRuntimeRunsRef.current.get(conversationId);
+      const run = activeConversationRuntimeRunsRef.current.get(conversationId);
       if (run) {
         run.toolStatusIsCompaction = Boolean(status?.trim()) && isCompaction;
       }
-      void queueGatewayRuntimeSnapshot(conversationId);
+      void queueConversationRuntimeSnapshot(conversationId);
     };
-    // Mirrors the live retry-attempt list to remote WebUI clients alongside
-    // the local live-transcript update.
-    const updateGatewayBridgeRetryAttempts: typeof updateRetryAttempts = (attempts, store) => {
-      gatewayBridgeEvents.queueRetryAttempts(attempts);
+    // Mirrors the retry-attempt list to paired clients alongside the local transcript.
+    const updateConversationEventRetryAttempts: typeof updateRetryAttempts = (attempts, store) => {
+      conversationEvents.queueRetryAttempts(attempts);
       updateRetryAttempts(attempts, store);
     };
     const setConversationErrorState = (message: string | null) => {
@@ -3800,15 +3007,10 @@ export function ChatPage(props: ChatPageProps) {
     };
     if (!runtimeEntry) {
       const message = `Conversation runtime not found: ${conversationId}`;
-      gatewayBridgeEvents.emitError(message, conversationId);
+      conversationEvents.emitError(message, conversationId);
       throw new Error(message);
     }
     if (runtimeEntry.isSending) {
-      if (gatewayBridgeRequest) {
-        const message = "Conversation is already sending.";
-        gatewayBridgeEvents.emitError(message, conversationId);
-        gatewayBridgeEvents.close();
-      }
       return false;
     }
     if (isImportingPastedTextRef.current && typeof overrides?.textOverride !== "string") {
@@ -3817,13 +3019,13 @@ export function ChatPage(props: ChatPageProps) {
     if (hydratingConversationIdRef.current === conversationId) {
       const message = "当前会话仍在补全完整历史，请稍候。";
       setConversationErrorState(message);
-      gatewayBridgeEvents.emitError(message, conversationId);
+      conversationEvents.emitError(message, conversationId);
       return false;
     }
     if (hydrationFailedConversationIdRef.current === conversationId) {
       const message = "当前会话完整历史加载失败，请重新打开该会话后再继续。";
       setConversationErrorState(message);
-      gatewayBridgeEvents.emitError(message, conversationId);
+      conversationEvents.emitError(message, conversationId);
       return false;
     }
     if (runtimeEntry.compactionStatus.phase !== "idle") {
@@ -3839,12 +3041,11 @@ export function ChatPage(props: ChatPageProps) {
         settings,
         conversationSelectedModel:
           conversationRuntimeCacheRef.current.get(conversationId)?.selectedModel,
-        gatewaySelectedModel: gatewayBridgeRequest?.selectedModelOverride,
       });
     } catch (error) {
       const message = asErrorMessage(error, "当前模型配置不可用，请重新选择后重试。");
       setConversationErrorState(message);
-      gatewayBridgeEvents.emitError(message);
+      conversationEvents.emitError(message);
       return false;
     }
 
@@ -3852,10 +3053,7 @@ export function ChatPage(props: ChatPageProps) {
     updateConversationRuntimeEntry(conversationId, (prev) =>
       selectedModelsMatch(prev.selectedModel, selectedModel) ? prev : { ...prev, selectedModel },
     );
-    const runtimeControls =
-      gatewayBridgeRequest?.runtimeControlsOverride ??
-      overrides?.runtimeControlsOverride ??
-      settings.chatRuntimeControls;
+    const runtimeControls = overrides?.runtimeControlsOverride ?? settings.chatRuntimeControls;
     const providerConfig = buildProviderRuntimeConfig(provider, model, runtimeControls);
     const memorySummaryModelSelection = resolveMemorySummaryModelSelection(settings);
     const memoryExtractionModel = memorySummaryModelSelection
@@ -3931,8 +3129,8 @@ export function ChatPage(props: ChatPageProps) {
         const message = asErrorMessage(error, "大段粘贴内容导入工作区失败");
         setConversationErrorState(message);
         setErrorMessage(message);
-        gatewayBridgeEvents.emitError(message, conversationId);
-        gatewayBridgeEvents.close();
+        conversationEvents.emitError(message, conversationId);
+        conversationEvents.close();
         return false;
       } finally {
         isImportingPastedTextRef.current = false;
@@ -3942,11 +3140,6 @@ export function ChatPage(props: ChatPageProps) {
 
     const userMessage = createUserMessageWithUploads(text, uploadedFiles, Date.now());
     if (!userMessage) {
-      if (gatewayBridgeRequest) {
-        const message = "Message is required.";
-        gatewayBridgeEvents.emitError(message, conversationId);
-        gatewayBridgeEvents.close();
-      }
       return false;
     }
     const pendingUserMessage = userMessage;
@@ -3994,9 +3187,7 @@ export function ChatPage(props: ChatPageProps) {
     });
     const baseConversationState = runtimeEntry.state;
     const isFirstTurn = baseConversationState.meta.totalMessageCount === 0;
-    const existingHistoryItem =
-      sidebarStore.peek(conversationId) ??
-      gatewayBridgeHistorySummaryRef.current.get(conversationId);
+    const existingHistoryItem = sidebarStore.peek(conversationId);
     // Branched conversations start with the placeholder title; the first
     // prompt sent inside the branch regenerates it like a first turn would.
     const isBranchDefaultTitle =
@@ -4043,7 +3234,7 @@ export function ChatPage(props: ChatPageProps) {
         content,
         sidebarStore,
         titleJobRef,
-        gatewayBridgeEvents,
+        conversationEvents,
       });
     }
 
@@ -4067,27 +3258,23 @@ export function ChatPage(props: ChatPageProps) {
       pendingUserMessage,
     ]);
     let conversationRunStarted = false;
-    let gatewayRunStarted = false;
-    function acknowledgeGatewayRunStarted() {
-      if (gatewayRunStarted) {
+    let runtimeSnapshotStarted = false;
+    function startRuntimeSnapshot() {
+      if (runtimeSnapshotStarted || !desktopBridgeEnabled) {
         return;
       }
-      gatewayRunStarted = true;
-      if (gatewayBridgeRequest || hasRemoteGatewayTarget) {
-        const run = registerActiveGatewayRuntimeRun({
-          conversationId,
-          runId: gatewayBridgeRequestId,
-          clientRequestId: gatewayBridgeRequest?.clientRequestId,
-          workerId: gatewayBridgeWorkerId,
-          cwd: conversationCwd,
-          revision: 0,
-          state: "running",
-          userMessage: pendingUserMessage,
-          transcriptStore,
-          toolStatusIsCompaction: false,
-        });
-        void queueGatewayRuntimeSnapshotForRun(run, { state: "running", force: true });
-      }
+      runtimeSnapshotStarted = true;
+      const run = registerActiveConversationRuntimeRun({
+        conversationId,
+        runId: conversationRunId,
+        cwd: conversationCwd,
+        revision: 0,
+        state: "running",
+        userMessage: pendingUserMessage,
+        transcriptStore,
+        toolStatusIsCompaction: false,
+      });
+      void queueConversationRuntimeSnapshotForRun(run, { state: "running", force: true });
     }
     function markConversationRunStarted() {
       if (conversationRunStarted) {
@@ -4106,32 +3293,20 @@ export function ChatPage(props: ChatPageProps) {
         scrollFollowRef.current?.stickToBottom();
       }
     }
-    function markConversationRunStopped(state: GatewayRuntimeSnapshotState = "completed") {
+    function markConversationRunStopped(state: ConversationRuntimeSnapshotState = "completed") {
       if (!conversationRunStarted) {
         return;
       }
       setConversationAbortController(conversationId, null);
       setConversationSendingState(conversationId, false);
-      if (gatewayRunStarted) {
-        finishActiveGatewayRuntimeRun(conversationId, state);
+      if (runtimeSnapshotStarted) {
+        finishActiveConversationRuntimeRun(conversationId, state);
       }
     }
-    let localGatewayRunStarted = false;
-    async function markLocalGatewayRunStarted() {
-      if (!mirrorsLocalRunToGateway || localGatewayRunStarted) {
-        return;
-      }
-      await invoke("gateway_chat_mark_local_started", {
-        request_id: gatewayBridgeRequestId,
-        conversation_id: conversationId,
-      } as any);
-      localGatewayRunStarted = true;
-    }
-
     markConversationRunStarted();
     // Clear the composer in the same beat as the optimistic user bubble.
-    // Everything below until the runtime turn starts (gateway mark-started
-    // IPC, initial history persist, skills refresh, memory overview read) may
+    // Everything below until the runtime turn starts (initial history persist,
+    // skills refresh, memory overview read) may
     // await for seconds; the input box must not keep the sent text visible in
     // the meantime. Early-failure paths below restore the cleared draft.
     let composerClearedOnStart = false;
@@ -4173,30 +3348,9 @@ export function ChatPage(props: ChatPageProps) {
         setPendingUploadsForConversation(conversationId, clearedPendingUploads);
       }
     };
-    if (mirrorsLocalRunToGateway) {
-      try {
-        await markLocalGatewayRunStarted();
-      } catch (error) {
-        console.warn("gateway_chat_mark_local_started failed", error);
-      }
-    }
-    if (overrides?.beforeRuntimeStart) {
-      try {
-        await overrides.beforeRuntimeStart();
-      } catch (error) {
-        const message = asErrorMessage(error, "启动远程对话运行失败");
-        setConversationErrorState(message);
-        gatewayBridgeEvents.emitError(message, conversationId);
-        gatewayBridgeEvents.close();
-        markConversationRunStopped("failed");
-        restoreComposerOnStartFailure();
-        return false;
-      }
-    }
-
-    // Persist the user turn immediately so WebUI/GUI sidebars can surface the
-    // latest conversation before the assistant round finishes. The live runtime
-    // itself is mirrored through ChatRuntimeSnapshot, not history_sync.
+    // Persist the user turn immediately so all local-access clients can surface
+    // the conversation before the assistant round finishes. Live state is
+    // distributed independently through runtime snapshots.
     const initialPersist = persistConversationWithHistorySync({
       conversationId,
       sessionId,
@@ -4210,13 +3364,13 @@ export function ChatPage(props: ChatPageProps) {
       titlePromise,
       titleLookahead: true,
     });
-    if (overrides?.afterInitialHistoryPersist && !overrides.beforeRuntimeStart) {
+    if (overrides?.afterInitialHistoryPersist) {
       const persisted = await initialPersist;
       if (!persisted) {
         const message = "历史记录保存失败，已取消回滚与重发。";
         setConversationErrorState(message);
-        gatewayBridgeEvents.emitError(message, conversationId);
-        gatewayBridgeEvents.close();
+        conversationEvents.emitError(message, conversationId);
+        conversationEvents.close();
         markConversationRunStopped("failed");
         restoreComposerOnStartFailure();
         return true;
@@ -4226,8 +3380,8 @@ export function ChatPage(props: ChatPageProps) {
       } catch (error) {
         const message = asErrorMessage(error, "回滚历史失败");
         setConversationErrorState(message);
-        gatewayBridgeEvents.emitError(message, conversationId);
-        gatewayBridgeEvents.close();
+        conversationEvents.emitError(message, conversationId);
+        conversationEvents.close();
         markConversationRunStopped("failed");
         restoreComposerOnStartFailure();
         return true;
@@ -4252,19 +3406,10 @@ export function ChatPage(props: ChatPageProps) {
         });
       void initialPersistConfirmation;
     }
-    if (gatewayBridgeRequest || hasRemoteGatewayTarget) {
-      const persisted = await initialPersist.catch((error) => {
-        console.warn("initial conversation history persist before gateway stream failed", error);
-        return false;
-      });
-      if (!persisted) {
-        console.warn("gateway stream started before initial user turn was persisted");
-      }
-    }
-    await gatewayBridgeEvents.queueUserMessage(text, uploadedFiles, {
+    await conversationEvents.queueUserMessage(text, uploadedFiles, {
       baseMessageRef: overrides?.editResendBaseMessageRef,
     });
-    acknowledgeGatewayRunStarted();
+    startRuntimeSnapshot();
     let skillsPrompt = "";
     let memoryPrompt = "";
     let skillsRootDirForTools = skillsRootDir;
@@ -4344,8 +3489,8 @@ export function ChatPage(props: ChatPageProps) {
             ...prev,
             compactionStatus: status,
           })),
-        setBridgeToolStatus: updateGatewayBridgeToolStatus,
-        queueCheckpoint: (state) => gatewayBridgeEvents.queueCheckpoint(state),
+        setLiveToolStatus: updateConversationEventToolStatus,
+        queueCheckpoint: (state) => conversationEvents.queueCheckpoint(state),
         persist: (state) =>
           persistConversation({
             conversationId,
@@ -4405,8 +3550,8 @@ export function ChatPage(props: ChatPageProps) {
       if (missing.length > 0) {
         const message = `找不到以下 Skills：${missing.join(", ")}（请先重新扫描固定 Skills 目录）`;
         setConversationErrorState(message);
-        gatewayBridgeEvents.emitError(message, conversationId);
-        gatewayBridgeEvents.close();
+        conversationEvents.emitError(message, conversationId);
+        conversationEvents.close();
         markConversationRunStopped("failed");
         restoreComposerOnStartFailure();
         return true;
@@ -4453,7 +3598,7 @@ export function ChatPage(props: ChatPageProps) {
     }
 
     const hookScope = createHookRunScope({
-      hooks: getAutomationState().hooks.hooks,
+      hooks: desktopBridgeEnabled ? getAutomationState().hooks.hooks : [],
       conversationId,
       workdir: effectiveWorkdir,
       onWarning: (warning) => {
@@ -4568,7 +3713,7 @@ export function ChatPage(props: ChatPageProps) {
       resetLiveTranscript(transcriptStore);
     }
 
-    let gatewayRuntimeFinalState: GatewayRuntimeSnapshotState = "completed";
+    let conversationRuntimeFinalState: ConversationRuntimeSnapshotState = "completed";
     try {
       if (effectiveIsAgentMode) {
         await chatRuntimeHost.runTurn({
@@ -4601,24 +3746,17 @@ export function ChatPage(props: ChatPageProps) {
             },
             agentTemplates: settings.agents,
             selectedSystemToolIds: effectiveSelectedSystemToolIds,
+            cloudExecution: settings.access,
+            nativeMobileRuntime: !desktopBridgeEnabled,
             getMcpSettings,
             applyMcpOps: (ops) => {
               setSettings((prev) => applyMcpOpsToAppSettings(prev, ops));
             },
-            remoteWebTunnelsEnabled: settings.remote.enableWebTunnels,
-            tunnelPublicBaseUrl: settings.remote.gatewayUrl.trim(),
             sshHosts: settings.ssh.hosts,
             associatedSshHostIds: effectiveAssociatedSshHostIds,
-            sshManagerRemoteAllowed:
-              !gatewayBridgeRequest || settings.remote.enableWebSshTerminal === true,
             onSshSessionsChanged: (change) => {
               if (change.action === "create") {
                 ensureSshTunnelToolTab(change.projectPathKey);
-              }
-            },
-            onTunnelsChanged: (change) => {
-              if (change.action === "create") {
-                ensureTunnelToolTab(change.projectPathKey);
               }
             },
             sessionId,
@@ -4628,10 +3766,12 @@ export function ChatPage(props: ChatPageProps) {
             createdAt,
             titlePromise,
             transcriptStore,
-            gatewayBridgeEvents,
+            conversationEvents,
             hookLifecycle,
             conversationDebugLogger,
-            subagentStore: subagentStoresRef.current.get(conversationId),
+            subagentStore: desktopBridgeEnabled
+              ? subagentStoresRef.current.get(conversationId)
+              : undefined,
             getNextConversationState: () => nextConversationState,
             applyConversationState,
             buildPreparedContext,
@@ -4640,7 +3780,7 @@ export function ChatPage(props: ChatPageProps) {
             resetLiveTranscript,
             batchLiveRoundsUpdate,
             updateToolStatus,
-            updateRetryAttempts: updateGatewayBridgeRetryAttempts,
+            updateRetryAttempts: updateConversationEventRetryAttempts,
             updatePersistableAgentProgress: (progress) => {
               persistableAgentProgress = progress;
             },
@@ -4677,7 +3817,7 @@ export function ChatPage(props: ChatPageProps) {
             createdAt,
             titlePromise,
             transcriptStore,
-            gatewayBridgeEvents,
+            conversationEvents,
             hookLifecycle,
             conversationDebugLogger,
             recoveryDebugLogger,
@@ -4689,8 +3829,8 @@ export function ChatPage(props: ChatPageProps) {
             resetLiveTranscript,
             appendDraftAssistantText,
             batchLiveRoundsUpdate,
-            updateGatewayBridgeToolStatus,
-            updateRetryAttempts: updateGatewayBridgeRetryAttempts,
+            updateConversationEventToolStatus,
+            updateRetryAttempts: updateConversationEventRetryAttempts,
             commitVisibleAbortedConversation,
             updateConversationRuntimeEntry,
             persistConversationWithHistorySync,
@@ -4699,12 +3839,12 @@ export function ChatPage(props: ChatPageProps) {
       }
     } catch (err) {
       const aborted = cancellation.userStop.signal.aborted || isAbortLikeError(err);
-      gatewayRuntimeFinalState = aborted ? "cancelled" : "failed";
+      conversationRuntimeFinalState = aborted ? "cancelled" : "failed";
       const remoteErrorMessage = aborted
         ? "Cancelled"
         : (err instanceof Error ? err.message : String(err)) || "Request failed";
-      gatewayBridgeEvents.emitError(remoteErrorMessage, conversationId);
-      gatewayBridgeEvents.close();
+      conversationEvents.emitError(remoteErrorMessage, conversationId);
+      conversationEvents.close();
       if (aborted) {
         hookScope.cancel();
         const rolledBack = await compaction.handleTurnAbort();
@@ -4726,7 +3866,7 @@ export function ChatPage(props: ChatPageProps) {
       hookLifecycle.endAgent();
       hookScope.close();
       clearAbortSnapshot(transcriptStore);
-      markConversationRunStopped(gatewayRuntimeFinalState);
+      markConversationRunStopped(conversationRuntimeFinalState);
       pruneIdleConversationCaches([conversationId]);
       requestQueuedChatTurnProcessing(conversationId);
     }
@@ -4754,7 +3894,10 @@ export function ChatPage(props: ChatPageProps) {
     startNewConversationActionRef.current({
       workdir: isAgentMode ? activeWorkspaceProjectPath || undefined : undefined,
     });
-  }, [activeWorkspaceProjectPath, isAgentMode, openController]);
+    if (compactViewport) {
+      setSidebarOpen(false);
+    }
+  }, [activeWorkspaceProjectPath, compactViewport, isAgentMode, openController]);
 
   const handleSelectConversation = useCallback(
     (id: string) => {
@@ -4765,362 +3908,20 @@ export function ChatPage(props: ChatPageProps) {
       prepareComposerForConversationChange();
       openController.open(targetConversationId);
       restoreCachedComposerDraft(targetConversationId);
+      if (compactViewport) {
+        setSidebarOpen(false);
+      }
     },
-    [openController],
+    [compactViewport, openController],
   );
 
-  const setSharedHistoryItemsState = useCallback((items: ChatHistorySummary[]) => {
-    const nextItems = sortSidebarConversations(items.map((item) => ({ ...item, isShared: true })));
-    sharedHistoryItemsRef.current = nextItems;
-    setSharedHistoryItems(nextItems);
-  }, []);
-
-  // Called by the sidebar container after the store confirmed a deletion:
-  // evict local caches, replace the visible conversation when it was the
-  // deleted one, and drop the row from the shared-history list.
+  // Called by the sidebar container after the store confirmed a deletion so
+  // local runtime caches and the visible conversation stay consistent.
   const handleConversationDeleted = useCallback(
     (id: string) => {
       cleanupDeletedConversationActionRef.current(id);
-      setSharedHistoryItemsState(sharedHistoryItemsRef.current.filter((item) => item.id !== id));
-    },
-    [setSharedHistoryItemsState],
-  );
-
-  const updateSharedManagerIdSet = useCallback(
-    (
-      setter: (updater: (current: ReadonlySet<string>) => ReadonlySet<string>) => void,
-      id: string,
-      enabled: boolean,
-    ) => {
-      setter((current) => {
-        const next = new Set(current);
-        if (enabled) {
-          next.add(id);
-        } else {
-          next.delete(id);
-        }
-        return next;
-      });
     },
     [],
-  );
-
-  const setSharedManagerError = useCallback((id: string, message: string | null) => {
-    setSharedManagerErrors((current) => {
-      const next = { ...current };
-      if (message) {
-        next[id] = message;
-      } else {
-        delete next[id];
-      }
-      return next;
-    });
-  }, []);
-
-  const refreshSharedHistoryItems = useCallback(async () => {
-    if (sharedHistoryListRequestRef.current) {
-      return sharedHistoryListRequestRef.current;
-    }
-
-    const request = (async () => {
-      const byId = new Map<string, ChatHistorySummary>();
-      let totalCount = 0;
-      for (let pageNumber = 1; ; pageNumber += 1) {
-        const page = await listSharedChatHistory(pageNumber, SHARED_HISTORY_LIST_PAGE_SIZE);
-        totalCount = Math.max(0, page.totalCount);
-        for (const item of page.items) {
-          byId.set(item.id, { ...item, isShared: true });
-        }
-        if (page.items.length === 0 || byId.size >= totalCount) {
-          break;
-        }
-      }
-
-      const nextItems = Array.from(byId.values());
-      setSharedHistoryItemsState(nextItems);
-      return sortSidebarConversations(nextItems);
-    })();
-
-    sharedHistoryListRequestRef.current = request;
-    try {
-      return await request;
-    } catch (error) {
-      setErrorMessage(asErrorMessage(error, "读取已分享历史列表失败"));
-      return sharedHistoryItemsRef.current;
-    } finally {
-      if (sharedHistoryListRequestRef.current === request) {
-        sharedHistoryListRequestRef.current = null;
-      }
-    }
-  }, [setSharedHistoryItemsState]);
-
-  useEffect(() => {
-    void refreshSharedHistoryItems();
-  }, [refreshSharedHistoryItems]);
-
-  const markSharedConversation = useCallback(
-    (id: string, isShared: boolean, source?: ChatHistorySummary | null) => {
-      const existing = sidebarStore.peek(id);
-      if (existing && existing.isShared !== isShared) {
-        sidebarStore.upsertLocal({ ...existing, isShared });
-      }
-      if (!isShared) {
-        setSharedHistoryItemsState(sharedHistoryItemsRef.current.filter((item) => item.id !== id));
-        return;
-      }
-
-      const conversation =
-        source ??
-        sidebarStore.peek(id) ??
-        sharedHistoryItemsRef.current.find((item) => item.id === id);
-      if (!conversation) {
-        return;
-      }
-      setSharedHistoryItemsState([
-        { ...conversation, isShared: true },
-        ...sharedHistoryItemsRef.current.filter((item) => item.id !== id),
-      ]);
-    },
-    [setSharedHistoryItemsState, sidebarStore],
-  );
-
-  const handleLoadSharedHistoryStatus = useCallback(
-    (conversation: ChatHistorySummary) => {
-      const id = conversation.id.trim();
-      if (!id) {
-        return;
-      }
-      setSharedManagerError(id, null);
-      updateSharedManagerIdSet(setSharedManagerLoadingIds, id, true);
-      void getChatHistoryShare(id)
-        .then((status) => {
-          setSharedManagerStatuses((current) => ({ ...current, [id]: status }));
-          markSharedConversation(id, status.enabled === true, conversation);
-        })
-        .catch((error) => {
-          setSharedManagerError(id, asErrorMessage(error, "读取分享状态失败"));
-        })
-        .finally(() => {
-          updateSharedManagerIdSet(setSharedManagerLoadingIds, id, false);
-        });
-    },
-    [markSharedConversation, setSharedManagerError, updateSharedManagerIdSet],
-  );
-
-  const refreshSharedManagerGatewayUrl = useCallback(() => {
-    setSharedManagerGatewayUrlLoading(true);
-    void invoke<GatewayRuntimeStatus>("gateway_status")
-      .then((status) => {
-        setRemoteRuntimeStatus(status);
-        setSharedManagerGatewayUrl(status.gatewayUrl?.trim() ?? "");
-      })
-      .catch(() => {
-        setSharedManagerGatewayUrl("");
-      })
-      .finally(() => {
-        setSharedManagerGatewayUrlLoading(false);
-      });
-  }, []);
-
-  const handleOpenShareModal = useCallback(
-    (conversation: ChatHistorySummary) => {
-      const id = conversation.id.trim();
-      if (!id) {
-        return;
-      }
-
-      setShareConversation(conversation);
-      setShareStatus(null);
-      setShareError(null);
-      setShareLoading(false);
-      setShareUpdating(false);
-      setSharedManagerGatewayUrl(
-        remoteRuntimeStatus.gatewayUrl?.trim() || settings.remote.gatewayUrl.trim(),
-      );
-      refreshSharedManagerGatewayUrl();
-
-      if (!canShareHistory) {
-        setShareError("Remote 尚未配置并连接成功，暂时不能分享会话。");
-        return;
-      }
-
-      setShareLoading(true);
-      void getChatHistoryShare(id)
-        .then((status) => {
-          setShareStatus(status);
-          setSharedManagerStatuses((current) => ({ ...current, [id]: status }));
-          setSharedManagerError(id, null);
-          markSharedConversation(id, status.enabled === true, conversation);
-        })
-        .catch((error) => {
-          setShareError(asErrorMessage(error, "读取分享状态失败"));
-        })
-        .finally(() => {
-          setShareLoading(false);
-        });
-    },
-    [
-      canShareHistory,
-      markSharedConversation,
-      refreshSharedManagerGatewayUrl,
-      remoteRuntimeStatus.gatewayUrl,
-      setSharedManagerError,
-      settings.remote.gatewayUrl,
-    ],
-  );
-
-  const handleCloseShareModal = useCallback(() => {
-    setShareConversation(null);
-    setShareStatus(null);
-    setShareError(null);
-    setShareLoading(false);
-    setShareUpdating(false);
-  }, []);
-
-  const handleToggleHistoryShare = useCallback(
-    (enabled: boolean, options?: { redactToolContent?: boolean }) => {
-      const id = shareConversation?.id.trim() ?? "";
-      if (!id) {
-        return;
-      }
-      if (enabled && !canShareHistory) {
-        setShareError("Remote 尚未配置并连接成功，暂时不能开启分享。");
-        return;
-      }
-
-      setShareError(null);
-      setSharedManagerError(id, null);
-      setShareUpdating(true);
-      if (enabled) {
-        refreshSharedManagerGatewayUrl();
-      }
-
-      void setChatHistoryShare(id, enabled, options)
-        .then((status) => {
-          setShareStatus(status);
-          setSharedManagerStatuses((current) => ({ ...current, [id]: status }));
-          markSharedConversation(id, status.enabled === true, shareConversation);
-          setShareConversation((current) =>
-            current?.id === id ? { ...current, isShared: status.enabled === true } : current,
-          );
-        })
-        .catch((error) => {
-          setShareError(asErrorMessage(error, enabled ? "开启分享失败" : "关闭分享失败"));
-        })
-        .finally(() => {
-          setShareUpdating(false);
-        });
-    },
-    [
-      canShareHistory,
-      markSharedConversation,
-      refreshSharedManagerGatewayUrl,
-      setSharedManagerError,
-      shareConversation,
-    ],
-  );
-
-  const handleSetShareRedactToolContent = useCallback(
-    (redactToolContent: boolean) => {
-      const id = shareConversation?.id.trim() ?? "";
-      if (!id) {
-        return;
-      }
-
-      setShareError(null);
-      setSharedManagerError(id, null);
-      setShareUpdating(true);
-
-      void setChatHistoryShare(id, true, { redactToolContent })
-        .then((status) => {
-          setShareStatus(status);
-          setSharedManagerStatuses((current) => ({ ...current, [id]: status }));
-          markSharedConversation(id, status.enabled === true, shareConversation);
-        })
-        .catch((error) => {
-          setShareError(asErrorMessage(error, "更新分享脱敏设置失败"));
-        })
-        .finally(() => {
-          setShareUpdating(false);
-        });
-    },
-    [markSharedConversation, setSharedManagerError, shareConversation],
-  );
-
-  const handleRefreshSharedHistoryStatuses = useCallback(() => {
-    refreshSharedManagerGatewayUrl();
-    void refreshSharedHistoryItems().then((items) => {
-      items.forEach(handleLoadSharedHistoryStatus);
-    });
-  }, [handleLoadSharedHistoryStatus, refreshSharedHistoryItems, refreshSharedManagerGatewayUrl]);
-
-  const handleOpenSharedHistoryManager = useCallback(() => {
-    setSharedManagerGatewayUrl(settings.remote.gatewayUrl.trim());
-    refreshSharedManagerGatewayUrl();
-    setSharedManagerOpen(true);
-    void refreshSharedHistoryItems().then((items) => {
-      items.forEach(handleLoadSharedHistoryStatus);
-    });
-  }, [
-    handleLoadSharedHistoryStatus,
-    refreshSharedHistoryItems,
-    refreshSharedManagerGatewayUrl,
-    settings.remote.gatewayUrl,
-  ]);
-
-  const handleDisableSharedHistory = useCallback(
-    (conversation: ChatHistorySummary) => {
-      const id = conversation.id.trim();
-      if (!id) {
-        return;
-      }
-      setSharedManagerError(id, null);
-      updateSharedManagerIdSet(setSharedManagerUpdatingIds, id, true);
-      void setChatHistoryShare(id, false)
-        .then((status) => {
-          setSharedManagerStatuses((current) => ({ ...current, [id]: status }));
-          markSharedConversation(id, status.enabled === true, conversation);
-        })
-        .catch((error) => {
-          setSharedManagerError(id, asErrorMessage(error, "关闭分享失败"));
-        })
-        .finally(() => {
-          updateSharedManagerIdSet(setSharedManagerUpdatingIds, id, false);
-        });
-    },
-    [markSharedConversation, setSharedManagerError, updateSharedManagerIdSet],
-  );
-
-  const handleSetSharedHistoryRedactToolContent = useCallback(
-    (conversation: ChatHistorySummary, redactToolContent: boolean) => {
-      const id = conversation.id.trim();
-      if (!id) {
-        return;
-      }
-
-      setSharedManagerError(id, null);
-      updateSharedManagerIdSet(setSharedManagerUpdatingIds, id, true);
-      void setChatHistoryShare(id, true, { redactToolContent })
-        .then((status) => {
-          setSharedManagerStatuses((current) => ({ ...current, [id]: status }));
-          markSharedConversation(id, status.enabled === true, conversation);
-          if (shareConversation?.id === id) {
-            setShareStatus(status);
-          }
-        })
-        .catch((error) => {
-          setSharedManagerError(id, asErrorMessage(error, "更新分享脱敏设置失败"));
-        })
-        .finally(() => {
-          updateSharedManagerIdSet(setSharedManagerUpdatingIds, id, false);
-        });
-    },
-    [
-      markSharedConversation,
-      setSharedManagerError,
-      shareConversation?.id,
-      updateSharedManagerIdSet,
-    ],
   );
 
   const handleSend = useCallback(() => {
@@ -5443,11 +4244,17 @@ export function ChatPage(props: ChatPageProps) {
           recentCollapsed={settings.customSettings.chatSidebar.recentCollapsed}
           onProjectsCollapsedChange={handleSidebarProjectsCollapsedChange}
           onRecentCollapsedChange={handleSidebarRecentCollapsedChange}
-          onCreateProject={handleOpenCreateWorkspaceProject}
+          onCreateProject={
+            desktopBridgeEnabled ? handleOpenCreateWorkspaceProject : undefined
+          }
           onSelectProject={handleSelectWorkspaceProject}
           onNewConversationForProject={handleNewConversationForProject}
-          onBrowseProjectInFileTree={handleBrowseWorkspaceProjectInFileTree}
-          onBrowseProjectInSystemFileManager={handleBrowseWorkspaceProjectInSystemFileManager}
+          onBrowseProjectInFileTree={
+            desktopBridgeEnabled ? handleBrowseWorkspaceProjectInFileTree : undefined
+          }
+          onBrowseProjectInSystemFileManager={
+            desktopBridgeEnabled ? handleBrowseWorkspaceProjectInSystemFileManager : undefined
+          }
           onStartRenamingProject={handleStartRenamingWorkspaceProject}
           onProjectRenameDraftChange={setProjectRenameDraft}
           onCommitProjectRename={handleCommitWorkspaceProjectRename}
@@ -5469,10 +4276,6 @@ export function ChatPage(props: ChatPageProps) {
             handleSelectConversation(id);
           }}
           onConversationDeleted={handleConversationDeleted}
-          canShareConversations={canShareHistory}
-          sharedConversationCount={sharedHistoryItems.length}
-          onShareConversation={handleOpenShareModal}
-          onOpenSharedConversations={handleOpenSharedHistoryManager}
           onCloseSidebar={handleCloseSidebar}
           onOpenSettings={() => onOpenSettings()}
           appUpdate={appUpdate}
@@ -5487,38 +4290,6 @@ export function ChatPage(props: ChatPageProps) {
             setActiveView("mcp-hub");
           }}
         />
-
-        {shareConversation ? (
-          <HistoryShareModal
-            conversation={shareConversation}
-            share={shareStatus}
-            isLoading={shareLoading}
-            isUpdating={shareUpdating}
-            errorMessage={shareError}
-            shareOrigin={sharedManagerShareOrigin}
-            shareOriginLoading={sharedManagerGatewayUrlLoading}
-            onToggle={handleToggleHistoryShare}
-            onRedactToolContentChange={handleSetShareRedactToolContent}
-            onClose={handleCloseShareModal}
-          />
-        ) : null}
-
-        {sharedManagerOpen ? (
-          <SharedHistoryManagerModal
-            conversations={sharedHistoryItems}
-            statuses={sharedManagerStatuses}
-            loadingIds={sharedManagerLoadingIds}
-            updatingIds={sharedManagerUpdatingIds}
-            errors={sharedManagerErrors}
-            shareOrigin={sharedManagerShareOrigin}
-            shareOriginLoading={sharedManagerGatewayUrlLoading}
-            onRefresh={handleRefreshSharedHistoryStatuses}
-            onLoadStatus={handleLoadSharedHistoryStatus}
-            onDisableShare={handleDisableSharedHistory}
-            onSetRedactToolContent={handleSetSharedHistoryRedactToolContent}
-            onClose={() => setSharedManagerOpen(false)}
-          />
-        ) : null}
 
         {confirmDialog}
 
@@ -5585,6 +4356,7 @@ export function ChatPage(props: ChatPageProps) {
                   onToggleTheme={onToggleTheme}
                   onOpenSidebar={handleOpenSidebar}
                   trailingActions={
+                    desktopBridgeEnabled ? (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -5611,6 +4383,7 @@ export function ChatPage(props: ChatPageProps) {
                         </span>
                       ) : null}
                     </Button>
+                    ) : null
                   }
                 />
                 <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
@@ -5620,7 +4393,7 @@ export function ChatPage(props: ChatPageProps) {
                 <ChatTranscript
                   conversationId={currentConversationId}
                   workspaceRoot={currentConversationWorkspaceRoot}
-                  gitClient={tauriGitClient}
+                  gitClient={desktopBridgeEnabled ? tauriGitClient : null}
                   followRef={scrollFollowRef}
                   hasModels={hasModels}
                   historyItems={historyRenderItems}
@@ -5659,8 +4432,10 @@ export function ChatPage(props: ChatPageProps) {
                 chatRuntimeControls={chatRuntimeControlsForCurrentProvider}
                 reasoningOptions={chatRuntimeReasoningOptions}
                 thinkingAlwaysOn={chatRuntimeThinkingAlwaysOn}
-                gitClient={tauriGitClient}
-                workspaceActivityClient={tauriWorkspaceActivityClient}
+                gitClient={desktopBridgeEnabled ? tauriGitClient : null}
+                workspaceActivityClient={
+                  desktopBridgeEnabled ? tauriWorkspaceActivityClient : null
+                }
                 onSend={handleSend}
                 onStop={handleStopSending}
                 onComposerBusyChange={handleComposerBusyChange}
@@ -5795,7 +4570,7 @@ export function ChatPage(props: ChatPageProps) {
             />
           </Suspense>
         ) : null}
-        {workspaceSshTerminalMounted ? (
+        {desktopBridgeEnabled && workspaceSshTerminalMounted ? (
           <Suspense
             fallback={
               <div className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl">
@@ -5819,7 +4594,7 @@ export function ChatPage(props: ChatPageProps) {
           </Suspense>
         ) : null}
       </div>
-      <RightDockPanel
+      {desktopBridgeEnabled ? <RightDockPanel
         isOpen={activeView === "chat" && rightDockOpen}
         collapseImmediately={activeView !== "chat"}
         fontScale={settings.customSettings.fontScale.rightDock}
@@ -5837,10 +4612,6 @@ export function ChatPage(props: ChatPageProps) {
         client={tauriTerminalClient}
         gitClient={tauriGitClient}
         gitWriteEnabled
-        tunnelClient={isAgentMode ? tauriTunnelClient : null}
-        tunnelEnabled={tunnelEnabled}
-        tunnelDisabledMessage={tunnelDisabledMessage}
-        tunnelPublicBaseUrl={settings.remote.gatewayUrl.trim()}
         workspaceActivityClient={tauriWorkspaceActivityClient}
         onWidthChange={handleRightDockWidthChange}
         onProjectStateChange={handleRightDockProjectStateChange}
@@ -5855,7 +4626,7 @@ export function ChatPage(props: ChatPageProps) {
         onInsertCodeReviewSkill={codeReviewSkill ? handleRightDockInsertCodeReviewSkill : undefined}
         onInsertCommitMention={handleRightDockInsertCommitMention}
         onInsertGitFileMention={handleRightDockInsertGitFileMention}
-      />
+      /> : null}
     </div>
   );
 }

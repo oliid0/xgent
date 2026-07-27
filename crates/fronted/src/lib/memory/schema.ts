@@ -1,7 +1,7 @@
 // Single source of truth for the memory domain: enums, decision shapes, and
 // the confidence contract. Every layer (extraction, organizer, MemoryManager
-// tool, settings panels, gateway web mirror) derives from this module —
-// nothing else may re-declare these unions.
+// tool, and settings panels) derives from this module; nothing else may
+// re-declare these unions.
 //
 // NOTE: contract ENFORCEMENT lives in Rust (mutations/evidence.rs). The
 // constants here exist so prompts, tool descriptions, and tests state the same

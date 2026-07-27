@@ -91,7 +91,6 @@ function sameSidebarConversation(left: SidebarConversation, right: SidebarConver
     left.updatedAt === right.updatedAt &&
     left.isPinned === right.isPinned &&
     left.pinnedAt === right.pinnedAt &&
-    left.isShared === right.isShared &&
     left.selectedModelJson === right.selectedModelJson &&
     left.isPending === right.isPending
   );
@@ -121,7 +120,6 @@ export function mergeSidebarConversation(
     cwd: mergeOptionalText(next.cwd, existing.cwd),
     isPinned: next.isPinned ?? existing.isPinned,
     pinnedAt: "pinnedAt" in next ? next.pinnedAt : existing.pinnedAt,
-    isShared: next.isShared ?? existing.isShared,
     selectedModelJson: mergeOptionalText(next.selectedModelJson, existing.selectedModelJson),
     isPending: next.isPending === true ? true : undefined,
   };

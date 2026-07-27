@@ -24,13 +24,10 @@ function provider(overrides = {}) {
 }
 
 function appSettings(customProviders, selectedModel) {
-  return settings.normalizeSettings({
-    customProviders,
-    selectedModel,
-  });
+  return settings.normalizeSettings({ customProviders, selectedModel });
 }
 
-test("local chat model selection resolves only an enabled selected model", () => {
+test("chat model selection resolves an enabled selected model", () => {
   const app = appSettings(
     [provider({ id: "openai-main", models: ["gpt-5", "gpt-5-mini"] })],
     { customProviderId: "openai-main", model: "gpt-5" },
@@ -44,98 +41,6 @@ test("local chat model selection resolves only an enabled selected model", () =>
   assert.deepEqual(resolved.selectedModel, {
     customProviderId: "openai-main",
     model: "gpt-5",
-  });
-});
-
-test("remote chat model selection does not fall back to another provider with the same type", () => {
-  const app = appSettings(
-    [
-      provider({ id: "openai-main", models: ["gpt-5"] }),
-      provider({ id: "openai-backup", models: ["gpt-5-mini"] }),
-    ],
-    { customProviderId: "openai-main", model: "gpt-5" },
-  );
-
-  assert.throws(
-    () =>
-      modelSelection.resolveEffectiveChatModelSelection({
-        settings: app,
-        gatewaySelectedModel: {
-          customProviderId: "missing-openai",
-          model: "gpt-5-mini",
-          providerType: "codex",
-        },
-      }),
-    /供应商不存在/,
-  );
-});
-
-test("remote chat model selection rejects provider type drift", () => {
-  const app = appSettings(
-    [provider({ id: "anthropic-main", type: "claude_code", models: ["claude-sonnet"] })],
-    { customProviderId: "anthropic-main", model: "claude-sonnet" },
-  );
-
-  assert.throws(
-    () =>
-      modelSelection.resolveEffectiveChatModelSelection({
-        settings: app,
-        gatewaySelectedModel: {
-          customProviderId: "anthropic-main",
-          model: "claude-sonnet",
-          providerType: "codex",
-        },
-      }),
-    /供应商类型.*不一致/,
-  );
-});
-
-test("remote chat model selection rejects models that are no longer enabled", () => {
-  const app = appSettings(
-    [
-      provider({
-        id: "openai-main",
-        models: ["gpt-5", "gpt-5-mini"],
-        activeModels: ["gpt-5"],
-      }),
-    ],
-    { customProviderId: "openai-main", model: "gpt-5" },
-  );
-
-  assert.throws(
-    () =>
-      modelSelection.resolveEffectiveChatModelSelection({
-        settings: app,
-        gatewaySelectedModel: {
-          customProviderId: "openai-main",
-          model: "gpt-5-mini",
-          providerType: "codex",
-        },
-      }),
-    /未在桌面端启用/,
-  );
-});
-
-test("remote chat model selection accepts an exact enabled provider model", () => {
-  const app = appSettings(
-    [provider({ id: "gemini-main", type: "gemini", models: ["gemini-3.5-flash"] })],
-    { customProviderId: "gemini-main", model: "gemini-3.5-flash" },
-  );
-
-  const resolved = modelSelection.resolveEffectiveChatModelSelection({
-    settings: app,
-    gatewaySelectedModel: {
-      customProviderId: "gemini-main",
-      model: "gemini-3.5-flash",
-      providerType: "gemini",
-    },
-  });
-
-  assert.equal(resolved.provider.id, "gemini-main");
-  assert.equal(resolved.providerId, "gemini");
-  assert.deepEqual(resolved.selectedModel, {
-    customProviderId: "gemini-main",
-    model: "gemini-3.5-flash",
   });
 });
 
@@ -155,39 +60,13 @@ test("conversation selection wins over the global default", () => {
 
   assert.equal(resolved.provider.id, "anthropic-main");
   assert.equal(resolved.providerId, "claude_code");
-  assert.deepEqual(resolved.selectedModel, {
-    customProviderId: "anthropic-main",
-    model: "claude-fable-5",
-  });
 });
 
-test("gateway override wins over the conversation selection", () => {
+test("invalid provider and disabled model selections are rejected", () => {
   const app = appSettings(
-    [
-      provider({ id: "openai-main", models: ["gpt-5"] }),
-      provider({ id: "gemini-main", type: "gemini", models: ["gemini-3.5-flash"] }),
-    ],
+    [provider({ id: "openai-main", models: ["gpt-5", "gpt-5-mini"], activeModels: ["gpt-5"] })],
     { customProviderId: "openai-main", model: "gpt-5" },
   );
-
-  const resolved = modelSelection.resolveEffectiveChatModelSelection({
-    settings: app,
-    conversationSelectedModel: { customProviderId: "openai-main", model: "gpt-5" },
-    gatewaySelectedModel: {
-      customProviderId: "gemini-main",
-      model: "gemini-3.5-flash",
-      providerType: "gemini",
-    },
-  });
-
-  assert.equal(resolved.provider.id, "gemini-main");
-});
-
-test("invalid conversation selection throws like an invalid default", () => {
-  const app = appSettings([provider({ id: "openai-main", models: ["gpt-5"] })], {
-    customProviderId: "openai-main",
-    model: "gpt-5",
-  });
 
   assert.throws(
     () =>
@@ -197,10 +76,18 @@ test("invalid conversation selection throws like an invalid default", () => {
       }),
     /供应商不存在/,
   );
+  assert.throws(
+    () =>
+      modelSelection.resolveEffectiveChatModelSelection({
+        settings: app,
+        conversationSelectedModel: { customProviderId: "openai-main", model: "gpt-5-mini" },
+      }),
+    /模型尚未启用/,
+  );
 });
 
 test("resolveActiveModelSelection prefers the conversation selection", () => {
-  const app = appSettings([provider({ id: "openai-main", models: ["gpt-5"] })], {
+  const app = appSettings([provider({ id: "openai-main" })], {
     customProviderId: "openai-main",
     model: "gpt-5",
   });
@@ -210,13 +97,10 @@ test("resolveActiveModelSelection prefers the conversation selection", () => {
     modelSelection.resolveActiveModelSelection(app, conversationSelection),
     conversationSelection,
   );
-  assert.deepEqual(modelSelection.resolveActiveModelSelection(app, undefined), {
-    customProviderId: "openai-main",
-    model: "gpt-5",
-  });
+  assert.deepEqual(modelSelection.resolveActiveModelSelection(app, undefined), app.selectedModel);
 });
 
-test("history persistence prefers the latest runtime selection over the turn-start model", () => {
+test("history persistence prefers the latest runtime selection", () => {
   const turnSelectedModel = { customProviderId: "openai-main", model: "gpt-5" };
   const runtimeSelectedModel = {
     customProviderId: "anthropic-main",
@@ -245,8 +129,6 @@ test("selected model json round-trips and rejects malformed payloads", () => {
     customProviderId: "p1",
     model: "m1",
   });
-  assert.equal(settings.parseSelectedModelJson(undefined), undefined);
   assert.equal(settings.parseSelectedModelJson("not-json"), undefined);
   assert.equal(settings.parseSelectedModelJson('{"model":"m1"}'), undefined);
-  assert.equal(settings.serializeSelectedModelJson(undefined), undefined);
 });

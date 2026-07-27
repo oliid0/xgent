@@ -1,0 +1,16 @@
+[package]
+name = "tauri-plugin-mobile-execution"
+version = "0.1.0"
+authors = ["XAgent contributors"]
+description = "Platform-neutral mobile command execution backends for XAgent"
+edition = "2021"
+license = "MIT"
+links = "tauri-plugin-mobile-execution"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tauri = "2.11.5"
+thiserror = "2"
+
+[build-dependencies]
+tauri-plugin = "2.5.4"

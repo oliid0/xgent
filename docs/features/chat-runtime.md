@@ -16,7 +16,7 @@
 | 2 | 加载 Skills prompt、Memory overview、hooks、历史上下文和当前 active segment。 | `useChatSkills.ts`、`memoryPrompt.ts`、`conversationState.ts` |
 | 3 | 构造模型 request context，必要时先触发 pre-send compaction。 | `conversationContextBuilders.ts`、`compaction/*` |
 | 4 | text 模式直接 stream assistant；tools/agent-dev 构造工具 registry 并进入 tool loop。 | `llm.ts`、`builtinRegistry.ts`、`runAgentConversationTurn.ts` |
-| 5 | 流式 token/thinking/hosted search/tool status 更新 transcript，并发布 Gateway event。 | `liveTranscriptStore.ts`、`gatewayBridgeEvents.ts` |
+| 5 | 流式 token/thinking/hosted search/tool status 更新 transcript，并发布本地访问运行快照。 | `liveTranscriptStore.ts`、`conversationEvents.ts` |
 | 6 | 工具调用通过 registry 分派到对应 executor，结果回填模型上下文。 | `lib/tools/*`、`lib/chat/conversation/run/*` |
 | 7 | turn 结束后写入 chat history，生成标题，触发 silent memory extraction 和 hooks。 | `chat_history.rs`、`conversationTitleJob.ts`、`silentMemoryExtraction.ts` |
 
@@ -79,4 +79,4 @@ Hooks 支持 shell script 和 HTTP requests，设置由 GUI/WebUI 同步维护�
 | Tool trace | `AssistantBubble` 中按 round 和 group 展示工具调用/结果。 |
 | Hosted search | Search block 进入 transcript，保留 anchor 与聚合状态。 |
 | Debug JSONL | `system_append_debug_jsonl` 可写入本地 debug 日志。 |
-| Gateway stream | WebUI 可看到 token/thinking/tool/done/error 等远程事件。 |
+| Local access stream | 配对客户端可订阅 token/thinking/tool/done/error 与运行快照。 |

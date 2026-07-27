@@ -185,26 +185,6 @@ pub struct GitOperationResponse {
     pub message: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-struct GitGatewayArgs {
-    branch: Option<String>,
-    kind: Option<String>,
-    path: Option<String>,
-    old_path: Option<String>,
-    remote_url: Option<String>,
-    message: Option<String>,
-    mode: Option<String>,
-    commit: Option<String>,
-    start_point: Option<String>,
-    limit: Option<usize>,
-    skip: Option<usize>,
-    user_name: Option<String>,
-    user_email: Option<String>,
-    force: Option<bool>,
-    new_branch: Option<String>,
-}
-
 struct GitOutput {
     stdout: String,
     stderr: String,
@@ -2491,104 +2471,6 @@ pub(crate) fn git_stash_pop_sync(workdir: String) -> Result<GitOperationResponse
     )
 }
 
-fn parse_gateway_args(args_json: String) -> Result<GitGatewayArgs, String> {
-    if args_json.trim().is_empty() {
-        return Ok(GitGatewayArgs::default());
-    }
-    serde_json::from_str(&args_json).map_err(|error| format!("Git 参数 JSON 无效：{error}"))
-}
-
-pub(crate) fn git_gateway_action_sync(
-    action: String,
-    workdir: String,
-    args_json: String,
-) -> Result<Value, String> {
-    let action = action.trim().to_ascii_lowercase();
-    let args = parse_gateway_args(args_json)?;
-    let value = match action.as_str() {
-        "status" => serde_json::to_value(git_status_sync(workdir)?),
-        "discover_repositories" => serde_json::to_value(git_discover_repositories_sync(workdir)?),
-        "branches" => serde_json::to_value(git_branches_sync(workdir)?),
-        "init" => serde_json::to_value(git_init_sync(
-            workdir,
-            args.branch.unwrap_or_else(|| "main".to_string()),
-            args.user_name,
-            args.user_email,
-        )?),
-        "switch_branch" => serde_json::to_value(git_switch_branch_sync(
-            workdir,
-            args.branch.unwrap_or_default(),
-            args.kind,
-        )?),
-        "create_branch" => serde_json::to_value(git_create_branch_sync(
-            workdir,
-            args.branch.unwrap_or_default(),
-            args.start_point,
-        )?),
-        "log" => serde_json::to_value(git_log_sync(workdir, args.limit, args.skip)?),
-        "commit_details" => serde_json::to_value(git_commit_details_sync(
-            workdir,
-            args.commit.unwrap_or_default(),
-        )?),
-        "compare_commit_with_remote" => serde_json::to_value(git_compare_commit_with_remote_sync(
-            workdir,
-            args.commit.unwrap_or_default(),
-        )?),
-        "commit_diff" => serde_json::to_value(git_commit_diff_sync(
-            workdir,
-            args.commit.unwrap_or_default(),
-            args.path,
-        )?),
-        "diff" => serde_json::to_value(git_diff_sync(workdir, args.mode, args.path)?),
-        "stage" => serde_json::to_value(git_stage_sync(workdir, args.path.unwrap_or_default())?),
-        "stage_all" => serde_json::to_value(git_stage_all_sync(workdir)?),
-        "unstage" => {
-            serde_json::to_value(git_unstage_sync(workdir, args.path.unwrap_or_default())?)
-        }
-        "unstage_all" => serde_json::to_value(git_unstage_all_sync(workdir)?),
-        "discard" => serde_json::to_value(git_discard_sync(
-            workdir,
-            args.path.unwrap_or_default(),
-            args.old_path,
-        )?),
-        "discard_all" => serde_json::to_value(git_discard_all_sync(workdir)?),
-        "add_to_gitignore" => serde_json::to_value(git_add_to_gitignore_sync(
-            workdir,
-            args.path.unwrap_or_default(),
-        )?),
-        "open_system_file_location" => serde_json::to_value(git_open_system_file_location_sync(
-            workdir,
-            args.path.unwrap_or_default(),
-        )?),
-        "commit" => {
-            serde_json::to_value(git_commit_sync(workdir, args.message.unwrap_or_default())?)
-        }
-        "fetch" => serde_json::to_value(git_fetch_sync(workdir)?),
-        "pull" => serde_json::to_value(git_pull_sync(workdir)?),
-        "set_remote" => serde_json::to_value(git_set_remote_sync(
-            workdir,
-            args.remote_url.unwrap_or_default(),
-        )?),
-        "push" => serde_json::to_value(git_push_sync(workdir)?),
-        "delete_branch" => serde_json::to_value(git_delete_branch_sync(
-            workdir,
-            args.branch.unwrap_or_default(),
-            args.force,
-        )?),
-        "rename_branch" => serde_json::to_value(git_rename_branch_sync(
-            workdir,
-            args.branch.unwrap_or_default(),
-            args.new_branch.unwrap_or_default(),
-        )?),
-        "stash_push" => serde_json::to_value(git_stash_push_sync(workdir, args.message)?),
-        "stash_pop" => serde_json::to_value(git_stash_pop_sync(workdir)?),
-        "" => return Err("Git action 不能为空。".to_string()),
-        other => return Err(format!("不支持的 Git action：{other}")),
-    }
-    .map_err(|error| format!("序列化 Git 响应失败：{error}"))?;
-    Ok(value)
-}
-
 #[tauri::command(rename_all = "snake_case")]
 pub async fn git_status(workdir: String) -> Result<GitRepositoryState, String> {
     tauri::async_runtime::spawn_blocking(move || git_status_sync(workdir))
@@ -2920,23 +2802,6 @@ mod tests {
             error: None,
         };
         assert_eq!(resolve_review_base(&state), "origin/feature");
-    }
-
-    #[test]
-    fn gateway_args_accept_empty_json() {
-        assert!(parse_gateway_args(String::new()).is_ok());
-        assert!(parse_gateway_args(json!({"path":"src/main.rs"}).to_string()).is_ok());
-        let init_args = parse_gateway_args(
-            json!({"branch":"main","userName":"XAgent Test","userEmail":"test@example.com"})
-                .to_string(),
-        )
-        .expect("parse init args");
-        assert_eq!(init_args.user_name.as_deref(), Some("XAgent Test"));
-        assert_eq!(init_args.user_email.as_deref(), Some("test@example.com"));
-        let log_args =
-            parse_gateway_args(json!({"limit":50,"skip":100}).to_string()).expect("parse log args");
-        assert_eq!(log_args.limit, Some(50));
-        assert_eq!(log_args.skip, Some(100));
     }
 
     #[test]
@@ -3961,7 +3826,7 @@ mod tests {
                 "merge",
                 "--no-ff",
                 "-m",
-                "Merge pull request #52 from Ohi01/features",
+                "Merge pull request #52 from Oliid0/features",
                 "features",
             ],
         );
@@ -3979,7 +3844,7 @@ mod tests {
         assert!(
             history.commits.iter().any(|commit| {
                 commit.sha == main_merge_sha
-                    && commit.subject == "Merge pull request #52 from Ohi01/features"
+                    && commit.subject == "Merge pull request #52 from Oliid0/features"
             }),
             "history should include origin/main merge outside current branch: {:?}",
             history
@@ -4271,73 +4136,4 @@ mod tests {
         assert!(dashed.is_err(), "dashed start point should error");
     }
 
-    #[test]
-    fn git_gateway_action_dispatches_branch_and_stash_actions() {
-        let Some(repo) = init_temp_repo() else {
-            return;
-        };
-        let workdir = repo.path().to_string_lossy().to_string();
-        let initial = git_status_sync(workdir.clone()).expect("initial status");
-
-        run_temp_git(repo.path(), &["branch", "gateway-branch"]);
-        let renamed = git_gateway_action_sync(
-            "rename_branch".to_string(),
-            workdir.clone(),
-            json!({"branch":"gateway-branch","newBranch":"gateway-renamed"}).to_string(),
-        )
-        .expect("rename via gateway");
-        assert_eq!(renamed["ok"], json!(true), "rename response: {renamed}");
-
-        run_temp_git(repo.path(), &["checkout", "gateway-renamed"]);
-        fs::write(repo.path().join("gateway.txt"), "gateway\n").expect("write gateway file");
-        run_temp_git(repo.path(), &["add", "gateway.txt"]);
-        run_temp_git(repo.path(), &["commit", "-m", "gateway commit"]);
-        run_temp_git(repo.path(), &["checkout", initial.head.as_str()]);
-
-        let soft_deleted = git_gateway_action_sync(
-            "delete_branch".to_string(),
-            workdir.clone(),
-            json!({"branch":"gateway-renamed"}).to_string(),
-        )
-        .expect("soft delete via gateway");
-        assert_eq!(
-            soft_deleted["ok"],
-            json!(false),
-            "soft delete response: {soft_deleted}"
-        );
-        let force_deleted = git_gateway_action_sync(
-            "delete_branch".to_string(),
-            workdir.clone(),
-            json!({"branch":"gateway-renamed","force":true}).to_string(),
-        )
-        .expect("force delete via gateway");
-        assert_eq!(
-            force_deleted["ok"],
-            json!(true),
-            "force delete response: {force_deleted}"
-        );
-
-        fs::write(repo.path().join("README.md"), "gateway stash\n").expect("modify readme");
-        let stashed = git_gateway_action_sync(
-            "stash_push".to_string(),
-            workdir.clone(),
-            json!({"message":"gateway stash"}).to_string(),
-        )
-        .expect("stash push via gateway");
-        assert_eq!(stashed["ok"], json!(true), "stash response: {stashed}");
-        assert_eq!(
-            stashed["state"]["stashCount"],
-            json!(1),
-            "stash response: {stashed}"
-        );
-
-        let popped = git_gateway_action_sync("stash_pop".to_string(), workdir, String::new())
-            .expect("stash pop via gateway");
-        assert_eq!(popped["ok"], json!(true), "pop response: {popped}");
-        assert_eq!(
-            popped["state"]["stashCount"],
-            json!(0),
-            "pop response: {popped}"
-        );
-    }
 }

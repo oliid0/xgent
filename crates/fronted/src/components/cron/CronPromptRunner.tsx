@@ -1,5 +1,5 @@
 import type { Context } from "@earendil-works/pi-ai";
-import { listen } from "@xagent/runtime";
+import { isBrowserRuntime, listen } from "@xagent/runtime";
 import { useEffect, useRef } from "react";
 import type { CompletePromptRunInput, PromptRunRequest } from "../../lib/automation";
 import { backend } from "../../lib/automation/backend";
@@ -171,6 +171,7 @@ async function executeCronPromptRun(
       model: request.model,
     },
     selectedSystemToolIds: settings.system.selectedSystemTools,
+    cloudExecution: settings.access,
     getMcpSettings: () => settings.mcp,
     mcpLoadFailureMode: "throw",
   });
@@ -265,12 +266,14 @@ async function completeWithRetry(input: CompletePromptRunInput) {
  */
 export function CronPromptRunner({ settings }: CronPromptRunnerProps) {
   const settingsRef = useRef(settings);
+  const browser = isBrowserRuntime();
 
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
 
   useEffect(() => {
+    if (browser) return;
     let disposed = false;
     const abortControllers = new Map<string, AbortController>();
 
@@ -355,7 +358,7 @@ export function CronPromptRunner({ settings }: CronPromptRunnerProps) {
         controller.abort();
       }
     };
-  }, []);
+  }, [browser]);
 
   return null;
 }

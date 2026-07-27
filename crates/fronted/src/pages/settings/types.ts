@@ -13,7 +13,7 @@ export type SectionId =
   | "memory"
   | "hooks"
   | "cron"
-  | "remote"
+  | "access"
   | "about";
 
 export type SettingsPageProps = {
@@ -23,6 +23,7 @@ export type SettingsPageProps = {
   onBack: () => void;
   initialSection?: SectionId;
   hiddenSections?: SectionId[];
+  nativeMobile?: boolean;
   appUpdate: AppUpdateController;
 };
 

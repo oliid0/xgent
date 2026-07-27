@@ -12,7 +12,6 @@ fn row_to_summary(row: &rusqlite::Row<'_>) -> rusqlite::Result<ChatHistorySummar
         updated_at: row.get("updated_at")?,
         is_pinned: row.get::<_, i64>("is_pinned")? != 0,
         pinned_at: row.get("pinned_at")?,
-        is_shared: row.get::<_, i64>("is_shared")? != 0,
     })
 }
 
@@ -34,8 +33,6 @@ fn row_to_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<ChatHistoryRecord>
         updated_at: row.get("updated_at")?,
         is_pinned: row.get::<_, i64>("is_pinned")? != 0,
         pinned_at: row.get("pinned_at")?,
-        is_shared: row.get::<_, i64>("is_shared")? != 0,
-        redact_tool_content: row.get::<_, i64>("redact_tool_content")? != 0,
     })
 }
 
@@ -68,17 +65,8 @@ fn get_summary_by_id(conn: &Connection, id: &str) -> Result<ChatHistorySummary, 
             h.created_at AS created_at,
             h.updated_at AS updated_at,
             h.is_pinned AS is_pinned,
-            h.pinned_at AS pinned_at,
-            CASE
-                WHEN share.enabled = 1 AND share.token IS NOT NULL THEN 1
-                ELSE 0
-            END AS is_shared,
-            CASE
-                WHEN share.enabled = 1 AND share.token IS NOT NULL AND share.redact_tool_content = 1 THEN 1
-                ELSE 0
-            END AS redact_tool_content
+            h.pinned_at AS pinned_at
         FROM chatHistory h
-        LEFT JOIN chatHistoryShare share ON share.conversation_id = h.id
         WHERE h.id = ?1
         ",
         params![id],
@@ -108,17 +96,8 @@ fn get_record_by_id(conn: &Connection, id: &str) -> Result<ChatHistoryRecord, St
             h.created_at AS created_at,
             h.updated_at AS updated_at,
             h.is_pinned AS is_pinned,
-            h.pinned_at AS pinned_at,
-            CASE
-                WHEN share.enabled = 1 AND share.token IS NOT NULL THEN 1
-                ELSE 0
-            END AS is_shared,
-            CASE
-                WHEN share.enabled = 1 AND share.token IS NOT NULL AND share.redact_tool_content = 1 THEN 1
-                ELSE 0
-            END AS redact_tool_content
+            h.pinned_at AS pinned_at
         FROM chatHistory h
-        LEFT JOIN chatHistoryShare share ON share.conversation_id = h.id
         WHERE h.id = ?1
         ",
         params![id],
@@ -210,13 +189,8 @@ pub(crate) fn list_chat_history_sync_with_filter(
                 h.created_at AS created_at,
                 h.updated_at AS updated_at,
                 h.is_pinned AS is_pinned,
-                h.pinned_at AS pinned_at,
-                CASE
-                    WHEN share.enabled = 1 AND share.token IS NOT NULL THEN 1
-                    ELSE 0
-                END AS is_shared
+                h.pinned_at AS pinned_at
             FROM chatHistory h
-            LEFT JOIN chatHistoryShare share ON share.conversation_id = h.id
             {where_clause}
             ORDER BY h.is_pinned DESC, h.pinned_at DESC, h.updated_at DESC, h.id ASC
             LIMIT {limit_param} OFFSET {offset_param}
@@ -281,74 +255,4 @@ pub(crate) fn list_chat_history_workdirs_sync(
         out.push(item);
     }
     Ok(ChatHistoryWorkdirsResponse { workdirs: out })
-}
-
-pub(crate) fn list_shared_chat_history_sync(
-    conn: &Connection,
-    page: i64,
-    page_size: i64,
-) -> Result<ChatHistoryListResponse, String> {
-    let page = resolve_history_list_page(page)?;
-    let limit = resolve_history_list_page_size(page_size)?;
-    let offset = (page - 1).saturating_mul(limit);
-    let total = conn
-        .query_row(
-            "
-            SELECT COUNT(*)
-            FROM chatHistory h
-            INNER JOIN chatHistoryShare share ON share.conversation_id = h.id
-            WHERE share.enabled = 1 AND share.token IS NOT NULL
-            ",
-            [],
-            |row| row.get::<_, i64>(0),
-        )
-        .map_err(|e| format!("count shared history list failed: {e}"))?;
-
-    let mut stmt = conn
-        .prepare(
-            "
-            SELECT
-                h.id AS id,
-                h.title AS title,
-                h.provider_id AS provider_id,
-                h.model AS model,
-                h.session_id AS session_id,
-                h.cwd AS cwd,
-                h.selected_model_json AS selected_model_json,
-                h.total_message_count AS total_message_count,
-                h.created_at AS created_at,
-                h.updated_at AS updated_at,
-                h.is_pinned AS is_pinned,
-                h.pinned_at AS pinned_at,
-                1 AS is_shared
-            FROM chatHistory h
-            INNER JOIN chatHistoryShare share ON share.conversation_id = h.id
-            WHERE share.enabled = 1 AND share.token IS NOT NULL
-            ORDER BY h.is_pinned DESC, h.pinned_at DESC, h.updated_at DESC, h.id ASC
-            LIMIT ?1 OFFSET ?2
-            ",
-        )
-        .map_err(|e| format!("prepare shared history list query failed: {e}"))?;
-
-    let rows = stmt
-        .query_map(params![limit, offset], row_to_summary)
-        .map_err(|e| format!("query shared history list failed: {e}"))?;
-
-    let mut out = Vec::new();
-    for row in rows {
-        out.push(row.map_err(|e| format!("read shared history list row failed: {e}"))?);
-    }
-
-    Ok(ChatHistoryListResponse {
-        items: out,
-        total_count: total,
-    })
-}
-
-pub(crate) fn list_shared_chat_history_page_sync(
-    page: i64,
-    page_size: i64,
-) -> Result<ChatHistoryListResponse, String> {
-    let conn = open_db()?;
-    list_shared_chat_history_sync(&conn, page, page_size)
 }

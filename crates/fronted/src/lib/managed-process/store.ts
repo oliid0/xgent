@@ -41,9 +41,8 @@ export function feedManagedProcessState(next: ManagedProcessState) {
   // Agent revisions are persisted and restart-safe; equal revisions are
   // accepted because the agent-online flag can flip without a bump.
   if (state.ready && next.revision < state.revision) {
-    // Stale snapshot (e.g. a restarted gateway replaying its empty cache):
-    // the process list is untrusted, but agentOnline is stamped by the
-    // transport at write time — adopt it so the offline banner still shows.
+    // Ignore a stale process list, but preserve transport liveness changes so
+    // the offline banner remains accurate after a host restart.
     if (next.agentOnline !== state.agentOnline) {
       state = { ...state, agentOnline: next.agentOnline };
       emit();

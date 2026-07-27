@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- PRoot is launched with ProcessBuilder from applicationInfo.nativeLibraryDir,
+         so its lib*.so executable and dependency closure must exist as extracted
+         files instead of only as mmap-able entries inside the APK. The versioned
+         libtalloc SONAME is materialized without modifying PRoot in codeCacheDir. -->
+    <application
+        android:extractNativeLibs="true"
+        android:networkSecurityConfig="@xml/xagent_network_security_config" />
+</manifest>

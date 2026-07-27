@@ -105,7 +105,7 @@ function collectContext() {
     : runGit(["rev-list", "-n", "1", releaseVersion.releaseTag]);
   const previousTag = previousTagFor(releaseCommit);
   const range = previousTag ? `${previousTag}..${releaseCommit}` : releaseCommit;
-  const repository = process.env.GITHUB_REPOSITORY?.trim() || "Ohi01/XAgent";
+  const repository = process.env.GITHUB_REPOSITORY?.trim() || "oliid0/xgent";
 
   const commitLog = runGit([
     "log",

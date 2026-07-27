@@ -37,7 +37,7 @@ test("release updater manifest embeds generated notes and platform signatures", 
         cwd: repoRoot,
         env: {
           ...process.env,
-          GITHUB_REPOSITORY: "Ohi01/XAgent",
+          GITHUB_REPOSITORY: "oliid0/xgent",
           RELEASE_TAG: "v9.9.9",
         },
         encoding: "utf8",
@@ -55,7 +55,7 @@ test("release updater manifest embeds generated notes and platform signatures", 
     assert.equal(manifest.notes, "## What's Changed\n\n- Fix updater checks.");
     assert.equal(
       manifest.platforms["darwin-aarch64-app"].url,
-      "https://github.com/Ohi01/XAgent/releases/download/v9.9.9/XAgent-v9.9.9-macOS-aarch64.app.tar.gz",
+      "https://github.com/oliid0/xgent/releases/download/v9.9.9/XAgent-v9.9.9-macOS-aarch64.app.tar.gz",
     );
     assert.equal(manifest.platforms["darwin-aarch64-app"].signature, "sig-mac-arm");
     assert.deepEqual(
@@ -91,7 +91,7 @@ test("release updater manifest omits generic Linux fallback without an AppImage"
         cwd: repoRoot,
         env: {
           ...process.env,
-          GITHUB_REPOSITORY: "Ohi01/XAgent",
+          GITHUB_REPOSITORY: "oliid0/xgent",
           RELEASE_TAG: "v9.9.9",
         },
         encoding: "utf8",
@@ -127,7 +127,7 @@ test("release updater manifest uses MSI for generic Windows fallback when NSIS i
         cwd: repoRoot,
         env: {
           ...process.env,
-          GITHUB_REPOSITORY: "Ohi01/XAgent",
+          GITHUB_REPOSITORY: "oliid0/xgent",
           RELEASE_TAG: "v9.9.9",
         },
         encoding: "utf8",

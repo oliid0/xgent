@@ -1,5 +1,5 @@
 import type { Context } from "@earendil-works/pi-ai";
-import { invoke, listen } from "@xagent/runtime";
+import { invoke, isBrowserRuntime } from "@xagent/runtime";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { CronPromptRunner } from "./components/cron/CronPromptRunner";
@@ -9,6 +9,12 @@ import { WindowsTitleBar } from "./components/WindowsTitleBar";
 import { LocaleContext, t as translate } from "./i18n";
 import { useAppUpdateController } from "./lib/appUpdates";
 import { initAutomation } from "./lib/automation";
+import { startLocalAccessHostBridge } from "./runtime/localAccessHostBridge";
+import {
+  inferRuntimePlatform,
+  resolveRuntimePlatform,
+  type RuntimePlatform,
+} from "./lib/runtimePlatform";
 import {
   type AppSettings,
   getDefaultSettings,
@@ -21,14 +27,8 @@ import {
 import {
   loadPersistedSettingsWithDefaults,
   persistSettings,
-  publishGatewaySettingsSync,
   type SettingsSaveState,
 } from "./lib/settings/storage";
-import {
-  applyGatewaySettingsSyncPayload,
-  buildGatewaySettingsSyncPayload,
-  type GatewaySettingsSyncPayload,
-} from "./lib/settings/sync";
 import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { SectionId } from "./pages/settings/types";
@@ -45,15 +45,13 @@ function asErrorMessage(error: unknown, fallback: string) {
   return text || fallback;
 }
 
-const GATEWAY_SETTINGS_SYNC_EVENT = "gateway:settings-sync";
-
 function AppChrome(props: { children: ReactNode }) {
   // Plain inputs get a shared cut/copy/paste menu; everything else keeps the
   // suppressed native menu (surfaces with their own menus opt out upstream).
   const { onRootContextMenu, onRootMouseDownCapture, menu } = useNativeInputContextMenu();
   return (
     <div
-      className="relative flex h-full w-full flex-col overflow-hidden bg-background"
+      className="app-safe-area relative flex h-full w-full flex-col overflow-hidden bg-background"
       onContextMenu={onRootContextMenu}
       onMouseDownCapture={onRootMouseDownCapture}
     >
@@ -61,54 +59,6 @@ function AppChrome(props: { children: ReactNode }) {
       <div className="relative min-h-0 flex-1 overflow-hidden bg-background">{props.children}</div>
       {menu}
     </div>
-  );
-}
-
-function hasSettingsSyncChanged(prev: AppSettings, next: AppSettings) {
-  return (
-    JSON.stringify(buildGatewaySettingsSyncPayload(prev)) !==
-    JSON.stringify(buildGatewaySettingsSyncPayload(next))
-  );
-}
-
-function hasSensitiveSettingsUpdates(settings: AppSettings) {
-  return (
-    settings.customProviders.some((provider) => provider.apiKey.trim().length > 0) ||
-    settings.ssh.hosts.some(
-      (host) => host.password.trim().length > 0 || host.privateKey.trim().length > 0,
-    )
-  );
-}
-
-function hasSensitiveSettingsUpdatesPayload(payload: unknown) {
-  const source =
-    payload && typeof payload === "object" && !Array.isArray(payload)
-      ? (payload as { providerApiKeyUpdates?: unknown; sshSecretUpdates?: unknown })
-      : {};
-  const providerUpdates = source.providerApiKeyUpdates;
-  if (
-    providerUpdates &&
-    typeof providerUpdates === "object" &&
-    !Array.isArray(providerUpdates) &&
-    Object.values(providerUpdates).some(
-      (value) => typeof value === "string" && value.trim().length > 0,
-    )
-  ) {
-    return true;
-  }
-  const sshUpdates = source.sshSecretUpdates;
-  return Boolean(
-    sshUpdates &&
-      typeof sshUpdates === "object" &&
-      !Array.isArray(sshUpdates) &&
-      Object.values(sshUpdates).some((value) => {
-        if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-        const update = value as { password?: unknown; privateKey?: unknown };
-        return (
-          (typeof update.password === "string" && update.password.trim().length > 0) ||
-          (typeof update.privateKey === "string" && update.privateKey.trim().length > 0)
-        );
-      }),
   );
 }
 
@@ -128,6 +78,24 @@ function applyRuntimeSystemDefaults(settings: AppSettings, defaultWorkdir: strin
 }
 
 export default function App() {
+  const browserRuntime = isBrowserRuntime();
+
+  const [runtimePlatform, setRuntimePlatform] = useState<RuntimePlatform>(inferRuntimePlatform);
+  const [platformResolved, setPlatformResolved] = useState(browserRuntime);
+  const nativeMobile =
+    platformResolved &&
+    !browserRuntime &&
+    (runtimePlatform === "android" || runtimePlatform === "ios");
+  const desktopBridgeEnabled = browserRuntime || (platformResolved && !nativeMobile);
+
+  useEffect(() => {
+    if (browserRuntime || !platformResolved || nativeMobile) return;
+    const unlistenPromise = startLocalAccessHostBridge();
+    return () => {
+      void unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [browserRuntime, nativeMobile, platformResolved]);
+
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SectionId>("system");
   const [settingsReady, setSettingsReady] = useState(false);
@@ -155,6 +123,19 @@ export default function App() {
   );
 
   useEffect(() => {
+    let cancelled = false;
+    void resolveRuntimePlatform().then((platform) => {
+      if (!cancelled) {
+        setRuntimePlatform(platform);
+        setPlatformResolved(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (settings.theme !== "system") return;
     return subscribeToSystemThemePreference(() => {
       setSystemThemeVersion((version) => version + 1);
@@ -168,13 +149,13 @@ export default function App() {
   }, [effectiveTheme]);
 
   useEffect(() => {
-    if (!settingsReady) return;
+    if (!settingsReady || !desktopBridgeEnabled) return;
     void invoke("app_set_close_window_behavior", {
       behavior: settings.closeWindowBehavior,
     }).catch(() => {
       // Ignore non-Tauri and older desktop shells.
     });
-  }, [settingsReady, settings.closeWindowBehavior]);
+  }, [desktopBridgeEnabled, settingsReady, settings.closeWindowBehavior]);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,9 +169,6 @@ export default function App() {
           settingsRef.current = loadedWithDefaults;
           setSettingsState(loadedWithDefaults);
           setSettingsSaveState({ status: "saved" });
-          void publishGatewaySettingsSync(loadedWithDefaults).catch((error) => {
-            console.error("publish gateway settings sync failed", error);
-          });
         }
       } catch (error) {
         if (!cancelled) {
@@ -216,20 +194,14 @@ export default function App() {
   }, []);
 
   const queueSettingsSave = useCallback(
-    (prev: AppSettings, next: AppSettings, fallback: string, publishSync: boolean) => {
+    (prev: AppSettings, next: AppSettings, fallback: string) => {
       const saveSequence = ++saveSequenceRef.current;
       setSettingsSaveState({ status: "saving" });
 
       saveChainRef.current = saveChainRef.current
         .catch(() => undefined)
         .then(() => persistSettings(prev, next))
-        .then(async (persistResult) => {
-          const publishTarget = persistResult.ssh
-            ? normalizeSettings({
-                ...next,
-                ssh: persistResult.ssh,
-              })
-            : next;
+        .then((persistResult) => {
           if (persistResult.ssh && saveSequenceRef.current === saveSequence) {
             const merged = normalizeSettings({
               ...settingsRef.current,
@@ -240,9 +212,6 @@ export default function App() {
           }
           if (persistResult.conflict) {
             throw new Error(persistResult.conflict);
-          }
-          if (publishSync) {
-            await publishGatewaySettingsSync(publishTarget);
           }
         })
         .then(() => {
@@ -273,12 +242,7 @@ export default function App() {
       );
       settingsRef.current = next;
       setSettingsState(next);
-      queueSettingsSave(
-        prev,
-        next,
-        "保存设置失败。",
-        hasSettingsSyncChanged(prev, next) || hasSensitiveSettingsUpdates(next),
-      );
+      queueSettingsSave(prev, next, "保存设置失败。");
     },
     [queueSettingsSave],
   );
@@ -351,53 +315,19 @@ export default function App() {
   );
 
   const appUpdate = useAppUpdateController({
-    enabled: settingsReady,
+    enabled: settingsReady && desktopBridgeEnabled,
     includePrereleases: settings.updates.includePrereleases,
     messages: appUpdateMessages,
   });
 
   useEffect(() => {
-    if (!settingsReady) return;
+    if (!settingsReady || !desktopBridgeEnabled) return;
     void initAutomation().catch((error) => {
       console.warn("Failed to initialize automation store", error);
     });
-  }, [settingsReady]);
+  }, [desktopBridgeEnabled, settingsReady]);
 
-  useEffect(() => {
-    if (!settingsReady) {
-      return;
-    }
-
-    let cancelled = false;
-    const unlistenPromise = listen<GatewaySettingsSyncPayload>(
-      GATEWAY_SETTINGS_SYNC_EVENT,
-      (event) => {
-        if (cancelled) {
-          return;
-        }
-
-        const prev = settingsRef.current;
-        const next = applyRuntimeSystemDefaults(
-          applyGatewaySettingsSyncPayload(prev, event.payload),
-          defaultWorkdirRef.current,
-        );
-        const publicChanged = hasSettingsSyncChanged(prev, next);
-        if (!publicChanged && !hasSensitiveSettingsUpdatesPayload(event.payload)) {
-          return;
-        }
-        settingsRef.current = next;
-        setSettingsState(next);
-        queueSettingsSave(prev, next, "同步 WebUI 设置失败。", publicChanged);
-      },
-    );
-
-    return () => {
-      cancelled = true;
-      void unlistenPromise.then((unlisten) => unlisten());
-    };
-  }, [queueSettingsSave, settingsReady]);
-
-  if (!settingsReady) {
+  if (!settingsReady || !platformResolved) {
     return (
       <LocaleContext.Provider value={localeContextValue}>
         <AppChrome>
@@ -415,7 +345,7 @@ export default function App() {
   return (
     <LocaleContext.Provider value={localeContextValue}>
       <AppChrome>
-        <CronPromptRunner settings={settings} />
+        {desktopBridgeEnabled ? <CronPromptRunner settings={settings} /> : null}
         <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
         <AppErrorBoundary>
           <ChatPage
@@ -427,6 +357,7 @@ export default function App() {
             onOpenSettings={openSettings}
             onToggleTheme={toggleTheme}
             appUpdate={appUpdate}
+            desktopBridgeEnabled={desktopBridgeEnabled}
           />
         </AppErrorBoundary>
         {visible && (
@@ -443,6 +374,10 @@ export default function App() {
                 saveState={settingsSaveState}
                 onBack={closeSettings}
                 initialSection={settingsSection}
+                hiddenSections={
+                  desktopBridgeEnabled ? [] : ["agents", "ssh", "hooks", "cron", "systemTools"]
+                }
+                nativeMobile={nativeMobile}
                 appUpdate={appUpdate}
               />
             </AppErrorBoundary>

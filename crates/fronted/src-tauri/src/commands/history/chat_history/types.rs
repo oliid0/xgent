@@ -13,7 +13,6 @@ pub struct ChatHistorySummary {
     pub updated_at: i64,
     pub is_pinned: bool,
     pub pinned_at: Option<i64>,
-    pub is_shared: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -76,19 +75,6 @@ pub struct ChatHistoryRecord {
     pub updated_at: i64,
     pub is_pinned: bool,
     pub pinned_at: Option<i64>,
-    pub is_shared: bool,
-    pub redact_tool_content: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatHistoryShareStatus {
-    pub conversation_id: String,
-    pub enabled: bool,
-    pub token: Option<String>,
-    pub created_at: Option<i64>,
-    pub updated_at: Option<i64>,
-    pub redact_tool_content: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -110,7 +96,6 @@ pub struct ChatHistoryActiveSegmentRecord {
     pub updated_at: i64,
     pub is_pinned: bool,
     pub pinned_at: Option<i64>,
-    pub is_shared: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

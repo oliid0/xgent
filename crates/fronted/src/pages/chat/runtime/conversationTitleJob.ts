@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { GatewayBridgeEventController } from "../../../lib/chat/conversation/run";
+import type { ConversationEventController } from "../../../lib/chat/conversation/run";
 import {
   buildConversationTitlePrompt,
   normalizeConversationTitle,
@@ -25,10 +25,10 @@ type StartConversationTitleJobParams = {
   // are renamed through the history IPC by the caller.
   sidebarStore: Pick<SidebarStore, "peek" | "upsertLocal">;
   titleJobRef: MutableRefObject<TitleJobRefValue>;
-  gatewayBridgeEvents: GatewayBridgeEventController;
+  conversationEvents: ConversationEventController;
 };
 
-const GATEWAY_BRIDGE_TITLE_MIN_INTERVAL_MS = 250;
+const TITLE_EVENT_MIN_INTERVAL_MS = 250;
 
 export function buildConversationTitleRuntime(
   runtime: Parameters<typeof streamAssistantMessage>[0]["runtime"],
@@ -52,24 +52,24 @@ export function startConversationTitleJob(params: StartConversationTitleJobParam
     content,
     sidebarStore,
     titleJobRef,
-    gatewayBridgeEvents,
+    conversationEvents,
   } = params;
   let streamedTitle = "";
-  let lastForwardedGatewayTitle = "";
-  let lastForwardedGatewayTitleAt = 0;
+  let lastForwardedTitle = "";
+  let lastForwardedTitleAt = 0;
 
-  const forwardGatewayTitlePreview = (preview: string, force = false) => {
+  const forwardTitlePreview = (preview: string, force = false) => {
     const title = preview.trim();
-    if (!title || title === lastForwardedGatewayTitle) {
+    if (!title || title === lastForwardedTitle) {
       return;
     }
     const now = Date.now();
-    if (!force && now - lastForwardedGatewayTitleAt < GATEWAY_BRIDGE_TITLE_MIN_INTERVAL_MS) {
+    if (!force && now - lastForwardedTitleAt < TITLE_EVENT_MIN_INTERVAL_MS) {
       return;
     }
-    lastForwardedGatewayTitle = title;
-    lastForwardedGatewayTitleAt = now;
-    gatewayBridgeEvents.queueTitle(title, force);
+    lastForwardedTitle = title;
+    lastForwardedTitleAt = now;
+    conversationEvents.queueTitle(title, force);
   };
 
   const titleRuntime = buildConversationTitleRuntime(runtime);
@@ -99,7 +99,7 @@ export function startConversationTitleJob(params: StartConversationTitleJobParam
         .replace(/^[`"'""'']+|[`"'""'']+$/g, "")
         .trim();
       if (!preview) return;
-      forwardGatewayTitlePreview(preview);
+      forwardTitlePreview(preview);
       const currentItem = sidebarStore.peek(conversationId);
       if (!currentItem?.isPending) return;
       sidebarStore.upsertLocal({
@@ -121,7 +121,7 @@ export function startConversationTitleJob(params: StartConversationTitleJobParam
   void titlePromise
     .then((resolvedTitle) => {
       if (!resolvedTitle) return;
-      forwardGatewayTitlePreview(resolvedTitle, true);
+      forwardTitlePreview(resolvedTitle, true);
       const currentItem = sidebarStore.peek(conversationId);
       if (!currentItem?.isPending) return;
       if (currentItem.title === resolvedTitle) return;

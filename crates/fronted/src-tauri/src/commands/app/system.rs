@@ -1,14 +1,17 @@
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+#[cfg(desktop)]
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
+#[cfg(desktop)]
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::runtime::platform::expand_tilde_path;
+#[cfg(desktop)]
 use crate::services::power_activity::PowerActivityManager;
 pub use crate::services::skills::{
     SystemListSkillFilesResponse, SystemManageSkillResponse, SystemReadSkillMetadataResponse,
@@ -79,12 +82,7 @@ pub struct SystemCreateProjectFolderResponse {
 }
 
 fn app_storage_dir() -> Result<PathBuf, String> {
-    let home =
-        dirs::home_dir().ok_or_else(|| "Failed to locate the user home directory".to_string())?;
-    let dir = home.join(format!(".{}", env!("CARGO_PKG_NAME")));
-    fs::create_dir_all(&dir)
-        .map_err(|e| format!("Failed to create the application directory: {e}"))?;
-    Ok(dir)
+    crate::services::app_paths::app_storage_dir()
 }
 
 fn debug_root_dir() -> Result<PathBuf, String> {
@@ -632,6 +630,7 @@ fn infer_native_attachment_mime(path: &Path, kind: Option<&str>) -> String {
     }
 }
 
+#[cfg(desktop)]
 fn system_pick_readable_files_sync(
     workdir: String,
     max_files: Option<usize>,
@@ -957,6 +956,7 @@ fn system_append_debug_jsonl_sync(conversation_id: String, entry: Value) -> Resu
     Ok(())
 }
 
+#[cfg(desktop)]
 fn resolve_pick_folder_initial_dir(initial_workdir: Option<String>) -> Option<PathBuf> {
     let raw = initial_workdir?;
     let trimmed = raw.trim();
@@ -1083,6 +1083,7 @@ pub(crate) fn system_create_project_folder_sync(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[cfg(desktop)]
 pub async fn system_pick_folder(initial_workdir: Option<String>) -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut dialog = FileDialog::new();
@@ -1099,6 +1100,7 @@ pub async fn system_pick_folder(initial_workdir: Option<String>) -> Result<Optio
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[cfg(desktop)]
 pub async fn system_pick_file(
     initial_workdir: Option<String>,
     filter_name: Option<String>,
@@ -1133,6 +1135,7 @@ pub async fn system_create_project_folder(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[cfg(desktop)]
 pub async fn system_pick_readable_files(
     workdir: String,
     max_files: Option<usize>,
@@ -1273,6 +1276,7 @@ pub async fn system_append_debug_jsonl(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[cfg(desktop)]
 pub fn system_begin_power_activity(
     activity_id: String,
     reason: String,
@@ -1284,6 +1288,7 @@ pub fn system_begin_power_activity(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[cfg(desktop)]
 pub fn system_end_power_activity(
     activity_id: String,
     power_activity: tauri::State<'_, Arc<PowerActivityManager>>,

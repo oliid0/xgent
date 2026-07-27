@@ -6,7 +6,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Child, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use tauri::Emitter;
@@ -19,7 +19,6 @@ use crate::runtime::process::{
     ProcessProbe,
 };
 use crate::runtime::shell_runner::spawn_platform_shell_command;
-use crate::services::gateway::GatewayController;
 
 const PROCESS_LOG_DIR: &str = "process-logs";
 const DEFAULT_LOG_BYTES: u64 = 64 * 1024;
@@ -35,11 +34,10 @@ const START_TIME_TOLERANCE_MS: i64 = 60_000;
 
 pub const MANAGED_PROCESS_CHANGED_EVENT: &str = "managed-process:changed";
 
-/// Fan-out target for registry mutations: every change emits the same full
-/// snapshot to the local webview and (when connected) to the gateway.
+/// Notification target for registry mutations. Every change emits the same
+/// full snapshot to the local webview.
 pub struct ManagedProcessNotifier {
     pub app_handle: tauri::AppHandle,
-    pub gateway: Weak<GatewayController>,
 }
 
 impl ManagedProcessNotifier {
@@ -49,14 +47,6 @@ impl ManagedProcessNotifier {
             .emit(MANAGED_PROCESS_CHANGED_EVENT, snapshot)
         {
             eprintln!("emit {MANAGED_PROCESS_CHANGED_EVENT} failed: {error}");
-        }
-        if let Some(gateway) = self.gateway.upgrade() {
-            let snapshot = snapshot.clone();
-            tauri::async_runtime::spawn(async move {
-                if let Err(error) = gateway.publish_managed_process_snapshot(snapshot).await {
-                    eprintln!("publish managed process snapshot failed: {error}");
-                }
-            });
         }
     }
 }

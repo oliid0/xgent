@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Your Local-First AI Agent Desktop</strong><br/>
-  Multi-model access · Local tool execution · MCP & Skills ecosystem · Remote Gateway
+  Multi-model access · Local tool execution · MCP & Skills · Web/PC/mobile
 </p>
 
 <p align="center">
@@ -14,11 +14,10 @@
 </p>
 
 <p align="center">
-  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blueviolet" />
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Web%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Android%20%7C%20iOS-blueviolet" />
   <img alt="Tauri" src="https://img.shields.io/badge/built%20with-Tauri%202-FFC131?logo=tauri&logoColor=white" />
   <img alt="React" src="https://img.shields.io/badge/React-19-087EA4?logo=react&logoColor=white" />
   <img alt="Rust" src="https://img.shields.io/badge/Rust-stable-B7410E?logo=rust&logoColor=white" />
-  <img alt="Go" src="https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white" />
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
 </p>
 
@@ -78,11 +77,12 @@
 
 ## Why XAgent?
 
-XAgent is a **local-first** AI agent desktop client. It deeply integrates large language model reasoning with local system tools, so the AI can genuinely operate your file system, run commands, and manage scheduled tasks — while the Gateway enables remote access and collaboration.
+XAgent is a **local-first** AI agent for Web, desktop, and mobile. It deeply integrates large language model reasoning with local system tools, so the AI can genuinely operate files, run commands, use MCP servers and Skills, and manage scheduled tasks.
 
 - **An agent that actually gets things done** — beyond chat: read and write files, make precise edits, run Bash, and supervise long-running processes
 - **A fully open ecosystem** — bridge any external tool via the MCP protocol, and load Skills packages on demand
-- **Local and remote, both** — the desktop app works fully standalone; deploy the Gateway and control it from any browser
+- **One frontend everywhere** — the same React/Tauri source powers Web, macOS, Windows, Linux, Android, and iOS
+- **LAN control and portable execution** — pair a browser or phone with the desktop on port `28367`, or use the mobile and GitHub Actions execution backends when the computer is unavailable
 
 ---
 
@@ -102,7 +102,7 @@ XAgent is a **local-first** AI agent desktop client. It deeply integrates large 
 - **Full file-system capabilities** — precise `Read` / `Write` / `Edit` / `Delete`, plus `Glob` / `Grep` pattern and regex search
 - **Bash & long-running processes** — non-interactive command execution (cwd / timeout), with `ManagedProcess` supervising dev servers and other resident tasks
 - **Sub-agent delegation** — independent sub-agents execute in parallel with worktree isolation and automatic merging
-- **Tunnel exposure** — `TunnelManager` exposes local services to the public internet in one click
+- **Cross-platform execution** — desktop system tools, Android PRoot, iOS a-Shell commands, and opt-in GitHub Actions jobs share one capability model
 
 ### 🧩 MCP & Skills Ecosystem
 
@@ -114,16 +114,17 @@ XAgent is a **local-first** AI agent desktop client. It deeply integrates large 
 - **Persistent memory** — Markdown + SQLite FTS full-text search for cross-session knowledge management
 - **Scheduled tasks** — bash / http / prompt cron job types, executed automatically in the background
 
-### 🌐 Remote Gateway
+### 🌐 Local WebUI & Mobile
 
-- **Access from any browser** — the same React frontend connects to the Go Gateway through its browser runtime
-- **Disconnect recovery** — a bounded seq window replays short outages, with desktop-side persistence as the safety net
+- **Paired LAN access** — enable WebUI in the desktop settings and open the displayed `http://<desktop-ip>:28367` address from another device
+- **No second frontend or server deployment** — the Tauri desktop host serves the same bundled React application and exposes an authenticated, permission-gated local API
+- **Mobile standalone mode** — Android and iOS can run supported tasks locally; cloud execution can produce cross-platform artifacts when explicitly enabled
 
 ---
 
 ## Download & Deployment
 
-Installers are automatically built and published by GitHub Actions — grab the latest version from [**GitHub Releases**](https://github.com/Ohi01/XAgent/releases/latest). Developer ID signing and notarization are release-specific; unsigned releases remain installable.
+Installers are automatically built and published by GitHub Actions — grab the latest version from [**GitHub Releases**](https://github.com/oliid0/xgent/releases/latest). Developer ID signing and notarization are release-specific; unsigned releases remain installable.
 
 ### System Requirements
 
@@ -132,10 +133,12 @@ Installers are automatically built and published by GitHub Actions — grab the 
 | macOS | Both Intel (x64) and Apple Silicon (aarch64) architectures |
 | Windows | x64; requires the WebView2 runtime (bundled with Windows 11) |
 | Linux | x86_64; requires WebKitGTK 4.1 (Ubuntu 22.04+ / Debian 12+, etc.) |
+| Android | arm64 or x86_64; optional PRoot environment is prepared on first use |
+| iOS / iPadOS | arm64; unsigned IPA releases must be re-signed before installation |
 
 ### macOS
 
-Download the DMG matching your chip from [Releases](https://github.com/Ohi01/XAgent/releases/latest), open it, and drag XAgent into Applications:
+Download the DMG matching your chip from [Releases](https://github.com/oliid0/xgent/releases/latest), open it, and drag XAgent into Applications:
 
 - Apple Silicon (M-series): `XAgent-<version>-macOS-aarch64.dmg`
 - Intel: `XAgent-<version>-macOS-x64.dmg`
@@ -144,7 +147,7 @@ Download the DMG matching your chip from [Releases](https://github.com/Ohi01/XAg
 
 ### Windows
 
-Pick an installation method from [Releases](https://github.com/Ohi01/XAgent/releases/latest):
+Pick an installation method from [Releases](https://github.com/oliid0/xgent/releases/latest):
 
 | Method | File | Best for |
 |---|---|---|
@@ -154,7 +157,7 @@ Pick an installation method from [Releases](https://github.com/Ohi01/XAgent/rele
 
 ### Linux
 
-Choose by distribution from [Releases](https://github.com/Ohi01/XAgent/releases/latest):
+Choose by distribution from [Releases](https://github.com/oliid0/xgent/releases/latest):
 
 | Format | Distributions | Install |
 |---|---|---|
@@ -162,61 +165,14 @@ Choose by distribution from [Releases](https://github.com/Ohi01/XAgent/releases/
 | DEB | Debian / Ubuntu family | `sudo dpkg -i XAgent-<version>-Linux-x86_64.deb` |
 | RPM | Fedora / openSUSE family | `sudo rpm -i XAgent-<version>-Linux-x86_64.rpm` |
 
-### Need Remote Access? Deploy the Gateway and Web Frontend
+### Use the WebUI on a Local Network
 
-The desktop app works without a server. Browser access uses the same React source under `crates/fronted`; `crates/gateway` is a pure Go API/WebSocket service and neither contains frontend assets nor publishes a container image.
+1. Open **Settings → Access** in the desktop application.
+2. Enable **WebUI**, keep the default port `28367`, and choose LAN or loopback scope.
+3. Generate a six-digit pairing code.
+4. Open the displayed URL on the phone, tablet, or browser and enter the pairing code.
 
-```bash
-# Build the pure Go Gateway
-make gateway-build
-
-# Build static Web assets from the shared React source
-make web
-```
-
-Deploy `crates/fronted/dist` to a static host and run `crates/gateway/bin/xagent-gateway` separately. In production, expose the static frontend and Gateway API/WebSocket routes through the same HTTPS origin; use port `443` in Remote settings.
-
-<details>
-<summary><b>Nginx reverse proxy configuration</b> — reference for custom domains / TLS</summary>
-
-> The Gateway handles API and WebSocket traffic only. Nginx serves the files generated from `crates/fronted/dist` and proxies backend routes to the Gateway.
->
-> WebSocket upgrades happen on several paths (`/ws/v2`, `/ws/v2/agent`, `/ws/v2/terminal`, and tunnels under `/t/`), so the simplest correct setup enables the upgrade on the whole vhost:
-
-```nginx
-# Gateway API and WebSocket routes
-location ~ ^/(api|ws|t)/ {
-    proxy_pass http://127.0.0.1:3000;
-    proxy_http_version 1.1;
-
-    # WebSocket upgrade
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-
-    # Required: the Gateway's same-origin check compares the browser's
-    # Origin header against X-Forwarded-Proto + Host
-    proxy_set_header Host $host;
-    proxy_set_header Authorization $http_authorization;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-
-    # The Gateway pings every WebSocket connection every 15s,
-    # so a generous-but-finite timeout is enough
-    proxy_read_timeout 300s;
-    proxy_send_timeout 300s;
-    proxy_buffering off;
-}
-
-# Web build from the shared React frontend
-location / {
-    root /srv/xagent/fronted;
-    try_files $uri $uri/ /index.html;
-}
-```
-
-> This example assumes the Gateway listens on `127.0.0.1:3000` and the Web build is copied to `/srv/xagent/fronted`. The server block needs `listen 443 ssl;` and a `client_max_body_size` large enough for attachment uploads (e.g. `100m`).
-
-</details>
+The desktop must remain running. Sessions are revocable, privileged tool groups have separate permission switches, and provider/SSH/GitHub credentials are never returned to the browser. Plain HTTP should only be used on a trusted local network.
 
 
 
@@ -234,15 +190,9 @@ Expand the Development Guide below for the full set of Make commands.
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                  Shared XAgent React Source                  │
-│            Web · Tauri Desktop · Tauri Mobile               │
+│              Web · Desktop · Android · iOS                   │
 └────────────────────────────┬─────────────────────────────────┘
-                             │ WebSocket / HTTP
-┌────────────────────────────▼─────────────────────────────────┐
-│                       Agent Gateway                           │
-│    Go · WebSocket · HTTP · Session Manager · Event Store     │
-│                  Pure Go API / WebSocket                     │
-└────────────────────────────┬─────────────────────────────────┘
-                             │ WebSocket v2 (bidirectional stream)
+                             │ Tauri IPC or paired HTTP/SSE
 ┌────────────────────────────▼─────────────────────────────────┐
 │                    Tauri 2 System Runtime                    │
 │                          Rust                                │
@@ -251,6 +201,10 @@ Expand the Development Guide below for the full set of Make commands.
 │ pi-ai    │ multi-turn │ FS/Bash/  │ progressive│ SQLite+MD   │
 │ + Codex  │ + SubAgent │ MCP bridge│ + Hub      │ FTS index   │
 └──────────┴────────────┴───────────┴────────────┴─────────────┘
+                             │ optional execution providers
+              ┌──────────────┼──────────────┐
+              ▼              ▼              ▼
+        Android PRoot    iOS a-Shell   GitHub Actions
 ```
 
 **Tech Stack**
@@ -261,11 +215,10 @@ Expand the Development Guide below for the full set of Make commands.
 | **Unified frontend** · Build | Vite 8 + pnpm (shared by Web/PC/mobile) |
 | **Unified frontend** · Styling | Tailwind CSS 4 + Base UI |
 | **Unified frontend** · Rendering | streamdown + KaTeX + Mermaid + Monaco Editor |
-| **Tauri** · Backend | Rust + Tokio + SQLite (rusqlite) + WebSocket (tokio-tungstenite) |
+| **Tauri** · Backend | Rust + Tokio + SQLite (rusqlite) + local Axum WebUI |
 | **Agent** · LLM | @earendil-works/pi-ai |
-| **Gateway** · Language | Go 1.25 |
-| **Gateway** · Protocols | WebSocket + Protobuf + HTTP |
-| **Gateway** · Boundary | Pure Go API/WebSocket; no frontend or container config |
+| **Mobile execution** | Android PRoot + Alpine; iOS a-Shell command runtime |
+| **Cloud execution** | User-owned public `agent-temp` repository + GitHub Actions |
 
 </details>
 
@@ -276,14 +229,9 @@ Expand the Development Guide below for the full set of Make commands.
 |---|---|
 | `make dev` | Start the Tauri development environment |
 | `make build` | Build the desktop app |
-| `make dev-gateway` | Start the Gateway dev server |
 | `make dev-web` | Start Web development from the unified frontend |
-| `make gateway-build` | Build the Gateway binary |
 | `make web` | Build Web assets from the unified frontend |
 | `make desktop-build-macos-release` | macOS signed release build |
-| `make build-linux` | Linux amd64 gateway |
-| `make build-linux-arm` | Linux arm64 gateway |
-| `make proto` | Regenerate Protobuf code |
 | `make clean` | Clean build artifacts |
 
 </details>
@@ -294,7 +242,7 @@ Expand the Development Guide below for the full set of Make commands.
 ```
 XAgent/
 ├── crates/
-│   ├── fronted/                  # Unified Web/PC/mobile frontend
+│   ├── fronted/                  # Unified Web/PC/mobile application
 │   │   ├── src/                  # React frontend
 │   │   │   ├── components/       #   UI components
 │   │   │   ├── lib/              #   Core logic (chat, tools, skills, memory)
@@ -303,10 +251,7 @@ XAgent/
 │   │   │   └── prompt/           #   System prompt templates
 │   │   └── src-tauri/            # Rust backend (Tauri)
 │   │
-│   └── gateway/                  # Pure Go gateway service
-│       ├── cmd/gateway/          #   Entry point
-│       ├── internal/             #   Core implementation
-│       └── proto/                #   Protobuf definitions
+│   └── mobile-execution/         # Android PRoot and iOS a-Shell plugin
 │
 ├── docs/                         # Project docs
 │   ├── architecture/             #   Architecture design
@@ -328,14 +273,14 @@ XAgent/
 <details>
 <summary><b>Does my API key ever leave my machine?</b></summary>
 
-No. Keys are stored locally on the desktop side only. The Gateway is a pure protocol relay — it never accesses the file system and never stores any credentials.
+No. Model and SSH credentials remain in the native host. Paired browsers receive redacted settings and use the authenticated local provider proxy. The GitHub PAT for cloud execution is stored in the native encrypted vault.
 
 </details>
 
 <details>
-<summary><b>Do I have to deploy the Gateway?</b></summary>
+<summary><b>Do I have to deploy a server for browser access?</b></summary>
 
-No. The desktop client works standalone with all local capabilities; deploy the Gateway only when you need browser-based remote access to your local agent.
+No. Enable WebUI in the desktop application; the embedded Tauri service hosts the same React frontend on port `28367`.
 
 </details>
 
@@ -349,7 +294,7 @@ Claude (Anthropic), Codex (OpenAI), and Gemini protocols are built in, plus cust
 <details>
 <summary><b>Will long conversations / disconnects lose context?</b></summary>
 
-No. The desktop app persists the full history with Segment + Summary Checkpoints; the Gateway replays short disconnects through a bounded seq window and converges automatically after reconnecting.
+No. The native host persists history with Segment + Summary Checkpoints. Paired clients read the same SQLite-backed history and subscribe to allowed runtime events.
 
 </details>
 
@@ -368,15 +313,10 @@ Before submitting a PR, make sure all of the following checks pass (they match t
 3. Frontend unit tests pass: `pnpm test:frontend` (also run `pnpm test:release` when touching release scripts)
 4. Rust backend check passes: `cargo check --manifest-path crates/fronted/src-tauri/Cargo.toml --tests` (run from the repo root)
 
-**Gateway · `crates/gateway` (if changed)**
-
-1. Go unit tests pass: `go test ./...`
-2. Regenerate and commit Go artifacts after proto changes: `make proto`
-
 **Single-frontend boundary**
 
 - Web, PC, and mobile builds all come from `crates/fronted`; platform differences belong in `src/runtime` or the Tauri system boundary.
-- `crates/gateway` contains only Go API/WebSocket/proto code and must not gain a frontend or static asset embedding.
+- Local browser access is owned by the Tauri host. Do not add a second frontend or a standalone gateway.
 - Keep the diff clean (no trailing whitespace): `git diff --check`
 
 ---
@@ -385,7 +325,7 @@ Before submitting a PR, make sure all of the following checks pass (they match t
 
 Thanks to everyone who has contributed to XAgent!
 
-<a href="https://github.com/Ohi01/XAgent/graphs/contributors">
+<a href="https://github.com/oliid0/xgent/graphs/contributors">
   <img src="docs/images/contributors.svg" alt="Contributors" />
 </a>
 
@@ -393,7 +333,7 @@ Thanks to everyone who has contributed to XAgent!
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=Ohi01%2FXAgent&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=oliid0%2Fxgent&type=date&legend=top-left">
 
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="docs/images/star-history-dark.svg" />
@@ -406,4 +346,4 @@ Thanks to everyone who has contributed to XAgent!
 
 ## License
 
-MIT © StackCairn
+MIT © Oliid0

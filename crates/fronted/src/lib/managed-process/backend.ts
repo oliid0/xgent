@@ -1,7 +1,5 @@
-// Desktop (Tauri) transport for the ManagedProcess store: direct invoke
-// calls plus change events emitted by the Rust registry notifier. This file
-// is the per-platform adapter — the web frontend ships its own copy speaking
-// the gateway process.* protocol.
+// Shared transport for the ManagedProcess store: Tauri uses direct invoke;
+// paired browsers use the same calls and events through local-access RPC/SSE.
 
 import { invoke, listen } from "@xagent/runtime";
 

@@ -4,6 +4,7 @@ import type { RuntimePlatform } from "../runtimePlatform";
 import {
   type McpSettings,
   type McpSettingsOp,
+  type AccessSettings,
   type ProviderId,
   type SshHostConfig,
   selectEnabledMcpServers,
@@ -20,12 +21,14 @@ import type {
   BuiltinToolMetadata,
 } from "./builtinTypes";
 import { createCronTools } from "./cronTools";
+import { createCloudTaskTools } from "./cloudTaskTools";
 import { createCustomSystemTools } from "./customSystemTools";
 import { createFileToolState, type FileToolState } from "./fileToolState";
 import { createFsTools } from "./fsTools";
 import { createMcpManagerTools } from "./mcpManagerTools";
 import { createMcpTools } from "./mcpTools";
 import { createMemoryTools } from "./memoryTools";
+import { resolveRuntimeToolCapabilities } from "./runtimeToolCapabilities";
 import { createShellTools } from "./shellTools";
 import type { SkillAccessPolicy } from "./skillAccessPolicy";
 import { createSkillTools } from "./skillTools";
@@ -33,7 +36,6 @@ import { createSSHManagerTools, type SshManagerSessionChange } from "./sshManage
 import type { SystemToolId, SystemToolRuntimeScope } from "./systemToolOptions";
 import { createTerminalTools } from "./terminalTools";
 import { createTodoTools, type TodoToolState } from "./todoTools";
-import { createTunnelManagerTools, type TunnelManagerChange } from "./tunnelManagerTools";
 
 export type BuiltinToolRegistry = {
   tools: BuiltinToolBundle["tools"];
@@ -124,6 +126,7 @@ type BuildBuiltinBaseToolRegistryParams = {
   workdir: string;
   providerId: ProviderId;
   runtimePlatform?: RuntimePlatform;
+  nativeMobileRuntime?: boolean;
   fileState: FileToolState;
   skillsEnabled: boolean;
   skillsRootDir?: string;
@@ -139,6 +142,7 @@ type BuildBuiltinBaseToolRegistryParams = {
     model: string;
   };
   selectedSystemToolIds: SystemToolId[];
+  cloudExecution?: AccessSettings;
   /** Live read of the authoritative MCP settings (never a turn-level snapshot). */
   getMcpSettings: () => McpSettings;
   /** Id-keyed merge commit into the authoritative settings; absent in read-only scopes. */
@@ -146,19 +150,17 @@ type BuildBuiltinBaseToolRegistryParams = {
   onMcpLoadError?: (message: string) => void;
   mcpLoadFailureMode?: "continue" | "throw";
   memoryToolMode?: "rw" | "ro";
-  remoteWebTunnelsEnabled?: boolean;
-  tunnelProjectPathKey?: string;
-  tunnelPublicBaseUrl?: string;
+  projectPathKey?: string;
   sshHosts?: SshHostConfig[];
   associatedSshHostIds?: string[];
   sshManagerRemoteAllowed?: boolean;
   onSshSessionsChanged?: (change: SshManagerSessionChange) => void | Promise<void>;
-  onTunnelsChanged?: (change: TunnelManagerChange) => void | Promise<void>;
 };
 
 const resolveHomeDir = () => homeDir();
 
 async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryParams) {
+  const capabilities = resolveRuntimeToolCapabilities(params.nativeMobileRuntime === true);
   const baseBundles: BuiltinToolBundle[] = [
     createFsTools({
       workdir: params.workdir,
@@ -175,7 +177,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       skillsRootEnabled: params.skillsEnabled,
       skillsRootDir: params.skillsRootDir,
       skillAccessPolicy: params.skillAccessPolicy,
-      managedProcessEnabled: params.runtimeScope === "chat",
+      managedProcessEnabled: capabilities.managedProcess && params.runtimeScope === "chat",
       resolveHomeDir,
     }),
     ...(params.skillsEnabled
@@ -187,47 +189,59 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
           }),
         ]
       : []),
-    createCronTools({
-      currentChatModel: params.currentChatModel,
-      workdir: params.workdir,
-    }),
-    createMcpManagerTools({
-      workdir: params.workdir,
-      getMcpSettings: params.getMcpSettings,
-      applyMcpOps: params.applyMcpOps,
-      runtimeScope: params.runtimeScope,
-      resolveHomeDir,
-    }),
-    createCustomSystemTools({
-      selectedToolIds: params.selectedSystemToolIds,
-      runtimeScope: params.runtimeScope,
-      currentChatModel: params.currentChatModel,
-    }),
+    ...(capabilities.cron
+      ? [
+          createCronTools({
+            currentChatModel: params.currentChatModel,
+            workdir: params.workdir,
+          }),
+        ]
+      : []),
+    ...(capabilities.mcp
+      ? [
+          createMcpManagerTools({
+            workdir: params.workdir,
+            getMcpSettings: params.getMcpSettings,
+            applyMcpOps: params.applyMcpOps,
+            runtimeScope: params.runtimeScope,
+            resolveHomeDir,
+          }),
+        ]
+      : []),
+    ...(capabilities.customSystemTools
+      ? [
+          createCustomSystemTools({
+            selectedToolIds: params.selectedSystemToolIds,
+            runtimeScope: params.runtimeScope,
+            currentChatModel: params.currentChatModel,
+          }),
+        ]
+      : []),
     createMemoryTools({
       workdir: params.workdir,
       mode: params.memoryToolMode ?? "rw",
     }),
-    createTunnelManagerTools({
-      enabled: params.remoteWebTunnelsEnabled === true && params.runtimeScope === "chat",
-      runtimeScope: params.runtimeScope,
-      projectPathKey: params.tunnelProjectPathKey,
-      publicBaseUrl: params.tunnelPublicBaseUrl,
-      onTunnelsChanged: params.onTunnelsChanged,
-    }),
-    createSSHManagerTools({
-      enabled:
-        params.runtimeScope === "chat" &&
-        params.sshManagerRemoteAllowed !== false &&
-        (params.associatedSshHostIds?.length ?? 0) > 0,
-      runtimeScope: params.runtimeScope,
-      workdir: params.workdir,
-      projectPathKey: params.tunnelProjectPathKey,
-      hosts: params.sshHosts,
-      associatedHostIds: params.associatedSshHostIds,
-      resolveHomeDir,
-      onSshSessionsChanged: params.onSshSessionsChanged,
-    }),
-    ...(params.runtimeScope === "chat"
+    ...(params.cloudExecution?.cloudExecutionEnabled
+      ? [createCloudTaskTools(params.cloudExecution, params.workdir)]
+      : []),
+    ...(capabilities.ssh
+      ? [
+          createSSHManagerTools({
+            enabled:
+              params.runtimeScope === "chat" &&
+              params.sshManagerRemoteAllowed !== false &&
+              (params.associatedSshHostIds?.length ?? 0) > 0,
+            runtimeScope: params.runtimeScope,
+            workdir: params.workdir,
+            projectPathKey: params.projectPathKey,
+            hosts: params.sshHosts,
+            associatedHostIds: params.associatedSshHostIds,
+            resolveHomeDir,
+            onSshSessionsChanged: params.onSshSessionsChanged,
+          }),
+        ]
+      : []),
+    ...(capabilities.terminal && params.runtimeScope === "chat"
       ? [
           createTerminalTools({
             workdir: params.workdir,
@@ -236,7 +250,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       : []),
   ];
 
-  const enabledServers = selectEnabledMcpServers(params.getMcpSettings());
+  const enabledServers = capabilities.mcp ? selectEnabledMcpServers(params.getMcpSettings()) : [];
   if (enabledServers.length > 0) {
     baseBundles.push(
       await createMcpTools({
@@ -256,13 +270,14 @@ export async function buildBuiltinToolRegistry(
     todoState?: TodoToolState;
   },
 ) {
+  const capabilities = resolveRuntimeToolCapabilities(params.nativeMobileRuntime === true);
   const baseBundles = await buildBaseBuiltinToolBundles(params);
   const todoBundles =
     params.runtimeScope === "chat" && params.todoState
       ? [createTodoTools({ state: params.todoState })]
       : [];
 
-  const subagentRuntime = params.subagentRuntime;
+  const subagentRuntime = capabilities.subagents ? params.subagentRuntime : undefined;
   if (!subagentRuntime) {
     return createBuiltinToolRegistry([...baseBundles, ...todoBundles]);
   }

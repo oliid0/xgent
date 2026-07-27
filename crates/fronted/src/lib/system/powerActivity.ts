@@ -1,5 +1,6 @@
 import { invoke } from "@xagent/runtime";
 
+import { isNativeMobileRuntime } from "../runtimePlatform";
 import { createUuid } from "../shared/id";
 
 const POWER_ACTIVITY_TTL_MS = 15 * 60_000;
@@ -18,6 +19,12 @@ async function beginPowerActivity(activityId: string, reason: string) {
 }
 
 export async function withPowerActivity<T>(scope: string, reason: string, run: () => Promise<T>) {
+  // Mobile lifecycle/background policy belongs to the native shell. The
+  // desktop inhibit-sleep command is intentionally not registered there.
+  if (isNativeMobileRuntime()) {
+    return await run();
+  }
+
   const activityId = createActivityId(scope);
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
 

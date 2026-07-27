@@ -282,17 +282,7 @@ export function summarizeToolCall(
                       : null,
                     args.include_schema === true ? "includeSchema=true" : null,
                   ]
-                : name === "TunnelManager"
-                  ? [
-                      includeManagerAction && typeof args.action === "string"
-                        ? `action=${args.action}`
-                        : null,
-                      typeof args.targetUrl === "string"
-                        ? `target=${summarizeToolArg(args.targetUrl)}`
-                        : null,
-                      typeof args.id === "string" ? `id=${summarizeToolArg(args.id)}` : null,
-                    ]
-                  : name === "SSHManager" || name === "SshManager"
+                : name === "SSHManager" || name === "SshManager"
                     ? [
                         includeManagerAction && typeof args.action === "string"
                           ? `action=${args.action}`

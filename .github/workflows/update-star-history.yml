@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   update:
-    if: github.repository == 'Ohi01/XAgent'
+    if: github.repository == 'oliid0/xgent'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository

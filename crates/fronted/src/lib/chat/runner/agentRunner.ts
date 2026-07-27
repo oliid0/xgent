@@ -304,8 +304,14 @@ export function buildToolsSuffix(
             `- Current platform: ${platformLabel}. Bash runs through POSIX shells.`,
             runtimePlatform === "macos"
               ? "- macOS prefers zsh, then Bash, then sh. Use POSIX/zsh-compatible commands."
-              : "- Linux prefers Bash, then zsh, then sh. Use POSIX/bash-compatible commands.",
-            "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xagent-task.log 2>&1 < /dev/null &`.",
+              : runtimePlatform === "android"
+                ? "- Android executes inside the installed Alpine PRoot environment. Use POSIX shell commands and only capability packs reported by Mobile execution settings."
+                : runtimePlatform === "ios"
+                  ? "- iOS/iPadOS exposes a restricted a-Shell-compatible native command catalog. Arbitrary WASI modules stay disabled until enforceable interruption is available; do not assume Linux process APIs, Node.js/npm, or arbitrary native packages."
+                  : "- Linux prefers Bash, then zsh, then sh. Use POSIX/bash-compatible commands.",
+            runtimePlatform === "android" || runtimePlatform === "ios"
+              ? "- Mobile operating systems may suspend the app. Keep commands foreground and bounded; do not detach background services."
+              : "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xagent-task.log 2>&1 < /dev/null &`.",
           ];
     sections.push(
       [

@@ -1,20 +1,6 @@
 import type { MentionComposerDraft } from "../../../components/chat/MentionComposer";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
 import type { ChatRuntimeControls, ExecutionMode, SystemToolId } from "../../../lib/settings";
-import type {
-  GatewayChatRuntimeControlsEvent,
-  GatewaySelectedModelEvent,
-} from "../gateway/gatewayBridgeTypes";
-
-export type QueuedGatewayChatRequest = {
-  requestId: string;
-  clientRequestId?: string;
-  workerId?: string;
-  queuePolicy?: "auto" | "append" | "interrupt";
-  selectedModel?: GatewaySelectedModelEvent;
-  runtimeControls?: GatewayChatRuntimeControlsEvent;
-};
-
 export type QueuedChatTurn = {
   id: string;
   conversationId: string;
@@ -25,7 +11,6 @@ export type QueuedChatTurn = {
   selectedSystemToolIds: SystemToolId[];
   runtimeControls: ChatRuntimeControls;
   createdAt: number;
-  gatewayRequest?: QueuedGatewayChatRequest;
 };
 
 export type ChatQueueItemSummary = {
@@ -72,7 +57,6 @@ export function createQueuedChatTurn(input: QueuedChatTurnInput): QueuedChatTurn
     selectedSystemToolIds: input.selectedSystemToolIds.slice(),
     runtimeControls: { ...input.runtimeControls },
     createdAt,
-    gatewayRequest: input.gatewayRequest ? { ...input.gatewayRequest } : undefined,
   };
 }
 

@@ -40,7 +40,11 @@ pub struct RuntimePlatformResponse {
 
 #[tauri::command]
 pub fn app_runtime_platform() -> RuntimePlatformResponse {
-    let platform = if cfg!(windows) {
+    let platform = if cfg!(target_os = "android") {
+        "android"
+    } else if cfg!(target_os = "ios") {
+        "ios"
+    } else if cfg!(windows) {
         "windows"
     } else if cfg!(target_os = "macos") {
         "macos"

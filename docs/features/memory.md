@@ -2,7 +2,7 @@
 
 ## 总体模型
 
-XAgent 的记忆系统由 Rust `MemoryStore` 作为本地真相源；前端 TypeScript 记忆域集中在 `src/lib/memory/`，提供 Settings 管理、Chat prompt 注入、`MemoryManager` 工具、回合后静默提取与离线组织器。浏览器运行时不拥有独立记忆库，只通过 Gateway 把 memory 请求转发到 Tauri Agent；Web、PC 和移动端共享同一套前端逻辑。
+XAgent 的记忆系统由 Rust `MemoryStore` 作为本地真相源；前端 TypeScript 记忆域集中在 `src/lib/memory/`，提供 Settings 管理、Chat prompt 注入、`MemoryManager` 工具、回合后静默提取与离线组织器。配对浏览器不拥有独立记忆库，而是通过本地访问 RPC 调用桌面宿主；Web、PC 和移动端共享同一套前端逻辑。
 
 | 层 | 路径 | 职责 |
 |---|---|---|
@@ -98,15 +98,14 @@ XAgent 的记忆系统由 Rust `MemoryStore` 作为本地真相源；前端 Type
 | apply | scheduled 自动应用低风险；manual 存入 v4 报告待面板复核（`memory_apply_batch` 按 groupId 保证合并先写后删）。 |
 | 记录 | 每相位更新 run 行；完成时写 `final_count/compression_ratio/token_usage_total` 与类型化 `report`（v4）；旧版报告在面板降级为只读摘要。 |
 
-## Gateway/WebUI 边界
+## WebUI 边界
 
 | 场景 | 实现 |
 |---|---|
-| 镜像纪律 | `lib/memory/{schema,config,api}.ts`、`organizer/{runRecord,quota}.ts`、`pages/settings/memory/` 5 个组件双端逐字节镜像并登记 manifest；平台差异（Select 实现、chatPageHelpers 路径、poke）只进各端 `pages/settings/memory/platform.tsx`。 |
-| WebUI MemoryPanel | 通过 `memory.manage` 转发到桌面端；desktop 桥的 `handle_memory_manage_sync` 为显式 match（新增命令需加臂）。 |
-| WebUI organizer | Run Now 创建 pending run（`pokeMemoryOrganizer` 恒 false → QueuedRemote 提示），实际执行依赖桌面端认领。 |
-| 提取/组织执行 | 仅桌面端（`prompts/*`、`extraction/*`、`organizer/{pipeline,service}`、`memoryTools` 不镜像）。 |
-| Project scope | WebUI 请求必须带 workdir，Gateway bridge 透传到 Rust，避免 project memory 失真。 |
+| 单源码 | `lib/memory` 与 Settings 组件在所有前端目标共用，不存在镜像目录。 |
+| WebUI MemoryPanel | `memory_*` 调用通过已认证的本地访问 RPC 到桌面 Rust Store。 |
+| Organizer | 只有安装了 organizer service 的运行时执行；无服务时明确返回未运行。 |
+| Project scope | WebUI 请求必须带 workdir，本地访问桥原样透传到 Rust。 |
 
 ## 常见排障入口
 
@@ -115,7 +114,7 @@ XAgent 的记忆系统由 Rust `MemoryStore` 作为本地真相源；前端 Type
 | 记忆没有写入 | 控制器 skip 原因（console.debug）、`SubmitMemoryPlan` 是否提交、`planTool` 拒绝码、`memory_apply_batch` warnings、MemoryStore audit log。 |
 | 提取被跳过 | `extractionSkipReason` 门控（过短/问候/节流/同消息）、coalesce 队列。 |
 | 搜不到记忆 | `memory-index.sqlite3` 是否 reconcile、FTS 行是否存在、scope/workdir 是否正确。 |
-| WebUI project memory 错位 | `memory.manage` payload 是否带 workdir，Gateway bridge 是否透传。 |
+| WebUI project memory 错位 | `memory_*` payload 是否带 workdir，本地访问 command allowlist 是否放行。 |
 | quota 显示不对 | `memory_quota_summary`、`deriveQuotaLadder` 阈值、面板横幅。 |
 | organizer 0 合并 | run 记录 `report.rejectionBuckets` 分桶、mode 注入、`shouldQueueDecision` 矩阵。 |
 | daily 标题异常 | `daily_slug_local_date`、`daily_title_for_meta`、Settings Journal 渲染。 |

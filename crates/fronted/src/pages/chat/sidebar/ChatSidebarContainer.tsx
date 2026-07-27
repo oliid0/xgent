@@ -1,9 +1,9 @@
 // Container between the sidebar store and the GUI sidebar view. Owns every
 // rendering subscription to the store (so sidebar commits never re-render
 // ChatPage), the conversation-rename UI state, the delete flow, and the
-// error-code → i18n mapping. NOT mirrored — the web end has its own container.
+// error-code → i18n mapping for every frontend target.
 
-import { useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import { ChatHistorySidebar } from "../../../components/chat/ChatHistorySidebar";
 import { useLocale } from "../../../i18n";
 import type { AppUpdateController } from "../../../lib/appUpdates";
@@ -17,7 +17,6 @@ import {
   sidebarShallowEqual,
 } from "../../../lib/sidebar/selectors";
 import type { SidebarSnapshot, SidebarStore } from "../../../lib/sidebar/store";
-import type { SidebarConversation } from "../../../lib/sidebar/types";
 import { useSidebarSelector } from "../../../lib/sidebar/useSidebarSelector";
 import { sortWorkspaceProjectsByActivity } from "../../../lib/workspaceProjects";
 
@@ -39,11 +38,11 @@ type ChatSidebarContainerProps = {
   recentCollapsed: boolean;
   onProjectsCollapsedChange: (collapsed: boolean) => void;
   onRecentCollapsedChange: (collapsed: boolean) => void;
-  onCreateProject: () => void;
+  onCreateProject?: () => void;
   onSelectProject: (project: WorkspaceProject) => void;
   onNewConversationForProject: (project: WorkspaceProject) => void;
-  onBrowseProjectInFileTree: (project: WorkspaceProject) => void;
-  onBrowseProjectInSystemFileManager: (project: WorkspaceProject) => void;
+  onBrowseProjectInFileTree?: (project: WorkspaceProject) => void;
+  onBrowseProjectInSystemFileManager?: (project: WorkspaceProject) => void;
   onStartRenamingProject: (project: WorkspaceProject) => void;
   onProjectRenameDraftChange: (value: string) => void;
   onCommitProjectRename: () => void;
@@ -58,10 +57,6 @@ type ChatSidebarContainerProps = {
   // Invoked after the store confirmed a deletion; ChatPage cleans artifacts
   // and replaces the current conversation when needed.
   onConversationDeleted: (id: string) => void;
-  canShareConversations: boolean;
-  sharedConversationCount: number;
-  onShareConversation: (item: SidebarConversation) => void;
-  onOpenSharedConversations: () => void;
   onCloseSidebar: () => void;
   onOpenSettings: () => void;
   appUpdate?: AppUpdateController;
@@ -174,67 +169,75 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
   }
 
   return (
-    <ChatHistorySidebar
-      items={items}
-      currentConversationId={props.currentConversationId}
-      runningConversationIds={runningConversationIds}
-      busyConversationIds={busyConversationIds}
-      listStatus={listState.status}
-      scopeKey={scopeKey}
-      totalItems={listState.totalCount}
-      hasMore={listState.hasMore}
-      isLoadingMore={listState.isLoadingMore}
-      errorMessage={errorMessage}
-      errorDetail={errorDetail}
-      onDismissError={handleDismissError}
-      renamingId={renamingId}
-      renameDraft={renameDraft}
-      isOpen={props.isOpen}
-      fontScale={props.fontScale}
-      activeView={props.activeView}
-      showProjects={props.showProjects}
-      projects={sortedProjects}
-      activeProjectId={props.activeProjectId}
-      missingProjectPathKeys={props.missingProjectPathKeys}
-      runningProjectPathKeys={projectActivityInputs.runningWorkdirPathKeys}
-      projectRenamingId={props.projectRenamingId}
-      projectRenameDraft={props.projectRenameDraft}
-      projectsCollapsed={props.projectsCollapsed}
-      recentCollapsed={props.recentCollapsed}
-      onProjectsCollapsedChange={props.onProjectsCollapsedChange}
-      onRecentCollapsedChange={props.onRecentCollapsedChange}
-      onCreateProject={props.onCreateProject}
-      onSelectProject={props.onSelectProject}
-      onNewConversationForProject={props.onNewConversationForProject}
-      onBrowseProjectInFileTree={props.onBrowseProjectInFileTree}
-      onBrowseProjectInSystemFileManager={props.onBrowseProjectInSystemFileManager}
-      onStartRenamingProject={props.onStartRenamingProject}
-      onProjectRenameDraftChange={props.onProjectRenameDraftChange}
-      onCommitProjectRename={props.onCommitProjectRename}
-      onCancelProjectRename={props.onCancelProjectRename}
-      onSetProjectPinned={props.onSetProjectPinned}
-      onRemoveProject={props.onRemoveProject}
-      onArchiveProject={props.onArchiveProject}
-      onUnarchiveProject={props.onUnarchiveProject}
-      archivedProjectPathKeys={props.archivedProjectPathKeys}
-      onNewConversation={props.onNewConversation}
-      onSelectConversation={props.onSelectConversation}
-      onStartRenaming={handleStartRenaming}
-      onRenameDraftChange={setRenameDraft}
-      onCommitRename={handleCommitRename}
-      onCancelRename={handleCancelRename}
-      onSetPinned={handleSetPinned}
-      canShareConversations={props.canShareConversations}
-      sharedConversationCount={props.sharedConversationCount}
-      onShareConversation={props.onShareConversation}
-      onOpenSharedConversations={props.onOpenSharedConversations}
-      onDeleteConversation={handleDeleteConversation}
-      onLoadMore={handleLoadMore}
-      onCloseSidebar={props.onCloseSidebar}
-      onOpenSettings={props.onOpenSettings}
-      appUpdate={props.appUpdate}
-      onOpenSkillsHub={props.onOpenSkillsHub}
-      onOpenMcpHub={props.onOpenMcpHub}
-    />
+    <Fragment>
+      <button
+        type="button"
+        aria-label={t("sidebar.closeSidebar")}
+        onClick={props.onCloseSidebar}
+        className={
+          props.isOpen
+            ? "fixed inset-0 z-40 bg-black/25 opacity-100 backdrop-blur-[1px] transition-opacity duration-200 md:hidden"
+            : "pointer-events-none fixed inset-0 z-40 bg-black/25 opacity-0 transition-opacity duration-200 md:hidden"
+        }
+      />
+      <ChatHistorySidebar
+        items={items}
+        currentConversationId={props.currentConversationId}
+        runningConversationIds={runningConversationIds}
+        busyConversationIds={busyConversationIds}
+        listStatus={listState.status}
+        scopeKey={scopeKey}
+        totalItems={listState.totalCount}
+        hasMore={listState.hasMore}
+        isLoadingMore={listState.isLoadingMore}
+        errorMessage={errorMessage}
+        errorDetail={errorDetail}
+        onDismissError={handleDismissError}
+        renamingId={renamingId}
+        renameDraft={renameDraft}
+        isOpen={props.isOpen}
+        fontScale={props.fontScale}
+        activeView={props.activeView}
+        showProjects={props.showProjects}
+        projects={sortedProjects}
+        activeProjectId={props.activeProjectId}
+        missingProjectPathKeys={props.missingProjectPathKeys}
+        runningProjectPathKeys={projectActivityInputs.runningWorkdirPathKeys}
+        projectRenamingId={props.projectRenamingId}
+        projectRenameDraft={props.projectRenameDraft}
+        projectsCollapsed={props.projectsCollapsed}
+        recentCollapsed={props.recentCollapsed}
+        onProjectsCollapsedChange={props.onProjectsCollapsedChange}
+        onRecentCollapsedChange={props.onRecentCollapsedChange}
+        onCreateProject={props.onCreateProject}
+        onSelectProject={props.onSelectProject}
+        onNewConversationForProject={props.onNewConversationForProject}
+        onBrowseProjectInFileTree={props.onBrowseProjectInFileTree}
+        onBrowseProjectInSystemFileManager={props.onBrowseProjectInSystemFileManager}
+        onStartRenamingProject={props.onStartRenamingProject}
+        onProjectRenameDraftChange={props.onProjectRenameDraftChange}
+        onCommitProjectRename={props.onCommitProjectRename}
+        onCancelProjectRename={props.onCancelProjectRename}
+        onSetProjectPinned={props.onSetProjectPinned}
+        onRemoveProject={props.onRemoveProject}
+        onArchiveProject={props.onArchiveProject}
+        onUnarchiveProject={props.onUnarchiveProject}
+        archivedProjectPathKeys={props.archivedProjectPathKeys}
+        onNewConversation={props.onNewConversation}
+        onSelectConversation={props.onSelectConversation}
+        onStartRenaming={handleStartRenaming}
+        onRenameDraftChange={setRenameDraft}
+        onCommitRename={handleCommitRename}
+        onCancelRename={handleCancelRename}
+        onSetPinned={handleSetPinned}
+        onDeleteConversation={handleDeleteConversation}
+        onLoadMore={handleLoadMore}
+        onCloseSidebar={props.onCloseSidebar}
+        onOpenSettings={props.onOpenSettings}
+        appUpdate={props.appUpdate}
+        onOpenSkillsHub={props.onOpenSkillsHub}
+        onOpenMcpHub={props.onOpenMcpHub}
+      />
+    </Fragment>
   );
 }

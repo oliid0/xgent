@@ -10,7 +10,7 @@ import {
   collectRetainedSubagentParentToolCallIds,
   pruneSubagentRunsForConversation,
 } from "../../../lib/subagents";
-import type { SendChatAction } from "../gateway/gatewayBridgeTypes";
+import type { SendChatAction } from "../local-access/conversationBridgeTypes";
 import type { ConversationRuntimeEntry } from "../runtime/chatPageRuntime";
 
 type UseEditResendParams = {

@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke, isBrowserRuntime } from "@xagent/runtime";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -122,6 +122,7 @@ function SshHostModal(props: {
   onSave: (data: SshHostDraft) => void;
   onClose: () => void;
 }) {
+  const browser = isBrowserRuntime();
   const { initialData, onSave, onClose } = props;
   const { t } = useLocale();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -399,7 +400,7 @@ function SshHostModal(props: {
                 <SshPasswordInput
                   id="ssh-password"
                   value={password}
-                  disabled={!isPasswordAuth}
+                  disabled={!isPasswordAuth || browser}
                   onChange={setPassword}
                 />
                 {initialData?.passwordConfigured && !password.trim() ? (
@@ -423,7 +424,7 @@ function SshHostModal(props: {
                     size="icon"
                     className="absolute right-2 top-2 z-10 h-7 w-7 rounded-md border border-transparent bg-background/80 p-0 text-muted-foreground shadow-none hover:border-border/70 hover:bg-muted/70 hover:text-foreground"
                     aria-label={t("settings.sshPrivateKeyImport")}
-                    disabled={!isPrivateKeyAuth}
+                    disabled={!isPrivateKeyAuth || browser}
                     onClick={() => fileInputRef.current?.click()}
                     title={t("settings.sshPrivateKeyImport")}
                   >
@@ -433,14 +434,14 @@ function SshHostModal(props: {
                     ref={fileInputRef}
                     type="file"
                     className="hidden"
-                    disabled={!isPrivateKeyAuth}
+                    disabled={!isPrivateKeyAuth || browser}
                     onChange={(event) => handleFileSelected(event.currentTarget.files?.[0])}
                   />
                   <Textarea
                     id="ssh-private-key"
                     aria-label={t("settings.sshPrivateKey")}
                     value={privateKey}
-                    disabled={!isPrivateKeyAuth}
+                    disabled={!isPrivateKeyAuth || browser}
                     className="min-h-[180px] resize-y pr-12 font-mono text-xs leading-relaxed"
                     onChange={(event) => setPrivateKey(event.currentTarget.value)}
                   />
@@ -460,7 +461,7 @@ function SshHostModal(props: {
                   <SshPasswordInput
                     id="ssh-private-key-passphrase"
                     value={privateKeyPassphrase}
-                    disabled={!isPrivateKeyAuth}
+                    disabled={!isPrivateKeyAuth || browser}
                     onChange={setPrivateKeyPassphrase}
                   />
                   {initialData?.privateKeyPassphraseConfigured && !privateKeyPassphrase.trim() ? (
@@ -576,6 +577,7 @@ function SshHostModal(props: {
                     <SshPasswordInput
                       id="ssh-proxy-password"
                       value={proxyPassword}
+                      disabled={browser}
                       onChange={setProxyPassword}
                     />
                     {initialData?.proxy.passwordConfigured && !proxyPassword.trim() ? (

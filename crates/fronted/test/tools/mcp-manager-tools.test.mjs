@@ -710,7 +710,7 @@ test("McpManager commits merge with concurrent settings writers instead of overw
   });
   await homeRequested;
 
-  // ...while another writer (UI edit / gateway sync / concurrent turn) lands.
+  // ...while another writer (UI edit / paired-client update / concurrent turn) lands.
   ctx.applyExternal((prev) => ({
     servers: [...prev.servers, { ...baseServer, id: "ui-added", command: "ui-mcp" }],
     selected: prev.selected,

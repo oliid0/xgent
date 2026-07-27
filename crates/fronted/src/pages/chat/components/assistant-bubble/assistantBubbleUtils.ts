@@ -10,7 +10,6 @@ import {
   FileText,
   FolderTree,
   ImageIcon,
-  Link2,
   ListChecks,
   Plug,
   Search,
@@ -52,8 +51,6 @@ export function getToolMeta(name: string): {
       return { Icon: Brain, accent: "var(--tool-list-accent)", category: "system" };
     case "McpManager":
       return { Icon: Plug, accent: "var(--tool-list-accent)", category: "mcp" };
-    case "TunnelManager":
-      return { Icon: Link2, accent: "var(--tool-list-accent)", category: "system" };
     case "SSHManager":
     case "SshManager":
       return { Icon: Server, accent: "var(--tool-bash-accent)", category: "terminal" };
@@ -235,7 +232,6 @@ const TOOL_CARD_ACTION_NAMES = new Set([
   "CronTaskManager",
   "McpManager",
   "MemoryManager",
-  "TunnelManager",
   "SSHManager",
   "ManagedProcess",
 ]);

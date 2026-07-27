@@ -1,4 +1,4 @@
-name: Desktop Release
+name: XAgent Release
 
 on:
   push:
@@ -156,9 +156,6 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install protobuf compiler
-        run: brew install protobuf
-
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: crates/fronted/src-tauri
@@ -282,11 +279,6 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install protobuf compiler
-        run: |
-          choco install protoc -y --no-progress
-          "$env:ChocolateyInstall\lib\protoc\tools\bin" | Out-File -Append $env:GITHUB_PATH
-
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: crates/fronted/src-tauri
@@ -386,7 +378,6 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libxdo-dev \
             patchelf \
-            protobuf-compiler \
             rpm \
             wget
 
@@ -462,6 +453,274 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  android:
+    name: Android universal APK
+    runs-on: ubuntu-latest
+    needs:
+      - release-metadata
+      - release-preflight
+    env:
+      XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
+      XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_NDK_VERSION: 28.2.13676358
+      ANDROID_BUILD_TOOLS_VERSION: 36.0.0
+      PROOT_SOURCE_COMMIT: b55e987fe2bd1c609291c16a4fa432814818cbdd
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release-metadata.outputs.release_sha }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK and native build tools
+        run: |
+          set -euo pipefail
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;$ANDROID_BUILD_TOOLS_VERSION" \
+            "ndk;$ANDROID_NDK_VERSION"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" >> "$GITHUB_ENV"
+
+      - name: Install host archive tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils zstd
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.32.1
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/fronted/src-tauri
+          shared-key: android
+
+      - name: Install frontend dependencies
+        working-directory: crates/fronted
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare release version config
+        working-directory: crates/fronted
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
+
+      - name: Prepare verified Android execution environment
+        run: |
+          set -euo pipefail
+          bash scripts/mobile/prepare-proot-android.sh
+          bash scripts/mobile/prepare-alpine-rootfs-android.sh
+          bash scripts/mobile/prepare-mobile-legal-notices.sh
+
+      - name: Initialize Tauri Android project
+        working-directory: crates/fronted
+        run: pnpm tauri android init --ci
+
+      - name: Build unsigned release APK
+        working-directory: crates/fronted
+        run: pnpm tauri android build --ci --apk --target aarch64 --target x86_64 --config "$XAGENT_TAURI_VERSION_CONFIG"
+
+      - name: Sign and verify installable APK
+        run: |
+          set -euo pipefail
+          mapfile -t apk_candidates < <(
+            find crates/fronted/src-tauri/gen/android/app/build/outputs/apk \
+              -type f -name '*.apk' -print
+          )
+          if [ "${#apk_candidates[@]}" -ne 1 ]; then
+            printf 'Expected one universal APK, found %s\n' "${#apk_candidates[@]}" >&2
+            printf '%s\n' "${apk_candidates[@]}" >&2
+            exit 1
+          fi
+
+          credential_count=0
+          for value in \
+            "$ANDROID_KEYSTORE_BASE64" \
+            "$ANDROID_KEY_ALIAS" \
+            "$ANDROID_KEYSTORE_PASSWORD" \
+            "$ANDROID_KEY_PASSWORD"; do
+            if [ -n "$value" ]; then credential_count=$((credential_count + 1)); fi
+          done
+
+          keystore_path="$RUNNER_TEMP/xagent-android-release.jks"
+          if [ "$credential_count" -eq 4 ]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+            signing_mode="repository release key"
+            effective_alias="$ANDROID_KEY_ALIAS"
+            effective_store_password="$ANDROID_KEYSTORE_PASSWORD"
+            effective_key_password="$ANDROID_KEY_PASSWORD"
+          elif [ "$credential_count" -eq 0 ]; then
+            signing_mode="ephemeral CI key (installable, but not update-stable)"
+            effective_alias="xagent-ci"
+            effective_store_password="xagent-ci-release"
+            effective_key_password="xagent-ci-release"
+            keytool -genkeypair -noprompt \
+              -keystore "$keystore_path" \
+              -storetype PKCS12 \
+              -storepass "$effective_store_password" \
+              -keypass "$effective_key_password" \
+              -alias "$effective_alias" \
+              -keyalg RSA \
+              -keysize 3072 \
+              -validity 3650 \
+              -dname "CN=XAgent CI, OU=Release, O=XAgent, C=US"
+          else
+            echo "Android signing secrets are partially configured; set all four or none." >&2
+            exit 1
+          fi
+
+          build_tools="$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS_VERSION"
+          mkdir -p dist
+          aligned_apk="$RUNNER_TEMP/xagent-aligned.apk"
+          release_apk="dist/XAgent-${XAGENT_RELEASE_TAG}-Android-universal.apk"
+          # Android 15+ devices can use a 16 KiB memory page size. Build-tools
+          # 35+ require -P 16 in addition to the normal 4-byte APK alignment
+          # for uncompressed native libraries.
+          "$build_tools/zipalign" -P 16 -f 4 "${apk_candidates[0]}" "$aligned_apk"
+          EFFECTIVE_STORE_PASSWORD="$effective_store_password" \
+          EFFECTIVE_KEY_PASSWORD="$effective_key_password" \
+            "$build_tools/apksigner" sign \
+              --ks "$keystore_path" \
+              --ks-key-alias "$effective_alias" \
+              --ks-pass env:EFFECTIVE_STORE_PASSWORD \
+              --key-pass env:EFFECTIVE_KEY_PASSWORD \
+              --out "$release_apk" \
+              "$aligned_apk"
+          "$build_tools/apksigner" verify --verbose --print-certs "$release_apk" \
+            | tee dist/Android-signing.txt
+          "$build_tools/zipalign" -c -P 16 4 "$release_apk"
+          printf '\nSigning mode: %s\n' "$signing_mode" >> dist/Android-signing.txt
+          unzip -l "$release_apk" | grep -F 'lib/arm64-v8a/libxagent_proot.so'
+          unzip -l "$release_apk" | grep -F 'lib/x86_64/libxagent_proot.so'
+          unzip -l "$release_apk" | grep -F 'assets/mobile-execution/rootfs/manifest.json'
+
+          native_check_dir="$RUNNER_TEMP/xagent-native-libraries"
+          mkdir -p "$native_check_dir"
+          unzip -q "$release_apk" 'lib/*/*.so' -d "$native_check_dir"
+          readelf="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$readelf"
+          alignment_failed=0
+          while IFS= read -r native_library; do
+            while IFS= read -r alignment; do
+              if [ "$((alignment))" -lt 16384 ]; then
+                echo "::error title=Android 16 KiB alignment::$native_library has LOAD alignment $alignment"
+                alignment_failed=1
+              fi
+            done < <("$readelf" -lW "$native_library" | awk '$1 == "LOAD" { print $NF }')
+          done < <(find "$native_check_dir/lib" -type f -name '*.so' -print)
+          test "$alignment_failed" -eq 0
+
+      - name: Package PRoot corresponding source
+        run: |
+          set -euo pipefail
+          source_archive="dist/XAgent-${XAGENT_RELEASE_TAG}-PRoot-${PROOT_SOURCE_COMMIT}-source.tar.gz"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            "https://codeload.github.com/termux/proot/tar.gz/$PROOT_SOURCE_COMMIT" \
+            --output "$source_archive"
+          test -s "$source_archive"
+          source_name="$(basename "$source_archive")"
+          (cd dist && sha256sum "$source_name" > "${source_name}.sha256")
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: xagent-android
+          path: dist/*
+          if-no-files-found: error
+
+  ios:
+    name: iOS arm64 unsigned IPA
+    runs-on: macos-14
+    needs:
+      - release-metadata
+      - release-preflight
+    env:
+      XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
+      XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release-metadata.outputs.release_sha }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.32.1
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/fronted/src-tauri
+          shared-key: ios
+
+      - name: Install frontend dependencies
+        working-directory: crates/fronted
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare release version config
+        working-directory: crates/fronted
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
+
+      - name: Prepare verified iOS shell resources
+        run: |
+          set -euo pipefail
+          bash scripts/mobile/prepare-ios-shell-resources.sh
+          bash scripts/mobile/prepare-mobile-legal-notices.sh
+
+      - name: Initialize Tauri iOS project
+        working-directory: crates/fronted
+        run: pnpm tauri ios init --ci
+
+      - name: Build unsigned iOS IPA
+        working-directory: crates/fronted
+        run: pnpm tauri ios build --ci --no-sign --target aarch64 --build-number "${{ github.run_number }}" --config "$XAGENT_TAURI_VERSION_CONFIG"
+
+      - name: Stage and inspect IPA
+        run: |
+          set -euo pipefail
+          ipa_candidates=()
+          while IFS= read -r -d '' candidate; do
+            ipa_candidates+=("$candidate")
+          done < <(find crates/fronted/src-tauri/gen/apple -type f -name '*.ipa' -print0)
+          if [ "${#ipa_candidates[@]}" -ne 1 ]; then
+            printf 'Expected one IPA, found %s\n' "${#ipa_candidates[@]}" >&2
+            printf '%s\n' "${ipa_candidates[@]}" >&2
+            exit 1
+          fi
+          mkdir -p dist
+          release_ipa="dist/XAgent-${XAGENT_RELEASE_TAG}-iOS-arm64-unsigned.ipa"
+          cp "${ipa_candidates[0]}" "$release_ipa"
+          unzip -t "$release_ipa"
+          unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/'
+          printf '%s\n' \
+            'This IPA is intentionally unsigned. Re-sign it with an Apple Developer identity or a compatible sideloading service before installation.' \
+            > dist/iOS-signing.txt
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: xagent-ios
+          path: dist/*
+          if-no-files-found: error
+
   publish:
     name: Publish GitHub Release
     if: ${{ needs.release-metadata.outputs.publish_release == 'true' }}
@@ -473,6 +732,8 @@ jobs:
       - macos
       - windows
       - linux
+      - android
+      - ios
     env:
       XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
       XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}

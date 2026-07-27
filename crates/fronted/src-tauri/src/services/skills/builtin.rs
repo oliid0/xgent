@@ -21,6 +21,8 @@ pub(crate) struct BuiltinSkill {
 const CODE_REVIEW_OWNERSHIP_MARKER_PATH: &str = "_xagent_builtin.json";
 const CODE_REVIEW_OWNERSHIP_MARKER_CONTENT: &str =
     "{\"schemaVersion\":1,\"owner\":\"XAgent\",\"skill\":\"xagent-code-review\"}\n";
+const CLOUD_EXECUTION_OWNERSHIP_MARKER_CONTENT: &str =
+    "{\"schemaVersion\":1,\"owner\":\"XAgent\",\"skill\":\"xagent-cloud-execution\"}\n";
 
 const SKILLS_INSTALLER_FILES: &[BuiltinSkillFile] = &[
     BuiltinSkillFile {
@@ -71,6 +73,17 @@ const CODE_REVIEW_FILES: &[BuiltinSkillFile] = &[
     },
 ];
 
+const CLOUD_EXECUTION_FILES: &[BuiltinSkillFile] = &[
+    BuiltinSkillFile {
+        path: "SKILL.md",
+        content: include_str!("../../../prompt/skills/xagent-cloud-execution/SKILL.md"),
+    },
+    BuiltinSkillFile {
+        path: CODE_REVIEW_OWNERSHIP_MARKER_PATH,
+        content: CLOUD_EXECUTION_OWNERSHIP_MARKER_CONTENT,
+    },
+];
+
 pub(crate) const BUILTIN_AGENT_SKILLS: &[BuiltinSkill] = &[
     BuiltinSkill {
         name: "xagent-code-review",
@@ -78,6 +91,14 @@ pub(crate) const BUILTIN_AGENT_SKILLS: &[BuiltinSkill] = &[
         ownership_marker: Some((
             CODE_REVIEW_OWNERSHIP_MARKER_PATH,
             CODE_REVIEW_OWNERSHIP_MARKER_CONTENT,
+        )),
+    },
+    BuiltinSkill {
+        name: "xagent-cloud-execution",
+        files: CLOUD_EXECUTION_FILES,
+        ownership_marker: Some((
+            CODE_REVIEW_OWNERSHIP_MARKER_PATH,
+            CLOUD_EXECUTION_OWNERSHIP_MARKER_CONTENT,
         )),
     },
     BuiltinSkill {

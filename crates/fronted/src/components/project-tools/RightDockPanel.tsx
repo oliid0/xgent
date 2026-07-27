@@ -27,7 +27,6 @@ import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types
 import { X } from "../icons";
 import { Button } from "../ui/button";
 import type { GitCommitContextPayload, GitFileContextPayload } from "./git-review";
-import type { LocalTunnelClient } from "./LocalTunnelPanel";
 import { RightDockContent } from "./RightDockContent";
 import {
   type GitReviewFocusRequest,
@@ -69,10 +68,6 @@ type RightDockPanelProps = {
   gitClient?: GitClient | null;
   gitWriteEnabled?: boolean;
   gitDisabledMessage?: string;
-  tunnelClient?: LocalTunnelClient | null;
-  tunnelEnabled?: boolean;
-  tunnelDisabledMessage?: string;
-  tunnelPublicBaseUrl: string;
   workspaceActivityClient?: WorkspaceActivityClient | null;
   onWidthChange: (width: number) => void;
   onProjectStateChange: (
@@ -350,10 +345,6 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
     gitClient,
     gitWriteEnabled = true,
     gitDisabledMessage,
-    tunnelClient,
-    tunnelEnabled = true,
-    tunnelDisabledMessage,
-    tunnelPublicBaseUrl,
     workspaceActivityClient,
     onWidthChange,
     onProjectStateChange,
@@ -482,7 +473,6 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
     (process) => process.running,
   ).length;
 
-  const tunnelAvailable = Boolean(tunnelClient);
   const {
     activateTab,
     canReorderTabs,
@@ -496,7 +486,6 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
     orderedProjectTabs,
     setDraftTabOrder,
     sshTunnelInitialized,
-    tunnelInitialized,
   } = useRightDockProjectTabs({
     backgroundTasksVisible,
     localSessions,
@@ -504,7 +493,6 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
     projectPathKey,
     projectState,
     sessionsLoaded,
-    tunnelAvailable,
   });
 
   const handleCreate = useCallback(() => {
@@ -573,25 +561,19 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
     [tabsScrollRef],
   );
 
-  const showDisabledMessage = Boolean(
-    disabledMessage && !tunnelAvailable && !tunnelInitialized && !sshTunnelInitialized,
-  );
+  const showDisabledMessage = Boolean(disabledMessage && !sshTunnelInitialized);
   const showRightDockChooser =
     !showDisabledMessage &&
-    (projectReady || tunnelAvailable) &&
+    projectReady &&
     currentActiveTab === "terminal" &&
     !activeSession;
 
   const startToolTab = useCallback(
     (kind: RightDockSingletonTabKind) => {
-      if (rightDockTabRequiresProject(kind)) {
-        if (!projectReady) return;
-      } else if (!tunnelClient) {
-        return;
-      }
+      if (rightDockTabRequiresProject(kind) && !projectReady) return;
       openSingletonTab(kind);
     },
-    [openSingletonTab, projectReady, tunnelClient],
+    [openSingletonTab, projectReady],
   );
 
   const setFileTreeInitialized = useCallback(
@@ -640,7 +622,6 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
       clients: {
         terminal: client,
         git: gitClient,
-        tunnel: tunnelClient,
         workspaceActivity: workspaceActivityClient,
       },
       capabilities: {
@@ -650,9 +631,6 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
         terminalDisabledMessage,
         gitWriteEnabled,
         gitDisabledMessage,
-        tunnelEnabled,
-        tunnelDisabledMessage,
-        tunnelPublicBaseUrl,
       },
       fileTree: {
         state: fileTreeState,
@@ -715,10 +693,6 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
       terminalDisabledMessage,
       terminalReady,
       theme,
-      tunnelClient,
-      tunnelDisabledMessage,
-      tunnelEnabled,
-      tunnelPublicBaseUrl,
       workspaceActivityClient,
     ],
   );
@@ -727,10 +701,9 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
     () => ({
       fileTree: fileTreeInitialized,
       gitReview: gitReviewInitialized,
-      tunnel: tunnelInitialized,
       sshTunnel: sshTunnelInitialized,
     }),
-    [fileTreeInitialized, gitReviewInitialized, sshTunnelInitialized, tunnelInitialized],
+    [fileTreeInitialized, gitReviewInitialized, sshTunnelInitialized],
   );
 
   return (
@@ -742,7 +715,7 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
         data-state={isOpen ? "open" : "closed"}
         data-project-tools-resizing={isResizing ? "true" : undefined}
         className={cn(
-          "project-tools-panel zone-font-scale fixed inset-x-0 bottom-0 z-40 flex h-[min(72vh,34rem)] min-h-0 w-full shrink-0 flex-col overflow-hidden bg-background shadow-2xl transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none md:relative md:inset-auto md:z-10 md:h-full md:overflow-visible md:shadow-none",
+          "project-tools-panel zone-font-scale fixed inset-x-0 bottom-0 z-40 flex h-[min(72dvh,34rem)] min-h-0 w-full shrink-0 flex-col overflow-hidden bg-background pb-[env(safe-area-inset-bottom,0px)] shadow-2xl transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none md:relative md:inset-auto md:z-10 md:h-full md:overflow-visible md:p-0 md:shadow-none",
           isOpen
             ? "pointer-events-auto translate-y-0 border-t border-border opacity-100 md:w-[var(--project-tools-panel-width)] md:translate-x-0 md:border-l md:border-t-0"
             : "pointer-events-none translate-y-full border-t border-transparent opacity-0 md:translate-x-3 md:translate-y-0 md:border-l-0 md:border-t-0",
@@ -817,7 +790,6 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
                   terminalReady={terminalReady}
                   terminalDisabledMessage={terminalDisabledMessage}
                   projectReady={projectReady}
-                  tunnelAvailable={tunnelAvailable}
                   creating={creating}
                   onCreateTerminal={createTerminal}
                   onStartTool={startToolTab}
@@ -879,7 +851,6 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
                   terminalDisabledMessage={terminalDisabledMessage}
                   disabledMessage={disabledMessage}
                   projectReady={projectReady}
-                  tunnelAvailable={tunnelAvailable}
                   creating={creating}
                   loading={loading}
                   error={error}

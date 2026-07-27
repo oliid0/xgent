@@ -2,17 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
-const gatewayInvokeCalls = [];
 const loader = createTsModuleLoader({
   mocks: {
     "@tauri-apps/api/core": {
       invoke(command, args) {
         if (command === "proxy_get_server_info") {
           return Promise.resolve({ baseUrl: "http://proxy.local:9999", token: "proxy-token" });
-        }
-        if (command === "gateway_provider_models") {
-          gatewayInvokeCalls.push(args);
-          return Promise.resolve({ data: [{ id: "gpt-proxied" }] });
         }
         throw new Error(`unexpected invoke(${command})`);
       },
@@ -273,39 +268,4 @@ test("fetchModelsFromApi retries claude_code with official anthropic headers", a
       );
     },
   );
-});
-
-test("gateway WebUI forwards the system proxy choice to desktop model fetching", async () => {
-  const previousWindow = globalThis.window;
-  globalThis.window = {
-    localStorage: {
-      getItem(key) {
-        return key === "xagent.gateway.token" ? "gateway-token" : null;
-      },
-    },
-  };
-  gatewayInvokeCalls.length = 0;
-  try {
-    const models = await providerUtils.fetchModelsFromApi(
-      "codex",
-      "https://relay.example.com/v1",
-      "test-key",
-      { useSystemProxy: true },
-    );
-    assert.deepEqual(
-      models.map((model) => model.id),
-      ["gpt-proxied"],
-    );
-    assert.deepEqual(gatewayInvokeCalls, [
-      {
-        type: "codex",
-        base_url: "https://relay.example.com/v1",
-        api_key: "test-key",
-        use_system_proxy: true,
-      },
-    ]);
-  } finally {
-    if (previousWindow === undefined) delete globalThis.window;
-    else globalThis.window = previousWindow;
-  }
 });

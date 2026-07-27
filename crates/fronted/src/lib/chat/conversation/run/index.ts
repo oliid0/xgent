@@ -1,2 +1,2 @@
-export * from "./gatewayBridgeEvents";
+export * from "./conversationEvents";
 export * from "./hookLifecycle";

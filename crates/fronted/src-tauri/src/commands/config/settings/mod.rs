@@ -10,8 +10,8 @@ use std::{
 };
 
 use crate::runtime::project_path::project_path_key as normalize_project_path_key;
+#[cfg(desktop)]
 use crate::services::automation::AutomationScheduler;
-use crate::services::gateway::GatewayController;
 
 const DB_FILENAME: &str = "config.sqlite";
 const DEFAULT_PROJECT_DIRNAME: &str = "default-project";
@@ -22,7 +22,7 @@ const AGENT_PROMPT_TEMPLATES_TABLE: &str = "agent_prompt_templates";
 const SSH_SETTINGS_TABLE: &str = "ssh_settings";
 const SSH_PROJECT_HOST_ASSOCIATIONS_TABLE: &str = "ssh_project_host_associations";
 const SSH_KNOWN_HOSTS_TABLE: &str = "ssh_known_hosts";
-const REMOTE_SETTINGS_TABLE: &str = "remote_settings";
+const ACCESS_SETTINGS_TABLE: &str = "access_settings";
 const MEMORY_SETTINGS_TABLE: &str = "memory_settings";
 
 const SYSTEM_EXECUTION_MODE_KEY: &str = "executionMode";
@@ -145,17 +145,19 @@ const SSH_KNOWN_HOSTS_DELETE_SQL: &str = "
 ";
 
 include!("types.rs");
-include!("remote.rs");
+include!("access.rs");
 include!("db.rs");
 include!("json.rs");
 include!("providers.rs");
+#[cfg(desktop)]
 include!("ccs_import.rs");
+#[cfg(desktop)]
 include!("cherry_import.rs");
 include!("agents.rs");
 include!("system.rs");
 include!("mcp.rs");
 include!("memory_settings.rs");
-include!("gateway_sync.rs");
+include!("local_access_snapshot.rs");
 include!("ssh/mod.rs");
 include!("commands.rs");
 include!("tests.rs");

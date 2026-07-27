@@ -1,12 +1,7 @@
 export { ChatComposerBar, type ChatQueueTurnPreview } from "./components/ChatComposerBar";
 export { ChatHeader } from "./components/ChatHeader";
-export type {
-  ActiveGatewayBridgeRequest,
-  EnsureGatewayBridgeConversationReadyOptions,
-  SendChatAction,
-} from "./gateway/gatewayBridgeTypes";
-export { useGatewayBridgeBatcher } from "./gateway/useGatewayBridgeBatcher";
-export { useGatewayBridgeListeners } from "./gateway/useGatewayBridgeListeners";
+export type { SendChatAction } from "./local-access/conversationBridgeTypes";
+export { useConversationEventPublisher } from "./local-access/useConversationEventPublisher";
 export {
   scheduleIdleHydration,
   useConversationHistoryActions,

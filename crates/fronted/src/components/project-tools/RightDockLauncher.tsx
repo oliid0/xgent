@@ -29,7 +29,6 @@ type RightDockCreateMenuProps = RightDockLauncherActions & {
   terminalReady: boolean;
   terminalDisabledMessage?: string;
   projectReady: boolean;
-  tunnelAvailable: boolean;
   creating: boolean;
 };
 
@@ -38,7 +37,6 @@ type RightDockChooserProps = RightDockLauncherActions & {
   terminalDisabledMessage?: string;
   disabledMessage?: string;
   projectReady: boolean;
-  tunnelAvailable: boolean;
   creating: boolean;
   loading: boolean;
   error: string | null;
@@ -52,7 +50,6 @@ export function RightDockCreateMenu(props: RightDockCreateMenuProps) {
     terminalReady,
     terminalDisabledMessage,
     projectReady,
-    tunnelAvailable,
     creating,
     onCreateTerminal,
     onStartTool,
@@ -101,7 +98,7 @@ export function RightDockCreateMenu(props: RightDockCreateMenuProps) {
           Radix (web) triggers both render a plain <button>, so this markup can
           stay byte-identical on both ends without asChild/render adapters. */}
       <DropdownMenuTrigger
-        disabled={!(projectReady || tunnelAvailable) || creating}
+        disabled={!projectReady || creating}
         title={t("projectTools.newProjectTool")}
         className={cn(
           buttonVariants({ variant: "ghost", size: "icon" }),
@@ -116,7 +113,7 @@ export function RightDockCreateMenu(props: RightDockCreateMenuProps) {
           <DropdownMenuItem
             key={definition.kind}
             onSelect={() => onStartTool(definition.kind)}
-            disabled={definition.projectRequired ? !projectReady : !tunnelAvailable}
+            disabled={!projectReady}
             className="gap-2 text-xs"
           >
             {definition.icon("h-3.5 w-3.5")}
@@ -138,7 +135,6 @@ export function RightDockChooser(props: RightDockChooserProps) {
     terminalDisabledMessage,
     disabledMessage,
     projectReady,
-    tunnelAvailable,
     creating,
     loading,
     error,
@@ -162,8 +158,8 @@ export function RightDockChooser(props: RightDockChooserProps) {
       title: t(definition.createTitleKey),
       description: t(definition.descriptionKey),
       icon: definition.icon("h-4.5 w-4.5"),
-      disabled: definition.projectRequired ? !projectReady : !tunnelAvailable,
-      titleAttr: definition.projectRequired ? disabledMessage : undefined,
+      disabled: !projectReady,
+      titleAttr: disabledMessage,
       onClick: () => onStartTool(definition.kind),
     })),
     {

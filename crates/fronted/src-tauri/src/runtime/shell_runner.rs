@@ -1,4 +1,3 @@
-use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read};
@@ -14,12 +13,13 @@ use crate::runtime::platform::{
     expand_tilde_path, maybe_augment_macos_path, shell_basename, strip_windows_verbatim_prefix,
 };
 use crate::runtime::process::{configure_child_process_group, terminate_child_process_tree};
+pub use crate::runtime::shell_types::ShellRunResponse;
+use crate::runtime::shell_types::{
+    DEFAULT_SHELL_TIMEOUT_MS, MAX_SHELL_TIMEOUT_MS, MIN_SHELL_TIMEOUT_MS,
+};
 
 const MAX_STDOUT_BYTES: usize = 400 * 1024; // 400KB
 const MAX_STDERR_BYTES: usize = 400 * 1024; // 400KB
-pub(crate) const DEFAULT_SHELL_TIMEOUT_MS: u64 = 120_000;
-pub(crate) const MIN_SHELL_TIMEOUT_MS: u64 = 1_000;
-pub(crate) const MAX_SHELL_TIMEOUT_MS: u64 = 10 * 60_000;
 const TERMINATION_GRACE_MS: u64 = 300;
 const STREAM_EOF_GRACE_MS: u64 = 300;
 
@@ -60,24 +60,6 @@ impl ShellRunRegistry {
             .expect("shell run registry poisoned")
             .remove(run_id);
     }
-}
-
-#[derive(Debug, Serialize)]
-pub struct ShellRunResponse {
-    pub exit_code: i32,
-    pub shell: String,
-    pub platform: String,
-    pub profile: String,
-    pub shell_family: String,
-    pub stdout: String,
-    pub stderr: String,
-    pub stdout_truncated: bool,
-    pub stderr_truncated: bool,
-    pub timed_out: bool,
-    pub cancelled: bool,
-    pub stdio_open_after_exit: bool,
-    pub effective_timeout_ms: u64,
-    pub duration_ms: u128,
 }
 
 #[derive(Debug)]

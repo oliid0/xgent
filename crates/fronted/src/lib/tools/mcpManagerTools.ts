@@ -654,7 +654,7 @@ export function createMcpManagerTools(params: {
   // Write commits are deliberately synchronous: each one re-reads the live
   // settings, validates, and applies its ops without any await in between, so
   // the single-threaded JS runtime guarantees the read-modify-write is atomic
-  // with respect to UI edits, gateway sync, and concurrent turns. Never make
+  // with respect to UI edits, paired-client updates, and concurrent turns. Never make
   // these functions async, and never reuse settings read before an await.
 
   function commitCreate(server: McpServerConfig, conflict: "fail" | "overwrite") {

@@ -137,7 +137,7 @@ fn parse_mcp_config_toml(
     errors: &mut Vec<String>,
 ) -> Result<(), String> {
     // 只取 message() 不用 Display：Display 会把出错的原文行渲染进错误信息，
-    // 误选敏感文件时会把文件内容回显给调用方（含 gateway 远端）。
+    // 误选敏感文件时会把文件内容回显给调用方（包括已配对的局域网设备）。
     let root: toml::Value = toml::from_str(strip_utf8_bom(text))
         .map_err(|err| format!("Failed to parse {display}: {}", err.message()))?;
     let Some(map) = root.get("mcp_servers").and_then(toml::Value::as_table) else {

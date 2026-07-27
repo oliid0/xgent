@@ -7,6 +7,7 @@ use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
+use crate::commands::subagent_store::SubagentWorktreeCleanupTarget;
 use crate::runtime::process::configure_child_process_group;
 
 fn git_command(cwd: &Path) -> Command {
@@ -92,14 +93,6 @@ pub struct SubagentWorktreeCleanupInput {
     pub dry_run: Option<bool>,
     pub force: Option<bool>,
     pub delete_branch: Option<bool>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SubagentWorktreeCleanupTarget {
-    pub run_id: Option<String>,
-    pub worktree_root: String,
-    pub branch_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
