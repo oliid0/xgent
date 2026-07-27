@@ -1,9 +1,6 @@
 import { isBrowserRuntime } from "@xagent/runtime";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
-import {
-  LOCAL_ACCESS_CSRF_KEY,
-  LOCAL_ACCESS_SESSION_CHANGED_EVENT,
-} from "../../runtime/browser";
+import { LOCAL_ACCESS_CSRF_KEY, LOCAL_ACCESS_SESSION_CHANGED_EVENT } from "../../runtime/browser";
 
 type SessionResponse = {
   authenticated?: boolean;

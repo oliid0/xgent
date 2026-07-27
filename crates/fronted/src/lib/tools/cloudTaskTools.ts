@@ -5,12 +5,7 @@ import { Type } from "typebox";
 import type { AccessSettings } from "../settings";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
 
-type CloudTaskAction =
-  | "start"
-  | "status"
-  | "wait"
-  | "failure_log"
-  | "download_artifact";
+type CloudTaskAction = "start" | "status" | "wait" | "failure_log" | "download_artifact";
 
 type CloudTaskStartResult = {
   taskId: string;
@@ -87,9 +82,7 @@ const CLOUD_TASK_PARAMETERS = Type.Object({
       Type.Object({
         path: Type.String({ description: "Relative path inside the isolated task workspace." }),
         content: Type.String(),
-        encoding: Type.Optional(
-          Type.Union([Type.Literal("utf8"), Type.Literal("base64")]),
-        ),
+        encoding: Type.Optional(Type.Union([Type.Literal("utf8"), Type.Literal("base64")])),
       }),
       { maxItems: 100 },
     ),
@@ -117,11 +110,7 @@ function requiredString(value: unknown, label: string) {
 
 function requiredRunner(value: unknown): NonNullable<CloudTaskArguments["runner"]> {
   const runner = requiredString(value, "runner");
-  if (
-    runner !== "ubuntu-latest" &&
-    runner !== "windows-latest" &&
-    runner !== "macos-latest"
-  ) {
+  if (runner !== "ubuntu-latest" && runner !== "windows-latest" && runner !== "macos-latest") {
     throw new Error("CloudTaskManager runner is invalid.");
   }
   return runner;
@@ -180,10 +169,7 @@ function resultText(action: CloudTaskAction, result: unknown) {
     .join("\n");
 }
 
-export function createCloudTaskTools(
-  settings: AccessSettings,
-  workdir: string,
-): BuiltinToolBundle {
+export function createCloudTaskTools(settings: AccessSettings, workdir: string): BuiltinToolBundle {
   const tool: Tool = {
     name: "CloudTaskManager",
     description:
@@ -238,10 +224,7 @@ export function createCloudTaskTools(
         } else if (action === "wait") {
           result = await invoke<CloudTaskStatus>("cloud_task_wait", {
             locator: locator(settings, taskId),
-            maxWaitSeconds: Math.min(
-              55,
-              Math.max(1, Math.floor(args.max_wait_seconds ?? 45)),
-            ),
+            maxWaitSeconds: Math.min(55, Math.max(1, Math.floor(args.max_wait_seconds ?? 45))),
           });
         } else if (action === "failure_log") {
           result = await invoke<CloudTaskFailureReport>("cloud_task_failure_log", {

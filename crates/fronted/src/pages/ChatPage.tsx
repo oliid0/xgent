@@ -106,10 +106,7 @@ import {
   isThinkingAlwaysOnForModel,
   toModelValue,
 } from "../lib/providers/llm";
-import {
-  isCompactViewport,
-  useCompactViewport,
-} from "../lib/responsive/compactViewport";
+import { isCompactViewport, useCompactViewport } from "../lib/responsive/compactViewport";
 import {
   type AppSettings,
   applyMcpOpsToAppSettings,
@@ -167,9 +164,7 @@ import {
   mergeAlwaysEnabledSkillNames,
   resolveExplicitSkillMentions,
 } from "../lib/skills";
-import {
-  createSubagentStoreManager,
-} from "../lib/subagents";
+import { createSubagentStoreManager } from "../lib/subagents";
 import {
   applyTerminalEventToSessions,
   sortTerminalSessions,
@@ -1216,8 +1211,7 @@ export function ChatPage(props: ChatPageProps) {
   } = useLiveTranscriptController({
     currentConversationId,
   });
-  const { queueConversationEventForRequest } =
-    useConversationEventPublisher(desktopBridgeEnabled);
+  const { queueConversationEventForRequest } = useConversationEventPublisher(desktopBridgeEnabled);
   const {
     currentConversationIdRef,
     conversationRuntimeCacheRef,
@@ -2646,7 +2640,9 @@ export function ChatPage(props: ChatPageProps) {
     if (options?.force) {
       clearConversationRuntimeSnapshotTimer(run.conversationId);
     } else if (conversationRuntimeSnapshotTimersRef.current.has(run.conversationId)) {
-      return conversationRuntimeSnapshotChainsRef.current.get(run.conversationId) ?? Promise.resolve();
+      return (
+        conversationRuntimeSnapshotChainsRef.current.get(run.conversationId) ?? Promise.resolve()
+      );
     }
 
     const publish = () => {
@@ -2671,7 +2667,9 @@ export function ChatPage(props: ChatPageProps) {
 
     const timerId = window.setTimeout(publish, CONVERSATION_RUNTIME_SNAPSHOT_DEBOUNCE_MS);
     conversationRuntimeSnapshotTimersRef.current.set(run.conversationId, timerId);
-    return conversationRuntimeSnapshotChainsRef.current.get(run.conversationId) ?? Promise.resolve();
+    return (
+      conversationRuntimeSnapshotChainsRef.current.get(run.conversationId) ?? Promise.resolve()
+    );
   }
 
   function queueConversationRuntimeSnapshot(
@@ -2737,7 +2735,6 @@ export function ChatPage(props: ChatPageProps) {
     },
     [],
   );
-
 
   useEffect(() => {
     currentConversationIdRef.current = currentConversationId;
@@ -3880,12 +3877,9 @@ export function ChatPage(props: ChatPageProps) {
 
   // Called by the sidebar container after the store confirmed a deletion so
   // local runtime caches and the visible conversation stay consistent.
-  const handleConversationDeleted = useCallback(
-    (id: string) => {
-      cleanupDeletedConversationActionRef.current(id);
-    },
-    [],
-  );
+  const handleConversationDeleted = useCallback((id: string) => {
+    cleanupDeletedConversationActionRef.current(id);
+  }, []);
 
   const handleSend = useCallback(() => {
     const conversationId = currentConversationIdRef.current.trim();
@@ -4207,9 +4201,7 @@ export function ChatPage(props: ChatPageProps) {
           recentCollapsed={settings.customSettings.chatSidebar.recentCollapsed}
           onProjectsCollapsedChange={handleSidebarProjectsCollapsedChange}
           onRecentCollapsedChange={handleSidebarRecentCollapsedChange}
-          onCreateProject={
-            desktopBridgeEnabled ? handleOpenCreateWorkspaceProject : undefined
-          }
+          onCreateProject={desktopBridgeEnabled ? handleOpenCreateWorkspaceProject : undefined}
           onSelectProject={handleSelectWorkspaceProject}
           onNewConversationForProject={handleNewConversationForProject}
           onBrowseProjectInFileTree={
@@ -4320,32 +4312,32 @@ export function ChatPage(props: ChatPageProps) {
                   onOpenSidebar={handleOpenSidebar}
                   trailingActions={
                     desktopBridgeEnabled ? (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setRightDockOpen((open) => !open)}
-                      disabled={Boolean(terminalDisabledMessage) && !rightDockOpen}
-                      aria-expanded={rightDockOpen}
-                      title={
-                        rightDockOpen
-                          ? "Collapse project tools panel"
-                          : (terminalDisabledMessage ?? "Expand project tools panel")
-                      }
-                      className={`relative h-8 w-8 rounded-lg text-muted-foreground transition-[background-color,color,transform] duration-150 hover:text-foreground active:scale-95 ${
-                        rightDockOpen ? "bg-muted text-foreground" : ""
-                      }`}
-                    >
-                      {rightDockOpen ? (
-                        <PanelRightClose className="h-4 w-4" />
-                      ) : (
-                        <PanelRightOpen className="h-4 w-4" />
-                      )}
-                      {projectTerminalSessions.length > 0 ? (
-                        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[calc(10px*var(--zone-font-scale,1))] font-semibold leading-none text-white">
-                          {projectTerminalSessions.length}
-                        </span>
-                      ) : null}
-                    </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setRightDockOpen((open) => !open)}
+                        disabled={Boolean(terminalDisabledMessage) && !rightDockOpen}
+                        aria-expanded={rightDockOpen}
+                        title={
+                          rightDockOpen
+                            ? "Collapse project tools panel"
+                            : (terminalDisabledMessage ?? "Expand project tools panel")
+                        }
+                        className={`relative h-8 w-8 rounded-lg text-muted-foreground transition-[background-color,color,transform] duration-150 hover:text-foreground active:scale-95 ${
+                          rightDockOpen ? "bg-muted text-foreground" : ""
+                        }`}
+                      >
+                        {rightDockOpen ? (
+                          <PanelRightClose className="h-4 w-4" />
+                        ) : (
+                          <PanelRightOpen className="h-4 w-4" />
+                        )}
+                        {projectTerminalSessions.length > 0 ? (
+                          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[calc(10px*var(--zone-font-scale,1))] font-semibold leading-none text-white">
+                            {projectTerminalSessions.length}
+                          </span>
+                        ) : null}
+                      </Button>
                     ) : null
                   }
                 />
@@ -4396,9 +4388,7 @@ export function ChatPage(props: ChatPageProps) {
                 reasoningOptions={chatRuntimeReasoningOptions}
                 thinkingAlwaysOn={chatRuntimeThinkingAlwaysOn}
                 gitClient={desktopBridgeEnabled ? tauriGitClient : null}
-                workspaceActivityClient={
-                  desktopBridgeEnabled ? tauriWorkspaceActivityClient : null
-                }
+                workspaceActivityClient={desktopBridgeEnabled ? tauriWorkspaceActivityClient : null}
                 onSend={handleSend}
                 onStop={handleStopSending}
                 onComposerBusyChange={handleComposerBusyChange}
@@ -4557,39 +4547,43 @@ export function ChatPage(props: ChatPageProps) {
           </Suspense>
         ) : null}
       </div>
-      {desktopBridgeEnabled ? <RightDockPanel
-        isOpen={activeView === "chat" && rightDockOpen}
-        collapseImmediately={activeView !== "chat"}
-        fontScale={settings.customSettings.fontScale.rightDock}
-        projectPathKey={terminalProjectPathKey}
-        cwd={terminalProjectPath}
-        sessions={terminalSessions}
-        sessionsLoaded={terminalSessionsLoaded}
-        width={settings.customSettings.rightDock.width}
-        theme={effectiveTheme}
-        disabledMessage={terminalDisabledMessage}
-        projectState={rightDockProjectState}
-        fileTreeState={rightDockFileTreeState}
-        sshHosts={settings.ssh.hosts}
-        associatedSshHostIds={associatedSshHostIds}
-        client={tauriTerminalClient}
-        gitClient={tauriGitClient}
-        gitWriteEnabled
-        workspaceActivityClient={tauriWorkspaceActivityClient}
-        onWidthChange={handleRightDockWidthChange}
-        onProjectStateChange={handleRightDockProjectStateChange}
-        onFileTreeStateChange={handleRightDockFileTreeStateChange}
-        onSshProjectHostIdsChange={handleSshProjectHostIdsChange}
-        onOpenSshSession={handleOpenSshTerminal}
-        onSessionsChange={handleRightDockSessionsChange}
-        onInsertFileMention={handleRightDockInsertFileMention}
-        onOpenFile={handleOpenWorkspaceFile}
-        gitReviewFocusRequest={gitReviewFocusRequest}
-        onGitReviewFocusRequestHandled={handleGitReviewFocusRequestHandled}
-        onInsertCodeReviewSkill={codeReviewSkill ? handleRightDockInsertCodeReviewSkill : undefined}
-        onInsertCommitMention={handleRightDockInsertCommitMention}
-        onInsertGitFileMention={handleRightDockInsertGitFileMention}
-      /> : null}
+      {desktopBridgeEnabled ? (
+        <RightDockPanel
+          isOpen={activeView === "chat" && rightDockOpen}
+          collapseImmediately={activeView !== "chat"}
+          fontScale={settings.customSettings.fontScale.rightDock}
+          projectPathKey={terminalProjectPathKey}
+          cwd={terminalProjectPath}
+          sessions={terminalSessions}
+          sessionsLoaded={terminalSessionsLoaded}
+          width={settings.customSettings.rightDock.width}
+          theme={effectiveTheme}
+          disabledMessage={terminalDisabledMessage}
+          projectState={rightDockProjectState}
+          fileTreeState={rightDockFileTreeState}
+          sshHosts={settings.ssh.hosts}
+          associatedSshHostIds={associatedSshHostIds}
+          client={tauriTerminalClient}
+          gitClient={tauriGitClient}
+          gitWriteEnabled
+          workspaceActivityClient={tauriWorkspaceActivityClient}
+          onWidthChange={handleRightDockWidthChange}
+          onProjectStateChange={handleRightDockProjectStateChange}
+          onFileTreeStateChange={handleRightDockFileTreeStateChange}
+          onSshProjectHostIdsChange={handleSshProjectHostIdsChange}
+          onOpenSshSession={handleOpenSshTerminal}
+          onSessionsChange={handleRightDockSessionsChange}
+          onInsertFileMention={handleRightDockInsertFileMention}
+          onOpenFile={handleOpenWorkspaceFile}
+          gitReviewFocusRequest={gitReviewFocusRequest}
+          onGitReviewFocusRequestHandled={handleGitReviewFocusRequestHandled}
+          onInsertCodeReviewSkill={
+            codeReviewSkill ? handleRightDockInsertCodeReviewSkill : undefined
+          }
+          onInsertCommitMention={handleRightDockInsertCommitMention}
+          onInsertGitFileMention={handleRightDockInsertGitFileMention}
+        />
+      ) : null}
     </div>
   );
 }

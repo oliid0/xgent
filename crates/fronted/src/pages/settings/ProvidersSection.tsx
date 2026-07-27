@@ -2016,108 +2016,108 @@ function ProviderList(props: {
             {t("settings.addProvider")}
           </Button>
           {thirdPartyImportEnabled ? (
-          <DropdownMenu open={syncMenuOpen} onOpenChange={handleSyncMenuOpenChange}>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={thirdPartyImporting}
-                />
-              }
-            >
-              {thirdPartyImporting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Download className="h-3.5 w-3.5" />
-              )}
-              从第三方同步
-              <ChevronDown
-                className={cn(
-                  "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ease-out",
-                  syncMenuOpen && "rotate-180",
+            <DropdownMenu open={syncMenuOpen} onOpenChange={handleSyncMenuOpenChange}>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={thirdPartyImporting}
+                  />
+                }
+              >
+                {thirdPartyImporting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
                 )}
-              />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              sideOffset={8}
-              collisionPadding={8}
-              className="model-selector-dropdown w-80 overflow-hidden rounded-xl border-border/40 bg-popover/70 p-0 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.25)] ring-1 ring-white/10 backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-popover/55"
-            >
-              <div className="flex items-center justify-between gap-2 px-3 py-1.5">
-                <DropdownMenuLabel className="p-0 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
-                  导入来源
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  closeOnClick={false}
-                  className="h-7 w-7 cursor-pointer justify-center rounded-md p-0 text-muted-foreground"
-                  disabled={thirdPartyLoading || thirdPartyImporting}
-                  onSelect={onRefreshThirdPartyProviders}
-                  aria-label="重新扫描本地配置"
-                  title="重新扫描本地配置"
-                >
-                  <RefreshCw className={cn("h-3.5 w-3.5", thirdPartyLoading && "animate-spin")} />
-                </DropdownMenuItem>
-              </div>
-              <DropdownMenuSeparator className="my-0 bg-border/40" />
-              <div className="p-1.5">
-                <DropdownMenuItem
-                  className="model-selector-item cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2.5"
-                  disabled={ccsLoading || !ccsAll.length}
-                  onSelect={onOpenCcsImport}
-                >
-                  <CcsSourceLogo className="h-9 w-9" />
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="flex items-center gap-1.5 text-sm font-medium">
-                      CC Switch
-                      {ccsAll.length > 0 ? (
-                        <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                          {ccsAll.length}
-                        </span>
-                      ) : null}
+                从第三方同步
+                <ChevronDown
+                  className={cn(
+                    "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ease-out",
+                    syncMenuOpen && "rotate-180",
+                  )}
+                />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                sideOffset={8}
+                collisionPadding={8}
+                className="model-selector-dropdown w-80 overflow-hidden rounded-xl border-border/40 bg-popover/70 p-0 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.25)] ring-1 ring-white/10 backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-popover/55"
+              >
+                <div className="flex items-center justify-between gap-2 px-3 py-1.5">
+                  <DropdownMenuLabel className="p-0 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
+                    导入来源
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    closeOnClick={false}
+                    className="h-7 w-7 cursor-pointer justify-center rounded-md p-0 text-muted-foreground"
+                    disabled={thirdPartyLoading || thirdPartyImporting}
+                    onSelect={onRefreshThirdPartyProviders}
+                    aria-label="重新扫描本地配置"
+                    title="重新扫描本地配置"
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", thirdPartyLoading && "animate-spin")} />
+                  </DropdownMenuItem>
+                </div>
+                <DropdownMenuSeparator className="my-0 bg-border/40" />
+                <div className="p-1.5">
+                  <DropdownMenuItem
+                    className="model-selector-item cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2.5"
+                    disabled={ccsLoading || !ccsAll.length}
+                    onSelect={onOpenCcsImport}
+                  >
+                    <CcsSourceLogo className="h-9 w-9" />
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="flex items-center gap-1.5 text-sm font-medium">
+                        CC Switch
+                        {ccsAll.length > 0 ? (
+                          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                            {ccsAll.length}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span
+                        className="line-clamp-2 text-xs text-muted-foreground"
+                        title={ccsSubtitle}
+                      >
+                        {ccsSubtitle}
+                      </span>
                     </span>
-                    <span
-                      className="line-clamp-2 text-xs text-muted-foreground"
-                      title={ccsSubtitle}
-                    >
-                      {ccsSubtitle}
+                    {ccsLoading ? (
+                      <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+                    ) : null}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="model-selector-item cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2.5"
+                    disabled={cherryLoading || cherryImporting || !cherryAll.length}
+                    onSelect={onOpenCherryImport}
+                  >
+                    <CherrySourceLogo className="h-9 w-9" />
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="flex items-center gap-1.5 text-sm font-medium">
+                        Cherry Studio
+                        {cherryReady > 0 ? (
+                          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                            {cherryReady}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span
+                        className="line-clamp-2 text-xs text-muted-foreground"
+                        title={cherrySubtitle}
+                      >
+                        {cherrySubtitle}
+                      </span>
                     </span>
-                  </span>
-                  {ccsLoading ? (
-                    <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
-                  ) : null}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="model-selector-item cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2.5"
-                  disabled={cherryLoading || cherryImporting || !cherryAll.length}
-                  onSelect={onOpenCherryImport}
-                >
-                  <CherrySourceLogo className="h-9 w-9" />
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="flex items-center gap-1.5 text-sm font-medium">
-                      Cherry Studio
-                      {cherryReady > 0 ? (
-                        <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                          {cherryReady}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span
-                      className="line-clamp-2 text-xs text-muted-foreground"
-                      title={cherrySubtitle}
-                    >
-                      {cherrySubtitle}
-                    </span>
-                  </span>
-                  {cherryLoading || cherryImporting ? (
-                    <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
-                  ) : null}
-                </DropdownMenuItem>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    {cherryLoading || cherryImporting ? (
+                      <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+                    ) : null}
+                  </DropdownMenuItem>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null}
         </div>
       </div>

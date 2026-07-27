@@ -9,10 +9,7 @@ import {
   mobileExecutionStatus,
   type MobileExecutionStatus,
 } from "../../lib/mobileExecution";
-import {
-  normalizeRuntimePlatform,
-  type RuntimePlatform,
-} from "../../lib/runtimePlatform";
+import { normalizeRuntimePlatform, type RuntimePlatform } from "../../lib/runtimePlatform";
 import type { AppSettings } from "../../lib/settings";
 import { AgentActivationSwitch } from "./shared";
 import type { SettingsSectionProps } from "./types";
@@ -55,9 +52,8 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
   const [error, setError] = useState("");
 
   const isNativeMobile = !browser && (platform === "android" || platform === "ios");
-  const enabled = platform === "android"
-    ? settings.access.androidProotEnabled
-    : settings.access.iosAShellEnabled;
+  const enabled =
+    platform === "android" ? settings.access.androidProotEnabled : settings.access.iosAShellEnabled;
 
   const refresh = useCallback(async () => {
     if (!isNativeMobile) return;
@@ -66,15 +62,17 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
     try {
       const next = await mobileExecutionStatus();
       setStatus(next);
-      setSelected((current) => current.filter((id) =>
-        next.toolchains.some(
-          (toolchain) => toolchain.id === id && !toolchain.installed && toolchain.installable,
+      setSelected((current) =>
+        current.filter((id) =>
+          next.toolchains.some(
+            (toolchain) => toolchain.id === id && !toolchain.installed && toolchain.installable,
+          ),
         ),
-      ));
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setBusy((current) => current === "status" ? "" : current);
+      setBusy((current) => (current === "status" ? "" : current));
     }
   }, [isNativeMobile]);
 
@@ -98,9 +96,7 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
 
   const pendingToolchains = useMemo(
     () =>
-      status?.toolchains.filter(
-        (toolchain) => !toolchain.installed && toolchain.installable,
-      ) ?? [],
+      status?.toolchains.filter((toolchain) => !toolchain.installed && toolchain.installable) ?? [],
     [status],
   );
 
@@ -133,7 +129,7 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
     setError("");
     try {
       const result = await installMobileToolchains(selected, runId);
-      setStatus((current) => current ? { ...current, toolchains: result.status } : current);
+      setStatus((current) => (current ? { ...current, toolchains: result.status } : current));
       if (!result.succeeded) {
         throw new Error(
           result.cancelled
@@ -201,7 +197,12 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
             </div>
             <div className="rounded-lg bg-muted/30 px-3 py-2.5">
               <div className="text-muted-foreground">{t("settings.mobileEnvironment")}</div>
-              <div className="mt-1 font-medium">{status?.environmentVersion ?? (status?.installed ? t("settings.mobileReady") : t("settings.mobileNotInstalled"))}</div>
+              <div className="mt-1 font-medium">
+                {status?.environmentVersion ??
+                  (status?.installed
+                    ? t("settings.mobileReady")
+                    : t("settings.mobileNotInstalled"))}
+              </div>
             </div>
             <div className="rounded-lg bg-muted/30 px-3 py-2.5">
               <div className="text-muted-foreground">{t("settings.mobileDiskUsage")}</div>
@@ -228,7 +229,9 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
                 onClick={() => void installEnvironment()}
                 className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
               >
-                {busy === "environment" ? t("settings.mobileInstalling") : t("settings.mobileInstallEnvironment")}
+                {busy === "environment"
+                  ? t("settings.mobileInstalling")
+                  : t("settings.mobileInstallEnvironment")}
               </button>
             ) : null}
           </div>
@@ -240,16 +243,21 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
                 {status.toolchains.map((toolchain) => {
                   const checked = toolchain.installed || selected.includes(toolchain.id);
                   return (
-                    <label key={toolchain.id} className="flex items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 text-xs">
+                    <label
+                      key={toolchain.id}
+                      className="flex items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 text-xs"
+                    >
                       <input
                         type="checkbox"
                         checked={checked}
                         disabled={toolchain.installed || !toolchain.installable || busy !== ""}
-                        onChange={() => setSelected((current) =>
-                          current.includes(toolchain.id)
-                            ? current.filter((id) => id !== toolchain.id)
-                            : [...current, toolchain.id],
-                        )}
+                        onChange={() =>
+                          setSelected((current) =>
+                            current.includes(toolchain.id)
+                              ? current.filter((id) => id !== toolchain.id)
+                              : [...current, toolchain.id],
+                          )
+                        }
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate">{toolchain.label}</span>
@@ -259,7 +267,9 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
                           </span>
                         ) : null}
                       </span>
-                      {toolchain.installed ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : null}
+                      {toolchain.installed ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-500" />
+                      ) : null}
                     </label>
                   );
                 })}
@@ -272,7 +282,9 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
                     onClick={() => void installSelected()}
                     className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
                   >
-                    {busy === "toolchains" || busy === "cancel" ? t("settings.mobileInstalling") : t("settings.mobileInstallSelected")}
+                    {busy === "toolchains" || busy === "cancel"
+                      ? t("settings.mobileInstalling")
+                      : t("settings.mobileInstallSelected")}
                   </button>
                   {activeRunId ? (
                     <button

@@ -1,11 +1,7 @@
 import type { MentionComposerDraft } from "../../../components/chat/MentionComposer";
 import type { HistoryMessageRef } from "../../../lib/chat/conversation/conversationState";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
-import type {
-  ChatRuntimeControls,
-  ExecutionMode,
-  SystemToolId,
-} from "../../../lib/settings";
+import type { ChatRuntimeControls, ExecutionMode, SystemToolId } from "../../../lib/settings";
 
 export type SendChatAction = (overrides?: {
   textOverride?: string;

@@ -312,7 +312,9 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
           signal: scope.controller.signal,
           debugLogger: streamAttempt === 0 ? conversationDebugLogger : recoveryDebugLogger,
           onRetryStatus: (attempt, maxAttempts, errorMessage) => {
-            updateConversationEventToolStatus(`连接已断开，正在重试 (${attempt}/${maxAttempts})...`);
+            updateConversationEventToolStatus(
+              `连接已断开，正在重试 (${attempt}/${maxAttempts})...`,
+            );
             retryAttemptsForAttempt.push({ attempt, maxAttempts, errorMessage });
             updateRetryAttempts(retryAttemptsForAttempt.slice(), transcriptStore);
           },

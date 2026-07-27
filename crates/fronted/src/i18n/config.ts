@@ -1472,7 +1472,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.accessStopped": "Web UI 已关闭",
     "settings.accessNativeOnly": "安全凭据和服务开关只能在原生 XAgent 客户端中管理。",
     "settings.accessWebUi": "开启 Web UI",
-    "settings.accessWebUiHint": "在本机 28367 端口提供同一套前端，局域网设备的任务由本机 Agent 执行",
+    "settings.accessWebUiHint":
+      "在本机 28367 端口提供同一套前端，局域网设备的任务由本机 Agent 执行",
     "settings.accessScope": "监听范围",
     "settings.accessScopeLan": "局域网设备",
     "settings.accessScopeLoopback": "仅本机",
@@ -1489,7 +1490,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.accessPairedDevices": "已配对 {count} 台设备",
     "settings.accessNewPairingCode": "生成配对码",
     "settings.accessCloudExecution": "云端执行任务",
-    "settings.accessCloudExecutionHint": "局域网和移动端本地执行不可用时，允许使用 GitHub Actions 后端",
+    "settings.accessCloudExecutionHint":
+      "局域网和移动端本地执行不可用时，允许使用 GitHub Actions 后端",
     "settings.accessCloudPublicWarning":
       "agent-temp 是公开任务仓库，任务脚本和输入文件可被公开读取；凭据不要写进任务文件。",
     "settings.accessCloudEnvironmentHint":
@@ -1504,13 +1506,16 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.accessUnlockVault": "解锁",
     "settings.accessGithubToken": "Fine-grained GitHub Personal Access Token",
     "settings.accessSaveToken": "安全保存",
-    "settings.accessVaultHint": "口令不会保存；Token 使用 Stronghold 加密落盘，也不会发送给 Web UI 或写入任务仓库。",
+    "settings.accessVaultHint":
+      "口令不会保存；Token 使用 Stronghold 加密落盘，也不会发送给 Web UI 或写入任务仓库。",
     "settings.accessMobileExecution": "移动端本地执行",
     "settings.accessAndroidProot": "Android PRoot 环境",
     "settings.accessAndroidProotHint": "可选安装隔离 Linux rootfs；局域网可用时仍优先使用电脑执行",
     "settings.accessIosAShell": "iOS / iPadOS a-Shell",
-    "settings.accessIosAShellHint": "可选启用 a-Shell 兼容的本地原生命令环境；局域网可用时仍优先使用电脑执行",
-    "settings.mobileNativeOnly": "移动执行环境只在 Android、iOS 或 iPadOS 原生客户端中管理；浏览器设备通过局域网使用电脑能力",
+    "settings.accessIosAShellHint":
+      "可选启用 a-Shell 兼容的本地原生命令环境；局域网可用时仍优先使用电脑执行",
+    "settings.mobileNativeOnly":
+      "移动执行环境只在 Android、iOS 或 iPadOS 原生客户端中管理；浏览器设备通过局域网使用电脑能力",
     "settings.mobileEnable": "启用本地移动执行",
     "settings.mobileBackend": "执行后端",
     "settings.mobileEnvironment": "基础环境",
@@ -3397,29 +3402,36 @@ export const translations: Record<Locale, Record<string, string>> = {
 
     /* ── Settings Local Access ── */
     "settings.accessTitle": "Local Access & Mobile",
-    "settings.accessDesc": "Share one local Agent on your LAN and configure mobile or cloud execution backends",
+    "settings.accessDesc":
+      "Share one local Agent on your LAN and configure mobile or cloud execution backends",
     "settings.accessRunning": "Web UI running",
     "settings.accessStopped": "Web UI stopped",
-    "settings.accessNativeOnly": "Security credentials and service switches can only be managed in the native XAgent app.",
+    "settings.accessNativeOnly":
+      "Security credentials and service switches can only be managed in the native XAgent app.",
     "settings.accessWebUi": "Enable Web UI",
-    "settings.accessWebUiHint": "Serve the same frontend on port 28367; LAN tasks are executed by this computer's Agent",
+    "settings.accessWebUiHint":
+      "Serve the same frontend on port 28367; LAN tasks are executed by this computer's Agent",
     "settings.accessScope": "Listen scope",
     "settings.accessScopeLan": "LAN devices",
     "settings.accessScopeLoopback": "This device only",
     "settings.accessPort": "Port",
     "settings.accessAllowTerminal": "Allow terminals",
-    "settings.accessAllowTerminalHint": "Paired devices may create and control local project terminals",
+    "settings.accessAllowTerminalHint":
+      "Paired devices may create and control local project terminals",
     "settings.accessAllowSsh": "Allow SSH",
     "settings.accessAllowSshHint": "Paired devices may use SSH profiles saved on this computer",
     "settings.accessAllowGit": "Allow Git writes",
-    "settings.accessAllowGitHint": "Paired devices may stage, commit, switch branches and synchronize repositories",
+    "settings.accessAllowGitHint":
+      "Paired devices may stage, commit, switch branches and synchronize repositories",
     "settings.accessAllowFileWrite": "Allow file writes",
-    "settings.accessAllowFileWriteHint": "Paired devices may change workspace files through the Agent, subject to approvals",
+    "settings.accessAllowFileWriteHint":
+      "Paired devices may change workspace files through the Agent, subject to approvals",
     "settings.accessPairing": "Device pairing",
     "settings.accessPairedDevices": "{count} paired devices",
     "settings.accessNewPairingCode": "New pairing code",
     "settings.accessCloudExecution": "Cloud task execution",
-    "settings.accessCloudExecutionHint": "Allow GitHub Actions when LAN and mobile-local execution are unavailable",
+    "settings.accessCloudExecutionHint":
+      "Allow GitHub Actions when LAN and mobile-local execution are unavailable",
     "settings.accessCloudPublicWarning":
       "agent-temp is public, so task scripts and input files are readable by anyone. Do not put credentials in task files.",
     "settings.accessCloudEnvironmentHint":
@@ -3434,13 +3446,17 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.accessUnlockVault": "Unlock",
     "settings.accessGithubToken": "Fine-grained GitHub Personal Access Token",
     "settings.accessSaveToken": "Save securely",
-    "settings.accessVaultHint": "The passphrase is never saved. Stronghold encrypts the token at rest; it is never sent to Web UI or written into task repositories.",
+    "settings.accessVaultHint":
+      "The passphrase is never saved. Stronghold encrypts the token at rest; it is never sent to Web UI or written into task repositories.",
     "settings.accessMobileExecution": "Mobile local execution",
     "settings.accessAndroidProot": "Android PRoot environment",
-    "settings.accessAndroidProotHint": "Optionally install an isolated Linux rootfs; prefer the computer when LAN access is available",
+    "settings.accessAndroidProotHint":
+      "Optionally install an isolated Linux rootfs; prefer the computer when LAN access is available",
     "settings.accessIosAShell": "iOS / iPadOS a-Shell",
-    "settings.accessIosAShellHint": "Optionally enable the local a-Shell-compatible native command environment; prefer the computer when LAN access is available",
-    "settings.mobileNativeOnly": "Manage mobile execution only in the native Android, iOS, or iPadOS app; browser devices use the computer over LAN",
+    "settings.accessIosAShellHint":
+      "Optionally enable the local a-Shell-compatible native command environment; prefer the computer when LAN access is available",
+    "settings.mobileNativeOnly":
+      "Manage mobile execution only in the native Android, iOS, or iPadOS app; browser devices use the computer over LAN",
     "settings.mobileEnable": "Enable mobile-local execution",
     "settings.mobileBackend": "Execution backend",
     "settings.mobileEnvironment": "Base environment",

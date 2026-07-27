@@ -48,8 +48,7 @@ function redactHost(host: AppSettings["ssh"]["hosts"][number]) {
     privateKeyPassphrase: "",
     privateKeyPassphraseConfigured:
       !interactive &&
-      (host.privateKeyPassphrase.trim().length > 0 ||
-        host.privateKeyPassphraseConfigured === true),
+      (host.privateKeyPassphrase.trim().length > 0 || host.privateKeyPassphraseConfigured === true),
     proxy: {
       ...host.proxy,
       password: "",
@@ -146,9 +145,7 @@ function buildMetadataPatch(
     ...Object.keys(previous.projectHostAssociations),
     ...Object.keys(next.projectHostAssociations),
   ]);
-  const projectAssociationChanges: NonNullable<
-    SshSettingsPatch["projectAssociationChanges"]
-  > = [];
+  const projectAssociationChanges: NonNullable<SshSettingsPatch["projectAssociationChanges"]> = [];
 
   for (const pathKey of [...pathKeys].sort()) {
     const before = previous.projectHostAssociations[pathKey] ?? [];

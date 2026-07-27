@@ -81,7 +81,11 @@ function CopyButton({ value }: { value: string }) {
       }}
       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
     >
-      {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? (
+        <Check className="h-3.5 w-3.5 text-emerald-500" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" />
+      )}
     </button>
   );
 }
@@ -110,7 +114,12 @@ function ToggleCard({
         </div>
         <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{hint}</p>
       </div>
-      <AgentActivationSwitch checked={checked} title={title} disabled={disabled} onToggle={onToggle} />
+      <AgentActivationSwitch
+        checked={checked}
+        title={title}
+        disabled={disabled}
+        onToggle={onToggle}
+      />
     </div>
   );
 }
@@ -197,166 +206,182 @@ export function AccessSection({ settings, setSettings }: SettingsSectionProps) {
         <MobileExecutionSection settings={settings} setSettings={setSettings} />
       ) : (
         <>
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/10">
-            <MonitorSmartphone className="h-[18px] w-[18px] text-sky-500" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold">{t("settings.accessTitle")}</h3>
-            <p className="text-xs text-muted-foreground">{t("settings.accessDesc")}</p>
-          </div>
-        </div>
-        <div
-          className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
-            localStatus.running
-              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-              : "bg-muted/50 text-muted-foreground"
-          }`}
-          title={localStatus.lastError ?? undefined}
-        >
-          {localStatus.running ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-          {localStatus.running ? t("settings.accessRunning") : t("settings.accessStopped")}
-        </div>
-      </div>
-
-      {browser ? (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
-          {t("settings.accessNativeOnly")}
-        </div>
-      ) : null}
-
-      <section className="space-y-4 rounded-xl border border-border/60 bg-card p-5">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Server className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <div className="text-sm font-medium">{t("settings.accessWebUi")}</div>
-              <p className="text-xs text-muted-foreground">{t("settings.accessWebUiHint")}</p>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/10">
+                <MonitorSmartphone className="h-[18px] w-[18px] text-sky-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold">{t("settings.accessTitle")}</h3>
+                <p className="text-xs text-muted-foreground">{t("settings.accessDesc")}</p>
+              </div>
+            </div>
+            <div
+              className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
+                localStatus.running
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  : "bg-muted/50 text-muted-foreground"
+              }`}
+              title={localStatus.lastError ?? undefined}
+            >
+              {localStatus.running ? (
+                <Wifi className="h-3.5 w-3.5" />
+              ) : (
+                <WifiOff className="h-3.5 w-3.5" />
+              )}
+              {localStatus.running ? t("settings.accessRunning") : t("settings.accessStopped")}
             </div>
           </div>
-          <AgentActivationSwitch
-            checked={settings.access.webUiEnabled}
-            title={t("settings.accessWebUi")}
-            disabled={browser}
-            onToggle={() =>
-              updateAccess(setSettings, { webUiEnabled: !settings.access.webUiEnabled })
-            }
-          />
-        </div>
 
-        <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
-          <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
-            <span>{t("settings.accessScope")}</span>
-            <select
-              value={settings.access.webUiScope}
-              disabled={browser}
-              onChange={(event) =>
-                updateAccess(setSettings, {
-                  webUiScope: event.currentTarget.value === "loopback" ? "loopback" : "lan",
-                })
-              }
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-            >
-              <option value="lan">{t("settings.accessScopeLan")}</option>
-              <option value="loopback">{t("settings.accessScopeLoopback")}</option>
-            </select>
-          </label>
-          <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
-            <span>{t("settings.accessPort")}</span>
-            <Input
-              type="number"
-              min={1}
-              max={65_535}
-              value={settings.access.webUiPort}
-              disabled={browser}
-              onChange={(event) =>
-                updateAccess(setSettings, {
-                  webUiPort: Math.min(65_535, Math.max(1, Number(event.currentTarget.value) || 28_367)),
-                })
-              }
-              className="font-mono text-[13px]"
-            />
-          </label>
-        </div>
-
-        <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 text-xs">
-          <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span className="min-w-0 flex-1 truncate font-mono">{endpoint}</span>
-          <CopyButton value={endpoint} />
-          <button
-            type="button"
-            disabled={busyAction !== "" || browser}
-            onClick={() => void runAction("refresh", refreshLocalStatus)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/60 disabled:opacity-40"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ToggleCard
-            icon={<Terminal className="h-3.5 w-3.5 text-muted-foreground" />}
-            title={t("settings.accessAllowTerminal")}
-            hint={t("settings.accessAllowTerminalHint")}
-            checked={settings.access.allowTerminal}
-            disabled={browser}
-            onToggle={() => updateAccess(setSettings, { allowTerminal: !settings.access.allowTerminal })}
-          />
-          <ToggleCard
-            icon={<Server className="h-3.5 w-3.5 text-muted-foreground" />}
-            title={t("settings.accessAllowSsh")}
-            hint={t("settings.accessAllowSshHint")}
-            checked={settings.access.allowSsh}
-            disabled={browser}
-            onToggle={() => updateAccess(setSettings, { allowSsh: !settings.access.allowSsh })}
-          />
-          <ToggleCard
-            icon={<GitBranch className="h-3.5 w-3.5 text-muted-foreground" />}
-            title={t("settings.accessAllowGit")}
-            hint={t("settings.accessAllowGitHint")}
-            checked={settings.access.allowGit}
-            disabled={browser}
-            onToggle={() => updateAccess(setSettings, { allowGit: !settings.access.allowGit })}
-          />
-          <ToggleCard
-            icon={<Shield className="h-3.5 w-3.5 text-muted-foreground" />}
-            title={t("settings.accessAllowFileWrite")}
-            hint={t("settings.accessAllowFileWriteHint")}
-            checked={settings.access.allowFileWrite}
-            disabled={browser}
-            onToggle={() => updateAccess(setSettings, { allowFileWrite: !settings.access.allowFileWrite })}
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/50 px-3 py-3 text-xs">
-          <div>
-            <div className="font-medium">{t("settings.accessPairing")}</div>
-            <div className="mt-0.5 text-muted-foreground">
-              {t("settings.accessPairedDevices").replace("{count}", String(localStatus.pairedDevices))}
+          {browser ? (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+              {t("settings.accessNativeOnly")}
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {localStatus.pairingCode ? (
-              <code className="rounded-md bg-muted px-3 py-2 text-sm font-semibold tracking-[0.2em]">
-                {localStatus.pairingCode}
-              </code>
-            ) : null}
-            <button
-              type="button"
-              disabled={!settings.access.webUiEnabled || busyAction !== "" || browser}
-              onClick={() =>
-                void runAction("pair", async () => {
-                  setLocalStatus(await invoke<LocalAccessStatus>("local_access_rotate_pairing_code"));
-                })
-              }
-              className="rounded-lg border border-border px-3 py-2 font-medium hover:bg-muted/50 disabled:opacity-40"
-            >
-              {t("settings.accessNewPairingCode")}
-            </button>
-          </div>
-        </div>
-      </section>
+          ) : null}
+
+          <section className="space-y-4 rounded-xl border border-border/60 bg-card p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Server className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <div className="text-sm font-medium">{t("settings.accessWebUi")}</div>
+                  <p className="text-xs text-muted-foreground">{t("settings.accessWebUiHint")}</p>
+                </div>
+              </div>
+              <AgentActivationSwitch
+                checked={settings.access.webUiEnabled}
+                title={t("settings.accessWebUi")}
+                disabled={browser}
+                onToggle={() =>
+                  updateAccess(setSettings, { webUiEnabled: !settings.access.webUiEnabled })
+                }
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
+              <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                <span>{t("settings.accessScope")}</span>
+                <select
+                  value={settings.access.webUiScope}
+                  disabled={browser}
+                  onChange={(event) =>
+                    updateAccess(setSettings, {
+                      webUiScope: event.currentTarget.value === "loopback" ? "loopback" : "lan",
+                    })
+                  }
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                >
+                  <option value="lan">{t("settings.accessScopeLan")}</option>
+                  <option value="loopback">{t("settings.accessScopeLoopback")}</option>
+                </select>
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                <span>{t("settings.accessPort")}</span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={65_535}
+                  value={settings.access.webUiPort}
+                  disabled={browser}
+                  onChange={(event) =>
+                    updateAccess(setSettings, {
+                      webUiPort: Math.min(
+                        65_535,
+                        Math.max(1, Number(event.currentTarget.value) || 28_367),
+                      ),
+                    })
+                  }
+                  className="font-mono text-[13px]"
+                />
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 text-xs">
+              <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate font-mono">{endpoint}</span>
+              <CopyButton value={endpoint} />
+              <button
+                type="button"
+                disabled={busyAction !== "" || browser}
+                onClick={() => void runAction("refresh", refreshLocalStatus)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/60 disabled:opacity-40"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ToggleCard
+                icon={<Terminal className="h-3.5 w-3.5 text-muted-foreground" />}
+                title={t("settings.accessAllowTerminal")}
+                hint={t("settings.accessAllowTerminalHint")}
+                checked={settings.access.allowTerminal}
+                disabled={browser}
+                onToggle={() =>
+                  updateAccess(setSettings, { allowTerminal: !settings.access.allowTerminal })
+                }
+              />
+              <ToggleCard
+                icon={<Server className="h-3.5 w-3.5 text-muted-foreground" />}
+                title={t("settings.accessAllowSsh")}
+                hint={t("settings.accessAllowSshHint")}
+                checked={settings.access.allowSsh}
+                disabled={browser}
+                onToggle={() => updateAccess(setSettings, { allowSsh: !settings.access.allowSsh })}
+              />
+              <ToggleCard
+                icon={<GitBranch className="h-3.5 w-3.5 text-muted-foreground" />}
+                title={t("settings.accessAllowGit")}
+                hint={t("settings.accessAllowGitHint")}
+                checked={settings.access.allowGit}
+                disabled={browser}
+                onToggle={() => updateAccess(setSettings, { allowGit: !settings.access.allowGit })}
+              />
+              <ToggleCard
+                icon={<Shield className="h-3.5 w-3.5 text-muted-foreground" />}
+                title={t("settings.accessAllowFileWrite")}
+                hint={t("settings.accessAllowFileWriteHint")}
+                checked={settings.access.allowFileWrite}
+                disabled={browser}
+                onToggle={() =>
+                  updateAccess(setSettings, { allowFileWrite: !settings.access.allowFileWrite })
+                }
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/50 px-3 py-3 text-xs">
+              <div>
+                <div className="font-medium">{t("settings.accessPairing")}</div>
+                <div className="mt-0.5 text-muted-foreground">
+                  {t("settings.accessPairedDevices").replace(
+                    "{count}",
+                    String(localStatus.pairedDevices),
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {localStatus.pairingCode ? (
+                  <code className="rounded-md bg-muted px-3 py-2 text-sm font-semibold tracking-[0.2em]">
+                    {localStatus.pairingCode}
+                  </code>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={!settings.access.webUiEnabled || busyAction !== "" || browser}
+                  onClick={() =>
+                    void runAction("pair", async () => {
+                      setLocalStatus(
+                        await invoke<LocalAccessStatus>("local_access_rotate_pairing_code"),
+                      );
+                    })
+                  }
+                  className="rounded-lg border border-border px-3 py-2 font-medium hover:bg-muted/50 disabled:opacity-40"
+                >
+                  {t("settings.accessNewPairingCode")}
+                </button>
+              </div>
+            </div>
+          </section>
         </>
       )}
 
@@ -366,7 +391,9 @@ export function AccessSection({ settings, setSettings }: SettingsSectionProps) {
             <Cloud className="h-4 w-4 text-muted-foreground" />
             <div>
               <div className="text-sm font-medium">{t("settings.accessCloudExecution")}</div>
-              <p className="text-xs text-muted-foreground">{t("settings.accessCloudExecutionHint")}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("settings.accessCloudExecutionHint")}
+              </p>
             </div>
           </div>
           <AgentActivationSwitch
@@ -387,7 +414,9 @@ export function AccessSection({ settings, setSettings }: SettingsSectionProps) {
             <Input
               value={settings.access.githubOwner}
               disabled={browser}
-              onChange={(event) => updateAccess(setSettings, { githubOwner: event.currentTarget.value })}
+              onChange={(event) =>
+                updateAccess(setSettings, { githubOwner: event.currentTarget.value })
+              }
               placeholder="github-user"
             />
           </label>
@@ -415,7 +444,11 @@ export function AccessSection({ settings, setSettings }: SettingsSectionProps) {
         <div className="rounded-lg border border-border/50 p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-medium">
-              {vaultStatus.unlocked ? <Key className="h-4 w-4 text-emerald-500" /> : <Lock className="h-4 w-4" />}
+              {vaultStatus.unlocked ? (
+                <Key className="h-4 w-4 text-emerald-500" />
+              ) : (
+                <Lock className="h-4 w-4" />
+              )}
               {t("settings.accessSecureVault")}
             </div>
             <span className="text-xs text-muted-foreground">
@@ -450,7 +483,9 @@ export function AccessSection({ settings, setSettings }: SettingsSectionProps) {
               }
               className="rounded-lg border border-border px-4 py-2 text-xs font-medium hover:bg-muted/50 disabled:opacity-40"
             >
-              {vaultStatus.unlocked ? t("settings.accessLockVault") : t("settings.accessUnlockVault")}
+              {vaultStatus.unlocked
+                ? t("settings.accessLockVault")
+                : t("settings.accessUnlockVault")}
             </button>
           </div>
           {vaultStatus.unlocked ? (

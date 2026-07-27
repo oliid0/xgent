@@ -79,13 +79,7 @@ function toBatchableConversationEvent(
 
 function batchableConversationEventKey(requestId: string, event: BatchableConversationEvent) {
   if (event.type === "tool_call_delta") {
-    return [
-      requestId,
-      event.type,
-      event.conversationId,
-      event.round ?? "",
-      event.id,
-    ].join("\n");
+    return [requestId, event.type, event.conversationId, event.round ?? "", event.id].join("\n");
   }
   return [requestId, event.type, event.conversationId, event.round ?? ""].join("\n");
 }

@@ -27,8 +27,9 @@ export type RightDockSingletonTabKind = RightDockToolKind;
 
 export const RIGHT_DOCK_SINGLETON_TAB_KINDS: readonly RightDockSingletonTabKind[] =
   RIGHT_DOCK_TOOL_KINDS;
-const PROJECT_REQUIRED_RIGHT_DOCK_TAB_KINDS =
-  new Set<RightDockSingletonTabKind>(RIGHT_DOCK_SINGLETON_TAB_KINDS);
+const PROJECT_REQUIRED_RIGHT_DOCK_TAB_KINDS = new Set<RightDockSingletonTabKind>(
+  RIGHT_DOCK_SINGLETON_TAB_KINDS,
+);
 
 export type RightDockVisibleTab =
   | {

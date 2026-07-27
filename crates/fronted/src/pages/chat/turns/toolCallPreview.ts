@@ -44,9 +44,7 @@ function buildHeadTailPreview(input: string, maxChars = TOOL_TEXT_PREVIEW_MAX_CH
 
 // All remote representations of a file tool's streaming arguments use this
 // canonical preview shape and monotonic progress value.
-export function buildToolCallPreviewArguments(
-  toolCall: Pick<ToolCall, "name" | "arguments">,
-) {
+export function buildToolCallPreviewArguments(toolCall: Pick<ToolCall, "name" | "arguments">) {
   const fieldsToPreview = FILE_TOOL_TEXT_FIELDS[toolCall.name];
   const sourceArgs = toolCall.arguments || {};
   if (!fieldsToPreview) {

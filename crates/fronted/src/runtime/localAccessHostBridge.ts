@@ -70,10 +70,7 @@ export async function startLocalAccessHostBridge() {
         }).catch(() => {});
       })
         .then((unlisten) => {
-          if (
-            stopped ||
-            subscriptionVersions.get(subscription.subscriptionId) !== version
-          ) {
+          if (stopped || subscriptionVersions.get(subscription.subscriptionId) !== version) {
             unlisten();
             return;
           }

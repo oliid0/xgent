@@ -78,7 +78,8 @@ async function invokeLocal<T>(command: string, args?: RuntimeInvokeArgs): Promis
     throw new Error(await responseError(response));
   }
   const payload = (await response.json()) as RpcResponse<T>;
-  if (payload.ok !== true) throw new Error(payload.error || `Local access command failed: ${command}`);
+  if (payload.ok !== true)
+    throw new Error(payload.error || `Local access command failed: ${command}`);
   return payload.result as T;
 }
 
