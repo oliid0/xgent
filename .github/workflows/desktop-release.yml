@@ -468,7 +468,7 @@ jobs:
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       ANDROID_NDK_VERSION: 28.2.13676358
       ANDROID_BUILD_TOOLS_VERSION: 36.0.0
-      PROOT_SOURCE_COMMIT: b55e987fe2bd1c609291c16a4fa432814818cbdd
+      PROOT_SOURCE_COMMIT: 87af48f58b752268cc4f93f251a9ca84e94c5655
     steps:
       - uses: actions/checkout@v6
         with:
@@ -644,7 +644,7 @@ jobs:
 
   ios:
     name: iOS arm64 unsigned IPA
-    runs-on: macos-14
+    runs-on: macos-15
     needs:
       - release-metadata
       - release-preflight

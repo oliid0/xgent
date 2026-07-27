@@ -4,10 +4,10 @@ The Android APK bundles PRoot as a separate executable invoked through
 `ProcessBuilder`. XAgent itself remains MIT licensed; PRoot remains licensed
 under GPL-2.0-or-later.
 
-- Packaged binary version: `5.1.107.84`
+- Packaged binary version: `5.1.107.87`
 - Binary distributor: Termux package repository
-- Corresponding source commit: `b55e987fe2bd1c609291c16a4fa432814818cbdd`
-- Upstream tag: `https://github.com/termux/proot/tree/v5.1.107.84`
+- Corresponding source commit: `87af48f58b752268cc4f93f251a9ca84e94c5655`
+- Upstream tag: `https://github.com/termux/proot/tree/v5.1.107.87`
 - Termux build recipe: `https://github.com/termux/termux-packages/tree/master/packages/proot`
 - Reproduction/inclusion script: `scripts/mobile/prepare-proot-android.sh`
 

@@ -34,9 +34,9 @@ runtimes are not included.
 - License: MIT
 - Copyright: Akio Yasui and contributors
 
-## PRoot 5.1.107.84 (Android only)
+## PRoot 5.1.107.87 (Android only)
 
-- Upstream: `https://github.com/termux/proot/tree/v5.1.107.84`
+- Upstream: `https://github.com/termux/proot/tree/v5.1.107.87`
 - License: GPL-2.0-or-later
 - Included as a separate executable, not linked into XAgent.
 - Corresponding source and reproduction details: `PROOT_SOURCE.md`.

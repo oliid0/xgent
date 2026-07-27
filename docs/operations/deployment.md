@@ -10,7 +10,7 @@
 | Windows | `windows-latest` | MSI、安装 EXE、便携 ZIP |
 | Linux | `ubuntu-latest` | AppImage、DEB、RPM |
 | Android | `ubuntu-latest` | 可安装的 universal APK、PRoot 对应源码 |
-| iOS | `macos-14` | arm64 未签名 IPA |
+| iOS | `macos-15` | arm64 未签名 IPA |
 
 Tag push 默认发布 GitHub Release。手动运行可只构建 Actions artifacts，也可以选择发布。所有平台 job 成功后 publish job 才公开 Release，避免发布半成品。
 

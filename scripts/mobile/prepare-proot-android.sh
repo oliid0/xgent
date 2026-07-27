@@ -5,7 +5,7 @@ set -euo pipefail
 # official Termux package repository. Every .deb is version- and SHA-pinned;
 # no file is copied from the local xx/ reference project.
 
-readonly PROOT_VERSION="5.1.107.84"
+readonly PROOT_VERSION="5.1.107.87"
 readonly TERMUX_REPOSITORY="https://packages.termux.dev/apt/termux-main"
 readonly OUTPUT_ROOT="${1:-crates/mobile-execution/android/src/main/jniLibs}"
 
@@ -85,7 +85,7 @@ trap 'rm -rf "$temp_dir"' EXIT
 prepare_abi \
   arm64-v8a \
   aarch64 \
-  59ace3b02894a9b87348eb5ccf246ed52ec64465021839422a151d7128acfe97 \
+  c978bbe7161a639349a2e369d3d134e35d234f5b846432182a5c9bffadb606a6 \
   0da3a24d558b93c92bcf8d611e0826a99ff96e396b148e6cdf33b47c47c57ff6 \
   ac81ad623d74c209718b9f3acb2dd702cc8a88c431e820d212229910b4db29da \
   "$temp_dir"
@@ -93,7 +93,7 @@ prepare_abi \
 prepare_abi \
   x86_64 \
   x86_64 \
-  98f30502dcc3c455ed5562e7fe0b8c04619b2b08633b3701a7750a86c6287e5d \
+  461be750d75fb48fd2966ab6c35e24b1bb18de20da8e050c8715314cb5465c58 \
   ffa9e4c87467b158b148d0ff92dda796aa038276c2075af3269cdcdb06f25797 \
   7ca2eaae2e53b28228a01301bc410b62845403d6317c25b8e0a7f40681de0628 \
   "$temp_dir"
