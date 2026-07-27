@@ -98,7 +98,8 @@ function createSinksRecorder() {
       applyState: (state) => events.push(["applyState", state]),
       applyStateMidRun: (state) => events.push(["applyStateMidRun", state]),
       publishStatus: (status) => events.push(["publishStatus", status]),
-      setBridgeToolStatus: (text, isCompaction) => events.push(["bridge", text, isCompaction]),
+      setLiveToolStatus: (text, isCompaction) =>
+        events.push(["liveToolStatus", text, isCompaction]),
       queueCheckpoint: (state) => events.push(["queueCheckpoint", state]),
       persist: async (state) => {
         events.push(["persist", state]);
@@ -179,11 +180,11 @@ test("pre-send compaction: checkpoint, persist, re-appended user message, paired
 
   assert.equal(recorder.byKind("queueCheckpoint").length, 1);
 
-  // bridge 状态成对：running 时 isCompaction=true，结束后清 null。
-  const bridgeEvents = recorder.byKind("bridge");
-  assert.match(bridgeEvents[0][1], /正在压缩历史/);
-  assert.equal(bridgeEvents[0][2], true);
-  assert.equal(bridgeEvents.at(-1)[1], null);
+  // Live tool status is paired: running marks compaction, then completion clears it.
+  const liveToolStatuses = recorder.byKind("liveToolStatus");
+  assert.match(liveToolStatuses[0][1], /正在压缩历史/);
+  assert.equal(liveToolStatuses[0][2], true);
+  assert.equal(liveToolStatuses.at(-1)[1], null);
 });
 
 test("below-threshold decisions are side-effect free", async () => {
@@ -275,8 +276,8 @@ test("user stop chains into the summarizer; handleTurnAbort rolls back and persi
   assert.equal(recorder.byKind("persistRollback").length, 1);
   const statuses = recorder.byKind("publishStatus").map(([, status]) => status.phase);
   assert.deepEqual(statuses, ["running", "idle"]);
-  // 回滚后 bridge 状态已清，isCompaction 不悬挂。
-  assert.equal(recorder.byKind("bridge").at(-1)[1], null);
+  // Rollback clears the live tool status and does not leave compaction active.
+  assert.equal(recorder.byKind("liveToolStatus").at(-1)[1], null);
 
   // 快照消费后再次调用不再回滚。
   assert.equal(await controller.handleTurnAbort(), false);
@@ -317,7 +318,7 @@ test("summarizer failure degrades to prune and still returns a usable context", 
     .map(([, status]) => status)
     .find((status) => status.phase === "failed");
   assert.match(failedStatus.message, /prune 降级/);
-  assert.equal(recorder.byKind("bridge").at(-1)[1], null);
+  assert.equal(recorder.byKind("liveToolStatus").at(-1)[1], null);
 });
 
 test("mid-stream compaction failure returns a safe continuation and disables protection", async () => {
@@ -433,7 +434,7 @@ test("escalation ladder: consecutive ineffective compactions advise but never ha
   assert.equal(controller.stats.compactionsApplied, 3);
 
   const runningTexts = recorder
-    .byKind("bridge")
+    .byKind("liveToolStatus")
     .filter(([, , isCompaction]) => isCompaction === true)
     .map(([, text]) => text);
   assert.equal(runningTexts.length, 3);
