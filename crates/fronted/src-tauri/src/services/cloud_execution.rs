@@ -120,7 +120,7 @@ cd "$task_root/workspace"
 bash ../run.sh
 "#;
 
-const CLOUD_ENTRY_PS1: &str = r#"param([Parameter(Mandatory=$true)][string]$TaskId)
+const CLOUD_ENTRY_PS1: &str = r##"param([Parameter(Mandatory=$true)][string]$TaskId)
 $ErrorActionPreference = "Stop"
 if ($TaskId -notmatch '^[a-z0-9][a-z0-9-]{7,63}$') { throw "Invalid task id" }
 $TaskRoot = Join-Path "tasks" $TaskId
@@ -145,7 +145,7 @@ Remove-Item Env:XAGENT_CLOUD_PUBLIC_ENV -ErrorAction SilentlyContinue
 Remove-Item Env:XAGENT_CLOUD_SECRET_ENV -ErrorAction SilentlyContinue
 Push-Location (Join-Path $TaskRoot "workspace")
 try { & (Join-Path ".." "run.ps1") } finally { Pop-Location }
-"#;
+"##;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]

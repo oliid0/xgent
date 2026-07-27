@@ -18,7 +18,7 @@ use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use tokio::sync::{broadcast, oneshot};
 use uuid::Uuid;
 

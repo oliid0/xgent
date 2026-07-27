@@ -13,8 +13,10 @@ use tauri_plugin_mobile_execution::{
 
 #[cfg(desktop)]
 use crate::runtime::shell_runner::{run_shell_script, ShellRunRegistry};
+use crate::runtime::shell_types::ShellRunResponse;
+#[cfg(mobile)]
 use crate::runtime::shell_types::{
-    ShellRunResponse, DEFAULT_SHELL_TIMEOUT_MS, MAX_SHELL_TIMEOUT_MS, MIN_SHELL_TIMEOUT_MS,
+    DEFAULT_SHELL_TIMEOUT_MS, MAX_SHELL_TIMEOUT_MS, MIN_SHELL_TIMEOUT_MS,
 };
 
 #[derive(Debug, Serialize)]

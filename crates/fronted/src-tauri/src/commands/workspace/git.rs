@@ -6,7 +6,6 @@ use std::process::{Command, Output, Stdio};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use tempfile::NamedTempFile;
 use wait_timeout::ChildExt;
 
@@ -2740,7 +2739,6 @@ mod tests {
     use super::*;
     use std::fs;
 
-    use serde_json::json;
     use tempfile::TempDir;
 
     #[test]

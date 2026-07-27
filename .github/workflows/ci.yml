@@ -58,8 +58,30 @@ jobs:
         run: pnpm build:web
 
       - name: Lint unified frontend
+        id: frontend_lint
+        continue-on-error: true
         working-directory: crates/fronted
         run: pnpm lint
+
+      - name: Generate frontend formatter patch
+        if: steps.frontend_lint.outcome == 'failure'
+        working-directory: crates/fronted
+        run: |
+          pnpm format
+          git diff --binary -- src > ../../frontend-format.patch
+
+      - name: Upload frontend formatter patch
+        if: steps.frontend_lint.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-format-patch
+          path: frontend-format.patch
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Enforce frontend lint result
+        if: steps.frontend_lint.outcome == 'failure'
+        run: exit 1
 
       - name: Test frontend modules
         working-directory: crates/fronted
