@@ -2,9 +2,9 @@ import type { ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { homeDir } from "@xagent/runtime";
 import type { RuntimePlatform } from "../runtimePlatform";
 import {
+  type AccessSettings,
   type McpSettings,
   type McpSettingsOp,
-  type AccessSettings,
   type ProviderId,
   type SshHostConfig,
   selectEnabledMcpServers,

@@ -79,10 +79,6 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-      - name: Enforce frontend lint result
-        if: steps.frontend_lint.outcome == 'failure'
-        run: exit 1
-
       - name: Test frontend modules
         working-directory: crates/fronted
         run: pnpm test:frontend
@@ -90,6 +86,10 @@ jobs:
       - name: Test release scripts
         working-directory: crates/fronted
         run: pnpm test:release
+
+      - name: Enforce frontend lint result
+        if: steps.frontend_lint.outcome == 'failure'
+        run: exit 1
 
   tauri-rust:
     name: Tauri Rust Check
