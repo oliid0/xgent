@@ -19,10 +19,10 @@ import {
 } from "../../components/icons";
 import { Input } from "../../components/ui/input";
 import { useLocale } from "../../i18n";
-import type { AppSettings } from "../../lib/settings";
 import { inferRuntimePlatform, resolveRuntimePlatform } from "../../lib/runtimePlatform";
-import { AgentActivationSwitch } from "./shared";
+import type { AppSettings } from "../../lib/settings";
 import { MobileExecutionSection } from "./MobileExecutionSection";
+import { AgentActivationSwitch } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 type LocalAccessStatus = {

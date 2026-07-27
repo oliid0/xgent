@@ -1,7 +1,5 @@
 export { ChatComposerBar, type ChatQueueTurnPreview } from "./components/ChatComposerBar";
 export { ChatHeader } from "./components/ChatHeader";
-export type { SendChatAction } from "./local-access/conversationBridgeTypes";
-export { useConversationEventPublisher } from "./local-access/useConversationEventPublisher";
 export {
   scheduleIdleHydration,
   useConversationHistoryActions,
@@ -11,6 +9,8 @@ export { useChatSkills } from "./hooks/useChatSkills";
 export { useEditResend } from "./hooks/useEditResend";
 export { useLiveTranscriptController } from "./hooks/useLiveTranscriptController";
 export { MAX_UPLOAD_FILES, usePendingUploads } from "./hooks/usePendingUploads";
+export type { SendChatAction } from "./local-access/conversationBridgeTypes";
+export { useConversationEventPublisher } from "./local-access/useConversationEventPublisher";
 export { createChatRuntimeHost } from "./runtime/ChatRuntimeHost";
 export {
   appendSystemPrompt,

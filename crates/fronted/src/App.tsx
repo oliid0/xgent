@@ -9,11 +9,10 @@ import { WindowsTitleBar } from "./components/WindowsTitleBar";
 import { LocaleContext, t as translate } from "./i18n";
 import { useAppUpdateController } from "./lib/appUpdates";
 import { initAutomation } from "./lib/automation";
-import { startLocalAccessHostBridge } from "./runtime/localAccessHostBridge";
 import {
   inferRuntimePlatform,
-  resolveRuntimePlatform,
   type RuntimePlatform,
+  resolveRuntimePlatform,
 } from "./lib/runtimePlatform";
 import {
   type AppSettings,
@@ -32,6 +31,7 @@ import {
 import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { SectionId } from "./pages/settings/types";
+import { startLocalAccessHostBridge } from "./runtime/localAccessHostBridge";
 
 function getDefaultContext(): Context {
   return {

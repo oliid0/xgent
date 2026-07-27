@@ -63,19 +63,19 @@ jobs:
         working-directory: crates/fronted
         run: pnpm lint
 
-      - name: Generate frontend formatter patch
+      - name: Generate frontend lint fix patch
         if: steps.frontend_lint.outcome == 'failure'
         working-directory: crates/fronted
         run: |
-          pnpm format
-          git diff --binary -- src > ../../frontend-format.patch
+          pnpm lint:fix
+          git diff --binary -- src > ../../frontend-lint-fix.patch
 
-      - name: Upload frontend formatter patch
+      - name: Upload frontend lint fix patch
         if: steps.frontend_lint.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
-          name: frontend-format-patch
-          path: frontend-format.patch
+          name: frontend-lint-fix-patch
+          path: frontend-lint-fix.patch
           if-no-files-found: error
           retention-days: 1
 

@@ -6,8 +6,8 @@ import {
   cancelMobileExecution,
   installMobileEnvironment,
   installMobileToolchains,
-  mobileExecutionStatus,
   type MobileExecutionStatus,
+  mobileExecutionStatus,
 } from "../../lib/mobileExecution";
 import { normalizeRuntimePlatform, type RuntimePlatform } from "../../lib/runtimePlatform";
 import type { AppSettings } from "../../lib/settings";

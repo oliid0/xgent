@@ -11,8 +11,8 @@ import type {
   RetryAttemptRecord,
 } from "../../../lib/chat/conversation/liveTranscriptStore";
 import type {
-  ConversationHookLifecycle,
   ConversationEventController,
+  ConversationHookLifecycle,
 } from "../../../lib/chat/conversation/run";
 import type { TurnCancellation } from "../../../lib/chat/conversation/turnCancellation";
 import { memoryExtraction } from "../../../lib/chat/memory/extractionController";
