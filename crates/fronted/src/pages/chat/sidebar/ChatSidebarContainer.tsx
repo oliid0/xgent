@@ -17,6 +17,7 @@ import {
   sidebarShallowEqual,
 } from "../../../lib/sidebar/selectors";
 import type { SidebarSnapshot, SidebarStore } from "../../../lib/sidebar/store";
+import type { SidebarConversation } from "../../../lib/sidebar/types";
 import { useSidebarSelector } from "../../../lib/sidebar/useSidebarSelector";
 import { sortWorkspaceProjectsByActivity } from "../../../lib/workspaceProjects";
 

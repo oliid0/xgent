@@ -54,7 +54,6 @@ import {
   createConversationStateFromContext,
   type HistoryMessageRef,
   type RenderTimelineItem,
-  truncateConversationFromMessage,
 } from "../lib/chat/conversation/conversationState";
 import type { LiveTranscriptStore } from "../lib/chat/conversation/liveTranscriptStore";
 import {
@@ -65,7 +64,6 @@ import { createTurnCancellation } from "../lib/chat/conversation/turnCancellatio
 import {
   branchChatHistory,
   deleteChatHistory,
-  getChatHistory,
   listChatHistory,
   setChatHistoryModel,
 } from "../lib/chat/history/chatHistory";
@@ -126,10 +124,8 @@ import {
   isAgentDevMode,
   isAgentExecutionMode,
   isRightDockSingletonTabOpen,
-  normalizeChatRuntimeControls,
   normalizeChatRuntimeControlsForProvider,
   normalizeSelectedModelForProviders,
-  normalizeSystemToolSelection,
   openRightDockSingletonTab,
   parseSelectedModelJson,
   type RightDockFileTreeStatePatch,
@@ -172,9 +168,7 @@ import {
   resolveExplicitSkillMentions,
 } from "../lib/skills";
 import {
-  collectRetainedSubagentParentToolCallIds,
   createSubagentStoreManager,
-  pruneSubagentRunsForConversation,
 } from "../lib/subagents";
 import {
   applyTerminalEventToSessions,
@@ -201,7 +195,6 @@ import {
   type ChatQueueTurnPreview,
   ChatTranscript,
   createChatRuntimeHost,
-  createConversationRuntimeEntry,
   type EffectiveChatModelSelection,
   formatHookWarningMessage,
   MAX_UPLOAD_FILES,
@@ -210,7 +203,6 @@ import {
   resolveEffectiveChatModelSelection,
   type SendChatAction,
   scheduleIdleHydration,
-  setConversationRuntimeCacheEntry,
   startConversationTitleJob,
   useChatPageRuntimeStore,
   useChatSkills,
@@ -227,7 +219,6 @@ import {
 import {
   appendQueuedChatTurn,
   buildQueuedChatTurnPreview,
-  type ChatQueueItemDetail,
   type ChatQueueSnapshot,
   createQueuedChatTurn,
   getQueuedConversationIds,
@@ -1726,7 +1717,6 @@ export function ChatPage(props: ChatPageProps) {
     | null
   >(null);
   const chatQueueRevisionRef = useRef(0);
-  const chatQueueKnownConversationIdsRef = useRef(new Set<string>());
   const activeConversationRuntimeRunsRef = useRef(new Map<string, ActiveConversationRuntimeRun>());
   const conversationRuntimeSnapshotChainsRef = useRef(new Map<string, Promise<void>>());
   const conversationRuntimeSnapshotTimersRef = useRef(new Map<string, number>());
@@ -1753,52 +1743,12 @@ export function ChatPage(props: ChatPageProps) {
     };
   }
 
-  function buildChatQueueItemDetail(item: QueuedChatTurn): ChatQueueItemDetail {
-    const summary = {
-      id: item.id,
-      previewText: buildQueuedChatTurnPreview(item.draft),
-      fileCount: item.uploadedFiles.length,
-      createdAt: item.createdAt,
-      source: "gui" as const,
-      editable: true,
-    };
-    return {
-      ...summary,
-      draftJson: JSON.stringify(item.draft),
-      uploadedFilesJson: JSON.stringify(item.uploadedFiles),
-    };
-  }
-
-  function rememberChatQueueConversationId(conversationId: string) {
-    const key = conversationId.trim();
-    if (key) {
-      chatQueueKnownConversationIdsRef.current.add(key);
-    }
-    return key;
-  }
-
-  function collectChatQueueSnapshotConversationIds(
-    queue: readonly QueuedChatTurn[] = queuedChatTurnsRef.current,
-    extraConversationIds: readonly string[] = [],
-  ) {
-    const conversationIds = new Set(chatQueueKnownConversationIdsRef.current);
-    for (const item of queue) {
-      const key = rememberChatQueueConversationId(item.conversationId);
-      if (key) conversationIds.add(key);
-    }
-    for (const conversationId of extraConversationIds) {
-      const key = rememberChatQueueConversationId(conversationId);
-      if (key) conversationIds.add(key);
-    }
-    return conversationIds;
-  }
-
   function publishChatQueueSnapshot(
     conversationId: string,
     queue: readonly QueuedChatTurn[] = queuedChatTurnsRef.current,
   ) {
     if (!desktopBridgeEnabled) return;
-    const targetConversationId = rememberChatQueueConversationId(conversationId);
+    const targetConversationId = conversationId.trim();
     if (!targetConversationId) {
       return;
     }
@@ -2763,6 +2713,19 @@ export function ChatPage(props: ChatPageProps) {
       clearConversationRuntimeSnapshotTimer(targetConversationId);
     });
   }
+
+  useEffect(() => {
+    if (!desktopBridgeEnabled) return;
+    const keepaliveTimerId = window.setInterval(() => {
+      for (const run of activeConversationRuntimeRunsRef.current.values()) {
+        void queueConversationRuntimeSnapshotForRun(run, {
+          state: run.state,
+          force: true,
+        });
+      }
+    }, CONVERSATION_RUNTIME_RUN_KEEPALIVE_MS);
+    return () => window.clearInterval(keepaliveTimerId);
+  }, [desktopBridgeEnabled]);
 
   useEffect(
     () => () => {
