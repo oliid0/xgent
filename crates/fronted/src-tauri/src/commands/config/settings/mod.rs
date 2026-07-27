@@ -159,6 +159,7 @@ include!("agents.rs");
 include!("system.rs");
 include!("mcp.rs");
 include!("memory_settings.rs");
+include!("secret_redaction.rs");
 #[cfg(desktop)]
 include!("local_access_snapshot.rs");
 include!("ssh/mod.rs");
