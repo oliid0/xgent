@@ -80,6 +80,8 @@ jobs:
           retention-days: 1
 
       - name: Test frontend modules
+        id: frontend_tests
+        continue-on-error: true
         working-directory: crates/fronted
         run: pnpm test:frontend
 
@@ -87,8 +89,8 @@ jobs:
         working-directory: crates/fronted
         run: pnpm test:release
 
-      - name: Enforce frontend lint result
-        if: steps.frontend_lint.outcome == 'failure'
+      - name: Enforce frontend validation result
+        if: steps.frontend_lint.outcome == 'failure' || steps.frontend_tests.outcome == 'failure'
         run: exit 1
 
   tauri-rust:

@@ -398,6 +398,7 @@ test("builtin agent skills stay selected and sort first", () => {
   assert.deepEqual(skillBuiltinHelpers.mergeAlwaysEnabledSkillNames(["demo-skill"]), [
     "skills-creator",
     "skills-installer",
+    "xagent-cloud-execution",
     "demo-skill",
   ]);
   assert.deepEqual(
@@ -412,6 +413,7 @@ test("builtin agent skills stay selected and sort first", () => {
   );
   assert.equal(skillBuiltinHelpers.isUserSelectableSkillName("xagent-code-review"), true);
   assert.equal(skillBuiltinHelpers.isUserSelectableSkillName("skills-creator"), false);
+  assert.equal(skillBuiltinHelpers.isUserSelectableSkillName("xagent-cloud-execution"), false);
   assert.equal(skillBuiltinHelpers.isUserSelectableSkillName("workflow-skill"), true);
 });
 
