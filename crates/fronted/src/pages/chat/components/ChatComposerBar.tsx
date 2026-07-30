@@ -26,6 +26,7 @@ import {
   LightbulbOff,
   Loader2,
   Maximize2,
+  Mic,
   Minimize2,
   Paperclip,
   Play,
@@ -50,6 +51,13 @@ import {
   type PendingUploadedFile,
 } from "../../../lib/chat/messages/uploadedFiles";
 import type { GitClient } from "../../../lib/git/types";
+import {
+  checkMobileAssistantPermissions,
+  mobileAssistantStatus,
+  requestMobileAssistantPermission,
+  startMobileVoiceInput,
+} from "../../../lib/mobileAssistant";
+import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
 import {
   type ChatRuntimeControls,
   DEFAULT_CHAT_RUNTIME_CONTROLS,
@@ -214,6 +222,9 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const [queueScrollbar, setQueueScrollbar] = useState<QueueScrollbarState>(
     DEFAULT_QUEUE_SCROLLBAR_STATE,
   );
+  const [voiceInputAvailable, setVoiceInputAvailable] = useState(false);
+  const [voiceInputActive, setVoiceInputActive] = useState(false);
+  const [voiceInputError, setVoiceInputError] = useState<string | null>(null);
   const uploadDisabled = isInputDisabled || isUploadingFiles || !isAgentMode || !workdir;
   const controlsDisabled = isInputDisabled;
   const hasSendableDraft = !composerIsEmpty || pendingUploadedFiles.length > 0;
@@ -239,6 +250,48 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     ? t("chat.runtime.thinkingUnavailable")
     : t("chat.runtime.thinkingTooltip");
   const webSearchTooltip = t("chat.runtime.webSearchTooltip");
+
+  useEffect(() => {
+    if (!isNativeMobileRuntime()) return;
+    let active = true;
+    void mobileAssistantStatus()
+      .then((status) => {
+        if (active) setVoiceInputAvailable(status.available && status.voiceInputAvailable);
+      })
+      .catch(() => {
+        if (active) setVoiceInputAvailable(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const startVoiceInput = useCallback(async () => {
+    if (voiceInputActive || isInputDisabled) return;
+    setVoiceInputError(null);
+    setVoiceInputActive(true);
+    try {
+      let permissions = await checkMobileAssistantPermissions();
+      if (permissions.microphone !== "granted") {
+        permissions = await requestMobileAssistantPermission("microphone");
+      }
+      if (permissions.microphone !== "granted") {
+        throw new Error(t("chat.composer.voicePermissionRequired"));
+      }
+      const result = await startMobileVoiceInput();
+      const text = result.text.trim();
+      if (text) {
+        const composer = composerRef.current;
+        const prefix = composer?.hasContent() ? " " : "";
+        composer?.insertText(`${prefix}${text}`);
+        composer?.focus();
+      }
+    } catch (error) {
+      setVoiceInputError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setVoiceInputActive(false);
+    }
+  }, [composerRef, isInputDisabled, t, voiceInputActive]);
   const toggleQueueTooltip = queueCollapsed ? t("chat.queue.expand") : t("chat.queue.collapse");
   const toggleComposerExpandTooltip = isComposerExpanded
     ? t("chat.composer.collapse")
@@ -796,6 +849,44 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                   ) : null}
                 </button>
               </RuntimeControlTooltip>
+
+              {voiceInputAvailable ? (
+                <RuntimeControlTooltip
+                  label={
+                    voiceInputError ??
+                    (voiceInputActive
+                      ? t("chat.composer.voiceListening")
+                      : t("chat.composer.voiceInput"))
+                  }
+                >
+                  <button
+                    type="button"
+                    disabled={isInputDisabled || voiceInputActive}
+                    onClick={() => void startVoiceInput()}
+                    aria-label={
+                      voiceInputActive
+                        ? t("chat.composer.voiceListening")
+                        : t("chat.composer.voiceInput")
+                    }
+                    aria-pressed={voiceInputActive}
+                    className={cn(
+                      "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
+                      "disabled:pointer-events-none disabled:opacity-55",
+                      voiceInputActive
+                        ? "bg-rose-500/10 text-rose-600 dark:text-rose-300"
+                        : voiceInputError
+                          ? "text-amber-600 dark:text-amber-300"
+                          : "text-muted-foreground hover:text-foreground dark:hover:text-white",
+                    )}
+                  >
+                    {voiceInputActive ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Mic className="h-4 w-4" />
+                    )}
+                  </button>
+                </RuntimeControlTooltip>
+              ) : null}
 
               <RuntimeControlTooltip label={webSearchTooltip}>
                 <button

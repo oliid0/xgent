@@ -130,11 +130,16 @@ export type FontScaleSettings = {
   rightDock: number;
 };
 
+export type BrowserExperienceSettings = {
+  homePage: string;
+};
+
 export type CustomSettings = {
   conversationTitleModel?: SelectedModel;
   chatSidebar: ChatSidebarSettings;
   rightDock: RightDockSettings;
   fontScale: FontScaleSettings;
+  browser: BrowserExperienceSettings;
 };
 
 export type UpdateSettings = {
@@ -297,7 +302,10 @@ export type AccessSettings = {
   webUiEnabled: boolean;
   webUiScope: WebUiScope;
   webUiPort: number;
+  /** Last desktop Web UI endpoint used by the native mobile control surface. */
+  lanControlUrl: string;
   allowTerminal: boolean;
+  allowBrowserAutomation: boolean;
   allowSsh: boolean;
   allowGit: boolean;
   allowFileWrite: boolean;
@@ -1007,7 +1015,9 @@ export function normalizeAccessSettings(input: unknown): AccessSettings {
     webUiEnabled: obj.webUiEnabled === true,
     webUiScope: obj.webUiScope === "loopback" ? "loopback" : "lan",
     webUiPort: normalizeIntegerInRange(obj.webUiPort, 1, 65_535, 28_367),
+    lanControlUrl: normalizeOptionalText(obj.lanControlUrl),
     allowTerminal: obj.allowTerminal === true,
+    allowBrowserAutomation: obj.allowBrowserAutomation === true,
     allowSsh: obj.allowSsh === true,
     allowGit: obj.allowGit === true,
     allowFileWrite: obj.allowFileWrite === true,
@@ -1015,8 +1025,8 @@ export function normalizeAccessSettings(input: unknown): AccessSettings {
     githubOwner: normalizeOptionalText(obj.githubOwner),
     githubRepository: normalizeOptionalText(obj.githubRepository) || "agent-temp",
     cloudArtifactRetentionDays: normalizeIntegerInRange(obj.cloudArtifactRetentionDays, 1, 90, 7),
-    androidProotEnabled: obj.androidProotEnabled === true,
-    iosAShellEnabled: obj.iosAShellEnabled === true,
+    androidProotEnabled: obj.androidProotEnabled !== false,
+    iosAShellEnabled: obj.iosAShellEnabled !== false,
   };
 }
 
@@ -1971,6 +1981,15 @@ export function normalizeCustomSettings(
     },
     rightDock: normalizeRightDockSettings(obj.rightDock),
     fontScale: normalizeFontScaleSettings(obj.fontScale),
+    browser: normalizeBrowserExperienceSettings(obj.browser),
+  };
+}
+
+function normalizeBrowserExperienceSettings(input: unknown): BrowserExperienceSettings {
+  const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const homePage = typeof obj.homePage === "string" ? obj.homePage.trim() : "";
+  return {
+    homePage: homePage || "https://www.google.com/",
   };
 }
 
@@ -2071,6 +2090,19 @@ export function updateMcp(prev: AppSettings, patch: Partial<McpSettings>): AppSe
     ...prev,
     mcp: {
       ...prev.mcp,
+      ...patch,
+    },
+  });
+}
+
+export function updateAccessSettings(
+  prev: AppSettings,
+  patch: Partial<AccessSettings>,
+): AppSettings {
+  return normalizeSettings({
+    ...prev,
+    access: {
+      ...prev.access,
       ...patch,
     },
   });

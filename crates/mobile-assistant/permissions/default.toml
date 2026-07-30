@@ -1,0 +1,10 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows the XAgent mobile shell to inspect native assistant capabilities and start user-initiated voice input."
+permissions = [
+  "allow-status",
+  "allow-start-voice-input",
+  "allow-check-permissions",
+  "allow-request-permissions",
+]

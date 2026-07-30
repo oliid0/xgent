@@ -8,12 +8,15 @@ export type SectionId =
   | "system"
   | "systemTools"
   | "providers"
+  | "soul"
   | "agents"
   | "ssh"
   | "memory"
   | "hooks"
   | "cron"
   | "access"
+  | "mobileAssistant"
+  | "mobileExecution"
   | "about";
 
 export type SettingsPageProps = {

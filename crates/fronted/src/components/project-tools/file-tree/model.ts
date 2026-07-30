@@ -36,10 +36,11 @@ export const FILE_TREE_HAS_OS_INTEGRATION =
   typeof window !== "undefined" &&
   "__TAURI_INTERNALS__" in (window as unknown as Record<string, unknown>);
 
-// The desktop keeps the pre-rewrite compact 28px rows while the web build
-// keeps its larger touch-friendly 32px rows (mirroring the styling the two
-// panels had before they were unified into one byte-identical source).
-export const FILE_TREE_ROW_HEIGHT = FILE_TREE_HAS_OS_INTEGRATION ? 28 : 32;
+// Pointer modality, not the presence of Tauri, decides row density. Android
+// and iOS are Tauri runtimes too; treating every Tauri target as a desktop
+// produced 28px tap targets in the mobile file browser.
+export const FILE_TREE_ROW_HEIGHT =
+  typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches ? 44 : 28;
 
 // ---------------------------------------------------------------------------
 // Path helpers

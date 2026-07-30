@@ -1,11 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- PRoot needs a real POSIX path for a user-selected SAF tree. Android
+         cannot bind a content:// descriptor as /workspace, so raw storage
+         access is requested only when the user explicitly mounts an external
+         folder. Managed app workspaces do not require these permissions. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
     <!-- PRoot is launched with ProcessBuilder from applicationInfo.nativeLibraryDir,
          so its lib*.so executable and dependency closure must exist as extracted
          files instead of only as mmap-able entries inside the APK. The versioned
          libtalloc SONAME is materialized without modifying PRoot in codeCacheDir. -->
     <application
         android:extractNativeLibs="true"
-        android:networkSecurityConfig="@xml/xagent_network_security_config" />
+        android:networkSecurityConfig="@xml/xagent_network_security_config">
+        <activity
+            android:name="com.ohi.xagent.mobileexecution.WorkspacePickerActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    </application>
 </manifest>

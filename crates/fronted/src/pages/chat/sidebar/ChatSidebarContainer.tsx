@@ -5,10 +5,12 @@
 
 import { Fragment, useCallback, useMemo, useState } from "react";
 import { ChatHistorySidebar } from "../../../components/chat/ChatHistorySidebar";
+import type { WorkspaceToolTarget } from "../../../components/project-tools/rightDockModel";
 import { useLocale } from "../../../i18n";
 import type { AppUpdateController } from "../../../lib/appUpdates";
 import { normalizeConversationTitle } from "../../../lib/chat/page/chatPageHelpers";
 import type { WorkspaceProject } from "../../../lib/settings";
+import type { TerminalShellOption } from "../../../lib/terminal/types";
 import {
   selectConversations,
   selectListState,
@@ -63,6 +65,11 @@ type ChatSidebarContainerProps = {
   appUpdate?: AppUpdateController;
   onOpenSkillsHub: () => void;
   onOpenMcpHub: () => void;
+  mobileExperience?: boolean;
+  workspaceToolsAvailable?: boolean;
+  fileTreeAvailable?: boolean;
+  terminalShellOptions?: TerminalShellOption[];
+  onOpenWorkspaceTool?: (target: WorkspaceToolTarget, shell?: string) => void;
 };
 
 function selectMutations(snapshot: SidebarSnapshot) {
@@ -238,6 +245,11 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         appUpdate={props.appUpdate}
         onOpenSkillsHub={props.onOpenSkillsHub}
         onOpenMcpHub={props.onOpenMcpHub}
+        mobileExperience={props.mobileExperience}
+        workspaceToolsAvailable={props.workspaceToolsAvailable}
+        fileTreeAvailable={props.fileTreeAvailable}
+        terminalShellOptions={props.terminalShellOptions}
+        onOpenWorkspaceTool={props.onOpenWorkspaceTool}
       />
     </Fragment>
   );

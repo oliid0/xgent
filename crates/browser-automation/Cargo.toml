@@ -1,0 +1,21 @@
+[package]
+name = "tauri-plugin-browser-automation"
+version = "0.1.0"
+authors = ["XAgent contributors"]
+description = "Shared desktop, Android, and iOS browser automation sessions for XAgent"
+edition = "2021"
+license = "MIT"
+links = "tauri-plugin-browser-automation"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tauri = "2.11.5"
+thiserror = "2"
+url = "2.5"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri = { version = "2.11.5", features = ["unstable"] }
+
+[build-dependencies]
+tauri-plugin = "2.5.4"

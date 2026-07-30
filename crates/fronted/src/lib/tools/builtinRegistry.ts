@@ -20,6 +20,8 @@ import type {
   BuiltinToolExecutionContext,
   BuiltinToolMetadata,
 } from "./builtinTypes";
+import { createAskUserQuestionTools } from "./askUserQuestionTools";
+import { createBrowserUseTools } from "./browserUseTools";
 import { createCloudTaskTools } from "./cloudTaskTools";
 import { createCronTools } from "./cronTools";
 import { createCustomSystemTools } from "./customSystemTools";
@@ -205,6 +207,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
             applyMcpOps: params.applyMcpOps,
             runtimeScope: params.runtimeScope,
             resolveHomeDir,
+            localStdioSupported: capabilities.localMcpStdio,
           }),
         ]
       : []),
@@ -221,6 +224,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       workdir: params.workdir,
       mode: params.memoryToolMode ?? "rw",
     }),
+    createBrowserUseTools(),
     ...(params.cloudExecution?.cloudExecutionEnabled
       ? [createCloudTaskTools(params.cloudExecution, params.workdir)]
       : []),
@@ -250,7 +254,11 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       : []),
   ];
 
-  const enabledServers = capabilities.mcp ? selectEnabledMcpServers(params.getMcpSettings()) : [];
+  const enabledServers = capabilities.mcp
+    ? selectEnabledMcpServers(params.getMcpSettings()).filter(
+        (server) => capabilities.localMcpStdio || server.transport !== "stdio",
+      )
+    : [];
   if (enabledServers.length > 0) {
     baseBundles.push(
       await createMcpTools({
@@ -268,6 +276,7 @@ export async function buildBuiltinToolRegistry(
   params: BuildBuiltinBaseToolRegistryParams & {
     subagentRuntime?: SubagentRuntimeConfig;
     todoState?: TodoToolState;
+    askUserQuestionConversationId?: string;
   },
 ) {
   const capabilities = resolveRuntimeToolCapabilities(params.nativeMobileRuntime === true);
@@ -276,10 +285,15 @@ export async function buildBuiltinToolRegistry(
     params.runtimeScope === "chat" && params.todoState
       ? [createTodoTools({ state: params.todoState })]
       : [];
+  const askUserQuestionBundles =
+    params.runtimeScope === "chat" && params.askUserQuestionConversationId
+      ? [createAskUserQuestionTools({ conversationId: params.askUserQuestionConversationId })]
+      : [];
+  const chatBundles = [...todoBundles, ...askUserQuestionBundles];
 
   const subagentRuntime = capabilities.subagents ? params.subagentRuntime : undefined;
   if (!subagentRuntime) {
-    return createBuiltinToolRegistry([...baseBundles, ...todoBundles]);
+    return createBuiltinToolRegistry([...baseBundles, ...chatBundles]);
   }
 
   const baseRegistry = createBuiltinToolRegistry(baseBundles);
@@ -301,7 +315,7 @@ export async function buildBuiltinToolRegistry(
   const parentBundles = parentMessageBundle ? [...baseBundles, parentMessageBundle] : baseBundles;
   return createBuiltinToolRegistry([
     ...parentBundles,
-    ...todoBundles,
+    ...chatBundles,
     createSubagentTools({
       providerId: subagentRuntime.providerId,
       model: subagentRuntime.model,

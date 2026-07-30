@@ -37,6 +37,24 @@ impl<R: Runtime> MobileExecution<R> {
         Err(crate::Error::Unavailable)
     }
 
+    pub fn list_external_workspaces(&self) -> crate::Result<Vec<ExternalWorkspace>> {
+        Ok(Vec::new())
+    }
+
+    pub fn pick_external_workspace(
+        &self,
+        _request: PickExternalWorkspaceRequest,
+    ) -> crate::Result<ExternalWorkspace> {
+        Err(crate::Error::Unavailable)
+    }
+
+    pub fn remove_external_workspace(
+        &self,
+        _request: RemoveExternalWorkspaceRequest,
+    ) -> crate::Result<RemoveExternalWorkspaceResponse> {
+        Err(crate::Error::Unavailable)
+    }
+
     pub fn run(&self, _request: RunRequest) -> crate::Result<RunResponse> {
         Err(crate::Error::Unavailable)
     }

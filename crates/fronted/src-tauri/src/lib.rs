@@ -243,10 +243,14 @@ macro_rules! app_invoke_handler {
             commands::system::system_append_debug_jsonl,
             commands::system::system_begin_power_activity,
             commands::system::system_end_power_activity,
+            commands::app_commands::soul::system_load_soul,
+            commands::app_commands::soul::system_list_souls,
+            commands::app_commands::soul::system_save_soul,
+            commands::app_commands::soul::system_create_soul,
+            commands::app_commands::soul::system_select_soul,
+            commands::app_commands::soul::system_delete_soul,
             commands::custom_tools::system_http_get_test,
             commands::cloud::cloud_secret_vault_status,
-            commands::cloud::cloud_secret_vault_unlock,
-            commands::cloud::cloud_secret_vault_lock,
             commands::cloud::cloud_secret_vault_set_github_token,
             commands::cloud::cloud_secret_vault_remove_github_token,
             commands::cloud::cloud_task_start,
@@ -254,6 +258,7 @@ macro_rules! app_invoke_handler {
             commands::cloud::cloud_task_wait,
             commands::cloud::cloud_task_failure_log,
             commands::cloud::cloud_task_download_artifact,
+            commands::cloud::cloud_task_open_artifact,
             commands::local_access::local_access_status,
             commands::local_access::local_access_rotate_pairing_code,
             commands::local_access::local_access_revoke_all_devices,
@@ -341,9 +346,13 @@ macro_rules! app_invoke_handler {
             commands::settings::settings_apply_ssh_patch,
             commands::settings::settings_reset_ssh_known_host,
             commands::settings::settings_save_memory,
+            commands::mcp::mcp_list_tools,
+            commands::mcp::mcp_call_tool,
+            commands::mcp::mcp_runtime_status,
+            commands::mcp::mcp_stop_server,
+            commands::mcp::mcp_test_server,
+            commands::mcp::mcp_restart_server,
             commands::cloud::cloud_secret_vault_status,
-            commands::cloud::cloud_secret_vault_unlock,
-            commands::cloud::cloud_secret_vault_lock,
             commands::cloud::cloud_secret_vault_set_github_token,
             commands::cloud::cloud_secret_vault_remove_github_token,
             commands::cloud::cloud_task_start,
@@ -351,9 +360,11 @@ macro_rules! app_invoke_handler {
             commands::cloud::cloud_task_wait,
             commands::cloud::cloud_task_failure_log,
             commands::cloud::cloud_task_download_artifact,
+            commands::cloud::cloud_task_open_artifact,
             commands::shell::shell_run,
             commands::shell::shell_cancel,
             commands::app::app_runtime_platform,
+            commands::system::system_pick_folder,
             commands::system::system_create_project_folder,
             commands::system::system_import_readable_file_paths,
             commands::system::system_import_uploaded_readable_files,
@@ -366,6 +377,12 @@ macro_rules! app_invoke_handler {
             commands::system::system_read_skill_text,
             commands::system::system_manage_skill,
             commands::system::system_append_debug_jsonl,
+            commands::app_commands::soul::system_load_soul,
+            commands::app_commands::soul::system_list_souls,
+            commands::app_commands::soul::system_save_soul,
+            commands::app_commands::soul::system_create_soul,
+            commands::app_commands::soul::system_select_soul,
+            commands::app_commands::soul::system_delete_soul,
             services::proxy::proxy_get_server_info,
         ]
     };
@@ -512,6 +529,18 @@ fn configure_windows_window_chrome(app: &tauri::App) -> tauri::Result<()> {
 
 #[cfg(desktop)]
 pub fn run() {
+    for warning in services::app_paths::initialize_desktop()
+        .expect("failed to initialize the unified XAgent data directory")
+    {
+        eprintln!("{warning}");
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let webview_data_dir = services::app_paths::webview_data_dir()
+            .expect("failed to initialize the XAgent WebView2 data directory");
+        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", webview_data_dir);
+    }
+
     let automation_store = Arc::new(
         services::automation::AutomationStore::open()
             .expect("failed to initialize XAgent automation store"),
@@ -536,6 +565,8 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_browser_automation::init())
+        .plugin(tauri_plugin_mobile_assistant::init())
         .plugin(tauri_plugin_mobile_execution::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_mcp_bridge::init())
@@ -568,10 +599,7 @@ pub fn run() {
                 if let Err(error) = commands::settings::initialize_system_proxy_from_db() {
                     eprintln!("failed to initialize system proxy state: {error}");
                 }
-                let app_data_dir = app
-                    .path()
-                    .app_data_dir()
-                    .map_err(|error| format!("resolve app data directory failed: {error}"))?;
+                let app_data_dir = services::app_paths::app_storage_dir()?;
                 let cloud_secret_vault = Arc::new(
                     services::cloud_secret_vault::CloudSecretVault::new(app_data_dir.clone())?,
                 );
@@ -680,13 +708,17 @@ pub fn run() {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_browser_automation::init())
+        .plugin(tauri_plugin_mobile_assistant::init())
         .plugin(tauri_plugin_mobile_execution::init())
+        .manage(Arc::new(commands::mcp::McpRuntimeManager::default()))
         .setup(|app| {
             let app_data_dir = app
                 .path()
                 .app_data_dir()
                 .map_err(|error| format!("resolve app data directory failed: {error}"))?;
-            services::app_paths::initialize(app_data_dir.clone())?;
+            services::app_paths::initialize(services::app_paths::mobile_root(&app_data_dir))?;
+            let app_data_dir = services::app_paths::app_storage_dir()?;
             commands::history_db::initialize_history_db()?;
             if let Err(error) = commands::settings::initialize_system_proxy_from_db() {
                 eprintln!("failed to initialize system proxy state: {error}");

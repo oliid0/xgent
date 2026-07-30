@@ -2,6 +2,9 @@ const COMMANDS: &[&str] = &[
     "status",
     "install",
     "install_toolchains",
+    "list_external_workspaces",
+    "pick_external_workspace",
+    "remove_external_workspace",
     "run",
     "cancel",
 ];

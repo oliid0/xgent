@@ -1124,6 +1124,12 @@ fn authorize_local_command(
         "git_commit_diff",
     ];
     if command == "settings_load_all"
+        || command == "system_load_soul"
+        || command == "system_list_souls"
+        || command == "system_save_soul"
+        || command == "system_create_soul"
+        || command == "system_select_soul"
+        || command == "system_delete_soul"
         || command == "cron_validate_expression"
         || crate::commands::settings::is_local_access_settings_write(command)
         || ALWAYS_ALLOWED_PREFIXES
@@ -1158,6 +1164,9 @@ fn authorize_local_command(
         && config.cloud_execution_enabled
         && (command != "cloud_task_download_artifact" || config.allow_file_write)
     {
+        return Ok(());
+    }
+    if command.starts_with("plugin:browser-automation|") && config.allow_browser_automation {
         return Ok(());
     }
     if (command.starts_with("ssh_") || command.starts_with("sftp_")) && config.allow_ssh {
@@ -1264,26 +1273,149 @@ fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
 }
 
 fn local_access_urls(config: &AccessSettingsPayload, port: u16) -> Vec<String> {
-    let mut urls = vec![format!("http://127.0.0.1:{port}")];
+    let loopback_url = format!("http://127.0.0.1:{port}");
+    let mut urls = Vec::new();
     if config.web_ui_scope == "lan" {
-        if let Some(ip) = preferred_lan_ip() {
+        for ip in lan_ipv4_addresses() {
             let url = format!("http://{ip}:{port}");
             if !urls.contains(&url) {
-                urls.insert(0, url);
+                urls.push(url);
             }
         }
     }
+    urls.push(loopback_url);
     urls
 }
 
-fn preferred_lan_ip() -> Option<IpAddr> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LanAddress {
+    interface_name: String,
+    ip: Ipv4Addr,
+    score: i16,
+}
+
+fn lan_ipv4_addresses() -> Vec<Ipv4Addr> {
+    let interfaces = if_addrs::get_if_addrs().unwrap_or_default();
+    let mut addresses = rank_lan_addresses(interfaces.into_iter().filter_map(|interface| {
+        let IpAddr::V4(ip) = interface.ip() else {
+            return None;
+        };
+        Some((interface.name, ip))
+    }));
+    if addresses.is_empty() {
+        if let Some(ip) = routed_lan_ip() {
+            addresses.push(LanAddress {
+                interface_name: "default-route".to_string(),
+                ip,
+                score: i16::MIN,
+            });
+        }
+    }
+    addresses.into_iter().map(|address| address.ip).collect()
+}
+
+fn rank_lan_addresses(
+    interfaces: impl IntoIterator<Item = (String, Ipv4Addr)>,
+) -> Vec<LanAddress> {
+    let mut by_ip: HashMap<Ipv4Addr, LanAddress> = HashMap::new();
+    for (interface_name, ip) in interfaces {
+        if !ip.is_private() || ip.is_loopback() || ip.is_unspecified() {
+            continue;
+        }
+        let candidate = LanAddress {
+            score: lan_interface_score(&interface_name, ip),
+            interface_name,
+            ip,
+        };
+        match by_ip.get(&ip) {
+            Some(existing) if existing.score >= candidate.score => {}
+            _ => {
+                by_ip.insert(ip, candidate);
+            }
+        }
+    }
+    let mut addresses: Vec<_> = by_ip.into_values().collect();
+    addresses.sort_by(|left, right| {
+        right
+            .score
+            .cmp(&left.score)
+            .then_with(|| left.interface_name.cmp(&right.interface_name))
+            .then_with(|| left.ip.octets().cmp(&right.ip.octets()))
+    });
+    addresses
+}
+
+fn lan_interface_score(interface_name: &str, ip: Ipv4Addr) -> i16 {
+    let normalized = interface_name.to_lowercase();
+    let virtual_interface = [
+        "tun",
+        "tap",
+        "wintun",
+        "wireguard",
+        "openvpn",
+        "vpn",
+        "tailscale",
+        "zerotier",
+        "hamachi",
+        "cloudflare",
+        "warp",
+        "clash",
+        "mihomo",
+        "sing-box",
+        "vmware",
+        "virtualbox",
+        "vbox",
+        "hyper-v",
+        "vethernet",
+        "docker",
+        "podman",
+        "wsl",
+        "bridge",
+    ]
+    .iter()
+    .any(|hint| normalized.contains(hint));
+    let physical_interface = [
+        "ethernet",
+        "wi-fi",
+        "wifi",
+        "wlan",
+        "wireless",
+        "以太网",
+        "无线",
+    ]
+    .iter()
+    .any(|hint| normalized.contains(hint))
+        || normalized.starts_with("eth")
+        || normalized.starts_with("en")
+        || normalized.starts_with("wl");
+
+    let subnet_score = match ip.octets() {
+        [192, 168, ..] => 30,
+        [10, ..] => 20,
+        [172, second, ..] if (16..=31).contains(&second) => 10,
+        _ => 0,
+    };
+    subnet_score + if physical_interface { 100 } else { 0 } - if virtual_interface { 200 } else { 0 }
+}
+
+fn routed_lan_ip() -> Option<Ipv4Addr> {
     let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).ok()?;
     socket.connect((Ipv4Addr::new(192, 0, 2, 1), 9)).ok()?;
-    let ip = socket.local_addr().ok()?.ip();
-    (!ip.is_loopback() && !ip.is_unspecified()).then_some(ip)
+    let IpAddr::V4(ip) = socket.local_addr().ok()?.ip() else {
+        return None;
+    };
+    (ip.is_private() && !ip.is_loopback() && !ip.is_unspecified()).then_some(ip)
 }
 
 fn is_allowed_host(host: &str, expected_port: u16) -> bool {
+    is_allowed_host_for_addresses(host, expected_port, &lan_ipv4_addresses())
+}
+
+fn is_allowed_host_for_addresses(
+    host: &str,
+    expected_port: u16,
+    lan_addresses: &[Ipv4Addr],
+) -> bool {
     let (hostname, port) = split_host_port(host, expected_port);
     if port != expected_port {
         return false;
@@ -1297,7 +1429,10 @@ fn is_allowed_host(host: &str, expected_port: u16) -> bool {
     if ip.is_loopback() {
         return true;
     }
-    preferred_lan_ip().is_some_and(|local| local == ip)
+    let IpAddr::V4(ip) = ip else {
+        return false;
+    };
+    lan_addresses.contains(&ip)
 }
 
 fn split_host_port(host: &str, default_port: u16) -> (String, u16) {
@@ -1351,4 +1486,54 @@ fn now_ms() -> i64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as i64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn physical_lan_interfaces_sort_before_tunnels() {
+        let addresses = rank_lan_addresses([
+            ("Wintun Userspace Tunnel".to_string(), Ipv4Addr::new(192, 168, 50, 2)),
+            ("Wi-Fi".to_string(), Ipv4Addr::new(10, 0, 0, 42)),
+            ("vEthernet (WSL)".to_string(), Ipv4Addr::new(172, 24, 0, 1)),
+        ]);
+
+        assert_eq!(
+            addresses.iter().map(|address| address.ip).collect::<Vec<_>>(),
+            vec![
+                Ipv4Addr::new(10, 0, 0, 42),
+                Ipv4Addr::new(192, 168, 50, 2),
+                Ipv4Addr::new(172, 24, 0, 1),
+            ]
+        );
+    }
+
+    #[test]
+    fn lan_addresses_exclude_public_loopback_and_link_local_ranges() {
+        let addresses = rank_lan_addresses([
+            ("Ethernet".to_string(), Ipv4Addr::new(192, 168, 1, 20)),
+            ("Ethernet".to_string(), Ipv4Addr::new(8, 8, 8, 8)),
+            ("Loopback".to_string(), Ipv4Addr::LOCALHOST),
+            ("Link Local".to_string(), Ipv4Addr::new(169, 254, 1, 2)),
+        ]);
+
+        assert_eq!(addresses.len(), 1);
+        assert_eq!(addresses[0].ip, Ipv4Addr::new(192, 168, 1, 20));
+    }
+
+    #[test]
+    fn host_validation_accepts_every_current_lan_address_only_on_the_bound_port() {
+        let addresses = [
+            Ipv4Addr::new(192, 168, 1, 20),
+            Ipv4Addr::new(10, 0, 0, 42),
+        ];
+
+        assert!(is_allowed_host_for_addresses("192.168.1.20:28367", 28_367, &addresses));
+        assert!(is_allowed_host_for_addresses("10.0.0.42:28367", 28_367, &addresses));
+        assert!(is_allowed_host_for_addresses("localhost:28367", 28_367, &addresses));
+        assert!(!is_allowed_host_for_addresses("192.168.1.20:8080", 28_367, &addresses));
+        assert!(!is_allowed_host_for_addresses("192.168.1.99:28367", 28_367, &addresses));
+    }
 }

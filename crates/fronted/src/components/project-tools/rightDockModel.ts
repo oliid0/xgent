@@ -24,6 +24,16 @@ export const BACKGROUND_TASKS_TAB_ID = "background-tasks";
 export const PROJECT_TOOLS_RESIZE_END_EVENT = "xagent:project-tools-resize-end";
 
 export type RightDockSingletonTabKind = RightDockToolKind;
+export type WorkspaceToolTarget =
+  | RightDockSingletonTabKind
+  | "terminal"
+  | "backgroundTasks";
+
+export type WorkspaceToolLaunchRequest = {
+  nonce: number;
+  target: WorkspaceToolTarget;
+  shell?: string;
+};
 
 export const RIGHT_DOCK_SINGLETON_TAB_KINDS: readonly RightDockSingletonTabKind[] =
   RIGHT_DOCK_TOOL_KINDS;

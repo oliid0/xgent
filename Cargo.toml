@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["crates/fronted/src-tauri", "crates/mobile-execution"]
+members = [
+  "crates/browser-automation",
+  "crates/fronted/src-tauri",
+  "crates/mobile-assistant",
+  "crates/mobile-execution",
+]
 
 [patch.crates-io]
 # Tauri 2.11 currently resolves Swift packages through swift-rs 1.0.7,

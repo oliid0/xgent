@@ -25,6 +25,29 @@ pub(crate) async fn install_toolchains<R: Runtime>(
 }
 
 #[command]
+pub(crate) async fn list_external_workspaces<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<Vec<ExternalWorkspace>> {
+    app.mobile_execution().list_external_workspaces()
+}
+
+#[command]
+pub(crate) async fn pick_external_workspace<R: Runtime>(
+    app: AppHandle<R>,
+    request: PickExternalWorkspaceRequest,
+) -> Result<ExternalWorkspace> {
+    app.mobile_execution().pick_external_workspace(request)
+}
+
+#[command]
+pub(crate) async fn remove_external_workspace<R: Runtime>(
+    app: AppHandle<R>,
+    request: RemoveExternalWorkspaceRequest,
+) -> Result<RemoveExternalWorkspaceResponse> {
+    app.mobile_execution().remove_external_workspace(request)
+}
+
+#[command]
 pub(crate) async fn run<R: Runtime>(
     app: AppHandle<R>,
     request: RunRequest,

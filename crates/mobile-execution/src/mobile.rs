@@ -45,6 +45,30 @@ impl<R: Runtime> MobileExecution<R> {
             .map_err(Into::into)
     }
 
+    pub fn list_external_workspaces(&self) -> crate::Result<Vec<ExternalWorkspace>> {
+        self.0
+            .run_mobile_plugin("listExternalWorkspaces", ())
+            .map_err(Into::into)
+    }
+
+    pub fn pick_external_workspace(
+        &self,
+        request: PickExternalWorkspaceRequest,
+    ) -> crate::Result<ExternalWorkspace> {
+        self.0
+            .run_mobile_plugin("pickExternalWorkspace", request)
+            .map_err(Into::into)
+    }
+
+    pub fn remove_external_workspace(
+        &self,
+        request: RemoveExternalWorkspaceRequest,
+    ) -> crate::Result<RemoveExternalWorkspaceResponse> {
+        self.0
+            .run_mobile_plugin("removeExternalWorkspace", request)
+            .map_err(Into::into)
+    }
+
     pub fn run(&self, request: RunRequest) -> crate::Result<RunResponse> {
         self.0.run_mobile_plugin("run", request).map_err(Into::into)
     }

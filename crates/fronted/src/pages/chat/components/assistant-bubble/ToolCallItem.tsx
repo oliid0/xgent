@@ -1,9 +1,16 @@
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
+import { AskUserQuestionCard } from "../../../../components/chat/AskUserQuestionCard";
 import { FileChangeBadge } from "../../../../components/chat/FileChangeBadge";
 import { ChevronRight, Search } from "../../../../components/icons";
 import { useLocale } from "../../../../i18n";
+import {
+  ASK_USER_QUESTION_TOOL_NAME,
+  type AskUserQuestionAnswer,
+  parseAskUserQuestionResultDetails,
+  sanitizeAskUserQuestionItems,
+} from "../../../../lib/chat/askUserQuestion";
 import { deriveFileChangeStats } from "../../../../lib/chat/messages/fileChangeStats";
 import {
   deriveFileToolPreview,
@@ -19,6 +26,10 @@ import {
 } from "../../../../lib/chat/messages/uiMessages";
 import { cn } from "../../../../lib/shared/utils";
 import { isSubagentCardToolCall } from "../../../../lib/subagents/card";
+import {
+  answerAskUserQuestion,
+  getAskUserQuestionDeadlineAt,
+} from "../../../../lib/tools/askUserQuestionTools";
 import {
   areStableValuesEqual,
   displayString,
@@ -324,13 +335,34 @@ function ToolCallItem({ item, isRunning }: { item: ToolTraceItem; isRunning?: bo
     isTodo && (Boolean(isRunning) || !result || Boolean(result.isError) || hasIncompleteTodo);
   const shouldCloseCompletedTodo =
     isTodo && Boolean(result && !result.isError) && todoItems.length > 0 && !hasIncompleteTodo;
+  const isAskUserQuestion = item.toolCall.name === ASK_USER_QUESTION_TOOL_NAME;
+  const askDetails = isAskUserQuestion
+    ? parseAskUserQuestionResultDetails(result?.details)
+    : null;
+  const askQuestions = isAskUserQuestion
+    ? askDetails?.questions.length
+      ? askDetails.questions
+      : sanitizeAskUserQuestionItems(item.toolCall.arguments?.questions)
+    : [];
+  const shouldKeepAskUserQuestionOpen =
+    isAskUserQuestion && Boolean(isRunning) && !result && askQuestions.length > 0;
+  const shouldCloseAnsweredQuestion = isAskUserQuestion && Boolean(result);
+  const submitAskUserQuestion = useCallback(
+    (answers: AskUserQuestionAnswer[]) =>
+      Promise.resolve(answerAskUserQuestion(item.toolCall.id, answers)),
+    [item.toolCall.id],
+  );
   const shouldAutoOpen =
-    item.toolCall.name === "Image" || builtinResultKind === "display_image" || shouldKeepTodoOpen;
+    item.toolCall.name === "Image" ||
+    builtinResultKind === "display_image" ||
+    shouldKeepTodoOpen ||
+    shouldKeepAskUserQuestionOpen;
   const [open, setOpen] = useState(shouldAutoOpen);
   const isSubagentCard = isSubagentCardToolCall(item.toolCall);
   const hasArgs = Object.keys(item.toolCall.arguments || {}).length > 0;
   const isStreamingFilePreviewTool = FILE_TOOL_TEXT_FIELDS[item.toolCall.name] !== undefined;
   const shouldShowArgs =
+    !isAskUserQuestion &&
     (!isSubagentCard || !result) &&
     (item.toolCall.name !== "TodoWrite" || !result) &&
     (isStreamingFilePreviewTool ? !result : hasArgs);
@@ -344,7 +376,9 @@ function ToolCallItem({ item, isRunning }: { item: ToolTraceItem; isRunning?: bo
   const toolArgsSummary =
     isBash || inlineCommand
       ? ""
-      : isSubagentCard
+      : isAskUserQuestion
+        ? (askQuestions[0]?.prompt ?? "")
+        : isSubagentCard
         ? getSubagentInlineSummary(item)
         : summarizeToolCall(item.toolCall, {
             includeName: false,
@@ -356,10 +390,14 @@ function ToolCallItem({ item, isRunning }: { item: ToolTraceItem; isRunning?: bo
   const title =
     item.toolCall.name === "TodoWrite"
       ? { name: t("chat.tool.todoTitle"), action: "" }
-      : getToolDisplayTitle(item.toolCall);
+      : isAskUserQuestion
+        ? { name: t("chat.tool.askUserTitle"), action: "" }
+        : getToolDisplayTitle(item.toolCall);
 
   const statusLabel = isRunning
-    ? t("chat.tool.running")
+    ? isAskUserQuestion
+      ? t("chat.askUser.waiting")
+      : t("chat.tool.running")
     : result
       ? result.isError
         ? t("chat.tool.failed")
@@ -371,16 +409,23 @@ function ToolCallItem({ item, isRunning }: { item: ToolTraceItem; isRunning?: bo
     : "text-muted-foreground/60";
 
   useEffect(() => {
-    if (shouldKeepTodoOpen) {
+    if (shouldKeepTodoOpen || shouldKeepAskUserQuestionOpen) {
       setOpen(true);
-    } else if (shouldCloseCompletedTodo) {
+    } else if (shouldCloseCompletedTodo || shouldCloseAnsweredQuestion) {
       setOpen(false);
     } else if (shouldAutoOpen) {
       setOpen(true);
     }
-  }, [shouldAutoOpen, shouldCloseCompletedTodo, shouldKeepTodoOpen]);
+  }, [
+    shouldAutoOpen,
+    shouldCloseAnsweredQuestion,
+    shouldCloseCompletedTodo,
+    shouldKeepAskUserQuestionOpen,
+    shouldKeepTodoOpen,
+  ]);
 
-  const canExpand = shouldShowArgs || Boolean(result);
+  const canExpand =
+    shouldShowArgs || Boolean(result) || (isAskUserQuestion && askQuestions.length > 0);
 
   return (
     <div className="group/tool min-w-0 max-w-full">
@@ -469,7 +514,19 @@ function ToolCallItem({ item, isRunning }: { item: ToolTraceItem; isRunning?: bo
               </ToolSection>
             ) : null}
 
-            {result ? (
+            {isAskUserQuestion && askQuestions.length > 0 ? (
+              <AskUserQuestionCard
+                questions={askQuestions}
+                answers={askDetails?.answers}
+                cancelled={askDetails?.cancelled === true}
+                timedOut={askDetails?.timedOut === true}
+                interactive={Boolean(isRunning) && !result}
+                deadlineAt={getAskUserQuestionDeadlineAt(item.toolCall.id)}
+                onSubmit={submitAskUserQuestion}
+              />
+            ) : null}
+
+            {result && (!isAskUserQuestion || !askDetails) ? (
               <ToolSection
                 label={isTodo ? undefined : t("chat.tool.return")}
                 trailing={

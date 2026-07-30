@@ -2,10 +2,30 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>XGent uses the microphone only when you start voice input.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>XGent converts speech to text when you start voice input.</string>
+  <key>NSCalendarsFullAccessUsageDescription</key>
+  <string>XGent can read and manage calendar events after you grant access.</string>
+  <key>NSCalendarsUsageDescription</key>
+  <string>XGent can read and manage calendar events after you grant access.</string>
+  <key>NSRemindersFullAccessUsageDescription</key>
+  <string>XGent can read and manage reminders after you grant access.</string>
+  <key>NSRemindersUsageDescription</key>
+  <string>XGent can read and manage reminders after you grant access.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>XGent can use selected photos in your tasks after you grant access.</string>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>XGent uses your location only for tasks you explicitly request.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsLocalNetworking</key>
         <true/>
+        <key>NSAllowsArbitraryLoadsInWebContent</key>
+        <true/>
     </dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>XAgent connects to your paired computer on the local network for WebUI control and task execution.</string>
 </dict>
 </plist>

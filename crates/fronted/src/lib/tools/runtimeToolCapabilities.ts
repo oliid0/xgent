@@ -2,6 +2,7 @@ export type RuntimeToolCapabilities = {
   managedProcess: boolean;
   cron: boolean;
   mcp: boolean;
+  localMcpStdio: boolean;
   ssh: boolean;
   terminal: boolean;
   subagents: boolean;
@@ -12,6 +13,7 @@ const DESKTOP_TOOL_CAPABILITIES: RuntimeToolCapabilities = {
   managedProcess: true,
   cron: true,
   mcp: true,
+  localMcpStdio: true,
   ssh: true,
   terminal: true,
   subagents: true,
@@ -21,7 +23,11 @@ const DESKTOP_TOOL_CAPABILITIES: RuntimeToolCapabilities = {
 const NATIVE_MOBILE_TOOL_CAPABILITIES: RuntimeToolCapabilities = {
   managedProcess: false,
   cron: false,
-  mcp: false,
+  // Native mobile can use network MCP transports directly. Local stdio MCP
+  // needs a persistent child-process protocol bridge, which neither iOS nor
+  // the current Android PRoot runner exposes.
+  mcp: true,
+  localMcpStdio: false,
   ssh: false,
   terminal: false,
   subagents: false,

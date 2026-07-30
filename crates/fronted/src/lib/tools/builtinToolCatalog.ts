@@ -207,6 +207,14 @@ export const BUILTIN_TOOL_CATALOG: readonly BuiltinToolCatalogEntry[] = [
     runtimeScopes: CHAT_ONLY,
     conditional: true,
   },
+  {
+    id: "ask_user_question",
+    toolName: "AskUserQuestion",
+    icon: "messageSquare",
+    categoryId: "intelligence",
+    isReadOnly: true,
+    runtimeScopes: CHAT_ONLY,
+  },
   /* ── Automation ── */
   {
     id: "cron_task_manager",
@@ -242,6 +250,14 @@ export const BUILTIN_TOOL_CATALOG: readonly BuiltinToolCatalogEntry[] = [
     isReadOnly: false,
     runtimeScopes: CHAT_AND_CRON,
     conditional: true,
+  },
+  {
+    id: "browser_use",
+    toolName: "browser_use",
+    icon: "globe",
+    categoryId: "connectivity",
+    isReadOnly: false,
+    runtimeScopes: CHAT_AND_CRON,
   },
 ];
 

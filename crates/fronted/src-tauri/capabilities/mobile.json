@@ -4,5 +4,11 @@
   "description": "Capability used only by the bundled Android and iOS application.",
   "windows": ["main"],
   "platforms": ["iOS", "android"],
-  "permissions": ["mobile-execution:default"]
+  "permissions": [
+    "core:default",
+    "browser-automation:default",
+    "mobile-assistant:default",
+    "mobile-execution:default",
+    "opener:default"
+  ]
 }

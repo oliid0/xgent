@@ -17,6 +17,7 @@ import {
 type UseRightDockPanelWidthOptions = {
   isOpen: boolean;
   collapseImmediately: boolean;
+  placement?: "left" | "right";
   width: number;
   onWidthChange: (width: number) => void;
 };
@@ -29,16 +30,20 @@ function getFallbackMaxPanelWidth() {
   );
 }
 
-function getDynamicMaxPanelWidth(panel: HTMLElement | null) {
+function getDynamicMaxPanelWidth(panel: HTMLElement | null, placement: "left" | "right") {
   if (!panel) return getFallbackMaxPanelWidth();
   const parent = panel.parentElement;
-  const sibling = panel.previousElementSibling;
+  const sibling =
+    placement === "left" ? panel.nextElementSibling : panel.previousElementSibling;
   const parentRect = parent?.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
   const siblingRect = sibling instanceof HTMLElement ? sibling.getBoundingClientRect() : null;
   const hostWidth =
     parentRect && siblingRect
-      ? parentRect.right - siblingRect.left
-      : (parentRect?.width ?? panel.getBoundingClientRect().width);
+      ? placement === "left"
+        ? siblingRect.right - panelRect.left
+        : parentRect.right - siblingRect.left
+      : (parentRect?.width ?? panelRect.width);
   if (!Number.isFinite(hostWidth) || hostWidth <= 0) {
     return getFallbackMaxPanelWidth();
   }
@@ -61,7 +66,7 @@ function applyPanelWidthStyle(panel: HTMLElement | null, width: number) {
 }
 
 export function useRightDockPanelWidth(options: UseRightDockPanelWidthOptions) {
-  const { isOpen, collapseImmediately, width, onWidthChange } = options;
+  const { isOpen, collapseImmediately, placement = "right", width, onWidthChange } = options;
   const [shouldRenderContent, setShouldRenderContent] = useState(isOpen);
   const [widthCollapsed, setWidthCollapsed] = useState(!isOpen);
   const [isResizing, setIsResizing] = useState(false);
@@ -95,7 +100,7 @@ export function useRightDockPanelWidth(options: UseRightDockPanelWidthOptions) {
     const updateMaxWidth = () => {
       frameId = 0;
       if (resizingRef.current) return;
-      setMaxPanelWidth(getDynamicMaxPanelWidth(panel));
+      setMaxPanelWidth(getDynamicMaxPanelWidth(panel, placement));
     };
     const scheduleUpdate = () => {
       if (frameId !== 0) return;
@@ -107,8 +112,10 @@ export function useRightDockPanelWidth(options: UseRightDockPanelWidthOptions) {
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleUpdate);
     if (panel) {
       resizeObserver?.observe(panel);
-      if (panel.previousElementSibling instanceof HTMLElement) {
-        resizeObserver?.observe(panel.previousElementSibling);
+      const contentSibling =
+        placement === "left" ? panel.nextElementSibling : panel.previousElementSibling;
+      if (contentSibling instanceof HTMLElement) {
+        resizeObserver?.observe(contentSibling);
       }
       if (panel.parentElement) {
         resizeObserver?.observe(panel.parentElement);
@@ -121,7 +128,7 @@ export function useRightDockPanelWidth(options: UseRightDockPanelWidthOptions) {
       }
       resizeObserver?.disconnect();
     };
-  }, [isOpen]);
+  }, [isOpen, placement]);
 
   useEffect(() => {
     return () => {
@@ -156,7 +163,7 @@ export function useRightDockPanelWidth(options: UseRightDockPanelWidthOptions) {
       event.preventDefault();
       resizeCleanupRef.current?.();
       const startX = event.clientX;
-      const dragMaxWidth = getDynamicMaxPanelWidth(panelRef.current);
+      const dragMaxWidth = getDynamicMaxPanelWidth(panelRef.current, placement);
       const startWidth = clampPanelWidth(panelWidth, dragMaxWidth);
       const previousCursor = document.body.style.cursor;
       const previousUserSelect = document.body.style.userSelect;
@@ -194,7 +201,9 @@ export function useRightDockPanelWidth(options: UseRightDockPanelWidthOptions) {
       };
 
       const handleMove = (moveEvent: globalThis.MouseEvent) => {
-        const nextWidth = clampPanelWidth(startWidth + startX - moveEvent.clientX, dragMaxWidth);
+        const delta =
+          placement === "left" ? moveEvent.clientX - startX : startX - moveEvent.clientX;
+        const nextWidth = clampPanelWidth(startWidth + delta, dragMaxWidth);
         schedulePanelWidth(nextWidth);
       };
 
@@ -215,7 +224,7 @@ export function useRightDockPanelWidth(options: UseRightDockPanelWidthOptions) {
       window.addEventListener("mouseup", handleUp);
       window.addEventListener("blur", handleUp);
     },
-    [clampedWidth, onWidthChange, panelWidth],
+    [clampedWidth, onWidthChange, panelWidth, placement],
   );
 
   return {

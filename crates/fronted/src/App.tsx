@@ -28,6 +28,7 @@ import {
   persistSettings,
   type SettingsSaveState,
 } from "./lib/settings/storage";
+import { SoulProvider } from "./lib/soul";
 import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { SectionId } from "./pages/settings/types";
@@ -344,46 +345,66 @@ export default function App() {
 
   return (
     <LocaleContext.Provider value={localeContextValue}>
-      <AppChrome>
-        {desktopBridgeEnabled ? <CronPromptRunner settings={settings} /> : null}
-        <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
-        <AppErrorBoundary>
-          <ChatPage
-            settings={settings}
-            setSettings={setSettings}
-            getMcpSettings={getMcpSettings}
-            context={context}
-            setContext={setContext}
-            onOpenSettings={openSettings}
-            onToggleTheme={toggleTheme}
-            appUpdate={appUpdate}
-            desktopBridgeEnabled={desktopBridgeEnabled}
-          />
-        </AppErrorBoundary>
-        {visible && (
-          <div
-            className={`absolute inset-0 z-50 transition-all duration-300 ease-out ${
-              active ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            }`}
-            onTransitionEnd={handleTransitionEnd}
-          >
-            <AppErrorBoundary>
-              <SettingsPage
-                settings={settings}
-                setSettings={setSettings}
-                saveState={settingsSaveState}
-                onBack={closeSettings}
-                initialSection={settingsSection}
-                hiddenSections={
-                  desktopBridgeEnabled ? [] : ["agents", "ssh", "hooks", "cron", "systemTools"]
+      <SoulProvider>
+        <AppChrome>
+          {desktopBridgeEnabled ? <CronPromptRunner settings={settings} /> : null}
+          <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
+          <AppErrorBoundary>
+            <ChatPage
+              settings={settings}
+              setSettings={setSettings}
+              getMcpSettings={getMcpSettings}
+              context={context}
+              setContext={setContext}
+              onOpenSettings={openSettings}
+              onToggleTheme={toggleTheme}
+              appUpdate={appUpdate}
+              desktopBridgeEnabled={desktopBridgeEnabled}
+              nativeMobile={nativeMobile}
+            />
+          </AppErrorBoundary>
+          {visible && (
+            <div
+              className={`absolute inset-0 z-50 flex bg-transparent transition-[background-color,opacity] duration-200 ease-out md:items-center md:justify-center md:bg-black/50 md:p-6 ${
+                active ? "opacity-100" : "pointer-events-none opacity-0"
+              }`}
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !nativeMobile) {
+                  closeSettings();
                 }
-                nativeMobile={nativeMobile}
-                appUpdate={appUpdate}
-              />
-            </AppErrorBoundary>
-          </div>
-        )}
-      </AppChrome>
+              }}
+              onTransitionEnd={(event) => {
+                if (event.target === event.currentTarget) {
+                  handleTransitionEnd();
+                }
+              }}
+            >
+              <div
+                className={`h-full w-full overflow-hidden bg-background transition-[transform,opacity] duration-200 ease-out md:h-[85vh] md:max-h-[900px] md:w-[min(calc(100vw-2rem),900px)] md:rounded-2xl md:border md:border-white/10 md:shadow-2xl ${
+                  active
+                    ? "translate-y-0 scale-100 opacity-100"
+                    : "translate-y-6 scale-100 opacity-0 md:translate-y-0 md:scale-95"
+                }`}
+              >
+                <AppErrorBoundary>
+                  <SettingsPage
+                    settings={settings}
+                    setSettings={setSettings}
+                    saveState={settingsSaveState}
+                    onBack={closeSettings}
+                    initialSection={settingsSection}
+                    hiddenSections={
+                      desktopBridgeEnabled ? [] : ["agents", "ssh", "hooks", "cron", "systemTools"]
+                    }
+                    nativeMobile={nativeMobile}
+                    appUpdate={appUpdate}
+                  />
+                </AppErrorBoundary>
+              </div>
+            </div>
+          )}
+        </AppChrome>
+      </SoulProvider>
     </LocaleContext.Provider>
   );
 }

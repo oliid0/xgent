@@ -11,6 +11,10 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::runtime::platform::expand_tilde_path;
+#[cfg(mobile)]
+use tauri_plugin_mobile_execution::{
+    MobileExecutionExt, PickExternalWorkspaceRequest,
+};
 #[cfg(desktop)]
 use crate::services::power_activity::PowerActivityManager;
 pub use crate::services::skills::{
@@ -1097,6 +1101,22 @@ pub async fn system_pick_folder(initial_workdir: Option<String>) -> Result<Optio
     })
     .await
     .map_err(|e| format!("system_pick_folder join 失败：{e}"))?
+}
+
+#[tauri::command(rename_all = "snake_case")]
+#[cfg(mobile)]
+pub async fn system_pick_folder<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    _initial_workdir: Option<String>,
+) -> Result<Option<String>, String> {
+    match app
+        .mobile_execution()
+        .pick_external_workspace(PickExternalWorkspaceRequest { allow_write: true })
+    {
+        Ok(workspace) => Ok(Some(workspace.path)),
+        Err(error) if error.to_string().to_ascii_lowercase().contains("cancel") => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
 }
 
 #[tauri::command(rename_all = "snake_case")]

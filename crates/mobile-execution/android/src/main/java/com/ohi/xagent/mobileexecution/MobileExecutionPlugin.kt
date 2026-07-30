@@ -1,6 +1,7 @@
 package com.ohi.xagent.mobileexecution
 
 import android.app.Activity
+import android.content.Intent
 import android.util.Base64
 import android.util.Log
 import app.tauri.annotation.Command
@@ -46,6 +47,16 @@ class CancelArgs {
     var runId: String? = null
 }
 
+@InvokeArg
+class PickExternalWorkspaceArgs {
+    var allowWrite: Boolean? = true
+}
+
+@InvokeArg
+class RemoveExternalWorkspaceArgs {
+    var id: String? = null
+}
+
 @TauriPlugin
 class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
     private val worker = Executors.newSingleThreadExecutor { task ->
@@ -59,13 +70,16 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
     private val rootfsDir = File(backendDir, "rootfs")
     private val installer = RootfsInstaller(activity.assets, backendDir, rootfsDir)
     private val inventory = MobileEnvironmentInventory(backendDir, rootfsDir)
+    private val externalWorkspaces = ExternalWorkspaceStore(activity)
     private val runner by lazy {
         ProotRunner(
             nativeLibraryDir = File(activity.applicationInfo.nativeLibraryDir),
             nativeRuntimeDir = File(activity.codeCacheDir, "xagent-native-runtime"),
             rootfsDir = rootfsDir,
             tempDir = File(activity.cacheDir, "xagent-proot"),
-            allowedHostRoot = activity.filesDir,
+            allowedHostRoots = {
+                listOf(activity.filesDir) + externalWorkspaces.allowedRoots()
+            },
             activeProcesses = activeProcesses,
             cancelledRuns = cancelledRuns,
         )
@@ -165,6 +179,55 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
+    fun listExternalWorkspaces(invoke: Invoke) {
+        invoke.resolve(externalWorkspaces.payload())
+    }
+
+    @Command
+    fun pickExternalWorkspace(invoke: Invoke) {
+        val args = runCatching { invoke.parseArgs(PickExternalWorkspaceArgs::class.java) }
+            .getOrElse { error ->
+                invoke.reject("Invalid external workspace request: ${error.message}")
+                return
+            }
+        if (!WorkspacePickerCoordinator.begin { uri, error ->
+                when {
+                    error != null -> invoke.reject(error)
+                    uri == null -> invoke.reject("Workspace selection was cancelled")
+                    else -> worker.execute {
+                        runCatching {
+                            externalWorkspaces.add(uri, args.allowWrite != false)
+                        }.onSuccess { entry ->
+                            invoke.resolve(externalWorkspaces.payload(entry))
+                        }.onFailure { cause ->
+                            invoke.reject(cause.message ?: "Could not mount the selected workspace")
+                        }
+                    }
+                }
+            }
+        ) {
+            invoke.reject("Another workspace picker is already open")
+            return
+        }
+        activity.startActivity(Intent(activity, WorkspacePickerActivity::class.java))
+    }
+
+    @Command
+    fun removeExternalWorkspace(invoke: Invoke) {
+        val args = runCatching { invoke.parseArgs(RemoveExternalWorkspaceArgs::class.java) }
+            .getOrElse { error ->
+                invoke.reject("Invalid external workspace removal request: ${error.message}")
+                return
+            }
+        val id = args.id?.trim().orEmpty()
+        if (id.isEmpty()) {
+            invoke.reject("External workspace id is required")
+            return
+        }
+        invoke.resolve(JSObject().apply { put("removed", externalWorkspaces.remove(id)) })
+    }
+
+    @Command
     fun run(invoke: Invoke) {
         val args = runCatching { invoke.parseArgs(RunArgs::class.java) }
             .getOrElse { error ->
@@ -251,9 +314,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                     put("wasi", false)
                     put("network", available && installed)
                     put("childProcesses", available && installed)
-                    // Android SAF content URIs need an explicit bridge before they can be
-                    // exposed safely as PRoot bind mounts. App-managed workspaces work now.
-                    put("userSelectedWorkspaces", false)
+                    put("userSelectedWorkspaces", true)
                     put("packageManagement", available && installed)
                 },
             )

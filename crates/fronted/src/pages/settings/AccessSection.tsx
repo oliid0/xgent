@@ -3,12 +3,12 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
+  ChevronDown,
   Cloud,
   Copy,
   GitBranch,
   Globe,
   Key,
-  Lock,
   MonitorSmartphone,
   RefreshCw,
   Server,
@@ -19,9 +19,11 @@ import {
 } from "../../components/icons";
 import { Input } from "../../components/ui/input";
 import { useLocale } from "../../i18n";
-import { inferRuntimePlatform, resolveRuntimePlatform } from "../../lib/runtimePlatform";
+import {
+  browserSessionController,
+  normalizeBrowserAddress,
+} from "../../lib/browser/browserSessionController";
 import type { AppSettings } from "../../lib/settings";
-import { MobileExecutionSection } from "./MobileExecutionSection";
 import { AgentActivationSwitch } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
@@ -37,9 +39,8 @@ type LocalAccessStatus = {
 };
 
 type CloudSecretVaultStatus = {
-  configured: boolean;
-  unlocked: boolean;
   githubTokenConfigured: boolean;
+  githubUsername?: string | null;
 };
 
 const EMPTY_LOCAL_STATUS: LocalAccessStatus = {
@@ -51,9 +52,11 @@ const EMPTY_LOCAL_STATUS: LocalAccessStatus = {
 };
 
 const EMPTY_VAULT_STATUS: CloudSecretVaultStatus = {
-  configured: false,
-  unlocked: false,
   githubTokenConfigured: false,
+};
+
+type AccessSectionProps = SettingsSectionProps & {
+  nativeMobile: boolean;
 };
 
 function updateAccess(
@@ -124,17 +127,28 @@ function ToggleCard({
   );
 }
 
-export function AccessSection({ settings, setSettings }: SettingsSectionProps) {
+function normalizeLanControlUrl(value: string) {
+  const normalized = normalizeBrowserAddress(value);
+  const url = new URL(normalized);
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("The computer address must use HTTP or HTTPS.");
+  }
+  return url.toString();
+}
+
+export function AccessSection({
+  settings,
+  setSettings,
+  nativeMobile,
+}: AccessSectionProps) {
   const { t } = useLocale();
   const browser = isBrowserRuntime();
-  const [nativeMobile, setNativeMobile] = useState(() => {
-    const platform = inferRuntimePlatform();
-    return !browser && (platform === "android" || platform === "ios");
-  });
   const [localStatus, setLocalStatus] = useState(EMPTY_LOCAL_STATUS);
   const [vaultStatus, setVaultStatus] = useState(EMPTY_VAULT_STATUS);
-  const [vaultPassphrase, setVaultPassphrase] = useState("");
   const [githubToken, setGithubToken] = useState("");
+  const [cloudDetailsOpen, setCloudDetailsOpen] = useState(
+    () => settings.access.cloudExecutionEnabled,
+  );
   const [actionError, setActionError] = useState("");
   const [busyAction, setBusyAction] = useState("");
 
@@ -158,17 +172,6 @@ export function AccessSection({ settings, setSettings }: SettingsSectionProps) {
     } catch (error) {
       setActionError(error instanceof Error ? error.message : String(error));
     }
-  }, [browser]);
-
-  useEffect(() => {
-    if (browser) return;
-    let cancelled = false;
-    void resolveRuntimePlatform().then((platform) => {
-      if (!cancelled) setNativeMobile(platform === "android" || platform === "ios");
-    });
-    return () => {
-      cancelled = true;
-    };
   }, [browser]);
 
   useEffect(() => {
@@ -201,9 +204,73 @@ export function AccessSection({ settings, setSettings }: SettingsSectionProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="settings-access-section space-y-6" data-native-mobile={nativeMobile}>
       {nativeMobile ? (
-        <MobileExecutionSection settings={settings} setSettings={setSettings} />
+        <section className="settings-access-card space-y-4 rounded-xl border border-border/60 bg-card p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/10">
+              <Wifi className="h-[18px] w-[18px] text-sky-500" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">{t("settings.accessLanControl")}</div>
+              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                {t("settings.accessLanControlHint")}
+              </p>
+            </div>
+          </div>
+
+          <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
+            <span>{t("settings.accessComputerAddress")}</span>
+            <Input
+              value={settings.access.lanControlUrl}
+              inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="http://192.168.1.10:28367"
+              onChange={(event) =>
+                updateAccess(setSettings, { lanControlUrl: event.currentTarget.value })
+              }
+              onBlur={() => {
+                const value = settings.access.lanControlUrl.trim();
+                if (!value) return;
+                try {
+                  updateAccess(setSettings, { lanControlUrl: normalizeLanControlUrl(value) });
+                } catch {
+                  // Preserve the draft so the user can correct it.
+                }
+              }}
+              className="h-11 font-mono text-[13px]"
+            />
+          </label>
+
+          <button
+            type="button"
+            disabled={!settings.access.lanControlUrl.trim() || busyAction !== ""}
+            onClick={() =>
+              void runAction("lan-control", async () => {
+                const url = normalizeLanControlUrl(settings.access.lanControlUrl);
+                updateAccess(setSettings, { lanControlUrl: url });
+                await browserSessionController.ensureSession({
+                  sessionId: "lan-control",
+                  url,
+                  visible: false,
+                });
+                browserSessionController.openPanel("lan-control");
+              })
+            }
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-transform active:scale-[0.99] disabled:opacity-40"
+          >
+            <MonitorSmartphone className="h-4 w-4" />
+            {busyAction === "lan-control"
+              ? t("settings.accessConnecting")
+              : t("settings.accessOpenComputer")}
+          </button>
+
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {t("settings.accessLanPairingHint")}
+          </p>
+        </section>
       ) : (
         <>
           <div className="flex items-center justify-between gap-4">
@@ -322,6 +389,18 @@ export function AccessSection({ settings, setSettings }: SettingsSectionProps) {
                 }
               />
               <ToggleCard
+                icon={<Globe className="h-3.5 w-3.5 text-muted-foreground" />}
+                title={t("settings.accessAllowBrowserAutomation")}
+                hint={t("settings.accessAllowBrowserAutomationHint")}
+                checked={settings.access.allowBrowserAutomation}
+                disabled={browser}
+                onToggle={() =>
+                  updateAccess(setSettings, {
+                    allowBrowserAutomation: !settings.access.allowBrowserAutomation,
+                  })
+                }
+              />
+              <ToggleCard
                 icon={<Server className="h-3.5 w-3.5 text-muted-foreground" />}
                 title={t("settings.accessAllowSsh")}
                 hint={t("settings.accessAllowSshHint")}
@@ -385,146 +464,156 @@ export function AccessSection({ settings, setSettings }: SettingsSectionProps) {
         </>
       )}
 
-      <section className="space-y-4 rounded-xl border border-border/60 bg-card p-5">
+      <section className="settings-access-card space-y-4 rounded-xl border border-border/60 bg-card p-5">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={!nativeMobile}
+            onClick={() => setCloudDetailsOpen((open) => !open)}
+            aria-expanded={!nativeMobile || cloudDetailsOpen}
+            className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
+          >
             <Cloud className="h-4 w-4 text-muted-foreground" />
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="text-sm font-medium">{t("settings.accessCloudExecution")}</div>
               <p className="text-xs text-muted-foreground">
                 {t("settings.accessCloudExecutionHint")}
               </p>
             </div>
-          </div>
+            {nativeMobile ? (
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+                  cloudDetailsOpen ? "rotate-180" : ""
+                }`}
+              />
+            ) : null}
+          </button>
           <AgentActivationSwitch
             checked={settings.access.cloudExecutionEnabled}
             title={t("settings.accessCloudExecution")}
             disabled={browser}
-            onToggle={() =>
-              updateAccess(setSettings, {
-                cloudExecutionEnabled: !settings.access.cloudExecutionEnabled,
-              })
-            }
+            onToggle={() => {
+              const enabled = !settings.access.cloudExecutionEnabled;
+              updateAccess(setSettings, { cloudExecutionEnabled: enabled });
+              if (nativeMobile && enabled) setCloudDetailsOpen(true);
+            }}
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
-            <span>{t("settings.accessGithubOwner")}</span>
-            <Input
-              value={settings.access.githubOwner}
-              disabled={browser}
-              onChange={(event) =>
-                updateAccess(setSettings, { githubOwner: event.currentTarget.value })
-              }
-              placeholder="github-user"
-            />
-          </label>
-          <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
-            <span>{t("settings.accessGithubRepository")}</span>
-            <Input
-              value={settings.access.githubRepository}
-              disabled={browser}
-              onChange={(event) =>
-                updateAccess(setSettings, { githubRepository: event.currentTarget.value })
-              }
-              placeholder="agent-temp"
-            />
-          </label>
-        </div>
-
-        <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
-          {t("settings.accessCloudPublicWarning")}
-        </div>
-
-        <div className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-          {t("settings.accessCloudEnvironmentHint")}
-        </div>
-
-        <div className="rounded-lg border border-border/50 p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              {vaultStatus.unlocked ? (
-                <Key className="h-4 w-4 text-emerald-500" />
-              ) : (
-                <Lock className="h-4 w-4" />
-              )}
-              {t("settings.accessSecureVault")}
+        {!nativeMobile || cloudDetailsOpen ? (
+          <div className="settings-cloud-details space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                <span>{t("settings.accessGithubOwner")}</span>
+                <Input
+                  value={settings.access.githubOwner}
+                  disabled={browser}
+                  onChange={(event) =>
+                    updateAccess(setSettings, { githubOwner: event.currentTarget.value })
+                  }
+                  placeholder="github-user"
+                />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                <span>{t("settings.accessGithubRepository")}</span>
+                <Input
+                  value={settings.access.githubRepository}
+                  disabled={browser}
+                  onChange={(event) =>
+                    updateAccess(setSettings, { githubRepository: event.currentTarget.value })
+                  }
+                  placeholder="agent-temp"
+                />
+              </label>
             </div>
-            <span className="text-xs text-muted-foreground">
-              {vaultStatus.githubTokenConfigured
-                ? t("settings.accessTokenConfigured")
-                : t("settings.accessTokenMissing")}
-            </span>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-            <Input
-              type="password"
-              autoComplete="current-password"
-              value={vaultPassphrase}
-              onChange={(event) => setVaultPassphrase(event.currentTarget.value)}
-              placeholder={t("settings.accessVaultPassphrase")}
-              disabled={browser || vaultStatus.unlocked}
-            />
-            <button
-              type="button"
-              disabled={browser || busyAction !== ""}
-              onClick={() =>
-                void runAction(vaultStatus.unlocked ? "lock" : "unlock", async () => {
-                  const next = vaultStatus.unlocked
-                    ? await invoke<CloudSecretVaultStatus>("cloud_secret_vault_lock")
-                    : await invoke<CloudSecretVaultStatus>("cloud_secret_vault_unlock", {
-                        passphrase: vaultPassphrase,
-                      });
-                  setVaultStatus(next);
-                  setVaultPassphrase("");
-                  setGithubToken("");
-                })
-              }
-              className="rounded-lg border border-border px-4 py-2 text-xs font-medium hover:bg-muted/50 disabled:opacity-40"
-            >
-              {vaultStatus.unlocked
-                ? t("settings.accessLockVault")
-                : t("settings.accessUnlockVault")}
-            </button>
-          </div>
-          {vaultStatus.unlocked ? (
-            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-              <Input
-                type="password"
-                autoComplete="off"
-                value={githubToken}
-                onChange={(event) => setGithubToken(event.currentTarget.value)}
-                placeholder={t("settings.accessGithubToken")}
-              />
-              <button
-                type="button"
-                disabled={!githubToken.trim() || busyAction !== ""}
-                onClick={() =>
-                  void runAction("save-token", async () => {
-                    setVaultStatus(
-                      await invoke<CloudSecretVaultStatus>("cloud_secret_vault_set_github_token", {
-                        token: githubToken,
-                      }),
-                    );
-                    setGithubToken("");
-                  })
-                }
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
-              >
-                {t("settings.accessSaveToken")}
-              </button>
+
+            <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+              {t("settings.accessCloudPublicWarning")}
             </div>
-          ) : null}
-          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-            {t("settings.accessVaultHint")}
-          </p>
-        </div>
+
+            <div className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+              {t("settings.accessCloudEnvironmentHint")}
+            </div>
+
+            <div className="settings-cloud-vault rounded-lg border border-border/50 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Key className="h-4 w-4 text-emerald-500" />
+                  {t("settings.accessSecureVault")}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {vaultStatus.githubTokenConfigured
+                    ? t("settings.accessTokenConfigured")
+                    : t("settings.accessTokenMissing")}
+                </span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={githubToken}
+                  onChange={(event) => setGithubToken(event.currentTarget.value)}
+                  placeholder={t("settings.accessGithubToken")}
+                  disabled={browser}
+                />
+                <button
+                  type="button"
+                  disabled={
+                    browser ||
+                    !settings.access.githubOwner.trim() ||
+                    !githubToken.trim() ||
+                    busyAction !== ""
+                  }
+                  onClick={() =>
+                    void runAction("save-token", async () => {
+                      setVaultStatus(
+                        await invoke<CloudSecretVaultStatus>("cloud_secret_vault_set_github_token", {
+                          username: settings.access.githubOwner,
+                          token: githubToken,
+                        }),
+                      );
+                      setGithubToken("");
+                    })
+                  }
+                  className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
+                >
+                  {t("settings.accessSaveToken")}
+                </button>
+                {vaultStatus.githubTokenConfigured ? (
+                  <button
+                    type="button"
+                    disabled={browser || busyAction !== ""}
+                    onClick={() =>
+                      void runAction("remove-token", async () => {
+                        setVaultStatus(
+                          await invoke<CloudSecretVaultStatus>(
+                            "cloud_secret_vault_remove_github_token",
+                          ),
+                        );
+                        setGithubToken("");
+                      })
+                    }
+                    className="rounded-lg border border-border px-4 py-2 text-xs font-medium hover:bg-muted/50 disabled:opacity-40"
+                  >
+                    {t("settings.accessRemoveToken")}
+                  </button>
+                ) : null}
+              </div>
+              {vaultStatus.githubUsername ? (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  {t("settings.accessTokenOwner").replace(
+                    "{username}",
+                    vaultStatus.githubUsername,
+                  )}
+                </p>
+              ) : null}
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                {t("settings.accessVaultHint")}
+              </p>
+            </div>
+          </div>
+        ) : null}
       </section>
-
-      {!nativeMobile ? (
-        <MobileExecutionSection settings={settings} setSettings={setSettings} />
-      ) : null}
 
       {actionError ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">

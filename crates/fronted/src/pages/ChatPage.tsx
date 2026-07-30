@@ -23,7 +23,12 @@ import type {
   MentionComposerLargePaste,
 } from "../components/chat/MentionComposer";
 import { type NotifyItem, NotifyToast } from "../components/chat/NotifyToast";
-import { Ban, PanelRightClose, PanelRightOpen, Terminal, Upload } from "../components/icons";
+import {
+  Ban,
+  Globe,
+  Terminal,
+  Upload,
+} from "../components/icons";
 import { MacOsTitleBarSpacer, MacOsTitleBarToggle } from "../components/MacOsTitleBarSpacer";
 import type {
   GitCommitContextPayload,
@@ -31,7 +36,11 @@ import type {
 } from "../components/project-tools/git-review";
 import type { GitReviewFocusRequest } from "../components/project-tools/RightDockContext";
 import { RightDockPanel } from "../components/project-tools/RightDockPanel";
-import { expandedPathsForFileTreePath } from "../components/project-tools/rightDockModel";
+import {
+  expandedPathsForFileTreePath,
+  type WorkspaceToolLaunchRequest,
+  type WorkspaceToolTarget,
+} from "../components/project-tools/rightDockModel";
 import { Button } from "../components/ui/button";
 import { useConfirmDialog } from "../components/ui/confirm-dialog";
 import type { WorkspaceCodeEditorOpenRequest } from "../components/workspace-editor/WorkspaceCodeEditorOverlay";
@@ -96,6 +105,7 @@ import { createStreamDebugLogger } from "../lib/debug/agentDebug";
 import { tauriGitClient } from "../lib/git/tauriGitClient";
 import { memoryDeleteProject } from "../lib/memory/api";
 import { buildMemoryOverviewSection } from "../lib/memory/prompts/injection";
+import { buildSoulSystemPrompt, useSoul } from "../lib/soul";
 import {
   lockMonacoNlsLocale,
   preparePreferredMonacoNlsLocale,
@@ -107,6 +117,7 @@ import {
   toModelValue,
 } from "../lib/providers/llm";
 import { isCompactViewport, useCompactViewport } from "../lib/responsive/compactViewport";
+import { useEdgeSwipeNavigation } from "../lib/responsive/useEdgeSwipeNavigation";
 import {
   type AppSettings,
   applyMcpOpsToAppSettings,
@@ -171,7 +182,7 @@ import {
   terminalSessionBelongsToProject,
 } from "../lib/terminal/sessionStore";
 import { tauriTerminalClient } from "../lib/terminal/tauriTerminalClient";
-import type { TerminalSession } from "../lib/terminal/types";
+import type { TerminalSession, TerminalShellOption } from "../lib/terminal/types";
 import { invokeFs } from "../lib/tools/fsBackend";
 import type { SkillAccessPolicy } from "../lib/tools/skillAccessPolicy";
 import { disposeTodoToolState } from "../lib/tools/todoTools";
@@ -207,6 +218,16 @@ import {
   useLiveTranscriptController,
   usePendingUploads,
 } from "./chat";
+import { MobileFilesPanel } from "./chat/mobile/MobileFilesPanel";
+import { MobileBrowserSettingsPanel } from "./chat/mobile/MobileBrowserSettingsPanel";
+import { MobileMcpPage } from "./chat/mobile/MobileMcpPage";
+import { MobileQuickActions } from "./chat/mobile/MobileQuickActions";
+import { MobileSkillsPage } from "./chat/mobile/MobileSkillsPage";
+import {
+  MobileTerminalPanel,
+  type MobileShellPanelMode,
+} from "./chat/mobile/MobileTerminalPanel";
+import { MobileWorkspaceCreateDialog } from "./chat/mobile/MobileWorkspaceCreateDialog";
 import {
   buildConversationRuntimeSnapshotEntries,
   type ConversationRuntimeSnapshotState,
@@ -228,6 +249,9 @@ import {
   resolveQueuedChatTurnSlotIndex,
   takeNextQueuedChatTurn,
 } from "./chat/queue/chatTurnQueue";
+import { MobileToolActivity } from "./chat/mobile/MobileToolActivity";
+import { BrowserPanel } from "./chat/browser/BrowserPanel";
+import { browserSessionController } from "../lib/browser/browserSessionController";
 import { ChatSidebarContainer } from "./chat/sidebar/ChatSidebarContainer";
 import { McpHubPage } from "./mcp-hub/McpHubPage";
 import type { SectionId } from "./settings/types";
@@ -271,6 +295,7 @@ type ChatPageProps = {
   onToggleTheme: () => void;
   appUpdate?: AppUpdateController;
   desktopBridgeEnabled: boolean;
+  nativeMobile: boolean;
 };
 
 type ActiveConversationRuntimeRun = {
@@ -550,6 +575,13 @@ function createWorkspaceProjectFromPath(path: string, kind: WorkspaceProject["ki
   } satisfies WorkspaceProject;
 }
 
+function parentWorkspacePath(path: string) {
+  const normalized = path.trim().replace(/\\/g, "/").replace(/\/+$/, "");
+  const delimiter = normalized.lastIndexOf("/");
+  if (delimiter <= 0) return normalized;
+  return normalized.slice(0, delimiter);
+}
+
 export function ChatPage(props: ChatPageProps) {
   const {
     settings,
@@ -561,6 +593,7 @@ export function ChatPage(props: ChatPageProps) {
     onToggleTheme,
     appUpdate,
     desktopBridgeEnabled,
+    nativeMobile,
   } = props;
   // Monaco reads NLS globals while the lazy editor module imports monaco-editor.
   setPreferredMonacoNlsLocale(settings.locale);
@@ -613,6 +646,8 @@ export function ChatPage(props: ChatPageProps) {
   const isAgentDevExecutionMode = isAgentDevMode(settings.system.executionMode);
   const skillsConfigured = settings.skills.enabled;
   const skillsEnabled = skillsConfigured && isAgentMode;
+  const { document: soulDocument } = useSoul();
+  const soulPrompt = useMemo(() => buildSoulSystemPrompt(soulDocument), [soulDocument]);
   const activeAgentPrompt = useMemo(() => {
     const activeTemplate = settings.agents.find(
       (template) => template.enabled && template.prompt.trim(),
@@ -682,6 +717,7 @@ export function ChatPage(props: ChatPageProps) {
   }, [sidebarScope, sidebarStore]);
   const historyScopeKey = sidebarScopeKey(sidebarScope);
   const compactViewport = useCompactViewport();
+  const mobileExperience = nativeMobile || compactViewport;
   const [sidebarOpen, setSidebarOpen] = useState(() => !isCompactViewport());
   const previousCompactViewportRef = useRef(compactViewport);
   useEffect(() => {
@@ -692,6 +728,19 @@ export function ChatPage(props: ChatPageProps) {
   }, [compactViewport]);
   const [activeView, setActiveView] = useState<"chat" | "skills-hub" | "mcp-hub">("chat");
   const [rightDockOpen, setRightDockOpen] = useState(false);
+  const [terminalShellOptions, setTerminalShellOptions] = useState<TerminalShellOption[]>([]);
+  const [workspaceToolLaunchRequest, setWorkspaceToolLaunchRequest] =
+    useState<WorkspaceToolLaunchRequest | null>(null);
+  const workspaceToolLaunchNonceRef = useRef(0);
+  const [mobileActivityOpen, setMobileActivityOpen] = useState(false);
+  const [mobileFilesOpen, setMobileFilesOpen] = useState(false);
+  const [mobileTerminalOpen, setMobileTerminalOpen] = useState(false);
+  const [mobileShellPanelMode, setMobileShellPanelMode] =
+    useState<MobileShellPanelMode>("terminal");
+  const [mobileTerminalInitialCommand, setMobileTerminalInitialCommand] = useState("");
+  const [mobileTerminalAutoRun, setMobileTerminalAutoRun] = useState(false);
+  const [mobileBrowserSettingsOpen, setMobileBrowserSettingsOpen] = useState(false);
+  const [mobileWorkspaceCreateOpen, setMobileWorkspaceCreateOpen] = useState(false);
   const previousRightDockFileTreeOpenRef = useRef(false);
   const [workspaceEditorMounted, setWorkspaceEditorMounted] = useState(false);
   const [workspaceEditorOpen, setWorkspaceEditorOpen] = useState(false);
@@ -933,6 +982,10 @@ export function ChatPage(props: ChatPageProps) {
   );
 
   const handleOpenCreateWorkspaceProject = useCallback(async () => {
+    if (nativeMobile) {
+      setMobileWorkspaceCreateOpen(true);
+      return;
+    }
     if (!desktopBridgeEnabled) return;
     try {
       const picked = await invoke<string | null>("system_pick_folder", {
@@ -944,7 +997,13 @@ export function ChatPage(props: ChatPageProps) {
     } catch (error) {
       setErrorMessage(asErrorMessage(error, "选择项目目录失败"));
     }
-  }, [activateWorkspaceProject, activeWorkspaceProjectPath, desktopBridgeEnabled, workdir]);
+  }, [
+    activateWorkspaceProject,
+    activeWorkspaceProjectPath,
+    desktopBridgeEnabled,
+    nativeMobile,
+    workdir,
+  ]);
 
   const commitWorkspaceProjectRename = useCallback(
     (project: WorkspaceProject, nextNameInput: string) => {
@@ -1265,15 +1324,10 @@ export function ChatPage(props: ChatPageProps) {
   const terminalProjectPathKey = terminalProjectPath
     ? workspaceProjectPathKey(terminalProjectPath)
     : "";
-  const projectTerminalSessions = useMemo(
-    () =>
-      terminalProjectPathKey
-        ? terminalSessions.filter((session) =>
-            terminalSessionBelongsToProject(session, terminalProjectPathKey),
-          )
-        : [],
-    [terminalProjectPathKey, terminalSessions],
-  );
+  const mobileWorkspacePath = (activeWorkspaceProjectPath || workdir).trim();
+  const mobileWorkspacePathKey = mobileWorkspacePath
+    ? workspaceProjectPathKey(mobileWorkspacePath)
+    : "";
   // getRightDockProjectState / getRightDockFileTreeState / getSshProjectHostIds
   // build fresh objects on every call, so memoize on the owning settings slice
   // + path key: RightDockPanel is memo'd and these references are props.
@@ -1286,6 +1340,10 @@ export function ChatPage(props: ChatPageProps) {
   const rightDockFileTreeState = useMemo(
     () => getRightDockFileTreeState(settings.customSettings, terminalProjectPathKey),
     [settings.customSettings.rightDock, terminalProjectPathKey],
+  );
+  const mobileFileTreeState = useMemo(
+    () => getRightDockFileTreeState(settings.customSettings, mobileWorkspacePathKey),
+    [mobileWorkspacePathKey, settings.customSettings.rightDock],
   );
   const rightDockFileTreeOpen = isRightDockSingletonTabOpen(
     settings.customSettings,
@@ -1301,6 +1359,38 @@ export function ChatPage(props: ChatPageProps) {
     : !terminalProjectPath
       ? "Select a project to use project tools."
       : undefined;
+  const handleOpenWorkspaceTool = useCallback(
+    (target: WorkspaceToolTarget, shell?: string) => {
+      if (nativeMobile) {
+        if (target !== "fileTree" || !mobileWorkspacePathKey) return;
+        setActiveView("chat");
+        setSidebarOpen(false);
+        setMobileFilesOpen(true);
+        return;
+      }
+      if (terminalDisabledMessage) return;
+      if (!desktopBridgeEnabled) return;
+      workspaceToolLaunchNonceRef.current += 1;
+      setActiveView("chat");
+      setRightDockOpen(true);
+      setWorkspaceToolLaunchRequest({
+        nonce: workspaceToolLaunchNonceRef.current,
+        target,
+        shell,
+      });
+    },
+    [
+      desktopBridgeEnabled,
+      mobileWorkspacePathKey,
+      nativeMobile,
+      terminalDisabledMessage,
+    ],
+  );
+  const handleWorkspaceToolLaunchRequestHandled = useCallback((nonce: number) => {
+    setWorkspaceToolLaunchRequest((current) =>
+      current?.nonce === nonce ? null : current,
+    );
+  }, []);
   // RightDockPanel is memo'd: every callback handed to it must be stable or
   // the memo boundary is void (see the panel-side context useMemo).
   const handleRightDockWidthChange = useCallback(
@@ -1320,6 +1410,14 @@ export function ChatPage(props: ChatPageProps) {
       setSettings((prev) => updateRightDockFileTreeState(prev, terminalProjectPathKey, patch));
     },
     [setSettings, terminalProjectPathKey],
+  );
+  const handleMobileFileTreeStateChange = useCallback(
+    (patch: RightDockFileTreeStatePatch) => {
+      setSettings((prev) =>
+        updateRightDockFileTreeState(prev, mobileWorkspacePathKey, patch),
+      );
+    },
+    [mobileWorkspacePathKey, setSettings],
   );
   const handleSshProjectHostIdsChange = useCallback(
     (hostIds: string[]) => {
@@ -1441,6 +1539,29 @@ export function ChatPage(props: ChatPageProps) {
       openWorkspaceFilePreview,
       terminalProjectPath,
       terminalProjectPathKey,
+    ],
+  );
+  const handleOpenMobileWorkspaceFile = useCallback(
+    (path: string, imagePaths?: string[]) => {
+      if (!mobileWorkspacePath || !mobileWorkspacePathKey) return;
+      const request = {
+        projectPathKey: mobileWorkspacePathKey,
+        workdir: mobileWorkspacePath,
+        path,
+        imagePaths,
+      };
+      setMobileFilesOpen(false);
+      if (isWorkspacePreviewPath(path)) {
+        openWorkspaceFilePreview(request);
+        return;
+      }
+      openWorkspaceEditorFile(request);
+    },
+    [
+      mobileWorkspacePath,
+      mobileWorkspacePathKey,
+      openWorkspaceEditorFile,
+      openWorkspaceFilePreview,
     ],
   );
   // ── 回复末尾「已编辑文件」卡的三个动作 ────────────────────────────────
@@ -3391,6 +3512,7 @@ export function ChatPage(props: ChatPageProps) {
       return buildPreparedConversationContext({
         state,
         tools,
+        soulPrompt,
         activeAgentPrompt,
         skillsPrompt,
         memoryPrompt,
@@ -3409,6 +3531,7 @@ export function ChatPage(props: ChatPageProps) {
         state,
         resumeMessage,
         tools,
+        soulPrompt,
         activeAgentPrompt,
         skillsPrompt,
         memoryPrompt,
@@ -3848,6 +3971,75 @@ export function ChatPage(props: ChatPageProps) {
     setSidebarOpen((prev) => !prev);
   }, []);
 
+  const handleOpenMobileActivity = useCallback(() => {
+    setSidebarOpen(false);
+    setMobileActivityOpen(true);
+  }, []);
+
+  const handleCloseMobileActivity = useCallback(() => {
+    setMobileActivityOpen(false);
+  }, []);
+
+  const handleOpenBrowser = useCallback(() => {
+    setSidebarOpen(false);
+    setMobileActivityOpen(false);
+    browserSessionController.openPanel();
+  }, []);
+
+  useEffect(() => {
+    browserSessionController.configure({
+      homePage: settings.customSettings.browser.homePage,
+    });
+  }, [settings.customSettings.browser.homePage]);
+
+  const handleOpenMobileTerminal = useCallback(
+    (
+      mode: MobileShellPanelMode = "terminal",
+      initialCommand = "",
+      autoRun = false,
+    ) => {
+      setSidebarOpen(false);
+      setMobileActivityOpen(false);
+      setMobileFilesOpen(false);
+      setMobileShellPanelMode(mode);
+      setMobileTerminalInitialCommand(initialCommand);
+      setMobileTerminalAutoRun(autoRun);
+      setMobileTerminalOpen(true);
+    },
+    [],
+  );
+
+  const handleOpenMobileSidebar = useCallback(() => {
+    setMobileActivityOpen(false);
+    setSidebarOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileExperience) {
+      setMobileActivityOpen(false);
+      setMobileFilesOpen(false);
+      setMobileTerminalOpen(false);
+      setMobileBrowserSettingsOpen(false);
+    }
+  }, [mobileExperience]);
+
+  useEdgeSwipeNavigation({
+    enabled:
+      mobileExperience &&
+      activeView === "chat" &&
+      !mobileFilesOpen &&
+      !mobileTerminalOpen &&
+      !workspaceEditorOpen &&
+      !workspaceFilePreviewOpen &&
+      !workspaceSshTerminalOpen,
+    leftOpen: sidebarOpen,
+    rightOpen: mobileActivityOpen,
+    onOpenLeft: handleOpenMobileSidebar,
+    onOpenRight: handleOpenMobileActivity,
+    onCloseLeft: handleCloseSidebar,
+    onCloseRight: handleCloseMobileActivity,
+  });
+
   const handleNewConversation = useCallback(() => {
     openController.cancel();
     prepareComposerForConversationChange();
@@ -4181,7 +4373,10 @@ export function ChatPage(props: ChatPageProps) {
         <MacOsTitleBarToggle
           sidebarOpen={sidebarOpen}
           onToggle={handleToggleSidebar}
-          onOpenSettings={() => onOpenSettings()}
+          onOpenSettings={() => {
+            if (mobileExperience) setSidebarOpen(false);
+            onOpenSettings();
+          }}
           appUpdate={appUpdate}
         />
         {/* ---- Sidebar ---- */}
@@ -4201,7 +4396,11 @@ export function ChatPage(props: ChatPageProps) {
           recentCollapsed={settings.customSettings.chatSidebar.recentCollapsed}
           onProjectsCollapsedChange={handleSidebarProjectsCollapsedChange}
           onRecentCollapsedChange={handleSidebarRecentCollapsedChange}
-          onCreateProject={desktopBridgeEnabled ? handleOpenCreateWorkspaceProject : undefined}
+          onCreateProject={
+            desktopBridgeEnabled || nativeMobile
+              ? handleOpenCreateWorkspaceProject
+              : undefined
+          }
           onSelectProject={handleSelectWorkspaceProject}
           onNewConversationForProject={handleNewConversationForProject}
           onBrowseProjectInFileTree={
@@ -4232,21 +4431,77 @@ export function ChatPage(props: ChatPageProps) {
           }}
           onConversationDeleted={handleConversationDeleted}
           onCloseSidebar={handleCloseSidebar}
-          onOpenSettings={() => onOpenSettings()}
+          onOpenSettings={() => {
+            if (mobileExperience) setSidebarOpen(false);
+            onOpenSettings();
+          }}
           appUpdate={appUpdate}
           onOpenSkillsHub={() => {
             cacheActiveComposerDraft();
             setRightDockOpen(false);
             setActiveView("skills-hub");
+            if (mobileExperience) setSidebarOpen(false);
           }}
           onOpenMcpHub={() => {
             cacheActiveComposerDraft();
             setRightDockOpen(false);
             setActiveView("mcp-hub");
+            if (mobileExperience) setSidebarOpen(false);
           }}
+          mobileExperience={mobileExperience}
+          workspaceToolsAvailable={desktopBridgeEnabled && !terminalDisabledMessage}
+          fileTreeAvailable={
+            desktopBridgeEnabled
+              ? !terminalDisabledMessage
+              : nativeMobile && Boolean(mobileWorkspacePathKey)
+          }
+          terminalShellOptions={terminalShellOptions}
+          onOpenWorkspaceTool={handleOpenWorkspaceTool}
         />
 
         {confirmDialog}
+
+        {desktopBridgeEnabled ? (
+          <RightDockPanel
+            isOpen={activeView === "chat" && rightDockOpen}
+            collapseImmediately={activeView !== "chat"}
+            fontScale={settings.customSettings.fontScale.rightDock}
+            projectPathKey={terminalProjectPathKey}
+            cwd={terminalProjectPath}
+            sessions={terminalSessions}
+            sessionsLoaded={terminalSessionsLoaded}
+            width={settings.customSettings.rightDock.width}
+            theme={effectiveTheme}
+            disabledMessage={terminalDisabledMessage}
+            projectState={rightDockProjectState}
+            fileTreeState={rightDockFileTreeState}
+            sshHosts={settings.ssh.hosts}
+            associatedSshHostIds={associatedSshHostIds}
+            client={tauriTerminalClient}
+            gitClient={tauriGitClient}
+            gitWriteEnabled
+            workspaceActivityClient={tauriWorkspaceActivityClient}
+            onWidthChange={handleRightDockWidthChange}
+            onProjectStateChange={handleRightDockProjectStateChange}
+            onFileTreeStateChange={handleRightDockFileTreeStateChange}
+            onSshProjectHostIdsChange={handleSshProjectHostIdsChange}
+            onOpenSshSession={handleOpenSshTerminal}
+            onSessionsChange={handleRightDockSessionsChange}
+            onInsertFileMention={handleRightDockInsertFileMention}
+            onOpenFile={handleOpenWorkspaceFile}
+            gitReviewFocusRequest={gitReviewFocusRequest}
+            onGitReviewFocusRequestHandled={handleGitReviewFocusRequestHandled}
+            onInsertCodeReviewSkill={
+              codeReviewSkill ? handleRightDockInsertCodeReviewSkill : undefined
+            }
+            onInsertCommitMention={handleRightDockInsertCommitMention}
+            onInsertGitFileMention={handleRightDockInsertGitFileMention}
+            launchRequest={workspaceToolLaunchRequest}
+            onLaunchRequestHandled={handleWorkspaceToolLaunchRequestHandled}
+            onShellOptionsChange={setTerminalShellOptions}
+            onClose={() => setRightDockOpen(false)}
+          />
+        ) : null}
 
         {/* ---- Main content ----
             字体缩放仅作用于聊天视图：Skills/MCP Hub 页面存在大量未迁移的固定
@@ -4265,23 +4520,41 @@ export function ChatPage(props: ChatPageProps) {
           }
         >
           {activeView === "skills-hub" ? (
-            <SkillsHubPage
-              settings={settings}
-              setSettings={setSettings}
-              initialSkills={availableSkills}
-              initialRootDir={skillsRootDir}
-              isAgentMode={isAgentMode}
-              sidebarOpen={sidebarOpen}
-              onOpenSidebar={handleOpenSidebar}
-            />
+            mobileExperience ? (
+              <MobileSkillsPage
+                settings={settings}
+                setSettings={setSettings}
+                initialSkills={availableSkills}
+                onOpenSidebar={handleOpenSidebar}
+              />
+            ) : (
+              <SkillsHubPage
+                settings={settings}
+                setSettings={setSettings}
+                initialSkills={availableSkills}
+                initialRootDir={skillsRootDir}
+                isAgentMode={isAgentMode}
+                sidebarOpen={sidebarOpen}
+                onOpenSidebar={handleOpenSidebar}
+              />
+            )
           ) : activeView === "mcp-hub" ? (
-            <McpHubPage
-              settings={settings}
-              setSettings={setSettings}
-              isAgentMode={isAgentMode}
-              sidebarOpen={sidebarOpen}
-              onOpenSidebar={handleOpenSidebar}
-            />
+            mobileExperience ? (
+              <MobileMcpPage
+                settings={settings}
+                setSettings={setSettings}
+                onOpenSidebar={handleOpenSidebar}
+                allowStdio={!nativeMobile}
+              />
+            ) : (
+              <McpHubPage
+                settings={settings}
+                setSettings={setSettings}
+                isAgentMode={isAgentMode}
+                sidebarOpen={sidebarOpen}
+                onOpenSidebar={handleOpenSidebar}
+              />
+            )
           ) : (
             <>
               <div className="relative z-20">
@@ -4310,35 +4583,32 @@ export function ChatPage(props: ChatPageProps) {
                   onOpenSettings={onOpenSettings}
                   onToggleTheme={onToggleTheme}
                   onOpenSidebar={handleOpenSidebar}
+                  mobileExperience={mobileExperience}
                   trailingActions={
-                    desktopBridgeEnabled ? (
+                    nativeMobile ? (
+                      <MobileQuickActions
+                        onOpenTerminal={() => handleOpenMobileTerminal("terminal")}
+                        onOpenRootfs={() => onOpenSettings("mobileExecution")}
+                        onOpenBrowser={handleOpenBrowser}
+                        onOpenBrowserSettings={() => {
+                          setSidebarOpen(false);
+                          setMobileBrowserSettingsOpen(true);
+                        }}
+                        onOpenGitReview={() => handleOpenMobileTerminal("git")}
+                        onOpenSsh={() => handleOpenMobileTerminal("ssh")}
+                        onOpenBackgroundTasks={handleOpenMobileActivity}
+                      />
+                    ) : (
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setRightDockOpen((open) => !open)}
-                        disabled={Boolean(terminalDisabledMessage) && !rightDockOpen}
-                        aria-expanded={rightDockOpen}
-                        title={
-                          rightDockOpen
-                            ? "Collapse project tools panel"
-                            : (terminalDisabledMessage ?? "Expand project tools panel")
-                        }
-                        className={`relative h-8 w-8 rounded-lg text-muted-foreground transition-[background-color,color,transform] duration-150 hover:text-foreground active:scale-95 ${
-                          rightDockOpen ? "bg-muted text-foreground" : ""
-                        }`}
+                        onClick={handleOpenBrowser}
+                        title={t("browser.open")}
+                        className="relative h-8 w-8 rounded-lg text-muted-foreground transition-[background-color,color,transform] duration-150 hover:text-foreground active:scale-95"
                       >
-                        {rightDockOpen ? (
-                          <PanelRightClose className="h-4 w-4" />
-                        ) : (
-                          <PanelRightOpen className="h-4 w-4" />
-                        )}
-                        {projectTerminalSessions.length > 0 ? (
-                          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[calc(10px*var(--zone-font-scale,1))] font-semibold leading-none text-white">
-                            {projectTerminalSessions.length}
-                          </span>
-                        ) : null}
+                        <Globe className="h-4 w-4" />
                       </Button>
-                    ) : null
+                    )
                   }
                 />
                 <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
@@ -4374,6 +4644,17 @@ export function ChatPage(props: ChatPageProps) {
                   suggestionsDisabled={isSuggestionTyping}
                 />
               </ChangedFilesActionsProvider>
+
+              {mobileExperience ? (
+                <MobileToolActivity
+                  store={liveTranscriptStore}
+                  open={mobileActivityOpen}
+                  onOpen={handleOpenMobileActivity}
+                  onOpenBrowser={handleOpenBrowser}
+                  onClose={handleCloseMobileActivity}
+                  bottomOffsetPx={composerOverlayHeight}
+                />
+              ) : null}
 
               <ChatComposerBar
                 composerRef={composerRef}
@@ -4473,6 +4754,53 @@ export function ChatPage(props: ChatPageProps) {
             </>
           )}
         </div>
+
+        <BrowserPanel />
+        {nativeMobile ? (
+          <MobileBrowserSettingsPanel
+            open={mobileBrowserSettingsOpen}
+            settings={settings}
+            setSettings={setSettings}
+            onClose={() => setMobileBrowserSettingsOpen(false)}
+          />
+        ) : null}
+        {nativeMobile ? (
+          <MobileFilesPanel
+            open={mobileFilesOpen}
+            projectPathKey={mobileWorkspacePathKey}
+            cwd={mobileWorkspacePath}
+            theme={effectiveTheme}
+            fileTreeState={mobileFileTreeState}
+            terminalClient={tauriTerminalClient}
+            workspaceActivityClient={null}
+            onFileTreeStateChange={handleMobileFileTreeStateChange}
+            onInsertFileMention={handleRightDockInsertFileMention}
+            onOpenFile={handleOpenMobileWorkspaceFile}
+            onClose={() => setMobileFilesOpen(false)}
+          />
+        ) : null}
+        {nativeMobile ? (
+          <MobileTerminalPanel
+            open={mobileTerminalOpen}
+            workdir={mobileWorkspacePath}
+            mode={mobileShellPanelMode}
+            sshHosts={settings.ssh.hosts}
+            initialCommand={mobileTerminalInitialCommand}
+            autoRunInitialCommand={mobileTerminalAutoRun}
+            onClose={() => setMobileTerminalOpen(false)}
+          />
+        ) : null}
+        {nativeMobile ? (
+          <MobileWorkspaceCreateDialog
+            open={mobileWorkspaceCreateOpen}
+            parent={parentWorkspacePath(getDefaultWorkspaceProjectPath(settings.system))}
+            onCreated={(path, kind) => {
+              setMobileWorkspaceCreateOpen(false);
+              activateWorkspaceProject(createWorkspaceProjectFromPath(path, kind));
+            }}
+            onClose={() => setMobileWorkspaceCreateOpen(false)}
+          />
+        ) : null}
         {workspaceEditorMounted ? (
           <Suspense
             fallback={
@@ -4547,43 +4875,6 @@ export function ChatPage(props: ChatPageProps) {
           </Suspense>
         ) : null}
       </div>
-      {desktopBridgeEnabled ? (
-        <RightDockPanel
-          isOpen={activeView === "chat" && rightDockOpen}
-          collapseImmediately={activeView !== "chat"}
-          fontScale={settings.customSettings.fontScale.rightDock}
-          projectPathKey={terminalProjectPathKey}
-          cwd={terminalProjectPath}
-          sessions={terminalSessions}
-          sessionsLoaded={terminalSessionsLoaded}
-          width={settings.customSettings.rightDock.width}
-          theme={effectiveTheme}
-          disabledMessage={terminalDisabledMessage}
-          projectState={rightDockProjectState}
-          fileTreeState={rightDockFileTreeState}
-          sshHosts={settings.ssh.hosts}
-          associatedSshHostIds={associatedSshHostIds}
-          client={tauriTerminalClient}
-          gitClient={tauriGitClient}
-          gitWriteEnabled
-          workspaceActivityClient={tauriWorkspaceActivityClient}
-          onWidthChange={handleRightDockWidthChange}
-          onProjectStateChange={handleRightDockProjectStateChange}
-          onFileTreeStateChange={handleRightDockFileTreeStateChange}
-          onSshProjectHostIdsChange={handleSshProjectHostIdsChange}
-          onOpenSshSession={handleOpenSshTerminal}
-          onSessionsChange={handleRightDockSessionsChange}
-          onInsertFileMention={handleRightDockInsertFileMention}
-          onOpenFile={handleOpenWorkspaceFile}
-          gitReviewFocusRequest={gitReviewFocusRequest}
-          onGitReviewFocusRequestHandled={handleGitReviewFocusRequestHandled}
-          onInsertCodeReviewSkill={
-            codeReviewSkill ? handleRightDockInsertCodeReviewSkill : undefined
-          }
-          onInsertCommitMention={handleRightDockInsertCommitMention}
-          onInsertGitFileMention={handleRightDockInsertGitFileMention}
-        />
-      ) : null}
     </div>
   );
 }

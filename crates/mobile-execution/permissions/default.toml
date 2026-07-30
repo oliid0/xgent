@@ -6,6 +6,9 @@ permissions = [
   "allow-status",
   "allow-install",
   "allow-install-toolchains",
+  "allow-list-external-workspaces",
+  "allow-pick-external-workspace",
+  "allow-remove-external-workspace",
   "allow-run",
   "allow-cancel",
 ]

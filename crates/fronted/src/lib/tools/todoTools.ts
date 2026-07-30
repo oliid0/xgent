@@ -49,8 +49,10 @@ Skip it for a single, trivial, or purely conversational task.
 
 Rules:
 - Exactly one item may have status="in_progress" at any time.
+- Every non-empty list with unfinished work must have exactly one in_progress item.
 - Mark an item in_progress before starting it, and completed immediately after finishing it — do not batch completions.
 - Only mark an item completed when it is FULLY done; keep it in_progress if blocked, partially done, or erroring.
+- For a plan with 3 or more items, include a concrete verification task and complete it before claiming the work is done.
 - content is the imperative form ("Run tests"); activeForm is the present-continuous form shown while the item is in_progress ("Running tests").`;
 
 const TODO_ITEM_CONTENT_DESCRIPTION = 'Imperative description of the task, e.g. "Run tests".';
@@ -112,17 +114,44 @@ function validateSingleInProgress(todos: TodoItem[]) {
       `Only one todo may be in_progress at a time; found ${inProgressCount}. Mark others as pending or completed.`,
     );
   }
+  const hasUnfinishedWork = todos.some((todo) => todo.status !== "completed");
+  if (hasUnfinishedWork && inProgressCount === 0) {
+    throw new Error(
+      "A non-empty todo list with unfinished work must have exactly one in_progress item.",
+    );
+  }
 }
 
-function buildTodoWriteResultText(todos: TodoItem[]) {
+const VERIFICATION_PATTERN =
+  /\b(test|tests|testing|verify|verification|validate|validation|lint|typecheck|build|review)\b|测试|验证|校验|检查|构建|审查/i;
+
+function needsVerificationNudge(todos: TodoItem[]) {
+  return (
+    todos.length >= 3 &&
+    todos.every((todo) => todo.status === "completed") &&
+    !todos.some(
+      (todo) =>
+        VERIFICATION_PATTERN.test(todo.content) || VERIFICATION_PATTERN.test(todo.activeForm),
+    )
+  );
+}
+
+function buildTodoWriteResultText(todos: TodoItem[], verificationRequired: boolean) {
   if (todos.length === 0) {
     return "Task list cleared.";
   }
   const completed = todos.filter((todo) => todo.status === "completed").length;
-  return [
+  const lines = [
     `Task list updated (${completed}/${todos.length} completed).`,
     ...todos.map((todo, index) => `${index + 1}. [${todo.status}] ${todo.content}`),
-  ].join("\n");
+  ];
+  if (verificationRequired) {
+    lines.push(
+      "",
+      "Verification is still required: this 3+ step plan was closed without a test, validation, build, or review task. Add and complete a concrete verification item before claiming completion.",
+    );
+  }
+  return lines.join("\n");
 }
 
 export function createTodoTools(params: { state: TodoToolState }): BuiltinToolBundle {
@@ -164,13 +193,14 @@ export function createTodoTools(params: { state: TodoToolState }): BuiltinToolBu
       const args = (toolCall.arguments || {}) as Record<string, unknown>;
       const todos = validateTodoShape(args);
       validateSingleInProgress(todos);
+      const verificationRequired = needsVerificationNudge(todos);
       params.state.setTodos(todos);
       return {
         role: "toolResult",
         toolCallId: toolCall.id,
         toolName: toolCall.name,
-        content: [{ type: "text", text: buildTodoWriteResultText(todos) }],
-        details: { kind: "todo_write", todos },
+        content: [{ type: "text", text: buildTodoWriteResultText(todos, verificationRequired) }],
+        details: { kind: "todo_write", todos, verificationRequired },
         isError: false,
         timestamp: now,
       };

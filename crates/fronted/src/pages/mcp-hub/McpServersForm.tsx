@@ -392,10 +392,18 @@ export function McpServerEditModal(props: {
   mode: "add" | "edit";
   initialServer: McpServerConfig | null;
   existingServers: McpServerConfig[];
+  allowStdio?: boolean;
   onClose: () => void;
   onSave: (server: McpServerConfig) => void;
 }) {
-  const { mode, initialServer, existingServers, onClose, onSave } = props;
+  const {
+    mode,
+    initialServer,
+    existingServers,
+    allowStdio = true,
+    onClose,
+    onSave,
+  } = props;
   const { t } = useLocale();
   const browser = isBrowserRuntime();
   const { modalState, requestClose } = useModalMotion(onClose);
@@ -406,18 +414,20 @@ export function McpServerEditModal(props: {
       .map((server) => server.id);
   }, [existingServers, initialServer, mode]);
 
-  const [draft, setDraft] = useState<ServerDraft>(() =>
-    initialServer ? draftFromServer(initialServer) : blankDraft(existingIdsExcludingCurrent),
-  );
+  const createInitialDraft = () => {
+    const next = initialServer
+      ? draftFromServer(initialServer)
+      : blankDraft(existingIdsExcludingCurrent);
+    return !allowStdio && !initialServer ? { ...next, transport: "http" as const } : next;
+  };
+  const [draft, setDraft] = useState<ServerDraft>(createInitialDraft);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    setDraft(
-      initialServer ? draftFromServer(initialServer) : blankDraft(existingIdsExcludingCurrent),
-    );
+    setDraft(createInitialDraft());
     setFormError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialServer]);
+  }, [allowStdio, initialServer]);
 
   function updateDraft(patch: Partial<ServerDraft>) {
     setFormError(null);
@@ -427,6 +437,9 @@ export function McpServerEditModal(props: {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
+      if (!allowStdio && draft.transport === "stdio") {
+        throw new Error(t("mcpHub.mobileNetworkOnly"));
+      }
       const server = buildServerFromDraft(draft, initialServer, existingIdsExcludingCurrent, t);
       onSave(server);
       requestClose();
@@ -509,11 +522,18 @@ export function McpServerEditModal(props: {
                     <SelectValue placeholder={t("mcpHub.selectTransport")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="stdio">{t("mcpHub.stdio")}</SelectItem>
+                    <SelectItem value="stdio" disabled={!allowStdio}>
+                      {t("mcpHub.stdio")}
+                    </SelectItem>
                     <SelectItem value="http">{t("mcpHub.http")}</SelectItem>
                     <SelectItem value="sse">{t("mcpHub.sse")}</SelectItem>
                   </SelectContent>
                 </Select>
+                {!allowStdio ? (
+                  <p className="text-[10.5px] leading-4 text-amber-600 dark:text-amber-300">
+                    {t("mcpHub.mobileNetworkOnly")}
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="mcp-edit-timeout" className="text-xs text-muted-foreground">

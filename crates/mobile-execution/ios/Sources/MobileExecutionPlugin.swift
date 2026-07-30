@@ -2,6 +2,8 @@ import Darwin
 import Foundation
 import SwiftRs
 import Tauri
+import UIKit
+import UniformTypeIdentifiers
 import ios_system
 
 // WasmKit 0.1.6 has no fuel or external interruption API. Keep the runtime
@@ -35,6 +37,14 @@ private struct RunArgs: Decodable {
 
 private struct CancelArgs: Decodable {
     let runId: String
+}
+
+private struct PickExternalWorkspaceArgs: Decodable {
+    let allowWrite: Bool?
+}
+
+private struct RemoveExternalWorkspaceArgs: Decodable {
+    let id: String
 }
 
 enum MobileExecutionError: LocalizedError {
@@ -167,7 +177,7 @@ private func iosToolchainPayload(
     iosToolchains(available: available, resources: resources).map(\.payload)
 }
 
-final class MobileExecutionPlugin: Plugin {
+final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private let executionQueue = DispatchQueue(label: "com.ohi.xagent.mobile-execution")
     private let stateLock = NSLock()
     private let initializationLock = NSLock()
@@ -176,6 +186,9 @@ final class MobileExecutionPlugin: Plugin {
     private var cancelledRuns = Set<String>()
     private var initialized = false
     private let sessionIdentifier = strdup("xagent-mobile-execution")!
+    private let externalWorkspaces = IOSExternalWorkspaceStore()
+    private var pendingWorkspaceInvoke: Invoke?
+    private var pendingWorkspaceAllowWrite = true
 
     @objc func status(_ invoke: Invoke) {
         let initializationError: Error?
@@ -198,7 +211,7 @@ final class MobileExecutionPlugin: Plugin {
                 "wasi": available && wasiExecutionAvailable,
                 "network": available && resources.certificateBundle,
                 "childProcesses": false,
-                "userSelectedWorkspaces": false,
+                "userSelectedWorkspaces": true,
                 "packageManagement": false,
             ],
             "toolchains": iosToolchainPayload(available: available, resources: resources),
@@ -253,6 +266,76 @@ final class MobileExecutionPlugin: Plugin {
             "timedOut": false,
             "cancelled": false,
         ])
+    }
+
+    @objc func listExternalWorkspaces(_ invoke: Invoke) {
+        invoke.resolve(externalWorkspaces.listPayload())
+    }
+
+    @objc func pickExternalWorkspace(_ invoke: Invoke) throws {
+        let request = try invoke.parseArgs(PickExternalWorkspaceArgs.self)
+        guard pendingWorkspaceInvoke == nil else {
+            throw MobileExecutionError.invalidRequest("Another workspace picker is already open")
+        }
+        guard let presenter = Self.topViewController() else {
+            throw MobileExecutionError.invalidRequest("Could not present the folder picker")
+        }
+        pendingWorkspaceInvoke = invoke
+        pendingWorkspaceAllowWrite = request.allowWrite ?? true
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
+        picker.allowsMultipleSelection = false
+        picker.delegate = self
+        presenter.present(picker, animated: true)
+    }
+
+    @objc func removeExternalWorkspace(_ invoke: Invoke) throws {
+        let request = try invoke.parseArgs(RemoveExternalWorkspaceArgs.self)
+        executionQueue.async { [weak self] in
+            guard let self else {
+                invoke.reject("The mobile execution backend is unavailable")
+                return
+            }
+            do {
+                let removed = try self.externalWorkspaces.remove(id: request.id)
+                invoke.resolve(["removed": removed])
+            } catch {
+                invoke.reject(error.localizedDescription)
+            }
+        }
+    }
+
+    func documentPicker(
+        _ controller: UIDocumentPickerViewController,
+        didPickDocumentsAt urls: [URL]
+    ) {
+        guard let invoke = pendingWorkspaceInvoke else { return }
+        pendingWorkspaceInvoke = nil
+        guard let url = urls.first else {
+            invoke.reject("Workspace selection was cancelled")
+            return
+        }
+        let allowWrite = pendingWorkspaceAllowWrite
+        executionQueue.async { [weak self] in
+            guard let self else {
+                invoke.reject("The mobile execution backend is unavailable")
+                return
+            }
+            do {
+                invoke.resolve(
+                    try self.externalWorkspaces.add(
+                        url: url,
+                        allowWrite: allowWrite
+                    )
+                )
+            } catch {
+                invoke.reject(error.localizedDescription)
+            }
+        }
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        pendingWorkspaceInvoke?.reject("Workspace selection was cancelled")
+        pendingWorkspaceInvoke = nil
     }
 
     @objc func run(_ invoke: Invoke) throws {
@@ -359,7 +442,7 @@ final class MobileExecutionPlugin: Plugin {
             throw MobileExecutionError.invalidRequest("Could not enter cwd")
         }
         defer { _ = FileManager.default.changeCurrentDirectoryPath(previousCwd) }
-        guard ios_setMiniRoot(workspace.path as NSString) == 1 else {
+        guard ios_setMiniRoot(workspace.path) == 1 else {
             throw MobileExecutionError.invalidRequest("Could not restrict the iOS shell to workdir")
         }
         guard let resourcePath = Bundle.module.resourcePath else {
@@ -518,7 +601,8 @@ final class MobileExecutionPlugin: Plugin {
         guard url.path.hasPrefix("/"),
               FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
               isDirectory.boolValue,
-              isPath(url.path, inside: sandboxRootPath()) else {
+              (isPath(url.path, inside: sandboxRootPath())
+                  || externalWorkspaces.contains(path: url.path)) else {
             throw MobileExecutionError.invalidRequest("workdir must be an existing directory")
         }
         return url
@@ -535,7 +619,7 @@ final class MobileExecutionPlugin: Plugin {
                 .resolvingSymlinksInPath()
                 .standardizedFileURL
             var isDirectory: ObjCBool = false
-            guard isPath(target.path, inside: sandboxRootPath()),
+            guard isPath(target.path, inside: workspace.path),
                   FileManager.default.fileExists(atPath: target.path, isDirectory: &isDirectory),
                   isDirectory.boolValue else {
                 throw MobileExecutionError.invalidRequest(
@@ -570,6 +654,25 @@ final class MobileExecutionPlugin: Plugin {
 
     private func isPath(_ candidate: String, inside root: String) -> Bool {
         candidate == root || candidate.hasPrefix(root + "/")
+    }
+
+    private static func topViewController() -> UIViewController? {
+        let root = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .rootViewController
+        var current = root
+        while let presented = current?.presentedViewController {
+            current = presented
+        }
+        if let navigation = current as? UINavigationController {
+            return navigation.visibleViewController ?? navigation
+        }
+        if let tabs = current as? UITabBarController {
+            return tabs.selectedViewController ?? tabs
+        }
+        return current
     }
 
     private func decodeInput(_ value: String?) throws -> Data? {

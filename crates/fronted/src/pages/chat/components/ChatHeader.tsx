@@ -58,6 +58,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
   onOpenSettings: (section?: SectionId) => void;
   onToggleTheme: () => void;
   onOpenSidebar: () => void;
+  mobileExperience?: boolean;
   preThemeActions?: ReactNode;
   trailingActions?: ReactNode;
 }) {
@@ -73,6 +74,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
     onOpenSettings,
     onToggleTheme,
     onOpenSidebar,
+    mobileExperience = false,
     preThemeActions,
     trailingActions,
   } = props;
@@ -118,7 +120,10 @@ export const ChatHeader = memo(function ChatHeader(props: {
     <header
       data-tauri-drag-region
       className={cn(
-        "flex items-center justify-between gap-2 py-2.5 pr-4",
+        "flex items-center justify-between gap-2 pr-4",
+        mobileExperience
+          ? "pb-2.5 pt-[calc(0.625rem+env(safe-area-inset-top,0px))]"
+          : "py-2.5",
         !sidebarOpen && macOsTauri ? "pl-[232px]" : "pl-4",
       )}
     >
@@ -129,9 +134,21 @@ export const ChatHeader = memo(function ChatHeader(props: {
             size="icon"
             onClick={onOpenSidebar}
             title={t("tooltip.openSidebar")}
-            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+            className={cn(
+              "text-muted-foreground hover:text-foreground",
+              mobileExperience
+                ? "h-10 w-10 rounded-full border border-border/60 bg-background/70 shadow-sm"
+                : "h-8 w-8 rounded-lg",
+            )}
           >
-            <PanelLeft className="h-4.5 w-4.5" />
+            {mobileExperience ? (
+              <span className="flex h-5 w-5 flex-col justify-center gap-1.5" aria-hidden="true">
+                <span className="h-0.5 w-5 rounded-full bg-current" />
+                <span className="h-0.5 w-3.5 rounded-full bg-current" />
+              </span>
+            ) : (
+              <PanelLeft className="h-4.5 w-4.5" />
+            )}
           </Button>
         ) : null}
 
@@ -346,18 +363,20 @@ export const ChatHeader = memo(function ChatHeader(props: {
       </div>
 
       <div className="flex shrink-0 -translate-y-px items-center gap-1">
-        {preThemeActions}
-        <Button
+        {!mobileExperience ? preThemeActions : null}
+        {!mobileExperience ? (
+          <Button
           variant="ghost"
           size="icon"
           onClick={onToggleTheme}
           title={themeToggleTitle}
           aria-label={themeToggleTitle}
           className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
-        >
-          <ThemeToggleIcon theme={nextTheme} />
-        </Button>
-        {!sidebarOpen && !isMacOsTauri() && (
+          >
+            <ThemeToggleIcon theme={nextTheme} />
+          </Button>
+        ) : null}
+        {!mobileExperience && !sidebarOpen && !isMacOsTauri() && (
           <Button
             variant="ghost"
             size="icon"

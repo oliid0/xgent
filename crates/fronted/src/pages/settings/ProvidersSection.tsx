@@ -2003,14 +2003,14 @@ function ProviderList(props: {
   const thirdPartyImporting = cherryImporting;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
-      <div className="flex shrink-0 items-center justify-between gap-3">
+    <div className="provider-list flex h-full min-h-0 flex-col gap-4">
+      <div className="provider-list-header flex shrink-0 items-center justify-between gap-3">
         <div className="text-sm text-muted-foreground">
           {filtered.length === 0
             ? t("settings.noProviders")
             : `${filtered.length} ${t("settings.navProviders")}`}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="provider-list-actions flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-1.5" onClick={onAdd}>
             <Plus className="h-3.5 w-3.5" />
             {t("settings.addProvider")}
@@ -2122,7 +2122,7 @@ function ProviderList(props: {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+      <div className="provider-list-scroll min-h-0 flex-1 overflow-y-auto pr-1">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-12 text-center">
             <div className="mb-3 flex items-center justify-center text-3xl text-foreground">
@@ -2136,7 +2136,7 @@ function ProviderList(props: {
             {filtered.map((provider) => (
               <div
                 key={provider.id}
-                className="group flex items-center gap-3 rounded-xl border bg-card px-4 py-3 transition-colors hover:bg-accent/30"
+                className="provider-list-card group flex items-center gap-3 rounded-xl border bg-card px-4 py-3 transition-colors hover:bg-accent/30"
               >
                 <div className="flex w-5 shrink-0 items-center justify-center text-lg text-foreground">
                   <ProviderBrandIcon type={type} />
@@ -2158,7 +2158,7 @@ function ProviderList(props: {
                     {provider.activeModels.length} {t("settings.activeModels")}
                   </div>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="provider-list-card-actions flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -2589,8 +2589,8 @@ export function ProvidersSection(
 
   return (
     <>
-      <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
-        <div className="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground">
+      <div className="providers-tabbar-row mb-4 flex shrink-0 items-center justify-between gap-3">
+        <div className="providers-tabbar inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground">
           {PROVIDER_TABS.map((tab) => (
             <button
               key={tab}
@@ -2620,7 +2620,7 @@ export function ProvidersSection(
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="providers-pages min-h-0 flex-1 overflow-hidden">
         <div
           className="flex h-full transition-transform duration-300 ease-in-out"
           style={{ transform: `translateX(-${activeTabIndex * 100}%)` }}

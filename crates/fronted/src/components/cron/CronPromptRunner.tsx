@@ -7,6 +7,7 @@ import { runAssistantWithTools } from "../../lib/chat/runner/agentRunner";
 import { createStreamDebugLogger } from "../../lib/debug/agentDebug";
 import { assistantMessageToText } from "../../lib/providers/llm";
 import { resolveRuntimePlatform } from "../../lib/runtimePlatform";
+import { buildSoulSystemPrompt, useSoul } from "../../lib/soul";
 import {
   type AppSettings,
   DEFAULT_CHAT_RUNTIME_CONTROLS,
@@ -126,6 +127,7 @@ async function executeCronPromptRun(
   settings: AppSettings,
   request: PromptRunRequest,
   signal: AbortSignal,
+  soulPrompt: string,
 ) {
   if (!isAgentExecutionMode(settings.system.executionMode)) {
     throw new Error(
@@ -177,6 +179,9 @@ async function executeCronPromptRun(
   });
 
   let systemPrompt = buildCronSystemPrompt(request.taskName);
+  if (soulPrompt) {
+    systemPrompt = appendSystemPrompt(systemPrompt, soulPrompt);
+  }
   if (activeAgentPrompt) {
     systemPrompt = appendSystemPrompt(systemPrompt, activeAgentPrompt);
   }
@@ -266,11 +271,17 @@ async function completeWithRetry(input: CompletePromptRunInput) {
  */
 export function CronPromptRunner({ settings }: CronPromptRunnerProps) {
   const settingsRef = useRef(settings);
+  const { document: soulDocument } = useSoul();
+  const soulPromptRef = useRef(buildSoulSystemPrompt(soulDocument));
   const browser = isBrowserRuntime();
 
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  useEffect(() => {
+    soulPromptRef.current = buildSoulSystemPrompt(soulDocument);
+  }, [soulDocument]);
 
   useEffect(() => {
     if (browser) return;
@@ -287,7 +298,12 @@ export function CronPromptRunner({ settings }: CronPromptRunnerProps) {
       let success = false;
       let output = "";
       try {
-        output = await executeCronPromptRun(settingsRef.current, request, controller.signal);
+        output = await executeCronPromptRun(
+          settingsRef.current,
+          request,
+          controller.signal,
+          soulPromptRef.current,
+        );
         success = true;
       } catch (error) {
         output = error instanceof Error ? error.message : String(error ?? "");

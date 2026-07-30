@@ -399,6 +399,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     nativeMobileRuntime,
     fileState,
     todoState,
+    askUserQuestionConversationId: conversationId,
     skillsEnabled: effectiveSkillsEnabled,
     skillsRootDir,
     skillAccessPolicy,

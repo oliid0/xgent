@@ -190,6 +190,64 @@ test("executor rejects a call with more than one in_progress item", async () => 
   assert.deepEqual(state.getTodos(), []);
 });
 
+test("executor rejects unfinished work without an in_progress item", async () => {
+  const { createTodoTools, createTodoToolState } = loadTodoTools();
+  const state = createTodoToolState();
+  const bundle = createTodoTools({ state });
+
+  const result = await bundle.executeToolCall(
+    createTodoToolCall({
+      todos: [
+        { content: "Inspect files", status: "pending", activeForm: "Inspecting files" },
+        { content: "Implement fix", status: "pending", activeForm: "Implementing fix" },
+      ],
+    }),
+  );
+
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /exactly one in_progress/i);
+  assert.deepEqual(state.getTodos(), []);
+});
+
+test("executor requests verification when a complex plan closes without evidence", async () => {
+  const { createTodoTools, createTodoToolState } = loadTodoTools();
+  const state = createTodoToolState();
+  const bundle = createTodoTools({ state });
+
+  const result = await bundle.executeToolCall(
+    createTodoToolCall({
+      todos: [
+        { content: "Inspect code", status: "completed", activeForm: "Inspecting code" },
+        { content: "Implement fix", status: "completed", activeForm: "Implementing fix" },
+        { content: "Update docs", status: "completed", activeForm: "Updating docs" },
+      ],
+    }),
+  );
+
+  assert.equal(result.isError, false);
+  assert.equal(result.details.verificationRequired, true);
+  assert.match(result.content[0].text, /verification is still required/i);
+});
+
+test("executor accepts a completed complex plan with a verification item", async () => {
+  const { createTodoTools, createTodoToolState } = loadTodoTools();
+  const state = createTodoToolState();
+  const bundle = createTodoTools({ state });
+
+  const result = await bundle.executeToolCall(
+    createTodoToolCall({
+      todos: [
+        { content: "Inspect code", status: "completed", activeForm: "Inspecting code" },
+        { content: "Implement fix", status: "completed", activeForm: "Implementing fix" },
+        { content: "Run tests", status: "completed", activeForm: "Running tests" },
+      ],
+    }),
+  );
+
+  assert.equal(result.isError, false);
+  assert.equal(result.details.verificationRequired, false);
+});
+
 test("executor rejects a malformed todos structure", async () => {
   const { createTodoTools, createTodoToolState } = loadTodoTools();
   const state = createTodoToolState();

@@ -79,6 +79,12 @@ const CLOUD_EXECUTION_FILES: &[BuiltinSkillFile] = &[
         content: include_str!("../../../prompt/skills/xagent-cloud-execution/SKILL.md"),
     },
     BuiltinSkillFile {
+        path: "references/execution-contract.md",
+        content: include_str!(
+            "../../../prompt/skills/xagent-cloud-execution/references/execution-contract.md"
+        ),
+    },
+    BuiltinSkillFile {
         path: CODE_REVIEW_OWNERSHIP_MARKER_PATH,
         content: CLOUD_EXECUTION_OWNERSHIP_MARKER_CONTENT,
     },

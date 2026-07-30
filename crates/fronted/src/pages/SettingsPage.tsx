@@ -3,26 +3,35 @@ import {
   ArrowLeft,
   BookOpen,
   Brain,
+  ChevronRight,
   Clock3,
   Cloud,
   Cpu,
   Info,
   Key,
+  Mic,
+  Search,
   Settings2,
+  Sparkles,
   Wrench,
   Zap,
+  Terminal,
+  X,
 } from "../components/icons";
-import { isMacOsTauri, MacOsTitleBarSpacer } from "../components/MacOsTitleBarSpacer";
 
 import { useLocale } from "../i18n";
+import { useCompactViewport } from "../lib/responsive/compactViewport";
 import { AboutSection } from "./settings/AboutSection";
 import { AccessSection } from "./settings/AccessSection";
 import { AgentsSection } from "./settings/AgentsSection";
 import { CronSection } from "./settings/CronSection";
 import { HooksSection } from "./settings/HooksSection";
 import { MemoryPanel } from "./settings/memory/MemoryPanel";
+import { MobileExecutionSection } from "./settings/MobileExecutionSection";
+import { MobileAssistantSection } from "./settings/MobileAssistantSection";
 import { ProvidersSection } from "./settings/ProvidersSection";
 import { SshSection } from "./settings/SshSection";
+import { SoulSection } from "./settings/SoulSection";
 import { SystemSettingsForm } from "./settings/SystemSettingsForm";
 import { SystemToolsSection } from "./settings/SystemToolsSection";
 import type { SectionId, SettingsPageProps } from "./settings/types";
@@ -64,17 +73,15 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
     <button
       type="button"
       onClick={onClick}
-      className={`settings-nav-item group relative flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-sm transition-all duration-150 ${
+      className={`settings-nav-item group relative flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition-colors duration-150 ${
         active
-          ? "settings-nav-item-active bg-primary/10 font-medium text-primary"
-          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+          ? "settings-nav-item-active bg-muted font-medium text-foreground"
+          : "text-foreground/75 hover:bg-muted/65 hover:text-foreground"
       }`}
     >
       <span
-        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors ${
-          active
-            ? "bg-primary/15 text-primary"
-            : "bg-muted/60 text-muted-foreground group-hover:bg-accent group-hover:text-foreground"
+        className={`flex h-6 w-6 shrink-0 items-center justify-center transition-colors ${
+          active ? "text-foreground" : "text-foreground/75 group-hover:text-foreground"
         }`}
       >
         {icon}
@@ -86,42 +93,120 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
 
 type NavGroup = {
   labelKey: string;
-  items: Array<{ id: SectionId; icon: ReactNode }>;
+  items: Array<{
+    id: SectionId;
+    icon: ReactNode;
+    accentClass: string;
+    descriptionKey: string;
+    mobileOnly?: boolean;
+  }>;
 };
 
 const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: "settings.groupGeneral",
     items: [
-      { id: "system", icon: <Settings2 className="h-3.5 w-3.5" /> },
-      { id: "providers", icon: <Cpu className="h-3.5 w-3.5" /> },
-      { id: "agents", icon: <BookOpen className="h-3.5 w-3.5" /> },
+      {
+        id: "system",
+        icon: <Settings2 className="h-3.5 w-3.5" />,
+        accentClass: "bg-slate-500",
+        descriptionKey: "settings.mobile.systemDescription",
+      },
+      {
+        id: "providers",
+        icon: <Cpu className="h-3.5 w-3.5" />,
+        accentClass: "bg-blue-500",
+        descriptionKey: "settings.mobile.providersDescription",
+      },
+      {
+        id: "soul",
+        icon: <Sparkles className="h-3.5 w-3.5" />,
+        accentClass: "bg-violet-500",
+        descriptionKey: "settings.mobile.soulDescription",
+      },
+      {
+        id: "agents",
+        icon: <BookOpen className="h-3.5 w-3.5" />,
+        accentClass: "bg-orange-500",
+        descriptionKey: "settings.mobile.agentsDescription",
+      },
     ],
   },
   {
     labelKey: "settings.groupIntelligence",
     items: [
-      { id: "memory", icon: <Brain className="h-3.5 w-3.5" /> },
-      { id: "systemTools", icon: <Wrench className="h-3.5 w-3.5" /> },
+      {
+        id: "memory",
+        icon: <Brain className="h-3.5 w-3.5" />,
+        accentClass: "bg-violet-500",
+        descriptionKey: "settings.mobile.memoryDescription",
+      },
+      {
+        id: "systemTools",
+        icon: <Wrench className="h-3.5 w-3.5" />,
+        accentClass: "bg-cyan-500",
+        descriptionKey: "settings.mobile.systemToolsDescription",
+      },
     ],
   },
   {
     labelKey: "settings.groupAutomation",
     items: [
-      { id: "hooks", icon: <Zap className="h-3.5 w-3.5" /> },
-      { id: "cron", icon: <Clock3 className="h-3.5 w-3.5" /> },
+      {
+        id: "hooks",
+        icon: <Zap className="h-3.5 w-3.5" />,
+        accentClass: "bg-amber-500",
+        descriptionKey: "settings.mobile.hooksDescription",
+      },
+      {
+        id: "cron",
+        icon: <Clock3 className="h-3.5 w-3.5" />,
+        accentClass: "bg-emerald-500",
+        descriptionKey: "settings.mobile.cronDescription",
+      },
     ],
   },
   {
     labelKey: "settings.groupConnectivity",
     items: [
-      { id: "ssh", icon: <Key className="h-3.5 w-3.5" /> },
-      { id: "access", icon: <Cloud className="h-3.5 w-3.5" /> },
+      {
+        id: "ssh",
+        icon: <Key className="h-3.5 w-3.5" />,
+        accentClass: "bg-teal-500",
+        descriptionKey: "settings.mobile.sshDescription",
+      },
+      {
+        id: "access",
+        icon: <Cloud className="h-3.5 w-3.5" />,
+        accentClass: "bg-sky-500",
+        descriptionKey: "settings.mobile.accessDescription",
+      },
+      {
+        id: "mobileAssistant",
+        icon: <Mic className="h-3.5 w-3.5" />,
+        accentClass: "bg-rose-500",
+        descriptionKey: "settings.mobile.assistantDescription",
+        mobileOnly: true,
+      },
+      {
+        id: "mobileExecution",
+        icon: <Terminal className="h-3.5 w-3.5" />,
+        accentClass: "bg-zinc-600",
+        descriptionKey: "settings.mobile.executionDescription",
+        mobileOnly: true,
+      },
     ],
   },
   {
     labelKey: "settings.groupOther",
-    items: [{ id: "about", icon: <Info className="h-3.5 w-3.5" /> }],
+    items: [
+      {
+        id: "about",
+        icon: <Info className="h-3.5 w-3.5" />,
+        accentClass: "bg-indigo-500",
+        descriptionKey: "settings.mobile.aboutDescription",
+      },
+    ],
   },
 ];
 
@@ -137,18 +222,27 @@ export function SettingsPage(props: SettingsPageProps) {
     appUpdate,
   } = props;
   const { t } = useLocale();
+  const compactViewport = useCompactViewport();
+  const compactSettings = nativeMobile || compactViewport;
   const [section, setSection] = useState<SectionId>(initialSection);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(
+    () => compactSettings && initialSection !== "system",
+  );
+  const [searchQuery, setSearchQuery] = useState("");
 
   const sectionLabels: Record<SectionId, string> = {
     system: t("settings.navSystem"),
     systemTools: t("settings.navSystemTools"),
     providers: t("settings.navProviders"),
+    soul: t("settings.navSoul"),
     agents: t("settings.navAgents"),
     ssh: t("settings.navSsh"),
     memory: t("settings.navMemory"),
     hooks: t("settings.navHooks"),
     cron: t("settings.navCron"),
     access: t("settings.navAccess"),
+    mobileAssistant: t("settings.navMobileAssistant"),
+    mobileExecution: t("settings.navMobileExecution"),
     about: t("settings.navAbout"),
   };
 
@@ -158,16 +252,31 @@ export function SettingsPage(props: SettingsPageProps) {
       NAV_GROUPS.map((group) => ({
         label: t(group.labelKey),
         items: group.items
-          .filter((item) => !hiddenSectionSet.has(item.id))
-          .map((item) => ({ ...item, label: sectionLabels[item.id] })),
+          .filter(
+            (item) =>
+              !hiddenSectionSet.has(item.id) && (!item.mobileOnly || nativeMobile),
+          )
+          .map((item) => ({
+            ...item,
+            label: sectionLabels[item.id],
+            description: t(item.descriptionKey),
+          })),
       })).filter((group) => group.items.length > 0),
-    [hiddenSectionSet, sectionLabels, t],
+    [hiddenSectionSet, nativeMobile, sectionLabels, t],
   );
   const allNavItems = useMemo(() => navGroups.flatMap((g) => g.items), [navGroups]);
+  const visibleDesktopNavItems = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    if (!query) return allNavItems;
+    return allNavItems.filter((item) =>
+      `${item.label} ${item.description}`.toLocaleLowerCase().includes(query),
+    );
+  }, [allNavItems, searchQuery]);
 
   useEffect(() => {
     setSection(initialSection);
-  }, [initialSection]);
+    setMobileDetailOpen(compactSettings && initialSection !== "system");
+  }, [compactSettings, initialSection]);
 
   useEffect(() => {
     if (allNavItems.some((item) => item.id === section)) {
@@ -187,8 +296,16 @@ export function SettingsPage(props: SettingsPageProps) {
             thirdPartyImportEnabled={!nativeMobile}
           />
         );
+      case "soul":
+        return <SoulSection />;
       case "system":
-        return <SystemSettingsForm settings={settings} setSettings={setSettings} />;
+        return (
+          <SystemSettingsForm
+            settings={settings}
+            setSettings={setSettings}
+            compact={compactSettings}
+          />
+        );
       case "systemTools":
         return <SystemToolsSection settings={settings} setSettings={setSettings} />;
       case "hooks":
@@ -200,7 +317,17 @@ export function SettingsPage(props: SettingsPageProps) {
       case "ssh":
         return <SshSection settings={settings} setSettings={setSettings} />;
       case "access":
-        return <AccessSection settings={settings} setSettings={setSettings} />;
+        return (
+          <AccessSection
+            settings={settings}
+            setSettings={setSettings}
+            nativeMobile={nativeMobile}
+          />
+        );
+      case "mobileExecution":
+        return <MobileExecutionSection settings={settings} setSettings={setSettings} />;
+      case "mobileAssistant":
+        return <MobileAssistantSection />;
       case "memory":
         return (
           <MemoryPanel
@@ -218,88 +345,204 @@ export function SettingsPage(props: SettingsPageProps) {
     }
   })();
 
-  const onMac = isMacOsTauri();
+  if (compactSettings) {
+    return (
+      <div
+        data-edge-swipe-ignore
+        className="relative flex h-full min-h-0 flex-col overflow-hidden bg-muted/25"
+      >
+        {mobileDetailOpen ? (
+          <main className="settings-mobile-detail flex min-h-0 flex-1 flex-col bg-background">
+            <header className="relative z-10 flex min-h-14 shrink-0 items-center border-b border-border/45 bg-background/80 px-2.5 backdrop-blur-2xl backdrop-saturate-150">
+              <button
+                type="button"
+                onClick={() => setMobileDetailOpen(false)}
+                className="inline-flex h-10 min-w-10 items-center justify-center gap-1 rounded-full px-2.5 text-sm text-primary transition-colors active:bg-primary/10"
+                aria-label={t("settings.mobile.backToSettings")}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>{t("settings.title")}</span>
+              </button>
+              <div className="pointer-events-none absolute inset-x-24 text-center text-[15px] font-semibold tracking-tight">
+                {sectionLabels[section]}
+              </div>
+              <div
+                className="ml-auto flex items-center gap-1.5 px-2 text-[11px] text-muted-foreground"
+                title={saveIndicator.title}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${saveIndicator.dotClass}`} />
+                <span className="sr-only">{saveIndicator.text}</span>
+              </div>
+            </header>
+
+            <div
+              key={section}
+              data-settings-section={section}
+              className={`settings-section-enter min-h-0 flex-1 px-3.5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-3.5 ${
+                section === "hooks" || section === "providers" || section === "memory"
+                  ? "flex flex-col overflow-hidden"
+                  : "overflow-y-auto overscroll-contain"
+              }`}
+            >
+              <div
+                className={`settings-section-shell ${
+                  section === "hooks" || section === "providers" || section === "memory"
+                    ? "flex min-h-0 flex-1 flex-col"
+                    : "min-h-full"
+                }`}
+              >
+                {sectionContent}
+              </div>
+            </div>
+          </main>
+        ) : (
+          <main className="settings-mobile-home min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
+            <header className="sticky top-0 z-10 flex min-h-14 items-center border-b border-border/35 bg-background/75 px-2.5 backdrop-blur-2xl backdrop-saturate-150">
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex h-10 min-w-10 items-center justify-center rounded-full text-primary transition-colors active:bg-primary/10"
+                aria-label={t("settings.backToChat")}
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div className="pointer-events-none absolute inset-x-16 text-center text-[17px] font-semibold tracking-tight">
+                {t("settings.title")}
+              </div>
+              <div
+                className="ml-auto flex h-10 items-center gap-1.5 px-2 text-[11px] text-muted-foreground"
+                title={saveIndicator.title}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${saveIndicator.dotClass}`} />
+                <span>{saveIndicator.text}</span>
+              </div>
+            </header>
+
+            <div className="mx-auto w-full max-w-2xl px-4 pt-2">
+              {navGroups.map((group) => (
+                <section key={group.label} className="pt-4">
+                  <h2 className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/75">
+                    {group.label}
+                  </h2>
+                  <div className="overflow-hidden rounded-2xl border border-black/[0.045] bg-background/75 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset,0_8px_28px_-24px_rgba(15,23,42,0.32)] backdrop-blur-2xl backdrop-saturate-150 dark:border-white/[0.08] dark:bg-white/[0.045] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
+                    {group.items.map((item, index) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setSection(item.id);
+                          setMobileDetailOpen(true);
+                        }}
+                        className="group relative flex min-h-[64px] w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors active:bg-foreground/[0.045]"
+                      >
+                        <span
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white shadow-sm ${item.accentClass}`}
+                        >
+                          {item.icon}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[15px] font-medium leading-5 text-foreground">
+                            {item.label}
+                          </span>
+                          <span className="mt-0.5 block truncate text-[12px] leading-4 text-muted-foreground">
+                            {item.description}
+                          </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/45 transition-transform group-active:translate-x-0.5" />
+                        {index < group.items.length - 1 ? (
+                          <span className="pointer-events-none absolute inset-x-0 bottom-0 ml-[58px] h-px bg-border/45" />
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </main>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <div className="flex min-h-0 flex-1">
-        <aside className="settings-sidebar flex w-56 shrink-0 flex-col border-r border-border/60 bg-muted/20">
-          {onMac && <div data-tauri-drag-region className="h-[38px] shrink-0" />}
-          <div className="border-b border-border/60 px-3 pb-3 pt-3">
-            <button
-              type="button"
-              onClick={onBack}
-              className="settings-back-button flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-            >
-              <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
-              <span>{t("settings.backToChat")}</span>
-            </button>
+    <div
+      data-edge-swipe-ignore
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("settings.title")}
+      className="flex h-full min-h-0 flex-col overflow-hidden bg-background"
+    >
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-border/60 px-5">
+        <h1 className="text-lg font-medium tracking-tight">{t("settings.title")}</h1>
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title={t("settings.backToChat")}
+          aria-label={t("settings.backToChat")}
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </header>
 
-            <div className="mt-3 flex items-center gap-2.5 px-1">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-                <Settings2 className="h-3.5 w-3.5 text-primary" />
-              </div>
-              <span className="text-sm font-semibold tracking-tight">{t("settings.title")}</span>
+      <div className="flex min-h-0 flex-1 gap-6 p-5">
+        <aside className="settings-sidebar flex w-[230px] shrink-0 flex-col">
+          <label className="relative block">
+            <span className="sr-only">{t("settings.searchPlaceholder")}</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.currentTarget.value)}
+              placeholder={t("settings.searchPlaceholder")}
+              className="h-10 w-full rounded-lg border-0 bg-muted/55 pl-10 pr-3 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/40"
+            />
+          </label>
+
+          <nav className="settings-nav mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="space-y-1">
+              {visibleDesktopNavItems.map((item) => (
+                <NavItem
+                  key={item.id}
+                  icon={item.icon}
+                  label={item.label}
+                  active={section === item.id}
+                  onClick={() => setSection(item.id)}
+                />
+              ))}
+              {visibleDesktopNavItems.length === 0 ? (
+                <div className="rounded-xl px-3 py-8 text-center text-sm text-muted-foreground">
+                  {t("settings.searchEmpty")}
+                </div>
+              ) : null}
             </div>
-          </div>
-
-          <nav className="settings-nav flex-1 overflow-y-auto px-3 py-3">
-            {navGroups.map((group, gi) => (
-              <div key={group.label} className={gi > 0 ? "mt-4" : ""}>
-                <div className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                  {group.label}
-                </div>
-                <div className="space-y-0.5">
-                  {group.items.map((item) => (
-                    <NavItem
-                      key={item.id}
-                      icon={item.icon}
-                      label={item.label}
-                      active={section === item.id}
-                      onClick={() => setSection(item.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
           </nav>
 
-          <div className="border-t border-border/60 px-3 py-2.5">
-            <div
-              className="flex items-center gap-1.5 px-2.5 text-[11px] text-muted-foreground"
-              title={saveIndicator.title}
-            >
-              <div className={`h-1.5 w-1.5 rounded-full ${saveIndicator.dotClass}`} />
-              {saveIndicator.text}
-            </div>
+          <div
+            className="mt-3 flex items-center gap-2 px-3 text-xs text-muted-foreground"
+            title={saveIndicator.title}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${saveIndicator.dotClass}`} />
+            <span>{saveIndicator.text}</span>
           </div>
         </aside>
 
-        <main className="flex min-w-0 flex-1 flex-col">
-          <MacOsTitleBarSpacer />
-          <div className="border-b px-6 py-3.5">
-            <div key={section} className="settings-section-title-enter text-base font-semibold">
-              {sectionLabels[section]}
-            </div>
-          </div>
-
+        <main
+          key={section}
+          className={`settings-section-enter min-w-0 flex-1 pr-2 ${
+            section === "hooks" || section === "providers" || section === "memory"
+              ? "flex min-h-0 flex-col overflow-hidden"
+              : "overflow-y-auto overscroll-contain"
+          }`}
+        >
           <div
-            key={section}
-            className={`settings-section-enter flex-1 px-6 py-5 ${
+            className={`settings-section-shell ${
               section === "hooks" || section === "providers" || section === "memory"
-                ? "flex min-h-0 flex-col overflow-hidden"
-                : "overflow-auto"
+                ? "flex min-h-0 flex-1 flex-col"
+                : "min-h-full"
             }`}
           >
-            <div
-              className={`settings-section-shell ${
-                section === "hooks" || section === "providers" || section === "memory"
-                  ? "flex min-h-0 flex-1 flex-col"
-                  : "min-h-full"
-              }`}
-            >
-              {sectionContent}
-            </div>
+            {sectionContent}
           </div>
         </main>
       </div>

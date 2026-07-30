@@ -22,7 +22,11 @@ import type {
   SshHostConfig,
 } from "../../lib/settings";
 import { cn } from "../../lib/shared/utils";
-import type { TerminalClient, TerminalSession } from "../../lib/terminal/types";
+import type {
+  TerminalClient,
+  TerminalSession,
+  TerminalShellOption,
+} from "../../lib/terminal/types";
 import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types";
 import { X } from "../icons";
 import { Button } from "../ui/button";
@@ -41,6 +45,7 @@ import {
   expandedPathsForFileTreePath,
   formatTerminalSessionTitle,
   type RightDockSingletonTabKind,
+  type WorkspaceToolLaunchRequest,
   rightDockTabRequiresProject,
 } from "./rightDockModel";
 import { useRightDockPanelWidth } from "./useRightDockPanelWidth";
@@ -84,6 +89,9 @@ type RightDockPanelProps = {
   onInsertGitFileMention?: (file: GitFileContextPayload) => void;
   gitReviewFocusRequest?: GitReviewFocusRequest | null;
   onGitReviewFocusRequestHandled?: (nonce: number) => void;
+  launchRequest?: WorkspaceToolLaunchRequest | null;
+  onLaunchRequestHandled?: (nonce: number) => void;
+  onShellOptionsChange?: (options: TerminalShellOption[]) => void;
   onClose?: () => void;
 };
 
@@ -359,6 +367,9 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
     onInsertGitFileMention,
     gitReviewFocusRequest,
     onGitReviewFocusRequestHandled,
+    launchRequest,
+    onLaunchRequestHandled,
+    onShellOptionsChange,
     onClose,
   } = props;
   const { t } = useLocale();
@@ -373,6 +384,7 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
   } = useRightDockPanelWidth({
     collapseImmediately,
     isOpen,
+    placement: "left",
     onWidthChange,
     width,
   });
@@ -573,6 +585,34 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
     [openSingletonTab, projectReady],
   );
 
+  useEffect(() => {
+    onShellOptionsChange?.(shellOptions);
+  }, [onShellOptionsChange, shellOptions]);
+
+  const handledLaunchRequestRef = useRef(0);
+  useEffect(() => {
+    if (!launchRequest || launchRequest.nonce === handledLaunchRequestRef.current) return;
+    handledLaunchRequestRef.current = launchRequest.nonce;
+    switch (launchRequest.target) {
+      case "terminal":
+        createTerminal(launchRequest.shell);
+        break;
+      case "backgroundTasks":
+        openBackgroundTasks();
+        break;
+      default:
+        startToolTab(launchRequest.target);
+        break;
+    }
+    onLaunchRequestHandled?.(launchRequest.nonce);
+  }, [
+    createTerminal,
+    launchRequest,
+    onLaunchRequestHandled,
+    openBackgroundTasks,
+    startToolTab,
+  ]);
+
   const setFileTreeInitialized = useCallback(
     (initialized: boolean) => {
       if (!projectPathKey) return;
@@ -714,8 +754,8 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
         className={cn(
           "project-tools-panel zone-font-scale fixed inset-x-0 bottom-0 z-40 flex h-[min(72dvh,34rem)] min-h-0 w-full shrink-0 flex-col overflow-hidden bg-background pb-[env(safe-area-inset-bottom,0px)] shadow-2xl transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none md:relative md:inset-auto md:z-10 md:h-full md:overflow-visible md:p-0 md:shadow-none",
           isOpen
-            ? "pointer-events-auto translate-y-0 border-t border-border opacity-100 md:w-[var(--project-tools-panel-width)] md:translate-x-0 md:border-l md:border-t-0"
-            : "pointer-events-none translate-y-full border-t border-transparent opacity-0 md:translate-x-3 md:translate-y-0 md:border-l-0 md:border-t-0",
+            ? "pointer-events-auto translate-y-0 border-t border-border opacity-100 md:w-[var(--project-tools-panel-width)] md:translate-x-0 md:border-r md:border-t-0"
+            : "pointer-events-none translate-y-full border-t border-transparent opacity-0 md:-translate-x-3 md:translate-y-0 md:border-r-0 md:border-t-0",
           effectiveWidthCollapsed ? "md:w-0" : "md:w-[var(--project-tools-panel-width)]",
         )}
         style={{ ...panelStyle, "--zone-font-scale": fontScale } as CSSProperties}
@@ -725,7 +765,7 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
             "project-tools-panel-inner flex h-full min-h-0 w-full flex-col transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none md:w-[var(--project-tools-panel-width)] md:min-w-[var(--project-tools-panel-width)]",
             isOpen
               ? "translate-y-0 opacity-100 md:translate-x-0"
-              : "translate-y-3 opacity-0 md:translate-x-2 md:translate-y-0",
+              : "translate-y-3 opacity-0 md:-translate-x-2 md:translate-y-0",
           )}
         >
           {effectiveShouldRenderContent ? (
@@ -736,7 +776,7 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
                 aria-label={t("projectTools.resizePanel")}
                 title={t("projectTools.resizePanel")}
                 className={cn(
-                  "group absolute inset-y-0 left-0 z-[90] hidden w-3 cursor-col-resize touch-none items-center justify-center border-0 bg-transparent p-0 md:flex",
+                  "group absolute inset-y-0 right-0 z-[90] hidden w-3 cursor-col-resize touch-none items-center justify-center border-0 bg-transparent p-0 md:flex",
                   "focus-visible:outline-none",
                 )}
                 onMouseDown={handleResizeStart}
@@ -798,7 +838,7 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
                     size="icon"
                     onClick={onClose}
                     title={t("projectTools.closePanel")}
-                    className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground md:hidden"
+                    className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
                   >
                     <X className="h-4 w-4" />
                   </Button>

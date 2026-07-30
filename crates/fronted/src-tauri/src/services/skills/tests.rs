@@ -277,6 +277,28 @@ fn builtin_seed_installs_xagent_code_review_workflow() {
 }
 
 #[test]
+fn builtin_seed_installs_cloud_execution_contract() {
+    let tmp = TempDir::new("xagent-cloud-execution-seed-test").expect("temp dir");
+    let root = tmp.path().join("skills");
+
+    let seeded = ensure_builtin_agent_skills_in_root(&root).expect("seed builtins");
+    let cloud_execution = seeded
+        .iter()
+        .find(|item| item.name == "xagent-cloud-execution")
+        .expect("cloud execution seed result");
+
+    assert_eq!(cloud_execution.action, "created");
+    let skill_dir = root.join("xagent-cloud-execution");
+    let contract = fs::read_to_string(skill_dir.join("references/execution-contract.md"))
+        .expect("read cloud execution contract");
+    assert!(contract.contains("# Cloud execution contract"));
+    assert!(contract.contains("download_artifact"));
+    assert!(skill_dir.join("_xagent_builtin.json").is_file());
+    let validation = validate_skill_dir(&skill_dir);
+    assert!(validation.ok, "{:?}", validation.errors);
+}
+
+#[test]
 fn builtin_seed_preserves_unmanaged_code_review_collision() {
     let tmp = TempDir::new("xagent-code-review-collision-test").expect("temp dir");
     let root = tmp.path().join("skills");

@@ -2,6 +2,7 @@ import { isBrowserRuntime } from "@xagent/runtime";
 import { useState } from "react";
 import {
   CheckCircle2,
+  ChevronDown,
   Cpu,
   Globe,
   LogOut,
@@ -36,13 +37,17 @@ import {
   updateCustomSettings,
   updateSystem,
 } from "../../lib/settings";
-import { AgentActivationSwitch } from "./shared";
+import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 const FONT_SCALE_OPTIONS = [0.9, 1, 1.1, 1.2] as const;
 
-export function SystemSettingsForm(props: SettingsSectionProps) {
-  const { settings, setSettings } = props;
+type SystemSettingsFormProps = SettingsSectionProps & {
+  compact?: boolean;
+};
+
+export function SystemSettingsForm(props: SystemSettingsFormProps) {
+  const { settings, setSettings, compact = false } = props;
   const { t } = useLocale();
   const browser = isBrowserRuntime();
 
@@ -99,6 +104,7 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
   const [proxyPortDraft, setProxyPortDraft] = useState<string | null>(null);
   const [proxyUsernameDraft, setProxyUsernameDraft] = useState<string | null>(null);
   const [proxyPasswordDraft, setProxyPasswordDraft] = useState<string | null>(null);
+  const [proxyDetailsOpen, setProxyDetailsOpen] = useState(() => settings.system.systemProxy.enabled);
   // 护栏 A：host + port 有效才算配置可用（端口在启用时必填有效）。
   // 用"草稿优先"的生效值计算：blur 提交前开关若仍禁用，点击开关触发的 blur
   // 会先把按钮变回可用，但落在禁用按钮上的这次 click 已被浏览器吞掉，需点两次。
@@ -151,21 +157,254 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
     }
   }
 
+  if (!compact) {
+    return (
+      <div className="settings-system-rows">
+        <SettingsRowGroup title={t("settings.executionMode")}>
+          <SettingsRow
+            label={t("settings.executionMode")}
+            description={
+              executionMode === "text"
+                ? t("settings.chatModeDesc")
+                : executionMode === "tools"
+                  ? t("settings.agentModeDesc")
+                  : t("settings.agentDevModeDesc")
+            }
+          >
+            <Select
+              value={executionMode}
+              onValueChange={(value) =>
+                setSettings((prev) =>
+                  updateSystem(prev, { executionMode: value as ExecutionMode }),
+                )
+              }
+            >
+              <SelectTrigger className="w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="text">{t("settings.chatMode")}</SelectItem>
+                <SelectItem value="tools">{t("settings.agentMode")}</SelectItem>
+                <SelectItem value="agent-dev">{t("settings.agentDevMode")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingsRow>
+        </SettingsRowGroup>
+
+        <SettingsRowGroup title={t("settings.appearance")}>
+          <SettingsRow label={t("settings.appearance")}>
+            <Select
+              value={settings.theme}
+              onValueChange={(value) =>
+                setSettings((prev) => ({ ...prev, theme: value as Theme }))
+              }
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {THEME_OPTIONS.map((theme) => (
+                  <SelectItem key={theme} value={theme}>
+                    {getThemeLabel(theme)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingsRow>
+          <SettingsRow label={t("settings.language")}>
+            <Select
+              value={settings.locale}
+              onValueChange={(locale) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  locale: locale as typeof prev.locale,
+                }))
+              }
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SUPPORTED_LOCALES.map((locale) => (
+                  <SelectItem key={locale} value={locale}>
+                    {locale === "zh-CN"
+                      ? t("settings.chinese")
+                      : locale === "en-US"
+                        ? t("settings.english")
+                        : locale}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingsRow>
+          {fontScaleZones.map((zone) => (
+            <SettingsRow key={zone.key} label={zone.label}>
+              <Select
+                value={String(fontScale[zone.key])}
+                onValueChange={(value) => setZoneFontScale(zone.key, Number(value))}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FONT_SCALE_OPTIONS.map((value) => (
+                    <SelectItem key={value} value={String(value)}>
+                      {getFontScaleLabel(value)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingsRow>
+          ))}
+        </SettingsRowGroup>
+
+        <SettingsRowGroup title={t("settings.systemProxy")}>
+          <SettingsRow
+            label={t("settings.systemProxy")}
+            description={
+              systemProxyInvalid
+                ? t("settings.systemProxyInvalid")
+                : t("settings.systemProxyDesc")
+            }
+          >
+            <AgentActivationSwitch
+              checked={systemProxy.enabled}
+              title={t("settings.systemProxyEnable")}
+              disabled={proxyToggleDisabled}
+              onToggle={() => patchSystemProxy({ enabled: !systemProxy.enabled })}
+            />
+          </SettingsRow>
+          {systemProxy.enabled ? (
+            <>
+              <SettingsRow label={t("settings.systemProxyType")}>
+                <Select
+                  value={systemProxy.type}
+                  onValueChange={(value) =>
+                    patchSystemProxy({ type: value as SystemProxyType })
+                  }
+                >
+                  <SelectTrigger className="w-44">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="http">HTTP</SelectItem>
+                    <SelectItem value="socks5">SOCKS5</SelectItem>
+                  </SelectContent>
+                </Select>
+              </SettingsRow>
+              <SettingsRow label={t("settings.systemProxyHost")}>
+                <Input
+                  value={proxyHostDraft ?? systemProxy.host}
+                  placeholder="127.0.0.1"
+                  className="w-64"
+                  onChange={(event) => setProxyHostDraft(event.currentTarget.value)}
+                  onBlur={commitProxyHostDraft}
+                />
+              </SettingsRow>
+              <SettingsRow label={t("settings.systemProxyPort")}>
+                <Input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={proxyPortDraft ?? (systemProxy.port > 0 ? String(systemProxy.port) : "")}
+                  placeholder={systemProxy.type === "socks5" ? "1080" : "7890"}
+                  className="w-44"
+                  onChange={(event) => setProxyPortDraft(event.currentTarget.value)}
+                  onBlur={commitProxyPortDraft}
+                />
+              </SettingsRow>
+              <SettingsRow label={t("settings.systemProxyUsername")}>
+                <Input
+                  value={proxyUsernameDraft ?? systemProxy.username}
+                  className="w-64"
+                  onChange={(event) => setProxyUsernameDraft(event.currentTarget.value)}
+                  onBlur={commitProxyUsernameDraft}
+                />
+              </SettingsRow>
+              <SettingsRow
+                label={t("settings.systemProxyPassword")}
+                description={
+                  systemProxy.passwordConfigured &&
+                  !(proxyPasswordDraft ?? systemProxy.password).trim()
+                    ? t("settings.systemProxyPasswordConfigured")
+                    : undefined
+                }
+              >
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="password"
+                    disabled={browser}
+                    value={proxyPasswordDraft ?? systemProxy.password}
+                    className="w-64"
+                    onChange={(event) => setProxyPasswordDraft(event.currentTarget.value)}
+                    onBlur={commitProxyPasswordDraft}
+                  />
+                  {systemProxy.passwordConfigured &&
+                  !(proxyPasswordDraft ?? systemProxy.password).trim() ? (
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                      disabled={browser}
+                      onClick={() => {
+                        setProxyPasswordDraft(null);
+                        patchSystemProxy({ password: "", passwordConfigured: false });
+                      }}
+                    >
+                      {t("settings.systemProxyPasswordClear")}
+                    </button>
+                  ) : null}
+                </div>
+              </SettingsRow>
+            </>
+          ) : null}
+        </SettingsRowGroup>
+
+        <SettingsRowGroup title={t("settings.closeWindowBehavior")}>
+          <SettingsRow label={t("settings.closeWindowBehavior")}>
+            <Select
+              value={settings.closeWindowBehavior}
+              onValueChange={(closeWindowBehavior) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  closeWindowBehavior:
+                    closeWindowBehavior as (typeof CLOSE_WINDOW_BEHAVIOR_OPTIONS)[number],
+                }))
+              }
+            >
+              <SelectTrigger className="w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CLOSE_WINDOW_BEHAVIOR_OPTIONS.map((behavior) => (
+                  <SelectItem key={behavior} value={behavior}>
+                    {behavior === "minimize"
+                      ? t("settings.closeWindowMinimize")
+                      : t("settings.closeWindowExit")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingsRow>
+        </SettingsRowGroup>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+    <div className="settings-system-form space-y-6" data-compact={compact ? "true" : "false"}>
+      <div className="settings-execution-section space-y-3">
+        <div className="settings-group-heading flex items-center gap-2 text-sm font-medium text-foreground">
           <Terminal className="h-4 w-4 text-muted-foreground" />
           {t("settings.executionMode")}
         </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="settings-execution-grid grid grid-cols-1 gap-3 md:grid-cols-3">
           <button
             type="button"
             onClick={() =>
               setSettings((prev) => updateSystem(prev, { executionMode: "text" as ExecutionMode }))
             }
-            className={`group relative flex flex-col items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+            className={`settings-execution-choice group relative flex flex-col items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
               executionMode === "text"
                 ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
                 : "border-transparent bg-muted/40 hover:border-border hover:bg-muted/60"
@@ -198,7 +437,7 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
             onClick={() =>
               setSettings((prev) => updateSystem(prev, { executionMode: "tools" as ExecutionMode }))
             }
-            className={`group relative flex flex-col items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+            className={`settings-execution-choice group relative flex flex-col items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
               isClassicAgentMode
                 ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
                 : "border-transparent bg-muted/40 hover:border-border hover:bg-muted/60"
@@ -233,7 +472,7 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
                 updateSystem(prev, { executionMode: "agent-dev" as ExecutionMode }),
               )
             }
-            className={`group relative flex flex-col items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+            className={`settings-execution-choice group relative flex flex-col items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
               isAgentDevMode
                 ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
                 : "border-transparent bg-muted/40 hover:border-border hover:bg-muted/60"
@@ -263,10 +502,10 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
         </div>
       </div>
 
-      <div className="border-t" />
+      <div className="settings-system-divider border-t" />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <section className="space-y-3 rounded-2xl border border-border/60 bg-card p-4">
+      <div className="settings-appearance-grid grid gap-4 md:grid-cols-2">
+        <section className="settings-system-card space-y-3 rounded-2xl border border-border/60 bg-card p-4">
           <div className="flex items-start gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -276,7 +515,7 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
             </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="settings-theme-grid grid gap-2 sm:grid-cols-3">
             {THEME_OPTIONS.map((theme) => {
               const selected = settings.theme === theme;
               return (
@@ -284,7 +523,7 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
                   key={theme}
                   type="button"
                   onClick={() => setSettings((prev) => ({ ...prev, theme }))}
-                  className={`group relative flex h-full items-start gap-3 rounded-xl border px-3.5 py-3.5 text-left transition-all ${
+                  className={`settings-choice-card group relative flex h-full items-start gap-3 rounded-xl border px-3.5 py-3.5 text-left transition-all ${
                     selected
                       ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
                       : "border-border/60 bg-background/80 hover:border-border hover:bg-muted/35"
@@ -313,7 +552,7 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
           </div>
         </section>
 
-        <section className="space-y-3 rounded-2xl border border-border/60 bg-card p-4">
+        <section className="settings-system-card space-y-3 rounded-2xl border border-border/60 bg-card p-4">
           <div className="flex items-start gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -323,7 +562,7 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="settings-locale-grid grid grid-cols-2 gap-2">
             {SUPPORTED_LOCALES.map((locale) => {
               const selected = settings.locale === locale;
               const localeLabel =
@@ -337,7 +576,7 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
                   key={locale}
                   type="button"
                   onClick={() => setSettings((prev) => ({ ...prev, locale }))}
-                  className={`group relative flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-all ${
+                  className={`settings-choice-card group relative flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-all ${
                     selected
                       ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
                       : "border-border/60 bg-background/80 hover:border-border hover:bg-muted/35"
@@ -362,187 +601,220 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
         </section>
       </div>
 
-      <section className="space-y-3 rounded-2xl border border-border/60 bg-card p-4">
+      <section className="settings-proxy-card settings-system-card space-y-3 rounded-2xl border border-border/60 bg-card p-4">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Globe className="h-4 w-4 text-muted-foreground" />
-            {t("settings.systemProxy")}
-          </div>
+          <button
+            type="button"
+            disabled={!compact}
+            onClick={() => setProxyDetailsOpen((open) => !open)}
+            className="settings-proxy-disclosure flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-medium text-foreground disabled:cursor-default"
+            aria-expanded={!compact || proxyDetailsOpen}
+          >
+            <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1">
+              <span className="block">{t("settings.systemProxy")}</span>
+              {compact && systemProxy.host ? (
+                <span className="mt-0.5 block truncate font-mono text-[11px] font-normal text-muted-foreground">
+                  {systemProxy.type}://{systemProxy.host}
+                  {systemProxy.port > 0 ? `:${systemProxy.port}` : ""}
+                </span>
+              ) : null}
+            </span>
+            {compact ? (
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+                  proxyDetailsOpen ? "rotate-180" : ""
+                }`}
+              />
+            ) : null}
+          </button>
           <AgentActivationSwitch
             checked={systemProxy.enabled}
             title={t("settings.systemProxyEnable")}
             disabled={proxyToggleDisabled}
-            onToggle={() => patchSystemProxy({ enabled: !systemProxy.enabled })}
+            onToggle={() => {
+              const enabled = !systemProxy.enabled;
+              patchSystemProxy({ enabled });
+              if (compact && enabled) setProxyDetailsOpen(true);
+            }}
           />
         </div>
-        <p className="text-xs text-muted-foreground">{t("settings.systemProxyDesc")}</p>
-        {systemProxyInvalid ? (
-          <p className="text-xs text-destructive">{t("settings.systemProxyInvalid")}</p>
-        ) : proxyToggleDisabled ? (
-          <p className="text-xs text-muted-foreground">{t("settings.systemProxyEnableHint")}</p>
-        ) : null}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12 lg:items-start">
-          <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
-            <Label className="text-xs font-medium text-muted-foreground">
-              {t("settings.systemProxyType")}
-            </Label>
-            <Select
-              value={systemProxy.type}
-              onValueChange={(value) => patchSystemProxy({ type: value as SystemProxyType })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue>{systemProxy.type === "socks5" ? "SOCKS5" : "HTTP"}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="http">HTTP</SelectItem>
-                <SelectItem value="socks5">SOCKS5</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5 lg:col-span-4">
-            <Label
-              htmlFor="system-proxy-host"
-              className="text-xs font-medium text-muted-foreground"
-            >
-              {t("settings.systemProxyHost")}
-            </Label>
-            <Input
-              id="system-proxy-host"
-              value={proxyHostDraft ?? systemProxy.host}
-              placeholder="127.0.0.1"
-              onChange={(event) => setProxyHostDraft(event.currentTarget.value)}
-              onBlur={commitProxyHostDraft}
-            />
-          </div>
-          <div className="space-y-1.5 lg:col-span-2">
-            <Label
-              htmlFor="system-proxy-port"
-              className="text-xs font-medium text-muted-foreground"
-            >
-              {t("settings.systemProxyPort")}
-            </Label>
-            <Input
-              id="system-proxy-port"
-              type="number"
-              min={1}
-              max={65535}
-              value={proxyPortDraft ?? (systemProxy.port > 0 ? String(systemProxy.port) : "")}
-              placeholder={systemProxy.type === "socks5" ? "1080" : "7890"}
-              onChange={(event) => setProxyPortDraft(event.currentTarget.value)}
-              onBlur={commitProxyPortDraft}
-            />
-          </div>
-          <div className="space-y-1.5 lg:col-span-2">
-            <Label
-              htmlFor="system-proxy-username"
-              className="text-xs font-medium text-muted-foreground"
-            >
-              {t("settings.systemProxyUsername")}
-            </Label>
-            <Input
-              id="system-proxy-username"
-              value={proxyUsernameDraft ?? systemProxy.username}
-              onChange={(event) => setProxyUsernameDraft(event.currentTarget.value)}
-              onBlur={commitProxyUsernameDraft}
-            />
-          </div>
-          <div className="space-y-1.5 lg:col-span-2">
-            <Label
-              htmlFor="system-proxy-password"
-              className="text-xs font-medium text-muted-foreground"
-            >
-              {t("settings.systemProxyPassword")}
-            </Label>
-            <Input
-              id="system-proxy-password"
-              type="password"
-              disabled={browser}
-              value={proxyPasswordDraft ?? systemProxy.password}
-              onChange={(event) => setProxyPasswordDraft(event.currentTarget.value)}
-              onBlur={commitProxyPasswordDraft}
-            />
-            {systemProxy.passwordConfigured &&
-            !(proxyPasswordDraft ?? systemProxy.password).trim() ? (
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                <span>{t("settings.systemProxyPasswordConfigured")}</span>
-                <button
-                  type="button"
-                  className="underline-offset-2 hover:text-foreground hover:underline"
-                  disabled={browser}
-                  onClick={() => {
-                    setProxyPasswordDraft(null);
-                    patchSystemProxy({ password: "", passwordConfigured: false });
-                  }}
-                >
-                  {t("settings.systemProxyPasswordClear")}
-                </button>
-              </div>
+        {!compact || proxyDetailsOpen ? (
+          <div className="settings-proxy-details space-y-3">
+            <p className="text-xs text-muted-foreground">{t("settings.systemProxyDesc")}</p>
+            {systemProxyInvalid ? (
+              <p className="text-xs text-destructive">{t("settings.systemProxyInvalid")}</p>
+            ) : proxyToggleDisabled ? (
+              <p className="text-xs text-muted-foreground">{t("settings.systemProxyEnableHint")}</p>
             ) : null}
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-3 rounded-2xl border border-border/60 bg-card p-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <Minimize2 className="h-4 w-4 text-muted-foreground" />
-          {t("settings.closeWindowBehavior")}
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-2">
-          {CLOSE_WINDOW_BEHAVIOR_OPTIONS.map((behavior) => {
-            const selected = settings.closeWindowBehavior === behavior;
-            const isMinimize = behavior === "minimize";
-            return (
-              <button
-                key={behavior}
-                type="button"
-                onClick={() =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    closeWindowBehavior: behavior,
-                  }))
-                }
-                className={`group relative flex h-full items-start gap-3 rounded-xl border px-3.5 py-3.5 text-left transition-all ${
-                  selected
-                    ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
-                    : "border-border/60 bg-background/80 hover:border-border hover:bg-muted/35"
-                }`}
-              >
-                <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                    selected
-                      ? "bg-primary/10 text-primary"
-                      : "bg-muted text-muted-foreground group-hover:bg-accent/80"
-                  }`}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12 lg:items-start">
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
+                <Label className="text-xs font-medium text-muted-foreground">
+                  {t("settings.systemProxyType")}
+                </Label>
+                <Select
+                  value={systemProxy.type}
+                  onValueChange={(value) => patchSystemProxy({ type: value as SystemProxyType })}
                 >
-                  {isMinimize ? (
-                    <Minimize2 className="h-4.5 w-4.5" />
-                  ) : (
-                    <LogOut className="h-4.5 w-4.5" />
-                  )}
-                </div>
-                <div className="min-w-0 pr-6">
-                  <div className="text-sm font-semibold">
-                    {isMinimize ? t("settings.closeWindowMinimize") : t("settings.closeWindowExit")}
-                  </div>
-                  <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                    {isMinimize
-                      ? t("settings.closeWindowMinimizeDesc")
-                      : t("settings.closeWindowExitDesc")}
-                  </div>
-                </div>
-                {selected ? (
-                  <div className="absolute right-3 top-3">
-                    <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
+                  <SelectTrigger className="w-full">
+                    <SelectValue>{systemProxy.type === "socks5" ? "SOCKS5" : "HTTP"}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="http">HTTP</SelectItem>
+                    <SelectItem value="socks5">SOCKS5</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 lg:col-span-4">
+                <Label
+                  htmlFor="system-proxy-host"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  {t("settings.systemProxyHost")}
+                </Label>
+                <Input
+                  id="system-proxy-host"
+                  value={proxyHostDraft ?? systemProxy.host}
+                  placeholder="127.0.0.1"
+                  onChange={(event) => setProxyHostDraft(event.currentTarget.value)}
+                  onBlur={commitProxyHostDraft}
+                />
+              </div>
+              <div className="space-y-1.5 lg:col-span-2">
+                <Label
+                  htmlFor="system-proxy-port"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  {t("settings.systemProxyPort")}
+                </Label>
+                <Input
+                  id="system-proxy-port"
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={proxyPortDraft ?? (systemProxy.port > 0 ? String(systemProxy.port) : "")}
+                  placeholder={systemProxy.type === "socks5" ? "1080" : "7890"}
+                  onChange={(event) => setProxyPortDraft(event.currentTarget.value)}
+                  onBlur={commitProxyPortDraft}
+                />
+              </div>
+              <div className="space-y-1.5 lg:col-span-2">
+                <Label
+                  htmlFor="system-proxy-username"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  {t("settings.systemProxyUsername")}
+                </Label>
+                <Input
+                  id="system-proxy-username"
+                  value={proxyUsernameDraft ?? systemProxy.username}
+                  onChange={(event) => setProxyUsernameDraft(event.currentTarget.value)}
+                  onBlur={commitProxyUsernameDraft}
+                />
+              </div>
+              <div className="space-y-1.5 lg:col-span-2">
+                <Label
+                  htmlFor="system-proxy-password"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  {t("settings.systemProxyPassword")}
+                </Label>
+                <Input
+                  id="system-proxy-password"
+                  type="password"
+                  disabled={browser}
+                  value={proxyPasswordDraft ?? systemProxy.password}
+                  onChange={(event) => setProxyPasswordDraft(event.currentTarget.value)}
+                  onBlur={commitProxyPasswordDraft}
+                />
+                {systemProxy.passwordConfigured &&
+                !(proxyPasswordDraft ?? systemProxy.password).trim() ? (
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span>{t("settings.systemProxyPasswordConfigured")}</span>
+                    <button
+                      type="button"
+                      className="underline-offset-2 hover:text-foreground hover:underline"
+                      disabled={browser}
+                      onClick={() => {
+                        setProxyPasswordDraft(null);
+                        patchSystemProxy({ password: "", passwordConfigured: false });
+                      }}
+                    >
+                      {t("settings.systemProxyPasswordClear")}
+                    </button>
                   </div>
                 ) : null}
-              </button>
-            );
-          })}
-        </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </section>
 
-      <section className="space-y-3 rounded-2xl border border-border/60 bg-card p-4">
+      {!compact ? (
+        <section className="settings-close-card settings-system-card space-y-3 rounded-2xl border border-border/60 bg-card p-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Minimize2 className="h-4 w-4 text-muted-foreground" />
+            {t("settings.closeWindowBehavior")}
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            {CLOSE_WINDOW_BEHAVIOR_OPTIONS.map((behavior) => {
+              const selected = settings.closeWindowBehavior === behavior;
+              const isMinimize = behavior === "minimize";
+              return (
+                <button
+                  key={behavior}
+                  type="button"
+                  onClick={() =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      closeWindowBehavior: behavior,
+                    }))
+                  }
+                  className={`group relative flex h-full items-start gap-3 rounded-xl border px-3.5 py-3.5 text-left transition-all ${
+                    selected
+                      ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
+                      : "border-border/60 bg-background/80 hover:border-border hover:bg-muted/35"
+                  }`}
+                >
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                      selected
+                        ? "bg-primary/10 text-primary"
+                        : "bg-muted text-muted-foreground group-hover:bg-accent/80"
+                    }`}
+                  >
+                    {isMinimize ? (
+                      <Minimize2 className="h-4.5 w-4.5" />
+                    ) : (
+                      <LogOut className="h-4.5 w-4.5" />
+                    )}
+                  </div>
+                  <div className="min-w-0 pr-6">
+                    <div className="text-sm font-semibold">
+                      {isMinimize
+                        ? t("settings.closeWindowMinimize")
+                        : t("settings.closeWindowExit")}
+                    </div>
+                    <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                      {isMinimize
+                        ? t("settings.closeWindowMinimizeDesc")
+                        : t("settings.closeWindowExitDesc")}
+                    </div>
+                  </div>
+                  {selected ? (
+                    <div className="absolute right-3 top-3">
+                      <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="settings-font-card settings-system-card space-y-3 rounded-2xl border border-border/60 bg-card p-4">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
           <ScanText className="h-4 w-4 text-muted-foreground" />
           {t("settings.fontSize")}
@@ -552,7 +824,7 @@ export function SystemSettingsForm(props: SettingsSectionProps) {
           {fontScaleZones.map((zone) => (
             <div
               key={zone.key}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-background/80 px-3.5 py-2.5"
+              className="settings-font-zone flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-background/80 px-3.5 py-2.5"
             >
               <div className="text-sm font-medium text-foreground">{zone.label}</div>
               <div className="flex items-center gap-1 rounded-lg bg-muted/50 p-0.5">

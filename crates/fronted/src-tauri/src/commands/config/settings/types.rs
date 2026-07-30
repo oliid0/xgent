@@ -20,8 +20,13 @@ pub struct AccessSettingsPayload {
     pub web_ui_scope: String,
     #[serde(default = "default_web_ui_port")]
     pub web_ui_port: u16,
+    /// Last desktop Web UI endpoint opened by a native mobile client.
+    #[serde(default)]
+    pub lan_control_url: String,
     #[serde(default)]
     pub allow_terminal: bool,
+    #[serde(default)]
+    pub allow_browser_automation: bool,
     #[serde(default)]
     pub allow_ssh: bool,
     #[serde(default)]
@@ -36,9 +41,9 @@ pub struct AccessSettingsPayload {
     pub github_repository: String,
     #[serde(default = "default_cloud_artifact_retention_days")]
     pub cloud_artifact_retention_days: u16,
-    #[serde(default)]
+    #[serde(default = "default_mobile_execution_enabled")]
     pub android_proot_enabled: bool,
-    #[serde(default)]
+    #[serde(default = "default_mobile_execution_enabled")]
     pub ios_a_shell_enabled: bool,
 }
 

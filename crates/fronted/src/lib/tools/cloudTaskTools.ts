@@ -247,7 +247,7 @@ export function createCloudTaskTools(settings: AccessSettings, workdir: string):
         toolCallId: toolCall.id,
         toolName: toolCall.name,
         content: [{ type: "text", text: resultText(action, result) }],
-        details: { action, ...result },
+        details: { kind: "cloud_task_manager", action, ...result },
         isError: failed,
         timestamp: now,
       };

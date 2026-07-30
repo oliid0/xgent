@@ -127,6 +127,7 @@ export interface MentionComposerHandle {
   getDraft: () => MentionComposerDraft;
   hasContent: () => boolean;
   setText: (text: string) => void;
+  insertText: (text: string) => void;
   setDraft: (draft: MentionComposerDraft) => void;
   insertFileMention: (path: string, kind: "file" | "dir") => void;
   insertSkillMention: (skill: MentionComposerSkillMention) => void;
@@ -2594,6 +2595,16 @@ export const MentionComposer = memo(
             closeMentionSession();
             refreshEmptyState();
           }
+        },
+        insertText: (text: string) => {
+          const el = editorRef.current;
+          if (!el || !text) return;
+          finishTypewriter();
+          resetPromptHistoryRecall();
+          focusEditorAtSavedSelection();
+          insertNodeAtCursor(el, document.createTextNode(text));
+          closeMentionSession();
+          refreshEmptyState();
         },
         setDraft: (draft: MentionComposerDraft) => {
           const el = editorRef.current;

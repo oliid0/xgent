@@ -43,6 +43,15 @@ export type MobileToolchainInstallResult = {
   cancelled: boolean;
 };
 
+export type ExternalMobileWorkspace = {
+  id: string;
+  name: string;
+  path: string;
+  writable: boolean;
+  active: boolean;
+  detail?: string | null;
+};
+
 const PLUGIN_COMMAND = "plugin:mobile-execution|";
 
 export function mobileExecutionStatus() {
@@ -69,5 +78,15 @@ export function installMobileToolchains(toolchains: string[], runId: string) {
 export function cancelMobileExecution(runId: string) {
   return invoke<{ cancelled: boolean }>(`${PLUGIN_COMMAND}cancel`, {
     request: { runId },
+  });
+}
+
+export function listExternalMobileWorkspaces() {
+  return invoke<ExternalMobileWorkspace[]>(`${PLUGIN_COMMAND}list_external_workspaces`);
+}
+
+export function removeExternalMobileWorkspace(id: string) {
+  return invoke<{ removed: boolean }>(`${PLUGIN_COMMAND}remove_external_workspace`, {
+    request: { id },
   });
 }

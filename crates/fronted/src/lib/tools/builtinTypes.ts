@@ -15,7 +15,8 @@ export type BuiltinToolGroupId =
   | "mcp"
   | "subagent"
   | "memory"
-  | "cloud";
+  | "cloud"
+  | "browser";
 
 export type BuiltinToolDisplayCategory =
   | "file"
@@ -23,6 +24,7 @@ export type BuiltinToolDisplayCategory =
   | "terminal"
   | "system"
   | "mcp"
+  | "browser"
   | "other";
 
 export type BuiltinToolMetadata = {
@@ -374,6 +376,29 @@ export type TodoItem = {
 export type TodoWriteResultDetails = {
   kind: "todo_write";
   todos: TodoItem[];
+  verificationRequired?: boolean;
+};
+
+export type AskUserQuestionResultDetails = {
+  kind: "ask_user_question";
+  questions: Array<{
+    id: string;
+    header?: string;
+    prompt: string;
+    options: Array<{
+      label: string;
+      description?: string;
+      recommended?: boolean;
+    }>;
+  }>;
+  answers: Array<{
+    questionId: string;
+    prompt: string;
+    selectedLabel: string;
+    custom?: boolean;
+  }>;
+  cancelled?: boolean;
+  timedOut?: boolean;
 };
 
 export type BuiltinToolResultDetails =
@@ -395,4 +420,5 @@ export type BuiltinToolResultDetails =
   | GlobResultDetails
   | GrepResultDetails
   | TodoWriteResultDetails
+  | AskUserQuestionResultDetails
   | Record<string, unknown>;

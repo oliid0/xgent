@@ -14,13 +14,19 @@ fn default_cloud_artifact_retention_days() -> u16 {
     7
 }
 
+fn default_mobile_execution_enabled() -> bool {
+    true
+}
+
 impl Default for AccessSettingsPayload {
     fn default() -> Self {
         Self {
             web_ui_enabled: false,
             web_ui_scope: default_web_ui_scope(),
             web_ui_port: default_web_ui_port(),
+            lan_control_url: String::new(),
             allow_terminal: false,
+            allow_browser_automation: false,
             allow_ssh: false,
             allow_git: false,
             allow_file_write: false,
@@ -28,8 +34,8 @@ impl Default for AccessSettingsPayload {
             github_owner: String::new(),
             github_repository: default_github_repository(),
             cloud_artifact_retention_days: default_cloud_artifact_retention_days(),
-            android_proot_enabled: false,
-            ios_a_shell_enabled: false,
+            android_proot_enabled: default_mobile_execution_enabled(),
+            ios_a_shell_enabled: default_mobile_execution_enabled(),
         }
     }
 }
@@ -50,7 +56,9 @@ pub(crate) fn normalize_access_settings_payload(
         } else {
             payload.web_ui_port
         },
+        lan_control_url: payload.lan_control_url.trim().to_string(),
         allow_terminal: payload.allow_terminal,
+        allow_browser_automation: payload.allow_browser_automation,
         allow_ssh: payload.allow_ssh,
         allow_git: payload.allow_git,
         allow_file_write: payload.allow_file_write,

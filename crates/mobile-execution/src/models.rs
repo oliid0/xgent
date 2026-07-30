@@ -81,6 +81,40 @@ pub struct InstallToolchainsResponse {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ExternalWorkspace {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub writable: bool,
+    pub active: bool,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PickExternalWorkspaceRequest {
+    #[serde(default = "default_allow_write")]
+    pub allow_write: bool,
+}
+
+fn default_allow_write() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveExternalWorkspaceRequest {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveExternalWorkspaceResponse {
+    pub removed: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WasiInvocation {
     pub module_path: String,
     #[serde(default)]

@@ -611,6 +611,8 @@ export function createMcpManagerTools(params: {
   applyMcpOps?: (ops: McpSettingsOp[]) => void;
   runtimeScope: SystemToolRuntimeScope;
   resolveHomeDir?: () => Promise<string>;
+  /** Native mobile currently supports network MCP transports, not local stdio children. */
+  localStdioSupported?: boolean;
 }): BuiltinToolBundle {
   const pathResolver = new ToolPathResolver({
     workdir: params.workdir,
@@ -644,6 +646,17 @@ export function createMcpManagerTools(params: {
     return normalizeMcpSettings(params.getMcpSettings());
   }
 
+  function validateForRuntime(server: McpServerConfig, existing?: McpSettings): ValidationResult {
+    const validation = validateServer(server, existing);
+    if (params.localStdioSupported === false && server.transport === "stdio") {
+      validation.errors.push(
+        "Native mobile runtimes support MCP over HTTP/SSE; local stdio MCP requires a persistent process bridge and is unavailable.",
+      );
+      validation.ok = false;
+    }
+    return validation;
+  }
+
   function requireApplyOps() {
     if (!params.applyMcpOps) {
       throw new Error("McpManager cannot modify MCP settings in this runtime scope.");
@@ -671,7 +684,7 @@ export function createMcpManagerTools(params: {
     const applyOps = requireApplyOps();
     const existing = requireExistingServer(currentSettings(), serverId);
     const updated = normalizeMcpServerConfig({ ...existing, ...patch, id: existing.id });
-    const validation = validateServer(updated);
+    const validation = validateForRuntime(updated);
     if (!validation.ok) return { server: updated, validation, changed: false };
     applyOps([{ kind: "patch", serverId, patch }]);
     return { server: updated, validation, changed: true };
@@ -753,7 +766,7 @@ export function createMcpManagerTools(params: {
         "McpManager.server.cwd",
       );
       throwIfAborted(signal);
-      const validation = validateServer(server);
+      const validation = validateForRuntime(server);
       if (!validation.ok) {
         return {
           action,
@@ -829,7 +842,10 @@ export function createMcpManagerTools(params: {
       const server = args.server
         ? await resolveServerCwd(normalizeServerInput(args.server), "McpManager.server.cwd")
         : requireExistingServer(currentSettings(), requireServerId(args.server_id));
-      const validation = validateServer(server, args.server ? undefined : currentSettings());
+      const validation = validateForRuntime(
+        server,
+        args.server ? undefined : currentSettings(),
+      );
       return {
         action,
         serverId: server.id,
@@ -853,7 +869,10 @@ export function createMcpManagerTools(params: {
         ? await resolveServerCwd(normalizeServerInput(args.server), "McpManager.server.cwd")
         : requireExistingServer(currentSettings(), requireServerId(args.server_id));
       throwIfAborted(signal);
-      const validation = validateServer(server, hasInlineServer ? undefined : currentSettings());
+      const validation = validateForRuntime(
+        server,
+        hasInlineServer ? undefined : currentSettings(),
+      );
       let runtime: McpRuntimeStatus | null = null;
       if (!hasInlineServer) {
         runtime = await runtimeStatus(server.id).catch((err) => ({

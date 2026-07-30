@@ -3194,7 +3194,9 @@ dependencies = [
  "sha2 0.11.0",
  "tauri",
  "tauri-build",
+ "tauri-plugin-browser-automation",
  "tauri-plugin-mcp-bridge",
+ "tauri-plugin-mobile-assistant",
  "tauri-plugin-mobile-execution",
  "tauri-plugin-opener",
  "tauri-plugin-updater",
@@ -6334,6 +6336,28 @@ dependencies = [
  "webview2-com",
  "windows 0.61.3",
  "windows-core 0.61.2",
+]
+
+[[package]]
+name = "tauri-plugin-browser-automation"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
+ "url",
+]
+
+[[package]]
+name = "tauri-plugin-mobile-assistant"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

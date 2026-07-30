@@ -1,7 +1,59 @@
+import type { ReactNode } from "react";
+
 export {
   ConfirmActionPopover,
   ConfirmDeletePopover,
 } from "../../components/ui/confirm-action-popover";
+
+export function SettingsRowGroup(props: {
+  title: string;
+  children: ReactNode;
+  tone?: "default" | "danger";
+}) {
+  return (
+    <section className="settings-row-section mb-7">
+      <h3
+        className={`mb-2 px-1 text-xs font-semibold uppercase tracking-wide ${
+          props.tone === "danger" ? "text-destructive" : "text-muted-foreground"
+        }`}
+      >
+        {props.title}
+      </h3>
+      <div
+        className={`settings-row-group divide-y overflow-hidden rounded-xl border text-sm ${
+          props.tone === "danger" ? "border-destructive/30" : "border-border/70"
+        }`}
+      >
+        {props.children}
+      </div>
+    </section>
+  );
+}
+
+export function SettingsRow(props: {
+  label: string;
+  description?: string;
+  children: ReactNode;
+  align?: "center" | "start";
+}) {
+  return (
+    <div
+      className={`settings-row flex min-h-14 gap-4 px-4 py-3 ${
+        props.align === "start" ? "items-start" : "items-center"
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="font-medium text-foreground">{props.label}</div>
+        {props.description ? (
+          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{props.description}</p>
+        ) : null}
+      </div>
+      <div className="settings-row-control flex shrink-0 items-center justify-end">
+        {props.children}
+      </div>
+    </div>
+  );
+}
 
 export function PromptTag({ label, muted = false }: { label: string; muted?: boolean }) {
   return (

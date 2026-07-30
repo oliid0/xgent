@@ -2386,6 +2386,322 @@
 }
 
 /*
+ * Compact settings presentation shared by the Android/iOS shells and narrow
+ * WebUI controllers. Semantic component classes keep one responsive settings
+ * implementation across desktop, web, and mobile.
+ */
+@media (max-width: 720px) {
+  .settings-mobile-home,
+  .settings-mobile-detail {
+    background:
+      radial-gradient(circle at 100% 0%, hsl(var(--primary) / 0.055), transparent 34%),
+      hsl(var(--muted) / 0.22);
+  }
+
+  .settings-mobile-detail [data-settings-section] {
+    padding: 10px 12px calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .settings-mobile-detail .settings-section-shell {
+    width: 100%;
+    max-width: 680px;
+    margin-inline: auto;
+  }
+
+  .settings-system-form[data-compact="true"] {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-group-heading {
+    padding-inline: 4px;
+    color: hsl(var(--muted-foreground));
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-execution-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid hsl(var(--border) / 0.55);
+    border-radius: 16px;
+    background: hsl(var(--card) / 0.82);
+    box-shadow:
+      inset 0 1px 0 hsl(var(--background) / 0.8),
+      0 10px 28px -26px hsl(var(--foreground) / 0.45);
+  }
+
+  .settings-system-form[data-compact="true"] .settings-execution-choice {
+    min-height: 68px;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    border-width: 0;
+    border-radius: 0;
+    padding: 10px 44px 10px 12px;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-execution-choice + .settings-execution-choice {
+    border-top: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  .settings-system-form[data-compact="true"] .settings-execution-choice[class*="bg-primary"] {
+    background: hsl(var(--primary) / 0.07);
+  }
+
+  .settings-system-form[data-compact="true"] .settings-execution-choice > div:first-child {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-execution-choice > div:nth-child(2) {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-execution-choice > div:nth-child(2) > div:last-child {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-height: 1.35;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-system-divider {
+    display: none;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-appearance-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-system-card {
+    border-color: hsl(var(--border) / 0.55);
+    border-radius: 16px;
+    padding: 12px;
+    background: hsl(var(--card) / 0.82);
+    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.75);
+  }
+
+  .settings-system-form[data-compact="true"] .settings-theme-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-theme-grid .settings-choice-card {
+    min-height: 74px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 4px;
+    text-align: center;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-theme-grid .settings-choice-card > div:first-child {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-theme-grid .settings-choice-card > div:nth-child(2) {
+    padding-right: 0;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-theme-grid .settings-choice-card > div:last-child {
+    top: 6px;
+    right: 6px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-locale-grid {
+    gap: 7px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-locale-grid .settings-choice-card {
+    min-height: 58px;
+    padding: 9px 10px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-proxy-card {
+    padding-block: 13px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-proxy-disclosure {
+    min-height: 36px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-proxy-details {
+    padding-top: 4px;
+    border-top: 1px solid hsl(var(--border) / 0.45);
+  }
+
+  .settings-system-form[data-compact="true"] .settings-proxy-details input,
+  .settings-system-form[data-compact="true"] .settings-proxy-details button[role="combobox"] {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-font-zone {
+    align-items: stretch;
+    gap: 8px;
+    border-color: hsl(var(--border) / 0.45);
+    padding: 10px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-font-zone > div:last-child {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+  }
+
+  .settings-system-form[data-compact="true"] .settings-font-zone button {
+    min-width: 0;
+    padding: 7px 2px;
+    line-height: 1.2;
+  }
+
+  .settings-access-section,
+  .settings-mobile-execution-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .settings-access-section .settings-access-card,
+  .settings-mobile-execution-card {
+    border-color: hsl(var(--border) / 0.55);
+    border-radius: 16px;
+    padding: 13px;
+    background: hsl(var(--card) / 0.84);
+    box-shadow:
+      inset 0 1px 0 hsl(var(--background) / 0.74),
+      0 10px 28px -26px hsl(var(--foreground) / 0.4);
+  }
+
+  .settings-access-section input:not([type="checkbox"]),
+  .settings-access-section select,
+  .settings-mobile-execution-card input:not([type="checkbox"]),
+  .settings-mobile-execution-card button:not([role="switch"]) {
+    min-height: 44px;
+  }
+
+  .settings-access-section .settings-cloud-details {
+    padding-top: 12px;
+    border-top: 1px solid hsl(var(--border) / 0.45);
+  }
+
+  .settings-access-section .settings-cloud-vault {
+    padding: 12px;
+  }
+
+  .settings-mobile-execution-card > div:first-child {
+    min-height: 44px;
+  }
+
+  .settings-mobile-execution-card label {
+    min-height: 58px;
+    border-radius: 13px;
+    background: hsl(var(--background) / 0.58);
+  }
+
+  .settings-mobile-detail [data-settings-section="providers"] {
+    padding-inline: 0;
+  }
+
+  .settings-mobile-detail [data-settings-section="providers"] .settings-section-shell {
+    max-width: none;
+  }
+
+  .providers-tabbar-row {
+    gap: 6px;
+    margin: 0;
+    padding: 8px 12px;
+    border-bottom: 1px solid hsl(var(--border) / 0.4);
+    background: hsl(var(--background) / 0.76);
+  }
+
+  .providers-tabbar {
+    min-width: 0;
+    flex: 1;
+    height: 38px;
+    border-radius: 11px;
+  }
+
+  .providers-tabbar > button {
+    min-width: 0;
+    flex: 1;
+    gap: 4px;
+    padding-inline: 5px;
+    font-size: 12px;
+  }
+
+  .providers-pages {
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .provider-list {
+    gap: 10px;
+  }
+
+  .provider-list-header {
+    min-height: 40px;
+    padding-inline: 2px;
+  }
+
+  .provider-list-actions > button {
+    min-height: 40px;
+  }
+
+  .provider-list-scroll {
+    padding-right: 0;
+    overscroll-behavior: contain;
+  }
+
+  .provider-list-card {
+    min-height: 64px;
+    gap: 11px;
+    border-color: hsl(var(--border) / 0.5);
+    border-radius: 16px;
+    padding: 10px 8px 10px 13px;
+    background: hsl(var(--card) / 0.84);
+    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.72);
+  }
+
+  .provider-list-card > div:first-child {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: hsl(var(--muted) / 0.72);
+  }
+
+  .provider-list-card-actions {
+    opacity: 1;
+  }
+
+  .provider-list-card-actions button {
+    width: 38px;
+    height: 38px;
+  }
+
+  .settings-mobile-detail input,
+  .settings-mobile-detail textarea {
+    font-size: 16px;
+  }
+}
+
+/*
  * Streamdown mermaid / table fullscreen fix — macOS WebKit (Tauri WKWebView)
  *
  * The streamdown library creates fullscreen overlays via createPortal to

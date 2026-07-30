@@ -17,7 +17,18 @@ import { useLocale } from "../../../i18n";
 import type { RightDockFileTreeStatePatch } from "../../../lib/settings";
 import { cn } from "../../../lib/shared/utils";
 import { getFileTypeIcon } from "../../chat/fileTypeIcons";
-import { Check, FolderOpen, Loader2, RefreshCw, Search, Trash2, X } from "../../icons";
+import {
+  Check,
+  Edit3,
+  FolderClosed,
+  FolderOpen,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  X,
+} from "../../icons";
 import { Button } from "../../ui/button";
 import { useConfirmDialog } from "../../ui/confirm-dialog";
 import { Input } from "../../ui/input";
@@ -50,8 +61,8 @@ type ContextMenuState = {
   path: string;
 };
 
-export function FileTreePanel(props: { active: boolean }) {
-  const { active } = props;
+export function FileTreePanel(props: { active: boolean; touchActions?: boolean }) {
+  const { active, touchActions = false } = props;
   const context = useRightDockToolContext();
   const { projectPathKey, cwd, fileTree } = context;
   const syncState = fileTree.state;
@@ -470,6 +481,51 @@ export function FileTreePanel(props: { active: boolean }) {
           <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
+
+      {touchActions ? (
+        <div className="grid shrink-0 grid-cols-4 gap-1 border-b border-border/60 px-2 py-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-9 gap-1.5 rounded-lg px-1 text-[11px] font-normal"
+            disabled={!canMutate || busyAction}
+            onClick={() => startAction("file", selectedPath)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span className="truncate">{t("projectTools.fileTree.newFile")}</span>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-9 gap-1.5 rounded-lg px-1 text-[11px] font-normal"
+            disabled={!canMutate || busyAction}
+            onClick={() => startAction("folder", selectedPath)}
+          >
+            <FolderClosed className="h-3.5 w-3.5" />
+            <span className="truncate">{t("projectTools.fileTree.newFolder")}</span>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-9 gap-1.5 rounded-lg px-1 text-[11px] font-normal"
+            disabled={!canMutate || !selectedPath || busyAction}
+            onClick={() => startAction("rename", selectedPath)}
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            <span className="truncate">{t("projectTools.fileTree.rename")}</span>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-9 gap-1.5 rounded-lg px-1 text-[11px] font-normal text-destructive hover:bg-destructive/10 hover:text-destructive"
+            disabled={!canMutate || !selectedPath || busyAction}
+            onClick={() => void deletePath(selectedPath)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span className="truncate">{t("projectTools.fileTree.delete")}</span>
+          </Button>
+        </div>
+      ) : null}
 
       {pendingAction ? (
         <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-3 py-2">

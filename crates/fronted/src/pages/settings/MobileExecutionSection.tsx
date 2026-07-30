@@ -1,13 +1,16 @@
 import { invoke, isBrowserRuntime } from "@xagent/runtime";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, RefreshCw, Terminal, X } from "../../components/icons";
+import { Check, FolderOpen, RefreshCw, Terminal, Trash2, X } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   cancelMobileExecution,
+  type ExternalMobileWorkspace,
   installMobileEnvironment,
   installMobileToolchains,
+  listExternalMobileWorkspaces,
   type MobileExecutionStatus,
   mobileExecutionStatus,
+  removeExternalMobileWorkspace,
 } from "../../lib/mobileExecution";
 import { normalizeRuntimePlatform, type RuntimePlatform } from "../../lib/runtimePlatform";
 import type { AppSettings } from "../../lib/settings";
@@ -47,6 +50,7 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
   const [platform, setPlatform] = useState<RuntimePlatform>();
   const [status, setStatus] = useState<MobileExecutionStatus>();
   const [selected, setSelected] = useState<string[]>([]);
+  const [externalWorkspaces, setExternalWorkspaces] = useState<ExternalMobileWorkspace[]>([]);
   const [busy, setBusy] = useState<"status" | "environment" | "toolchains" | "cancel" | "">("");
   const [activeRunId, setActiveRunId] = useState("");
   const [error, setError] = useState("");
@@ -60,8 +64,12 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
     setBusy((current) => current || "status");
     setError("");
     try {
-      const next = await mobileExecutionStatus();
+      const [next, mounted] = await Promise.all([
+        mobileExecutionStatus(),
+        listExternalMobileWorkspaces(),
+      ]);
       setStatus(next);
+      setExternalWorkspaces(mounted);
       setSelected((current) =>
         current.filter((id) =>
           next.toolchains.some(
@@ -159,8 +167,34 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
     }
   }
 
+  async function chooseExternalWorkspace() {
+    setBusy("environment");
+    setError("");
+    try {
+      await invoke<string | null>("system_pick_folder", { initial_workdir: null });
+      setExternalWorkspaces(await listExternalMobileWorkspaces());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function removeExternalWorkspace(id: string) {
+    setBusy("environment");
+    setError("");
+    try {
+      await removeExternalMobileWorkspace(id);
+      setExternalWorkspaces(await listExternalMobileWorkspaces());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy("");
+    }
+  }
+
   return (
-    <section className="space-y-4 rounded-xl border border-border/60 bg-card p-5">
+    <section className="settings-mobile-execution-card space-y-4 rounded-xl border border-border/60 bg-card p-5">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Terminal className="h-4 w-4 text-muted-foreground" />
@@ -299,6 +333,85 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
                   ) : null}
                 </div>
               ) : null}
+            </div>
+          ) : null}
+
+          {status?.capabilities.userSelectedWorkspaces ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-medium">
+                    {t("settings.mobileExternalWorkspaces")}
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {t("settings.mobileExternalWorkspacesHint")}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy !== ""}
+                  onClick={() => void chooseExternalWorkspace()}
+                  className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium active:bg-muted disabled:opacity-40"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  {t("settings.mobileMountFolder")}
+                </button>
+              </div>
+              {externalWorkspaces.length > 0 ? (
+                <div className="overflow-hidden rounded-xl border border-border/50">
+                  {externalWorkspaces.map((workspace, index) => (
+                    <div
+                      key={workspace.id}
+                      className={`flex min-h-14 items-center gap-3 px-3 py-2 ${
+                        index > 0 ? "border-t border-border/40" : ""
+                      }`}
+                    >
+                      <FolderOpen className="h-4 w-4 shrink-0 text-blue-500" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span
+                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                              workspace.active ? "bg-emerald-500" : "bg-amber-500"
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <div className="truncate text-xs font-medium">{workspace.name}</div>
+                        </div>
+                        <div className="truncate font-mono text-[10px] text-muted-foreground">
+                          {workspace.path}
+                        </div>
+                        {workspace.detail ? (
+                          <div
+                            className={`mt-0.5 text-[10px] ${
+                              workspace.active ? "text-muted-foreground" : "text-amber-600"
+                            }`}
+                          >
+                            {workspace.detail}
+                          </div>
+                        ) : null}
+                      </div>
+                      <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">
+                        {workspace.writable
+                          ? t("settings.mobileReadWrite")
+                          : t("settings.mobileReadOnly")}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={busy !== ""}
+                        onClick={() => void removeExternalWorkspace(workspace.id)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground active:bg-destructive/10 active:text-destructive disabled:opacity-40"
+                        aria-label={t("settings.delete")}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+                  {t("settings.mobileNoExternalWorkspaces")}
+                </div>
+              )}
             </div>
           ) : null}
         </>

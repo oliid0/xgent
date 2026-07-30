@@ -37,6 +37,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::status,
             commands::install,
             commands::install_toolchains,
+            commands::list_external_workspaces,
+            commands::pick_external_workspace,
+            commands::remove_external_workspace,
             commands::run,
             commands::cancel
         ])

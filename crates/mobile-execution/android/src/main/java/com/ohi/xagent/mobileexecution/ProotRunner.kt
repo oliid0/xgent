@@ -54,14 +54,13 @@ internal class ProotRunner(
     nativeRuntimeDir: File,
     private val rootfsDir: File,
     private val tempDir: File,
-    allowedHostRoot: File,
+    private val allowedHostRoots: () -> List<File>,
     private val activeProcesses: ConcurrentHashMap<String, Process>,
     private val cancelledRuns: MutableSet<String>,
 ) {
     private val nativeLibraryDir = nativeLibraryDir.canonicalFile
     private val binaries = ProotBinaries.resolve(nativeLibraryDir)
     private val nativeRuntimeDir = nativeRuntimeDir.canonicalFile
-    private val allowedHostRoot = allowedHostRoot.canonicalFile
 
     fun execute(request: AndroidRunRequest): AndroidRunResult {
         require(binaries.available) { "PRoot binaries are unavailable for this Android ABI" }
@@ -70,8 +69,8 @@ internal class ProotRunner(
 
         val workdir = File(request.workdir).canonicalFile
         require(workdir.isDirectory) { "workdir must be an existing directory" }
-        require(workdir.isWithin(allowedHostRoot)) {
-            "workdir must be inside the XAgent application sandbox"
+        require(isAllowedHostPath(workdir)) {
+            "workdir must be inside XAgent storage or a mounted external workspace"
         }
         val resolvedCwd = resolveCwd(request.cwd, workdir)
 
@@ -232,8 +231,8 @@ internal class ProotRunner(
         if (value.startsWith('/')) {
             val target = File(value).canonicalFile
             require(target.isDirectory) { "cwd must be an existing directory" }
-            require(target.isWithin(allowedHostRoot)) {
-                "absolute cwd must be inside the XAgent application sandbox"
+            require(isAllowedHostPath(target)) {
+                "absolute cwd must be inside XAgent storage or a mounted external workspace"
             }
             if (target.isWithin(workdir)) {
                 val relative = workdir.toPath().relativize(target.toPath()).toString()
@@ -251,6 +250,13 @@ internal class ProotRunner(
         }
         val guest = if (relative.isEmpty()) WORKSPACE_PATH else "$WORKSPACE_PATH/$relative"
         return ResolvedCwd(guestPath = guest, externalBind = null)
+    }
+
+    private fun isAllowedHostPath(path: File): Boolean {
+        val canonical = path.canonicalFile
+        return allowedHostRoots().any { root ->
+            runCatching { canonical.isWithin(root.canonicalFile) }.getOrDefault(false)
+        }
     }
 
     private fun normalizeRelativeCwd(raw: String): String {

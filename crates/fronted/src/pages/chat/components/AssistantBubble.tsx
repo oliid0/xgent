@@ -1,8 +1,10 @@
 import { memo, useMemo } from "react";
 
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
+import { CloudArtifactsCard } from "../../../components/chat/CloudArtifactsCard";
 import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
 import { collectChangedFiles } from "../../../lib/chat/messages/changedFiles";
+import { collectCloudArtifacts } from "../../../lib/chat/messages/cloudArtifacts";
 import type { UiRound } from "../../../lib/chat/messages/uiMessages";
 
 import { AssistantAvatar } from "./assistant-bubble/AssistantAvatar";
@@ -58,6 +60,10 @@ export const AssistantBubble = memo(function AssistantBubble(props: {
     () => (isLive ? null : collectChangedFiles(rounds)),
     [isLive, rounds],
   );
+  const cloudArtifacts = useMemo(
+    () => (isLive ? [] : collectCloudArtifacts(rounds)),
+    [isLive, rounds],
+  );
 
   return (
     <div className="flex w-full max-w-full items-start gap-3">
@@ -81,6 +87,7 @@ export const AssistantBubble = memo(function AssistantBubble(props: {
           />
         ))}
         {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
+        {cloudArtifacts.length > 0 ? <CloudArtifactsCard artifacts={cloudArtifacts} /> : null}
       </div>
     </div>
   );

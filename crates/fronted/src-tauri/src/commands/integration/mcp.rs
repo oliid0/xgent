@@ -1327,6 +1327,13 @@ fn validate_runtime_config(cfg: &McpServerConfig) -> Result<(), String> {
         return Err("MCP server name cannot be empty".to_string());
     }
 
+    #[cfg(mobile)]
+    if !matches!(cfg.transport(), "http" | "sse") {
+        return Err(format!(
+            "MCP server({id}) cannot use local stdio on native mobile; configure an HTTP or SSE endpoint"
+        ));
+    }
+
     match cfg.transport() {
         "http" | "sse" => {
             let u = cfg.url_trimmed().unwrap_or("");

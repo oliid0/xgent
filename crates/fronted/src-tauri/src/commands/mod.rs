@@ -34,7 +34,6 @@ pub use history_commands::subagent_store;
 pub use integration_commands::cloud;
 #[cfg(desktop)]
 pub use integration_commands::local_access;
-#[cfg(desktop)]
 pub use integration_commands::mcp;
 pub use integration_commands::memory;
 
