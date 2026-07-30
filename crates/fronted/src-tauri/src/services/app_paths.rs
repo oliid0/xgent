@@ -5,7 +5,6 @@ use std::sync::OnceLock;
 const APP_ROOT_NAME: &str = ".xgent";
 const DATA_DIR_NAME: &str = "data";
 const WEBVIEW_PROFILE_DIR_NAME: &str = "EBWebView";
-const LEGACY_WEBVIEW_PARENT_DIR_NAME: &str = "ebwebview";
 const LEGACY_APP_IDENTIFIERS: &[&str] = &["com.ohi.xagent", "com.ohi.agent"];
 
 static APP_ROOT: OnceLock<PathBuf> = OnceLock::new();
@@ -38,41 +37,9 @@ pub fn initialize_desktop() -> Result<Vec<String>, String> {
     let mut warnings = Vec::new();
     let data_dir = root.join(DATA_DIR_NAME);
     let webview_profile_dir = root.join(WEBVIEW_PROFILE_DIR_NAME);
-    let legacy_webview_parent = root.join(LEGACY_WEBVIEW_PARENT_DIR_NAME);
     let home = dirs::home_dir()
         .ok_or_else(|| "Failed to locate the user home directory".to_string())?;
     migrate_directory(&home.join(".xagent"), &data_dir, &mut warnings);
-
-    // An earlier unified-path implementation passed `.xgent/ebwebview` as
-    // WebView2's UDF root. WebView2 then appended its own `EBWebView` profile
-    // directory. Lift that profile into the real UDF root and remove the
-    // redundant parent without discarding any collision data.
-    let legacy_nested_profile = legacy_webview_parent.join(WEBVIEW_PROFILE_DIR_NAME);
-    let nested_destination = if paths_refer_to_same_entry(
-        &legacy_webview_parent,
-        &webview_profile_dir,
-    ) {
-        legacy_webview_parent.clone()
-    } else {
-        webview_profile_dir.clone()
-    };
-    migrate_directory(
-        &legacy_nested_profile,
-        &nested_destination,
-        &mut warnings,
-    );
-    if !paths_refer_to_same_entry(&legacy_webview_parent, &webview_profile_dir) {
-        migrate_directory(
-            &legacy_webview_parent,
-            &webview_profile_dir,
-            &mut warnings,
-        );
-    }
-    normalize_windows_directory_case(
-        &legacy_webview_parent,
-        &webview_profile_dir,
-        &mut warnings,
-    );
 
     if let Some(roaming) = dirs::data_dir() {
         for identifier in LEGACY_APP_IDENTIFIERS {
@@ -114,8 +81,7 @@ pub fn app_storage_dir() -> Result<PathBuf, String> {
 }
 
 /// WebView2 receives the unified application root as its UDF root and creates
-/// the standard `EBWebView` profile directly below it. Passing an already
-/// suffixed directory would produce a redundant `ebwebview/EBWebView` layer.
+/// the standard `EBWebView` profile directly below it.
 pub fn webview_user_data_root() -> Result<PathBuf, String> {
     let root = app_root_dir()?;
     fs::create_dir_all(&root)
@@ -161,49 +127,6 @@ fn paths_refer_to_same_entry(left: &Path, right: &Path) -> bool {
         (Ok(left), Ok(right)) => left == right,
         _ => false,
     }
-}
-
-#[cfg(target_os = "windows")]
-fn normalize_windows_directory_case(source: &Path, destination: &Path, warnings: &mut Vec<String>) {
-    if !source.exists() || source == destination || !paths_refer_to_same_entry(source, destination) {
-        return;
-    }
-    let actual_name = fs::canonicalize(source)
-        .ok()
-        .and_then(|path| path.file_name().map(|name| name.to_os_string()));
-    if actual_name.as_deref() == destination.file_name() {
-        return;
-    }
-    let Some(parent) = destination.parent() else {
-        return;
-    };
-    let Some(temp) = (1..=10_000)
-        .map(|index| parent.join(format!(".xgent-webview-migration-{index}")))
-        .find(|candidate| !candidate.exists())
-    else {
-        warnings.push("Could not allocate a temporary WebView2 migration directory".to_string());
-        return;
-    };
-    if let Err(error) = fs::rename(source, &temp) {
-        warnings.push(format!(
-            "Could not normalize the WebView2 profile directory name: {error}"
-        ));
-        return;
-    }
-    if let Err(error) = fs::rename(&temp, destination) {
-        let _ = fs::rename(&temp, source);
-        warnings.push(format!(
-            "Could not finish normalizing the WebView2 profile directory name: {error}"
-        ));
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn normalize_windows_directory_case(
-    _source: &Path,
-    _destination: &Path,
-    _warnings: &mut Vec<String>,
-) {
 }
 
 fn merge_directory(source: &Path, destination: &Path) -> Result<(), String> {
@@ -324,7 +247,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_webview_contents_move_without_an_extra_ebwebview_layer() {
+    fn legacy_webview_contents_move_directly_into_the_profile() {
         let temp = tempfile::tempdir().expect("temp dir");
         let legacy_app_dir = temp.path().join("com.ohi.xagent");
         let legacy_webview_dir = legacy_app_dir.join("EBWebView");
@@ -343,24 +266,5 @@ mod tests {
         );
         assert!(!destination.join("EBWebView").exists());
         assert!(!legacy_app_dir.exists());
-    }
-
-    #[test]
-    fn redundant_webview_profile_layer_is_lifted_into_its_parent() {
-        let temp = tempfile::tempdir().expect("temp dir");
-        let misspelled_parent = temp.path().join(".xgent/ebwebview");
-        let redundant_profile = misspelled_parent.join("EBWebView");
-        fs::create_dir_all(&redundant_profile).expect("create redundant profile");
-        fs::write(redundant_profile.join("Preferences"), "profile")
-            .expect("write profile preference");
-
-        merge_directory(&redundant_profile, &misspelled_parent).expect("lift profile");
-
-        assert_eq!(
-            fs::read_to_string(misspelled_parent.join("Preferences"))
-                .expect("read lifted preference"),
-            "profile"
-        );
-        assert!(!redundant_profile.exists());
     }
 }
