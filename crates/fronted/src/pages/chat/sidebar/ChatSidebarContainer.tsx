@@ -10,7 +10,6 @@ import { useLocale } from "../../../i18n";
 import type { AppUpdateController } from "../../../lib/appUpdates";
 import { normalizeConversationTitle } from "../../../lib/chat/page/chatPageHelpers";
 import type { WorkspaceProject } from "../../../lib/settings";
-import type { TerminalShellOption } from "../../../lib/terminal/types";
 import {
   selectConversations,
   selectListState,
@@ -21,6 +20,7 @@ import {
 import type { SidebarSnapshot, SidebarStore } from "../../../lib/sidebar/store";
 import type { SidebarConversation } from "../../../lib/sidebar/types";
 import { useSidebarSelector } from "../../../lib/sidebar/useSidebarSelector";
+import type { TerminalShellOption } from "../../../lib/terminal/types";
 import { sortWorkspaceProjectsByActivity } from "../../../lib/workspaceProjects";
 
 type ChatSidebarContainerProps = {

@@ -45,8 +45,8 @@ import {
   expandedPathsForFileTreePath,
   formatTerminalSessionTitle,
   type RightDockSingletonTabKind,
-  type WorkspaceToolLaunchRequest,
   rightDockTabRequiresProject,
+  type WorkspaceToolLaunchRequest,
 } from "./rightDockModel";
 import { useRightDockPanelWidth } from "./useRightDockPanelWidth";
 import { useRightDockProjectTabs } from "./useRightDockProjectTabs";
@@ -605,13 +605,7 @@ export const RightDockPanel = memo(function RightDockPanel(props: RightDockPanel
         break;
     }
     onLaunchRequestHandled?.(launchRequest.nonce);
-  }, [
-    createTerminal,
-    launchRequest,
-    onLaunchRequestHandled,
-    openBackgroundTasks,
-    startToolTab,
-  ]);
+  }, [createTerminal, launchRequest, onLaunchRequestHandled, openBackgroundTasks, startToolTab]);
 
   const setFileTreeInitialized = useCallback(
     (initialized: boolean) => {

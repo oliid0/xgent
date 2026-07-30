@@ -104,7 +104,9 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
   const [proxyPortDraft, setProxyPortDraft] = useState<string | null>(null);
   const [proxyUsernameDraft, setProxyUsernameDraft] = useState<string | null>(null);
   const [proxyPasswordDraft, setProxyPasswordDraft] = useState<string | null>(null);
-  const [proxyDetailsOpen, setProxyDetailsOpen] = useState(() => settings.system.systemProxy.enabled);
+  const [proxyDetailsOpen, setProxyDetailsOpen] = useState(
+    () => settings.system.systemProxy.enabled,
+  );
   // 护栏 A：host + port 有效才算配置可用（端口在启用时必填有效）。
   // 用"草稿优先"的生效值计算：blur 提交前开关若仍禁用，点击开关触发的 blur
   // 会先把按钮变回可用，但落在禁用按钮上的这次 click 已被浏览器吞掉，需点两次。
@@ -174,9 +176,7 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
             <Select
               value={executionMode}
               onValueChange={(value) =>
-                setSettings((prev) =>
-                  updateSystem(prev, { executionMode: value as ExecutionMode }),
-                )
+                setSettings((prev) => updateSystem(prev, { executionMode: value as ExecutionMode }))
               }
             >
               <SelectTrigger className="w-52">
@@ -195,9 +195,7 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
           <SettingsRow label={t("settings.appearance")}>
             <Select
               value={settings.theme}
-              onValueChange={(value) =>
-                setSettings((prev) => ({ ...prev, theme: value as Theme }))
-              }
+              onValueChange={(value) => setSettings((prev) => ({ ...prev, theme: value as Theme }))}
             >
               <SelectTrigger className="w-44">
                 <SelectValue />
@@ -262,9 +260,7 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
           <SettingsRow
             label={t("settings.systemProxy")}
             description={
-              systemProxyInvalid
-                ? t("settings.systemProxyInvalid")
-                : t("settings.systemProxyDesc")
+              systemProxyInvalid ? t("settings.systemProxyInvalid") : t("settings.systemProxyDesc")
             }
           >
             <AgentActivationSwitch
@@ -279,9 +275,7 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
               <SettingsRow label={t("settings.systemProxyType")}>
                 <Select
                   value={systemProxy.type}
-                  onValueChange={(value) =>
-                    patchSystemProxy({ type: value as SystemProxyType })
-                  }
+                  onValueChange={(value) => patchSystemProxy({ type: value as SystemProxyType })}
                 >
                   <SelectTrigger className="w-44">
                     <SelectValue />

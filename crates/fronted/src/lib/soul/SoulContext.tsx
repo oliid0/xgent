@@ -12,9 +12,9 @@ import {
 import {
   DEFAULT_SOUL_METADATA,
   parseSoulDocument,
-  serializeSoulDocument,
   type SoulDocument,
   type SoulDraft,
+  serializeSoulDocument,
   validateSoulDraft,
 } from "./model";
 
@@ -53,8 +53,7 @@ function parseLibrary(response: SoulLibraryResponse) {
   const presets = response.presets.map((preset) =>
     parseSoulDocument(preset.content, preset.path, preset.id),
   );
-  const document =
-    presets.find((preset) => preset.id === response.activeId) ?? presets[0] ?? null;
+  const document = presets.find((preset) => preset.id === response.activeId) ?? presets[0] ?? null;
   return {
     presets,
     document,
@@ -215,19 +214,7 @@ export function SoulProvider(props: { children: ReactNode }) {
       select,
       remove,
     }),
-    [
-      activeId,
-      create,
-      document,
-      error,
-      loading,
-      presets,
-      reload,
-      remove,
-      save,
-      saving,
-      select,
-    ],
+    [activeId, create, document, error, loading, presets, reload, remove, save, saving, select],
   );
   return <SoulContext.Provider value={value}>{props.children}</SoulContext.Provider>;
 }

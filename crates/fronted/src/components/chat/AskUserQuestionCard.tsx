@@ -11,9 +11,7 @@ import { cn } from "../../lib/shared/utils";
 import { Check, Sparkles } from "../icons";
 
 type SubmitOutcome = { ok: boolean; message?: string };
-type DraftAnswer =
-  | { kind: "option"; value: string }
-  | { kind: "custom"; value: string };
+type DraftAnswer = { kind: "option"; value: string } | { kind: "custom"; value: string };
 
 function formatRemaining(milliseconds: number) {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
@@ -103,9 +101,7 @@ export function AskUserQuestionCard({
       const outcome = await onSubmit(payload);
       if (!outcome.ok) setError(outcome.message || t("chat.askUser.submitFailed"));
     } catch (submitError) {
-      setError(
-        submitError instanceof Error ? submitError.message : t("chat.askUser.submitFailed"),
-      );
+      setError(submitError instanceof Error ? submitError.message : t("chat.askUser.submitFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -224,9 +220,7 @@ export function AskUserQuestionCard({
                   maxLength={ASK_USER_QUESTION_CUSTOM_MAX_LENGTH}
                   placeholder={t("chat.askUser.otherPlaceholder")}
                   onClick={(event) => event.stopPropagation()}
-                  onChange={(event) =>
-                    choose({ kind: "custom", value: event.currentTarget.value })
-                  }
+                  onChange={(event) => choose({ kind: "custom", value: event.currentTarget.value })}
                   onKeyDown={(event) => {
                     event.stopPropagation();
                     if (event.key === "Enter" && allAnswered) void submit();

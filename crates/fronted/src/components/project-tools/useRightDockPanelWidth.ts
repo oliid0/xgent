@@ -33,8 +33,7 @@ function getFallbackMaxPanelWidth() {
 function getDynamicMaxPanelWidth(panel: HTMLElement | null, placement: "left" | "right") {
   if (!panel) return getFallbackMaxPanelWidth();
   const parent = panel.parentElement;
-  const sibling =
-    placement === "left" ? panel.nextElementSibling : panel.previousElementSibling;
+  const sibling = placement === "left" ? panel.nextElementSibling : panel.previousElementSibling;
   const parentRect = parent?.getBoundingClientRect();
   const panelRect = panel.getBoundingClientRect();
   const siblingRect = sibling instanceof HTMLElement ? sibling.getBoundingClientRect() : null;

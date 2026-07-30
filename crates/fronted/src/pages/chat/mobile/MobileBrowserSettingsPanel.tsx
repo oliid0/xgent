@@ -1,7 +1,10 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { ArrowLeft, Globe, Loader2, Shield, Trash2 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
-import { browserSessionController, normalizeBrowserAddress } from "../../../lib/browser/browserSessionController";
+import {
+  browserSessionController,
+  normalizeBrowserAddress,
+} from "../../../lib/browser/browserSessionController";
 import {
   type AppSettings,
   updateAccessSettings,
@@ -103,9 +106,7 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
               checked={props.settings.access.allowBrowserAutomation}
               label={t("settings.accessAllowBrowserAutomation")}
               onChange={(allowBrowserAutomation) =>
-                props.setSettings((prev) =>
-                  updateAccessSettings(prev, { allowBrowserAutomation }),
-                )
+                props.setSettings((prev) => updateAccessSettings(prev, { allowBrowserAutomation }))
               }
             />
           </div>

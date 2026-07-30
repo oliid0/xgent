@@ -8,20 +8,12 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import {
-  ArrowLeft,
-  Globe,
-  Loader2,
-  Lock,
-  Plus,
-  RefreshCw,
-  X,
-} from "../../../components/icons";
+import { ArrowLeft, Globe, Loader2, Lock, Plus, RefreshCw, X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import {
+  browserSessionController,
   HIDDEN_BROWSER_VIEWPORT,
   MAX_BROWSER_SESSIONS,
-  browserSessionController,
   normalizeBrowserAddress,
 } from "../../../lib/browser/browserSessionController";
 import { cn } from "../../../lib/shared/utils";
@@ -116,9 +108,7 @@ function BrowserAddressBar() {
   const active = snapshot.sessions.find(
     (session) => session.sessionId === snapshot.activeSessionId,
   );
-  const busy = Boolean(
-    active && snapshot.busySessionIds.includes(active.sessionId),
-  );
+  const busy = Boolean(active && snapshot.busySessionIds.includes(active.sessionId));
   const [value, setValue] = useState(active?.url ?? "");
 
   useEffect(() => {
@@ -145,11 +135,7 @@ function BrowserAddressBar() {
         disabled={!active || busy}
         onClick={() =>
           active &&
-          void browserSessionController.action(
-            "go_back",
-            {},
-            { sessionId: active.sessionId },
-          )
+          void browserSessionController.action("go_back", {}, { sessionId: active.sessionId })
         }
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-35"
         aria-label={t("browser.back")}
@@ -161,11 +147,7 @@ function BrowserAddressBar() {
         disabled={!active || busy}
         onClick={() =>
           active &&
-          void browserSessionController.action(
-            "go_forward",
-            {},
-            { sessionId: active.sessionId },
-          )
+          void browserSessionController.action("go_forward", {}, { sessionId: active.sessionId })
         }
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-35"
         aria-label={t("browser.forward")}
@@ -194,11 +176,7 @@ function BrowserAddressBar() {
         disabled={!active || busy}
         onClick={() =>
           active &&
-          void browserSessionController.action(
-            "reload",
-            {},
-            { sessionId: active.sessionId },
-          )
+          void browserSessionController.action("reload", {}, { sessionId: active.sessionId })
         }
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-35"
         aria-label={t("browser.reload")}

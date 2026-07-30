@@ -52,9 +52,7 @@ export function ensureAskUserQuestionDeadlineAt(toolCallId: string) {
 
 export function getAskUserQuestionDeadlineAt(toolCallId: string) {
   const id = toolCallId.trim();
-  return (
-    pendingByToolCallId.get(id)?.deadlineAt ?? presetDeadlineByToolCallId.get(id) ?? undefined
-  );
+  return pendingByToolCallId.get(id)?.deadlineAt ?? presetDeadlineByToolCallId.get(id) ?? undefined;
 }
 
 export function answerAskUserQuestion(
@@ -66,10 +64,7 @@ export function answerAskUserQuestion(
   if (!pending) {
     return { ok: false, message: "This question is no longer waiting for an answer." };
   }
-  if (
-    expectedConversationId?.trim() &&
-    pending.conversationId !== expectedConversationId.trim()
-  ) {
+  if (expectedConversationId?.trim() && pending.conversationId !== expectedConversationId.trim()) {
     return { ok: false, message: "This question belongs to another conversation." };
   }
   const answers = resolveAskUserQuestionAnswers(pending.questions, rawAnswers);

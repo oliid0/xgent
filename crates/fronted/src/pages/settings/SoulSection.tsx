@@ -4,12 +4,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { useLocale } from "../../i18n";
-import {
-  DEFAULT_SOUL_METADATA,
-  type SoulDraft,
-  useSoul,
-  validateSoulDraft,
-} from "../../lib/soul";
+import { DEFAULT_SOUL_METADATA, type SoulDraft, useSoul, validateSoulDraft } from "../../lib/soul";
 
 export function SoulSection() {
   const { t } = useLocale();
@@ -153,9 +148,7 @@ export function SoulSection() {
                 >
                   <span
                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                      active
-                        ? "bg-violet-500 text-white"
-                        : "bg-violet-500/10 text-violet-500"
+                      active ? "bg-violet-500 text-white" : "bg-violet-500/10 text-violet-500"
                     }`}
                   >
                     {active ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}

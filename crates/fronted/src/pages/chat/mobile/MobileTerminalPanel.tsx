@@ -1,12 +1,5 @@
 import { invoke } from "@xagent/runtime";
-import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   GitBranch,
   Key,
@@ -207,12 +200,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       let nextCwd = sessionCwd;
       if (cdTarget !== null) {
         try {
-          nextCwd = normalizedRelativeCwd(
-            sessionCwd,
-            cdTarget,
-            workdir,
-            previousSessionCwd,
-          );
+          nextCwd = normalizedRelativeCwd(sessionCwd, cdTarget, workdir, previousSessionCwd);
         } catch (cause) {
           setEntries((current) => [
             ...current,
@@ -405,7 +393,9 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
                 </pre>
               ) : null}
               {entry.error ? (
-                <pre className="mt-2 whitespace-pre-wrap break-words text-red-300">{entry.error}</pre>
+                <pre className="mt-2 whitespace-pre-wrap break-words text-red-300">
+                  {entry.error}
+                </pre>
               ) : null}
               {exitCode !== undefined ? (
                 <div className="mt-1 text-[10px] text-zinc-500">
@@ -445,9 +435,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           onClick={activeRunId ? () => void cancel() : undefined}
           disabled={!activeRunId && (!command.trim() || !workdir)}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-zinc-950 disabled:bg-zinc-800 disabled:text-zinc-600"
-          aria-label={
-            activeRunId ? t("chat.mobileTerminal.stop") : t("chat.mobileTerminal.run")
-          }
+          aria-label={activeRunId ? t("chat.mobileTerminal.stop") : t("chat.mobileTerminal.run")}
         >
           {activeRunId ? <Square className="h-4 w-4 fill-current" /> : <Send className="h-4 w-4" />}
         </button>

@@ -120,9 +120,7 @@ export function MobileAssistantSection() {
 
   const permissionRows = useMemo(
     () =>
-      PERMISSIONS.filter(
-        (permission) => status?.permissionAliases?.[permission.id] !== undefined,
-      ),
+      PERMISSIONS.filter((permission) => status?.permissionAliases?.[permission.id] !== undefined),
     [status],
   );
 

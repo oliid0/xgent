@@ -7,7 +7,6 @@ import { runAssistantWithTools } from "../../lib/chat/runner/agentRunner";
 import { createStreamDebugLogger } from "../../lib/debug/agentDebug";
 import { assistantMessageToText } from "../../lib/providers/llm";
 import { resolveRuntimePlatform } from "../../lib/runtimePlatform";
-import { buildSoulSystemPrompt, useSoul } from "../../lib/soul";
 import {
   type AppSettings,
   DEFAULT_CHAT_RUNTIME_CONTROLS,
@@ -22,6 +21,7 @@ import {
   isAlwaysEnabledSkillName,
   type SkillSummary,
 } from "../../lib/skills";
+import { buildSoulSystemPrompt, useSoul } from "../../lib/soul";
 import { buildBuiltinToolRegistry } from "../../lib/tools/builtinRegistry";
 import { createFileToolState } from "../../lib/tools/fileToolState";
 import type { SkillAccessPolicy } from "../../lib/tools/skillAccessPolicy";

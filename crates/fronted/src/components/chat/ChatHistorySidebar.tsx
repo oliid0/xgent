@@ -10,14 +10,13 @@ import {
   workspaceProjectPathKey,
 } from "../../lib/settings";
 import { cn } from "../../lib/shared/utils";
-import { useSoul } from "../../lib/soul";
 import type {
   SidebarConversation,
   SidebarListStatus,
   SidebarMutationKind,
 } from "../../lib/sidebar/types";
+import { useSoul } from "../../lib/soul";
 import type { TerminalShellOption } from "../../lib/terminal/types";
-import type { WorkspaceToolTarget } from "../project-tools/rightDockModel";
 import { AppUpdateButton } from "../AppUpdateButton";
 import {
   Archive,
@@ -47,6 +46,7 @@ import {
   X,
 } from "../icons";
 import { isMacOsTauri, MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
+import type { WorkspaceToolTarget } from "../project-tools/rightDockModel";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -1860,11 +1860,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                       )}
                     >
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-500/10 text-violet-500">
-                        {active ? (
-                          <Check className="h-3 w-3" />
-                        ) : (
-                          <Sparkles className="h-3 w-3" />
-                        )}
+                        {active ? <Check className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
                       </span>
                       <span className="min-w-0 flex-1 truncate">
                         {preset.metadata.name || "XGent"}
@@ -1948,35 +1944,35 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     </div>
                   ) : null}
                   {[
-                {
-                  target: "gitReview" as const,
-                  label: t("sidebar.gitReview"),
-                  icon: <GitBranch className="h-4 w-4 text-muted-foreground" />,
-                },
-                {
-                  target: "sshTunnel" as const,
-                  label: t("sidebar.sshConnection"),
-                  icon: <Key className="h-4 w-4 text-muted-foreground" />,
-                },
-                {
-                  target: "backgroundTasks" as const,
-                  label: t("sidebar.backgroundTasks"),
-                  icon: <Cpu className="h-4 w-4 text-muted-foreground" />,
-                },
+                    {
+                      target: "gitReview" as const,
+                      label: t("sidebar.gitReview"),
+                      icon: <GitBranch className="h-4 w-4 text-muted-foreground" />,
+                    },
+                    {
+                      target: "sshTunnel" as const,
+                      label: t("sidebar.sshConnection"),
+                      icon: <Key className="h-4 w-4 text-muted-foreground" />,
+                    },
+                    {
+                      target: "backgroundTasks" as const,
+                      label: t("sidebar.backgroundTasks"),
+                      icon: <Cpu className="h-4 w-4 text-muted-foreground" />,
+                    },
                   ].map((item) => (
-                <button
-                  key={item.target}
-                  type="button"
-                  onClick={() => {
-                    onOpenWorkspaceTool?.(item.target);
-                    setSoulLauncherOpen(false);
-                  }}
-                  disabled={!workspaceToolsAvailable || !onOpenWorkspaceTool}
-                  className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07] disabled:opacity-45"
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </button>
+                    <button
+                      key={item.target}
+                      type="button"
+                      onClick={() => {
+                        onOpenWorkspaceTool?.(item.target);
+                        setSoulLauncherOpen(false);
+                      }}
+                      disabled={!workspaceToolsAvailable || !onOpenWorkspaceTool}
+                      className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07] disabled:opacity-45"
+                    >
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </button>
                   ))}
                   <div className="mx-1 my-1 border-t border-border/50" />
                   <button

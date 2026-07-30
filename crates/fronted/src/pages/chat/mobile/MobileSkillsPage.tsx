@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Markdown } from "../../../components/Markdown";
 import {
   ArrowLeft,
   ChevronRight,
@@ -8,6 +7,7 @@ import {
   RefreshCw,
   SkillIcon,
 } from "../../../components/icons";
+import { Markdown } from "../../../components/Markdown";
 import { useLocale } from "../../../i18n";
 import { type AppSettings, updateSkills } from "../../../lib/settings";
 import {
@@ -194,9 +194,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
         <MobileToggle
           checked={props.settings.skills.enabled}
           label={t("settings.skillsEnable")}
-          onChange={(enabled) =>
-            props.setSettings((prev) => updateSkills(prev, { enabled }))
-          }
+          onChange={(enabled) => props.setSettings((prev) => updateSkills(prev, { enabled }))}
         />
       </div>
       {refreshError ? (

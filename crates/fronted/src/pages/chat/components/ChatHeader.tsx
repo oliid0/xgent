@@ -121,9 +121,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
       data-tauri-drag-region
       className={cn(
         "flex items-center justify-between gap-2 pr-4",
-        mobileExperience
-          ? "pb-2.5 pt-[calc(0.625rem+env(safe-area-inset-top,0px))]"
-          : "py-2.5",
+        mobileExperience ? "pb-2.5 pt-[calc(0.625rem+env(safe-area-inset-top,0px))]" : "py-2.5",
         !sidebarOpen && macOsTauri ? "pl-[232px]" : "pl-4",
       )}
     >
@@ -366,12 +364,12 @@ export const ChatHeader = memo(function ChatHeader(props: {
         {!mobileExperience ? preThemeActions : null}
         {!mobileExperience ? (
           <Button
-          variant="ghost"
-          size="icon"
-          onClick={onToggleTheme}
-          title={themeToggleTitle}
-          aria-label={themeToggleTitle}
-          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+            variant="ghost"
+            size="icon"
+            onClick={onToggleTheme}
+            title={themeToggleTitle}
+            aria-label={themeToggleTitle}
+            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
           >
             <ThemeToggleIcon theme={nextTheme} />
           </Button>

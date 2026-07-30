@@ -2448,7 +2448,9 @@
     box-shadow: none;
   }
 
-  .settings-system-form[data-compact="true"] .settings-execution-choice + .settings-execution-choice {
+  .settings-system-form[data-compact="true"]
+    .settings-execution-choice
+    + .settings-execution-choice {
     border-top: 1px solid hsl(var(--border) / 0.5);
   }
 
@@ -2467,7 +2469,10 @@
     flex: 1;
   }
 
-  .settings-system-form[data-compact="true"] .settings-execution-choice > div:nth-child(2) > div:last-child {
+  .settings-system-form[data-compact="true"]
+    .settings-execution-choice
+    > div:nth-child(2)
+    > div:last-child {
     display: -webkit-box;
     overflow: hidden;
     -webkit-box-orient: vertical;
@@ -2509,17 +2514,26 @@
     text-align: center;
   }
 
-  .settings-system-form[data-compact="true"] .settings-theme-grid .settings-choice-card > div:first-child {
+  .settings-system-form[data-compact="true"]
+    .settings-theme-grid
+    .settings-choice-card
+    > div:first-child {
     width: 32px;
     height: 32px;
     border-radius: 999px;
   }
 
-  .settings-system-form[data-compact="true"] .settings-theme-grid .settings-choice-card > div:nth-child(2) {
+  .settings-system-form[data-compact="true"]
+    .settings-theme-grid
+    .settings-choice-card
+    > div:nth-child(2) {
     padding-right: 0;
   }
 
-  .settings-system-form[data-compact="true"] .settings-theme-grid .settings-choice-card > div:last-child {
+  .settings-system-form[data-compact="true"]
+    .settings-theme-grid
+    .settings-choice-card
+    > div:last-child {
     top: 6px;
     right: 6px;
   }

@@ -42,16 +42,16 @@ const MAX_STYLE_CHARACTERS = 1000;
 function unquoteFrontmatterValue(value: string) {
   const trimmed = value.trim();
   if (trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')) {
-    return trimmed
-      .slice(1, -1)
-      .replace(/\\"/g, '"')
-      .replace(/\\\\/g, "\\");
+    return trimmed.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
   }
   return trimmed;
 }
 
 function escapeFrontmatterValue(value: string) {
-  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\r\n]+/g, " ");
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/[\r\n]+/g, " ");
 }
 
 export function parseSoulDocument(content: string, path = "", id = ""): SoulDocument {
@@ -94,7 +94,10 @@ export function parseSoulDocument(content: string, path = "", id = ""): SoulDocu
   return {
     id,
     metadata,
-    body: lines.slice(closingLine + 1).join("\n").trim(),
+    body: lines
+      .slice(closingLine + 1)
+      .join("\n")
+      .trim(),
     content,
     path,
   };

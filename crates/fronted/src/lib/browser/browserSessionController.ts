@@ -302,9 +302,7 @@ class BrowserSessionController {
 
   async setViewport(sessionIdInput: string, viewport: BrowserViewport) {
     const sessionId = normalizedSessionId(sessionIdInput);
-    const session = await this.enqueue(sessionId, () =>
-      setBrowserViewport(sessionId, viewport),
-    );
+    const session = await this.enqueue(sessionId, () => setBrowserViewport(sessionId, viewport));
     this.update({ sessions: mergeSession(this.state.sessions, session), error: null });
     return session;
   }

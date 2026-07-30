@@ -336,9 +336,7 @@ function ToolCallItem({ item, isRunning }: { item: ToolTraceItem; isRunning?: bo
   const shouldCloseCompletedTodo =
     isTodo && Boolean(result && !result.isError) && todoItems.length > 0 && !hasIncompleteTodo;
   const isAskUserQuestion = item.toolCall.name === ASK_USER_QUESTION_TOOL_NAME;
-  const askDetails = isAskUserQuestion
-    ? parseAskUserQuestionResultDetails(result?.details)
-    : null;
+  const askDetails = isAskUserQuestion ? parseAskUserQuestionResultDetails(result?.details) : null;
   const askQuestions = isAskUserQuestion
     ? askDetails?.questions.length
       ? askDetails.questions
@@ -379,11 +377,11 @@ function ToolCallItem({ item, isRunning }: { item: ToolTraceItem; isRunning?: bo
       : isAskUserQuestion
         ? (askQuestions[0]?.prompt ?? "")
         : isSubagentCard
-        ? getSubagentInlineSummary(item)
-        : summarizeToolCall(item.toolCall, {
-            includeName: false,
-            includeManagerAction: false,
-          });
+          ? getSubagentInlineSummary(item)
+          : summarizeToolCall(item.toolCall, {
+              includeName: false,
+              includeManagerAction: false,
+            });
   const fileChangeStats = useMemo(() => deriveFileChangeStats(item.toolCall), [item.toolCall]);
   const meta = getToolMeta(item.toolCall.name);
   const ToolIcon = meta.Icon;

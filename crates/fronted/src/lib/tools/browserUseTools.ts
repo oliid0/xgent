@@ -1,19 +1,14 @@
-import type {
-  Tool,
-  ToolCall,
-  ToolResultMessage,
-} from "@earendil-works/pi-ai";
+import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-
+import {
+  browserSessionController,
+  normalizeBrowserAddress,
+} from "../browser/browserSessionController";
 import type {
   BrowserAction,
   BrowserActionInput,
   BrowserActionResponse,
 } from "../browserAutomation";
-import {
-  browserSessionController,
-  normalizeBrowserAddress,
-} from "../browser/browserSessionController";
 import {
   type BuiltinToolBundle,
   type BuiltinToolExecutionContext,
@@ -95,13 +90,10 @@ const BROWSER_PARAMETERS = Type.Object({
   text: Type.Optional(Type.String({ description: "Text to enter for action=type." })),
   script: Type.Optional(
     Type.String({
-      description:
-        "Synchronous JavaScript body for execute_js. Return a JSON-serializable value.",
+      description: "Synchronous JavaScript body for execute_js. Return a JSON-serializable value.",
     }),
   ),
-  direction: Type.Optional(
-    Type.Union([Type.Literal("up"), Type.Literal("down")]),
-  ),
+  direction: Type.Optional(Type.Union([Type.Literal("up"), Type.Literal("down")])),
   amount: Type.Optional(
     Type.Number({ minimum: 1, maximum: 10_000, description: "Scroll distance in CSS pixels." }),
   ),
@@ -203,11 +195,7 @@ function pageFingerprint(info: PageInfo) {
   ].join("|");
 }
 
-async function waitForDomStable(
-  sessionId: string,
-  timeoutMs: number,
-  signal?: AbortSignal,
-) {
+async function waitForDomStable(sessionId: string, timeoutMs: number, signal?: AbortSignal) {
   const normalizedTimeout = Math.min(30_000, Math.max(500, timeoutMs));
   const startedAt = Date.now();
   const deadline = startedAt + normalizedTimeout;
@@ -244,16 +232,10 @@ async function waitForDomStable(
   };
 }
 
-function formatResult(
-  action: BrowserUseAction,
-  sessionId: string,
-  result: unknown,
-) {
+function formatResult(action: BrowserUseAction, sessionId: string, result: unknown) {
   const encoded = JSON.stringify(result, null, 2);
   const body =
-    encoded.length > 24_000
-      ? `${encoded.slice(0, 24_000)}\n… browser result truncated`
-      : encoded;
+    encoded.length > 24_000 ? `${encoded.slice(0, 24_000)}\n… browser result truncated` : encoded;
   return `browser_use ${action} succeeded in tab "${sessionId}".\n${body}`;
 }
 
@@ -291,9 +273,7 @@ export function createBrowserUseTools(): BuiltinToolBundle {
               sessionId,
               url: normalizeBrowserAddress(args.url || ""),
             })
-          : await browserSessionController.newSession(
-              normalizeBrowserAddress(args.url || ""),
-            );
+          : await browserSessionController.newSession(normalizeBrowserAddress(args.url || ""));
         sessionId = session.sessionId;
         result = session;
       } else if (action === "open") {
@@ -327,7 +307,11 @@ export function createBrowserUseTools(): BuiltinToolBundle {
           args.url = normalizeBrowserAddress(requiredString(args.url, "url"));
         }
         if (action === "type") requiredString(args.selector, "selector");
-        if (action === "click" && !args.selector && (args.coordinate_x == null || args.coordinate_y == null)) {
+        if (
+          action === "click" &&
+          !args.selector &&
+          (args.coordinate_x == null || args.coordinate_y == null)
+        ) {
           throw new Error("browser_use click requires selector or coordinate_x + coordinate_y.");
         }
         if (action === "execute_js") requiredString(args.script, "script");

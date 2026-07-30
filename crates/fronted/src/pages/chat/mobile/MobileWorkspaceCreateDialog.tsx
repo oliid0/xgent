@@ -91,9 +91,7 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
           </button>
         </div>
         <label className="mt-4 block">
-          <span className="mb-1.5 block text-xs font-medium">
-            {t("chat.mobileWorkspace.name")}
-          </span>
+          <span className="mb-1.5 block text-xs font-medium">{t("chat.mobileWorkspace.name")}</span>
           <input
             autoFocus
             value={name}
@@ -102,7 +100,10 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
             className="h-11 w-full rounded-2xl border border-border/60 bg-muted/35 px-3.5 text-sm outline-none focus:border-primary/45 focus:ring-2 focus:ring-primary/15"
           />
         </label>
-        <p className="mt-2 truncate px-1 font-mono text-[10px] text-muted-foreground" title={parent}>
+        <p
+          className="mt-2 truncate px-1 font-mono text-[10px] text-muted-foreground"
+          title={parent}
+        >
           {parent}
         </p>
         {error ? (

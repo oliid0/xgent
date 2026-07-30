@@ -136,11 +136,7 @@ function normalizeLanControlUrl(value: string) {
   return url.toString();
 }
 
-export function AccessSection({
-  settings,
-  setSettings,
-  nativeMobile,
-}: AccessSectionProps) {
+export function AccessSection({ settings, setSettings, nativeMobile }: AccessSectionProps) {
   const { t } = useLocale();
   const browser = isBrowserRuntime();
   const [localStatus, setLocalStatus] = useState(EMPTY_LOCAL_STATUS);
@@ -567,10 +563,13 @@ export function AccessSection({
                   onClick={() =>
                     void runAction("save-token", async () => {
                       setVaultStatus(
-                        await invoke<CloudSecretVaultStatus>("cloud_secret_vault_set_github_token", {
-                          username: settings.access.githubOwner,
-                          token: githubToken,
-                        }),
+                        await invoke<CloudSecretVaultStatus>(
+                          "cloud_secret_vault_set_github_token",
+                          {
+                            username: settings.access.githubOwner,
+                            token: githubToken,
+                          },
+                        ),
                       );
                       setGithubToken("");
                     })
@@ -601,10 +600,7 @@ export function AccessSection({
               </div>
               {vaultStatus.githubUsername ? (
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  {t("settings.accessTokenOwner").replace(
-                    "{username}",
-                    vaultStatus.githubUsername,
-                  )}
+                  {t("settings.accessTokenOwner").replace("{username}", vaultStatus.githubUsername)}
                 </p>
               ) : null}
               <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">

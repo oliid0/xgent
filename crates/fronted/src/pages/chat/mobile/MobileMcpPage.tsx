@@ -1,17 +1,7 @@
 import { useMemo, useState } from "react";
-import {
-  ChevronRight,
-  MoreHorizontal,
-  Plug,
-  Plus,
-  Server,
-} from "../../../components/icons";
+import { ChevronRight, MoreHorizontal, Plug, Plus, Server } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
-import {
-  type AppSettings,
-  type McpServerConfig,
-  updateMcp,
-} from "../../../lib/settings";
+import { type AppSettings, type McpServerConfig, updateMcp } from "../../../lib/settings";
 import { McpServerEditModal } from "../../mcp-hub/McpServersForm";
 import { MobileHubHeader, MobileHubSearch, MobileToggle } from "./MobileHubChrome";
 
@@ -62,9 +52,7 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
     props.setSettings((prev) => {
       if (editing?.mode === "edit") {
         return updateMcp(prev, {
-          servers: prev.mcp.servers.map((item, index) =>
-            index === editing.index ? server : item,
-          ),
+          servers: prev.mcp.servers.map((item, index) => (index === editing.index ? server : item)),
         });
       }
       return updateMcp(prev, { servers: [...prev.mcp.servers, server] });

@@ -816,7 +816,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.mobileAssistant.icloud": "iCloud 同步",
     "settings.mobileAssistant.icloudDescription": "同步 XGent 配置与工作区元数据。",
     "settings.mobileAssistant.externalFolders": "挂载外部目录",
-    "settings.mobileAssistant.externalFoldersDescription": "将系统文件选择器中的目录安全挂载到任务工作区。",
+    "settings.mobileAssistant.externalFoldersDescription":
+      "将系统文件选择器中的目录安全挂载到任务工作区。",
     "settings.mobileAssistant.available": "可用",
     "settings.mobileAssistant.unavailable": "尚未启用",
     "settings.mobile.aboutDescription": "版本、更新与应用信息",
@@ -2237,7 +2238,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "chat.composer.collapse": "Restore input",
     "chat.composer.voiceInput": "Voice input",
     "chat.composer.voiceListening": "Listening…",
-    "chat.composer.voicePermissionRequired": "Microphone and speech recognition permission is required",
+    "chat.composer.voicePermissionRequired":
+      "Microphone and speech recognition permission is required",
     "chat.markdown.copyCode": "Copy code",
     "chat.markdown.copied": "Copied",
     "chat.markdown.expandCode": "Expand {count} lines",
@@ -2905,7 +2907,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.soulNewDefaultName": "New persona",
     "settings.soulPresetNoStyle": "No response style",
     "settings.soulDeletePreset": "Delete persona",
-    "settings.soulDescription": "SOUL.md is the persistent cross-conversation persona file. It controls identity, voice, and expression preferences only.",
+    "settings.soulDescription":
+      "SOUL.md is the persistent cross-conversation persona file. It controls identity, voice, and expression preferences only.",
     "settings.soulIdentityGroup": "Identity",
     "settings.soulVoiceGroup": "Personality & voice",
     "settings.soulName": "Name",
@@ -2917,7 +2920,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.soulStyleHint": "A short description of tone, formatting, and expression",
     "settings.soulStylePlaceholder": "For example: concise and direct; lead with the outcome",
     "settings.soulPersonality": "Personality",
-    "settings.soulPersonalityHint": "Use Markdown to describe stance, character, and collaboration style",
+    "settings.soulPersonalityHint":
+      "Use Markdown to describe stance, character, and collaboration style",
     "settings.soulCharacters": "characters",
     "settings.soulWords": "words",
     "settings.soulSave": "Save",
@@ -3409,7 +3413,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.builtinTool.ssh_manager.detail":
       "Performs remote operations — commands and file management — on associated SSH hosts. Requires an SSH host associated in settings; chat sessions only.",
     "settings.builtinTool.browser_use.name": "Embedded Browser",
-    "settings.builtinTool.browser_use.desc": "Let the agent operate a WebView session shared with the user",
+    "settings.builtinTool.browser_use.desc":
+      "Let the agent operate a WebView session shared with the user",
     "settings.builtinTool.browser_use.detail":
       "Uses the same structured actions on PC, Android, and iOS to navigate, read, click, type, scroll, and capture pages. The user and agent share the same tabs and session without a separate browser extension.",
     "settings.customTool.http_get_test.name": "Local HTTP Test",

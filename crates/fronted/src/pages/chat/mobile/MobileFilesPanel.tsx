@@ -1,17 +1,14 @@
 import { openUrl } from "@xagent/runtime";
 import { useCallback, useMemo } from "react";
+import { FolderTree, X } from "../../../components/icons";
 import { FileTreePanel } from "../../../components/project-tools/file-tree";
 import {
   RightDockToolContext,
   type RightDockToolContextValue,
 } from "../../../components/project-tools/RightDockContext";
 import { expandedPathsForFileTreePath } from "../../../components/project-tools/rightDockModel";
-import { FolderTree, X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
-import type {
-  RightDockFileTreeState,
-  RightDockFileTreeStatePatch,
-} from "../../../lib/settings";
+import type { RightDockFileTreeState, RightDockFileTreeStatePatch } from "../../../lib/settings";
 import type { TerminalClient } from "../../../lib/terminal/types";
 import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
 
@@ -68,10 +65,7 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
         query: "",
         selectedPath,
         expandedPaths: Array.from(
-          new Set([
-            ...fileTreeState.expandedPaths,
-            ...expandedPathsForFileTreePath(selectedPath),
-          ]),
+          new Set([...fileTreeState.expandedPaths, ...expandedPathsForFileTreePath(selectedPath)]),
         ),
         bumpRevision: true,
       });
@@ -91,7 +85,8 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
       capabilities: {
         projectReady,
         terminalReady: false,
-        terminalDisabledMessage: "Desktop terminal lifecycle is not mounted in the mobile file view.",
+        terminalDisabledMessage:
+          "Desktop terminal lifecycle is not mounted in the mobile file view.",
         gitWriteEnabled: false,
       },
       fileTree: {
@@ -148,9 +143,7 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
             <h2 className="truncate text-[16px] font-semibold tracking-tight">
               {t("sidebar.myFiles")}
             </h2>
-            {cwd ? (
-              <p className="truncate text-[11px] text-muted-foreground">{cwd}</p>
-            ) : null}
+            {cwd ? <p className="truncate text-[11px] text-muted-foreground">{cwd}</p> : null}
           </div>
           <button
             type="button"

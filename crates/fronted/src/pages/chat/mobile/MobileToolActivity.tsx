@@ -1,5 +1,5 @@
-import { useMemo, useSyncExternalStore } from "react";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
+import { useMemo, useSyncExternalStore } from "react";
 import {
   Check,
   ChevronRight,
@@ -17,8 +17,8 @@ import type {
 import {
   safeStringify,
   summarizeToolCall,
-  toolResultMessageToText,
   type ToolTraceItem,
+  toolResultMessageToText,
 } from "../../../lib/chat/messages/uiMessages";
 import { cn } from "../../../lib/shared/utils";
 
@@ -65,7 +65,11 @@ function collectActivityItems(snapshot: LiveTranscriptState): ActivityItem[] {
 
 function activityKind(name: string): "shell" | "browser" | "tool" {
   const normalized = name.toLowerCase();
-  if (normalized.includes("bash") || normalized.includes("shell") || normalized.includes("terminal")) {
+  if (
+    normalized.includes("bash") ||
+    normalized.includes("shell") ||
+    normalized.includes("terminal")
+  ) {
     return "shell";
   }
   if (
@@ -192,9 +196,7 @@ export function MobileToolActivity({
           <button
             type="button"
             onClick={
-              capsuleItem &&
-              activityKind(capsuleItem.toolCall.name) === "browser" &&
-              onOpenBrowser
+              capsuleItem && activityKind(capsuleItem.toolCall.name) === "browser" && onOpenBrowser
                 ? onOpenBrowser
                 : onOpen
             }
@@ -247,9 +249,7 @@ export function MobileToolActivity({
                 {t("chat.mobileActivity.title")}
               </div>
               <div className="truncate text-[11px] text-muted-foreground">
-                {activeItem
-                  ? t("chat.mobileActivity.running")
-                  : t("chat.mobileActivity.recent")}
+                {activeItem ? t("chat.mobileActivity.running") : t("chat.mobileActivity.recent")}
               </div>
             </div>
             <button

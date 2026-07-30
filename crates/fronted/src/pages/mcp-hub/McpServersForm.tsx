@@ -396,14 +396,7 @@ export function McpServerEditModal(props: {
   onClose: () => void;
   onSave: (server: McpServerConfig) => void;
 }) {
-  const {
-    mode,
-    initialServer,
-    existingServers,
-    allowStdio = true,
-    onClose,
-    onSave,
-  } = props;
+  const { mode, initialServer, existingServers, allowStdio = true, onClose, onSave } = props;
   const { t } = useLocale();
   const browser = isBrowserRuntime();
   const { modalState, requestClose } = useModalMotion(onClose);

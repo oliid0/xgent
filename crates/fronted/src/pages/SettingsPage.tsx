@@ -13,10 +13,10 @@ import {
   Search,
   Settings2,
   Sparkles,
-  Wrench,
-  Zap,
   Terminal,
+  Wrench,
   X,
+  Zap,
 } from "../components/icons";
 
 import { useLocale } from "../i18n";
@@ -26,12 +26,12 @@ import { AccessSection } from "./settings/AccessSection";
 import { AgentsSection } from "./settings/AgentsSection";
 import { CronSection } from "./settings/CronSection";
 import { HooksSection } from "./settings/HooksSection";
-import { MemoryPanel } from "./settings/memory/MemoryPanel";
-import { MobileExecutionSection } from "./settings/MobileExecutionSection";
 import { MobileAssistantSection } from "./settings/MobileAssistantSection";
+import { MobileExecutionSection } from "./settings/MobileExecutionSection";
+import { MemoryPanel } from "./settings/memory/MemoryPanel";
 import { ProvidersSection } from "./settings/ProvidersSection";
-import { SshSection } from "./settings/SshSection";
 import { SoulSection } from "./settings/SoulSection";
+import { SshSection } from "./settings/SshSection";
 import { SystemSettingsForm } from "./settings/SystemSettingsForm";
 import { SystemToolsSection } from "./settings/SystemToolsSection";
 import type { SectionId, SettingsPageProps } from "./settings/types";
@@ -252,10 +252,7 @@ export function SettingsPage(props: SettingsPageProps) {
       NAV_GROUPS.map((group) => ({
         label: t(group.labelKey),
         items: group.items
-          .filter(
-            (item) =>
-              !hiddenSectionSet.has(item.id) && (!item.mobileOnly || nativeMobile),
-          )
+          .filter((item) => !hiddenSectionSet.has(item.id) && (!item.mobileOnly || nativeMobile))
           .map((item) => ({
             ...item,
             label: sectionLabels[item.id],

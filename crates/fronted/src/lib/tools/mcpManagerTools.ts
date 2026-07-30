@@ -842,10 +842,7 @@ export function createMcpManagerTools(params: {
       const server = args.server
         ? await resolveServerCwd(normalizeServerInput(args.server), "McpManager.server.cwd")
         : requireExistingServer(currentSettings(), requireServerId(args.server_id));
-      const validation = validateForRuntime(
-        server,
-        args.server ? undefined : currentSettings(),
-      );
+      const validation = validateForRuntime(server, args.server ? undefined : currentSettings());
       return {
         action,
         serverId: server.id,

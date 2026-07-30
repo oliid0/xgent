@@ -23,12 +23,7 @@ import type {
   MentionComposerLargePaste,
 } from "../components/chat/MentionComposer";
 import { type NotifyItem, NotifyToast } from "../components/chat/NotifyToast";
-import {
-  Ban,
-  Globe,
-  Terminal,
-  Upload,
-} from "../components/icons";
+import { Ban, Globe, Terminal, Upload } from "../components/icons";
 import { MacOsTitleBarSpacer, MacOsTitleBarToggle } from "../components/MacOsTitleBarSpacer";
 import type {
   GitCommitContextPayload,
@@ -51,6 +46,7 @@ import { useLocale } from "../i18n";
 import type { AppUpdateController } from "../lib/appUpdates";
 import { getAutomationState } from "../lib/automation";
 import { createHookRunScope } from "../lib/automation/hookRunner";
+import { browserSessionController } from "../lib/browser/browserSessionController";
 import type { CompactionStatus } from "../lib/chat/compaction/types";
 import {
   buildPersistableMessagesFromSnapshot,
@@ -105,7 +101,6 @@ import { createStreamDebugLogger } from "../lib/debug/agentDebug";
 import { tauriGitClient } from "../lib/git/tauriGitClient";
 import { memoryDeleteProject } from "../lib/memory/api";
 import { buildMemoryOverviewSection } from "../lib/memory/prompts/injection";
-import { buildSoulSystemPrompt, useSoul } from "../lib/soul";
 import {
   lockMonacoNlsLocale,
   preparePreferredMonacoNlsLocale,
@@ -175,6 +170,7 @@ import {
   mergeAlwaysEnabledSkillNames,
   resolveExplicitSkillMentions,
 } from "../lib/skills";
+import { buildSoulSystemPrompt, useSoul } from "../lib/soul";
 import { createSubagentStoreManager } from "../lib/subagents";
 import {
   applyTerminalEventToSessions,
@@ -218,20 +214,19 @@ import {
   useLiveTranscriptController,
   usePendingUploads,
 } from "./chat";
-import { MobileFilesPanel } from "./chat/mobile/MobileFilesPanel";
-import { MobileBrowserSettingsPanel } from "./chat/mobile/MobileBrowserSettingsPanel";
-import { MobileMcpPage } from "./chat/mobile/MobileMcpPage";
-import { MobileQuickActions } from "./chat/mobile/MobileQuickActions";
-import { MobileSkillsPage } from "./chat/mobile/MobileSkillsPage";
-import {
-  MobileTerminalPanel,
-  type MobileShellPanelMode,
-} from "./chat/mobile/MobileTerminalPanel";
-import { MobileWorkspaceCreateDialog } from "./chat/mobile/MobileWorkspaceCreateDialog";
+import { BrowserPanel } from "./chat/browser/BrowserPanel";
 import {
   buildConversationRuntimeSnapshotEntries,
   type ConversationRuntimeSnapshotState,
 } from "./chat/local-access/conversationRuntimeSnapshot";
+import { MobileBrowserSettingsPanel } from "./chat/mobile/MobileBrowserSettingsPanel";
+import { MobileFilesPanel } from "./chat/mobile/MobileFilesPanel";
+import { MobileMcpPage } from "./chat/mobile/MobileMcpPage";
+import { MobileQuickActions } from "./chat/mobile/MobileQuickActions";
+import { MobileSkillsPage } from "./chat/mobile/MobileSkillsPage";
+import { type MobileShellPanelMode, MobileTerminalPanel } from "./chat/mobile/MobileTerminalPanel";
+import { MobileToolActivity } from "./chat/mobile/MobileToolActivity";
+import { MobileWorkspaceCreateDialog } from "./chat/mobile/MobileWorkspaceCreateDialog";
 import {
   appendQueuedChatTurn,
   buildQueuedChatTurnPreview,
@@ -249,9 +244,6 @@ import {
   resolveQueuedChatTurnSlotIndex,
   takeNextQueuedChatTurn,
 } from "./chat/queue/chatTurnQueue";
-import { MobileToolActivity } from "./chat/mobile/MobileToolActivity";
-import { BrowserPanel } from "./chat/browser/BrowserPanel";
-import { browserSessionController } from "../lib/browser/browserSessionController";
 import { ChatSidebarContainer } from "./chat/sidebar/ChatSidebarContainer";
 import { McpHubPage } from "./mcp-hub/McpHubPage";
 import type { SectionId } from "./settings/types";
@@ -1379,17 +1371,10 @@ export function ChatPage(props: ChatPageProps) {
         shell,
       });
     },
-    [
-      desktopBridgeEnabled,
-      mobileWorkspacePathKey,
-      nativeMobile,
-      terminalDisabledMessage,
-    ],
+    [desktopBridgeEnabled, mobileWorkspacePathKey, nativeMobile, terminalDisabledMessage],
   );
   const handleWorkspaceToolLaunchRequestHandled = useCallback((nonce: number) => {
-    setWorkspaceToolLaunchRequest((current) =>
-      current?.nonce === nonce ? null : current,
-    );
+    setWorkspaceToolLaunchRequest((current) => (current?.nonce === nonce ? null : current));
   }, []);
   // RightDockPanel is memo'd: every callback handed to it must be stable or
   // the memo boundary is void (see the panel-side context useMemo).
@@ -1413,9 +1398,7 @@ export function ChatPage(props: ChatPageProps) {
   );
   const handleMobileFileTreeStateChange = useCallback(
     (patch: RightDockFileTreeStatePatch) => {
-      setSettings((prev) =>
-        updateRightDockFileTreeState(prev, mobileWorkspacePathKey, patch),
-      );
+      setSettings((prev) => updateRightDockFileTreeState(prev, mobileWorkspacePathKey, patch));
     },
     [mobileWorkspacePathKey, setSettings],
   );
@@ -3993,11 +3976,7 @@ export function ChatPage(props: ChatPageProps) {
   }, [settings.customSettings.browser.homePage]);
 
   const handleOpenMobileTerminal = useCallback(
-    (
-      mode: MobileShellPanelMode = "terminal",
-      initialCommand = "",
-      autoRun = false,
-    ) => {
+    (mode: MobileShellPanelMode = "terminal", initialCommand = "", autoRun = false) => {
       setSidebarOpen(false);
       setMobileActivityOpen(false);
       setMobileFilesOpen(false);
@@ -4397,9 +4376,7 @@ export function ChatPage(props: ChatPageProps) {
           onProjectsCollapsedChange={handleSidebarProjectsCollapsedChange}
           onRecentCollapsedChange={handleSidebarRecentCollapsedChange}
           onCreateProject={
-            desktopBridgeEnabled || nativeMobile
-              ? handleOpenCreateWorkspaceProject
-              : undefined
+            desktopBridgeEnabled || nativeMobile ? handleOpenCreateWorkspaceProject : undefined
           }
           onSelectProject={handleSelectWorkspaceProject}
           onNewConversationForProject={handleNewConversationForProject}
