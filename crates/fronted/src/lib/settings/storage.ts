@@ -6,6 +6,7 @@ import {
   type ChatRuntimeControls,
   type CloseWindowBehavior,
   getDefaultSettings,
+  normalizeBrowserExperienceSettings,
   normalizeChatRuntimeControls,
   normalizeCloseWindowBehavior,
   normalizeFontScaleSettings,
@@ -87,6 +88,7 @@ function readLocalUiSettings(): {
       },
       rightDock: normalizeRightDockSettings(obj.rightDock),
       fontScale: normalizeFontScaleSettings(obj.fontScale),
+      browser: normalizeBrowserExperienceSettings(obj.browser),
     };
   }
 

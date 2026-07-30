@@ -220,7 +220,7 @@ class BrowserSessionController {
     const session = await this.enqueue(sessionId, () =>
       openBrowserSession({
         sessionId,
-        url: normalizeBrowserAddress(options.url || existing?.url || this.homePage),
+        url: normalizeBrowserAddress(options.url || this.homePage),
         viewport: {
           ...HIDDEN_BROWSER_VIEWPORT,
           visible: options.visible === true,

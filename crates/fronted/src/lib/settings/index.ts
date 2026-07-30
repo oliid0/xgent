@@ -1985,7 +1985,7 @@ export function normalizeCustomSettings(
   };
 }
 
-function normalizeBrowserExperienceSettings(input: unknown): BrowserExperienceSettings {
+export function normalizeBrowserExperienceSettings(input: unknown): BrowserExperienceSettings {
   const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const homePage = typeof obj.homePage === "string" ? obj.homePage.trim() : "";
   return {

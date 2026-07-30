@@ -158,7 +158,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
               {preview.error}
             </div>
           ) : null}
-          {preview.content ? <Markdown>{preview.content}</Markdown> : null}
+          {preview.content ? <Markdown content={preview.content} /> : null}
         </div>
       </section>
     );

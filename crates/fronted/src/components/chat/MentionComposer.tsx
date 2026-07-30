@@ -1336,7 +1336,20 @@ function createLargePasteChip(paste: MentionComposerLargePaste) {
   return chip;
 }
 
-function insertNodeAtCursor(root: HTMLElement, node: HTMLElement) {
+function placeCaretAfterInsertedNode(node: Node) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    placeCaretInTextNode(node as Text, (node as Text).data.length);
+    return;
+  }
+  if (node instanceof HTMLElement) {
+    const anchor = ensureCaretAnchorAfterChip(node);
+    if (anchor) {
+      placeCaretInTextNode(anchor.textNode, anchor.offset);
+    }
+  }
+}
+
+function insertNodeAtCursor(root: HTMLElement, node: Node) {
   const sel = window.getSelection();
   if (sel && sel.rangeCount > 0) {
     const range = sel.getRangeAt(0);
@@ -1356,21 +1369,15 @@ function insertNodeAtCursor(root: HTMLElement, node: HTMLElement) {
         range.deleteContents();
       }
       range.insertNode(node);
-      // Reuse the split-off text node as the caret anchor instead of minting
-      // a fresh one, so mid-text inserts leave no empty text-node leftovers.
-      const anchor = ensureCaretAnchorAfterChip(node);
-      if (anchor) {
-        placeCaretInTextNode(anchor.textNode, anchor.offset);
-      }
+      // Text insertions keep their natural caret position. Non-editable chips
+      // receive a dedicated text anchor so the caret never lands inside them.
+      placeCaretAfterInsertedNode(node);
       return;
     }
   }
 
   root.appendChild(node);
-  const anchor = ensureCaretAnchorAfterChip(node);
-  if (anchor) {
-    placeCaretInTextNode(anchor.textNode, anchor.offset);
-  }
+  placeCaretAfterInsertedNode(node);
 }
 
 /** Measure the caret rect without corrupting the selection.
