@@ -17,7 +17,7 @@ test("the unified composer restores the last editor selection before external me
     assert.match(composer, /document\.addEventListener\("selectionchange", rememberEditorSelection\)/);
     assert.equal(
       (composer.match(/focusEditorAtSavedSelection\(\);/g) ?? []).length,
-      5,
+      6,
     );
   }
 });
@@ -35,6 +35,10 @@ test("insertNodeAtCursor hops chip-inner boundaries and normalizes the caret anc
     extractFunction(source(root, "chat/MentionComposer.tsx"), "insertNodeAtCursor"),
   );
   const body = bodies[0];
+  const caretBody = extractFunction(
+    source(sourceRoots[0], "chat/MentionComposer.tsx"),
+    "placeCaretAfterInsertedNode",
+  );
   // A saved selection restored before external insertion can sit inside a
   // non-editable chip; the insert must hop outside instead of nesting.
   assert.match(body, /closestComposerChipFromNode\(root, range\.startContainer\)/);
@@ -43,7 +47,9 @@ test("insertNodeAtCursor hops chip-inner boundaries and normalizes the caret anc
   assert.match(body, /setEndBefore\(endChip\)/);
   // The caret anchor must go through the canonical normalizer so split-off
   // text nodes are reused instead of leaving empty leftovers.
-  assert.match(body, /ensureCaretAnchorAfterChip\(node\)/);
+  assert.match(body, /placeCaretAfterInsertedNode\(node\)/);
+  assert.match(caretBody, /ensureCaretAnchorAfterChip\(node\)/);
+  assert.match(caretBody, /placeCaretInTextNode\(node as Text/);
   assert.doesNotMatch(body, /range\.insertNode\(afterNode\)/);
 });
 

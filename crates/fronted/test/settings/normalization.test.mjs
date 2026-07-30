@@ -5,7 +5,7 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 const loader = createTsModuleLoader();
 const settings = loader.loadModule("src/lib/settings/index.ts");
 
-test("default settings use one local workspace and disabled external access", () => {
+test("default settings keep external access closed while mobile sandboxes are ready", () => {
   const value = settings.getDefaultSettings();
   assert.equal(value.system.executionMode, "tools");
   assert.equal(value.access.webUiEnabled, false);
@@ -13,8 +13,8 @@ test("default settings use one local workspace and disabled external access", ()
   assert.equal(value.access.webUiPort, 28_367);
   assert.equal(value.access.cloudExecutionEnabled, false);
   assert.equal(value.access.githubRepository, "agent-temp");
-  assert.equal(value.access.androidProotEnabled, false);
-  assert.equal(value.access.iosAShellEnabled, false);
+  assert.equal(value.access.androidProotEnabled, true);
+  assert.equal(value.access.iosAShellEnabled, true);
 });
 
 test("access settings clamp ports and cloud artifact retention", () => {
@@ -34,7 +34,9 @@ test("access settings clamp ports and cloud artifact retention", () => {
     webUiEnabled: true,
     webUiScope: "loopback",
     webUiPort: 65_535,
+    lanControlUrl: "",
     allowTerminal: true,
+    allowBrowserAutomation: false,
     allowSsh: false,
     allowGit: false,
     allowFileWrite: false,

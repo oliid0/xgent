@@ -536,9 +536,9 @@ pub fn run() {
     }
     #[cfg(target_os = "windows")]
     {
-        let webview_data_dir = services::app_paths::webview_data_dir()
-            .expect("failed to initialize the XAgent WebView2 data directory");
-        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", webview_data_dir);
+        let webview_user_data_root = services::app_paths::webview_user_data_root()
+            .expect("failed to initialize the XAgent WebView2 user-data root");
+        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", webview_user_data_root);
     }
 
     let automation_store = Arc::new(
