@@ -22,6 +22,7 @@ import {
   type SshImportCandidate,
 } from "../../lib/ssh/scan";
 import type { SettingsSectionProps } from "./types";
+import { ConfirmActionPopover } from "./shared";
 
 type SshSettingsView = "list" | "edit" | "import";
 
@@ -98,13 +99,23 @@ export function SshSettingsSection(props: SettingsSectionProps) {
     const normalized: SshHostConfig = {
       ...draft,
       name,
+      description: draft.description.trim(),
       host,
       username: draft.username.trim(),
       port: Math.min(65_535, Math.max(1, Math.floor(Number(draft.port) || 22))),
       privateKeyConfigured:
         Boolean(draft.privateKey.trim() || draft.privateKeyPath.trim()) ||
         draft.privateKeyConfigured,
+      privateKeyPassphraseConfigured:
+        Boolean(draft.privateKeyPassphrase) || draft.privateKeyPassphraseConfigured,
       passwordConfigured: Boolean(draft.password) || draft.passwordConfigured,
+      proxy: {
+        ...draft.proxy,
+        url: draft.proxy.url.trim(),
+        username: draft.proxy.username.trim(),
+        port: Math.min(65_535, Math.max(0, Math.floor(Number(draft.proxy.port) || 0))),
+        passwordConfigured: Boolean(draft.proxy.password) || draft.proxy.passwordConfigured,
+      },
     };
     setSettings((previous) =>
       updateSsh(previous, {
@@ -232,6 +243,19 @@ export function SshSettingsSection(props: SettingsSectionProps) {
             />
           </label>
           <label className={`${fieldClassName()} sm:col-span-2`}>
+            <span>{t("settings.sshDescription")}</span>
+            <Input
+              value={draft.description}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  description: event.currentTarget.value,
+                }))
+              }
+              placeholder={t("settings.sshDescriptionPlaceholder")}
+            />
+          </label>
+          <label className={`${fieldClassName()} sm:col-span-2`}>
             <span>{t("settings.sshAuthMethod")}</span>
             <select
               value={draft.authType}
@@ -313,9 +337,117 @@ export function SshSettingsSection(props: SettingsSectionProps) {
                 placeholder={t("settings.sshPrivateKeyPlaceholder")}
                 className="min-h-32 w-full resize-y rounded-lg border border-input bg-background p-3 font-mono text-xs outline-none focus:ring-2 focus:ring-ring/30"
               />
+              <Input
+                type="password"
+                value={draft.privateKeyPassphrase}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    privateKeyPassphrase: event.currentTarget.value,
+                  }))
+                }
+                placeholder={
+                  draft.privateKeyPassphraseConfigured
+                    ? t("settings.sshPrivateKeyPassphraseConfigured")
+                    : t("settings.sshPrivateKeyPassphrase")
+                }
+              />
             </div>
           ) : null}
         </div>
+
+        <section className="space-y-3 rounded-xl border border-border bg-background p-4">
+          <div>
+            <h3 className="text-sm font-semibold">{t("settings.sshAdvancedProxy")}</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {t("settings.sshProxyOptionalHint")}
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className={fieldClassName()}>
+              <span>{t("settings.sshProxyType")}</span>
+              <select
+                value={draft.proxy.type}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    proxy: {
+                      ...current.proxy,
+                      type: event.currentTarget.value as SshHostConfig["proxy"]["type"],
+                    },
+                  }))
+                }
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
+              >
+                <option value="socks5">{t("settings.sshProxyTypeSocks5")}</option>
+                <option value="http">{t("settings.sshProxyTypeHttp")}</option>
+              </select>
+            </label>
+            <label className={fieldClassName()}>
+              <span>{t("settings.sshProxyPort")}</span>
+              <Input
+                type="number"
+                min={0}
+                max={65_535}
+                value={draft.proxy.port}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    proxy: { ...current.proxy, port: Number(event.currentTarget.value) },
+                  }))
+                }
+              />
+            </label>
+            <label className={`${fieldClassName()} sm:col-span-2`}>
+              <span>{t("settings.sshProxyUrl")}</span>
+              <Input
+                value={draft.proxy.url}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    proxy: { ...current.proxy, url: event.currentTarget.value },
+                  }))
+                }
+                placeholder={
+                  draft.proxy.type === "http"
+                    ? t("settings.sshProxyUrlHttpPlaceholder")
+                    : t("settings.sshProxyUrlSocks5Placeholder")
+                }
+              />
+            </label>
+            <label className={fieldClassName()}>
+              <span>{t("settings.sshProxyUsername")}</span>
+              <Input
+                value={draft.proxy.username}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    proxy: { ...current.proxy, username: event.currentTarget.value },
+                  }))
+                }
+                placeholder={t("settings.sshProxyUsernamePlaceholder")}
+              />
+            </label>
+            <label className={fieldClassName()}>
+              <span>{t("settings.sshProxyPassword")}</span>
+              <Input
+                type="password"
+                value={draft.proxy.password}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    proxy: { ...current.proxy, password: event.currentTarget.value },
+                  }))
+                }
+                placeholder={
+                  draft.proxy.passwordConfigured
+                    ? t("settings.sshProxyPasswordConfigured")
+                    : t("settings.sshProxyPasswordPlaceholder")
+                }
+              />
+            </label>
+          </div>
+        </section>
 
         {formError ? <p className="text-xs text-destructive">{formError}</p> : null}
         <div className="flex justify-end gap-2">
@@ -452,9 +584,18 @@ export function SshSettingsSection(props: SettingsSectionProps) {
               <button type="button" onClick={() => openEdit(host)} className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted" aria-label={t("settings.sshEdit")}>
                 <Pencil className="h-4 w-4" />
               </button>
-              <button type="button" onClick={() => removeHost(host.id)} className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={t("settings.delete")}>
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <ConfirmActionPopover
+                title={t("settings.deleteConfirm")}
+                description={`${host.name} · ${t("settings.deleteConfirmDesc")}`}
+                confirmLabel={t("settings.deleteConfirmYes")}
+                onConfirm={() => removeHost(host.id)}
+              >
+                {(open) => (
+                  <button type="button" onClick={open} className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={t("settings.delete")}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </ConfirmActionPopover>
             </article>
           ))}
         </div>

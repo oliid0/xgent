@@ -44,6 +44,7 @@ import {
 } from "../../lib/mcpRegistry";
 import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
 import { useModalMotion } from "../../lib/shared/modalMotion";
+import { SettingsModalShell } from "../settings/SettingsModalShell";
 import { cn } from "../../lib/shared/utils";
 
 const STORE_PAGE_LIMIT = 18;
@@ -419,17 +420,15 @@ function McpConfigureModal(props: {
   const isStdio = draft.transport === "stdio";
   const isSse = draft.transport === "sse";
 
-  return createPortal(
-    <div
-      className="settings-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
-      data-state={modalState}
-      role="dialog"
-      aria-modal="true"
+  return (
+    <SettingsModalShell
+      onClose={requestClose}
+      state={modalState}
+      ariaLabel={t("mcpHub.storeConfigureTitle")}
     >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={requestClose} />
       <form
         onSubmit={handleSubmit}
-        className="settings-modal-panel relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <div className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]">
@@ -675,8 +674,7 @@ function McpConfigureModal(props: {
           </Button>
         </div>
       </form>
-    </div>,
-    document.body,
+    </SettingsModalShell>
   );
 }
 
@@ -975,7 +973,7 @@ function McpRegistryPreviewDrawer(props: {
   return createPortal(
     <div
       className={cn(
-        "fixed inset-0 z-50 flex justify-end bg-background/35 backdrop-blur-[2px]",
+        "fixed inset-0 z-50 flex justify-end bg-black/35 max-sm:bg-transparent",
         closing ? "skills-drawer-backdrop-closing" : "skills-drawer-backdrop",
       )}
       role="dialog"
@@ -988,7 +986,7 @@ function McpRegistryPreviewDrawer(props: {
     >
       <aside
         className={cn(
-          "flex h-full w-full flex-col border-l border-border/45 bg-background/95 shadow-[-18px_0_45px_-28px_rgba(15,23,42,0.45)] dark:border-white/[0.08] dark:bg-popover/95 dark:shadow-[-18px_0_45px_-28px_rgba(0,0,0,0.7)] backdrop-blur-xl md:w-2/5 md:max-w-[34rem]",
+          "flex h-full w-full flex-col border-l border-border bg-background shadow-[-18px_0_45px_-28px_rgba(15,23,42,0.45)] md:w-2/5 md:max-w-[34rem] max-sm:border-l-0",
           closing ? "skills-drawer-panel-closing" : "skills-drawer-panel",
         )}
       >

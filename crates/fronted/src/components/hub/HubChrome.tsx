@@ -65,7 +65,8 @@ export function HubHeader(props: {
   );
 }
 
-export function GlassPanel(props: {
+/** Solid information surface shared by Skills and MCP hubs. */
+export function HubPanel(props: {
   children: ReactNode;
   tone?: "default" | "muted" | "error" | "amber" | "violet" | "neutral";
   active?: boolean;
@@ -75,28 +76,72 @@ export function GlassPanel(props: {
   const toneClass = (() => {
     switch (tone) {
       case "muted":
-        return "border-border/40 bg-muted/40";
+        return "border-border bg-muted";
       case "error":
         return "border-destructive/30 bg-destructive/5";
       case "amber":
       case "violet":
       case "neutral":
         return active
-          ? "border-border/55 bg-background/80 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_6px_22px_-14px_rgba(15,23,42,0.18)] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_6px_22px_-14px_rgba(0,0,0,0.55)]"
-          : "border-border/40 bg-background/60";
+          ? "border-foreground/20 bg-card shadow-sm"
+          : "border-border bg-card";
       default:
-        return "border-border/40 bg-background/60";
+        return "border-border bg-card";
     }
   })();
   return (
     <div
       className={cn(
-        "hub-glass-panel rounded-xl border px-4 py-3.5",
+        "hub-panel rounded-xl border px-4 py-3.5",
         toneClass,
         className,
       )}
     >
       {children}
     </div>
+  );
+}
+
+/** Temporary source-compatible alias while callers migrate to the semantic name. */
+export const GlassPanel = HubPanel;
+
+export function HubSegmentedControl(props: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "inline-flex min-w-0 items-center rounded-xl border border-border bg-muted p-1",
+        props.className,
+      )}
+    >
+      {props.children}
+    </div>
+  );
+}
+
+export function HubSegmentedButton(props: {
+  active: boolean;
+  children: ReactNode;
+  className?: string;
+  disabled?: boolean;
+  title?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={props.active}
+      disabled={props.disabled}
+      title={props.title}
+      onClick={props.onClick}
+      className={cn(
+        "inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-[12.5px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        props.active
+          ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+          : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
+        props.className,
+      )}
+    >
+      {props.children}
+    </button>
   );
 }

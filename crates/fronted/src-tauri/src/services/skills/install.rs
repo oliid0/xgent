@@ -5,6 +5,7 @@
 //! 原子入位。读者永远只会看到旧目录或新目录，不存在半成品窗口。
 
 use chrono::Utc;
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,6 +21,8 @@ const STAGING_MAX_AGE_MS: u128 = 24 * 60 * 60 * 1000;
 pub(crate) const INSTALL_CANCELLED_ERROR: &str = "Skill install cancelled";
 
 static UNIQUE_SUFFIX_SEQ: AtomicU64 = AtomicU64::new(0);
+const MAX_UPLOADED_SKILL_FILES: usize = 512;
+const MAX_UPLOADED_SKILL_BUNDLE_BYTES: u64 = 32 * 1024 * 1024;
 
 /// Nanosecond timestamp + process-wide counter: unique even for concurrent
 /// callers within the same clock tick.
@@ -432,6 +435,77 @@ pub(crate) fn install_source_from_payload(
     payload: &serde_json::Map<String, Value>,
 ) -> Result<Vec<SystemSkillInstallResult>, String> {
     install_source_from_payload_with_progress(root, payload, |_| {}, &|| false)
+}
+
+/// Installs a directory chosen through a WebView file picker. Uploaded paths
+/// are reconstructed only inside a private temporary root, then handed to the
+/// regular stage/validate/atomic-swap installer so local picker imports have
+/// exactly the same safety and conflict behavior as filesystem imports.
+pub(crate) fn install_uploaded_bundle_from_payload(
+    root: &Path,
+    payload: &serde_json::Map<String, Value>,
+) -> Result<Vec<SystemSkillInstallResult>, String> {
+    let files = payload
+        .get("files")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "SkillsManager import_bundle requires files".to_string())?;
+    if files.is_empty() {
+        return Err("The selected folder contains no files".to_string());
+    }
+    if files.len() > MAX_UPLOADED_SKILL_FILES {
+        return Err(format!(
+            "The selected Skill bundle contains too many files (maximum {MAX_UPLOADED_SKILL_FILES})"
+        ));
+    }
+
+    let temp = TempDir::new("xagent-skill-picker")?;
+    let mut total_bytes = 0u64;
+    for (index, file) in files.iter().enumerate() {
+        let file = file
+            .as_object()
+            .ok_or_else(|| format!("files[{index}] must be an object"))?;
+        let raw_path = object_string(file, "path")
+            .ok_or_else(|| format!("files[{index}].path is required"))?;
+        let relative = Path::new(raw_path);
+        if relative.is_absolute()
+            || relative.components().any(|component| {
+                !matches!(component, std::path::Component::Normal(_))
+            })
+        {
+            return Err(format!("Unsafe Skill bundle path: {raw_path}"));
+        }
+        let encoded = object_string(file, "contentBase64")
+            .or_else(|| object_string(file, "content_base64"))
+            .ok_or_else(|| format!("files[{index}].contentBase64 is required"))?;
+        let bytes = BASE64_STANDARD
+            .decode(encoded)
+            .map_err(|error| format!("Decode Skill bundle file {raw_path} failed: {error}"))?;
+        if bytes.len() as u64 > MAX_SKILL_FILE_BYTES {
+            return Err(format!("Skill bundle file is too large: {raw_path}"));
+        }
+        total_bytes = total_bytes.saturating_add(bytes.len() as u64);
+        if total_bytes > MAX_UPLOADED_SKILL_BUNDLE_BYTES {
+            return Err(format!(
+                "The selected Skill bundle is larger than {} MiB",
+                MAX_UPLOADED_SKILL_BUNDLE_BYTES / (1024 * 1024)
+            ));
+        }
+        let target = temp.path().join(relative);
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|error| format!("Create Skill bundle directory failed: {error}"))?;
+        }
+        fs::write(&target, bytes)
+            .map_err(|error| format!("Write Skill bundle file {raw_path} failed: {error}"))?;
+    }
+
+    let mut install_payload = payload.clone();
+    install_payload.insert(
+        "source".to_string(),
+        Value::String(temp.path().display().to_string()),
+    );
+    install_payload.remove("files");
+    install_source_from_payload(root, &install_payload)
 }
 
 pub(crate) fn install_source_from_payload_with_progress<F>(

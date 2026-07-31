@@ -270,6 +270,15 @@ export function SettingsPage(props: SettingsPageProps) {
       `${item.label} ${item.description}`.toLocaleLowerCase().includes(query),
     );
   }, [allNavItems, searchQuery]);
+  const desktopNavGroups = useMemo(() => {
+    const visibleIds = new Set(visibleDesktopNavItems.map((item) => item.id));
+    return navGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => visibleIds.has(item.id)),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [navGroups, visibleDesktopNavItems]);
 
   useEffect(() => {
     setSection(initialSection);
@@ -502,15 +511,24 @@ export function SettingsPage(props: SettingsPageProps) {
           </label>
 
           <nav className="settings-nav mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
-            <div className="space-y-1">
-              {visibleDesktopNavItems.map((item) => (
-                <NavItem
-                  key={item.id}
-                  icon={item.icon}
-                  label={item.label}
-                  active={section === item.id}
-                  onClick={() => setSection(item.id)}
-                />
+            <div className="space-y-4">
+              {desktopNavGroups.map((group) => (
+                <section key={group.label}>
+                  <h2 className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+                    {group.label}
+                  </h2>
+                  <div className="space-y-0.5">
+                    {group.items.map((item) => (
+                      <NavItem
+                        key={item.id}
+                        icon={item.icon}
+                        label={item.label}
+                        active={section === item.id}
+                        onClick={() => setSection(item.id)}
+                      />
+                    ))}
+                  </div>
+                </section>
               ))}
               {visibleDesktopNavItems.length === 0 ? (
                 <div className="rounded-xl px-3 py-8 text-center text-sm text-muted-foreground">

@@ -63,13 +63,13 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
   return (
     <div
       data-edge-swipe-ignore
-      className="absolute inset-0 z-[80] flex items-end bg-black/25 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] backdrop-blur-[2px]"
+      className="fixed inset-0 z-[80] flex items-end bg-black/35 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
       onClick={onClose}
     >
       <form
         onSubmit={(event) => void submit(event)}
         onClick={(event) => event.stopPropagation()}
-        className="w-full overflow-hidden rounded-3xl border border-white/40 bg-background/92 p-4 shadow-2xl backdrop-blur-2xl dark:border-white/[0.09]"
+        className="w-full overflow-hidden rounded-2xl border border-border bg-background p-4 shadow-xl"
       >
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-500/12 text-blue-500">

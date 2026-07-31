@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { ArrowLeft, Globe, Loader2, Shield, Trash2 } from "../../../components/icons";
+import { Globe, Loader2, Shield, Trash2 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import {
   browserSessionController,
@@ -11,6 +11,7 @@ import {
   updateCustomSettings,
 } from "../../../lib/settings";
 import { MobileToggle } from "./MobileHubChrome";
+import { MobileFullscreenPanel, MobilePanelHeader } from "./MobilePanelScaffold";
 
 type MobileBrowserSettingsPanelProps = {
   open: boolean;
@@ -43,22 +44,12 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
   };
 
   return (
-    <section
-      data-edge-swipe-ignore
-      className="absolute inset-0 z-[74] flex min-h-0 flex-col bg-muted/25"
-      aria-label={t("chat.mobileMenu.browserSettings")}
-    >
-      <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-border/40 bg-background/92 px-3 pt-[env(safe-area-inset-top,0px)] backdrop-blur-2xl">
-        <button
-          type="button"
-          onClick={props.onClose}
-          className="flex h-11 w-11 items-center justify-center rounded-full active:bg-muted"
-          aria-label={t("settings.close")}
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <h1 className="text-[18px] font-semibold">{t("chat.mobileMenu.browserSettings")}</h1>
-      </header>
+    <MobileFullscreenPanel open label={t("chat.mobileMenu.browserSettings")} className="bg-muted">
+      <MobilePanelHeader
+        title={t("chat.mobileMenu.browserSettings")}
+        backLabel={t("settings.close")}
+        onBack={props.onClose}
+      />
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-6">
         <h2 className="px-2 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -138,6 +129,6 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
           </button>
         </div>
       </div>
-    </section>
+    </MobileFullscreenPanel>
   );
 }

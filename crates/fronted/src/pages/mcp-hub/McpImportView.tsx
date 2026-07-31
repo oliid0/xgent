@@ -1,6 +1,9 @@
-import { invoke } from "@xagent/runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GlassPanel } from "../../components/hub/HubChrome";
+import {
+  HubPanel,
+  HubSegmentedButton,
+  HubSegmentedControl,
+} from "../../components/hub/HubChrome";
 import {
   AlertTriangle,
   Check,
@@ -20,7 +23,7 @@ import {
   type ExternalMcpServerEntry,
   type ExternalMcpToolScan,
   scanExternalMcpServers,
-  scanMcpConfigFile,
+  scanMcpConfigContent,
 } from "../../lib/skills";
 
 const EXTERNAL_MCP_TOOL_LABELS: Record<string, string> = {
@@ -34,6 +37,7 @@ const EXTERNAL_MCP_TOOL_LABELS: Record<string, string> = {
 const LOCAL_FILE_TOOL = "local-file";
 
 const DEFAULT_IMPORT_TIMEOUT_MS = 60_000;
+const MAX_MCP_CONFIG_FILE_BYTES = 16 * 1024 * 1024;
 
 function fileScanLabel(scan: ExternalMcpToolScan, fallback: string) {
   const basename = scan.configPath.split(/[\\/]/).pop();
@@ -81,6 +85,7 @@ export function McpImportView(props: {
   const [importedCount, setImportedCount] = useState<number | null>(null);
   const [activeTool, setActiveTool] = useState<string>("claude-code");
   const userChoseToolRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const allScans = useMemo(
     () => (fileScan ? [...(scans ?? []), fileScan] : (scans ?? [])),
@@ -125,6 +130,7 @@ export function McpImportView(props: {
 
   // 扫描结果就绪后自动定位到第一个有配置的工具；用户手动切换后不再干预
   useEffect(() => {
+  useEffect(() => {
     if (userChoseToolRef.current || !scans || scans.length === 0) return;
     const preferred =
       scans.find((scan) => scan.servers.length > 0) ??
@@ -135,17 +141,14 @@ export function McpImportView(props: {
     }
   }, [scans, activeTool]);
 
-  const pickFileAndScan = useCallback(async () => {
+  const scanSelectedFile = useCallback(async (file: File) => {
     setFileError(null);
     setFilePicking(true);
     try {
-      const picked = await invoke<string | null>("system_pick_file", {
-        filter_name: "JSON / TOML",
-        extensions: ["json", "toml"],
-      });
-      const path = picked?.trim();
-      if (!path) return;
-      const scan = await scanMcpConfigFile(path);
+      if (file.size > MAX_MCP_CONFIG_FILE_BYTES) {
+        throw new Error(`File is larger than ${MAX_MCP_CONFIG_FILE_BYTES / 1024 / 1024} MiB`);
+      }
+      const scan = await scanMcpConfigContent(file.name, await file.text());
       // 换文件后清掉上一个文件遗留的选择项，避免按 id 误选到新文件的同名条目
       setSelected((prev) => {
         const next = new Set([...prev].filter((key) => !key.startsWith(`${LOCAL_FILE_TOOL}:`)));
@@ -158,6 +161,7 @@ export function McpImportView(props: {
       setFileError(err instanceof Error ? err.message : String(err));
     } finally {
       setFilePicking(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }, []);
 
@@ -236,60 +240,60 @@ export function McpImportView(props: {
     <div className="h-full min-h-0 overflow-y-auto px-0.5 pb-4 pr-1 pt-1.5">
       <div className="flex flex-col gap-4">
         {error ? (
-          <GlassPanel tone="error" className="hub-panel-enter">
+          <HubPanel tone="error" className="hub-panel-enter">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
               <span className="text-xs text-destructive">
                 {t("mcpHub.importScanFailed")}: {error}
               </span>
             </div>
-          </GlassPanel>
+          </HubPanel>
         ) : null}
 
         {!allowStdio ? (
-          <GlassPanel tone="muted" className="hub-panel-enter">
+          <HubPanel tone="muted" className="hub-panel-enter">
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="text-xs leading-5 text-muted-foreground">
                 {t("mcpHub.mobileNetworkOnly")}
               </span>
             </div>
-          </GlassPanel>
+          </HubPanel>
         ) : null}
 
         {fileError ? (
-          <GlassPanel tone="error" className="hub-panel-enter">
+          <HubPanel tone="error" className="hub-panel-enter">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
               <span className="text-xs text-destructive">
                 {t("mcpHub.importFileFailed")}: {fileError}
               </span>
             </div>
-          </GlassPanel>
+          </HubPanel>
         ) : null}
 
         {importedCount !== null && importedCount > 0 ? (
-          <GlassPanel tone="muted" className="hub-panel-enter">
+          <HubPanel tone="muted" className="hub-panel-enter">
             <div className="flex items-center gap-2">
               <Check className="h-4 w-4 shrink-0 text-[hsl(var(--chat-success))]" />
               <span className="text-xs text-muted-foreground">
                 {t("mcpHub.importDone").replace("{count}", String(importedCount))}
               </span>
             </div>
-          </GlassPanel>
+          </HubPanel>
         ) : null}
 
         {loading && !scans ? (
-          <GlassPanel className="hub-panel-enter">
+          <HubPanel className="hub-panel-enter">
             <div className="flex items-center gap-3 py-4">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               <span className="text-xs text-muted-foreground">{t("mcpHub.importScanning")}</span>
             </div>
-          </GlassPanel>
+          </HubPanel>
         ) : (
           <>
             <div className="hub-panel-enter flex flex-wrap items-center justify-between gap-3">
-              <div className="inline-flex shrink-0 rounded-2xl border border-border/40 bg-background/60 p-1 backdrop-blur-xl shadow-[0_1px_0_rgba(255,255,255,0.5)_inset] dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
+              <HubSegmentedControl className="shrink-0 max-w-full overflow-x-auto">
                 {allScans.map((scan) => {
                   const isLocalFile = scan.tool === LOCAL_FILE_TOOL;
                   const toolLabel = isLocalFile
@@ -297,20 +301,15 @@ export function McpImportView(props: {
                     : (EXTERNAL_MCP_TOOL_LABELS[scan.tool] ?? scan.tool);
                   const active = scan.tool === activeTool;
                   return (
-                    <button
+                    <HubSegmentedButton
                       key={scan.tool}
-                      type="button"
+                      active={active}
                       title={isLocalFile ? scan.configPath : undefined}
                       onClick={() => {
                         userChoseToolRef.current = true;
                         setActiveTool(scan.tool);
                       }}
-                      className={cn(
-                        "relative inline-flex h-9 items-center justify-center gap-2 rounded-xl px-4 text-[12.5px] font-medium transition-all",
-                        active
-                          ? "bg-background/85 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_4px_12px_-8px_rgba(15,23,42,0.18)] ring-1 ring-border/45 dark:bg-white/[0.08] dark:ring-white/[0.09] dark:shadow-[0_1px_0_rgba(255,255,255,0.07)_inset,0_4px_12px_-8px_rgba(0,0,0,0.55)]"
-                          : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
-                      )}
+                      className="px-4"
                     >
                       {isLocalFile ? (
                         <FileText className="h-3.5 w-3.5" />
@@ -334,19 +333,29 @@ export function McpImportView(props: {
                           {t("mcpHub.importNotDetected")}
                         </span>
                       )}
-                    </button>
+                    </HubSegmentedButton>
                   );
                 })}
-              </div>
+              </HubSegmentedControl>
 
               <div className="flex shrink-0 items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,.toml,application/json,text/plain"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    if (file) void scanSelectedFile(file);
+                  }}
+                />
                 <Button
                   variant="outline"
                   size="sm"
                   className="gap-1.5 rounded-full"
                   disabled={filePicking}
                   title={t("mcpHub.importFromFileHint")}
-                  onClick={() => void pickFileAndScan()}
+                  onClick={() => fileInputRef.current?.click()}
                 >
                   {filePicking ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -418,17 +427,17 @@ export function McpImportView(props: {
                 </div>
 
                 {!activeScan.exists ? (
-                  <GlassPanel tone="muted">
+                  <HubPanel tone="muted">
                     <p className="py-2 text-center text-xs text-muted-foreground">
                       {t("mcpHub.importNotDetected")} · {activeScan.configPath}
                     </p>
-                  </GlassPanel>
+                  </HubPanel>
                 ) : activeScan.servers.length === 0 ? (
-                  <GlassPanel tone="muted">
+                  <HubPanel tone="muted">
                     <p className="py-2 text-center text-xs text-muted-foreground">
                       {t("mcpHub.importEmpty")}
                     </p>
-                  </GlassPanel>
+                  </HubPanel>
                 ) : (
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {activeScan.servers.map((server) => {

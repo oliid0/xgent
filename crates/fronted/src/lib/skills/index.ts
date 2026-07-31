@@ -526,6 +526,7 @@ export async function manageSkill(
   const action = typeof params.action === "string" ? params.action : "";
   if (
     action === "install" ||
+    action === "import_bundle" ||
     action === "create" ||
     action === "delete" ||
     action === "clawhub_install" ||
@@ -552,6 +553,19 @@ export async function scanMcpConfigFile(path: string): Promise<ExternalMcpToolSc
   const scan = response.externalMcp?.[0];
   if (!scan) {
     throw new Error("SkillsManager scan_mcp_file did not return a scan result");
+  }
+  return scan;
+}
+
+/** Parse MCP JSON/TOML selected through a browser or native WebView file input. */
+export async function scanMcpConfigContent(
+  name: string,
+  content: string,
+): Promise<ExternalMcpToolScan> {
+  const response = await manageSkill({ action: "scan_mcp_content", name, content });
+  const scan = response.externalMcp?.[0];
+  if (!scan) {
+    throw new Error("SkillsManager scan_mcp_content did not return a scan result");
   }
   return scan;
 }

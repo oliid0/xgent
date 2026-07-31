@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { HubBackdrop, HubHeader } from "../../components/hub/HubChrome";
+import {
+  HubBackdrop,
+  HubHeader,
+  HubSegmentedButton,
+  HubSegmentedControl,
+} from "../../components/hub/HubChrome";
 import { Cable, Cloud, Download, Plug, Plus, Server, Sparkles } from "../../components/icons";
 import { Button } from "../../components/ui/button";
 import { useLocale } from "../../i18n";
@@ -74,20 +79,20 @@ export function McpHubPage(props: McpHubPageProps) {
             {/* Status banner */}
             <div
               className={cn(
-                "hub-panel-enter relative overflow-hidden rounded-2xl border backdrop-blur-xl",
+                "hub-panel-enter relative overflow-hidden rounded-xl border bg-card",
                 ready
-                  ? "border-border/50 bg-background/75 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_8px_24px_-18px_rgba(15,23,42,0.18)] dark:border-white/[0.09] dark:bg-white/[0.05] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_8px_24px_-18px_rgba(0,0,0,0.6)]"
-                  : "border-border/40 bg-background/60",
+                  ? "border-border shadow-sm"
+                  : "border-border",
               )}
             >
               <div className="flex items-center gap-3 px-4 py-3.5 sm:gap-x-5 sm:px-5">
                 <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-3.5">
                   <div
                     className={cn(
-                      "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border transition-colors",
+                      "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors",
                       ready
-                        ? "border-border/50 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-                        : "border-border/40 bg-muted/40 text-muted-foreground",
+                        ? "border-border bg-muted text-foreground"
+                        : "border-border bg-muted text-muted-foreground",
                     )}
                   >
                     <Plug className="h-5 w-5" />
@@ -103,10 +108,10 @@ export function McpHubPage(props: McpHubPageProps) {
                       {ready ? (
                         <span
                           className={cn(
-                            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium tabular-nums backdrop-blur-md",
+                            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium tabular-nums ring-1",
                             enabledCount > 0
                               ? "bg-foreground/[0.06] text-foreground/85 ring-1 ring-border/50"
-                              : "bg-background/60 text-muted-foreground ring-1 ring-border/40",
+                              : "bg-muted text-muted-foreground ring-border",
                           )}
                         >
                           <span className="font-semibold">{enabledCount}</span>
@@ -127,7 +132,7 @@ export function McpHubPage(props: McpHubPageProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 shrink-0 gap-1.5 rounded-full border-border/50 bg-background/70 px-3 backdrop-blur-md sm:px-3.5"
+                  className="h-8 shrink-0 gap-1.5 rounded-lg border-border bg-background px-3 sm:px-3.5"
                   onClick={openAdd}
                   title={t("mcpHub.add")}
                 >
@@ -139,7 +144,7 @@ export function McpHubPage(props: McpHubPageProps) {
 
             {/* Tab bar */}
             <div className="hub-panel-enter flex items-center justify-between gap-3">
-              <div className="inline-flex shrink-0 rounded-2xl border border-border/40 bg-background/60 p-1 backdrop-blur-xl shadow-[0_1px_0_rgba(255,255,255,0.5)_inset] dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
+              <HubSegmentedControl className="shrink-0">
                 {[
                   {
                     value: "installed" as const,
@@ -163,16 +168,11 @@ export function McpHubPage(props: McpHubPageProps) {
                   const Icon = item.icon;
                   const active = view === item.value;
                   return (
-                    <button
+                    <HubSegmentedButton
                       key={item.value}
-                      type="button"
+                      active={active}
                       onClick={() => setView(item.value)}
-                      className={cn(
-                        "relative inline-flex h-9 items-center justify-center gap-2 rounded-xl px-4 text-[12.5px] font-medium transition-all",
-                        active
-                          ? "bg-background/85 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_4px_12px_-8px_rgba(15,23,42,0.18)] ring-1 ring-border/45 dark:bg-white/[0.08] dark:ring-white/[0.09] dark:shadow-[0_1px_0_rgba(255,255,255,0.07)_inset,0_4px_12px_-8px_rgba(0,0,0,0.55)]"
-                          : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
-                      )}
+                      className="px-4"
                     >
                       <Icon className="h-3.5 w-3.5" />
                       <span>{item.label}</span>
@@ -188,10 +188,10 @@ export function McpHubPage(props: McpHubPageProps) {
                           {item.count}
                         </span>
                       ) : null}
-                    </button>
+                    </HubSegmentedButton>
                   );
                 })}
-              </div>
+              </HubSegmentedControl>
 
               {view === "store" ? (
                 <div className="hidden text-[11.5px] text-muted-foreground sm:flex items-center gap-1.5">

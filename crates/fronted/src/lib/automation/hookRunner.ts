@@ -1,7 +1,7 @@
-// Desktop-only hook execution service. One module-level chain serializes all
-// hook executions app-wide (preserving cross-run ordering), while each
-// conversation run owns a cancellable scope: aborting the run drops its
-// queued hooks and kills its in-flight script via the Rust scope registry.
+// Cross-platform hook execution service. One module-level chain serializes
+// executions app-wide (preserving run ordering), while each conversation owns
+// a cancellable native scope. Desktop and mobile provide platform-specific
+// executors behind the same invoke contract.
 
 import { invoke } from "@xagent/runtime";
 

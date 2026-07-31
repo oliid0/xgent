@@ -478,7 +478,7 @@ export default function App() {
     <LocaleContext.Provider value={localeContextValue}>
       <SoulProvider>
         <AppChrome>
-          {desktopBridgeEnabled ? <CronPromptRunner settings={settings} /> : null}
+          <CronPromptRunner settings={settings} />
           <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
           <AppErrorBoundary>
             <ChatPage

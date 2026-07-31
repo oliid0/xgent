@@ -6,11 +6,11 @@
 // runtime boundary, never in this panel.
 
 import { useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { useLocale } from "../../../i18n";
 import type { MemoryMeta } from "../../../lib/memory/api";
 import { MEMORY_TYPES, type MemoryType } from "../../../lib/memory/schema";
 import type { AppSettings } from "../../../lib/settings";
+import { SettingsModalShell } from "../SettingsModalShell";
 import { MemorySettingsDrawer } from "./MemorySettingsDrawer";
 import {
   entryKey,
@@ -606,19 +606,13 @@ export function MemoryPanel(props: {
         />
       ) : null}
 
-      {wipeConfirmOpen
-        ? createPortal(
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="memory-wipe-confirm-title"
-            >
-              <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                onClick={() => setWipeConfirmOpen(false)}
-              />
-              <div className="relative z-10 w-full max-w-md overflow-hidden rounded-xl border bg-background shadow-2xl">
+      {wipeConfirmOpen ? (
+        <SettingsModalShell
+          onClose={() => setWipeConfirmOpen(false)}
+          ariaLabel={t("settings.memoryWipeConfirmTitle")}
+          panelClassName="max-w-md"
+          showScrim={false}
+        >
                 <div className="flex items-start gap-3 border-b px-5 py-4">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
                     <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -640,11 +634,8 @@ export function MemoryPanel(props: {
                     {t("settings.memoryWipeAll")}
                   </Button>
                 </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+        </SettingsModalShell>
+      ) : null}
     </>
   );
 }

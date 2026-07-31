@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocale } from "../../i18n";
 import type { AppSettings } from "../../lib/settings";
 import { cn } from "../../lib/shared/utils";
@@ -10,26 +10,45 @@ import { BackgroundTasksPanel } from "../project-tools/BackgroundTasksPanel";
 type BackgroundServicesPanelProps = {
   settings: AppSettings;
   setSettings: (updater: (current: AppSettings) => AppSettings) => void;
+  managedProcessesAvailable?: boolean;
 };
 
 type BackgroundServiceView = "processes" | "hooks" | "schedules";
 
 export function BackgroundServicesPanel(props: BackgroundServicesPanelProps) {
   const { t } = useLocale();
-  const [view, setView] = useState<BackgroundServiceView>("processes");
+  const managedProcessesAvailable = props.managedProcessesAvailable !== false;
+  const [view, setView] = useState<BackgroundServiceView>(() =>
+    managedProcessesAvailable ? "processes" : "schedules",
+  );
   const tabs = [
-    {
-      id: "processes" as const,
-      label: t("sidebar.backgroundTasks"),
-      icon: Cpu,
-    },
+    ...(managedProcessesAvailable
+      ? [
+          {
+            id: "processes" as const,
+            label: t("sidebar.backgroundTasks"),
+            icon: Cpu,
+          },
+        ]
+      : []),
     { id: "hooks" as const, label: t("settings.navHooks"), icon: Zap },
     { id: "schedules" as const, label: t("settings.navCron"), icon: Clock3 },
   ];
 
+  useEffect(() => {
+    if (!managedProcessesAvailable && view === "processes") {
+      setView("schedules");
+    }
+  }, [managedProcessesAvailable, view]);
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="grid shrink-0 grid-cols-3 gap-1 border-b border-border/55 p-2">
+      <div
+        className={cn(
+          "grid shrink-0 gap-1 border-b border-border/55 p-2",
+          managedProcessesAvailable ? "grid-cols-3" : "grid-cols-2",
+        )}
+      >
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (

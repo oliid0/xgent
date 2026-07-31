@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { SettingsModalShell } from "../SettingsModalShell";
 import {
   formatMemoryError,
   type MemoryQuotaSummaryResponse,
@@ -280,7 +281,7 @@ export function MemorySettingsDrawer(props: {
 
   return createPortal(
     <div
-      className="skills-drawer-backdrop fixed inset-0 z-50 flex justify-end bg-foreground/[0.04] backdrop-blur-md dark:bg-background/30"
+      className="skills-drawer-backdrop fixed inset-0 z-50 flex justify-end bg-black/35 max-sm:bg-transparent"
       role="dialog"
       aria-modal="true"
       aria-labelledby="memory-settings-drawer-title"
@@ -290,11 +291,7 @@ export function MemorySettingsDrawer(props: {
         }
       }}
     >
-      <aside className="skills-drawer-panel relative flex h-full w-full flex-col overflow-hidden border-l border-foreground/[0.06] bg-background/65 shadow-[-30px_0_70px_-32px_rgba(15,23,42,0.28)] backdrop-blur-2xl sm:max-w-[420px] dark:border-foreground/[0.08] dark:bg-background/55">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/55 to-transparent dark:via-white/10"
-        />
+      <aside className="skills-drawer-panel relative flex h-full w-full flex-col overflow-hidden border-l border-border bg-background shadow-[-24px_0_55px_-32px_rgba(15,23,42,0.35)] sm:max-w-[420px] max-sm:border-l-0">
         <div className="relative flex items-center gap-3 border-b border-foreground/[0.06] px-6 py-[18px]">
           <div className="min-w-0 flex-1">
             <div
@@ -344,7 +341,7 @@ export function MemorySettingsDrawer(props: {
               <div className="px-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground/65">
                 {t("settings.memoryDriverModels")}
               </div>
-              <div className="rounded-2xl border border-foreground/[0.06] bg-white/55 p-4 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset,0_6px_16px_-12px_rgba(15,23,42,0.08)] backdrop-blur-md dark:bg-white/[0.035] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
+              <div className="rounded-xl border border-border bg-muted/25 p-4">
                 <label className="block space-y-1.5">
                   <span className="text-[11.5px] text-muted-foreground/90">
                     {t("settings.memoryOrganizerModel")}
@@ -388,7 +385,7 @@ export function MemorySettingsDrawer(props: {
                   onToggle={handleOrganizerToggle}
                 />
               </div>
-              <div className="rounded-2xl border border-foreground/[0.06] bg-white/55 p-4 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset,0_6px_16px_-12px_rgba(15,23,42,0.08)] backdrop-blur-md dark:bg-white/[0.035] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
+              <div className="rounded-xl border border-border bg-muted/25 p-4">
                 <div className="space-y-3">
                   <div className="grid grid-cols-[1fr_108px] gap-2.5">
                     <label className="block space-y-1.5">
@@ -536,7 +533,7 @@ export function MemorySettingsDrawer(props: {
                 <AlertTriangle className="h-3 w-3" />
                 {t("settings.memorySettingsDangerZone")}
               </div>
-              <div className="rounded-2xl border border-destructive/15 bg-destructive/[0.025] p-4 backdrop-blur-md">
+              <div className="rounded-xl border border-destructive/20 bg-destructive/[0.04] p-4">
                 <div className="text-[11.5px] leading-relaxed text-muted-foreground">
                   {t("settings.memorySettingsWipeDescription")}
                 </div>
@@ -564,17 +561,12 @@ export function MemorySettingsDrawer(props: {
         />
       ) : null}
       {drawerWipeConfirmOpen ? (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="memory-drawer-wipe-confirm-title"
+        <SettingsModalShell
+          onClose={() => setDrawerWipeConfirmOpen(false)}
+          ariaLabel={t("settings.memoryWipeConfirmTitle")}
+          panelClassName="max-w-md"
+          showScrim={false}
         >
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setDrawerWipeConfirmOpen(false)}
-          />
-          <div className="relative z-10 w-full max-w-md overflow-hidden rounded-xl border bg-background shadow-2xl">
             <div className="flex items-start gap-3 border-b px-5 py-4">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
                 <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -609,8 +601,7 @@ export function MemorySettingsDrawer(props: {
                 {t("settings.memoryWipeAll")}
               </Button>
             </div>
-          </div>
-        </div>
+        </SettingsModalShell>
       ) : null}
     </div>,
     document.body,

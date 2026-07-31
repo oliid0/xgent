@@ -8,7 +8,13 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { GlassPanel, HubBackdrop, HubHeader } from "../../components/hub/HubChrome";
+import {
+  GlassPanel,
+  HubBackdrop,
+  HubHeader,
+  HubSegmentedButton,
+  HubSegmentedControl,
+} from "../../components/hub/HubChrome";
 import {
   Activity,
   AlertTriangle,
@@ -103,7 +109,26 @@ const EXTERNAL_TOOL_LABELS: Record<string, string> = {
 const STORE_PAGE_LIMIT = 24;
 const INSTALLED_SKILL_PREVIEW_LINES = 10_000;
 const COPY_FEEDBACK_MS = 1600;
+const MAX_LOCAL_SKILL_BUNDLE_FILES = 512;
+const MAX_LOCAL_SKILL_BUNDLE_BYTES = 32 * 1024 * 1024;
 const TERMINAL_INSTALL_PHASES = new Set(["done", "error", "cancelled"]);
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error(`Failed to read ${file.name}`));
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const separator = result.indexOf(",");
+      if (separator < 0) {
+        reject(new Error(`Failed to encode ${file.name}`));
+        return;
+      }
+      resolve(result.slice(separator + 1));
+    };
+    reader.readAsDataURL(file);
+  });
+}
 const STORE_SORT_OPTIONS: Array<{ value: ClawHubSort; labelKey: string }> = [
   { value: "downloads", labelKey: "settings.skillsStoreSortMostDownloaded" },
   { value: "stars", labelKey: "settings.skillsStoreSortMostStarred" },
@@ -732,6 +757,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     Array<{ baseDir: string; name: string; message: string }>
   >([]);
   const [importedCount, setImportedCount] = useState<number | null>(null);
+  const [localBundleImporting, setLocalBundleImporting] = useState(false);
   const [importToast, setImportToast] = useState<string | null>(null);
   const importToastTimerRef = useRef<number | null>(null);
   const [previewInstalledSkill, setPreviewInstalledSkill] = useState<SkillSummary | null>(null);
@@ -1022,6 +1048,61 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     showImportToast,
     t,
   ]);
+
+  const importLocalSkillBundle = useCallback(
+    async (selectedFiles: File[]) => {
+      if (localBundleImporting || selectedFiles.length === 0) return;
+      if (selectedFiles.length > MAX_LOCAL_SKILL_BUNDLE_FILES) {
+        showImportToast(
+          t("settings.skillsLocalImportTooMany").replace(
+            "{count}",
+            String(MAX_LOCAL_SKILL_BUNDLE_FILES),
+          ),
+        );
+        return;
+      }
+      const totalBytes = selectedFiles.reduce((total, file) => total + file.size, 0);
+      if (totalBytes > MAX_LOCAL_SKILL_BUNDLE_BYTES) {
+        showImportToast(
+          t("settings.skillsLocalImportTooLarge").replace(
+            "{size}",
+            String(MAX_LOCAL_SKILL_BUNDLE_BYTES / (1024 * 1024)),
+          ),
+        );
+        return;
+      }
+
+      setLocalBundleImporting(true);
+      setImportErrors([]);
+      setImportedCount(null);
+      try {
+        const files = await Promise.all(
+          selectedFiles.map(async (file) => ({
+            path: (file.webkitRelativePath || file.name).replace(/\\/g, "/"),
+            contentBase64: await readFileAsBase64(file),
+          })),
+        );
+        const response = await manageSkill({
+          action: "import_bundle",
+          conflict: "backup",
+          files,
+        });
+        setImportedCount(response.installed?.length ?? 0);
+        await refresh({ silent: true });
+      } catch (error) {
+        setImportErrors([
+          {
+            baseDir: "local-picker",
+            name: t("settings.skillsLocalImport"),
+            message: error instanceof Error ? error.message : String(error),
+          },
+        ]);
+      } finally {
+        setLocalBundleImporting(false);
+      }
+    },
+    [localBundleImporting, refresh, showImportToast, t],
+  );
 
   // Drop installed skills from import selection (cannot re-import).
   useEffect(() => {
@@ -1775,20 +1856,20 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
             {/* Status pill row */}
             <div
               className={cn(
-                "hub-panel-enter relative overflow-hidden rounded-2xl border backdrop-blur-xl",
+                "hub-panel-enter relative overflow-hidden rounded-xl border bg-card",
                 skillsEnabled
-                  ? "border-border/50 bg-background/75 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_8px_24px_-18px_rgba(15,23,42,0.18)] dark:border-white/[0.09] dark:bg-white/[0.05] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_8px_24px_-18px_rgba(0,0,0,0.6)]"
-                  : "border-border/40 bg-background/60",
+                  ? "border-border shadow-sm"
+                  : "border-border",
               )}
             >
               <div className="flex items-center gap-3 px-4 py-3.5 sm:gap-x-5 sm:px-5">
                 <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-3.5">
                   <div
                     className={cn(
-                      "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border transition-colors",
+                      "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors",
                       skillsEnabled
-                        ? "border-border/50 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-                        : "border-border/40 bg-muted/40 text-muted-foreground",
+                        ? "border-border bg-muted text-foreground"
+                        : "border-border bg-muted text-muted-foreground",
                     )}
                   >
                     <Plug className="h-5 w-5" />
@@ -1806,10 +1887,10 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                       {selectableSkills.length > 0 && (
                         <span
                           className={cn(
-                            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium tabular-nums backdrop-blur-md",
+                            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium tabular-nums ring-1",
                             selectedCount > 0
                               ? "bg-foreground/[0.06] text-foreground/85 ring-1 ring-border/50"
-                              : "bg-background/60 text-muted-foreground ring-1 ring-border/40",
+                              : "bg-muted text-muted-foreground ring-border",
                           )}
                         >
                           <span className="font-semibold">{selectedCount}</span>
@@ -1840,7 +1921,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                       "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full ring-1 transition-all",
                       "disabled:cursor-not-allowed disabled:opacity-50",
                       skillsEnabled
-                        ? "bg-emerald-500 ring-emerald-400/45 shadow-[0_2px_10px_-3px_rgba(16,185,129,0.65)] dark:bg-emerald-400 dark:ring-emerald-300/45"
+                        ? "bg-emerald-600 ring-emerald-600 dark:bg-emerald-500 dark:ring-emerald-500"
                         : "bg-muted-foreground/25 ring-border/40",
                     )}
                     title={
@@ -1861,8 +1942,8 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                     variant="outline"
                     size="sm"
                     className={cn(
-                      "h-8 shrink-0 gap-1.5 rounded-full border-border/50 bg-background/70 px-3 backdrop-blur-md",
-                      loading && "border-border/60 bg-background/85 text-foreground",
+                      "h-8 shrink-0 gap-1.5 rounded-lg border-border bg-background px-3",
+                      loading && "text-foreground",
                     )}
                     onClick={() => void refresh()}
                     disabled={loading || lockedByChatMode}
@@ -1890,7 +1971,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
             </div>
 
             <div className="hub-panel-enter flex items-center justify-between gap-3 max-sm:flex-col max-sm:items-stretch max-sm:gap-2">
-              <div className="inline-flex shrink-0 rounded-2xl border border-border/40 bg-background/60 p-1 backdrop-blur-xl shadow-[0_1px_0_rgba(255,255,255,0.5)_inset] max-sm:max-w-full max-sm:overflow-x-auto max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
+              <HubSegmentedControl className="shrink-0 max-sm:max-w-full max-sm:overflow-x-auto max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden">
                 {[
                   {
                     value: "installed" as const,
@@ -1914,16 +1995,11 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                   const Icon = item.icon;
                   const active = view === item.value;
                   return (
-                    <button
+                    <HubSegmentedButton
                       key={item.value}
-                      type="button"
+                      active={active}
                       onClick={() => setView(item.value)}
-                      className={cn(
-                        "relative inline-flex h-9 items-center justify-center gap-2 rounded-xl px-4 text-[12.5px] font-medium transition-all max-sm:shrink-0",
-                        active
-                          ? "bg-background/85 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_4px_12px_-8px_rgba(15,23,42,0.18)] ring-1 ring-border/45 dark:bg-white/[0.08] dark:ring-white/[0.09] dark:shadow-[0_1px_0_rgba(255,255,255,0.07)_inset,0_4px_12px_-8px_rgba(0,0,0,0.55)]"
-                          : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
-                      )}
+                      className="px-4 max-sm:shrink-0"
                     >
                       <Icon className="h-3.5 w-3.5" />
                       <span>{item.label}</span>
@@ -1939,10 +2015,10 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                           {item.count}
                         </span>
                       ) : null}
-                    </button>
+                    </HubSegmentedButton>
                   );
                 })}
-              </div>
+              </HubSegmentedControl>
 
               {!lockedByChatMode ? (
                 <div className="flex w-full min-w-0 items-center justify-end gap-2">
@@ -1960,10 +2036,10 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                           : t("settings.skillsBulkImportHint")
                       }
                       className={cn(
-                        "inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3.5 text-[12.5px] font-medium backdrop-blur-xl transition-all max-sm:px-2.5",
+                        "inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3.5 text-[12.5px] font-medium transition-colors max-sm:px-2.5",
                         bulkMode
-                          ? "border-primary/50 bg-primary/10 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_4px_12px_-8px_rgba(15,23,42,0.18)] ring-1 ring-primary/30 dark:border-primary/40 dark:bg-primary/15"
-                          : "border-border/40 bg-background/60 text-muted-foreground hover:bg-background/80 hover:text-foreground dark:border-white/[0.06] dark:bg-white/[0.04]",
+                          ? "border-primary/50 bg-primary/10 text-foreground ring-1 ring-primary/20"
+                          : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
                       )}
                     >
                       <ListChecks className="h-3.5 w-3.5" />
@@ -2485,6 +2561,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                       importProgress={importProgress}
                       importErrors={importErrors}
                       importedCount={importedCount}
+                      localBundleImporting={localBundleImporting}
                       importToast={importToast}
                       onDismissImportToast={() => {
                         if (importToastTimerRef.current !== null) {
@@ -2498,6 +2575,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                       onBatchToggle={batchToggleExternalSkills}
                       onRescan={() => void rescanExternalSkills()}
                       onImport={() => void importSelectedExternalSkills()}
+                      onImportLocalBundle={(files) => void importLocalSkillBundle(files)}
                     />
                   )}
                 </>
@@ -2650,6 +2728,7 @@ function SkillsImportView(props: {
   importProgress: { done: number; total: number } | null;
   importErrors: Array<{ baseDir: string; name: string; message: string }>;
   importedCount: number | null;
+  localBundleImporting: boolean;
   importToast: string | null;
   onDismissImportToast: () => void;
   bulkMode: boolean;
@@ -2657,6 +2736,7 @@ function SkillsImportView(props: {
   onBatchToggle: (baseDirs: string[], on: boolean) => void;
   onRescan: () => void;
   onImport: () => void;
+  onImportLocalBundle: (files: File[]) => void;
 }) {
   const {
     scans,
@@ -2668,6 +2748,7 @@ function SkillsImportView(props: {
     importProgress,
     importErrors,
     importedCount,
+    localBundleImporting,
     importToast,
     onDismissImportToast,
     bulkMode,
@@ -2675,9 +2756,16 @@ function SkillsImportView(props: {
     onBatchToggle,
     onRescan,
     onImport,
+    onImportLocalBundle,
   } = props;
   const { t } = useLocale();
   const bulkAnchorRef = useRef<string | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    folderInputRef.current?.setAttribute("webkitdirectory", "");
+    folderInputRef.current?.setAttribute("directory", "");
+  }, []);
 
   const normalizedQuery = query.trim().toLowerCase();
   const filteredScans = useMemo(
@@ -2859,6 +2947,31 @@ function SkillsImportView(props: {
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
+                <input
+                  ref={folderInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    const files = Array.from(event.currentTarget.files ?? []);
+                    event.currentTarget.value = "";
+                    onImportLocalBundle(files);
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 rounded-full"
+                  disabled={loading || importing || localBundleImporting}
+                  onClick={() => folderInputRef.current?.click()}
+                >
+                  {localBundleImporting ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Folder className="h-3.5 w-3.5" />
+                  )}
+                  {t("settings.skillsLocalImport")}
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"

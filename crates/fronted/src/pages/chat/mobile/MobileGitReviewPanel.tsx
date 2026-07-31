@@ -17,6 +17,7 @@ import {
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import { cn } from "../../../lib/shared/utils";
+import { MobileFullscreenPanel } from "./MobilePanelScaffold";
 
 type ShellRunResponse = {
   exit_code?: number;
@@ -296,7 +297,6 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   };
 
   const remoteOperation = async (operation: "fetch" | "pull" | "push") => {
-    const label = t(`projectTools.gitReview.${operation}`);
     try {
       await run(operation, gitCommand(operation));
       setNotice(t(`projectTools.gitReview.${operation}SuccessMessage`));
@@ -319,12 +319,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   const showingDetail = Boolean(selectedChange || selectedCommit);
 
   return (
-    <section
-      data-edge-swipe-ignore
-      aria-label={t("chat.mobileGit.title")}
-      className="absolute inset-0 z-[74] flex min-h-0 flex-col bg-background text-foreground"
-    >
-      <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top,0px)]">
+    <MobileFullscreenPanel open label={t("chat.mobileGit.title")}>
+      <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
         {showingDetail ? (
           <button
             type="button"
@@ -628,6 +624,6 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
           )}
         </div>
       )}
-    </section>
+    </MobileFullscreenPanel>
   );
 }

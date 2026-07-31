@@ -11,6 +11,8 @@ use crate::commands::settings::{
     check_runtime_ssh_known_host, RuntimeSshHostConfig, RuntimeSshKnownHostKey,
     RuntimeSshKnownHostStatus,
 };
+use crate::services::ssh_proxy::resolve_ssh_proxy_endpoint;
+pub(crate) use crate::services::ssh_proxy::SshProxyKind;
 
 use super::*;
 
@@ -69,12 +71,6 @@ pub(crate) enum ResolvedSshAuth {
         passphrase: Option<String>,
     },
     KeyboardInteractive,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SshProxyKind {
-    Socks5,
-    Http,
 }
 
 #[derive(Debug, Clone)]
@@ -180,77 +176,18 @@ pub(crate) fn configure_ssh_transport_stream(stream: &TcpStream) {
 pub(crate) fn resolve_ssh_proxy(
     host_config: &RuntimeSshHostConfig,
 ) -> Result<ResolvedSshProxy, String> {
-    let raw_url = host_config.proxy.url.trim();
-    if raw_url.is_empty() {
-        return Err("SSH proxy host is required".to_string());
-    }
-    let (scheme, authority) = split_proxy_scheme(raw_url);
-    let kind = resolve_proxy_kind(host_config.proxy.proxy_type.as_str(), scheme)?;
-    let authority = authority
-        .split(['/', '?', '#'])
-        .next()
-        .unwrap_or(authority)
-        .trim();
-    let authority = authority.rsplit('@').next().unwrap_or(authority);
-    let (proxy_host, url_port) = split_host_port(authority);
-    if proxy_host.trim().is_empty() {
-        return Err("SSH proxy host is required".to_string());
-    }
-    let configured_port = u16::try_from(host_config.proxy.port)
-        .ok()
-        .filter(|port| *port >= 1);
-    let default_port = match kind {
-        SshProxyKind::Socks5 => 1080,
-        SshProxyKind::Http => 8080,
-    };
+    let endpoint = resolve_ssh_proxy_endpoint(
+        &host_config.proxy.url,
+        &host_config.proxy.proxy_type,
+        host_config.proxy.port,
+    )?;
     Ok(ResolvedSshProxy {
-        kind,
-        host: proxy_host,
-        port: configured_port.or(url_port).unwrap_or(default_port),
+        kind: endpoint.kind,
+        host: endpoint.host,
+        port: endpoint.port,
         username: host_config.proxy.username.trim().to_string(),
         password: host_config.proxy.password.trim().to_string(),
     })
-}
-
-pub(crate) fn split_proxy_scheme(input: &str) -> (Option<&str>, &str) {
-    if let Some(index) = input.find("://") {
-        let (scheme, rest) = input.split_at(index);
-        return (Some(scheme), &rest[3..]);
-    }
-    (None, input)
-}
-
-pub(crate) fn resolve_proxy_kind(
-    raw_type: &str,
-    scheme: Option<&str>,
-) -> Result<SshProxyKind, String> {
-    let source = scheme.unwrap_or(raw_type).trim().to_ascii_lowercase();
-    match source.as_str() {
-        "http" => Ok(SshProxyKind::Http),
-        "" | "socks5" | "socks" => Ok(SshProxyKind::Socks5),
-        other => Err(format!("SSH proxy type is not supported: {other}")),
-    }
-}
-
-pub(crate) fn split_host_port(authority: &str) -> (String, Option<u16>) {
-    let authority = authority.trim();
-    if let Some(rest) = authority.strip_prefix('[') {
-        if let Some(end) = rest.find(']') {
-            let host = rest[..end].to_string();
-            let port = rest[end + 1..].strip_prefix(':').and_then(parse_u16_port);
-            return (host, port);
-        }
-    }
-    if let Some((host, port)) = authority.rsplit_once(':') {
-        if !host.contains(':') {
-            return (host.to_string(), parse_u16_port(port));
-        }
-    }
-    (authority.to_string(), None)
-}
-
-pub(crate) fn parse_u16_port(value: &str) -> Option<u16> {
-    value.trim().parse::<u16>().ok().filter(|port| *port >= 1)
 }
 
 pub(crate) async fn http_connect_proxy(

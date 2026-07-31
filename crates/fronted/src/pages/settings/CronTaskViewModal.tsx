@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   BrushCleaning,
@@ -33,6 +32,8 @@ import {
   useAutomation,
 } from "../../lib/automation";
 import { useModalMotion } from "../../lib/shared/modalMotion";
+import { useCompactViewport } from "../../lib/responsive/compactViewport";
+import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmActionPopover } from "./shared";
 
 type CronTaskViewModalProps = {
@@ -405,10 +406,12 @@ function RightPanel({
   task,
   t,
   onClose,
+  hideClose = false,
 }: {
   task: CronTask;
   t: (key: string) => string;
   onClose: () => void;
+  hideClose?: boolean;
 }) {
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [logs, setLogs] = useState<CronRunRecord[]>([]);
@@ -532,16 +535,17 @@ function RightPanel({
             </span>
           ) : null}
         </div>
-        {/* Close button */}
-        <button
-          type="button"
-          onClick={onClose}
-          title={t("settings.cronViewClose")}
-          aria-label={t("settings.cronViewClose")}
-          className="settings-cron-logs-close flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-        >
-          <X size={14} />
-        </button>
+        {!hideClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            title={t("settings.cronViewClose")}
+            aria-label={t("settings.cronViewClose")}
+            className="settings-cron-logs-close flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            <X size={14} />
+          </button>
+        ) : null}
       </div>
 
       {/* ── Scrollable log list ── */}
@@ -694,6 +698,7 @@ function RightPanel({
 
 export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
   const { t } = useLocale();
+  const compactViewport = useCompactViewport();
   const { modalState, requestClose } = useModalMotion(onClose);
   // Live subscription: enable/disable toggles, executor decrements and
   // scheduler errors show up while the modal is open.
@@ -702,6 +707,7 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
   const [isRunningNow, setIsRunningNow] = useState(false);
   const [manualRunStartedAt, setManualRunStartedAt] = useState<number | null>(null);
   const [runNowError, setRunNowError] = useState<string | null>(null);
+  const [compactTab, setCompactTab] = useState<"details" | "logs">("details");
   const runNowLockRef = useRef(false);
   // Manual runs are watched for at least the legacy six-minute window, and
   // longer when the task timeout exceeds it (plus scheduler/completion slack).
@@ -782,17 +788,52 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
     }
   }
 
-  return createPortal(
-    <div
-      className="settings-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
-      data-state={modalState}
+  return (
+    <SettingsModalShell
+      onClose={requestClose}
+      state={modalState}
+      ariaLabel={task.name}
+      panelClassName="settings-cron-view-panel h-[80vh] max-w-4xl !flex-row max-sm:h-full max-sm:!flex-col"
     >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={requestClose} />
-
-      {/* Use explicit h-[80vh] so children can compute flex/overflow correctly */}
-      <div className="settings-modal-panel settings-cron-view-panel relative z-10 flex h-[80vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl">
+        {compactViewport ? (
+          <header className="flex min-h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top,0px)]">
+            <button
+              type="button"
+              onClick={requestClose}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted"
+              aria-label={t("settings.cronViewClose")}
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="grid min-w-0 flex-1 grid-cols-2 rounded-lg bg-muted p-0.5">
+              <button
+                type="button"
+                onClick={() => setCompactTab("details")}
+                className={`h-8 rounded-md text-xs font-medium transition-colors ${
+                  compactTab === "details"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {t("settings.cronViewConfig")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCompactTab("logs")}
+                className={`h-8 rounded-md text-xs font-medium transition-colors ${
+                  compactTab === "logs"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {t("settings.cronViewLogs")}
+              </button>
+            </div>
+          </header>
+        ) : null}
         {/* ── Left: task detail ── */}
-        <div className="settings-cron-view-left flex w-[380px] shrink-0 flex-col border-r border-border/40 bg-background">
+        {!compactViewport || compactTab === "details" ? (
+        <div className="settings-cron-view-left flex w-[380px] shrink-0 flex-col border-r border-border/40 bg-background max-sm:min-h-0 max-sm:w-full max-sm:flex-1 max-sm:border-r-0">
           <LeftPanel
             task={task}
             t={t}
@@ -805,13 +846,19 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
             onClose={requestClose}
           />
         </div>
+        ) : null}
 
         {/* ── Right: logs ── */}
-        <div className="settings-cron-view-right flex min-w-0 flex-1 flex-col bg-muted/5">
-          <RightPanel task={task} t={t} onClose={requestClose} />
+        {!compactViewport || compactTab === "logs" ? (
+        <div className="settings-cron-view-right flex min-w-0 flex-1 flex-col bg-background">
+          <RightPanel
+            task={task}
+            t={t}
+            onClose={requestClose}
+            hideClose={compactViewport}
+          />
         </div>
-      </div>
-    </div>,
-    document.body,
+        ) : null}
+    </SettingsModalShell>
   );
 }

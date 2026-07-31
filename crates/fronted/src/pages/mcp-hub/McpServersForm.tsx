@@ -1,6 +1,5 @@
 import { isBrowserRuntime } from "@xagent/runtime";
 import { type FormEvent, memo, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { ToolPolicyToggle } from "../../components/hub/ToolPolicyToggle";
 import {
   AlertTriangle,
@@ -36,6 +35,7 @@ import {
   updateSystem,
 } from "../../lib/settings";
 import { useModalMotion } from "../../lib/shared/modalMotion";
+import { SettingsModalShell } from "../settings/SettingsModalShell";
 import { cn } from "../../lib/shared/utils";
 import { toolGroupPolicyKey, toolServerPolicyKey } from "../../lib/tools/toolPolicy";
 
@@ -475,17 +475,11 @@ export function McpServerEditModal(props: {
       : t("mcpHub.editSubtitle").replace("{name}", initialServer?.id ?? "");
   const submitLabel = mode === "add" ? t("mcpHub.modalAdd") : t("mcpHub.modalSave");
 
-  return createPortal(
-    <div
-      className="settings-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
-      data-state={modalState}
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={requestClose} />
+  return (
+    <SettingsModalShell onClose={requestClose} state={modalState} ariaLabel={title}>
       <form
         onSubmit={handleSubmit}
-        className="settings-modal-panel relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <div className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]">
@@ -688,8 +682,7 @@ export function McpServerEditModal(props: {
           </Button>
         </div>
       </form>
-    </div>,
-    document.body,
+    </SettingsModalShell>
   );
 }
 

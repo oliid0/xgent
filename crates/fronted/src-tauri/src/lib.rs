@@ -405,6 +405,7 @@ macro_rules! app_invoke_handler {
             commands::cloud::cloud_task_open_artifact,
             commands::shell::shell_run,
             commands::shell::shell_cancel,
+            commands::shell::mobile_ssh_exec,
             commands::app::app_runtime_platform,
             commands::system::system_pick_folder,
             commands::system::system_home_dir,
@@ -786,10 +787,6 @@ pub fn run() {
                 services::automation::AutomationStore::open()
                     .map_err(|error| format!("initialize XAgent automation store failed: {error}"))?,
             );
-            automation_store.set_notifier(services::automation::AutomationNotifier {
-                app_handle: app.handle().clone(),
-            });
-            app.manage(automation_store);
             let cloud_secret_vault = Arc::new(
                 services::cloud_secret_vault::CloudSecretVault::new(app_data_dir.clone())?,
             );
@@ -801,9 +798,22 @@ pub fn run() {
             let lan_pc_client = Arc::new(services::lan_pc_client::LanPcClient::new(
                 Arc::clone(&cloud_secret_vault),
             )?);
+            let automation_scheduler = Arc::new(
+                services::automation::AutomationScheduler::new(
+                    Arc::clone(&automation_store),
+                    app.handle().clone(),
+                    Arc::clone(&lan_pc_client),
+                ),
+            );
+            automation_store.set_notifier(services::automation::AutomationNotifier {
+                app_handle: app.handle().clone(),
+                scheduler: Arc::downgrade(&automation_scheduler),
+            });
+            app.manage(Arc::clone(&automation_store));
+            app.manage(Arc::clone(&automation_scheduler));
             app.manage(Arc::clone(&cloud_secret_vault));
             app.manage(Arc::clone(&provider_oauth));
-            app.manage(lan_pc_client);
+            app.manage(Arc::clone(&lan_pc_client));
             app.manage(Arc::new(
                 services::cloud_execution::CloudExecutionService::new(app_data_dir)?,
             ));
@@ -811,6 +821,7 @@ pub fn run() {
             if let Err(error) = services::skills::ensure_builtin_agent_skills_sync() {
                 eprintln!("failed to seed builtin skills: {error}");
             }
+            Arc::clone(&automation_scheduler).start();
             Ok(())
         })
         .invoke_handler(app_invoke_handler!())

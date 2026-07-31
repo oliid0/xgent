@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -8,8 +8,11 @@ use tauri::AppHandle;
 use tauri_plugin_mobile_execution::{CancelRequest as MobileCancelRequest, MobileExecutionExt};
 
 use crate::commands::shell::{run_mobile_shell, MobileShellRunInput};
-use crate::services::automation::validate::MAX_HOOK_TIMEOUT_MS;
+use crate::services::automation::validate::{MAX_HOOK_TIMEOUT_MS, MIN_HOOK_TIMEOUT_MS};
 use crate::services::lan_pc_client::LanPcClient;
+
+const DEFAULT_HOOK_SCRIPT_TIMEOUT_MS: u64 = 60_000;
+const MAX_REMEMBERED_CANCELLED_SCOPES: usize = 256;
 
 #[derive(Default)]
 pub struct MobileHookScopeRegistry {
@@ -20,6 +23,7 @@ pub struct MobileHookScopeRegistry {
 struct MobileHookScopeState {
     active_run_ids: HashMap<String, HashSet<String>>,
     cancelled: HashSet<String>,
+    cancelled_order: VecDeque<String>,
 }
 
 impl MobileHookScopeRegistry {
@@ -62,7 +66,14 @@ impl MobileHookScopeRegistry {
             .state
             .lock()
             .map_err(|_| "mobile hook scope registry poisoned".to_string())?;
-        state.cancelled.insert(scope_id.to_string());
+        if state.cancelled.insert(scope_id.to_string()) {
+            state.cancelled_order.push_back(scope_id.to_string());
+            while state.cancelled_order.len() > MAX_REMEMBERED_CANCELLED_SCOPES {
+                if let Some(evicted) = state.cancelled_order.pop_front() {
+                    state.cancelled.remove(&evicted);
+                }
+            }
+        }
         Ok(state
             .active_run_ids
             .remove(scope_id)
@@ -83,7 +94,7 @@ fn script_with_context(script: String, context: Option<HashMap<String, String>>)
     let mut exports = context
         .into_iter()
         .filter(|(key, _)| {
-            !key.is_empty()
+            key.starts_with("XAGENT_")
                 && key
                     .chars()
                     .all(|character| character == '_' || character.is_ascii_alphanumeric())
@@ -130,7 +141,11 @@ pub async fn hook_run_script(
             workdir,
             command: script_with_context(script, context),
             cwd: None,
-            timeout_ms,
+            timeout_ms: Some(
+                timeout_ms
+                    .unwrap_or(DEFAULT_HOOK_SCRIPT_TIMEOUT_MS)
+                    .clamp(MIN_HOOK_TIMEOUT_MS, MAX_HOOK_TIMEOUT_MS),
+            ),
             max_timeout_ms: Some(MAX_HOOK_TIMEOUT_MS),
             provider_id: None,
             run_id: Some(run_id.clone()),
@@ -194,10 +209,7 @@ pub async fn hook_run_http_requests(
         return Err("A hook requires at least one HTTP request.".to_string());
     }
     let scope_id = scope_id.unwrap_or_default();
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .build()
-        .map_err(|error| error.to_string())?;
+    let client = crate::services::system_proxy::cached_client()?;
     let mut results = Vec::with_capacity(requests.len());
     for request in requests {
         if !scope_id.is_empty() && registry.is_cancelled(&scope_id) {
@@ -206,7 +218,9 @@ pub async fn hook_run_http_requests(
         let started = Instant::now();
         let method = reqwest::Method::from_bytes(request.method.as_bytes())
             .map_err(|error| format!("invalid HTTP method: {error}"))?;
-        let mut builder = client.request(method, &request.url);
+        let mut builder = client
+            .request(method, &request.url)
+            .timeout(std::time::Duration::from_secs(60));
         for (name, value) in &request.headers {
             builder = builder.header(name, value);
         }

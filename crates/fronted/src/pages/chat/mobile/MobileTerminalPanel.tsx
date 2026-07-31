@@ -12,6 +12,7 @@ import {
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import type { SshHostConfig } from "../../../lib/settings";
+import { MobileFullscreenPanel } from "./MobilePanelScaffold";
 
 type ShellRunResponse = {
   exit_code?: number;
@@ -291,12 +292,8 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   };
 
   return (
-    <section
-      data-edge-swipe-ignore
-      aria-label={panelTitle}
-      className="absolute inset-0 z-[72] flex min-h-0 flex-col bg-zinc-950 text-zinc-100"
-    >
-      <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-white/10 bg-zinc-950/90 px-3 pt-[env(safe-area-inset-top,0px)] backdrop-blur-xl">
+    <MobileFullscreenPanel open label={panelTitle} className="bg-zinc-950 text-zinc-100">
+      <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-white/10 bg-zinc-950 px-3">
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
           <PanelIcon className="h-4 w-4" />
         </span>
@@ -409,7 +406,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
 
       <form
         onSubmit={(event) => void submit(event)}
-        className="flex shrink-0 items-end gap-2 border-t border-white/10 bg-zinc-950/92 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3"
+        className="flex shrink-0 items-end gap-2 border-t border-white/10 bg-zinc-950 px-3 pb-3 pt-3"
       >
         <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-2xl border border-white/12 bg-white/[0.055] px-3">
           <span className="font-mono text-emerald-400">$</span>
@@ -440,6 +437,6 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           {activeRunId ? <Square className="h-4 w-4 fill-current" /> : <Send className="h-4 w-4" />}
         </button>
       </form>
-    </section>
+    </MobileFullscreenPanel>
   );
 }

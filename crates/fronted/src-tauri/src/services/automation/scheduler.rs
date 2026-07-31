@@ -8,11 +8,17 @@ use tokio::sync::{Mutex as AsyncMutex, Notify};
 use tokio_cron_scheduler::{Job, JobScheduler};
 use uuid::Uuid;
 
+#[cfg(desktop)]
 use crate::runtime::shell_runner::{run_shell_script, ShellRunResponse};
+#[cfg(desktop)]
 use crate::runtime::task_runner::{
     build_http_client, resolve_workdir, run_single_http_request, HttpExecutionFailure,
     HttpExecutionResult, HttpRequestInput,
 };
+#[cfg(mobile)]
+use crate::commands::shell::{run_mobile_shell, MobileShellRunInput};
+#[cfg(mobile)]
+use crate::services::lan_pc_client::LanPcClient;
 
 use super::db::now_ms;
 use super::store::{AutomationStore, PromptQueueOutcome};
@@ -40,6 +46,10 @@ impl RunTrigger {
 
 pub struct AutomationScheduler {
     store: Arc<AutomationStore>,
+    #[cfg(mobile)]
+    app_handle: tauri::AppHandle,
+    #[cfg(mobile)]
+    lan_pc_client: Arc<LanPcClient>,
     scheduler: AsyncMutex<Option<JobScheduler>>,
     jobs: AsyncMutex<HashMap<String, ScheduledJob>>,
     active_runs: Mutex<HashSet<String>>,
@@ -48,9 +58,28 @@ pub struct AutomationScheduler {
 }
 
 impl AutomationScheduler {
+    #[cfg(desktop)]
     pub fn new(store: Arc<AutomationStore>) -> Self {
         Self {
             store,
+            scheduler: AsyncMutex::new(None),
+            jobs: AsyncMutex::new(HashMap::new()),
+            active_runs: Mutex::new(HashSet::new()),
+            reload_notify: Notify::new(),
+            reload_pending: AtomicBool::new(false),
+        }
+    }
+
+    #[cfg(mobile)]
+    pub fn new(
+        store: Arc<AutomationStore>,
+        app_handle: tauri::AppHandle,
+        lan_pc_client: Arc<LanPcClient>,
+    ) -> Self {
+        Self {
+            store,
+            app_handle,
+            lan_pc_client,
             scheduler: AsyncMutex::new(None),
             jobs: AsyncMutex::new(HashMap::new()),
             active_runs: Mutex::new(HashSet::new()),
@@ -353,6 +382,7 @@ impl AutomationScheduler {
         // fails this run and disables the task so it stops re-firing into a
         // directory that no longer exists. Follow-global tasks keep the
         // legacy behavior (bash/prompt fail the run without disabling).
+        #[cfg(desktop)]
         let workdir = match task.workdir.as_deref().map(str::trim) {
             Some(pin) if !pin.is_empty() => match resolve_workdir(Some(pin.to_string())) {
                 Ok(resolved) => resolved.display().to_string(),
@@ -370,6 +400,11 @@ impl AutomationScheduler {
             },
             _ => workdir,
         };
+        // Mobile workspaces may be backed by app-scoped storage or an Android
+        // document provider, so std::fs existence checks are not authoritative
+        // here. The platform executor resolves and validates the workspace.
+        #[cfg(mobile)]
+        let workdir = workdir;
 
         if task.kind == "prompt" {
             let store = Arc::clone(&self.store);
@@ -400,6 +435,7 @@ impl AutomationScheduler {
             return;
         }
 
+        #[cfg(desktop)]
         let run = tauri::async_runtime::spawn_blocking(move || {
             let mut run = execute_blocking(task, workdir);
             run.counted = trigger.counted();
@@ -413,8 +449,35 @@ impl AutomationScheduler {
                 false,
             )
         });
+        #[cfg(mobile)]
+        let run = {
+            let mut run = self.execute_mobile_task(&task, workdir).await;
+            run.counted = trigger.counted();
+            run
+        };
         self.record_run_detached(run);
         self.clear_active(&task_id);
+    }
+
+    #[cfg(mobile)]
+    async fn execute_mobile_task(&self, task: &CronTask, workdir: String) -> CompletedRun {
+        match task.kind.as_str() {
+            "bash" => {
+                execute_mobile_bash(
+                    task,
+                    workdir,
+                    self.app_handle.clone(),
+                    Arc::clone(&self.lan_pc_client),
+                )
+                .await
+            }
+            "http" => execute_mobile_http(task).await,
+            other => failed_run(
+                &task.id,
+                format!("Unsupported cron task kind: {other}"),
+                false,
+            ),
+        }
     }
 
     fn clear_active(&self, task_id: &str) {
@@ -477,6 +540,210 @@ fn failed_run(task_id: &str, message: String, counted: bool) -> CompletedRun {
     }
 }
 
+#[cfg(mobile)]
+async fn execute_mobile_bash(
+    task: &CronTask,
+    workdir: String,
+    app_handle: tauri::AppHandle,
+    lan_pc_client: Arc<LanPcClient>,
+) -> CompletedRun {
+    let started_at = now_ms();
+    let overall = Instant::now();
+    let script = task.script.as_deref().unwrap_or_default().trim().to_string();
+    if script.is_empty() {
+        return failed_run(
+            &task.id,
+            "No shell script configured for this Cron task.".to_string(),
+            true,
+        );
+    }
+    if workdir.trim().is_empty() {
+        return failed_run(
+            &task.id,
+            "Cron shell task requires an active mobile workspace.".to_string(),
+            true,
+        );
+    }
+
+    let timeout_ms = task.timeout_seconds.saturating_mul(1_000);
+    let result = run_mobile_shell(
+        app_handle,
+        &lan_pc_client,
+        MobileShellRunInput {
+            workdir,
+            command: script.clone(),
+            cwd: None,
+            timeout_ms: Some(timeout_ms),
+            max_timeout_ms: Some(timeout_ms),
+            provider_id: None,
+            run_id: Some(format!("cron-{}-{}", task.id, Uuid::new_v4())),
+        },
+    )
+    .await;
+
+    match result {
+        Ok(result) => CompletedRun {
+            task_id: task.id.clone(),
+            success: result.exit_code == 0 && !result.timed_out && !result.cancelled,
+            started_at,
+            duration_ms: overall.elapsed().as_millis() as u64,
+            exit_code: Some(result.exit_code),
+            output: format_mobile_shell_result(&script, &result),
+            counted: true,
+        },
+        Err(error) => failed_run(&task.id, error, true),
+    }
+}
+
+#[cfg(mobile)]
+fn format_mobile_shell_result(
+    script: &str,
+    result: &crate::runtime::shell_types::ShellRunResponse,
+) -> String {
+    let mut lines = vec![
+        format!("shell={}", result.shell),
+        format!("profile={}", result.profile),
+        format!("exit={}", result.exit_code),
+        format!("timed_out={}", result.timed_out),
+        format!("cancelled={}", result.cancelled),
+        format!("duration={}ms", result.duration_ms),
+        "script:".to_string(),
+        script.to_string(),
+    ];
+    if !result.stdout.trim().is_empty() {
+        lines.push("stdout:".to_string());
+        lines.push(result.stdout.trim().to_string());
+    }
+    if !result.stderr.trim().is_empty() {
+        lines.push("stderr:".to_string());
+        lines.push(result.stderr.trim().to_string());
+    }
+    if result.stdout_truncated {
+        lines.push("stdout_truncated=true".to_string());
+    }
+    if result.stderr_truncated {
+        lines.push("stderr_truncated=true".to_string());
+    }
+    lines.join("\n")
+}
+
+#[cfg(mobile)]
+async fn execute_mobile_http(task: &CronTask) -> CompletedRun {
+    let started_at = now_ms();
+    let overall = Instant::now();
+    let requests = task.requests.clone().unwrap_or_default();
+    if requests.is_empty() {
+        return failed_run(
+            &task.id,
+            "No HTTP requests configured for this Cron task.".to_string(),
+            true,
+        );
+    }
+    let client = match crate::services::system_proxy::cached_client() {
+        Ok(client) => client,
+        Err(error) => return failed_run(&task.id, error, true),
+    };
+    let timeout = Duration::from_secs(task.timeout_seconds.max(1));
+    let mut sections = Vec::with_capacity(requests.len());
+    let mut success = true;
+
+    for (index, request) in requests.into_iter().enumerate() {
+        let method_label = request.method.trim().to_uppercase();
+        let display = format!("{} {}", method_label, request.url.trim());
+        let request_started = Instant::now();
+        let result = execute_mobile_http_request(&client, request, timeout).await;
+        match result {
+            Ok((status, body)) => {
+                let mut lines = vec![
+                    format!("Request {}: {}", index + 1, display),
+                    format!("status={status}"),
+                    format!("duration={}ms", request_started.elapsed().as_millis()),
+                ];
+                if !body.trim().is_empty() {
+                    lines.push("response:".to_string());
+                    lines.push(body.trim().to_string());
+                }
+                sections.push(lines.join("\n"));
+            }
+            Err(error) => {
+                success = false;
+                sections.push(
+                    [
+                        format!("Request {}: {}", index + 1, display),
+                        "status=failed".to_string(),
+                        format!("duration={}ms", request_started.elapsed().as_millis()),
+                        error,
+                    ]
+                    .join("\n"),
+                );
+            }
+        }
+    }
+
+    CompletedRun {
+        task_id: task.id.clone(),
+        success,
+        started_at,
+        duration_ms: overall.elapsed().as_millis() as u64,
+        exit_code: None,
+        output: sections.join("\n\n"),
+        counted: true,
+    }
+}
+
+#[cfg(mobile)]
+async fn execute_mobile_http_request(
+    client: &reqwest::Client,
+    request: HttpRequestSpec,
+    timeout: Duration,
+) -> Result<(u16, String), String> {
+    let method_label = request.method.trim().to_uppercase();
+    let method = reqwest::Method::from_bytes(method_label.as_bytes())
+        .map_err(|_| format!("Invalid Cron HTTP method: {method_label}"))?;
+    let url = reqwest::Url::parse(request.url.trim())
+        .map_err(|error| format!("Invalid Cron HTTP URL: {} ({error})", request.url.trim()))?;
+    let mut builder = client.request(method.clone(), url.clone()).timeout(timeout);
+    if let Some(headers) = request.headers {
+        for (name, value) in headers {
+            let name = reqwest::header::HeaderName::from_bytes(name.as_bytes())
+                .map_err(|_| format!("Invalid Cron HTTP header name: {name}"))?;
+            let value = reqwest::header::HeaderValue::from_str(&value)
+                .map_err(|_| format!("Invalid Cron HTTP header value: {name}"))?;
+            builder = builder.header(name, value);
+        }
+    }
+    if matches!(
+        method,
+        reqwest::Method::POST
+            | reqwest::Method::PUT
+            | reqwest::Method::PATCH
+            | reqwest::Method::DELETE
+    ) {
+        if let Some(body) = request.body {
+            builder = builder.json(&body);
+        }
+    }
+    let response = builder
+        .send()
+        .await
+        .map_err(|error| format!("Cron HTTP request failed: {method_label} {url} ({error})"))?;
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|error| format!("Read Cron HTTP response failed: {method_label} {url} ({error})"))?;
+    if !status.is_success() {
+        let preview = body.trim();
+        return Err(if preview.is_empty() {
+            format!("Cron HTTP request failed: {method_label} {url} -> {status}")
+        } else {
+            format!("Cron HTTP request failed: {method_label} {url} -> {status}\n{preview}")
+        });
+    }
+    Ok((status.as_u16(), body))
+}
+
+#[cfg(desktop)]
 fn execute_blocking(task: CronTask, workdir: String) -> CompletedRun {
     match task.kind.as_str() {
         "bash" => execute_bash(&task, workdir),
@@ -489,6 +756,7 @@ fn execute_blocking(task: CronTask, workdir: String) -> CompletedRun {
     }
 }
 
+#[cfg(desktop)]
 fn execute_bash(task: &CronTask, workdir: String) -> CompletedRun {
     let started_at = now_ms();
     let overall = Instant::now();
@@ -540,6 +808,7 @@ fn execute_bash(task: &CronTask, workdir: String) -> CompletedRun {
     }
 }
 
+#[cfg(desktop)]
 fn execute_http(task: &CronTask) -> CompletedRun {
     let started_at = now_ms();
     let overall = Instant::now();
@@ -584,6 +853,7 @@ fn execute_http(task: &CronTask) -> CompletedRun {
     }
 }
 
+#[cfg(desktop)]
 pub fn to_http_input(request: HttpRequestSpec) -> HttpRequestInput {
     HttpRequestInput {
         id: request.id,
@@ -594,6 +864,7 @@ pub fn to_http_input(request: HttpRequestSpec) -> HttpRequestInput {
     }
 }
 
+#[cfg(desktop)]
 fn format_shell_result(script: &str, result: &ShellRunResponse) -> String {
     let mut lines = vec![
         format!("shell={}", result.shell),
@@ -620,6 +891,7 @@ fn format_shell_result(script: &str, result: &ShellRunResponse) -> String {
     lines.join("\n")
 }
 
+#[cfg(desktop)]
 fn format_http_result(index: usize, display: &str, result: &HttpExecutionResult) -> String {
     let mut lines = vec![
         format!("Request {index}: {display}"),
@@ -633,6 +905,7 @@ fn format_http_result(index: usize, display: &str, result: &HttpExecutionResult)
     lines.join("\n")
 }
 
+#[cfg(desktop)]
 fn format_http_failure(index: usize, display: &str, error: &HttpExecutionFailure) -> String {
     [
         format!("Request {index}: {display}"),

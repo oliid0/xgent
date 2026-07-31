@@ -1567,7 +1567,7 @@ function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => voi
     <div
       className={`${
         closing ? "skills-drawer-backdrop-closing" : "skills-drawer-backdrop"
-      } fixed inset-0 z-50 flex justify-end bg-foreground/[0.06] backdrop-blur-md dark:bg-background/40`}
+      } fixed inset-0 z-50 flex justify-end bg-black/35 max-sm:bg-transparent`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="provider-custom-settings-title"
@@ -1578,17 +1578,8 @@ function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => voi
       <aside
         className={`${
           closing ? "skills-drawer-panel-closing" : "skills-drawer-panel"
-        } relative flex h-full w-full flex-col overflow-hidden border-l border-white/50 bg-white/70 shadow-[-32px_0_80px_-28px_rgba(15,23,42,0.22)] backdrop-blur-[28px] backdrop-saturate-150 sm:max-w-[440px] dark:border-foreground/[0.08] dark:bg-background/60`}
+        } relative flex h-full w-full flex-col overflow-hidden border-l border-border bg-background shadow-[-24px_0_55px_-32px_rgba(15,23,42,0.35)] sm:max-w-[440px] max-sm:border-l-0`}
       >
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent dark:via-white/10"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/35 via-transparent to-white/5 dark:from-white/[0.02] dark:via-transparent dark:to-transparent"
-        />
-
         <div className="relative flex items-start gap-3 px-6 pb-4 pt-[22px]">
           <div className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]">
             <div
@@ -1619,7 +1610,7 @@ function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => voi
 
         <div className="relative min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <section className="space-y-3">
-            <div className="rounded-2xl border border-foreground/[0.06] bg-white/60 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),inset_0_1px_0_rgba(255,255,255,0.65)] backdrop-blur-xl dark:border-foreground/[0.08] dark:bg-foreground/[0.03] dark:shadow-none">
+            <div className="rounded-xl border border-border bg-muted/25 p-4">
               <div className="space-y-2">
                 <Label className="text-[12.5px] font-medium text-foreground/85">
                   {t("settings.conversationTitleModel")}
@@ -1631,7 +1622,7 @@ function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => voi
                   placeholder={t("settings.conversationTitleModelFollowCurrent")}
                   noneLabel={t("settings.conversationTitleModelFollowCurrent")}
                   ariaLabel={t("settings.conversationTitleModel")}
-                  triggerClassName="h-9 rounded-lg border-foreground/10 bg-white/70 text-[13px] shadow-sm dark:bg-background/40"
+                  triggerClassName="h-9 rounded-lg border-border bg-background text-[13px] shadow-none"
                 />
                 {modelOptions.length === 0 ? (
                   <div className="mt-1 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2 text-[11.5px] leading-relaxed text-amber-700 dark:text-amber-300">

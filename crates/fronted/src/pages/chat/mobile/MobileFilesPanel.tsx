@@ -1,6 +1,6 @@
 import { openUrl } from "@xagent/runtime";
 import { useCallback, useMemo } from "react";
-import { FolderTree, X } from "../../../components/icons";
+import { FolderTree } from "../../../components/icons";
 import { FileTreePanel } from "../../../components/project-tools/file-tree";
 import {
   WorkspaceToolsContext,
@@ -11,6 +11,7 @@ import { useLocale } from "../../../i18n";
 import type { WorkspaceFileTreeState, WorkspaceFileTreeStatePatch } from "../../../lib/settings";
 import type { TerminalClient } from "../../../lib/terminal/types";
 import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
+import { MobileFullscreenPanel, MobilePanelHeader } from "./MobilePanelScaffold";
 
 type MobileFilesPanelProps = {
   open: boolean;
@@ -130,35 +131,23 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
 
   return (
     <WorkspaceToolsContext.Provider value={context}>
-      <section
-        data-edge-swipe-ignore
-        aria-label={t("sidebar.myFiles")}
-        className="absolute inset-0 z-50 flex min-h-0 flex-col bg-background"
-      >
-        <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-border/50 bg-background/85 px-3 backdrop-blur-2xl backdrop-saturate-150">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500/10 text-sky-500">
+      <MobileFullscreenPanel open label={t("sidebar.myFiles")}>
+        <MobilePanelHeader
+          title={t("sidebar.myFiles")}
+          subtitle={cwd || undefined}
+          backLabel={t("chat.cancel")}
+          onBack={onClose}
+          leading={
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-foreground">
             <FolderTree className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-[16px] font-semibold tracking-tight">
-              {t("sidebar.myFiles")}
-            </h2>
-            {cwd ? <p className="truncate text-[11px] text-muted-foreground">{cwd}</p> : null}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors active:bg-foreground/[0.08] active:text-foreground"
-            aria-label={t("chat.cancel")}
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </header>
+            </span>
+          }
+        />
 
         <div className="min-h-0 flex-1 pb-[env(safe-area-inset-bottom,0px)]">
           <FileTreePanel active touchActions />
         </div>
-      </section>
+      </MobileFullscreenPanel>
     </WorkspaceToolsContext.Provider>
   );
 }

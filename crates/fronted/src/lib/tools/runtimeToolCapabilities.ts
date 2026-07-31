@@ -24,13 +24,16 @@ const DESKTOP_TOOL_CAPABILITIES: RuntimeToolCapabilities = {
 
 const NATIVE_MOBILE_TOOL_CAPABILITIES: RuntimeToolCapabilities = {
   managedProcess: false,
-  cron: false,
+  // Native Cron uses the same persistent scheduler state as desktop. Shell
+  // jobs execute through the mobile runner (with paired-LAN fallback), while
+  // HTTP and prompt jobs stay inside the native application runtime.
+  cron: true,
   // Native mobile can use network MCP transports directly. Local stdio MCP
   // needs a persistent child-process protocol bridge, which neither iOS nor
   // the current Android PRoot runner exposes.
   mcp: true,
   localMcpStdio: false,
-  ssh: false,
+  ssh: true,
   terminal: false,
   subagents: false,
   customSystemTools: false,

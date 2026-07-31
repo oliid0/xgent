@@ -93,7 +93,7 @@ export function MobileQuickActions(props: MobileQuickActionsProps) {
           collisionPadding={12}
           className="z-[100]"
         >
-          <Popover.Popup className="w-[min(20rem,calc(100vw-1.5rem))] rounded-3xl border border-white/40 bg-background/88 p-2.5 shadow-2xl outline-none backdrop-blur-2xl backdrop-saturate-150 dark:border-white/[0.09] dark:bg-background/84">
+          <Popover.Popup className="w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-border bg-popover p-2.5 shadow-xl outline-none">
             <div className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               {t("chat.mobileMenu.title")}
             </div>

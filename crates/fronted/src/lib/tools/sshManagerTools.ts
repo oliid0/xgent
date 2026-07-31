@@ -548,6 +548,7 @@ async function executeSSHManager(
     hosts: SshHostConfig[];
     associatedHostIds: string[];
     pathResolver: ToolPathResolver;
+    mobileCommandMode: boolean;
     onSshSessionsChanged?: (change: SshManagerSessionChange) => void | Promise<void>;
   },
   signal?: AbortSignal,
@@ -601,6 +602,63 @@ async function executeSSHManager(
           : "No authorized SSH hosts.",
         details: { hosts },
       });
+    }
+
+    if (params.mobileCommandMode) {
+      if (action !== "exec") {
+        throw new Error(
+          "Native mobile SSH supports list_hosts and one-shot exec. Interactive sessions and SFTP require a paired desktop command host.",
+        );
+      }
+      const hostId = requireString(args, "host_id");
+      const host = allowedHosts.get(hostId);
+      if (!host) {
+        throw new Error("SSH host is not associated with the current project.");
+      }
+      if (host.authType === "keyboardInteractive") {
+        throw new Error(
+          "Keyboard-interactive SSH needs a live terminal; configure password/private-key authentication or pair a desktop command host.",
+        );
+      }
+      const command = requireString(args, "command");
+      const cwd = normalizeOptionalString(args.cwd);
+      const remoteCommand = cwd
+        ? `cd '${cwd.replaceAll("'", `'\\''`)}' && ${command}`
+        : command;
+      const runId = `ssh-tool-${toolCall.id}`
+        .replace(/[^A-Za-z0-9._-]/g, "-")
+        .slice(0, 120);
+      const cancel = () => {
+        void invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
+      };
+      signal?.addEventListener("abort", cancel, { once: true });
+      try {
+        const result = await invoke<Record<string, unknown>>("mobile_ssh_exec", {
+          host_id: host.id,
+          workdir: params.workdir,
+          remote_command: remoteCommand,
+          timeout_ms: normalizeOptionalPositiveInt(args.timeout_ms, 1_000, 300_000),
+          run_id: runId,
+        });
+        return okResult({
+          toolCall,
+          action,
+          text: [
+            `host_id: ${host.id}`,
+            `exit_code: ${result.exitCode ?? result.exit_code ?? "unknown"}`,
+            `timed_out: ${result.timedOut === true || result.timed_out === true ? "true" : "false"}`,
+            "",
+            "stdout:",
+            String(result.stdout ?? "") || "(empty)",
+            "",
+            "stderr:",
+            String(result.stderr ?? "") || "(empty)",
+          ].join("\n"),
+          details: { host: hostSummary(host), result, mobile_command_mode: true },
+        });
+      } finally {
+        signal?.removeEventListener("abort", cancel);
+      }
     }
 
     if (action === "list_sessions") {
@@ -1010,6 +1068,7 @@ export function createSSHManagerTools(params: {
   projectPathKey?: string;
   hosts?: SshHostConfig[];
   associatedHostIds?: string[];
+  mobileCommandMode?: boolean;
   resolveHomeDir?: () => Promise<string>;
   onSshSessionsChanged?: (change: SshManagerSessionChange) => void | Promise<void>;
 }): BuiltinToolBundle {
@@ -1025,7 +1084,15 @@ export function createSSHManagerTools(params: {
     params.runtimeScope === "chat" &&
     projectPathKey.trim() &&
     associatedHostIds.length > 0
-      ? [SSH_MANAGER_TOOL]
+      ? [
+          params.mobileCommandMode
+            ? {
+                ...SSH_MANAGER_TOOL,
+                description:
+                  "Run non-interactive commands on SSH hosts explicitly associated with the current project. Call list_hosts first when the host id is unknown, then exec with host_id and command. Credentials remain in XAgent secure storage. Native mobile mode does not expose persistent sessions or SFTP; use a paired desktop command host for those actions.",
+              }
+            : SSH_MANAGER_TOOL,
+        ]
       : [];
 
   return {
@@ -1040,6 +1107,7 @@ export function createSSHManagerTools(params: {
           hosts,
           associatedHostIds,
           pathResolver,
+          mobileCommandMode: params.mobileCommandMode === true,
           onSshSessionsChanged: params.onSshSessionsChanged,
         },
         signal,

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   Check,
@@ -44,6 +43,7 @@ import {
   parseHttpRequestDrafts,
   requestToDraft,
 } from "./httpRequestEditor";
+import { SettingsModalShell } from "./SettingsModalShell";
 import { ModelPicker, type ModelPickerOption } from "./modelPicker";
 
 export type CronPromptModelOption = ModelPickerOption;
@@ -302,14 +302,8 @@ export function CronTaskModal({
 
   const modalTitle = mode === "add" ? t("settings.cronModalAdd") : t("settings.cronModalEdit");
 
-  return createPortal(
-    <div
-      className="settings-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
-      data-state={modalState}
-    >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={requestClose} />
-
-      <div className="settings-modal-panel relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl">
+  return (
+    <SettingsModalShell onClose={requestClose} state={modalState} ariaLabel={modalTitle}>
         {/* Header */}
         <div className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
@@ -862,8 +856,6 @@ export function CronTaskModal({
             </Button>
           </div>
         </div>
-      </div>
-    </div>,
-    document.body,
+    </SettingsModalShell>
   );
 }

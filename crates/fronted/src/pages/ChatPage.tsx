@@ -236,6 +236,7 @@ import { MobileBackgroundTasksPanel } from "./chat/mobile/MobileBackgroundTasksP
 import { MobileFilesPanel } from "./chat/mobile/MobileFilesPanel";
 import { MobileGitReviewPanel } from "./chat/mobile/MobileGitReviewPanel";
 import { MobileQuickActions } from "./chat/mobile/MobileQuickActions";
+import { MobileSshPanel } from "./chat/mobile/MobileSshPanel";
 import { type MobileShellPanelMode, MobileTerminalPanel } from "./chat/mobile/MobileTerminalPanel";
 import { MobileToolActivity } from "./chat/mobile/MobileToolActivity";
 import { MobileWorkspaceCreateDialog } from "./chat/mobile/MobileWorkspaceCreateDialog";
@@ -309,6 +310,7 @@ type MobileWorkspaceDestination =
   | { kind: "background-tasks" }
   | { kind: "files" }
   | { kind: "git-review" }
+  | { kind: "ssh" }
   | { kind: "browser-settings" }
   | {
       kind: "terminal";
@@ -1413,6 +1415,8 @@ export function ChatPage(props: ChatPageProps) {
           setMobileWorkspaceDestination({ kind: "background-tasks" });
         } else if (target === "gitReview") {
           setMobileWorkspaceDestination({ kind: "git-review" });
+        } else if (target === "sshConnection" && nativeMobile) {
+          setMobileWorkspaceDestination({ kind: "ssh" });
         } else {
           setMobileWorkspaceDestination({
             kind: "terminal",
@@ -1431,6 +1435,7 @@ export function ChatPage(props: ChatPageProps) {
       desktopBridgeEnabled,
       mobileExperience,
       mobileWorkspacePathKey,
+      nativeMobile,
       showDesktopWorkspaceTool,
       terminalDisabledMessage,
     ],
@@ -4073,6 +4078,11 @@ export function ChatPage(props: ChatPageProps) {
     setMobileWorkspaceDestination({ kind: "git-review" });
   }, []);
 
+  const handleOpenMobileSsh = useCallback(() => {
+    setSidebarOpen(false);
+    setMobileWorkspaceDestination({ kind: "ssh" });
+  }, []);
+
   const handleOpenMobileSidebar = useCallback(() => {
     setMobileWorkspaceDestination(null);
     setSidebarOpen(true);
@@ -4716,7 +4726,7 @@ export function ChatPage(props: ChatPageProps) {
                           setMobileWorkspaceDestination({ kind: "browser-settings" });
                         }}
                         onOpenGitReview={handleOpenMobileGitReview}
-                        onOpenSsh={() => handleOpenMobileTerminal("ssh")}
+                        onOpenSsh={handleOpenMobileSsh}
                         onOpenBackgroundTasks={handleOpenMobileBackgroundTasks}
                       />
                     ) : (
@@ -4935,6 +4945,18 @@ export function ChatPage(props: ChatPageProps) {
           <MobileGitReviewPanel
             open={mobileWorkspaceDestination?.kind === "git-review"}
             workdir={mobileWorkspacePath}
+            onClose={() => setMobileWorkspaceDestination(null)}
+          />
+        ) : null}
+        {nativeMobile ? (
+          <MobileSshPanel
+            open={mobileWorkspaceDestination?.kind === "ssh"}
+            workdir={mobileWorkspacePath}
+            hosts={settings.ssh.hosts}
+            onOpenSettings={() => {
+              setMobileWorkspaceDestination(null);
+              onOpenSettings("ssh");
+            }}
             onClose={() => setMobileWorkspaceDestination(null)}
           />
         ) : null}

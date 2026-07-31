@@ -27,18 +27,15 @@ trap 'rm -rf "$TEMP_ROOT"' EXIT
 package_record() {
   local termux_arch="$1"
   local package_name="$2"
-  local index="$TEMP_ROOT/Packages-$termux_arch.xz"
+  local index="$TEMP_ROOT/Packages-$termux_arch"
   if [ ! -f "$index" ]; then
-    curl --fail --location --proto '=https' --tlsv1.2 \
-      "$TERMUX_PACKAGE_REPOSITORY/dists/stable/main/binary-$termux_arch/Packages.xz" \
-      --output "$index"
+    fetch_package_index "$termux_arch" "$index"
   fi
   python3 - "$index" "$package_name" <<'PY'
-import lzma
 import sys
 
 index_path, wanted = sys.argv[1:]
-with lzma.open(index_path, "rt", encoding="utf-8", errors="strict") as stream:
+with open(index_path, "rt", encoding="utf-8", errors="strict") as stream:
     paragraphs = stream.read().split("\n\n")
 for paragraph in paragraphs:
     fields = {}
@@ -56,6 +53,45 @@ raise SystemExit(f"Package {wanted} was not found for this architecture")
 PY
 }
 
+fetch_package_index() {
+  local termux_arch="$1"
+  local destination="$2"
+  local base="$TERMUX_PACKAGE_REPOSITORY/dists/stable/main/binary-$termux_arch/Packages"
+  local compressed="$TEMP_ROOT/Packages-$termux_arch.download"
+  local encoding
+
+  for encoding in xz gz plain; do
+    local url="$base"
+    [ "$encoding" = xz ] && url="$base.xz"
+    [ "$encoding" = gz ] && url="$base.gz"
+    if curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
+      --proto '=https' --tlsv1.2 "$url" --output "$compressed"; then
+      if python3 - "$compressed" "$destination" "$encoding" <<'PY'
+import gzip
+import lzma
+import pathlib
+import sys
+
+source, destination, encoding = sys.argv[1:]
+payload = pathlib.Path(source).read_bytes()
+if encoding == "xz":
+    payload = lzma.decompress(payload)
+elif encoding == "gz":
+    payload = gzip.decompress(payload)
+text = payload.decode("utf-8", errors="strict")
+if "Package: proot\n" not in text:
+    raise SystemExit("Termux package index does not contain PRoot")
+pathlib.Path(destination).write_text(text, encoding="utf-8", newline="\n")
+PY
+      then
+        return 0
+      fi
+    fi
+  done
+  echo "Unable to download a valid Termux package index for $termux_arch" >&2
+  return 1
+}
+
 extract_official_package() {
   local termux_arch="$1"
   local package_name="$2"
@@ -64,7 +100,7 @@ extract_official_package() {
   record="$(package_record "$termux_arch" "$package_name")"
   IFS=$'\t' read -r version filename sha256 <<<"$record"
   archive="$TEMP_ROOT/${termux_arch}-${package_name}.deb"
-  curl --fail --location --proto '=https' --tlsv1.2 \
+  curl --fail --location --retry 3 --retry-all-errors --proto '=https' --tlsv1.2 \
     "$TERMUX_PACKAGE_REPOSITORY/$filename" --output "$archive"
   echo "$sha256  $archive" | sha256sum --check --status
   member="$(ar t "$archive" | awk '/^data\.tar(\.|$)/ { print; exit }')"
@@ -260,6 +296,7 @@ build_abi() {
   cp -a "$TEMP_ROOT/proot-upstream/." "$source_root"
   cp -a "$TEMP_ROOT/dependencies/talloc-${TALLOC_VERSION}" "$dependency_root/talloc"
   cp "$TEMP_ROOT/dependencies/libandroid-shmem-${SHMEM_VERSION}/shmem.c" "$dependency_root/"
+  cp "$TEMP_ROOT/dependencies/libandroid-shmem-${SHMEM_VERSION}/shm.h" "$include_root/shm.h"
   cp "$TEMP_ROOT/dependencies/libandroid-shmem-${SHMEM_VERSION}/shm.h" "$include_root/sys/shm.h"
 
   # Use talloc's own cross-compile configuration, following the official

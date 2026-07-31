@@ -24,7 +24,7 @@ const TRANSPORT_SSE: &str = "sse";
 pub(crate) const LOCAL_FILE_MCP_TOOL: &str = "local-file";
 
 /// 手选配置文件的体积上限，防止误选大文件把整份内容读进内存。
-const MAX_MCP_CONFIG_FILE_BYTES: u64 = 16 * 1024 * 1024;
+pub(crate) const MAX_MCP_CONFIG_FILE_BYTES: usize = 16 * 1024 * 1024;
 
 pub(crate) fn scan_external_mcp_servers() -> Vec<SystemExternalMcpToolScan> {
     vec![
@@ -51,7 +51,7 @@ pub(crate) fn scan_mcp_config_file(path: &str) -> Result<SystemExternalMcpToolSc
     if !metadata.is_file() {
         return Err(format!("Not a file: {}", file.display()));
     }
-    if metadata.len() > MAX_MCP_CONFIG_FILE_BYTES {
+    if metadata.len() > MAX_MCP_CONFIG_FILE_BYTES as u64 {
         return Err(format!(
             "Config file too large: {} ({} bytes, max {MAX_MCP_CONFIG_FILE_BYTES} bytes)",
             file.display(),
@@ -62,7 +62,27 @@ pub(crate) fn scan_mcp_config_file(path: &str) -> Result<SystemExternalMcpToolSc
     let text = std::fs::read_to_string(&file)
         .map_err(|err| format!("Failed to read {display}: {err}"))?;
 
-    let is_toml = file
+    scan_mcp_config_content(&display, &text)
+}
+
+/// Parse MCP configuration text uploaded by the frontend. This keeps Android/iOS WebViews
+/// independent from desktop filesystem paths while sharing the desktop parser and validation.
+pub(crate) fn scan_mcp_config_content(
+    display: &str,
+    text: &str,
+) -> Result<SystemExternalMcpToolScan, String> {
+    let display = display.trim();
+    if display.is_empty() {
+        return Err("MCP config name must not be empty".to_string());
+    }
+    if text.len() > MAX_MCP_CONFIG_FILE_BYTES {
+        return Err(format!(
+            "Config file too large: {display} ({} bytes, max {MAX_MCP_CONFIG_FILE_BYTES} bytes)",
+            text.len(),
+        ));
+    }
+
+    let is_toml = PathBuf::from(display)
         .extension()
         .and_then(std::ffi::OsStr::to_str)
         .is_some_and(|ext| ext.eq_ignore_ascii_case("toml"));
@@ -70,9 +90,9 @@ pub(crate) fn scan_mcp_config_file(path: &str) -> Result<SystemExternalMcpToolSc
     let mut servers = Vec::new();
     let mut errors = Vec::new();
     if is_toml {
-        parse_mcp_config_toml(&text, &display, &mut servers, &mut errors)?;
+        parse_mcp_config_toml(text, display, &mut servers, &mut errors)?;
     } else {
-        parse_mcp_config_json(&text, &display, &mut servers, &mut errors)?;
+        parse_mcp_config_json(text, display, &mut servers, &mut errors)?;
     }
     if servers.is_empty() {
         let mut message = format!("No MCP server definitions found in {display}");
@@ -98,8 +118,8 @@ pub(crate) fn scan_mcp_config_file(path: &str) -> Result<SystemExternalMcpToolSc
     }
     Ok(finish_scan(
         LOCAL_FILE_MCP_TOOL,
-        vec![display.clone()],
-        &display,
+        vec![display.to_string()],
+        display,
         servers,
         errors,
     ))

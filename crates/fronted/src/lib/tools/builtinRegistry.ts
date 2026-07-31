@@ -252,6 +252,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
             projectPathKey: params.projectPathKey,
             hosts: params.sshHosts,
             associatedHostIds: params.associatedSshHostIds,
+            mobileCommandMode: runtimeToolHost === "native-mobile",
             resolveHomeDir,
             onSshSessionsChanged: params.onSshSessionsChanged,
           }),
