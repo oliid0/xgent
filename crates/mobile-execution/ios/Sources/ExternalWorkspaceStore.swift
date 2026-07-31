@@ -13,6 +13,15 @@ private struct ActiveExternalWorkspace {
     let url: URL
 }
 
+struct ExternalWorkspaceListItem: Encodable {
+    let id: String
+    let name: String
+    let path: String
+    let writable: Bool
+    let active: Bool
+    let detail: String?
+}
+
 /**
  * Owns persistent security-scoped folder grants used by the iOS a-Shell
  * backend and by Rust file tools in the same application process.
@@ -42,11 +51,11 @@ final class IOSExternalWorkspaceStore {
         urls.forEach { $0.stopAccessingSecurityScopedResource() }
     }
 
-    func listPayload() -> [[String: Any]] {
+    func listEncodablePayload() -> [ExternalWorkspaceListItem] {
         lock.lock()
         defer { lock.unlock() }
         return entries.map { entry in
-            payload(
+            encodablePayload(
                 entry,
                 active: activeById[entry.id],
                 restoreError: restoreErrors[entry.id]
@@ -289,6 +298,31 @@ final class IOSExternalWorkspaceStore {
             "active": active != nil,
             "detail": detail,
         ]
+    }
+
+    private func encodablePayload(
+        _ entry: PersistedExternalWorkspace,
+        active: ActiveExternalWorkspace?,
+        restoreError: String?
+    ) -> ExternalWorkspaceListItem {
+        let detail: String?
+        if let restoreError {
+            detail = restoreError
+        } else if active == nil {
+            detail = "Restoring access to the selected folder"
+        } else if !entry.writable {
+            detail = "The selected folder is mounted read-only"
+        } else {
+            detail = nil
+        }
+        return ExternalWorkspaceListItem(
+            id: entry.id,
+            name: entry.name,
+            path: active?.url.path ?? entry.lastKnownPath ?? "",
+            writable: entry.writable,
+            active: active != nil,
+            detail: detail
+        )
     }
 
     private func save(_ persisted: [PersistedExternalWorkspace]) throws {

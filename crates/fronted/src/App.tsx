@@ -1,5 +1,11 @@
 import type { Context } from "@earendil-works/pi-ai";
-import { invoke, isBrowserRuntime } from "@xagent/runtime";
+import {
+  configureLanPcCommandHost,
+  invoke,
+  isBrowserRuntime,
+  LAN_PC_SESSION_CHANGED_EVENT,
+  listen,
+} from "@xagent/runtime";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { CronPromptRunner } from "./components/cron/CronPromptRunner";
@@ -29,9 +35,10 @@ import {
   type SettingsSaveState,
 } from "./lib/settings/storage";
 import { SoulProvider } from "./lib/soul";
+import { applyFontFamilies } from "./lib/system/fontFamily";
 import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";
-import type { SectionId } from "./pages/settings/types";
+import type { SectionId, SettingsOpenOptions } from "./pages/settings/types";
 import { startLocalAccessHostBridge } from "./runtime/localAccessHostBridge";
 
 function getDefaultContext(): Context {
@@ -99,8 +106,11 @@ export default function App() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SectionId>("system");
+  const [soulCreateRequestId, setSoulCreateRequestId] = useState(0);
   const [settingsReady, setSettingsReady] = useState(false);
   const [settings, setSettingsState] = useState<AppSettings>(() => getDefaultSettings());
+  const [lanPcCommandHostReady, setLanPcCommandHostReady] = useState(false);
+  const [lanPcSessionRevision, setLanPcSessionRevision] = useState(0);
   const [settingsSaveState, setSettingsSaveState] = useState<SettingsSaveState>({
     status: "idle",
   });
@@ -137,6 +147,89 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!nativeMobile) return;
+    let disposed = false;
+    let unlistenSessionChange: (() => void) | undefined;
+    void listen(LAN_PC_SESSION_CHANGED_EVENT, () => {
+      if (!disposed) setLanPcSessionRevision((revision) => revision + 1);
+    }).then((dispose) => {
+      if (disposed) {
+        dispose();
+      } else {
+        unlistenSessionChange = dispose;
+      }
+    });
+    return () => {
+      disposed = true;
+      unlistenSessionChange?.();
+    };
+  }, [nativeMobile]);
+
+  useEffect(() => {
+    let cancelled = false;
+    configureLanPcCommandHost();
+    setLanPcCommandHostReady(false);
+    if (
+      !settingsReady ||
+      !nativeMobile ||
+      !settings.access.preferLanPcExecution ||
+      !settings.access.lanControlUrl.trim()
+    ) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const baseUrl = settings.access.lanControlUrl.trim();
+    void Promise.all([
+      invoke<{ defaultWorkdir?: unknown }>("lan_pc_invoke", {
+        base_url: baseUrl,
+        command: "settings_load_all",
+        args: {},
+      }),
+      invoke<string>("lan_pc_invoke", {
+        base_url: baseUrl,
+        command: "system_home_dir",
+        args: {},
+      }),
+    ])
+      .then(([snapshot, remoteHomeDir]) => {
+        if (cancelled) return;
+        const remoteWorkdir =
+          typeof snapshot.defaultWorkdir === "string" ? snapshot.defaultWorkdir.trim() : "";
+        if (!remoteWorkdir) {
+          throw new Error("LAN computer did not return a default workspace");
+        }
+        configureLanPcCommandHost({
+          enabled: true,
+          baseUrl,
+          localWorkdir: settings.system.workdir,
+          remoteWorkdir,
+          remoteHomeDir,
+        });
+        setLanPcCommandHostReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          configureLanPcCommandHost();
+          setLanPcCommandHostReady(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      configureLanPcCommandHost();
+    };
+  }, [
+    lanPcSessionRevision,
+    nativeMobile,
+    settings.access.lanControlUrl,
+    settings.access.preferLanPcExecution,
+    settings.system.workdir,
+    settingsReady,
+  ]);
+
+  useEffect(() => {
     if (settings.theme !== "system") return;
     return subscribeToSystemThemePreference(() => {
       setSystemThemeVersion((version) => version + 1);
@@ -148,6 +241,18 @@ export default function App() {
     const root = document.documentElement;
     root.classList.toggle("dark", effectiveTheme === "dark");
   }, [effectiveTheme]);
+
+  useEffect(() => {
+    applyFontFamilies({
+      interfaceFontFamily: settings.customSettings.interfaceFontFamily,
+      chatFontFamily: settings.customSettings.chatFontFamily,
+      codeFontFamily: settings.customSettings.codeFontFamily,
+    });
+  }, [
+    settings.customSettings.chatFontFamily,
+    settings.customSettings.codeFontFamily,
+    settings.customSettings.interfaceFontFamily,
+  ]);
 
   useEffect(() => {
     if (!settingsReady || !desktopBridgeEnabled) return;
@@ -252,6 +357,7 @@ export default function App() {
   // synchronously by setSettings, so read-modify-write sequences that stay in
   // one synchronous segment can never observe a stale snapshot.
   const getMcpSettings = useCallback(() => settingsRef.current.mcp, []);
+  const getToolPolicies = useCallback(() => settingsRef.current.system.toolPolicies, []);
 
   const reloadPersistedSettings = useCallback(async () => {
     await saveChainRef.current.catch(() => undefined);
@@ -271,8 +377,13 @@ export default function App() {
   }, [setSettings]);
 
   const openSettings = useCallback(
-    (section: SectionId = "system") => {
+    (section: SectionId = "system", options?: SettingsOpenOptions) => {
       setSettingsSection(section);
+      if (section === "soul" && options?.createSoul) {
+        setSoulCreateRequestId((current) => current + 1);
+      } else {
+        setSoulCreateRequestId(0);
+      }
       setSettingsOpen(true);
       setOverlay("entering");
       requestAnimationFrame(() => requestAnimationFrame(() => setOverlay("open")));
@@ -322,11 +433,11 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (!settingsReady || !desktopBridgeEnabled) return;
+    if (!settingsReady || (!desktopBridgeEnabled && !lanPcCommandHostReady)) return;
     void initAutomation().catch((error) => {
       console.warn("Failed to initialize automation store", error);
     });
-  }, [desktopBridgeEnabled, settingsReady]);
+  }, [desktopBridgeEnabled, lanPcCommandHostReady, settingsReady]);
 
   if (!settingsReady || !platformResolved) {
     return (
@@ -354,12 +465,14 @@ export default function App() {
               settings={settings}
               setSettings={setSettings}
               getMcpSettings={getMcpSettings}
+              getToolPolicies={getToolPolicies}
               context={context}
               setContext={setContext}
               onOpenSettings={openSettings}
               onToggleTheme={toggleTheme}
               appUpdate={appUpdate}
               desktopBridgeEnabled={desktopBridgeEnabled}
+              lanPcCommandHostReady={lanPcCommandHostReady}
               nativeMobile={nativeMobile}
             />
           </AppErrorBoundary>
@@ -393,9 +506,7 @@ export default function App() {
                     saveState={settingsSaveState}
                     onBack={closeSettings}
                     initialSection={settingsSection}
-                    hiddenSections={
-                      desktopBridgeEnabled ? [] : ["agents", "ssh", "hooks", "cron", "systemTools"]
-                    }
+                    soulCreateRequestId={soulCreateRequestId}
                     nativeMobile={nativeMobile}
                     appUpdate={appUpdate}
                   />

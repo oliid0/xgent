@@ -34,9 +34,10 @@ runtimes are not included.
 - License: MIT
 - Copyright: Akio Yasui and contributors
 
-## PRoot 5.1.107.87 (Android only)
+## PRoot from official termux/proot source (Android only)
 
-- Upstream: `https://github.com/termux/proot/tree/v5.1.107.87`
+- Upstream commit: `a89b3732ec6ae1db674510f0843b2f3db54d0a2f`
+- Upstream: `https://github.com/termux/proot/tree/a89b3732ec6ae1db674510f0843b2f3db54d0a2f`
 - License: GPL-2.0-or-later
 - Included as a separate executable, not linked into XAgent.
 - Corresponding source and reproduction details: `PROOT_SOURCE.md`.
@@ -44,9 +45,9 @@ runtimes are not included.
 ## PRoot native dependencies (Android only)
 
 - libandroid-shmem 0.7 — BSD-3-Clause
-- libtalloc 2.4.3 — LGPL-3.0-or-later
-- Binary distributor: the official Termux package repository.
-- Package paths and SHA-256 digests are pinned in
+- libtalloc 2.4.4 — LGPL-3.0-or-later
+- Built from official source archives and linked statically into the separate
+  PRoot executable. Source URLs and SHA-256 digests are pinned in
   `scripts/mobile/prepare-proot-android.sh`.
 
 ## Alpine Linux minirootfs 3.22.5 (Android only)

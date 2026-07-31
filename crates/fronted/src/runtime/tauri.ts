@@ -7,6 +7,13 @@ import {
   revealItemInDir as tauriRevealItemInDir,
 } from "@tauri-apps/plugin-opener";
 
+import {
+  getLanPcCommandHostConfig,
+  LAN_PC_RELAY_EVENT,
+  prepareLanPcInvokeArgs,
+  shouldDelegateCommandToLanPc,
+  shouldDelegateEventToLanPc,
+} from "./lanPcCommandHost";
 import type {
   RuntimeEvent,
   RuntimeFileDropEvent,
@@ -17,10 +24,46 @@ import type {
 
 export const tauriRuntime: XAgentRuntime = {
   invoke<T>(command: string, args?: RuntimeInvokeArgs) {
+    if (shouldDelegateCommandToLanPc(command, args)) {
+      const host = getLanPcCommandHostConfig();
+      return tauriInvoke<T>("lan_pc_invoke", {
+        base_url: host.baseUrl,
+        command,
+        args: prepareLanPcInvokeArgs(args),
+      });
+    }
     return tauriInvoke<T>(command, args);
   },
 
-  listen<T>(event: string, handler: (event: RuntimeEvent<T>) => void) {
+  async listen<T>(event: string, handler: (event: RuntimeEvent<T>) => void) {
+    if (shouldDelegateEventToLanPc(event)) {
+      const host = getLanPcCommandHostConfig();
+      let subscriptionId = "";
+      const unlisten = await tauriListen<{
+        subscriptionId?: string;
+        payload?: unknown;
+      }>(LAN_PC_RELAY_EVENT, (relayed) => {
+        if (subscriptionId && relayed.payload.subscriptionId === subscriptionId) {
+          handler({ payload: relayed.payload.payload as T });
+        }
+      });
+      try {
+        const response = await tauriInvoke<{ subscriptionId: string }>("lan_pc_subscribe", {
+          base_url: host.baseUrl,
+          event,
+        });
+        subscriptionId = response.subscriptionId;
+      } catch (error) {
+        unlisten();
+        throw error;
+      }
+      return () => {
+        unlisten();
+        if (subscriptionId) {
+          void tauriInvoke("lan_pc_unsubscribe", { subscription_id: subscriptionId });
+        }
+      };
+    }
     return tauriListen<T>(event, handler);
   },
 
@@ -33,6 +76,8 @@ export const tauriRuntime: XAgentRuntime = {
   },
 
   homeDir() {
+    const host = getLanPcCommandHostConfig();
+    if (host.enabled && host.remoteHomeDir) return Promise.resolve(host.remoteHomeDir);
     return tauriHomeDir();
   },
 

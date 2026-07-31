@@ -1,6 +1,7 @@
 import type {
   CodexRequestFormat,
   CustomProvider,
+  ProviderAuthMode,
   ProviderModelConfig,
   ReasoningLevel,
 } from "../../settings";
@@ -13,6 +14,8 @@ export type CompactionIntent = "optimization" | "protection";
 export type ProviderRuntimeConfig = {
   baseUrl: string;
   apiKey: string;
+  authMode?: ProviderAuthMode;
+  oauthAccountId?: string;
   customHeaders?: CustomProvider["customHeaders"];
   requestFormat?: CodexRequestFormat;
   reasoning?: ReasoningLevel;

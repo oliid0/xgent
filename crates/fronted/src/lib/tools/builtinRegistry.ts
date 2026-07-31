@@ -30,7 +30,10 @@ import { createFsTools } from "./fsTools";
 import { createMcpManagerTools } from "./mcpManagerTools";
 import { createMcpTools } from "./mcpTools";
 import { createMemoryTools } from "./memoryTools";
-import { resolveRuntimeToolCapabilities } from "./runtimeToolCapabilities";
+import {
+  resolveRuntimeToolCapabilities,
+  resolveRuntimeToolHost,
+} from "./runtimeToolCapabilities";
 import { createShellTools } from "./shellTools";
 import type { SkillAccessPolicy } from "./skillAccessPolicy";
 import { createSkillTools } from "./skillTools";
@@ -129,6 +132,7 @@ type BuildBuiltinBaseToolRegistryParams = {
   providerId: ProviderId;
   runtimePlatform?: RuntimePlatform;
   nativeMobileRuntime?: boolean;
+  lanPcCommandHostReady?: boolean;
   fileState: FileToolState;
   skillsEnabled: boolean;
   skillsRootDir?: string;
@@ -162,7 +166,11 @@ type BuildBuiltinBaseToolRegistryParams = {
 const resolveHomeDir = () => homeDir();
 
 async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryParams) {
-  const capabilities = resolveRuntimeToolCapabilities(params.nativeMobileRuntime === true);
+  const runtimeToolHost = resolveRuntimeToolHost(
+    params.nativeMobileRuntime === true,
+    params.lanPcCommandHostReady === true,
+  );
+  const capabilities = resolveRuntimeToolCapabilities(runtimeToolHost);
   const baseBundles: BuiltinToolBundle[] = [
     createFsTools({
       workdir: params.workdir,
@@ -224,7 +232,14 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       workdir: params.workdir,
       mode: params.memoryToolMode ?? "rw",
     }),
-    createBrowserUseTools(),
+    createBrowserUseTools({
+      delegateToLanPc: {
+        enabled:
+          params.nativeMobileRuntime === true &&
+          params.cloudExecution?.preferLanPcExecution === true,
+        baseUrl: params.cloudExecution?.lanControlUrl ?? "",
+      },
+    }),
     ...(params.cloudExecution?.cloudExecutionEnabled
       ? [createCloudTaskTools(params.cloudExecution, params.workdir)]
       : []),
@@ -279,7 +294,11 @@ export async function buildBuiltinToolRegistry(
     askUserQuestionConversationId?: string;
   },
 ) {
-  const capabilities = resolveRuntimeToolCapabilities(params.nativeMobileRuntime === true);
+  const runtimeToolHost = resolveRuntimeToolHost(
+    params.nativeMobileRuntime === true,
+    params.lanPcCommandHostReady === true,
+  );
+  const capabilities = resolveRuntimeToolCapabilities(runtimeToolHost);
   const baseBundles = await buildBaseBuiltinToolBundles(params);
   const todoBundles =
     params.runtimeScope === "chat" && params.todoState

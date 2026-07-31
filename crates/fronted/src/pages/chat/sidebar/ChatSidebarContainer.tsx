@@ -5,7 +5,7 @@
 
 import { Fragment, useCallback, useMemo, useState } from "react";
 import { ChatHistorySidebar } from "../../../components/chat/ChatHistorySidebar";
-import type { WorkspaceToolTarget } from "../../../components/project-tools/rightDockModel";
+import type { WorkspaceToolTarget } from "../../../components/project-tools/workspaceToolsModel";
 import { useLocale } from "../../../i18n";
 import type { AppUpdateController } from "../../../lib/appUpdates";
 import { normalizeConversationTitle } from "../../../lib/chat/page/chatPageHelpers";
@@ -62,10 +62,12 @@ type ChatSidebarContainerProps = {
   onConversationDeleted: (id: string) => void;
   onCloseSidebar: () => void;
   onOpenSettings: () => void;
+  onCreateSoul: () => void;
   appUpdate?: AppUpdateController;
   onOpenSkillsHub: () => void;
   onOpenMcpHub: () => void;
   mobileExperience?: boolean;
+  desktopPanelMode?: boolean;
   workspaceToolsAvailable?: boolean;
   fileTreeAvailable?: boolean;
   terminalShellOptions?: TerminalShellOption[];
@@ -242,10 +244,12 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         onLoadMore={handleLoadMore}
         onCloseSidebar={props.onCloseSidebar}
         onOpenSettings={props.onOpenSettings}
+        onCreateSoul={props.onCreateSoul}
         appUpdate={props.appUpdate}
         onOpenSkillsHub={props.onOpenSkillsHub}
         onOpenMcpHub={props.onOpenMcpHub}
         mobileExperience={props.mobileExperience}
+        desktopPanelMode={props.desktopPanelMode}
         workspaceToolsAvailable={props.workspaceToolsAvailable}
         fileTreeAvailable={props.fileTreeAvailable}
         terminalShellOptions={props.terminalShellOptions}

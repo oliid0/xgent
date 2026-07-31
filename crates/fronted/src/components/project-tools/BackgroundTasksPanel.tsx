@@ -31,7 +31,7 @@ import {
 import { Button } from "../ui/button";
 
 type BackgroundTasksPanelProps = {
-  // Visibility contract from the right dock: gates the per-second uptime
+  // Visibility contract from the workspace side panel: gates the per-second uptime
   // tick while the panel is hidden behind another tab.
   active?: boolean;
 };

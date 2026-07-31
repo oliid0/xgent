@@ -7,6 +7,7 @@ export const XAGENT_PROXY_TOKEN_HEADER = "x-xagent-proxy-token";
 export const XAGENT_UPSTREAM_ORIGIN_HEADER = "x-xagent-upstream-origin";
 export const XAGENT_UPSTREAM_USER_AGENT_HEADER = "x-xagent-upstream-user-agent";
 export const XAGENT_UPSTREAM_CONTENT_TYPE_HEADER = "x-xagent-upstream-content-type";
+export const XAGENT_OAUTH_ACCOUNT_ID_HEADER = "x-xagent-oauth-account-id";
 // 布尔标记头：声明该请求经系统代理出网。代理地址/凭据只存于桌面 Rust 侧，
 // 由本地反代按此头选择带代理的 client（x-xagent-* 头不会转发给上游）。
 export const XAGENT_USE_SYSTEM_PROXY_HEADER = "x-xagent-use-system-proxy";
@@ -183,7 +184,7 @@ export async function prepareProxyRequest(
   providerId: ProviderId,
   upstreamBaseUrl: string,
   headers: Record<string, string>,
-  options?: { useSystemProxy?: boolean },
+  options?: { useSystemProxy?: boolean; oauthAccountId?: string },
 ): Promise<PreparedProxyRequest> {
   const proxyServerInfo = await getProxyServerInfo();
   const { baseUrl, upstreamOrigin } = buildProxyBaseUrl(
@@ -200,6 +201,9 @@ export async function prepareProxyRequest(
       [XAGENT_UPSTREAM_ORIGIN_HEADER]: upstreamOrigin,
       [XAGENT_PROXY_TOKEN_HEADER]: proxyServerInfo.token,
       ...(options?.useSystemProxy ? { [XAGENT_USE_SYSTEM_PROXY_HEADER]: "1" } : {}),
+      ...(options?.oauthAccountId?.trim()
+        ? { [XAGENT_OAUTH_ACCOUNT_ID_HEADER]: options.oauthAccountId.trim() }
+        : {}),
     },
   };
 }

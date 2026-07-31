@@ -1,6 +1,7 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import {
+  BrowserSessionController,
   browserSessionController,
   normalizeBrowserAddress,
 } from "../browser/browserSessionController";
@@ -9,6 +10,7 @@ import type {
   BrowserActionInput,
   BrowserActionResponse,
 } from "../browserAutomation";
+import { createLanPcBrowserAutomationClient } from "../browserAutomation";
 import {
   type BuiltinToolBundle,
   type BuiltinToolExecutionContext,
@@ -195,7 +197,12 @@ function pageFingerprint(info: PageInfo) {
   ].join("|");
 }
 
-async function waitForDomStable(sessionId: string, timeoutMs: number, signal?: AbortSignal) {
+async function waitForDomStable(
+  controller: BrowserSessionController,
+  sessionId: string,
+  timeoutMs: number,
+  signal?: AbortSignal,
+) {
   const normalizedTimeout = Math.min(30_000, Math.max(500, timeoutMs));
   const startedAt = Date.now();
   const deadline = startedAt + normalizedTimeout;
@@ -205,7 +212,7 @@ async function waitForDomStable(sessionId: string, timeoutMs: number, signal?: A
 
   while (Date.now() < deadline) {
     if (signal?.aborted) throw new Error("Cancelled");
-    latest = await browserSessionController.action(
+    latest = await controller.action(
       "page_info",
       {},
       { sessionId, timeoutMs: Math.min(5_000, timeoutMs) },
@@ -239,7 +246,32 @@ function formatResult(action: BrowserUseAction, sessionId: string, result: unkno
   return `browser_use ${action} succeeded in tab "${sessionId}".\n${body}`;
 }
 
-export function createBrowserUseTools(): BuiltinToolBundle {
+export type BrowserUseToolsOptions = {
+  delegateToLanPc?: {
+    enabled: boolean;
+    baseUrl: string;
+  };
+};
+
+export function createBrowserUseTools(
+  options: BrowserUseToolsOptions = {},
+): BuiltinToolBundle {
+  const lanDelegation = options.delegateToLanPc;
+  const remoteController =
+    lanDelegation?.enabled && lanDelegation.baseUrl.trim()
+      ? new BrowserSessionController(
+          createLanPcBrowserAutomationClient(lanDelegation.baseUrl.trim()),
+        )
+      : null;
+  let resolvedController: Promise<BrowserSessionController> | null = null;
+  const resolveController = () => {
+    if (!remoteController) return Promise.resolve(browserSessionController);
+    resolvedController ??= remoteController.initialize().then((state) => {
+      if (state.status?.available && !state.error) return remoteController;
+      return browserSessionController;
+    });
+    return resolvedController;
+  };
   const tool: Tool = {
     name: "browser_use",
     description:
@@ -261,47 +293,59 @@ export function createBrowserUseTools(): BuiltinToolBundle {
       if (toolCall.name !== "browser_use") throw new Error(`Unknown tool: ${toolCall.name}`);
       action = requiredAction(args.action);
       context?.emitToolStatus?.(`Browser · ${action}`);
+      const controller = await resolveController();
+      const delegated = controller !== browserSessionController;
 
       let result: unknown;
       let screenshotBase64: string | null | undefined;
       if (action === "list_tabs") {
-        await browserSessionController.initialize();
-        result = await browserSessionController.refreshSessions();
+        await controller.initialize();
+        result = await controller.refreshSessions();
       } else if (action === "new_tab") {
         const session = args.session_id?.trim()
-          ? await browserSessionController.ensureSession({
+          ? await controller.ensureSession({
               sessionId,
               url: normalizeBrowserAddress(args.url || ""),
             })
-          : await browserSessionController.newSession(normalizeBrowserAddress(args.url || ""));
+          : await controller.newSession(normalizeBrowserAddress(args.url || ""));
         sessionId = session.sessionId;
         result = session;
       } else if (action === "open") {
-        const session = await browserSessionController.ensureSession({
+        const session = await controller.ensureSession({
           sessionId,
           url: normalizeBrowserAddress(requiredString(args.url, "url")),
         });
         result = {
           session,
           dom: await waitForDomStable(
+            controller,
             sessionId,
             Math.min(8_000, Math.max(1_500, args.timeout ?? 5_000)),
             signal,
           ),
         };
       } else if (action === "close_tab") {
-        await browserSessionController.closeSession(sessionId);
+        await controller.closeSession(sessionId);
         result = { closed: true, sessionId };
       } else if (action === "show") {
-        await browserSessionController.ensureSession({ sessionId });
-        browserSessionController.openPanel(sessionId);
-        result = { visible: true, sessionId };
+        await controller.ensureSession({ sessionId });
+        if (delegated) {
+          result = { visible: false, delegated: true, sessionId };
+        } else {
+          controller.openPanel(sessionId);
+          result = { visible: true, delegated: false, sessionId };
+        }
       } else if (action === "hide") {
-        browserSessionController.closePanel();
-        result = { visible: false, sessionId };
+        if (!delegated) controller.closePanel();
+        result = { visible: false, delegated, sessionId };
       } else if (action === "wait_for_dom_stable") {
-        await browserSessionController.ensureSession({ sessionId });
-        result = await waitForDomStable(sessionId, args.timeout ?? 8_000, signal);
+        await controller.ensureSession({ sessionId });
+        result = await waitForDomStable(
+          controller,
+          sessionId,
+          args.timeout ?? 8_000,
+          signal,
+        );
       } else {
         if (action === "navigate") {
           args.url = normalizeBrowserAddress(requiredString(args.url, "url"));
@@ -316,7 +360,7 @@ export function createBrowserUseTools(): BuiltinToolBundle {
         }
         if (action === "execute_js") requiredString(args.script, "script");
 
-        const response = await browserSessionController.action(
+        const response = await controller.action(
           runtimeAction(action),
           actionInput(args),
           { sessionId, timeoutMs: args.timeout },
@@ -336,6 +380,7 @@ export function createBrowserUseTools(): BuiltinToolBundle {
           result = {
             ...browserResult,
             dom: await waitForDomStable(
+              controller,
               sessionId,
               Math.min(8_000, Math.max(1_500, args.timeout ?? 5_000)),
               signal,

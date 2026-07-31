@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RightDockProjectState } from "../../lib/settings";
+import type { WorkspaceToolsProjectState } from "../../lib/settings";
 import type {
   TerminalClient,
   TerminalSession,
@@ -10,24 +10,24 @@ import {
   areSessionsEqual,
   DEFAULT_TERMINAL_COLS,
   DEFAULT_TERMINAL_ROWS,
-  rightDockNeighborTabId,
+  workspaceToolsNeighborTabId,
   sortSessions,
   terminalSessionBelongsToProject,
-} from "./rightDockModel";
+} from "./workspaceToolsModel";
 
 const PENDING_CREATE_ACTIVATION_TIMEOUT_MS = 15_000;
 
-type UseRightDockSessionsOptions = {
+type UseWorkspaceToolSessionsOptions = {
   client: TerminalClient;
   cwd: string;
   externalSessions?: TerminalSession[];
   externalSessionsLoaded?: boolean;
   isOpen: boolean;
   projectPathKey: string;
-  projectState: RightDockProjectState;
+  projectState: WorkspaceToolsProjectState;
   terminalReady: boolean;
   onProjectStateChange: (
-    updater: (current: RightDockProjectState) => RightDockProjectState,
+    updater: (current: WorkspaceToolsProjectState) => WorkspaceToolsProjectState,
   ) => void;
   onSessionsChange?: (sessions: TerminalSession[]) => void;
 };
@@ -36,7 +36,7 @@ type UseRightDockSessionsOptions = {
 // project state only records user intent (active tab, order). This hook
 // therefore never reconciles sessions back into settings — the only settings
 // writes below are direct user gestures (activate, close).
-export function useRightDockSessions(options: UseRightDockSessionsOptions) {
+export function useWorkspaceToolSessions(options: UseWorkspaceToolSessionsOptions) {
   const {
     client,
     cwd,
@@ -334,7 +334,7 @@ export function useRightDockSessions(options: UseRightDockSessionsOptions) {
                 ? current
                 : { ...current, tabOrder };
             }
-            const fallback = rightDockNeighborTabId(current.tabOrder, session.id);
+            const fallback = workspaceToolsNeighborTabId(current.tabOrder, session.id);
             return {
               ...current,
               ...(fallback ? { activeTabId: fallback } : {}),

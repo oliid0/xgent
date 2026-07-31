@@ -1,5 +1,5 @@
 import { isBrowserRuntime } from "@xagent/runtime";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   ChevronDown,
@@ -37,6 +37,16 @@ import {
   updateCustomSettings,
   updateSystem,
 } from "../../lib/settings";
+import {
+  buildFontFamilySelectOptions,
+  FONT_FAMILY_CUSTOM_SELECT_VALUE,
+  FONT_FAMILY_DEFAULT_SELECT_VALUE,
+  fromFontFamilySelectValue,
+  listLocalFontFamilies,
+  normalizeFontFamily,
+  toFontFamilySelectValue,
+  type FontFamilySettings,
+} from "../../lib/system/fontFamily";
 import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
@@ -76,10 +86,36 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
   }
 
   const fontScale = settings.customSettings.fontScale;
+  const [localFontFamilies, setLocalFontFamilies] = useState<string[]>([]);
+  const [customFontModes, setCustomFontModes] = useState<
+    Partial<Record<keyof FontFamilySettings, boolean>>
+  >({});
+  const [customFontDrafts, setCustomFontDrafts] = useState<
+    Partial<Record<keyof FontFamilySettings, string>>
+  >({});
+  const fontFamilyOptions = useMemo(
+    () => buildFontFamilySelectOptions(localFontFamilies),
+    [localFontFamilies],
+  );
+  const fontFamilyFields: Array<{ key: keyof FontFamilySettings; label: string }> = [
+    { key: "interfaceFontFamily", label: t("settings.interfaceFontFamily") },
+    { key: "chatFontFamily", label: t("settings.chatFontFamily") },
+    { key: "codeFontFamily", label: t("settings.codeFontFamily") },
+  ];
+
+  useEffect(() => {
+    let cancelled = false;
+    void listLocalFontFamilies().then((families) => {
+      if (!cancelled) setLocalFontFamilies(families);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const fontScaleZones: Array<{ key: keyof FontScaleSettings; label: string }> = [
     { key: "sidebar", label: t("settings.fontSizeSidebar") },
     { key: "chat", label: t("settings.fontSizeChat") },
-    { key: "rightDock", label: t("settings.fontSizeRightDock") },
+    { key: "workspaceTools", label: t("settings.fontSizeWorkspaceTools") },
   ];
 
   function getFontScaleLabel(value: number) {
@@ -95,6 +131,29 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
         fontScale: { ...prev.customSettings.fontScale, [zone]: value },
       }),
     );
+  }
+
+  function setFontFamily(key: keyof FontFamilySettings, value: string) {
+    setSettings((prev) => updateCustomSettings(prev, { [key]: normalizeFontFamily(value) }));
+  }
+
+  function handleFontFamilySelect(key: keyof FontFamilySettings, value: string) {
+    if (value === FONT_FAMILY_CUSTOM_SELECT_VALUE) {
+      setCustomFontModes((current) => ({ ...current, [key]: true }));
+      setCustomFontDrafts((current) => ({
+        ...current,
+        [key]: current[key] ?? settings.customSettings[key],
+      }));
+      return;
+    }
+    setCustomFontModes((current) => ({ ...current, [key]: false }));
+    setFontFamily(key, fromFontFamilySelectValue(value));
+  }
+
+  function commitCustomFontFamily(key: keyof FontFamilySettings) {
+    const value = normalizeFontFamily(customFontDrafts[key] ?? settings.customSettings[key]);
+    setCustomFontDrafts((current) => ({ ...current, [key]: value }));
+    setFontFamily(key, value);
   }
 
   const systemProxy = settings.system.systemProxy;
@@ -235,6 +294,55 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
               </SelectContent>
             </Select>
           </SettingsRow>
+          {fontFamilyFields.map(({ key, label }) => {
+            const currentValue = settings.customSettings[key];
+            const selectValue = toFontFamilySelectValue(
+              currentValue,
+              fontFamilyOptions,
+              customFontModes[key] === true,
+            );
+            const custom = selectValue === FONT_FAMILY_CUSTOM_SELECT_VALUE;
+            return (
+              <SettingsRow key={key} label={label}>
+                <div className="flex min-w-0 items-center gap-2">
+                  <Select value={selectValue} onValueChange={(value) => handleFontFamilySelect(key, value)}>
+                    <SelectTrigger className={custom ? "w-40" : "w-60"}>
+                      <SelectValue>
+                        {(value) => {
+                          if (value === FONT_FAMILY_DEFAULT_SELECT_VALUE) return t("settings.fontFamilyDefault");
+                          if (value === FONT_FAMILY_CUSTOM_SELECT_VALUE) return t("settings.fontFamilyCustom");
+                          return fontFamilyOptions.find((option) => option.value === value)?.label ?? String(value ?? "");
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      <SelectItem value={FONT_FAMILY_DEFAULT_SELECT_VALUE}>{t("settings.fontFamilyDefault")}</SelectItem>
+                      <SelectItem value={FONT_FAMILY_CUSTOM_SELECT_VALUE}>{t("settings.fontFamilyCustom")}</SelectItem>
+                      {fontFamilyOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value} style={{ fontFamily: option.value }}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {custom ? (
+                    <Input
+                      className="w-60"
+                      value={customFontDrafts[key] ?? currentValue}
+                      spellCheck={false}
+                      autoComplete="off"
+                      placeholder={t("settings.fontFamilyPlaceholder")}
+                      onChange={(event) => setCustomFontDrafts((current) => ({ ...current, [key]: event.currentTarget.value }))}
+                      onBlur={() => commitCustomFontFamily(key)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") event.currentTarget.blur();
+                      }}
+                    />
+                  ) : null}
+                </div>
+              </SettingsRow>
+            );
+          })}
           {fontScaleZones.map((zone) => (
             <SettingsRow key={zone.key} label={zone.label}>
               <Select
@@ -242,7 +350,7 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
                 onValueChange={(value) => setZoneFontScale(zone.key, Number(value))}
               >
                 <SelectTrigger className="w-44">
-                  <SelectValue />
+                  <SelectValue>{getFontScaleLabel(fontScale[zone.key])}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {FONT_SCALE_OPTIONS.map((value) => (
@@ -807,6 +915,65 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
           </div>
         </section>
       ) : null}
+
+      <section className="settings-font-card settings-system-card space-y-3 rounded-2xl border border-border/60 bg-card p-4">
+        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <ScanText className="h-4 w-4 text-muted-foreground" />
+          {t("settings.fontFamily")}
+        </div>
+        <div className="space-y-2">
+          {fontFamilyFields.map(({ key, label }) => {
+            const currentValue = settings.customSettings[key];
+            const selectValue = toFontFamilySelectValue(
+              currentValue,
+              fontFamilyOptions,
+              customFontModes[key] === true,
+            );
+            const custom = selectValue === FONT_FAMILY_CUSTOM_SELECT_VALUE;
+            return (
+              <div key={key} className="rounded-xl border border-border/60 bg-background/80 px-3.5 py-2.5">
+                <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+                <div className="mt-1.5 flex min-w-0 items-center gap-2 max-sm:flex-col max-sm:items-stretch">
+                  <Select value={selectValue} onValueChange={(value) => handleFontFamilySelect(key, value)}>
+                    <SelectTrigger className={custom ? "w-48 max-sm:w-full" : "w-full"}>
+                      <SelectValue>
+                        {(value) => {
+                          if (value === FONT_FAMILY_DEFAULT_SELECT_VALUE) return t("settings.fontFamilyDefault");
+                          if (value === FONT_FAMILY_CUSTOM_SELECT_VALUE) return t("settings.fontFamilyCustom");
+                          return fontFamilyOptions.find((option) => option.value === value)?.label ?? String(value ?? "");
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      <SelectItem value={FONT_FAMILY_DEFAULT_SELECT_VALUE}>{t("settings.fontFamilyDefault")}</SelectItem>
+                      <SelectItem value={FONT_FAMILY_CUSTOM_SELECT_VALUE}>{t("settings.fontFamilyCustom")}</SelectItem>
+                      {fontFamilyOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value} style={{ fontFamily: option.value }}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {custom ? (
+                    <Input
+                      className="min-w-0 flex-1"
+                      value={customFontDrafts[key] ?? currentValue}
+                      spellCheck={false}
+                      autoComplete="off"
+                      placeholder={t("settings.fontFamilyPlaceholder")}
+                      onChange={(event) => setCustomFontDrafts((current) => ({ ...current, [key]: event.currentTarget.value }))}
+                      onBlur={() => commitCustomFontFamily(key)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") event.currentTarget.blur();
+                      }}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="settings-font-card settings-system-card space-y-3 rounded-2xl border border-border/60 bg-card p-4">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">

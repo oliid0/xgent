@@ -17,6 +17,8 @@ use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener as TokioTcpListener;
 use uuid::Uuid;
 
+use crate::services::provider_oauth::ProviderOAuthService;
+
 const ACCESS_CONTROL_REQUEST_HEADERS: &str = "access-control-request-headers";
 const ACCESS_CONTROL_REQUEST_METHOD: &str = "access-control-request-method";
 const ACCESS_CONTROL_PREFIX: &str = "access-control-";
@@ -31,6 +33,7 @@ const PROXY_AUTHORIZATION: &str = "proxy-authorization";
 const PROXY_CONNECTION: &str = "proxy-connection";
 const PROXY_PREFIX: &str = "x-xagent-";
 const PROXY_TOKEN_HEADER: &str = "x-xagent-proxy-token";
+const OAUTH_ACCOUNT_ID_HEADER: &str = "x-xagent-oauth-account-id";
 const REFERER: &str = "referer";
 const TE: &str = "te";
 const TRAILER: &str = "trailer";
@@ -40,7 +43,7 @@ const UPSTREAM_ORIGIN_HEADER: &str = "x-xagent-upstream-origin";
 const UPSTREAM_USER_AGENT_HEADER: &str = "x-xagent-upstream-user-agent";
 const UPSTREAM_CONTENT_TYPE_HEADER: &str = "x-xagent-upstream-content-type";
 const USE_SYSTEM_PROXY_HEADER: &str = "x-xagent-use-system-proxy";
-const DEFAULT_ALLOW_HEADERS: &str = "authorization,content-type,x-api-key,x-goog-api-key,anthropic-version,x-xagent-upstream-origin,x-xagent-upstream-user-agent,x-xagent-upstream-content-type,x-xagent-proxy-token,x-xagent-use-system-proxy";
+const DEFAULT_ALLOW_HEADERS: &str = "authorization,content-type,x-api-key,x-goog-api-key,anthropic-version,x-xagent-upstream-origin,x-xagent-upstream-user-agent,x-xagent-upstream-content-type,x-xagent-proxy-token,x-xagent-use-system-proxy,x-xagent-oauth-account-id";
 const ALLOW_METHODS_VALUE: &str = "GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD";
 const VARY_VALUE: &str = "Origin, Access-Control-Request-Method, Access-Control-Request-Headers";
 const IMAGE_PROXY_MAX_BYTES: usize = 25 * 1024 * 1024;
@@ -59,6 +62,7 @@ pub struct ProxyServerInfo {
 pub struct ProxyServerState {
     info: ProxyServerInfo,
     client: reqwest::Client,
+    provider_oauth: Arc<ProviderOAuthService>,
 }
 
 impl ProxyServerState {
@@ -84,7 +88,9 @@ pub fn proxy_get_server_info(state: tauri::State<'_, Arc<ProxyServerState>>) -> 
     state.info.clone()
 }
 
-pub fn start_proxy_server() -> Result<Arc<ProxyServerState>, String> {
+pub fn start_proxy_server(
+    provider_oauth: Arc<ProviderOAuthService>,
+) -> Result<Arc<ProxyServerState>, String> {
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
         .map_err(|err| format!("绑定本地代理端口失败：{err}"))?;
     listener
@@ -104,6 +110,7 @@ pub fn start_proxy_server() -> Result<Arc<ProxyServerState>, String> {
             base_url: proxy_base_url,
             token: Uuid::new_v4().to_string(),
         },
+        provider_oauth,
         client: reqwest::Client::builder()
             .no_proxy()
             .build()
@@ -393,9 +400,53 @@ async fn handle_proxy(
     } else {
         state.client.clone()
     };
-    let mut request = client
-        .request(method, target_url)
-        .headers(build_upstream_request_headers(&headers));
+    let mut upstream_headers = build_upstream_request_headers(&headers);
+    if provider == "codex" {
+        if let Some(account_id) = headers
+            .get(OAUTH_ACCOUNT_ID_HEADER)
+            .and_then(|value| value.to_str().ok())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            let (access_token, resolved_account_id) =
+                match state.provider_oauth.codex_access_token(Some(account_id)).await {
+                    Ok(result) => result,
+                    Err(error) => {
+                        return error_response(
+                            StatusCode::UNAUTHORIZED,
+                            &format!("OpenAI OAuth authorization failed: {error}"),
+                            &headers,
+                        );
+                    }
+                };
+            let authorization = match HeaderValue::from_str(&format!("Bearer {access_token}")) {
+                Ok(value) => value,
+                Err(_) => {
+                    return error_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "OpenAI OAuth returned an invalid access token",
+                        &headers,
+                    );
+                }
+            };
+            let account_header = match HeaderValue::from_str(&resolved_account_id) {
+                Ok(value) => value,
+                Err(_) => {
+                    return error_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "OpenAI OAuth returned an invalid account identifier",
+                        &headers,
+                    );
+                }
+            };
+            upstream_headers.insert(HeaderName::from_static("authorization"), authorization);
+            upstream_headers.insert(
+                HeaderName::from_static("chatgpt-account-id"),
+                account_header,
+            );
+        }
+    }
+    let mut request = client.request(method, target_url).headers(upstream_headers);
     if !body_bytes.is_empty() {
         request = request.body(body_bytes);
     }

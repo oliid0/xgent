@@ -53,7 +53,7 @@ test("insertNodeAtCursor hops chip-inner boundaries and normalizes the caret anc
   assert.doesNotMatch(body, /range\.insertNode\(afterNode\)/);
 });
 
-test("right-dock context menus preserve composer selection", () => {
+test("workspace tool context menus preserve composer selection", () => {
   for (const root of sourceRoots) {
     for (const relativePath of [
       "project-tools/file-tree/index.tsx",

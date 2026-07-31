@@ -269,7 +269,10 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     }
 
     @objc func listExternalWorkspaces(_ invoke: Invoke) {
-        invoke.resolve(externalWorkspaces.listPayload())
+        // Tauri 2.11's JsonObject overload only accepts an object root. The
+        // generic Encodable overload preserves the array response expected by
+        // the Rust mobile binding.
+        invoke.resolve(externalWorkspaces.listEncodablePayload())
     }
 
     @objc func pickExternalWorkspace(_ invoke: Invoke) throws {

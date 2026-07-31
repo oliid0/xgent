@@ -41,7 +41,7 @@ import {
   Tag,
   Target,
 } from "../../icons";
-import { useRightDockToolContext } from "../RightDockContext";
+import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
 import { DiffContent } from "./DiffView";
 import {
   basename,
@@ -573,7 +573,7 @@ export function GitReviewHistoryView(props: {
     setHistoryError,
     state,
   } = data;
-  const context = useRightDockToolContext();
+  const context = useWorkspaceToolsContext();
   const onInsertCommitMention = context.git.onInsertCommitMention;
   const onInsertGitFileMention = context.git.onInsertGitFileMention;
   const { t } = useLocale();

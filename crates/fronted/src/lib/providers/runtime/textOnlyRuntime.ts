@@ -142,16 +142,38 @@ export async function streamAssistantMessage(params: {
   const modelId = params.model.trim();
   if (!modelId) throw new Error("No model selected");
   if (!params.runtime.baseUrl.trim()) throw new Error("Base URL cannot be empty");
-  if (!params.runtime.apiKey.trim()) throw new Error("API Key cannot be empty");
+  if (
+    params.runtime.authMode !== "oauth-managed" &&
+    !params.runtime.apiKey.trim()
+  ) {
+    throw new Error("API Key cannot be empty");
+  }
+  if (
+    params.runtime.authMode === "oauth-managed" &&
+    !params.runtime.oauthAccountId?.trim()
+  ) {
+    throw new Error("OpenAI OAuth account is not selected");
+  }
 
   const proxyRequest = await prepareProxyRequest(
     params.providerId,
     params.runtime.baseUrl.trim(),
     mergeCustomHeaders(
-      buildProviderRequestHeaders(params.providerId, params.runtime.apiKey, params.sessionId),
+      buildProviderRequestHeaders(
+        params.providerId,
+        params.runtime.apiKey,
+        params.sessionId,
+        params.runtime.authMode,
+      ),
       params.runtime.customHeaders,
     ),
-    { useSystemProxy: params.runtime.useSystemProxy === true },
+    {
+      useSystemProxy: params.runtime.useSystemProxy === true,
+      oauthAccountId:
+        params.runtime.authMode === "oauth-managed"
+          ? params.runtime.oauthAccountId
+          : undefined,
+    },
   );
 
   const m = createModelFromConfig(
@@ -337,16 +359,38 @@ export async function completeAssistantMessage(params: {
   const modelId = params.model.trim();
   if (!modelId) throw new Error("No model selected");
   if (!params.runtime.baseUrl.trim()) throw new Error("Base URL cannot be empty");
-  if (!params.runtime.apiKey.trim()) throw new Error("API Key cannot be empty");
+  if (
+    params.runtime.authMode !== "oauth-managed" &&
+    !params.runtime.apiKey.trim()
+  ) {
+    throw new Error("API Key cannot be empty");
+  }
+  if (
+    params.runtime.authMode === "oauth-managed" &&
+    !params.runtime.oauthAccountId?.trim()
+  ) {
+    throw new Error("OpenAI OAuth account is not selected");
+  }
 
   const proxyRequest = await prepareProxyRequest(
     params.providerId,
     params.runtime.baseUrl.trim(),
     mergeCustomHeaders(
-      buildProviderRequestHeaders(params.providerId, params.runtime.apiKey, params.sessionId),
+      buildProviderRequestHeaders(
+        params.providerId,
+        params.runtime.apiKey,
+        params.sessionId,
+        params.runtime.authMode,
+      ),
       params.runtime.customHeaders,
     ),
-    { useSystemProxy: params.runtime.useSystemProxy === true },
+    {
+      useSystemProxy: params.runtime.useSystemProxy === true,
+      oauthAccountId:
+        params.runtime.authMode === "oauth-managed"
+          ? params.runtime.oauthAccountId
+          : undefined,
+    },
   );
 
   const m = createModelFromConfig(

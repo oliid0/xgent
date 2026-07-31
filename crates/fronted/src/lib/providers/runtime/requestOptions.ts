@@ -1,5 +1,5 @@
 import type { CacheRetention, SimpleStreamOptions } from "@earendil-works/pi-ai";
-import type { CustomProvider, ProviderId, ReasoningLevel } from "../../settings";
+import type { CustomProvider, ProviderAuthMode, ProviderId, ReasoningLevel } from "../../settings";
 import { createUuid } from "../../shared/id";
 import {
   ANTHROPIC_DEFAULT_REQUEST_HEADERS,
@@ -34,8 +34,14 @@ export function buildProviderRequestHeaders(
   providerId: ProviderId,
   apiKey: string,
   sessionId?: string,
+  authMode: ProviderAuthMode = "api-key",
 ): Record<string, string> {
-  const authHeaders = buildProviderAuthHeaders(providerId, apiKey);
+  const authHeaders =
+    authMode === "oauth-managed"
+      ? {}
+      : authMode === "oauth-token" && providerId !== "gemini"
+      ? { Authorization: `Bearer ${apiKey}` }
+      : buildProviderAuthHeaders(providerId, apiKey);
   if (providerId === "claude_code") {
     if (isAnthropicOAuthApiKey(apiKey)) return {};
     return {

@@ -9,6 +9,8 @@ export type RuntimeToolCapabilities = {
   customSystemTools: boolean;
 };
 
+export type RuntimeToolHost = "desktop" | "native-mobile" | "lan-desktop";
+
 const DESKTOP_TOOL_CAPABILITIES: RuntimeToolCapabilities = {
   managedProcess: true,
   cron: true,
@@ -37,12 +39,20 @@ const NATIVE_MOBILE_TOOL_CAPABILITIES: RuntimeToolCapabilities = {
 /**
  * Resolves the command-host capabilities for an agent run.
  *
- * Browser Web UI sessions deliberately use the desktop profile even when the
- * browser itself runs on a phone: commands are executed by the paired desktop
- * host. Only a native Android/iOS application uses the restricted profile.
+ * Browser Web UI and paired native clients use a desktop capability profile:
+ * their commands execute on the authenticated desktop host. A native mobile
+ * client uses the restricted profile only while it is executing locally.
  */
-export function resolveRuntimeToolCapabilities(nativeMobileRuntime: boolean) {
+export function resolveRuntimeToolCapabilities(host: RuntimeToolHost) {
   return {
-    ...(nativeMobileRuntime ? NATIVE_MOBILE_TOOL_CAPABILITIES : DESKTOP_TOOL_CAPABILITIES),
+    ...(host === "native-mobile" ? NATIVE_MOBILE_TOOL_CAPABILITIES : DESKTOP_TOOL_CAPABILITIES),
   };
+}
+
+export function resolveRuntimeToolHost(
+  nativeMobileRuntime: boolean,
+  lanPcCommandHostReady: boolean,
+): RuntimeToolHost {
+  if (!nativeMobileRuntime) return "desktop";
+  return lanPcCommandHostReady ? "lan-desktop" : "native-mobile";
 }

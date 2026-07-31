@@ -1,4 +1,4 @@
-// Memoized virtual-list rows for the right-dock file tree panel.
+// Memoized virtual-list rows for the workspace file tree panel.
 //
 // Shared by every frontend runtime; only relative, npm-package, or
 // @xagent/runtime imports are allowed here.

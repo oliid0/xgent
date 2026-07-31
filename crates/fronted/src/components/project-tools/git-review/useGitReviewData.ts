@@ -26,7 +26,7 @@ import type {
 import { emptyGitRepositoryState } from "../../../lib/git/types";
 import type { WorkspaceInvalidationHint } from "../../../lib/workspace-activity/useWorkspaceInvalidation";
 import { useWorkspaceInvalidation } from "../../../lib/workspace-activity/useWorkspaceInvalidation";
-import { useRightDockToolContext } from "../RightDockContext";
+import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
 import {
   assertGitOperationResult,
   basename,
@@ -66,7 +66,7 @@ export type UseGitReviewDataOptions = {
 
 export function useGitReviewData(options: UseGitReviewDataOptions) {
   const { active } = options;
-  const context = useRightDockToolContext();
+  const context = useWorkspaceToolsContext();
   const workspaceCwd = context.cwd;
   const gitClient = (context.clients.git ?? null) as GitReviewClient | null;
   const workspaceActivityClient = context.clients.workspaceActivity ?? null;

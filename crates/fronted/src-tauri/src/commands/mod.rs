@@ -32,10 +32,12 @@ pub use history_commands::history_db;
 pub use history_commands::subagent_store;
 
 pub use integration_commands::cloud;
+pub use integration_commands::lan_pc;
 #[cfg(desktop)]
 pub use integration_commands::local_access;
 pub use integration_commands::mcp;
 pub use integration_commands::memory;
+pub use integration_commands::provider_oauth;
 
 #[cfg(desktop)]
 pub use runtime_commands::process;

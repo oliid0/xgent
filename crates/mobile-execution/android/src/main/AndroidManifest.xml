@@ -17,9 +17,9 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <!-- PRoot is launched with ProcessBuilder from applicationInfo.nativeLibraryDir,
-         so its lib*.so executable and dependency closure must exist as extracted
-         files instead of only as mmap-able entries inside the APK. The versioned
-         libtalloc SONAME is materialized without modifying PRoot in codeCacheDir. -->
+         so the source-built lib*.so executable must exist as an extracted file
+         instead of only as a mmap-able APK entry. Its small native dependencies
+         are linked statically by scripts/mobile/prepare-proot-android.sh. -->
     <application
         android:extractNativeLibs="true"
         android:networkSecurityConfig="@xml/xagent_network_security_config">

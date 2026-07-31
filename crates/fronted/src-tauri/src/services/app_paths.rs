@@ -54,7 +54,10 @@ pub fn initialize_desktop() -> Result<Vec<String>, String> {
                 &webview_profile_dir,
                 &mut warnings,
             );
-            migrate_directory(&legacy_dir, &webview_profile_dir, &mut warnings);
+            // WebView2 owns only EBWebView. Any remaining bundle-identifier
+            // files are application data and belong under the unified data
+            // directory, never inside the browser profile.
+            migrate_directory(&legacy_dir, &data_dir, &mut warnings);
         }
     }
 

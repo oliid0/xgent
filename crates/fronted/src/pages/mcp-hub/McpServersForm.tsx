@@ -28,10 +28,21 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { Textarea } from "../../components/ui/textarea";
+import { ToolPolicyToggle } from "../../components/hub/ToolPolicyToggle";
 import { useLocale } from "../../i18n";
-import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
+import {
+  type AppSettings,
+  type McpServerConfig,
+  type ToolPolicy,
+  updateMcp,
+  updateSystem,
+} from "../../lib/settings";
 import { useModalMotion } from "../../lib/shared/modalMotion";
 import { cn } from "../../lib/shared/utils";
+import {
+  toolGroupPolicyKey,
+  toolServerPolicyKey,
+} from "../../lib/tools/toolPolicy";
 
 type SetMcpSettingsFn = (updater: (prev: AppSettings) => AppSettings) => void;
 
@@ -225,10 +236,11 @@ function CounterPill(props: { label: string; count: number }) {
 const McpServerCard = memo(function McpServerCard(props: {
   server: McpServerConfig;
   idx: number;
+  policy: ToolPolicy;
   setSettings: SetMcpSettingsFn;
   onEdit: () => void;
 }) {
-  const { server: serverConfig, idx, setSettings, onEdit } = props;
+  const { server: serverConfig, idx, policy, setSettings, onEdit } = props;
   const { t } = useLocale();
   const transport = serverConfig.transport || "stdio";
   const isStdio = transport === "stdio";
@@ -353,6 +365,21 @@ const McpServerCard = memo(function McpServerCard(props: {
         ) : null}
 
         <div className="flex shrink-0 items-center gap-1">
+          <ToolPolicyToggle
+            value={policy}
+            size="sm"
+            ariaLabel={`${serverConfig.id} tool policy`}
+            onChange={(next) =>
+              setSettings((current) =>
+                updateSystem(current, {
+                  toolPolicies: {
+                    ...(current.system.toolPolicies ?? {}),
+                    [toolServerPolicyKey(serverConfig.id)]: next,
+                  },
+                }),
+              )
+            }
+          />
           <button
             type="button"
             onClick={onEdit}
@@ -364,11 +391,14 @@ const McpServerCard = memo(function McpServerCard(props: {
           <ConfirmDeletePopover
             name={serverConfig.id || `Server ${idx + 1}`}
             onConfirm={() =>
-              setSettings((prev) =>
-                updateMcp(prev, {
+              setSettings((prev) => {
+                const next = updateMcp(prev, {
                   servers: prev.mcp.servers.filter((_, index) => index !== idx),
-                }),
-              )
+                });
+                const toolPolicies = { ...(next.system.toolPolicies ?? {}) };
+                delete toolPolicies[toolServerPolicyKey(serverConfig.id)];
+                return updateSystem(next, { toolPolicies });
+              })
             }
           >
             {(open) => (
@@ -674,6 +704,8 @@ export function McpServersForm(props: McpServersFormProps) {
   const [filter, setFilter] = useState("");
 
   const servers = settings.mcp.servers;
+  const groupPolicy =
+    settings.system.toolPolicies?.[toolGroupPolicyKey("mcp")] ?? "allow";
   const serverCount = servers.length;
 
   const filtered = useMemo(() => {
@@ -742,6 +774,9 @@ export function McpServersForm(props: McpServersFormProps) {
                 key={idx}
                 server={server}
                 idx={idx}
+                policy={
+                  settings.system.toolPolicies?.[toolServerPolicyKey(server.id)] ?? groupPolicy
+                }
                 setSettings={setSettings}
                 onEdit={() => onEditServer?.(server, idx)}
               />

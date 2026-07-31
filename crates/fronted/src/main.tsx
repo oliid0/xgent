@@ -5,6 +5,19 @@ import { LocalAccessPairingGate } from "./components/local-access/LocalAccessPai
 import "./index.css";
 import "katex/dist/katex.min.css";
 import "streamdown/styles.css";
+import { inferRuntimePlatform } from "./lib/runtimePlatform";
+import { installWebviewNavigationGuard } from "./lib/system/webviewNavigationGuard";
+import { isBrowserRuntime } from "./runtime";
+
+if (!isBrowserRuntime()) {
+  const platform = inferRuntimePlatform();
+  if (platform === "windows" || platform === "macos" || platform === "linux") {
+    installWebviewNavigationGuard({
+      isMac: platform === "macos",
+      allowReloadChords: import.meta.env.DEV,
+    });
+  }
+}
 
 if (import.meta.env.DEV) {
   // Dev console hook for transcript perf work: window.__seedLongConversation()

@@ -1,8 +1,6 @@
 use serde::Serialize;
-use tauri::AppHandle;
-
-#[cfg(desktop)]
 use std::sync::Arc;
+use tauri::AppHandle;
 #[cfg(desktop)]
 use tauri::State;
 
@@ -10,10 +8,14 @@ use tauri::State;
 use tauri_plugin_mobile_execution::{
     CancelRequest as MobileCancelRequest, MobileExecutionExt, RunRequest as MobileRunRequest,
 };
+#[cfg(mobile)]
+use serde_json::json;
 
 #[cfg(desktop)]
 use crate::runtime::shell_runner::{run_shell_script, ShellRunRegistry};
 use crate::runtime::shell_types::ShellRunResponse;
+#[cfg(mobile)]
+use crate::services::lan_pc_client::LanPcClient;
 #[cfg(mobile)]
 use crate::runtime::shell_types::{
     DEFAULT_SHELL_TIMEOUT_MS, MAX_SHELL_TIMEOUT_MS, MIN_SHELL_TIMEOUT_MS,
@@ -28,6 +30,7 @@ pub struct ShellCancelResponse {
 #[cfg(mobile)]
 pub async fn shell_run(
     app: AppHandle,
+    lan_pc_client: tauri::State<'_, Arc<LanPcClient>>,
     workdir: String,
     command: String,
     cwd: Option<String>,
@@ -36,10 +39,70 @@ pub async fn shell_run(
     provider_id: Option<String>,
     run_id: Option<String>,
 ) -> Result<ShellRunResponse, String> {
-    let _ = provider_id;
     let settings = crate::commands::settings::load_access_settings(
         &crate::commands::settings::open_db()?,
     )?;
+    let run_id = run_id
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let maximum = max_timeout_ms
+        .unwrap_or(MAX_SHELL_TIMEOUT_MS)
+        .clamp(MIN_SHELL_TIMEOUT_MS, MAX_SHELL_TIMEOUT_MS);
+    let effective_timeout_ms = timeout_ms
+        .unwrap_or(DEFAULT_SHELL_TIMEOUT_MS)
+        .clamp(MIN_SHELL_TIMEOUT_MS, maximum);
+
+    let mut lan_fallback_error = None;
+    if settings.prefer_lan_pc_execution && !settings.lan_control_url.trim().is_empty() {
+        let remote_workdir = lan_pc_client
+            .invoke(
+                Some(&settings.lan_control_url),
+                "settings_load_all",
+                json!({}),
+            )
+            .await
+            .and_then(|value| {
+                value
+                    .get("defaultWorkdir")
+                    .and_then(|value| value.as_str())
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(ToOwned::to_owned)
+                    .ok_or_else(|| "paired LAN computer did not report a working directory".to_string())
+            });
+        match remote_workdir {
+            Ok(remote_workdir) => {
+                match lan_pc_client
+                    .invoke(
+                        Some(&settings.lan_control_url),
+                        "shell_run",
+                        json!({
+                            "workdir": remote_workdir,
+                            "command": &command,
+                            "cwd": null,
+                            "timeout_ms": effective_timeout_ms,
+                            "max_timeout_ms": maximum,
+                            "provider_id": provider_id.as_deref(),
+                            "run_id": &run_id,
+                        }),
+                    )
+                    .await
+                    .and_then(|value| {
+                        serde_json::from_value::<ShellRunResponse>(value)
+                            .map_err(|error| format!("decode LAN computer shell result failed: {error}"))
+                    })
+                {
+                    Ok(mut response) => {
+                        response.profile = format!("lan-pc/{}", response.profile);
+                        return Ok(response);
+                    }
+                    Err(error) => lan_fallback_error = Some(error),
+                }
+            }
+            Err(error) => lan_fallback_error = Some(error),
+        }
+    }
     #[cfg(target_os = "android")]
     if !settings.android_proot_enabled {
         return Err("Android PRoot execution is disabled in Access settings".to_string());
@@ -49,17 +112,7 @@ pub async fn shell_run(
         return Err("iOS a-Shell execution is disabled in Access settings".to_string());
     }
 
-    let maximum = max_timeout_ms
-        .unwrap_or(MAX_SHELL_TIMEOUT_MS)
-        .clamp(MIN_SHELL_TIMEOUT_MS, MAX_SHELL_TIMEOUT_MS);
-    let effective_timeout_ms = timeout_ms
-        .unwrap_or(DEFAULT_SHELL_TIMEOUT_MS)
-        .clamp(MIN_SHELL_TIMEOUT_MS, maximum);
-    let run_id = run_id
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-    let response = app
+    let mut response = app
         .mobile_execution()
         .run(MobileRunRequest {
             run_id,
@@ -71,6 +124,16 @@ pub async fn shell_run(
             wasi: None,
         })
         .map_err(|error| error.to_string())?;
+    if let Some(error) = lan_fallback_error {
+        let notice = format!(
+            "LAN computer was unavailable, so XAgent used the mobile shell instead: {error}"
+        );
+        response.stderr = if response.stderr.trim().is_empty() {
+            notice
+        } else {
+            format!("{notice}\n{}", response.stderr)
+        };
+    }
     Ok(ShellRunResponse {
         exit_code: response.exit_code,
         shell: response.shell,
@@ -130,12 +193,37 @@ pub async fn shell_run(
 
 #[tauri::command(rename_all = "snake_case")]
 #[cfg(mobile)]
-pub fn shell_cancel(app: AppHandle, run_id: String) -> ShellCancelResponse {
+pub async fn shell_cancel(
+    app: AppHandle,
+    lan_pc_client: tauri::State<'_, Arc<LanPcClient>>,
+    run_id: String,
+) -> ShellCancelResponse {
+    let run_id = run_id.trim().to_string();
+    let settings = crate::commands::settings::open_db()
+        .and_then(|connection| crate::commands::settings::load_access_settings(&connection))
+        .ok();
+    let remote_cancelled = if let Some(settings) = settings.filter(|settings| {
+        settings.prefer_lan_pc_execution && !settings.lan_control_url.trim().is_empty()
+    }) {
+        lan_pc_client
+            .invoke(
+                Some(&settings.lan_control_url),
+                "shell_cancel",
+                json!({ "run_id": &run_id }),
+            )
+            .await
+            .ok()
+            .and_then(|value| value.get("cancelled").and_then(|value| value.as_bool()))
+            .unwrap_or(false)
+    } else {
+        false
+    };
     ShellCancelResponse {
-        cancelled: app
+        cancelled: remote_cancelled
+            || app
             .mobile_execution()
             .cancel(MobileCancelRequest {
-                run_id: run_id.trim().to_string(),
+                run_id,
             })
             .map(|response| response.cancelled)
             .unwrap_or(false),

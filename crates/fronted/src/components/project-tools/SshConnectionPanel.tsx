@@ -38,8 +38,8 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 
-type SshTunnelScope = "project" | "all";
-type SshTunnelView = "list" | "settings" | "create";
+type SshConnectionScope = "project" | "all";
+type SshConnectionView = "list" | "settings" | "create";
 
 type SshLatencyState = {
   latencyMs?: number;
@@ -54,7 +54,7 @@ type PendingSshCreate = {
   promptId: string | null;
 };
 
-type SshTunnelPanelProps = {
+type SshConnectionPanelProps = {
   active: boolean;
   cwd: string;
   projectPathKey: string;
@@ -102,7 +102,7 @@ export function hostSecretReady(host: SshHostConfig) {
 }
 
 export function hostStatusMessage(host: SshHostConfig, t: (key: string) => string) {
-  if (!hostSecretReady(host)) return t("projectTools.sshTunnelMissingSecret");
+  if (!hostSecretReady(host)) return t("projectTools.sshConnectionMissingSecret");
   return "";
 }
 
@@ -143,12 +143,12 @@ function sshStatusLabel(session: TerminalSession, t: (key: string) => string) {
   if (status === "reconnecting") {
     const attempt = Math.max(1, Number(session.ssh?.reconnectAttempt ?? 1));
     const max = Math.max(attempt, Number(session.ssh?.reconnectMaxAttempts ?? 3));
-    return t("projectTools.sshTunnelReconnecting")
+    return t("projectTools.sshConnectionReconnecting")
       .replace("{attempt}", String(attempt))
       .replace("{max}", String(max));
   }
-  if (status === "disconnected") return t("projectTools.sshTunnelDisconnected");
-  return t("projectTools.sshTunnelConnected");
+  if (status === "disconnected") return t("projectTools.sshConnectionDisconnected");
+  return t("projectTools.sshConnectionConnected");
 }
 
 function errorMessage(error: unknown) {
@@ -188,7 +188,7 @@ function HostMetaTags(props: { host: SshHostConfig }) {
   );
 }
 
-export function SshTunnelPanel(props: SshTunnelPanelProps) {
+export function SshConnectionPanel(props: SshConnectionPanelProps) {
   const {
     active,
     cwd,
@@ -206,8 +206,8 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
   const { t } = useLocale();
   const { confirm: requestCloseSessionConfirm, dialog: closeSessionConfirmDialog } =
     useConfirmDialog();
-  const [scope, setScope] = useState<SshTunnelScope>("project");
-  const [view, setView] = useState<SshTunnelView>("list");
+  const [scope, setScope] = useState<SshConnectionScope>("project");
+  const [view, setView] = useState<SshConnectionView>("list");
   const [createHostId, setCreateHostId] = useState("");
   const [createHostMenuOpen, setCreateHostMenuOpen] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
@@ -509,7 +509,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
   const handleCloseSession = useCallback(
     async (session: TerminalSession) => {
       if (closingSessionIds.has(session.id)) return;
-      const title = sessionTitle(session, t("projectTools.sshTunnelTitle"));
+      const title = sessionTitle(session, t("projectTools.sshConnectionTitle"));
       const confirmed = await requestCloseSessionConfirm({
         title: t("projectTools.confirmCloseSshSession"),
         subtitle: t("projectTools.closeSshSessionConfirm").replace("{title}", title),
@@ -567,35 +567,35 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
   );
   const emptyTitle =
     scope === "project"
-      ? t("projectTools.sshTunnelProjectEmpty")
-      : t("projectTools.sshTunnelAllEmpty");
+      ? t("projectTools.sshConnectionProjectEmpty")
+      : t("projectTools.sshConnectionAllEmpty");
   const emptyHint =
     scope === "project"
-      ? t("projectTools.sshTunnelProjectEmptyHint")
-      : t("projectTools.sshTunnelAllEmptyHint");
+      ? t("projectTools.sshConnectionProjectEmptyHint")
+      : t("projectTools.sshConnectionAllEmptyHint");
   const visibleSessionCount = visibleSessions.length;
   const connectedSessionCount = visibleSessions.filter(sshSessionConnected).length;
   const statusText =
     visibleSessionCount > 0
-      ? t("projectTools.sshTunnelConnectionCount")
+      ? t("projectTools.sshConnectionConnectionCount")
           .replace("{count}", String(visibleSessionCount))
           .replace("{connected}", String(connectedSessionCount))
       : scope === "all"
-        ? t("projectTools.sshTunnelAllEmpty")
+        ? t("projectTools.sshConnectionAllEmpty")
         : projectPathKey
-          ? t("projectTools.sshTunnelProjectEmpty")
-          : t("projectTools.sshTunnelNoProject");
+          ? t("projectTools.sshConnectionProjectEmpty")
+          : t("projectTools.sshConnectionNoProject");
   const hostKeyPrompt = prompt?.kind === "hostKey";
   const promptSubmitDisabled =
     answeringPrompt || Boolean(prompt && !hostKeyPrompt && !promptAnswer.trim());
   const latencyText = (session: TerminalSession) => {
     const state = latencyBySessionId[session.id];
-    if (state?.failed) return t("projectTools.sshTunnelLatencyUnknown");
+    if (state?.failed) return t("projectTools.sshConnectionLatencyUnknown");
     if (state?.latencyMs) {
-      return t("projectTools.sshTunnelLatencyValue").replace("{ms}", String(state.latencyMs));
+      return t("projectTools.sshConnectionLatencyValue").replace("{ms}", String(state.latencyMs));
     }
-    if (state?.loading) return t("projectTools.sshTunnelLatencyChecking");
-    return t("projectTools.sshTunnelLatencyUnknown");
+    if (state?.loading) return t("projectTools.sshConnectionLatencyChecking");
+    return t("projectTools.sshConnectionLatencyUnknown");
   };
 
   return (
@@ -607,22 +607,22 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
             variant="ghost"
             size="icon"
             className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
-            title={t("projectTools.sshTunnelBack")}
+            title={t("projectTools.sshConnectionBack")}
             onClick={() => setView("list")}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold text-foreground">
-              {t("projectTools.sshTunnelAssociateHosts")}
+              {t("projectTools.sshConnectionAssociateHosts")}
             </div>
             <div className="truncate text-xs text-muted-foreground">
-              {t("projectTools.sshTunnelAssociateHostsHint")}
+              {t("projectTools.sshConnectionAssociateHostsHint")}
             </div>
           </div>
           <div className="rounded-md bg-muted/60 px-2 py-1 text-xs text-muted-foreground">
             <span className="tabular-nums text-foreground">{associatedHosts.length}</span>{" "}
-            {t("projectTools.sshTunnelAssociatedCount")}
+            {t("projectTools.sshConnectionAssociatedCount")}
           </div>
         </div>
 
@@ -633,10 +633,10 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
             </div>
             <div className="max-w-xs space-y-1">
               <div className="text-sm font-medium text-foreground">
-                {t("projectTools.sshTunnelNoConfiguredHosts")}
+                {t("projectTools.sshConnectionNoConfiguredHosts")}
               </div>
               <div className="text-xs leading-relaxed text-muted-foreground">
-                {t("projectTools.sshTunnelNoConfiguredHostsHint")}
+                {t("projectTools.sshConnectionNoConfiguredHostsHint")}
               </div>
             </div>
           </div>
@@ -704,17 +704,17 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
             variant="ghost"
             size="icon"
             className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
-            title={t("projectTools.sshTunnelBack")}
+            title={t("projectTools.sshConnectionBack")}
             onClick={() => setView("list")}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold text-foreground">
-              {t("projectTools.sshTunnelCreateTitle")}
+              {t("projectTools.sshConnectionCreateTitle")}
             </div>
             <div className="truncate text-xs text-muted-foreground">
-              {t("projectTools.sshTunnelCreateHint")}
+              {t("projectTools.sshConnectionCreateHint")}
             </div>
           </div>
         </div>
@@ -727,13 +727,13 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
             <div className="max-w-xs space-y-1">
               <div className="text-sm font-medium text-foreground">
                 {hosts.length === 0
-                  ? t("projectTools.sshTunnelNoConfiguredHosts")
-                  : t("projectTools.sshTunnelCreateNoAssociatedHosts")}
+                  ? t("projectTools.sshConnectionNoConfiguredHosts")
+                  : t("projectTools.sshConnectionCreateNoAssociatedHosts")}
               </div>
               <div className="text-xs leading-relaxed text-muted-foreground">
                 {hosts.length === 0
-                  ? t("projectTools.sshTunnelNoConfiguredHostsHint")
-                  : t("projectTools.sshTunnelCreateNoAssociatedHostsHint")}
+                  ? t("projectTools.sshConnectionNoConfiguredHostsHint")
+                  : t("projectTools.sshConnectionCreateNoAssociatedHostsHint")}
               </div>
             </div>
           </div>
@@ -748,7 +748,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
             <div className="space-y-3">
               <div className="block space-y-1.5">
                 <span className="text-xs font-medium text-foreground">
-                  {t("projectTools.sshTunnelHost")}
+                  {t("projectTools.sshConnectionHost")}
                 </span>
                 <DropdownMenu open={createHostMenuOpen} onOpenChange={setCreateHostMenuOpen}>
                   <DropdownMenuTrigger
@@ -757,7 +757,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
                       "flex min-h-12 w-full items-center gap-3 rounded-lg border border-border/70 bg-card/80 px-3 py-2 text-left shadow-[0_1px_2px_hsl(0_0%_0%_/_0.04)] outline-none transition-all hover:border-emerald-500/40 hover:bg-card focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/20",
                       createHostMenuOpen && "border-emerald-500/50 ring-1 ring-emerald-500/20",
                     )}
-                    aria-label={t("projectTools.sshTunnelHost")}
+                    aria-label={t("projectTools.sshConnectionHost")}
                   >
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
                       <Server className="h-4 w-4" />
@@ -837,14 +837,14 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
 
               <label className="block space-y-1.5">
                 <span className="text-xs font-medium text-foreground">
-                  {t("projectTools.sshTunnelTabTitle")}
+                  {t("projectTools.sshConnectionTabTitle")}
                 </span>
                 <input
                   value={createTitle}
                   onChange={(event) => setCreateTitle(event.currentTarget.value)}
                   className="h-10 w-full rounded-lg border border-border/70 bg-background/80 px-3 text-[calc(11px*var(--zone-font-scale,1))] text-foreground outline-none transition-colors placeholder:text-[calc(11px*var(--zone-font-scale,1))] placeholder:text-muted-foreground/70 focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/20"
                   placeholder={
-                    selectedCreateHost?.name || t("projectTools.sshTunnelTabTitlePlaceholder")
+                    selectedCreateHost?.name || t("projectTools.sshConnectionTabTitlePlaceholder")
                   }
                 />
               </label>
@@ -857,7 +857,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
                   className="h-4 w-4 rounded border-border text-emerald-500 accent-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/20"
                 />
                 <span className="min-w-0 flex-1 text-xs font-medium">
-                  {t("projectTools.sshTunnelSftpEnabled")}
+                  {t("projectTools.sshConnectionSftpEnabled")}
                 </span>
               </label>
 
@@ -901,7 +901,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
                 className="h-8 rounded-lg px-3 text-xs"
                 onClick={() => setView("list")}
               >
-                {t("projectTools.sshTunnelCreateCancel")}
+                {t("projectTools.sshConnectionCreateCancel")}
               </Button>
               <Button
                 type="submit"
@@ -911,8 +911,8 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
               >
                 {creating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
                 {creating
-                  ? t("projectTools.sshTunnelConnecting")
-                  : t("projectTools.sshTunnelConnect")}
+                  ? t("projectTools.sshConnectionConnecting")
+                  : t("projectTools.sshConnectionConnect")}
               </Button>
             </div>
           </form>
@@ -927,7 +927,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold tracking-tight text-foreground">
-                {t("projectTools.sshTunnelTitle")}
+                {t("projectTools.sshConnectionTitle")}
               </div>
               <div className="truncate text-xs text-muted-foreground">{statusText}</div>
             </div>
@@ -935,8 +935,8 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
               <button
                 type="button"
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition-colors hover:border-border/60 hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                title={t("projectTools.newSshTunnel")}
-                aria-label={t("projectTools.newSshTunnel")}
+                title={t("projectTools.newSshConnection")}
+                aria-label={t("projectTools.newSshConnection")}
                 onClick={openCreateView}
               >
                 <ConnectionIcon height="1em" />
@@ -946,8 +946,8 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
               <button
                 type="button"
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition-colors hover:border-border/60 hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                title={t("projectTools.sshTunnelSettings")}
-                aria-label={t("projectTools.sshTunnelSettings")}
+                title={t("projectTools.sshConnectionSettings")}
+                aria-label={t("projectTools.sshConnectionSettings")}
                 onClick={() => setView("settings")}
               >
                 <Settings className="h-4 w-4" />
@@ -956,7 +956,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
           </div>
 
           <fieldset
-            aria-label={t("projectTools.sshTunnelScopeGroup")}
+            aria-label={t("projectTools.sshConnectionScopeGroup")}
             className="relative m-0 mt-3 grid min-w-0 grid-cols-2 gap-0.5 rounded-lg border-0 bg-muted/70 p-0.5"
           >
             <div
@@ -971,8 +971,8 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
               const Icon = option === "project" ? Server : Globe;
               const label =
                 option === "project"
-                  ? t("projectTools.sshTunnelScopeProject")
-                  : t("projectTools.sshTunnelScopeAll");
+                  ? t("projectTools.sshConnectionScopeProject")
+                  : t("projectTools.sshConnectionScopeAll");
               return (
                 <button
                   key={option}
@@ -1020,7 +1020,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
                       className="h-7 rounded-lg px-2.5 text-xs"
                       onClick={openCreateView}
                     >
-                      {t("projectTools.newSshTunnel")}
+                      {t("projectTools.newSshConnection")}
                     </Button>
                   ) : null}
                   {scope === "project" && associatedHosts.length === 0 ? (
@@ -1031,7 +1031,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
                       className="h-7 rounded-lg bg-background/70 px-2.5 text-xs"
                       onClick={() => setView("settings")}
                     >
-                      {t("projectTools.sshTunnelAssociateHosts")}
+                      {t("projectTools.sshConnectionAssociateHosts")}
                     </Button>
                   ) : null}
                 </div>
@@ -1040,7 +1040,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
           ) : (
             <div className="space-y-2">
               {visibleSessions.map((session) => {
-                const title = sessionTitle(session, t("projectTools.sshTunnelTitle"));
+                const title = sessionTitle(session, t("projectTools.sshConnectionTitle"));
                 const endpoint = sessionEndpointLabel(session);
                 const projectLabel = sessionProjectLabel(session);
                 const closing = closingSessionIds.has(session.id);
@@ -1116,8 +1116,8 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
                         <button
                           type="button"
                           className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-background/70 text-muted-foreground transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:hover:text-emerald-400"
-                          title={t("projectTools.sshTunnelOpenBash")}
-                          aria-label={t("projectTools.sshTunnelOpenBash")}
+                          title={t("projectTools.sshConnectionOpenBash")}
+                          aria-label={t("projectTools.sshConnectionOpenBash")}
                           disabled={!connected}
                           onClick={() => onOpenSession(session, "bash")}
                         >
@@ -1127,8 +1127,8 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
                           <button
                             type="button"
                             className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-background/70 text-muted-foreground transition-colors hover:border-sky-500/40 hover:bg-sky-500/10 hover:text-sky-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:hover:text-sky-400"
-                            title={t("projectTools.sshTunnelOpenSftp")}
-                            aria-label={t("projectTools.sshTunnelOpenSftp")}
+                            title={t("projectTools.sshConnectionOpenSftp")}
+                            aria-label={t("projectTools.sshConnectionOpenSftp")}
                             disabled={!connected}
                             onClick={() => onOpenSession(session, "sftp")}
                           >
@@ -1138,8 +1138,8 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
                         <button
                           type="button"
                           className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-background/70 text-muted-foreground transition-colors hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                          title={t("projectTools.sshTunnelCloseSession")}
-                          aria-label={t("projectTools.sshTunnelCloseSession")}
+                          title={t("projectTools.sshConnectionCloseSession")}
+                          aria-label={t("projectTools.sshConnectionCloseSession")}
                           disabled={closing}
                           onClick={() => handleCloseSession(session)}
                         >
@@ -1175,8 +1175,8 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-foreground">
                   {hostKeyPrompt
-                    ? t("projectTools.sshTunnelPromptTitle")
-                    : t("projectTools.sshTunnelAuthPromptTitle")}
+                    ? t("projectTools.sshConnectionPromptTitle")
+                    : t("projectTools.sshConnectionAuthPromptTitle")}
                 </div>
                 <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
                   {prompt.message}
@@ -1186,7 +1186,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
             <div className="mt-3 space-y-2 rounded-lg bg-muted/40 px-3 py-2 text-xs">
               <div className="flex gap-2">
                 <span className="shrink-0 text-muted-foreground">
-                  {t("projectTools.sshTunnelHost")}
+                  {t("projectTools.sshConnectionHost")}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-mono text-foreground">
                   {prompt.host}:{prompt.port}
@@ -1195,7 +1195,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
               {prompt.keyType ? (
                 <div className="flex gap-2">
                   <span className="shrink-0 text-muted-foreground">
-                    {t("projectTools.sshTunnelKeyType")}
+                    {t("projectTools.sshConnectionKeyType")}
                   </span>
                   <span className="min-w-0 flex-1 truncate font-mono text-foreground">
                     {prompt.keyType}
@@ -1205,7 +1205,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
               {prompt.fingerprintSha256 ? (
                 <div className="flex gap-2">
                   <span className="shrink-0 text-muted-foreground">
-                    {t("projectTools.sshTunnelFingerprint")}
+                    {t("projectTools.sshConnectionFingerprint")}
                   </span>
                   <span className="min-w-0 flex-1 break-all font-mono text-foreground">
                     {prompt.fingerprintSha256}
@@ -1219,7 +1219,7 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
                 onChange={(event) => setPromptAnswer(event.currentTarget.value)}
                 className="mt-3 h-10 w-full rounded-lg border border-border/70 bg-background/80 px-3 text-[calc(11px*var(--zone-font-scale,1))] text-foreground outline-none transition-colors placeholder:text-[calc(11px*var(--zone-font-scale,1))] placeholder:text-muted-foreground/70 focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/20"
                 type={prompt.answerEcho ? "text" : "password"}
-                aria-label={t("projectTools.sshTunnelAuthPromptTitle")}
+                aria-label={t("projectTools.sshConnectionAuthPromptTitle")}
                 autoFocus
               />
             ) : null}
@@ -1233,8 +1233,8 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
                 disabled={answeringPrompt}
               >
                 {hostKeyPrompt
-                  ? t("projectTools.sshTunnelRejectHost")
-                  : t("projectTools.sshTunnelPromptCancel")}
+                  ? t("projectTools.sshConnectionRejectHost")
+                  : t("projectTools.sshConnectionPromptCancel")}
               </Button>
               <Button
                 type="submit"
@@ -1244,8 +1244,8 @@ export function SshTunnelPanel(props: SshTunnelPanelProps) {
               >
                 {answeringPrompt ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
                 {hostKeyPrompt
-                  ? t("projectTools.sshTunnelTrustHost")
-                  : t("projectTools.sshTunnelPromptSubmit")}
+                  ? t("projectTools.sshConnectionTrustHost")
+                  : t("projectTools.sshConnectionPromptSubmit")}
               </Button>
             </div>
           </form>

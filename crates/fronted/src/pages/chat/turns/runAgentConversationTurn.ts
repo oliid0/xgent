@@ -5,6 +5,7 @@ import type {
   ToolCall,
   ToolResultMessage,
 } from "@earendil-works/pi-ai";
+import { getLanPcCommandHostConfig } from "@xagent/runtime";
 import type { CompactionController } from "../../../lib/chat/compaction/controller";
 import { estimateTextTokenUnits } from "../../../lib/chat/compaction/tokenLedger";
 import type { ProviderRuntimeConfig } from "../../../lib/chat/compaction/types";
@@ -40,6 +41,7 @@ import {
   collapseThinking,
   type LiveRound,
   markToolCallRunningInRound,
+  summarizeToolCall,
   updateLiveRound,
   upsertHostedSearchToRound,
   upsertToolCallToRound,
@@ -73,6 +75,8 @@ import { createFileToolState } from "../../../lib/tools/fileToolState";
 import type { SkillAccessPolicy } from "../../../lib/tools/skillAccessPolicy";
 import type { SshManagerSessionChange } from "../../../lib/tools/sshManagerTools";
 import { getOrCreateTodoToolState } from "../../../lib/tools/todoTools";
+import { isSessionApproved, requestToolApproval } from "../../../lib/tools/toolApproval";
+import { resolveToolPolicy } from "../../../lib/tools/toolPolicy";
 import {
   appendSystemPrompt,
   buildPartialAssistantMessage,
@@ -223,7 +227,9 @@ export type RunAgentConversationTurnParams = {
   selectedSystemToolIds: SystemToolId[];
   cloudExecution?: AppSettings["access"];
   nativeMobileRuntime?: boolean;
+  lanPcCommandHostReady?: boolean;
   getMcpSettings: () => AppSettings["mcp"];
+  getToolPolicies?: () => AppSettings["system"]["toolPolicies"];
   applyMcpOps?: (ops: McpSettingsOp[]) => void;
   sshHosts?: SshHostConfig[];
   associatedSshHostIds?: string[];
@@ -250,6 +256,7 @@ export type RunAgentConversationTurnParams = {
   compaction: CompactionController;
   cancellation: TurnCancellation;
   resetLiveTranscript: (store: LiveTranscriptStore) => void;
+  settleLiveTranscript: (store: LiveTranscriptStore) => void;
   batchLiveRoundsUpdate: (
     updater: (prev: LiveRound[]) => LiveRound[],
     store: LiveTranscriptStore,
@@ -288,7 +295,9 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     selectedSystemToolIds,
     cloudExecution,
     nativeMobileRuntime,
+    lanPcCommandHostReady,
     getMcpSettings,
+    getToolPolicies,
     applyMcpOps,
     sshHosts,
     associatedSshHostIds,
@@ -311,6 +320,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     compaction,
     cancellation,
     resetLiveTranscript,
+    settleLiveTranscript,
     batchLiveRoundsUpdate,
     updateToolStatus,
     updateRetryAttempts,
@@ -391,12 +401,18 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
   const todoState = getOrCreateTodoToolState(conversationId);
   const subagentScheduler = createSubagentScheduler();
   const runtimePlatform = await resolveRuntimePlatform();
+  const lanPcCommandHost = getLanPcCommandHostConfig();
+  const toolWorkdir =
+    lanPcCommandHostReady && lanPcCommandHost.remoteWorkdir
+      ? lanPcCommandHost.remoteWorkdir
+      : effectiveWorkdir;
   const buildRegistryStartedAt = perfNowMs();
   const builtinRegistry = await buildBuiltinToolRegistry({
-    workdir: effectiveWorkdir,
+    workdir: toolWorkdir,
     providerId,
     runtimePlatform,
     nativeMobileRuntime,
+    lanPcCommandHostReady,
     fileState,
     todoState,
     askUserQuestionConversationId: conversationId,
@@ -410,7 +426,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     cloudExecution,
     getMcpSettings,
     applyMcpOps,
-    projectPathKey: workspaceProjectPathKey(effectiveWorkdir),
+    projectPathKey: workspaceProjectPathKey(toolWorkdir),
     sshHosts,
     associatedSshHostIds,
     sshManagerRemoteAllowed,
@@ -436,7 +452,15 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     toolCount: builtinRegistry.tools.length,
     enabledMcpServerCount: selectEnabledMcpServers(getMcpSettings()).length,
   });
-  const combinedTools = builtinRegistry.tools;
+  const toolPoliciesSnapshot = getToolPolicies?.();
+  const combinedTools = builtinRegistry.tools.filter(
+    (tool) =>
+      resolveToolPolicy(
+        tool.name,
+        builtinRegistry.metadataByName.get(tool.name),
+        toolPoliciesSnapshot,
+      ) !== "deny",
+  );
 
   const preCompactionStartedAt = perfNowMs();
   await compaction.maybeCompactPreSend({
@@ -463,6 +487,43 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     context?: BuiltinToolExecutionContext,
   ) => Promise<Message> = (tc, signal, context) =>
     builtinRegistry.executeToolCall(tc, signal, context);
+
+  const resolveToolGate = async (
+    toolCall: ToolCall,
+    signal?: AbortSignal,
+  ): Promise<{ allow: true } | { allow: false; reason: string }> => {
+    const policy = resolveToolPolicy(
+      toolCall.name,
+      builtinRegistry.metadataByName.get(toolCall.name),
+      getToolPolicies?.(),
+    );
+    if (policy === "deny") {
+      return {
+        allow: false,
+        reason: `Tool ${toolCall.name} is disabled by the user's execution policy. Do not retry it.`,
+      };
+    }
+    if (policy !== "ask" || isSessionApproved(conversationId, toolCall.name)) {
+      return { allow: true };
+    }
+    const settlement = await requestToolApproval({
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      summary: summarizeToolCall(toolCall, { includeName: false }),
+      conversationId,
+      signal,
+    });
+    if (settlement.kind === "decided" && settlement.decision !== "deny") {
+      return { allow: true };
+    }
+    const reason =
+      settlement.kind === "timeout"
+        ? `Approval for ${toolCall.name} timed out and was denied. Do not retry it.`
+        : settlement.kind === "cancelled"
+          ? `The turn stopped before ${toolCall.name} was approved.`
+          : `The user denied ${toolCall.name}. Do not retry it.`;
+    return { allow: false, reason };
+  };
 
   hookLifecycle.startAgent();
   let result: Awaited<ReturnType<typeof runAssistantWithTools>> | null = null;
@@ -660,12 +721,13 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
         runtime,
         runtimePlatform,
         context: agentContext,
-        workdir: effectiveWorkdir,
+        workdir: toolWorkdir,
         sessionId,
         nativeWebSearch: nativeWebSearchEnabled,
         tools: combinedTools,
         subagentScheduler,
         executeToolCall: combinedExecutor,
+        resolveToolGate,
         onTurnStart: (round) => {
           activeAgentRound = round;
           streamedAgentText = "";
@@ -1123,7 +1185,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     );
   }
   hookLifecycle.endAgent();
-  resetLiveTranscript(transcriptStore);
+  settleLiveTranscript(transcriptStore);
   updateConversationRuntimeEntry(conversationId, (prev) => ({
     ...prev,
     state: completedState,

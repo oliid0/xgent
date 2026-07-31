@@ -2,15 +2,11 @@ import {
   type BrowserAction,
   type BrowserActionInput,
   type BrowserActionResponse,
+  type BrowserAutomationClient,
   type BrowserSessionSummary,
   type BrowserStatus,
   type BrowserViewport,
-  browserAutomationStatus,
-  closeBrowserSession,
-  listBrowserSessions,
-  openBrowserSession,
-  runBrowserAction,
-  setBrowserViewport,
+  localBrowserAutomationClient,
 } from "../browserAutomation";
 
 const DEFAULT_BROWSER_SESSION_ID = "main";
@@ -82,7 +78,11 @@ function mergeSession(
   return next.sort((left, right) => left.sessionId.localeCompare(right.sessionId));
 }
 
-class BrowserSessionController {
+export class BrowserSessionController {
+  constructor(
+    private readonly client: BrowserAutomationClient = localBrowserAutomationClient,
+  ) {}
+
   private homePage = DEFAULT_BROWSER_HOME;
   private state: BrowserControllerState = {
     initialized: false,
@@ -136,7 +136,7 @@ class BrowserSessionController {
     if (this.initializePromise) return this.initializePromise;
 
     this.update({ initializing: true, error: null });
-    this.initializePromise = Promise.all([browserAutomationStatus(), listBrowserSessions()])
+    this.initializePromise = Promise.all([this.client.status(), this.client.listSessions()])
       .then(([status, sessions]) => {
         const activeSessionId =
           this.state.activeSessionId &&
@@ -168,7 +168,7 @@ class BrowserSessionController {
   }
 
   async refreshSessions() {
-    const sessions = await listBrowserSessions();
+    const sessions = await this.client.listSessions();
     const activeSessionId =
       this.state.activeSessionId &&
       sessions.some((session) => session.sessionId === this.state.activeSessionId)
@@ -194,7 +194,7 @@ class BrowserSessionController {
       }
       const target = normalizeBrowserAddress(options.url || existing.url);
       const response = await this.enqueue(sessionId, () =>
-        runBrowserAction(sessionId, "navigate", { url: target }),
+        this.client.action(sessionId, "navigate", { url: target }),
       );
       const session: BrowserSessionSummary = {
         ...existing,
@@ -218,7 +218,7 @@ class BrowserSessionController {
     }
 
     const session = await this.enqueue(sessionId, () =>
-      openBrowserSession({
+      this.client.openSession({
         sessionId,
         url: normalizeBrowserAddress(options.url || this.homePage),
         viewport: {
@@ -273,7 +273,7 @@ class BrowserSessionController {
 
   async closeSession(sessionIdInput: string) {
     const sessionId = normalizedSessionId(sessionIdInput);
-    await this.enqueue(sessionId, () => closeBrowserSession(sessionId));
+    await this.enqueue(sessionId, () => this.client.closeSession(sessionId));
     const sessions = this.state.sessions.filter((session) => session.sessionId !== sessionId);
     const activeSessionId =
       this.state.activeSessionId === sessionId
@@ -290,7 +290,7 @@ class BrowserSessionController {
   async closeAllSessions() {
     const sessionIds = this.state.sessions.map((session) => session.sessionId);
     for (const sessionId of sessionIds) {
-      await this.enqueue(sessionId, () => closeBrowserSession(sessionId));
+      await this.enqueue(sessionId, () => this.client.closeSession(sessionId));
     }
     this.update({
       sessions: [],
@@ -302,7 +302,9 @@ class BrowserSessionController {
 
   async setViewport(sessionIdInput: string, viewport: BrowserViewport) {
     const sessionId = normalizedSessionId(sessionIdInput);
-    const session = await this.enqueue(sessionId, () => setBrowserViewport(sessionId, viewport));
+    const session = await this.enqueue(sessionId, () =>
+      this.client.setViewport(sessionId, viewport),
+    );
     this.update({ sessions: mergeSession(this.state.sessions, session), error: null });
     return session;
   }
@@ -317,7 +319,7 @@ class BrowserSessionController {
     this.setSessionBusy(sessionId, true);
     try {
       const response = await this.enqueue(sessionId, () =>
-        runBrowserAction(sessionId, action, input, options.timeoutMs),
+        this.client.action(sessionId, action, input, options.timeoutMs),
       );
       const existing = this.state.sessions.find((session) => session.sessionId === sessionId);
       this.update({

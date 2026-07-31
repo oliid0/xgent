@@ -9,6 +9,12 @@ import { invoke } from "@xagent/runtime";
 
 import type { McpServerConfig } from "../settings";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
+import {
+  createToolRunId,
+  invokeWithAbort,
+  waitForAbortablePromise,
+} from "./invokeWithAbort";
+import { normalizeToolParametersSchema } from "./toolSchema";
 
 type McpToolInfo = {
   serverId: string;
@@ -26,7 +32,11 @@ type McpCallToolResponse = {
 
 const mcpServerCallLocks = new Map<string, Promise<void>>();
 
-async function withMcpServerCallLock<T>(serverId: string, run: () => Promise<T>): Promise<T> {
+async function withMcpServerCallLock<T>(
+  serverId: string,
+  run: () => Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
   const previous = mcpServerCallLocks.get(serverId) ?? Promise.resolve();
   let release!: () => void;
   const current = new Promise<void>((resolve) => {
@@ -35,8 +45,11 @@ async function withMcpServerCallLock<T>(serverId: string, run: () => Promise<T>)
   const tail = previous.catch(() => undefined).then(() => current);
   mcpServerCallLocks.set(serverId, tail);
 
-  await previous.catch(() => undefined);
   try {
+    // Waiting for an earlier call must remain cancellable. The finally block
+    // still releases this queue slot, so aborting a queued call cannot
+    // deadlock every later call to the same MCP server.
+    await waitForAbortablePromise(previous.catch(() => undefined), signal);
     return await run();
   } finally {
     release();
@@ -175,6 +188,7 @@ export async function createMcpTools(params: {
         kind: string;
         isReadOnly: boolean;
         displayCategory: "mcp";
+        serverId: string;
       },
     ]
   > = [];
@@ -185,9 +199,7 @@ export async function createMcpTools(params: {
     tools.push({
       name: safeName,
       description: `${descriptionPrefix}${info.description || info.name}`,
-      // pi-ai Tool.parameters is TypeBox's TSchema type, but providers only need JSON Schema.
-      // MCP already provides JSON Schema under `inputSchema`, so we pass it through.
-      parameters: (info.inputSchema ?? { type: "object" }) as any,
+      parameters: normalizeToolParametersSchema(info.inputSchema, `MCP ${safeName}`),
     });
     toolNameMap.set(safeName, {
       serverId: info.serverId,
@@ -201,6 +213,7 @@ export async function createMcpTools(params: {
         kind: "mcp",
         isReadOnly: false,
         displayCategory: "mcp",
+        serverId: info.serverId,
       },
     ]);
   }
@@ -236,40 +249,54 @@ export async function createMcpTools(params: {
     }
 
     try {
-      return await withMcpServerCallLock(mapped.serverId, async () => {
-        if (signal?.aborted) {
+      return await withMcpServerCallLock(
+        mapped.serverId,
+        async () => {
+          if (signal?.aborted) {
+            return {
+              role: "toolResult",
+              toolCallId: toolCall.id,
+              toolName: toolCall.name,
+              content: [{ type: "text", text: "Cancelled" }],
+              details: {},
+              isError: true,
+              timestamp: Date.now(),
+            };
+          }
+
+          const runId = createToolRunId("mcp", toolCall.id);
+          const res = await invokeWithAbort<McpCallToolResponse>(
+            "mcp_call_tool",
+            {
+              server_id: mapped.serverId,
+              tool_name: mapped.toolName,
+              arguments: toolCall.arguments ?? {},
+              run_id: runId,
+            },
+            signal,
+            {
+              onAbort: () =>
+                invoke("mcp_cancel_tool", { run_id: runId } as any).catch(() => undefined),
+            },
+          );
+
           return {
             role: "toolResult",
             toolCallId: toolCall.id,
             toolName: toolCall.name,
-            content: [{ type: "text", text: "Cancelled" }],
-            details: {},
-            isError: true,
+            content: (res?.content ?? [{ type: "text", text: "" }]) as any,
+            details: {
+              serverId: mapped.serverId,
+              serverLabel: mapped.serverLabel,
+              tool: mapped.toolName,
+              mcp: res?.details,
+            },
+            isError: Boolean(res?.isError),
             timestamp: Date.now(),
           };
-        }
-
-        const res = await invoke<McpCallToolResponse>("mcp_call_tool", {
-          server_id: mapped.serverId,
-          tool_name: mapped.toolName,
-          arguments: toolCall.arguments ?? {},
-        } as any);
-
-        return {
-          role: "toolResult",
-          toolCallId: toolCall.id,
-          toolName: toolCall.name,
-          content: (res?.content ?? [{ type: "text", text: "" }]) as any,
-          details: {
-            serverId: mapped.serverId,
-            serverLabel: mapped.serverLabel,
-            tool: mapped.toolName,
-            mcp: res?.details,
-          },
-          isError: Boolean(res?.isError),
-          timestamp: Date.now(),
-        };
-      });
+        },
+        signal,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return {

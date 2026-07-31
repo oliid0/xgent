@@ -47,7 +47,6 @@ const RAW_DIFF_PREVIEW_CHAR_LIMIT = 60 * 1024;
 const DIFF_SELECTION_AUTOSCROLL_EDGE_PX = 40;
 const DIFF_SELECTION_AUTOSCROLL_MAX_STEP_PX = 22;
 const DIFF_HORIZONTAL_SCROLLBAR_MIN_THUMB_PX = 32;
-const PROJECT_TOOLS_RESIZE_END_EVENT = "xagent:project-tools-resize-end";
 
 function diffSelectionAutoScrollDelta(
   pointer: number,
@@ -180,10 +179,6 @@ function chooseDiffHorizontalScrollTarget(targets: HTMLElement[], preferred: HTM
     }
   }
   return bestTarget;
-}
-
-function isRightDockPanelResizing(root: HTMLElement | null) {
-  return Boolean(root?.closest('[data-project-tools-resizing="true"]'));
 }
 
 type DiffSelectionContextMenuState = {
@@ -467,7 +462,6 @@ export function DiffContent(props: {
 
   const updateDiffHorizontalScrollbar = useCallback(() => {
     const root = rootRef.current;
-    if (isRightDockPanelResizing(root)) return;
 
     const trackWidth =
       diffHorizontalScrollbarTrackRef.current?.clientWidth ??
@@ -612,7 +606,6 @@ export function DiffContent(props: {
           });
     mutationObserver?.observe(root, { childList: true, subtree: true });
     window.addEventListener("resize", refreshTargets);
-    window.addEventListener(PROJECT_TOOLS_RESIZE_END_EVENT, refreshTargets);
     refreshTargets();
 
     return () => {
@@ -623,7 +616,6 @@ export function DiffContent(props: {
         window.clearTimeout(refreshTimer);
       }
       window.removeEventListener("resize", refreshTargets);
-      window.removeEventListener(PROJECT_TOOLS_RESIZE_END_EVENT, refreshTargets);
       mutationObserver?.disconnect();
       detachTargets();
       resizeObserver?.disconnect();

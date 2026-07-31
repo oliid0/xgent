@@ -1,39 +1,29 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
-  BookOpen,
   Brain,
   ChevronRight,
-  Clock3,
   Cloud,
   Cpu,
   Info,
-  Key,
   Mic,
   Search,
   Settings2,
   Sparkles,
   Terminal,
-  Wrench,
   X,
-  Zap,
 } from "../components/icons";
 
 import { useLocale } from "../i18n";
 import { useCompactViewport } from "../lib/responsive/compactViewport";
 import { AboutSection } from "./settings/AboutSection";
 import { AccessSection } from "./settings/AccessSection";
-import { AgentsSection } from "./settings/AgentsSection";
-import { CronSection } from "./settings/CronSection";
-import { HooksSection } from "./settings/HooksSection";
 import { MobileAssistantSection } from "./settings/MobileAssistantSection";
 import { MobileExecutionSection } from "./settings/MobileExecutionSection";
 import { MemoryPanel } from "./settings/memory/MemoryPanel";
 import { ProvidersSection } from "./settings/ProvidersSection";
 import { SoulSection } from "./settings/SoulSection";
-import { SshSection } from "./settings/SshSection";
 import { SystemSettingsForm } from "./settings/SystemSettingsForm";
-import { SystemToolsSection } from "./settings/SystemToolsSection";
 import type { SectionId, SettingsPageProps } from "./settings/types";
 
 function getSaveIndicator(state: SettingsPageProps["saveState"], t: (key: string) => string) {
@@ -124,12 +114,6 @@ const NAV_GROUPS: NavGroup[] = [
         accentClass: "bg-violet-500",
         descriptionKey: "settings.mobile.soulDescription",
       },
-      {
-        id: "agents",
-        icon: <BookOpen className="h-3.5 w-3.5" />,
-        accentClass: "bg-orange-500",
-        descriptionKey: "settings.mobile.agentsDescription",
-      },
     ],
   },
   {
@@ -141,40 +125,11 @@ const NAV_GROUPS: NavGroup[] = [
         accentClass: "bg-violet-500",
         descriptionKey: "settings.mobile.memoryDescription",
       },
-      {
-        id: "systemTools",
-        icon: <Wrench className="h-3.5 w-3.5" />,
-        accentClass: "bg-cyan-500",
-        descriptionKey: "settings.mobile.systemToolsDescription",
-      },
-    ],
-  },
-  {
-    labelKey: "settings.groupAutomation",
-    items: [
-      {
-        id: "hooks",
-        icon: <Zap className="h-3.5 w-3.5" />,
-        accentClass: "bg-amber-500",
-        descriptionKey: "settings.mobile.hooksDescription",
-      },
-      {
-        id: "cron",
-        icon: <Clock3 className="h-3.5 w-3.5" />,
-        accentClass: "bg-emerald-500",
-        descriptionKey: "settings.mobile.cronDescription",
-      },
     ],
   },
   {
     labelKey: "settings.groupConnectivity",
     items: [
-      {
-        id: "ssh",
-        icon: <Key className="h-3.5 w-3.5" />,
-        accentClass: "bg-teal-500",
-        descriptionKey: "settings.mobile.sshDescription",
-      },
       {
         id: "access",
         icon: <Cloud className="h-3.5 w-3.5" />,
@@ -217,6 +172,7 @@ export function SettingsPage(props: SettingsPageProps) {
     saveState,
     onBack,
     initialSection = "system",
+    soulCreateRequestId = 0,
     hiddenSections = [],
     nativeMobile = false,
     appUpdate,
@@ -232,14 +188,9 @@ export function SettingsPage(props: SettingsPageProps) {
 
   const sectionLabels: Record<SectionId, string> = {
     system: t("settings.navSystem"),
-    systemTools: t("settings.navSystemTools"),
     providers: t("settings.navProviders"),
     soul: t("settings.navSoul"),
-    agents: t("settings.navAgents"),
-    ssh: t("settings.navSsh"),
     memory: t("settings.navMemory"),
-    hooks: t("settings.navHooks"),
-    cron: t("settings.navCron"),
     access: t("settings.navAccess"),
     mobileAssistant: t("settings.navMobileAssistant"),
     mobileExecution: t("settings.navMobileExecution"),
@@ -294,7 +245,7 @@ export function SettingsPage(props: SettingsPageProps) {
           />
         );
       case "soul":
-        return <SoulSection />;
+        return <SoulSection createRequestId={soulCreateRequestId} />;
       case "system":
         return (
           <SystemSettingsForm
@@ -303,16 +254,6 @@ export function SettingsPage(props: SettingsPageProps) {
             compact={compactSettings}
           />
         );
-      case "systemTools":
-        return <SystemToolsSection settings={settings} setSettings={setSettings} />;
-      case "hooks":
-        return <HooksSection settings={settings} setSettings={setSettings} />;
-      case "cron":
-        return <CronSection settings={settings} setSettings={setSettings} />;
-      case "agents":
-        return <AgentsSection settings={settings} setSettings={setSettings} />;
-      case "ssh":
-        return <SshSection settings={settings} setSettings={setSettings} />;
       case "access":
         return (
           <AccessSection
@@ -376,14 +317,14 @@ export function SettingsPage(props: SettingsPageProps) {
               key={section}
               data-settings-section={section}
               className={`settings-section-enter min-h-0 flex-1 px-3.5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-3.5 ${
-                section === "hooks" || section === "providers" || section === "memory"
+                section === "providers" || section === "memory"
                   ? "flex flex-col overflow-hidden"
                   : "overflow-y-auto overscroll-contain"
               }`}
             >
               <div
                 className={`settings-section-shell ${
-                  section === "hooks" || section === "providers" || section === "memory"
+                  section === "providers" || section === "memory"
                     ? "flex min-h-0 flex-1 flex-col"
                     : "min-h-full"
                 }`}
@@ -430,24 +371,24 @@ export function SettingsPage(props: SettingsPageProps) {
                           setSection(item.id);
                           setMobileDetailOpen(true);
                         }}
-                        className="group relative flex min-h-[64px] w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors active:bg-foreground/[0.045]"
+                        className="group relative flex min-h-12 w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors active:bg-muted"
                       >
                         <span
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white shadow-sm ${item.accentClass}`}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center text-foreground/75"
                         >
                           {item.icon}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-[15px] font-medium leading-5 text-foreground">
+                          <span className="block text-sm font-medium leading-5 text-foreground">
                             {item.label}
                           </span>
-                          <span className="mt-0.5 block truncate text-[12px] leading-4 text-muted-foreground">
+                          <span className="mt-0.5 block truncate text-[11px] leading-4 text-muted-foreground">
                             {item.description}
                           </span>
                         </span>
                         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/45 transition-transform group-active:translate-x-0.5" />
                         {index < group.items.length - 1 ? (
-                          <span className="pointer-events-none absolute inset-x-0 bottom-0 ml-[58px] h-px bg-border/45" />
+                          <span className="pointer-events-none absolute inset-x-0 bottom-0 ml-[50px] h-px bg-border/45" />
                         ) : null}
                       </button>
                     ))}
@@ -527,14 +468,14 @@ export function SettingsPage(props: SettingsPageProps) {
         <main
           key={section}
           className={`settings-section-enter min-w-0 flex-1 pr-2 ${
-            section === "hooks" || section === "providers" || section === "memory"
+            section === "providers" || section === "memory"
               ? "flex min-h-0 flex-col overflow-hidden"
               : "overflow-y-auto overscroll-contain"
           }`}
         >
           <div
             className={`settings-section-shell ${
-              section === "hooks" || section === "providers" || section === "memory"
+              section === "providers" || section === "memory"
                 ? "flex min-h-0 flex-1 flex-col"
                 : "min-h-full"
             }`}

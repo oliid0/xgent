@@ -1,4 +1,4 @@
-// GitReview panel assembly: reads the right-dock tool context, owns the
+// GitReview panel assembly: reads the workspace-tools context, owns the
 // layout/presentation state shared across views and composes the toolbar,
 // status view and history view around the data layer.
 //
@@ -18,7 +18,7 @@ export type { GitCommitContextPayload, GitFileContextPayload } from "./model";
 const GIT_REVIEW_SPLIT_LAYOUT_MIN_WIDTH = 500;
 
 type GitReviewPanelProps = {
-  // Visibility contract from the right-dock registry: while inactive the
+  // Visibility contract from the workspace feature panel: while inactive the
   // panel issues no requests (invalidations are buffered and flushed on
   // activation by the data layer).
   active?: boolean;

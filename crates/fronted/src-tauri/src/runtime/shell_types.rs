@@ -1,10 +1,10 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub(crate) const DEFAULT_SHELL_TIMEOUT_MS: u64 = 120_000;
 pub(crate) const MIN_SHELL_TIMEOUT_MS: u64 = 1_000;
 pub(crate) const MAX_SHELL_TIMEOUT_MS: u64 = 10 * 60_000;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ShellRunResponse {
     pub exit_code: i32,
     pub shell: String,

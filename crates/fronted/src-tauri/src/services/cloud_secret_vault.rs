@@ -152,6 +152,61 @@ impl CloudSecretVault {
             .ok_or_else(|| "GitHub token is not configured".to_string())?;
         String::from_utf8(value).map_err(|_| "stored GitHub token is not valid UTF-8".to_string())
     }
+
+    /// Stores an opaque credential payload for another native service. These
+    /// helpers deliberately remain crate-private so secret material cannot be
+    /// exposed through a Tauri command by accident.
+    pub(crate) fn set_namespaced_secret(&self, key: &[u8], value: &[u8]) -> Result<(), String> {
+        if key.is_empty() {
+            return Err("credential namespace cannot be empty".to_string());
+        }
+        let stronghold = self
+            .stronghold
+            .lock()
+            .map_err(|_| "cloud credential lock poisoned".to_string())?;
+        stronghold
+            .get_client(VAULT_CLIENT_ID)
+            .map_err(|error| format!("open cloud credential client failed: {error}"))?
+            .store()
+            .insert(key.to_vec(), value.to_vec(), None)
+            .map_err(|error| format!("store protected credential failed: {error}"))?;
+        stronghold
+            .save()
+            .map_err(|error| format!("save protected credential failed: {error}"))
+    }
+
+    pub(crate) fn namespaced_secret(&self, key: &[u8]) -> Result<Option<Vec<u8>>, String> {
+        if key.is_empty() {
+            return Err("credential namespace cannot be empty".to_string());
+        }
+        self.stronghold
+            .lock()
+            .map_err(|_| "cloud credential lock poisoned".to_string())?
+            .get_client(VAULT_CLIENT_ID)
+            .map_err(|error| format!("open cloud credential client failed: {error}"))?
+            .store()
+            .get(key)
+            .map_err(|error| format!("read protected credential failed: {error}"))
+    }
+
+    pub(crate) fn remove_namespaced_secret(&self, key: &[u8]) -> Result<(), String> {
+        if key.is_empty() {
+            return Err("credential namespace cannot be empty".to_string());
+        }
+        let stronghold = self
+            .stronghold
+            .lock()
+            .map_err(|_| "cloud credential lock poisoned".to_string())?;
+        stronghold
+            .get_client(VAULT_CLIENT_ID)
+            .map_err(|error| format!("open cloud credential client failed: {error}"))?
+            .store()
+            .delete(key)
+            .map_err(|error| format!("remove protected credential failed: {error}"))?;
+        stronghold
+            .save()
+            .map_err(|error| format!("save protected credential failed: {error}"))
+    }
 }
 
 fn validate_github_username(value: &str) -> Result<String, String> {

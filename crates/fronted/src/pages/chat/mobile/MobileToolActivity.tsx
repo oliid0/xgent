@@ -27,6 +27,7 @@ type MobileToolActivityProps = {
   open: boolean;
   onOpen: () => void;
   onOpenBrowser?: () => void;
+  onOpenTerminal?: () => void;
   onClose: () => void;
   bottomOffsetPx: number;
 };
@@ -45,6 +46,7 @@ const EMPTY_TRANSCRIPT: LiveTranscriptState = {
   toolStatus: null,
   liveRounds: [],
   retryAttempts: [],
+  isSettled: true,
 };
 
 function collectActivityItems(snapshot: LiveTranscriptState): ActivityItem[] {
@@ -171,6 +173,7 @@ export function MobileToolActivity({
   open,
   onOpen,
   onOpenBrowser,
+  onOpenTerminal,
   onClose,
   bottomOffsetPx,
 }: MobileToolActivityProps) {
@@ -195,11 +198,18 @@ export function MobileToolActivity({
         >
           <button
             type="button"
-            onClick={
-              capsuleItem && activityKind(capsuleItem.toolCall.name) === "browser" && onOpenBrowser
-                ? onOpenBrowser
-                : onOpen
-            }
+            onClick={() => {
+              const kind = capsuleItem ? activityKind(capsuleItem.toolCall.name) : "tool";
+              if (kind === "browser" && onOpenBrowser) {
+                onOpenBrowser();
+                return;
+              }
+              if (kind === "shell" && onOpenTerminal) {
+                onOpenTerminal();
+                return;
+              }
+              onOpen();
+            }}
             className="pointer-events-auto flex h-9 max-w-[min(86vw,420px)] items-center gap-2 rounded-full border border-black/[0.07] bg-white/82 px-3 text-left shadow-[0_8px_24px_-12px_rgba(15,23,42,0.38),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl backdrop-saturate-150 active:scale-[0.98] dark:border-white/[0.12] dark:bg-zinc-900/82 dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.09)]"
           >
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500/12 text-blue-600 dark:text-blue-300">

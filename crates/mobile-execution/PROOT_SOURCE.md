@@ -4,20 +4,20 @@ The Android APK bundles PRoot as a separate executable invoked through
 `ProcessBuilder`. XAgent itself remains MIT licensed; PRoot remains licensed
 under GPL-2.0-or-later.
 
-- Packaged binary version: `5.1.107.87`
-- Binary distributor: Termux package repository
-- Corresponding source commit: `87af48f58b752268cc4f93f251a9ca84e94c5655`
-- Upstream tag: `https://github.com/termux/proot/tree/v5.1.107.87`
-- Termux build recipe: `https://github.com/termux/termux-packages/tree/master/packages/proot`
+- Packaged source identity: `termux-a89b3732ec6a`
+- Binary builder: XGent GitHub Actions, using the Android NDK
+- Corresponding source commit: `a89b3732ec6ae1db674510f0843b2f3db54d0a2f`
+- Official source: `https://github.com/termux/proot/tree/a89b3732ec6ae1db674510f0843b2f3db54d0a2f`
 - Reproduction/inclusion script: `scripts/mobile/prepare-proot-android.sh`
 
-The script verifies the complete Termux `.deb` files for PRoot, libtalloc, and
-libandroid-shmem against pinned SHA-256 digests before copying the executable,
-loader, and both required libraries into the Android build tree. The official
-binaries remain byte-for-byte unchanged. At runtime XAgent copies
-`libtalloc.so` inside its private code-cache directory under the SONAME
-`libtalloc.so.2`, then resolves it through `LD_LIBRARY_PATH`. Generated
-binaries are intentionally not checked into Git and never come from `xx/`.
+The script checks out the immutable commit directly from the official
+`termux/proot` repository and verifies the exact commit before compiling it for
+each APK ABI. libtalloc 2.4.4 and libandroid-shmem 0.7 are built from their
+official, SHA-256-pinned source archives and linked statically into the
+standalone PRoot executable. The PRoot loader is bundled by the upstream build
+system, so runtime availability no longer depends on a removable package
+mirror or separately extracted dependency files. Generated binaries are
+intentionally not checked into Git and never come from `xx/`.
 
 Every Android GitHub Release includes a source archive generated directly from
 that immutable commit, plus its SHA-256 checksum, beside the signed APK.

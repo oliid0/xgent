@@ -40,7 +40,7 @@ import {
   DropdownMenuTrigger,
 } from "../../ui/dropdown-menu";
 import { Input } from "../../ui/input";
-import { useRightDockToolContext } from "../RightDockContext";
+import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
 import {
   type GitBranchFromCommitState,
   type GitBranchSwitchConflictState,
@@ -675,7 +675,7 @@ export function GitReviewToolbar(props: {
     state,
   } = data;
   const { t } = useLocale();
-  const { onInsertCodeReviewSkill } = useRightDockToolContext().git;
+  const { onInsertCodeReviewSkill } = useWorkspaceToolsContext().git;
   const operationBusy = busy !== "";
   // Which selector the dial exposes; branch is the everyday one, so it wins
   // the full-width dropdown by default.

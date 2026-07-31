@@ -43,6 +43,13 @@ type CloudSecretVaultStatus = {
   githubUsername?: string | null;
 };
 
+type LanPcClientStatus = {
+  paired: boolean;
+  baseUrl?: string | null;
+  deviceId?: string | null;
+  expiresAt?: number | null;
+};
+
 const EMPTY_LOCAL_STATUS: LocalAccessStatus = {
   running: false,
   bindAddress: "",
@@ -53,6 +60,10 @@ const EMPTY_LOCAL_STATUS: LocalAccessStatus = {
 
 const EMPTY_VAULT_STATUS: CloudSecretVaultStatus = {
   githubTokenConfigured: false,
+};
+
+const EMPTY_LAN_PC_STATUS: LanPcClientStatus = {
+  paired: false,
 };
 
 type AccessSectionProps = SettingsSectionProps & {
@@ -133,6 +144,10 @@ function normalizeLanControlUrl(value: string) {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("The computer address must use HTTP or HTTPS.");
   }
+  if (url.protocol === "http:" && !url.port) url.port = "28367";
+  url.pathname = "/";
+  url.search = "";
+  url.hash = "";
   return url.toString();
 }
 
@@ -141,6 +156,18 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
   const browser = isBrowserRuntime();
   const [localStatus, setLocalStatus] = useState(EMPTY_LOCAL_STATUS);
   const [vaultStatus, setVaultStatus] = useState(EMPTY_VAULT_STATUS);
+  const [lanPcStatus, setLanPcStatus] = useState(EMPTY_LAN_PC_STATUS);
+  const [lanPairingCode, setLanPairingCode] = useState("");
+  const [lanDeviceName, setLanDeviceName] = useState(() => {
+    const platform = /iPad/i.test(navigator.userAgent)
+      ? "iPad"
+      : /iPhone/i.test(navigator.userAgent)
+        ? "iPhone"
+        : /Android/i.test(navigator.userAgent)
+          ? "Android"
+          : "Mobile";
+    return `XAgent ${platform}`;
+  });
   const [githubToken, setGithubToken] = useState("");
   const [cloudDetailsOpen, setCloudDetailsOpen] = useState(
     () => settings.access.cloudExecutionEnabled,
@@ -170,11 +197,24 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
     }
   }, [browser]);
 
+  const refreshLanPcStatus = useCallback(async () => {
+    if (browser || !nativeMobile) return;
+    setLanPcStatus(await invoke<LanPcClientStatus>("lan_pc_status"));
+  }, [browser, nativeMobile]);
+
   useEffect(() => {
     if (browser) return;
     if (!nativeMobile) void refreshLocalStatus();
     void refreshVaultStatus();
-  }, [browser, nativeMobile, refreshLocalStatus, refreshVaultStatus, settings.access.webUiEnabled]);
+    if (nativeMobile) void refreshLanPcStatus();
+  }, [
+    browser,
+    nativeMobile,
+    refreshLanPcStatus,
+    refreshLocalStatus,
+    refreshVaultStatus,
+    settings.access.webUiEnabled,
+  ]);
 
   useEffect(() => {
     if (browser || nativeMobile || !settings.access.webUiEnabled) return;
@@ -186,6 +226,20 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
     () => localStatus.urls[0] ?? `http://127.0.0.1:${settings.access.webUiPort}`,
     [localStatus.urls, settings.access.webUiPort],
   );
+  const normalizedConfiguredLanUrl = useMemo(() => {
+    try {
+      return settings.access.lanControlUrl.trim()
+        ? normalizeLanControlUrl(settings.access.lanControlUrl).replace(/\/$/, "")
+        : "";
+    } catch {
+      return "";
+    }
+  }, [settings.access.lanControlUrl]);
+  const pairedLanUrl = (lanPcStatus.baseUrl ?? "").replace(/\/$/, "");
+  const lanPcReady =
+    lanPcStatus.paired &&
+    Boolean(normalizedConfiguredLanUrl) &&
+    normalizedConfiguredLanUrl === pairedLanUrl;
 
   async function runAction(name: string, action: () => Promise<void>) {
     setActionError("");
@@ -239,6 +293,126 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
               className="h-11 font-mono text-[13px]"
             />
           </label>
+
+          <div className="grid gap-2 sm:grid-cols-[1fr_8rem]">
+            <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
+              <span>{t("settings.accessLanPairingCode")}</span>
+              <Input
+                value={lanPairingCode}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="000000"
+                onChange={(event) =>
+                  setLanPairingCode(event.currentTarget.value.replace(/\D/g, "").slice(0, 6))
+                }
+                className="h-11 font-mono text-center text-base tracking-[0.2em]"
+              />
+            </label>
+            <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
+              <span>{t("settings.accessLanDeviceName")}</span>
+              <Input
+                value={lanDeviceName}
+                maxLength={64}
+                onChange={(event) => setLanDeviceName(event.currentTarget.value)}
+                className="h-11 text-[13px]"
+              />
+            </label>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={
+                !settings.access.lanControlUrl.trim() ||
+                lanPairingCode.length !== 6 ||
+                !lanDeviceName.trim() ||
+                busyAction !== ""
+              }
+              onClick={() =>
+                void runAction("lan-pair", async () => {
+                  const url = normalizeLanControlUrl(settings.access.lanControlUrl);
+                  updateAccess(setSettings, { lanControlUrl: url });
+                  const next = await invoke<LanPcClientStatus>("lan_pc_pair", {
+                    baseUrl: url,
+                    code: lanPairingCode,
+                    deviceName: lanDeviceName.trim(),
+                  });
+                  setLanPcStatus(next);
+                  setLanPairingCode("");
+                })
+              }
+              className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-border px-3 text-sm font-medium transition-colors hover:bg-muted/50 disabled:opacity-40"
+            >
+              <Wifi className="h-4 w-4" />
+              {busyAction === "lan-pair"
+                ? t("settings.accessConnecting")
+                : t("settings.accessPairComputer")}
+            </button>
+            {lanPcStatus.paired ? (
+              <button
+                type="button"
+                disabled={busyAction !== ""}
+                onClick={() =>
+                  void runAction("lan-disconnect", async () => {
+                    setLanPcStatus(
+                      await invoke<LanPcClientStatus>("lan_pc_disconnect"),
+                    );
+                    updateAccess(setSettings, { preferLanPcExecution: false });
+                  })
+                }
+                className="h-10 rounded-xl border border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground disabled:opacity-40"
+              >
+                {t("settings.accessDisconnectComputer")}
+              </button>
+            ) : null}
+          </div>
+
+          <div
+            className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-xs ${
+              lanPcReady
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : "bg-muted/40 text-muted-foreground"
+            }`}
+          >
+            <span>
+              {lanPcReady
+                ? t("settings.accessComputerPaired")
+                : t("settings.accessComputerNotPaired")}
+            </span>
+            {lanPcStatus.paired ? (
+              <button
+                type="button"
+                disabled={busyAction !== "" || !normalizedConfiguredLanUrl}
+                onClick={() =>
+                  void runAction("lan-refresh", async () => {
+                    setLanPcStatus(
+                      await invoke<LanPcClientStatus>("lan_pc_refresh", {
+                        baseUrl: normalizeLanControlUrl(settings.access.lanControlUrl),
+                      }),
+                    );
+                  })
+                }
+                className="flex h-7 items-center gap-1 rounded-lg px-2 font-medium hover:bg-background/70 disabled:opacity-40"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                {t("settings.accessCheckComputer")}
+              </button>
+            ) : null}
+          </div>
+
+          <ToggleCard
+            icon={<MonitorSmartphone className="h-3.5 w-3.5 text-muted-foreground" />}
+            title={t("settings.accessPreferLanPc")}
+            hint={t("settings.accessPreferLanPcHint")}
+            checked={settings.access.preferLanPcExecution}
+            disabled={!lanPcReady}
+            onToggle={() =>
+              updateAccess(setSettings, {
+                preferLanPcExecution: !settings.access.preferLanPcExecution,
+              })
+            }
+          />
 
           <button
             type="button"

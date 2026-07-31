@@ -1,4 +1,4 @@
-// Pure model helpers for the right-dock file tree panel.
+// Pure model helpers for the workspace file tree panel.
 //
 // Shared by every frontend runtime; only relative, npm-package, or
 // @xagent/runtime imports are allowed here. Platform differences are resolved

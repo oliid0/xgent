@@ -44,6 +44,7 @@ import {
 import type {
   CodexRequestFormat,
   CustomProvider,
+  ProviderAuthMode,
   ProviderId,
   ProviderModelConfig,
   ReasoningLevel,
@@ -653,6 +654,8 @@ export async function runAssistantWithTools(params: {
   runtime: {
     baseUrl: string;
     apiKey: string;
+    authMode?: ProviderAuthMode;
+    oauthAccountId?: string;
     customHeaders?: CustomProvider["customHeaders"];
     requestFormat?: CodexRequestFormat;
     reasoning?: ReasoningLevel;
@@ -673,6 +676,10 @@ export async function runAssistantWithTools(params: {
     signal?: AbortSignal,
     context?: ToolExecutionEventContext,
   ) => Promise<Message>;
+  resolveToolGate?: (
+    toolCall: ToolCall,
+    signal?: AbortSignal,
+  ) => Promise<{ allow: true } | { allow: false; reason: string }>;
   onTurnStart?: (round: number) => void;
   onTextDelta: (delta: string, round: number) => void;
   onThinkingDelta?: (delta: string, round: number) => void;
@@ -703,7 +710,18 @@ export async function runAssistantWithTools(params: {
   const modelId = params.model.trim();
   if (!modelId) throw new Error("No model selected");
   if (!params.runtime.baseUrl.trim()) throw new Error("Base URL cannot be empty");
-  if (!params.runtime.apiKey.trim()) throw new Error("API Key cannot be empty");
+  if (
+    params.runtime.authMode !== "oauth-managed" &&
+    !params.runtime.apiKey.trim()
+  ) {
+    throw new Error("API Key cannot be empty");
+  }
+  if (
+    params.runtime.authMode === "oauth-managed" &&
+    !params.runtime.oauthAccountId?.trim()
+  ) {
+    throw new Error("OpenAI OAuth account is not selected");
+  }
   if (!params.workdir.trim() && !params.allowEmptyWorkdir) {
     throw new Error("A working directory must be configured for tool mode");
   }
@@ -716,10 +734,21 @@ export async function runAssistantWithTools(params: {
       params.providerId,
       params.runtime.baseUrl.trim(),
       mergeCustomHeaders(
-        buildProviderRequestHeaders(params.providerId, params.runtime.apiKey, params.sessionId),
+        buildProviderRequestHeaders(
+          params.providerId,
+          params.runtime.apiKey,
+          params.sessionId,
+          params.runtime.authMode,
+        ),
         params.runtime.customHeaders,
       ),
-      { useSystemProxy: params.runtime.useSystemProxy === true },
+      {
+        useSystemProxy: params.runtime.useSystemProxy === true,
+        oauthAccountId:
+          params.runtime.authMode === "oauth-managed"
+            ? params.runtime.oauthAccountId
+            : undefined,
+      },
     );
 
     const model = createModelFromConfig(
@@ -1344,6 +1373,12 @@ export async function runAssistantWithTools(params: {
             block: true,
             reason: buildTruncatedToolCallText(effectiveToolCall.name, truncationReason),
           };
+        }
+        if (params.resolveToolGate) {
+          const gate = await params.resolveToolGate(effectiveToolCall, params.signal);
+          if (!gate.allow) {
+            return { block: true, reason: gate.reason };
+          }
         }
         if (effectiveToolCall.name !== "Agent") {
           return undefined;

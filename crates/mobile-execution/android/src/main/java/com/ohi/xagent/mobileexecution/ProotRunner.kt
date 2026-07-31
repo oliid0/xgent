@@ -3,8 +3,6 @@ package com.ohi.xagent.mobileexecution
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
@@ -32,40 +30,30 @@ internal data class AndroidRunResult(
 
 internal data class ProotBinaries(
     val executable: File,
-    val loader: File,
-    val talloc: File,
-    val androidShmem: File,
 ) {
     val available: Boolean
-        get() = executable.isFile && loader.isFile && talloc.isFile && androidShmem.isFile
+        get() = executable.isFile
 
     companion object {
         fun resolve(nativeLibraryDir: File): ProotBinaries = ProotBinaries(
             executable = File(nativeLibraryDir, "libxagent_proot.so"),
-            loader = File(nativeLibraryDir, "libxagent_proot_loader.so"),
-            talloc = File(nativeLibraryDir, "libtalloc.so"),
-            androidShmem = File(nativeLibraryDir, "libandroid-shmem.so"),
         )
     }
 }
 
 internal class ProotRunner(
     nativeLibraryDir: File,
-    nativeRuntimeDir: File,
     private val rootfsDir: File,
     private val tempDir: File,
     private val allowedHostRoots: () -> List<File>,
     private val activeProcesses: ConcurrentHashMap<String, Process>,
     private val cancelledRuns: MutableSet<String>,
 ) {
-    private val nativeLibraryDir = nativeLibraryDir.canonicalFile
     private val binaries = ProotBinaries.resolve(nativeLibraryDir)
-    private val nativeRuntimeDir = nativeRuntimeDir.canonicalFile
 
     fun execute(request: AndroidRunRequest): AndroidRunResult {
         require(binaries.available) { "PRoot binaries are unavailable for this Android ABI" }
         require(File(rootfsDir, "bin/sh").isFile) { "Alpine rootfs is not installed" }
-        val runtimeTalloc = prepareNativeRuntime()
 
         val workdir = File(request.workdir).canonicalFile
         require(workdir.isDirectory) { "workdir must be an existing directory" }
@@ -85,13 +73,8 @@ internal class ProotRunner(
             .redirectErrorStream(false)
             .apply {
                 environment().clear()
-                environment()["PROOT_LOADER"] = binaries.loader.absolutePath
                 environment()["PROOT_TMP_DIR"] = tempDir.absolutePath
                 environment()["TMPDIR"] = tempDir.absolutePath
-                environment()["LD_LIBRARY_PATH"] = listOf(
-                    runtimeTalloc.parentFile!!.absolutePath,
-                    nativeLibraryDir.absolutePath,
-                ).joinToString(File.pathSeparator)
             }
             .start()
 
@@ -143,39 +126,6 @@ internal class ProotRunner(
             effectiveTimeoutMs = request.timeoutMs,
             durationMs = durationMs,
         )
-    }
-
-    /**
-     * Android's APK native-library extractor only accepts names ending in
-     * `.so`, while the unmodified Termux PRoot executable requests the
-     * versioned SONAME `libtalloc.so.2`. Keep the official ELF untouched and
-     * materialize that versioned filename in the app's private code cache.
-     */
-    private fun prepareNativeRuntime(): File {
-        nativeRuntimeDir.mkdirs()
-        require(nativeRuntimeDir.isDirectory) { "could not create the native runtime directory" }
-        val target = File(nativeRuntimeDir, "libtalloc.so.2")
-        val temporary = File(nativeRuntimeDir, "libtalloc.so.2.tmp")
-        temporary.delete()
-        binaries.talloc.copyTo(temporary, overwrite = true)
-        require(temporary.canRead()) { "the private libtalloc runtime is unreadable" }
-        runCatching {
-            Files.move(
-                temporary.toPath(),
-                target.toPath(),
-                StandardCopyOption.ATOMIC_MOVE,
-                StandardCopyOption.REPLACE_EXISTING,
-            )
-        }.recoverCatching {
-            Files.move(
-                temporary.toPath(),
-                target.toPath(),
-                StandardCopyOption.REPLACE_EXISTING,
-            )
-        }.getOrElse { error ->
-            throw IllegalStateException("could not activate the private libtalloc runtime", error)
-        }
-        return target
     }
 
     private fun buildCommand(

@@ -3,12 +3,12 @@ import { useCallback, useMemo } from "react";
 import { FolderTree, X } from "../../../components/icons";
 import { FileTreePanel } from "../../../components/project-tools/file-tree";
 import {
-  RightDockToolContext,
-  type RightDockToolContextValue,
-} from "../../../components/project-tools/RightDockContext";
-import { expandedPathsForFileTreePath } from "../../../components/project-tools/rightDockModel";
+  WorkspaceToolsContext,
+  type WorkspaceToolsContextValue,
+} from "../../../components/project-tools/WorkspaceToolsContext";
+import { expandedPathsForFileTreePath } from "../../../components/project-tools/workspaceToolsModel";
 import { useLocale } from "../../../i18n";
-import type { RightDockFileTreeState, RightDockFileTreeStatePatch } from "../../../lib/settings";
+import type { WorkspaceFileTreeState, WorkspaceFileTreeStatePatch } from "../../../lib/settings";
 import type { TerminalClient } from "../../../lib/terminal/types";
 import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
 
@@ -17,10 +17,10 @@ type MobileFilesPanelProps = {
   projectPathKey: string;
   cwd: string;
   theme: "light" | "dark";
-  fileTreeState: RightDockFileTreeState;
+  fileTreeState: WorkspaceFileTreeState;
   terminalClient: TerminalClient;
   workspaceActivityClient?: WorkspaceActivityClient | null;
-  onFileTreeStateChange: (patch: RightDockFileTreeStatePatch) => void;
+  onFileTreeStateChange: (patch: WorkspaceFileTreeStatePatch) => void;
   onInsertFileMention?: (path: string, kind: "file" | "dir") => void;
   onOpenFile?: (path: string, imagePaths?: string[]) => void;
   onClose: () => void;
@@ -36,7 +36,7 @@ function normalizeTreePath(path: string) {
 /**
  * Touch-first shell around the shared file-tree data/UI layer.
  *
- * The desktop RightDockPanel owns terminal, SSH, Git, process and resize
+ * The desktop WorkspaceToolsPanel owns terminal, SSH, Git, process and resize
  * lifecycles. Mobile only needs the file workspace here, so it provides the
  * same narrow tool context without mounting any desktop-only lifecycle.
  */
@@ -73,7 +73,7 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
     [fileTreeState.expandedPaths, onFileTreeStateChange, projectReady],
   );
 
-  const context = useMemo<RightDockToolContextValue>(
+  const context = useMemo<WorkspaceToolsContextValue>(
     () => ({
       projectPathKey,
       cwd,
@@ -129,7 +129,7 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
   if (!open) return null;
 
   return (
-    <RightDockToolContext.Provider value={context}>
+    <WorkspaceToolsContext.Provider value={context}>
       <section
         data-edge-swipe-ignore
         aria-label={t("sidebar.myFiles")}
@@ -159,6 +159,6 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
           <FileTreePanel active touchActions />
         </div>
       </section>
-    </RightDockToolContext.Provider>
+    </WorkspaceToolsContext.Provider>
   );
 }

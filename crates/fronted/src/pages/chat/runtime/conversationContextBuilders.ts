@@ -29,7 +29,6 @@ export function buildPreparedContext(params: {
   state: ConversationViewState;
   tools?: Context["tools"];
   soulPrompt: string;
-  activeAgentPrompt: string;
   skillsPrompt: string;
   memoryPrompt?: string;
   includeAbortedMessages?: boolean;
@@ -45,9 +44,6 @@ export function buildPreparedContext(params: {
   let systemPrompt = withTools.systemPrompt;
   if (params.soulPrompt) {
     systemPrompt = appendSystemPrompt(systemPrompt, params.soulPrompt);
-  }
-  if (params.activeAgentPrompt) {
-    systemPrompt = appendSystemPrompt(systemPrompt, params.activeAgentPrompt);
   }
   if (params.skillsPrompt) {
     systemPrompt = appendSystemPrompt(systemPrompt, params.skillsPrompt);
@@ -69,7 +65,6 @@ export function buildResumeContext(params: {
   resumeMessage?: UserMessage;
   tools?: Context["tools"];
   soulPrompt: string;
-  activeAgentPrompt: string;
   skillsPrompt: string;
   memoryPrompt?: string;
   includeAbortedMessages?: boolean;

@@ -1,101 +1,209 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# PRoot and its complete native dependency closure are downloaded from the
-# official Termux package repository. Every .deb is version- and SHA-pinned;
-# no file is copied from the local xx/ reference project.
+# Build PRoot directly from the immutable official termux/proot commit. This
+# intentionally does not consume Termux .deb files: package mirrors may prune
+# old versions, while the Git commit remains reproducible.
 
-readonly PROOT_VERSION="5.1.107.87"
-readonly TERMUX_REPOSITORY="https://packages.termux.dev/apt/termux-main"
+readonly PROOT_SOURCE_REPOSITORY="https://github.com/termux/proot.git"
+readonly PROOT_SOURCE_COMMIT="${PROOT_SOURCE_COMMIT:-a89b3732ec6ae1db674510f0843b2f3db54d0a2f}"
+readonly PROOT_BUILD_VERSION="termux-${PROOT_SOURCE_COMMIT:0:12}"
+readonly TALLOC_VERSION="2.4.4"
+readonly TALLOC_ARCHIVE_URL="https://www.samba.org/ftp/talloc/talloc-${TALLOC_VERSION}.tar.gz"
+readonly TALLOC_ARCHIVE_SHA256="55e47994018c13743485544e7206780ffbb3c8495e704a99636503e6e77abf59"
+readonly SHMEM_VERSION="0.7"
+readonly SHMEM_ARCHIVE_URL="https://github.com/termux/libandroid-shmem/archive/refs/tags/v${SHMEM_VERSION}.tar.gz"
+readonly SHMEM_ARCHIVE_SHA256="1e5ff8459bc0a8c229dd8a94b27d119987e09ef3414331c2b5ebfff20b98e867"
+readonly ANDROID_API="26"
 readonly OUTPUT_ROOT="${1:-crates/mobile-execution/android/src/main/jniLibs}"
 
-if ! command -v ar >/dev/null || ! command -v tar >/dev/null || \
-   ! command -v curl >/dev/null || ! command -v sha256sum >/dev/null; then
-  echo "ar, tar, curl, and sha256sum are required to prepare Android PRoot binaries" >&2
+for command_name in git curl tar sha256sum make python3; do
+  command -v "$command_name" >/dev/null || {
+    echo "$command_name is required to build Android PRoot" >&2
+    exit 1
+  }
+done
+
+if [ -z "${ANDROID_NDK_HOME:-}" ] || [ ! -d "$ANDROID_NDK_HOME" ]; then
+  echo "ANDROID_NDK_HOME must point to an installed Android NDK" >&2
   exit 1
 fi
 
-prepare_abi() {
-  local android_abi="$1"
-  local deb_arch="$2"
-  local proot_sha="$3"
-  local shmem_sha="$4"
-  local talloc_sha="$5"
-  local temp_dir="$6/$android_abi"
-  mkdir -p "$temp_dir"
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64) readonly NDK_HOST_TAG="linux-x86_64" ;;
+  Darwin-x86_64|Darwin-arm64) readonly NDK_HOST_TAG="darwin-x86_64" ;;
+  *)
+    echo "Unsupported Android PRoot build host: $(uname -s) $(uname -m)" >&2
+    exit 1
+    ;;
+esac
+readonly TOOLCHAIN_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST_TAG/bin"
+test -d "$TOOLCHAIN_BIN"
 
-  fetch_and_extract \
-    "pool/main/p/proot/proot_${PROOT_VERSION}_${deb_arch}.deb" \
-    "$proot_sha" "$temp_dir/proot"
-  fetch_and_extract \
-    "pool/main/liba/libandroid-shmem/libandroid-shmem_0.7_${deb_arch}.deb" \
-    "$shmem_sha" "$temp_dir/shmem"
-  fetch_and_extract \
-    "pool/main/libt/libtalloc/libtalloc_2.4.3_${deb_arch}.deb" \
-    "$talloc_sha" "$temp_dir/talloc"
+readonly TEMP_ROOT="$(mktemp -d)"
+trap 'rm -rf "$TEMP_ROOT"' EXIT
 
-  local termux_prefix="data/data/com.termux/files/usr"
-  local proot_path="$temp_dir/proot/$termux_prefix/bin/proot"
-  local loader_path="$temp_dir/proot/$termux_prefix/libexec/proot/loader"
-  local shmem_path="$temp_dir/shmem/$termux_prefix/lib/libandroid-shmem.so"
-  local talloc_path="$temp_dir/talloc/$termux_prefix/lib/libtalloc.so.2.4.3"
-  for required in "$proot_path" "$loader_path" "$shmem_path" "$talloc_path"; do
-    if [ ! -f "$required" ]; then
-      echo "Termux runtime package layout changed; missing $required" >&2
-      exit 1
-    fi
-  done
-
-  local abi_output="$OUTPUT_ROOT/$android_abi"
-  install -Dm755 "$proot_path" "$abi_output/libxagent_proot.so"
-  install -Dm755 "$loader_path" "$abi_output/libxagent_proot_loader.so"
-  install -Dm755 "$shmem_path" "$abi_output/libandroid-shmem.so"
-  install -Dm755 "$talloc_path" "$abi_output/libtalloc.so"
-}
-
-fetch_and_extract() {
-  local repository_path="$1"
-  local expected_sha="$2"
-  local extract_dir="$3"
-  local package_path="$extract_dir/package.deb"
-  local data_member
-  mkdir -p "$extract_dir"
-  curl --fail --location --proto '=https' --tlsv1.2 \
-    "$TERMUX_REPOSITORY/$repository_path" --output "$package_path"
-  echo "$expected_sha  $package_path" | sha256sum --check --status || {
-    echo "Termux package SHA-256 mismatch: $repository_path" >&2
+fetch_verified_archive() {
+  local url="$1"
+  local sha256="$2"
+  local output="$3"
+  curl --fail --location --proto '=https' --tlsv1.2 "$url" --output "$output"
+  echo "$sha256  $output" | sha256sum --check --status || {
+    echo "Source archive SHA-256 mismatch: $url" >&2
     exit 1
   }
-  data_member="$(ar t "$package_path" | grep -E '^data\.tar\.(xz|zst|gz)$' | head -n 1)"
-  if [ -z "$data_member" ]; then
-    echo "Termux package has no supported data archive: $repository_path" >&2
-    exit 1
-  fi
-  ar p "$package_path" "$data_member" > "$extract_dir/$data_member"
-  case "$data_member" in
-    *.xz) tar -xJf "$extract_dir/$data_member" -C "$extract_dir" ;;
-    *.zst) tar --zstd -xf "$extract_dir/$data_member" -C "$extract_dir" ;;
-    *.gz) tar -xzf "$extract_dir/$data_member" -C "$extract_dir" ;;
-  esac
 }
 
-temp_dir="$(mktemp -d)"
-trap 'rm -rf "$temp_dir"' EXIT
+fetch_proot_source() {
+  local source_dir="$TEMP_ROOT/proot-upstream"
+  git init --quiet "$source_dir"
+  git -C "$source_dir" remote add origin "$PROOT_SOURCE_REPOSITORY"
+  git -C "$source_dir" fetch --quiet --depth=1 origin "$PROOT_SOURCE_COMMIT"
+  git -C "$source_dir" checkout --quiet --detach FETCH_HEAD
+  local resolved_commit
+  resolved_commit="$(git -C "$source_dir" rev-parse HEAD)"
+  if [ "$resolved_commit" != "$PROOT_SOURCE_COMMIT" ]; then
+    echo "Official PRoot checkout resolved to unexpected commit: $resolved_commit" >&2
+    exit 1
+  fi
+}
 
-prepare_abi \
-  arm64-v8a \
-  aarch64 \
-  c978bbe7161a639349a2e369d3d134e35d234f5b846432182a5c9bffadb606a6 \
-  0da3a24d558b93c92bcf8d611e0826a99ff96e396b148e6cdf33b47c47c57ff6 \
-  ac81ad623d74c209718b9f3acb2dd702cc8a88c431e820d212229910b4db29da \
-  "$temp_dir"
+prepare_dependency_sources() {
+  local talloc_archive="$TEMP_ROOT/talloc.tar.gz"
+  local shmem_archive="$TEMP_ROOT/libandroid-shmem.tar.gz"
+  fetch_verified_archive "$TALLOC_ARCHIVE_URL" "$TALLOC_ARCHIVE_SHA256" "$talloc_archive"
+  fetch_verified_archive "$SHMEM_ARCHIVE_URL" "$SHMEM_ARCHIVE_SHA256" "$shmem_archive"
+  mkdir -p "$TEMP_ROOT/dependencies"
+  tar -xzf "$talloc_archive" -C "$TEMP_ROOT/dependencies"
+  tar -xzf "$shmem_archive" -C "$TEMP_ROOT/dependencies"
+  test -f "$TEMP_ROOT/dependencies/talloc-${TALLOC_VERSION}/talloc.c"
+  test -f "$TEMP_ROOT/dependencies/libandroid-shmem-${SHMEM_VERSION}/shmem.c"
+}
 
-prepare_abi \
-  x86_64 \
-  x86_64 \
-  461be750d75fb48fd2966ab6c35e24b1bb18de20da8e050c8715314cb5465c58 \
-  ffa9e4c87467b158b148d0ff92dda796aa038276c2075af3269cdcdb06f25797 \
-  7ca2eaae2e53b28228a01301bc410b62845403d6317c25b8e0a7f40681de0628 \
-  "$temp_dir"
+build_abi() {
+  local android_abi="$1"
+  local ndk_triple="$2"
+  local expected_arch="$3"
+  local build_root="$TEMP_ROOT/build-$android_abi"
+  local source_root="$build_root/proot"
+  local dependency_root="$build_root/dependencies"
+  local include_root="$build_root/include"
+  local library_root="$build_root/lib"
+  local cc="$TOOLCHAIN_BIN/${ndk_triple}${ANDROID_API}-clang"
+  local ar="$TOOLCHAIN_BIN/llvm-ar"
+  local ranlib="$TOOLCHAIN_BIN/llvm-ranlib"
+  local strip="$TOOLCHAIN_BIN/llvm-strip"
+  local objcopy="$TOOLCHAIN_BIN/llvm-objcopy"
+  local objdump="$TOOLCHAIN_BIN/llvm-objdump"
+  local readelf="$TOOLCHAIN_BIN/llvm-readelf"
 
-echo "Prepared verified PRoot $PROOT_VERSION binaries in $OUTPUT_ROOT"
+  for tool in "$cc" "$ar" "$ranlib" "$strip" "$objcopy" "$objdump" "$readelf"; do
+    test -x "$tool" || {
+      echo "Missing Android NDK tool: $tool" >&2
+      exit 1
+    }
+  done
+
+  mkdir -p "$build_root" "$dependency_root" "$include_root/sys" "$library_root"
+  cp -a "$TEMP_ROOT/proot-upstream/." "$source_root"
+  cp -a "$TEMP_ROOT/dependencies/talloc-${TALLOC_VERSION}" "$dependency_root/talloc"
+  cp "$TEMP_ROOT/dependencies/libandroid-shmem-${SHMEM_VERSION}/shmem.c" "$dependency_root/"
+  cp "$TEMP_ROOT/dependencies/libandroid-shmem-${SHMEM_VERSION}/shm.h" "$include_root/sys/shm.h"
+
+  # Use talloc's own cross-compile configuration, following the official
+  # Termux libtalloc package recipe. This keeps feature detection and replace
+  # headers generated by upstream instead of maintaining an Android shim.
+  cat > "$dependency_root/talloc/cross-answers.txt" <<'EOF'
+Checking uname sysname type: "Linux"
+Checking uname machine type: "dontcare"
+Checking uname release type: "dontcare"
+Checking uname version type: "dontcare"
+Checking simple C program: OK
+building library support: OK
+Checking for large file support: OK
+Checking for -D_FILE_OFFSET_BITS=64: OK
+Checking for WORDS_BIGENDIAN: OK
+Checking for C99 vsnprintf: OK
+Checking for HAVE_SECURE_MKSTEMP: OK
+rpath library support: OK
+-Wl,--version-script support: FAIL
+Checking correct behavior of strtoll: OK
+Checking correct behavior of strptime: OK
+Checking for HAVE_IFACE_GETIFADDRS: OK
+Checking for HAVE_IFACE_IFCONF: OK
+Checking for HAVE_IFACE_IFREQ: OK
+Checking getconf LFS_CFLAGS: OK
+Checking for large file support without additional flags: OK
+Checking for working strptime: OK
+Checking for HAVE_SHARED_MMAP: OK
+Checking for HAVE_MREMAP: OK
+Checking for HAVE_INCOHERENT_MMAP: OK
+Checking getconf large file support flags work: OK
+EOF
+  (
+    cd "$dependency_root/talloc"
+    CC="$cc" \
+    AR="$ar" \
+    RANLIB="$ranlib" \
+    CFLAGS="-fPIC -O2 -Wall" \
+      ./configure \
+        --prefix="$dependency_root/talloc-prefix" \
+        --disable-rpath \
+        --disable-python \
+        --cross-compile \
+        --cross-answers=cross-answers.txt
+    make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+  )
+  mapfile -t talloc_objects < <(
+    find "$dependency_root/talloc/bin/default" -maxdepth 1 -type f -name 'talloc*.o' -print
+  )
+  if [ "${#talloc_objects[@]}" -eq 0 ]; then
+    echo "talloc cross-build produced no static objects for $android_abi" >&2
+    exit 1
+  fi
+  "$ar" rcs "$library_root/libtalloc.a" "${talloc_objects[@]}"
+  "$ranlib" "$library_root/libtalloc.a"
+
+  "$cc" -c "$dependency_root/shmem.c" \
+    -o "$dependency_root/shmem.o" \
+    -I"$include_root" \
+    -fPIC -O2 -Wall -Wextra -std=c11
+  "$ar" rcs "$library_root/libandroid-shmem.a" "$dependency_root/shmem.o"
+  "$ranlib" "$library_root/libandroid-shmem.a"
+
+  (
+    cd "$source_root/src"
+    make \
+      CC="$cc" \
+      LD="$cc" \
+      AR="$ar" \
+      STRIP="$strip" \
+      OBJCOPY="$objcopy" \
+      OBJDUMP="$objdump" \
+      CPPFLAGS="-D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I. -DARG_MAX=131072 -DVERSION=\\\"$PROOT_BUILD_VERSION\\\" -I$dependency_root/talloc -I$include_root" \
+      CFLAGS="-O2 -Wall -Wextra -fPIE -DWITH_LIBANDROID_SHMEM" \
+      LDFLAGS="-pie -Wl,-z,noexecstack -Wl,-z,max-page-size=16384 -L$library_root -Wl,-Bstatic -ltalloc -landroid-shmem -Wl,-Bdynamic -llog -landroid" \
+      PROOT_WITH_LIBANDROID_SHMEM=true \
+      -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+  )
+
+  local built_binary="$source_root/src/proot"
+  test -f "$built_binary"
+  "$strip" "$built_binary"
+  "$objdump" -f "$built_binary" | grep -F "$expected_arch" >/dev/null || {
+    echo "Built PRoot has the wrong architecture for $android_abi" >&2
+    exit 1
+  }
+  if "$readelf" -d "$built_binary" | grep -Eq 'lib(talloc|android-shmem)'; then
+    echo "Built PRoot unexpectedly depends on an unpackaged native library" >&2
+    exit 1
+  fi
+  install -Dm755 "$built_binary" "$OUTPUT_ROOT/$android_abi/libxagent_proot.so"
+}
+
+fetch_proot_source
+prepare_dependency_sources
+build_abi "arm64-v8a" "aarch64-linux-android" "aarch64"
+build_abi "x86_64" "x86_64-linux-android" "i386:x86-64"
+
+echo "Built PRoot directly from official termux/proot commit $PROOT_SOURCE_COMMIT in $OUTPUT_ROOT"

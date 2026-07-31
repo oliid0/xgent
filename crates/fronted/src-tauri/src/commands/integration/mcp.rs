@@ -77,12 +77,19 @@ fn build_stdio_command(cmd: &str, args: &[String], cwd: Option<&Path>) -> Comman
     #[cfg(windows)]
     {
         if is_windows_batch_program(&program) {
+            use std::os::windows::process::CommandExt;
+
+            // CreateProcess cannot execute .cmd/.bat directly. Passing the
+            // complete /C payload with raw_arg avoids Rust's MSVCRT escaping,
+            // which cmd.exe does not understand.
             let mut command = Command::new("cmd.exe");
             command
+                .arg("/E:ON")
+                .arg("/V:OFF")
                 .arg("/D")
                 .arg("/S")
-                .arg("/C")
-                .arg(windows_batch_command_line(&program, args));
+                .arg("/C");
+            command.raw_arg(windows_cmd_c_argument(&program, args));
             return command;
         }
     }
@@ -92,7 +99,7 @@ fn build_stdio_command(cmd: &str, args: &[String], cwd: Option<&Path>) -> Comman
     command
 }
 
-#[cfg(windows)]
+#[cfg_attr(not(windows), allow(dead_code))]
 fn is_windows_batch_program(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
@@ -100,19 +107,40 @@ fn is_windows_batch_program(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-#[cfg(windows)]
-fn windows_batch_command_line(program: &Path, args: &[String]) -> String {
-    std::iter::once(program.to_string_lossy().into_owned())
+#[cfg_attr(not(windows), allow(dead_code))]
+fn windows_cmd_c_argument(program: &Path, args: &[String]) -> String {
+    let line = std::iter::once(program.to_string_lossy().into_owned())
         .chain(args.iter().cloned())
         .map(|value| windows_cmd_quote_arg(&value))
         .collect::<Vec<_>>()
-        .join(" ")
+        .join(" ");
+    format!("\"{line}\"")
 }
 
-#[cfg(windows)]
+#[cfg_attr(not(windows), allow(dead_code))]
 fn windows_cmd_quote_arg(value: &str) -> String {
-    let escaped = value.replace('"', "\\\"");
-    format!("\"{escaped}\"")
+    let mut escaped = String::with_capacity(value.len() + 2);
+    escaped.push('"');
+    let mut backslashes = 0usize;
+    for ch in value.chars() {
+        if ch == '\\' {
+            backslashes += 1;
+        } else {
+            if ch == '"' {
+                escaped.extend(std::iter::repeat('\\').take(backslashes));
+                escaped.push('"');
+            } else if ch == '%' || ch == '\r' {
+                // Break cmd.exe's %VAR% pairing while preserving the
+                // original bytes after expansion.
+                escaped.push_str("%%cd:~,");
+            }
+            backslashes = 0;
+        }
+        escaped.push(ch);
+    }
+    escaped.extend(std::iter::repeat('\\').take(backslashes));
+    escaped.push('"');
+    escaped
 }
 
 #[derive(Debug, Serialize)]
@@ -141,8 +169,34 @@ pub struct McpCallToolResponse {
 }
 
 #[derive(Default)]
+struct McpCallCancellation {
+    cancelled: AtomicBool,
+    notify: tokio::sync::Notify,
+}
+
+impl McpCallCancellation {
+    fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+        self.notify.notify_waiters();
+    }
+
+    async fn cancelled(&self) {
+        while !self.cancelled.load(Ordering::SeqCst) {
+            let notified = self.notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            if self.cancelled.load(Ordering::SeqCst) {
+                return;
+            }
+            notified.await;
+        }
+    }
+}
+
+#[derive(Default)]
 pub struct McpRuntimeManager {
     clients: Mutex<HashMap<String, Arc<Mutex<McpClient>>>>,
+    active_calls: Mutex<HashMap<String, Arc<McpCallCancellation>>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1418,6 +1472,47 @@ fn run_client_test(
 }
 
 impl McpRuntimeManager {
+    fn register_call(&self, run_id: &str) -> Arc<McpCallCancellation> {
+        let token = Arc::new(McpCallCancellation::default());
+        let previous = self
+            .active_calls
+            .lock()
+            .expect("MCP active call registry poisoned")
+            .insert(run_id.to_string(), Arc::clone(&token));
+        if let Some(previous) = previous {
+            previous.cancel();
+        }
+        token
+    }
+
+    fn cancel_call(&self, run_id: &str) -> bool {
+        let token = self
+            .active_calls
+            .lock()
+            .expect("MCP active call registry poisoned")
+            .get(run_id)
+            .cloned();
+        if let Some(token) = token {
+            token.cancel();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn unregister_call(&self, run_id: &str, token: &Arc<McpCallCancellation>) {
+        let mut active_calls = self
+            .active_calls
+            .lock()
+            .expect("MCP active call registry poisoned");
+        if active_calls
+            .get(run_id)
+            .is_some_and(|registered| Arc::ptr_eq(registered, token))
+        {
+            active_calls.remove(run_id);
+        }
+    }
+
     // Lock discipline: the clients-map lock is only ever held for a get/insert
     // and is never held while locking an individual client or spawning one.
     // Holding the map lock across a busy client (long tools/call) or a slow
@@ -1666,16 +1761,24 @@ pub async fn mcp_call_tool(
     server_id: String,
     tool_name: String,
     arguments: Value,
+    run_id: Option<String>,
 ) -> Result<McpCallToolResponse, String> {
     // IMPORTANT: tool call can block (network / pipes / SSE). Offload.
     let manager = state.inner().clone();
-    run_blocking("mcp_call_tool", move || {
+    let normalized_run_id = run_id
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let cancel_token = normalized_run_id
+        .as_deref()
+        .map(|id| manager.register_call(id));
+    let worker_manager = Arc::clone(&manager);
+    let mut task = tauri::async_runtime::spawn_blocking(move || {
         let id = server_id.trim().to_string();
         if id.is_empty() {
             return Err("server_id cannot be empty".to_string());
         }
 
-        let map = manager
+        let map = worker_manager
             .clients
             .lock()
             .map_err(|_| "Failed to lock MCP state".to_string())?;
@@ -1691,8 +1794,39 @@ pub async fn mcp_call_tool(
             .lock()
             .map_err(|_| "Failed to lock MCP client".to_string())?;
         locked.tools_call(tool_name.trim(), arguments)
-    })
-    .await
+    });
+    let result = if let Some(cancel_token) = cancel_token.as_ref() {
+        tokio::select! {
+            join = &mut task => {
+                join.map_err(|error| format!("mcp_call_tool join failed: {error}"))?
+            }
+            _ = cancel_token.cancelled() => Err("Cancelled".to_string()),
+        }
+    } else {
+        task.await
+            .map_err(|error| format!("mcp_call_tool join failed: {error}"))?
+    };
+    if let (Some(run_id), Some(cancel_token)) =
+        (normalized_run_id.as_deref(), cancel_token.as_ref())
+    {
+        manager.unregister_call(run_id, cancel_token);
+    }
+    result
+}
+
+#[derive(Debug, Serialize)]
+pub struct McpCancelToolResponse {
+    cancelled: bool,
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn mcp_cancel_tool(
+    state: tauri::State<'_, Arc<McpRuntimeManager>>,
+    run_id: String,
+) -> McpCancelToolResponse {
+    McpCancelToolResponse {
+        cancelled: state.cancel_call(run_id.trim()),
+    }
 }
 
 #[tauri::command(rename_all = "snake_case")]

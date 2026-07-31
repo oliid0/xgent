@@ -1,12 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
-import { Check, Plus, RefreshCw, Save, Sparkles, Trash2 } from "../../components/icons";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Check, Plus, RefreshCw, Save, Sparkles, Trash2, X } from "../../components/icons";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { useLocale } from "../../i18n";
-import { DEFAULT_SOUL_METADATA, type SoulDraft, useSoul, validateSoulDraft } from "../../lib/soul";
+import {
+  DEFAULT_SOUL_METADATA,
+  type SoulDraft,
+  useSoul,
+  validateSoulDraft,
+} from "../../lib/soul";
 
-export function SoulSection() {
+type SoulSectionProps = {
+  createRequestId?: number;
+};
+
+function createEmptySoulDraft(): SoulDraft {
+  return {
+    metadata: {
+      ...DEFAULT_SOUL_METADATA,
+      name: "",
+    },
+    body: "",
+  };
+}
+
+export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
   const { t } = useLocale();
   const soul = useSoul();
   const [draft, setDraft] = useState<SoulDraft>({
@@ -15,23 +34,37 @@ export function SoulSection() {
   });
   const [localError, setLocalError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const beginCreate = useCallback(() => {
+    setCreating(true);
+    setDraft(createEmptySoulDraft());
+    setLocalError(null);
+    setSaved(false);
+  }, []);
 
   useEffect(() => {
-    if (!soul.document) return;
+    if (creating || !soul.document) return;
     setDraft({
       metadata: { ...soul.document.metadata },
       body: soul.document.body,
     });
     setLocalError(null);
-  }, [soul.document]);
+  }, [creating, soul.document]);
+
+  useEffect(() => {
+    if (createRequestId > 0) beginCreate();
+  }, [beginCreate, createRequestId]);
 
   const validation = useMemo(() => validateSoulDraft(draft), [draft]);
-  const changed = soul.document
-    ? draft.metadata.name !== soul.document.metadata.name ||
+  const changed = creating
+    ? true
+    : soul.document
+      ? draft.metadata.name !== soul.document.metadata.name ||
       draft.metadata.style !== soul.document.metadata.style ||
       draft.metadata.lang !== soul.document.metadata.lang ||
       draft.body !== soul.document.body
-    : false;
+      : false;
 
   const updateMetadata = (patch: Partial<SoulDraft["metadata"]>) => {
     setSaved(false);
@@ -47,7 +80,12 @@ export function SoulSection() {
       return;
     }
     try {
-      await soul.save(draft);
+      if (creating) {
+        await soul.create(draft);
+        setCreating(false);
+      } else {
+        await soul.save(draft);
+      }
       setLocalError(null);
       setSaved(true);
     } catch (error) {
@@ -55,25 +93,22 @@ export function SoulSection() {
     }
   };
 
-  const handleCreate = async () => {
-    try {
-      await soul.create({
-        metadata: {
-          ...DEFAULT_SOUL_METADATA,
-          name: t("settings.soulNewDefaultName"),
-        },
-        body: "",
+  const cancelCreate = () => {
+    setCreating(false);
+    setLocalError(null);
+    setSaved(false);
+    if (soul.document) {
+      setDraft({
+        metadata: { ...soul.document.metadata },
+        body: soul.document.body,
       });
-      setLocalError(null);
-      setSaved(false);
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : String(error));
     }
   };
 
   const handleSelect = async (presetId: string) => {
-    if (presetId === soul.activeId) return;
+    if (presetId === soul.activeId && !creating) return;
     try {
+      setCreating(false);
       await soul.select(presetId);
       setLocalError(null);
       setSaved(false);
@@ -123,17 +158,32 @@ export function SoulSection() {
           <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             {t("settings.soulPresetsGroup")}
           </h3>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => void handleCreate()}
-            disabled={soul.saving}
-            className="h-8 gap-1.5 rounded-lg px-2.5 text-xs"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {t("settings.soulAddPreset")}
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {creating ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={cancelCreate}
+                disabled={soul.saving}
+                className="h-8 gap-1.5 rounded-lg px-2.5 text-xs"
+              >
+                <X className="h-3.5 w-3.5" />
+                {t("settings.cancel")}
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={beginCreate}
+              disabled={soul.saving || creating}
+              className="h-8 gap-1.5 rounded-lg px-2.5 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t("settings.soulAddPreset")}
+            </Button>
+          </div>
         </div>
         <div className="divide-y divide-border/55 overflow-hidden rounded-2xl border border-border/60 bg-card">
           {soul.presets.map((preset) => {
@@ -151,7 +201,11 @@ export function SoulSection() {
                       active ? "bg-violet-500 text-white" : "bg-violet-500/10 text-violet-500"
                     }`}
                   >
-                    {active ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                    {active && !creating ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">
@@ -178,6 +232,12 @@ export function SoulSection() {
           })}
         </div>
       </section>
+
+      {creating ? (
+        <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-4 py-3 text-sm text-violet-700 dark:text-violet-300">
+          {t("settings.soulCreateDraftHint")}
+        </div>
+      ) : null}
 
       <section>
         <h3 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">

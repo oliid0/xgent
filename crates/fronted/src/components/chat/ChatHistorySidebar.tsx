@@ -46,7 +46,7 @@ import {
   X,
 } from "../icons";
 import { isMacOsTauri, MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
-import type { WorkspaceToolTarget } from "../project-tools/rightDockModel";
+import type { WorkspaceToolTarget } from "../project-tools/workspaceToolsModel";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -118,10 +118,12 @@ type ChatHistorySidebarProps = {
   onLoadMore: () => void;
   onCloseSidebar: () => void;
   onOpenSettings: () => void;
+  onCreateSoul: () => void;
   appUpdate?: AppUpdateController;
   onOpenSkillsHub?: () => void;
   onOpenMcpHub?: () => void;
   mobileExperience?: boolean;
+  desktopPanelMode?: boolean;
   workspaceToolsAvailable?: boolean;
   fileTreeAvailable?: boolean;
   terminalShellOptions?: TerminalShellOption[];
@@ -969,10 +971,12 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     onLoadMore,
     onCloseSidebar,
     onOpenSettings,
+    onCreateSoul,
     appUpdate,
     onOpenSkillsHub,
     onOpenMcpHub,
     mobileExperience = false,
+    desktopPanelMode = false,
     workspaceToolsAvailable = false,
     fileTreeAvailable = workspaceToolsAvailable,
     terminalShellOptions = [],
@@ -1432,15 +1436,31 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
       className={cn(
         "chat-history-sidebar zone-font-scale fixed inset-y-0 left-0 z-50 flex h-full w-[min(90vw,360px)] shrink-0 flex-col overflow-hidden border-r border-border/50 bg-[hsl(var(--sidebar-bg))] pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pt-[env(safe-area-inset-top,0px)] shadow-2xl transition-[width,opacity,transform] duration-200 ease-out md:relative md:inset-auto md:z-auto md:p-0 md:shadow-none",
         isOpen
-          ? "translate-x-0 opacity-100 md:w-[272px]"
+          ? desktopPanelMode
+            ? "translate-x-0 opacity-100 md:w-[360px]"
+            : "translate-x-0 opacity-100 md:w-[272px]"
           : "pointer-events-none -translate-x-full opacity-0 md:w-0 md:translate-x-0",
       )}
       style={{ "--zone-font-scale": fontScale } as CSSProperties}
     >
-      <div className="chat-history-sidebar-inner flex min-h-0 w-full min-w-0 flex-1 flex-col md:w-[272px] md:min-w-[272px]">
-        <MacOsTitleBarSpacer className="bg-[hsl(var(--sidebar-bg))]" />
+      <div
+        className={cn(
+          "chat-history-sidebar-inner flex min-h-0 w-full min-w-0 flex-1 flex-col",
+          desktopPanelMode
+            ? "md:w-[360px] md:min-w-[360px]"
+            : "md:w-[272px] md:min-w-[272px]",
+        )}
+      >
+        <MacOsTitleBarSpacer
+          className={cn("bg-[hsl(var(--sidebar-bg))]", desktopPanelMode && "md:hidden")}
+        />
         <div className="shrink-0 border-b border-border/50 px-2 pb-3 pt-3">
-          <div className="flex items-center justify-between gap-2">
+          {desktopPanelMode ? (
+            <div className="hidden h-8 items-center px-2 text-base font-semibold md:flex">
+              {t("chat.recentConversation")}
+            </div>
+          ) : null}
+          <div className={cn("flex items-center justify-between gap-2", desktopPanelMode && "md:hidden")}>
             <div className="flex min-w-0 -translate-y-0.5 items-center gap-2">
               <img
                 src={iconSimpleUrl}
@@ -1491,6 +1511,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               onClick={() => onOpenMcpHub?.()}
               className={cn(
                 "sidebar-hub-menu-item h-[30px] w-full justify-start gap-3 rounded-lg px-3 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 shadow-none transition-colors",
+                desktopPanelMode && "md:hidden",
                 activeView === "mcp-hub"
                   ? "bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]"
                   : "text-foreground/80 hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]",
@@ -1511,6 +1532,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               onClick={() => onOpenSkillsHub?.()}
               className={cn(
                 "sidebar-hub-menu-item h-[30px] w-full justify-start gap-3 rounded-lg px-3 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 shadow-none transition-colors",
+                desktopPanelMode && "md:hidden",
                 activeView === "skills-hub"
                   ? "bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]"
                   : "text-foreground/80 hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]",
@@ -1530,7 +1552,10 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               variant="ghost"
               onClick={() => onOpenWorkspaceTool?.("fileTree")}
               disabled={!fileTreeAvailable || !onOpenWorkspaceTool}
-              className="sidebar-hub-menu-item h-[30px] w-full justify-start gap-3 rounded-lg px-3 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 text-foreground/80 shadow-none transition-colors hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]"
+              className={cn(
+                "sidebar-hub-menu-item h-[30px] w-full justify-start gap-3 rounded-lg px-3 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 text-foreground/80 shadow-none transition-colors hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]",
+                desktopPanelMode && "md:hidden",
+              )}
               title={t("sidebar.myFiles")}
             >
               <FolderTree className="h-4 w-4 shrink-0 text-sky-500" />
@@ -1837,7 +1862,12 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
             </div>
           </div>
         </div>
-        <div className="shrink-0 border-t border-border/50 bg-[hsl(var(--sidebar-bg))] px-2 py-1.5">
+        <div
+          className={cn(
+            "shrink-0 border-t border-border/50 bg-[hsl(var(--sidebar-bg))] px-2 py-1.5",
+            desktopPanelMode && "md:hidden",
+          )}
+        >
           {soulLauncherOpen ? (
             <div className="mb-1.5 space-y-0.5 rounded-xl border border-border/55 bg-background/55 p-1.5 shadow-sm backdrop-blur-xl">
               <div className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
@@ -1872,20 +1902,8 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               <button
                 type="button"
                 onClick={() => {
-                  void soul
-                    .create({
-                      metadata: {
-                        name: t("settings.soulNewDefaultName"),
-                        style: "",
-                        lang: "auto",
-                      },
-                      body: "",
-                    })
-                    .then(() => {
-                      setSoulLauncherOpen(false);
-                      onOpenSettings();
-                    })
-                    .catch(() => undefined);
+                  setSoulLauncherOpen(false);
+                  onCreateSoul();
                 }}
                 disabled={soul.saving}
                 className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07] disabled:opacity-45"
@@ -1950,7 +1968,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                       icon: <GitBranch className="h-4 w-4 text-muted-foreground" />,
                     },
                     {
-                      target: "sshTunnel" as const,
+                      target: "sshConnection" as const,
                       label: t("sidebar.sshConnection"),
                       icon: <Key className="h-4 w-4 text-muted-foreground" />,
                     },

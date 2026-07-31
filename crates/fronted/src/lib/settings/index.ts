@@ -12,14 +12,18 @@ import {
 import { getAvailableThinkingLevelsForModel } from "../providers/runtime/modelFactory";
 import { createUuid } from "../shared/id";
 import { mergeAlwaysEnabledSkillNames } from "../skills/builtin";
+import { normalizeFontFamily } from "../system/fontFamily";
 import { SYSTEM_TOOL_OPTIONS, type SystemToolId } from "../tools/systemToolOptions";
 import { normalizeApiKey, normalizeBaseUrl, normalizeModels } from "./normalize";
 
 export type { SystemToolId } from "../tools/systemToolOptions";
+export { normalizeFontFamily } from "../system/fontFamily";
 
 export type ProviderId = "codex" | "claude_code" | "gemini";
+export type ProviderAuthMode = "api-key" | "oauth-managed" | "oauth-token";
 
 export type ExecutionMode = "text" | "tools" | "agent-dev";
+export type ToolPolicy = "allow" | "ask" | "deny";
 
 export type CodexRequestFormat = "openai-completions" | "openai-responses";
 
@@ -78,37 +82,37 @@ export type ChatSidebarSettings = {
   recentCollapsed: boolean;
 };
 
-export const RIGHT_DOCK_TOOL_KINDS = ["fileTree", "gitReview", "sshTunnel"] as const;
+export const WORKSPACE_TOOLS_TOOL_KINDS = ["fileTree", "gitReview", "sshConnection"] as const;
 
-export type RightDockToolKind = (typeof RIGHT_DOCK_TOOL_KINDS)[number];
+export type WorkspaceToolKind = (typeof WORKSPACE_TOOLS_TOOL_KINDS)[number];
 
-export type RightDockTabKind = RightDockToolKind | "terminal" | "backgroundTasks";
+export type WorkspaceToolTabKind = WorkspaceToolKind | "terminal" | "backgroundTasks";
 
-export type RightDockToolTab = {
+export type WorkspaceToolTab = {
   openedAt: number;
   uiState?: Record<string, unknown>;
 };
 
-// Persisted dock state is user intent only: terminal tab existence is derived
+// Persisted workspace-tool state is user intent only: terminal session existence is derived
 // from live sessions at render time, so tabOrder may contain session ids that
 // are dead or not yet loaded — they are preserved here and lazily collected on
 // user gestures once the session list is known.
-export type RightDockProjectState = {
+export type WorkspaceToolsProjectState = {
   activeTabId?: string;
   tabOrder: string[];
-  tools: Partial<Record<RightDockToolKind, RightDockToolTab>>;
+  tools: Partial<Record<WorkspaceToolKind, WorkspaceToolTab>>;
   openVersion: number;
   stateVersion: number;
   writerId: string;
   lastUsedAt: number;
 };
 
-export type RightDockSettings = {
+export type WorkspaceToolsSettings = {
   width: number;
-  projects: Record<string, RightDockProjectState>;
+  projects: Record<string, WorkspaceToolsProjectState>;
 };
 
-export type RightDockFileTreeState = {
+export type WorkspaceFileTreeState = {
   query: string;
   selectedPath: string;
   expandedPaths: string[];
@@ -120,14 +124,14 @@ export type RightDockFileTreeState = {
   revision: number;
 };
 
-export type RightDockFileTreeStatePatch = Partial<RightDockFileTreeState> & {
+export type WorkspaceFileTreeStatePatch = Partial<WorkspaceFileTreeState> & {
   bumpRevision?: boolean;
 };
 
 export type FontScaleSettings = {
   sidebar: number;
   chat: number;
-  rightDock: number;
+  workspaceTools: number;
 };
 
 export type BrowserExperienceSettings = {
@@ -137,7 +141,10 @@ export type BrowserExperienceSettings = {
 export type CustomSettings = {
   conversationTitleModel?: SelectedModel;
   chatSidebar: ChatSidebarSettings;
-  rightDock: RightDockSettings;
+  workspaceTools: WorkspaceToolsSettings;
+  interfaceFontFamily: string;
+  chatFontFamily: string;
+  codeFontFamily: string;
   fontScale: FontScaleSettings;
   browser: BrowserExperienceSettings;
 };
@@ -164,6 +171,8 @@ export type SystemSettings = {
   executionMode: ExecutionMode;
   workdir: string;
   selectedSystemTools: SystemToolId[];
+  /** Per-tool, tool-group and MCP-server execution policies. */
+  toolPolicies?: Record<string, ToolPolicy>;
   workspaceProjects: WorkspaceProject[];
   activeWorkspaceProjectId?: string;
   hiddenWorkspaceProjectPaths: string[];
@@ -272,6 +281,9 @@ export type CustomProvider = {
   baseUrl: string;
   apiKey: string;
   apiKeyConfigured?: boolean;
+  authMode?: ProviderAuthMode;
+  /** Stronghold-backed account selected for managed Codex OAuth. */
+  oauthAccountId?: string;
   customHeaders?: { key: string; value: string }[];
   models: ProviderModelConfig[];
   activeModels: string[];
@@ -304,6 +316,8 @@ export type AccessSettings = {
   webUiPort: number;
   /** Last desktop Web UI endpoint used by the native mobile control surface. */
   lanControlUrl: string;
+  /** Prefer the paired LAN computer for supported tool execution on native mobile. */
+  preferLanPcExecution: boolean;
   allowTerminal: boolean;
   allowBrowserAutomation: boolean;
   allowSsh: boolean;
@@ -539,7 +553,7 @@ function assignNormalizedProjectKeyValue<T>(
   }
 }
 
-export function normalizeRightDockFileTreePath(path: unknown): string {
+export function normalizeWorkspaceFileTreePath(path: unknown): string {
   if (typeof path !== "string") return "";
   return path
     .trim()
@@ -1016,6 +1030,7 @@ export function normalizeAccessSettings(input: unknown): AccessSettings {
     webUiScope: obj.webUiScope === "loopback" ? "loopback" : "lan",
     webUiPort: normalizeIntegerInRange(obj.webUiPort, 1, 65_535, 28_367),
     lanControlUrl: normalizeOptionalText(obj.lanControlUrl),
+    preferLanPcExecution: obj.preferLanPcExecution === true,
     allowTerminal: obj.allowTerminal === true,
     allowBrowserAutomation: obj.allowBrowserAutomation === true,
     allowSsh: obj.allowSsh === true,
@@ -1252,6 +1267,17 @@ export function normalizeCustomProvider(input: unknown): CustomProvider {
       : normalizeBaseUrl(typeof obj.baseUrl === "string" ? obj.baseUrl : ""),
     apiKey,
     apiKeyConfigured: apiKey.length > 0 || obj.apiKeyConfigured === true,
+    authMode:
+      obj.authMode === "oauth-managed" && type === "codex"
+        ? "oauth-managed"
+        : obj.authMode === "oauth-token" ||
+            (type === "claude_code" && apiKey.includes("sk-ant-oat"))
+          ? "oauth-token"
+          : "api-key",
+    oauthAccountId:
+      type === "codex" && typeof obj.oauthAccountId === "string"
+        ? obj.oauthAccountId.trim() || undefined
+        : undefined,
     customHeaders: normalizeCustomHeaders(obj.customHeaders),
     models,
     activeModels: normalizeModels(normalizeStringArray(obj.activeModels)).filter((modelId) =>
@@ -1462,6 +1488,7 @@ export function normalizeSystemSettings(input: unknown): SystemSettings {
     executionMode: normalizeExecutionMode(obj.executionMode),
     workdir: normalizeWorkdir(obj.workdir),
     selectedSystemTools: normalizeSystemToolSelection(obj.selectedSystemTools),
+    toolPolicies: normalizeToolPolicies(obj.toolPolicies),
     workspaceProjects: normalizeWorkspaceProjects(obj.workspaceProjects),
     activeWorkspaceProjectId:
       typeof obj.activeWorkspaceProjectId === "string" && obj.activeWorkspaceProjectId.trim()
@@ -1760,26 +1787,26 @@ export function normalizeMemorySettings(
   };
 }
 
-export const RIGHT_DOCK_SINGLETON_TAB_IDS = {
+export const WORKSPACE_TOOLS_SINGLETON_TAB_IDS = {
   fileTree: "tool:fileTree",
   gitReview: "tool:gitReview",
-  sshTunnel: "tool:sshTunnel",
-} as const satisfies Record<RightDockToolKind, string>;
+  sshConnection: "tool:sshConnection",
+} as const satisfies Record<WorkspaceToolKind, string>;
 
-const RIGHT_DOCK_TOOL_KIND_BY_TAB_ID = new Map<string, RightDockToolKind>(
-  RIGHT_DOCK_TOOL_KINDS.map((kind) => [RIGHT_DOCK_SINGLETON_TAB_IDS[kind], kind]),
+const WORKSPACE_TOOLS_TOOL_KIND_BY_TAB_ID = new Map<string, WorkspaceToolKind>(
+  WORKSPACE_TOOLS_TOOL_KINDS.map((kind) => [WORKSPACE_TOOLS_SINGLETON_TAB_IDS[kind], kind]),
 );
 
-export function rightDockToolKindForTabId(tabId: string): RightDockToolKind | undefined {
-  return RIGHT_DOCK_TOOL_KIND_BY_TAB_ID.get(tabId);
+export function workspaceToolKindForTabId(tabId: string): WorkspaceToolKind | undefined {
+  return WORKSPACE_TOOLS_TOOL_KIND_BY_TAB_ID.get(tabId);
 }
 
 // Empty buckets whose tools were closed act as tombstones so a stale snapshot
 // cannot resurrect them through merge; they expire after this window.
-const RIGHT_DOCK_TOMBSTONE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
-const MAX_RIGHT_DOCK_PROJECTS = 100;
+const WORKSPACE_TOOLS_TOMBSTONE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const MAX_WORKSPACE_TOOLS_PROJECTS = 100;
 
-export const DEFAULT_RIGHT_DOCK_FILE_TREE_STATE: RightDockFileTreeState = {
+export const DEFAULT_WORKSPACE_TOOLS_FILE_TREE_STATE: WorkspaceFileTreeState = {
   query: "",
   selectedPath: "",
   expandedPaths: [""],
@@ -1787,34 +1814,34 @@ export const DEFAULT_RIGHT_DOCK_FILE_TREE_STATE: RightDockFileTreeState = {
   revision: 0,
 };
 
-function normalizeRightDockFileTreeSearchQuery(query: unknown): string {
+function normalizeWorkspaceFileTreeSearchQuery(query: unknown): string {
   return typeof query === "string" ? query.slice(0, 200) : "";
 }
 
-function normalizeRightDockFileTreeExpandedPaths(paths: unknown): string[] {
+function normalizeWorkspaceFileTreeExpandedPaths(paths: unknown): string[] {
   if (!Array.isArray(paths)) return [""];
   const normalized = Array.from(
     new Set(
       paths
-        .map((path) => normalizeRightDockFileTreePath(path))
+        .map((path) => normalizeWorkspaceFileTreePath(path))
         .filter((path) => path.length <= 1024),
     ),
   );
   return normalized.slice(0, 512);
 }
 
-export function normalizeRightDockFileTreeState(input: unknown): RightDockFileTreeState {
+export function normalizeWorkspaceFileTreeState(input: unknown): WorkspaceFileTreeState {
   const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   return {
-    query: normalizeRightDockFileTreeSearchQuery(obj.query),
-    selectedPath: normalizeRightDockFileTreePath(obj.selectedPath),
-    expandedPaths: normalizeRightDockFileTreeExpandedPaths(obj.expandedPaths),
+    query: normalizeWorkspaceFileTreeSearchQuery(obj.query),
+    selectedPath: normalizeWorkspaceFileTreePath(obj.selectedPath),
+    expandedPaths: normalizeWorkspaceFileTreeExpandedPaths(obj.expandedPaths),
     showHidden: obj.showHidden === true,
     revision: normalizeIntegerInRange(obj.revision, 0, Number.MAX_SAFE_INTEGER, 0),
   };
 }
 
-export function normalizeRightDockTabOrder(input: unknown): string[] {
+export function normalizeWorkspaceToolTabOrder(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
   const order: string[] = [];
   const seen = new Set<string>();
@@ -1829,7 +1856,7 @@ export function normalizeRightDockTabOrder(input: unknown): string[] {
   return order;
 }
 
-function normalizeRightDockRecord(input: unknown): Record<string, unknown> | undefined {
+function normalizeWorkspaceToolsRecord(input: unknown): Record<string, unknown> | undefined {
   if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
   const output: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
@@ -1849,19 +1876,19 @@ function normalizeRightDockRecord(input: unknown): Record<string, unknown> | und
   return Object.keys(output).length > 0 ? output : undefined;
 }
 
-function normalizeRightDockToolUiState(
-  kind: RightDockToolKind,
+function normalizeWorkspaceToolUiState(
+  kind: WorkspaceToolKind,
   input: unknown,
 ): Record<string, unknown> | undefined {
   if (kind === "fileTree") {
-    return normalizeRightDockFileTreeState(input);
+    return normalizeWorkspaceFileTreeState(input);
   }
-  return normalizeRightDockRecord(input);
+  return normalizeWorkspaceToolsRecord(input);
 }
 
-function normalizeRightDockToolTab(kind: RightDockToolKind, input: unknown): RightDockToolTab {
+function normalizeWorkspaceToolTab(kind: WorkspaceToolKind, input: unknown): WorkspaceToolTab {
   const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
-  const uiState = normalizeRightDockToolUiState(kind, obj.uiState);
+  const uiState = normalizeWorkspaceToolUiState(kind, obj.uiState);
   return {
     openedAt: normalizeIntegerInRange(obj.openedAt, 0, Number.MAX_SAFE_INTEGER, Date.now()),
     ...(uiState ? { uiState } : {}),
@@ -1871,7 +1898,7 @@ function normalizeRightDockToolTab(kind: RightDockToolKind, input: unknown): Rig
 // Accepts both the current shape ({ tools }) and the legacy persisted shape
 // ({ tabs } keyed by tab id, including now-derived terminal entries which are
 // dropped). tabOrder keeps unknown ids: they are terminal session ids.
-export function normalizeRightDockProjectState(input: unknown): RightDockProjectState {
+export function normalizeWorkspaceToolsProjectState(input: unknown): WorkspaceToolsProjectState {
   const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const rawTools = (
     obj.tools && typeof obj.tools === "object" && !Array.isArray(obj.tools) ? obj.tools : {}
@@ -1879,22 +1906,35 @@ export function normalizeRightDockProjectState(input: unknown): RightDockProject
   const legacyTabs = (
     obj.tabs && typeof obj.tabs === "object" && !Array.isArray(obj.tabs) ? obj.tabs : {}
   ) as Record<string, unknown>;
-  const tools: Partial<Record<RightDockToolKind, RightDockToolTab>> = {};
-  for (const kind of RIGHT_DOCK_TOOL_KINDS) {
-    const raw = rawTools[kind] ?? legacyTabs[RIGHT_DOCK_SINGLETON_TAB_IDS[kind]];
+  const tools: Partial<Record<WorkspaceToolKind, WorkspaceToolTab>> = {};
+  for (const kind of WORKSPACE_TOOLS_TOOL_KINDS) {
+    const previousSshConnectionState =
+      kind === "sshConnection" ? rawTools.sshTunnel ?? legacyTabs["tool:sshTunnel"] : undefined;
+    const raw =
+      rawTools[kind] ?? legacyTabs[WORKSPACE_TOOLS_SINGLETON_TAB_IDS[kind]] ?? previousSshConnectionState;
     if (!raw || typeof raw !== "object") continue;
     const legacy = raw as Record<string, unknown>;
-    tools[kind] = normalizeRightDockToolTab(
+    tools[kind] = normalizeWorkspaceToolTab(
       kind,
       "openedAt" in legacy ? legacy : { ...legacy, openedAt: legacy.createdAt },
     );
   }
-  const tabOrder = normalizeRightDockTabOrder(obj.tabOrder);
-  for (const kind of RIGHT_DOCK_TOOL_KINDS) {
-    const tabId = RIGHT_DOCK_SINGLETON_TAB_IDS[kind];
+  const tabOrder = Array.from(
+    new Set(
+      normalizeWorkspaceToolTabOrder(obj.tabOrder).map((tabId) =>
+        tabId === "tool:sshTunnel" ? WORKSPACE_TOOLS_SINGLETON_TAB_IDS.sshConnection : tabId,
+      ),
+    ),
+  );
+  for (const kind of WORKSPACE_TOOLS_TOOL_KINDS) {
+    const tabId = WORKSPACE_TOOLS_SINGLETON_TAB_IDS[kind];
     if (tools[kind] && !tabOrder.includes(tabId)) tabOrder.push(tabId);
   }
-  const rawActiveTabId = typeof obj.activeTabId === "string" ? obj.activeTabId.trim() : "";
+  const persistedActiveTabId = typeof obj.activeTabId === "string" ? obj.activeTabId.trim() : "";
+  const rawActiveTabId =
+    persistedActiveTabId === "tool:sshTunnel"
+      ? WORKSPACE_TOOLS_SINGLETON_TAB_IDS.sshConnection
+      : persistedActiveTabId;
   const activeTabId = rawActiveTabId && rawActiveTabId.length <= 160 ? rawActiveTabId : undefined;
   return {
     ...(activeTabId ? { activeTabId } : {}),
@@ -1907,7 +1947,7 @@ export function normalizeRightDockProjectState(input: unknown): RightDockProject
   };
 }
 
-export function normalizeRightDockSettings(input: unknown): RightDockSettings {
+export function normalizeWorkspaceToolsSettings(input: unknown): WorkspaceToolsSettings {
   const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const rawProjects = (
     obj.projects && typeof obj.projects === "object" && !Array.isArray(obj.projects)
@@ -1915,30 +1955,30 @@ export function normalizeRightDockSettings(input: unknown): RightDockSettings {
       : {}
   ) as Record<string, unknown>;
   const now = Date.now();
-  const projects: Record<string, RightDockProjectState> = {};
+  const projects: Record<string, WorkspaceToolsProjectState> = {};
   for (const [pathKey, projectState] of Object.entries(rawProjects)) {
     const normalizedPathKey = workspaceProjectPathKey(pathKey);
     if (!normalizedPathKey || projects[normalizedPathKey]) continue;
-    const project = normalizeRightDockProjectState(projectState);
+    const project = normalizeWorkspaceToolsProjectState(projectState);
     const isEmpty = Object.keys(project.tools).length === 0;
     if (isEmpty && project.openVersion === 0 && project.stateVersion === 0) continue;
     if (isEmpty) {
       // Tombstone: start (or continue) the expiry clock, drop once elapsed.
       const tombstonedAt = project.lastUsedAt > 0 ? project.lastUsedAt : now;
-      if (now - tombstonedAt > RIGHT_DOCK_TOMBSTONE_TTL_MS) continue;
+      if (now - tombstonedAt > WORKSPACE_TOOLS_TOMBSTONE_TTL_MS) continue;
       projects[normalizedPathKey] = { ...project, lastUsedAt: tombstonedAt };
       continue;
     }
     projects[normalizedPathKey] = project;
   }
   const keys = Object.keys(projects);
-  if (keys.length > MAX_RIGHT_DOCK_PROJECTS) {
+  if (keys.length > MAX_WORKSPACE_TOOLS_PROJECTS) {
     // Keep the most recently used buckets instead of the first-inserted ones.
     keys.sort((a, b) => {
       const byRecency = (projects[b]?.lastUsedAt ?? 0) - (projects[a]?.lastUsedAt ?? 0);
       return byRecency !== 0 ? byRecency : a.localeCompare(b);
     });
-    for (const key of keys.slice(MAX_RIGHT_DOCK_PROJECTS)) {
+    for (const key of keys.slice(MAX_WORKSPACE_TOOLS_PROJECTS)) {
       delete projects[key];
     }
   }
@@ -1958,7 +1998,7 @@ export function normalizeFontScaleSettings(input: unknown): FontScaleSettings {
   return {
     sidebar: normalizeFontScale(obj.sidebar),
     chat: normalizeFontScale(obj.chat),
-    rightDock: normalizeFontScale(obj.rightDock),
+    workspaceTools: normalizeFontScale(obj.workspaceTools),
   };
 }
 
@@ -1979,10 +2019,26 @@ export function normalizeCustomSettings(
       projectsCollapsed: chatSidebar.projectsCollapsed === true,
       recentCollapsed: chatSidebar.recentCollapsed === true,
     },
-    rightDock: normalizeRightDockSettings(obj.rightDock),
+    workspaceTools: normalizeWorkspaceToolsSettings(obj.workspaceTools),
+    interfaceFontFamily: normalizeFontFamily(obj.interfaceFontFamily ?? obj.fontFamily),
+    chatFontFamily: normalizeFontFamily(obj.chatFontFamily),
+    codeFontFamily: normalizeFontFamily(obj.codeFontFamily),
     fontScale: normalizeFontScaleSettings(obj.fontScale),
     browser: normalizeBrowserExperienceSettings(obj.browser),
   };
+}
+
+export function normalizeToolPolicies(input: unknown): Record<string, ToolPolicy> | undefined {
+  if (!input || typeof input !== "object") return undefined;
+  const policies: Record<string, ToolPolicy> = {};
+  for (const [rawKey, value] of Object.entries(input as Record<string, unknown>)) {
+    const key = rawKey.trim();
+    if (!key) continue;
+    if (value === "allow" || value === "ask" || value === "deny") {
+      policies[key] = value;
+    }
+  }
+  return Object.keys(policies).length > 0 ? policies : undefined;
 }
 
 export function normalizeBrowserExperienceSettings(input: unknown): BrowserExperienceSettings {
@@ -2007,6 +2063,7 @@ export function getDefaultSettings(): AppSettings {
       executionMode: "tools",
       workdir: "",
       selectedSystemTools: [],
+      toolPolicies: undefined,
       workspaceProjects: [],
       activeWorkspaceProjectId: undefined,
       hiddenWorkspaceProjectPaths: [],
@@ -2225,55 +2282,55 @@ export function updateCustomSettings(
   });
 }
 
-const RIGHT_DOCK_WRITER_ID_STORAGE_KEY = "xagent.client-id";
+const WORKSPACE_TOOLS_WRITER_ID_STORAGE_KEY = "xagent.client-id";
 
-let cachedRightDockWriterId = "";
+let cachedWorkspaceToolsWriterId = "";
 
-function generateRightDockWriterId(): string {
+function generateWorkspaceToolsWriterId(): string {
   return createUuid().replace(/-/g, "").slice(0, 12);
 }
 
 // Stable per-client id used to break stateVersion ties deterministically in
-// mergeSyncedRightDockSettings: both sides of a merge evaluate the same
+// mergeSyncedWorkspaceToolsSettings: both sides of a merge evaluate the same
 // (stateVersion, writerId) order, so concurrent writers converge without the
 // old "+2 beats the echo" version-bump tricks.
-export function getRightDockWriterId(): string {
-  if (cachedRightDockWriterId) return cachedRightDockWriterId;
+export function getWorkspaceToolsWriterId(): string {
+  if (cachedWorkspaceToolsWriterId) return cachedWorkspaceToolsWriterId;
   let stored = "";
   try {
-    stored = globalThis.localStorage?.getItem(RIGHT_DOCK_WRITER_ID_STORAGE_KEY) ?? "";
+    stored = globalThis.localStorage?.getItem(WORKSPACE_TOOLS_WRITER_ID_STORAGE_KEY) ?? "";
   } catch {
     stored = "";
   }
   const normalized = stored.trim().slice(0, 32);
   if (normalized) {
-    cachedRightDockWriterId = normalized;
+    cachedWorkspaceToolsWriterId = normalized;
     return normalized;
   }
-  const generated = generateRightDockWriterId();
+  const generated = generateWorkspaceToolsWriterId();
   try {
-    globalThis.localStorage?.setItem(RIGHT_DOCK_WRITER_ID_STORAGE_KEY, generated);
+    globalThis.localStorage?.setItem(WORKSPACE_TOOLS_WRITER_ID_STORAGE_KEY, generated);
   } catch {
     // Ephemeral id for environments without storage (e.g. tests).
   }
-  cachedRightDockWriterId = generated;
+  cachedWorkspaceToolsWriterId = generated;
   return generated;
 }
 
-// Version fields are stamped centrally by updateRightDockProjectState; content
+// Version fields are stamped centrally by updateWorkspaceToolsProjectState; content
 // is everything a user can observe or reorder.
-function rightDockProjectContentKey(state: RightDockProjectState): string {
+function workspaceToolsProjectContentKey(state: WorkspaceToolsProjectState): string {
   return JSON.stringify({
     activeTabId: state.activeTabId ?? "",
     tabOrder: state.tabOrder,
-    tools: RIGHT_DOCK_TOOL_KINDS.map((kind) => [kind, state.tools[kind] ?? null]),
+    tools: WORKSPACE_TOOLS_TOOL_KINDS.map((kind) => [kind, state.tools[kind] ?? null]),
     openVersion: state.openVersion,
   });
 }
 
-function rightDockFileTreeStateEqual(
-  left: RightDockFileTreeState,
-  right: RightDockFileTreeState,
+function workspaceFileTreeStateEqual(
+  left: WorkspaceFileTreeState,
+  right: WorkspaceFileTreeState,
 ): boolean {
   return (
     left.query === right.query &&
@@ -2285,22 +2342,22 @@ function rightDockFileTreeStateEqual(
   );
 }
 
-export function getRightDockProjectState(
+export function getWorkspaceToolsProjectState(
   customSettings: CustomSettings,
   projectPathKey: string,
-): RightDockProjectState {
+): WorkspaceToolsProjectState {
   const normalizedPathKey = workspaceProjectPathKey(projectPathKey);
-  return normalizeRightDockProjectState(
-    normalizedPathKey ? customSettings.rightDock.projects[normalizedPathKey] : {},
+  return normalizeWorkspaceToolsProjectState(
+    normalizedPathKey ? customSettings.workspaceTools.projects[normalizedPathKey] : {},
   );
 }
 
-export function updateRightDockWidth(prev: AppSettings, width: number): AppSettings {
+export function updateWorkspaceToolsWidth(prev: AppSettings, width: number): AppSettings {
   const nextWidth = normalizeIntegerInRange(width, 320, 1280, 420);
-  if (prev.customSettings.rightDock.width === nextWidth) return prev;
+  if (prev.customSettings.workspaceTools.width === nextWidth) return prev;
   return updateCustomSettings(prev, {
-    rightDock: {
-      ...prev.customSettings.rightDock,
+    workspaceTools: {
+      ...prev.customSettings.workspaceTools,
       width: nextWidth,
     },
   });
@@ -2309,25 +2366,25 @@ export function updateRightDockWidth(prev: AppSettings, width: number): AppSetti
 // All persisted dock mutations funnel through here: the updater describes
 // content only, and version stamping (stateVersion / writerId / lastUsedAt)
 // happens centrally so no call site can get the merge bookkeeping wrong.
-export function updateRightDockProjectState(
+export function updateWorkspaceToolsProjectState(
   prev: AppSettings,
   projectPathKey: string,
-  updater: (current: RightDockProjectState) => RightDockProjectState,
+  updater: (current: WorkspaceToolsProjectState) => WorkspaceToolsProjectState,
 ): AppSettings {
   const normalizedPathKey = workspaceProjectPathKey(projectPathKey);
   if (!normalizedPathKey) return prev;
-  const current = getRightDockProjectState(prev.customSettings, normalizedPathKey);
-  const next = normalizeRightDockProjectState(updater(current));
-  if (rightDockProjectContentKey(current) === rightDockProjectContentKey(next)) return prev;
+  const current = getWorkspaceToolsProjectState(prev.customSettings, normalizedPathKey);
+  const next = normalizeWorkspaceToolsProjectState(updater(current));
+  if (workspaceToolsProjectContentKey(current) === workspaceToolsProjectContentKey(next)) return prev;
   return updateCustomSettings(prev, {
-    rightDock: {
-      ...prev.customSettings.rightDock,
+    workspaceTools: {
+      ...prev.customSettings.workspaceTools,
       projects: {
-        ...prev.customSettings.rightDock.projects,
+        ...prev.customSettings.workspaceTools.projects,
         [normalizedPathKey]: {
           ...next,
           stateVersion: current.stateVersion + 1,
-          writerId: getRightDockWriterId(),
+          writerId: getWorkspaceToolsWriterId(),
           lastUsedAt: Date.now(),
         },
       },
@@ -2335,18 +2392,18 @@ export function updateRightDockProjectState(
   });
 }
 
-export function createRightDockToolTab(kind: RightDockToolKind): RightDockToolTab {
+export function createWorkspaceToolTab(kind: WorkspaceToolKind): WorkspaceToolTab {
   return {
     openedAt: Date.now(),
-    ...(kind === "fileTree" ? { uiState: DEFAULT_RIGHT_DOCK_FILE_TREE_STATE } : {}),
+    ...(kind === "fileTree" ? { uiState: DEFAULT_WORKSPACE_TOOLS_FILE_TREE_STATE } : {}),
   };
 }
 
-export function openRightDockToolTabState(
-  current: RightDockProjectState,
-  kind: RightDockToolKind,
-): RightDockProjectState {
-  const tabId = RIGHT_DOCK_SINGLETON_TAB_IDS[kind];
+export function openWorkspaceToolTabState(
+  current: WorkspaceToolsProjectState,
+  kind: WorkspaceToolKind,
+): WorkspaceToolsProjectState {
+  const tabId = WORKSPACE_TOOLS_SINGLETON_TAB_IDS[kind];
   const alreadyOpen = Boolean(current.tools[kind]);
   if (alreadyOpen && current.activeTabId === tabId && current.tabOrder.includes(tabId)) {
     return current;
@@ -2355,59 +2412,59 @@ export function openRightDockToolTabState(
     ...current,
     activeTabId: tabId,
     tabOrder: current.tabOrder.includes(tabId) ? current.tabOrder : [...current.tabOrder, tabId],
-    tools: alreadyOpen ? current.tools : { ...current.tools, [kind]: createRightDockToolTab(kind) },
+    tools: alreadyOpen ? current.tools : { ...current.tools, [kind]: createWorkspaceToolTab(kind) },
     openVersion: current.openVersion + (alreadyOpen ? 0 : 1),
   };
 }
 
-export function openRightDockSingletonTab(
+export function openWorkspaceToolsSingletonTab(
   prev: AppSettings,
   projectPathKey: string,
-  kind: RightDockToolKind,
+  kind: WorkspaceToolKind,
 ): AppSettings {
-  return updateRightDockProjectState(prev, projectPathKey, (current) =>
-    openRightDockToolTabState(current, kind),
+  return updateWorkspaceToolsProjectState(prev, projectPathKey, (current) =>
+    openWorkspaceToolTabState(current, kind),
   );
 }
 
-export function isRightDockSingletonTabOpen(
+export function isWorkspaceToolsSingletonTabOpen(
   customSettings: CustomSettings,
   projectPathKey: string,
-  kind: RightDockToolKind,
+  kind: WorkspaceToolKind,
 ): boolean {
-  const state = getRightDockProjectState(customSettings, projectPathKey);
+  const state = getWorkspaceToolsProjectState(customSettings, projectPathKey);
   return Boolean(state.tools[kind]);
 }
 
-export function removeRightDockProjectState(
+export function removeWorkspaceToolsProjectState(
   prev: AppSettings,
   projectPathKey: string,
 ): AppSettings {
   const normalizedPathKey = workspaceProjectPathKey(projectPathKey);
   if (!normalizedPathKey) return prev;
-  const hasRightDockProject = Object.hasOwn(
-    prev.customSettings.rightDock.projects,
+  const hasWorkspaceToolsProject = Object.hasOwn(
+    prev.customSettings.workspaceTools.projects,
     normalizedPathKey,
   );
   const hasSshProjectAssociation = Object.hasOwn(
     prev.ssh.projectHostAssociations,
     normalizedPathKey,
   );
-  if (!hasRightDockProject && !hasSshProjectAssociation) return prev;
-  const currentRightDockProject = getRightDockProjectState(prev.customSettings, normalizedPathKey);
-  const hasRightDockTools = Object.keys(currentRightDockProject.tools).length > 0;
-  if (hasRightDockProject && !hasRightDockTools && !hasSshProjectAssociation) return prev;
+  if (!hasWorkspaceToolsProject && !hasSshProjectAssociation) return prev;
+  const currentWorkspaceToolsProject = getWorkspaceToolsProjectState(prev.customSettings, normalizedPathKey);
+  const hasWorkspaceTools = Object.keys(currentWorkspaceToolsProject.tools).length > 0;
+  if (hasWorkspaceToolsProject && !hasWorkspaceTools && !hasSshProjectAssociation) return prev;
 
-  const projects = hasRightDockProject
-    ? { ...prev.customSettings.rightDock.projects }
-    : prev.customSettings.rightDock.projects;
-  if (hasRightDockProject && hasRightDockTools) {
+  const projects = hasWorkspaceToolsProject
+    ? { ...prev.customSettings.workspaceTools.projects }
+    : prev.customSettings.workspaceTools.projects;
+  if (hasWorkspaceToolsProject && hasWorkspaceTools) {
     projects[normalizedPathKey] = {
       tabOrder: [],
       tools: {},
-      openVersion: currentRightDockProject.openVersion + 1,
-      stateVersion: currentRightDockProject.stateVersion + 1,
-      writerId: getRightDockWriterId(),
+      openVersion: currentWorkspaceToolsProject.openVersion + 1,
+      stateVersion: currentWorkspaceToolsProject.stateVersion + 1,
+      writerId: getWorkspaceToolsWriterId(),
       lastUsedAt: Date.now(),
     };
   }
@@ -2424,43 +2481,43 @@ export function removeRightDockProjectState(
     },
     customSettings: {
       ...prev.customSettings,
-      rightDock: {
-        ...prev.customSettings.rightDock,
+      workspaceTools: {
+        ...prev.customSettings.workspaceTools,
         projects,
       },
     },
   });
 }
 
-export function getRightDockFileTreeState(
+export function getWorkspaceFileTreeState(
   customSettings: CustomSettings,
   projectPathKey: string,
-): RightDockFileTreeState {
-  const projectState = getRightDockProjectState(customSettings, projectPathKey);
+): WorkspaceFileTreeState {
+  const projectState = getWorkspaceToolsProjectState(customSettings, projectPathKey);
   const state = projectState.tools.fileTree?.uiState;
-  return state ? normalizeRightDockFileTreeState(state) : DEFAULT_RIGHT_DOCK_FILE_TREE_STATE;
+  return state ? normalizeWorkspaceFileTreeState(state) : DEFAULT_WORKSPACE_TOOLS_FILE_TREE_STATE;
 }
 
-export function updateRightDockFileTreeState(
+export function updateWorkspaceFileTreeState(
   prev: AppSettings,
   projectPathKey: string,
-  patch: RightDockFileTreeStatePatch,
+  patch: WorkspaceFileTreeStatePatch,
 ): AppSettings {
   const normalizedPathKey = workspaceProjectPathKey(projectPathKey);
   if (!normalizedPathKey) return prev;
-  const current = getRightDockFileTreeState(prev.customSettings, normalizedPathKey);
-  const next: RightDockFileTreeState = {
+  const current = getWorkspaceFileTreeState(prev.customSettings, normalizedPathKey);
+  const next: WorkspaceFileTreeState = {
     query:
       patch.query !== undefined
-        ? normalizeRightDockFileTreeSearchQuery(patch.query)
+        ? normalizeWorkspaceFileTreeSearchQuery(patch.query)
         : current.query,
     selectedPath:
       patch.selectedPath !== undefined
-        ? normalizeRightDockFileTreePath(patch.selectedPath)
+        ? normalizeWorkspaceFileTreePath(patch.selectedPath)
         : current.selectedPath,
     expandedPaths:
       patch.expandedPaths !== undefined
-        ? normalizeRightDockFileTreeExpandedPaths(patch.expandedPaths)
+        ? normalizeWorkspaceFileTreeExpandedPaths(patch.expandedPaths)
         : current.expandedPaths,
     showHidden: patch.showHidden ?? current.showHidden,
     revision: patch.bumpRevision
@@ -2469,9 +2526,9 @@ export function updateRightDockFileTreeState(
         ? normalizeIntegerInRange(patch.revision, 0, Number.MAX_SAFE_INTEGER, 0)
         : current.revision,
   };
-  if (rightDockFileTreeStateEqual(current, next)) return prev;
-  return updateRightDockProjectState(prev, normalizedPathKey, (projectState) => {
-    const tab = projectState.tools.fileTree ?? createRightDockToolTab("fileTree");
+  if (workspaceFileTreeStateEqual(current, next)) return prev;
+  return updateWorkspaceToolsProjectState(prev, normalizedPathKey, (projectState) => {
+    const tab = projectState.tools.fileTree ?? createWorkspaceToolTab("fileTree");
     return {
       ...projectState,
       tools: {

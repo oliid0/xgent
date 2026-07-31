@@ -23,6 +23,9 @@ pub struct AccessSettingsPayload {
     /// Last desktop Web UI endpoint opened by a native mobile client.
     #[serde(default)]
     pub lan_control_url: String,
+    /// Route supported mobile tool calls to the paired LAN computer when available.
+    #[serde(default)]
+    pub prefer_lan_pc_execution: bool,
     #[serde(default)]
     pub allow_terminal: bool,
     #[serde(default)]

@@ -1,8 +1,11 @@
 import { isBrowserRuntime } from "@xagent/runtime";
+import { mergeCustomHeaders } from "../../lib/providers/customHeaders";
 import { prepareProxyRequest } from "../../lib/providers/proxy";
 import {
   createProviderModelConfig,
   normalizeProviderModelConfigs,
+  type CustomProvider,
+  type ProviderAuthMode,
   type ProviderId,
   type ProviderModelConfig,
 } from "../../lib/settings";
@@ -81,23 +84,37 @@ export function buildProviderModelsUrl(
   return baseUrl.endsWith("/v1") ? `${baseUrl}/models` : `${baseUrl}/v1/models`;
 }
 
-function buildDefaultModelsHeaders(type: ProviderId, apiKey: string): Record<string, string> {
+type ProviderModelsAuthOptions = {
+  authMode?: ProviderAuthMode;
+  oauthAccountId?: string;
+  customHeaders?: CustomProvider["customHeaders"];
+};
+
+function buildDefaultModelsHeaders(
+  type: ProviderId,
+  apiKey: string,
+  authMode: ProviderAuthMode,
+): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${apiKey}`,
   };
+  if (authMode !== "oauth-managed") headers.Authorization = `Bearer ${apiKey}`;
   if (type === "gemini") {
     headers["x-goog-api-key"] = apiKey;
     return headers;
   }
-  headers["x-api-key"] = apiKey;
+  if (authMode === "api-key") headers["x-api-key"] = apiKey;
   if (type === "claude_code") {
     headers["anthropic-version"] = ANTHROPIC_API_VERSION;
   }
   return headers;
 }
 
-function buildOfficialModelsHeaders(type: ProviderId, apiKey: string): Record<string, string> {
+function buildOfficialModelsHeaders(
+  type: ProviderId,
+  apiKey: string,
+  authMode: ProviderAuthMode,
+): Record<string, string> {
   if (type === "gemini") {
     return {
       "Content-Type": "application/json",
@@ -107,9 +124,14 @@ function buildOfficialModelsHeaders(type: ProviderId, apiKey: string): Record<st
   if (type === "claude_code") {
     return {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
+      ...(authMode === "oauth-token"
+        ? { Authorization: `Bearer ${apiKey}` }
+        : { "x-api-key": apiKey }),
       "anthropic-version": ANTHROPIC_API_VERSION,
     };
+  }
+  if (authMode === "oauth-managed") {
+    return { "Content-Type": "application/json" };
   }
   return {
     "Content-Type": "application/json",
@@ -131,10 +153,24 @@ export function buildProviderModelsAttempts(
   type: ProviderId,
   baseUrl: string,
   apiKey: string,
+  options?: ProviderModelsAuthOptions,
 ): ProviderModelsAttempt[] {
+  const authMode = options?.authMode ?? "api-key";
   const candidates: ProviderModelsAttempt[] = [
-    { kind: "default", headers: buildDefaultModelsHeaders(type, apiKey) },
-    { kind: "official", headers: buildOfficialModelsHeaders(type, apiKey) },
+    {
+      kind: "default",
+      headers: mergeCustomHeaders(
+        buildDefaultModelsHeaders(type, apiKey, authMode),
+        options?.customHeaders,
+      ),
+    },
+    {
+      kind: "official",
+      headers: mergeCustomHeaders(
+        buildOfficialModelsHeaders(type, apiKey, authMode),
+        options?.customHeaders,
+      ),
+    },
   ];
 
   const attempts: ProviderModelsAttempt[] = [];
@@ -290,25 +326,34 @@ export function buildProviderModelsFetchKey(
   baseUrl: string,
   apiKey: string,
   useSystemProxy: boolean,
+  authMode: ProviderAuthMode = "api-key",
+  customHeaders?: CustomProvider["customHeaders"],
+  oauthAccountId?: string,
 ): string {
-  return `${baseUrl.trim()}||${apiKey.trim()}||${useSystemProxy ? "proxy" : "direct"}`;
+  const headerKey = (customHeaders ?? [])
+    .map((header) => `${header.key.trim().toLowerCase()}:${header.value}`)
+    .sort()
+    .join("|");
+  return `${baseUrl.trim()}||${apiKey.trim()}||${useSystemProxy ? "proxy" : "direct"}||${authMode}||${oauthAccountId?.trim() ?? ""}||${headerKey}`;
 }
 
 export async function fetchModelsFromApi(
   type: ProviderId,
   baseUrl: string,
   apiKey: string,
-  options?: { useSystemProxy?: boolean },
+  options?: ProviderModelsAuthOptions & { useSystemProxy?: boolean },
 ): Promise<ProviderModelConfig[]> {
   const normalizedUrl = normalizeModelBaseUrl(type, baseUrl);
   const normalizedApiKey = apiKey.trim();
-  const attempts = buildProviderModelsAttempts(type, normalizedUrl, normalizedApiKey);
+  const attempts = buildProviderModelsAttempts(type, normalizedUrl, normalizedApiKey, options);
   const failures: ProviderModelsFailure[] = [];
   let emptyResult: ProviderModelConfig[] | null = null;
 
   for (const attempt of attempts) {
     const proxyRequest = await prepareProxyRequest(type, normalizedUrl, attempt.headers, {
       useSystemProxy: options?.useSystemProxy === true,
+      oauthAccountId:
+        options?.authMode === "oauth-managed" ? options.oauthAccountId : undefined,
     });
     const modelsUrl = buildProviderModelsUrl(type, proxyRequest.baseUrl, attempt.kind);
 

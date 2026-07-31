@@ -1,4 +1,4 @@
-// Data layer for the right-dock file tree panel: fs_list loading with
+// Data layer for the workspace file tree panel: fs_list loading with
 // request de-duplication and out-of-order protection, per-project LRU state
 // buckets, workspace-activity driven invalidation, search, and fs mutations.
 //

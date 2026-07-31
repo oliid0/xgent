@@ -25,6 +25,13 @@ pub use crate::services::skills::{
 const UPLOADED_IMAGE_PREVIEW_MAX_BYTES: usize = 5 * 1024 * 1024; // 5MB
 const UPLOADED_NATIVE_ATTACHMENT_MAX_BYTES: u64 = 25 * 1024 * 1024; // 25MB
 
+#[tauri::command]
+pub fn system_home_dir() -> Result<String, String> {
+    dirs::home_dir()
+        .map(|path| path.to_string_lossy().into_owned())
+        .ok_or_else(|| "Failed to locate the user home directory".to_string())
+}
+
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemReadableFileEntry {

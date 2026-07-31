@@ -1099,6 +1099,7 @@ fn authorize_local_command(
         "fs_path_status",
         "fs_read_image_source",
         "fs_read_workspace_image",
+        "fs_open_workspace_path",
         "fs_roots",
         "fs_list_dirs",
         "fs_list",
@@ -1124,6 +1125,7 @@ fn authorize_local_command(
         "git_commit_diff",
     ];
     if command == "settings_load_all"
+        || command == "system_home_dir"
         || command == "system_load_soul"
         || command == "system_list_souls"
         || command == "system_save_soul"
@@ -1149,6 +1151,7 @@ fn authorize_local_command(
     if (command.starts_with("terminal_")
         || command.starts_with("managed_process_")
         || command.starts_with("shell_")
+        || command.starts_with("hook_")
         || matches!(
             command,
             "automation_cron_apply"
@@ -1295,13 +1298,7 @@ struct LanAddress {
 }
 
 fn lan_ipv4_addresses() -> Vec<Ipv4Addr> {
-    let interfaces = if_addrs::get_if_addrs().unwrap_or_default();
-    let mut addresses = rank_lan_addresses(interfaces.into_iter().filter_map(|interface| {
-        let IpAddr::V4(ip) = interface.ip() else {
-            return None;
-        };
-        Some((interface.name, ip))
-    }));
+    let mut addresses = enumerated_lan_addresses();
     if addresses.is_empty() {
         if let Some(ip) = routed_lan_ip() {
             addresses.push(LanAddress {
@@ -1312,6 +1309,24 @@ fn lan_ipv4_addresses() -> Vec<Ipv4Addr> {
         }
     }
     addresses.into_iter().map(|address| address.ip).collect()
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn enumerated_lan_addresses() -> Vec<LanAddress> {
+    let interfaces = if_addrs::get_if_addrs().unwrap_or_default();
+    rank_lan_addresses(interfaces.into_iter().filter_map(|interface| {
+        let IpAddr::V4(ip) = interface.ip() else {
+            return None;
+        };
+        Some((interface.name, ip))
+    }))
+}
+
+// `if-addrs` stays desktop-only. Mobile clients share this module but do not
+// host the LAN Web UI, so the routed-address fallback below is sufficient.
+#[cfg(any(target_os = "android", target_os = "ios"))]
+fn enumerated_lan_addresses() -> Vec<LanAddress> {
+    Vec::new()
 }
 
 fn rank_lan_addresses(

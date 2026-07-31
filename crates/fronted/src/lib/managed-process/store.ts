@@ -2,7 +2,7 @@
 // only ever changes by feeding authoritative snapshots (initial fetch,
 // change events, operation responses); there is no write-back path. The
 // background-tasks dock tab derives its existence from this store and never
-// touches persisted right-dock settings.
+// touches persisted workspace-tool settings.
 
 import { useSyncExternalStore } from "react";
 

@@ -33,7 +33,7 @@ import {
 } from "../../icons";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
-import { useRightDockToolContext } from "../RightDockContext";
+import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
 import { DiffReviewCard } from "./DiffView";
 import {
   basename,
@@ -108,7 +108,7 @@ export function GitReviewStatusView(props: {
     state,
     worktreeDiff,
   } = data;
-  const context = useRightDockToolContext();
+  const context = useWorkspaceToolsContext();
   const onRevealInFileTree = context.fileTree.onRevealInFileTree;
   const { t } = useLocale();
 

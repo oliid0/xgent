@@ -1,4 +1,4 @@
-// Context menu for the right-dock file tree panel.
+// Context menu for the workspace file tree panel.
 //
 // Shared by every frontend runtime; only relative, npm-package, or
 // @xagent/runtime imports are allowed here.

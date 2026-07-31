@@ -30,6 +30,7 @@ const MEMORY_SETTINGS_TABLE: &str = "memory_settings";
 const SYSTEM_EXECUTION_MODE_KEY: &str = "executionMode";
 const SYSTEM_WORKDIR_KEY: &str = "workdir";
 const SYSTEM_SELECTED_TOOLS_KEY: &str = "selectedSystemTools";
+const SYSTEM_TOOL_POLICIES_KEY: &str = "toolPolicies";
 const SYSTEM_WORKSPACE_PROJECTS_KEY: &str = "workspaceProjects";
 const SYSTEM_ACTIVE_WORKSPACE_PROJECT_ID_KEY: &str = "activeWorkspaceProjectId";
 const SYSTEM_HIDDEN_WORKSPACE_PROJECT_PATHS_KEY: &str = "hiddenWorkspaceProjectPaths";

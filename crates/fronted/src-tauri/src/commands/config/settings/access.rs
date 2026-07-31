@@ -25,6 +25,7 @@ impl Default for AccessSettingsPayload {
             web_ui_scope: default_web_ui_scope(),
             web_ui_port: default_web_ui_port(),
             lan_control_url: String::new(),
+            prefer_lan_pc_execution: false,
             allow_terminal: false,
             allow_browser_automation: false,
             allow_ssh: false,
@@ -57,6 +58,7 @@ pub(crate) fn normalize_access_settings_payload(
             payload.web_ui_port
         },
         lan_control_url: payload.lan_control_url.trim().to_string(),
+        prefer_lan_pc_execution: payload.prefer_lan_pc_execution,
         allow_terminal: payload.allow_terminal,
         allow_browser_automation: payload.allow_browser_automation,
         allow_ssh: payload.allow_ssh,

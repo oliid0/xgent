@@ -6,18 +6,18 @@ export type SetSettingsFn = (updater: (prev: AppSettings) => AppSettings) => voi
 
 export type SectionId =
   | "system"
-  | "systemTools"
   | "providers"
   | "soul"
-  | "agents"
-  | "ssh"
   | "memory"
-  | "hooks"
-  | "cron"
   | "access"
   | "mobileAssistant"
   | "mobileExecution"
   | "about";
+
+export type SettingsOpenOptions = {
+  /** Opens the Soul section with a local, unsaved draft. */
+  createSoul?: boolean;
+};
 
 export type SettingsPageProps = {
   settings: AppSettings;
@@ -25,6 +25,7 @@ export type SettingsPageProps = {
   saveState: SettingsSaveState;
   onBack: () => void;
   initialSection?: SectionId;
+  soulCreateRequestId?: number;
   hiddenSections?: SectionId[];
   nativeMobile?: boolean;
   appUpdate: AppUpdateController;

@@ -32,6 +32,8 @@ export type BuiltinToolMetadata = {
   kind: string;
   isReadOnly: boolean;
   displayCategory: BuiltinToolDisplayCategory;
+  /** Present for MCP tools so server-level policies can be resolved. */
+  serverId?: string;
 };
 
 export type BuiltinToolExecutionContext = {

@@ -54,13 +54,6 @@ function buildCronSystemPrompt(taskName: string) {
   return lines.join("\n");
 }
 
-function getActiveAgentPrompt(settings: AppSettings) {
-  return (
-    settings.agents.find((template) => template.enabled && template.prompt.trim())?.prompt.trim() ??
-    ""
-  );
-}
-
 async function buildCronSkillsContext(settings: AppSettings) {
   const selectedSkillNames = settings.skills.selected.filter(
     (name) => !isAlwaysEnabledSkillName(name),
@@ -157,7 +150,6 @@ async function executeCronPromptRun(
   }
 
   const skillsContext = await buildCronSkillsContext(settings);
-  const activeAgentPrompt = getActiveAgentPrompt(settings);
   const runtimePlatform = await resolveRuntimePlatform();
   const builtinRegistry = await buildBuiltinToolRegistry({
     workdir,
@@ -181,9 +173,6 @@ async function executeCronPromptRun(
   let systemPrompt = buildCronSystemPrompt(request.taskName);
   if (soulPrompt) {
     systemPrompt = appendSystemPrompt(systemPrompt, soulPrompt);
-  }
-  if (activeAgentPrompt) {
-    systemPrompt = appendSystemPrompt(systemPrompt, activeAgentPrompt);
   }
   if (skillsContext.prompt) {
     systemPrompt = appendSystemPrompt(systemPrompt, skillsContext.prompt);
@@ -216,6 +205,8 @@ async function executeCronPromptRun(
     runtime: {
       baseUrl: provider.baseUrl,
       apiKey: provider.apiKey,
+      authMode: provider.authMode,
+      oauthAccountId: provider.oauthAccountId,
       customHeaders: provider.customHeaders,
       requestFormat: provider.requestFormat,
       reasoning: resolveCronReasoning(request.reasoning),

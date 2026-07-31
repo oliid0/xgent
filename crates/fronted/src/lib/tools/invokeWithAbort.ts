@@ -1,0 +1,108 @@
+import { invoke } from "@xagent/runtime";
+
+type InvokeWithAbortOptions<T> = {
+  onAbort?: () => Promise<void> | void;
+  onLateResult?: (result: T) => Promise<void> | void;
+};
+
+export class ToolInvocationCancelledError extends Error {
+  constructor() {
+    super("Cancelled");
+    this.name = "ToolInvocationCancelledError";
+  }
+}
+
+export function throwIfToolInvocationAborted(signal?: AbortSignal) {
+  if (signal?.aborted) {
+    throw new ToolInvocationCancelledError();
+  }
+}
+
+export function createToolRunId(prefix: string, toolCallId: string) {
+  const normalizedPrefix = prefix.trim() || "tool";
+  const normalizedToolCallId = toolCallId.trim() || "call";
+  // Provider tool-call ids are commonly reused between conversations. A
+  // UUID keeps cancellation scoped to exactly one native invocation.
+  return `${normalizedPrefix}:${normalizedToolCallId}:${crypto.randomUUID()}`;
+}
+
+export function waitForAbortablePromise<T>(
+  promise: Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
+  throwIfToolInvocationAborted(signal);
+  if (!signal) return promise;
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => signal.removeEventListener("abort", handleAbort);
+    const handleAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new ToolInvocationCancelledError());
+    };
+    signal.addEventListener("abort", handleAbort, { once: true });
+    if (signal.aborted) handleAbort();
+    void promise.then(
+      (value) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}
+
+export function invokeWithAbort<T>(
+  command: string,
+  args: Record<string, unknown> | undefined,
+  signal?: AbortSignal,
+  options: InvokeWithAbortOptions<T> = {},
+): Promise<T> {
+  throwIfToolInvocationAborted(signal);
+  const invocation = invoke<T>(command, args);
+  if (!signal) return invocation;
+
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    let aborted = false;
+    const cleanup = () => signal.removeEventListener("abort", handleAbort);
+    const handleAbort = () => {
+      if (settled) return;
+      settled = true;
+      aborted = true;
+      cleanup();
+      void Promise.resolve(options.onAbort?.()).catch(() => undefined);
+      reject(new ToolInvocationCancelledError());
+    };
+
+    signal.addEventListener("abort", handleAbort, { once: true });
+    if (signal.aborted) handleAbort();
+
+    void invocation.then(
+      (result) => {
+        if (aborted) {
+          void Promise.resolve(options.onLateResult?.(result)).catch(() => undefined);
+          return;
+        }
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(result);
+      },
+      (error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}

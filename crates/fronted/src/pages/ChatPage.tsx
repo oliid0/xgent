@@ -10,11 +10,13 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import {
   type ChangedFilesActions,
   ChangedFilesActionsProvider,
 } from "../components/chat/ChangedFilesCard";
+import { ToolApprovalBar } from "../components/chat/ToolApprovalBar";
 import type {
   MentionComposerCommitMention,
   MentionComposerDraft,
@@ -29,13 +31,17 @@ import type {
   GitCommitContextPayload,
   GitFileContextPayload,
 } from "../components/project-tools/git-review";
-import type { GitReviewFocusRequest } from "../components/project-tools/RightDockContext";
-import { RightDockPanel } from "../components/project-tools/RightDockPanel";
+import type { GitReviewFocusRequest } from "../components/project-tools/WorkspaceToolsContext";
 import {
   expandedPathsForFileTreePath,
+  type WorkspaceNavigationTarget,
   type WorkspaceToolLaunchRequest,
   type WorkspaceToolTarget,
-} from "../components/project-tools/rightDockModel";
+} from "../components/project-tools/workspaceToolsModel";
+import { McpSidePanel } from "../components/workspace-tools/McpSidePanel";
+import { SkillsSidePanel } from "../components/workspace-tools/SkillsSidePanel";
+import { WorkspaceNavigationRail } from "../components/workspace-tools/WorkspaceNavigationRail";
+import { WorkspaceSidePanel } from "../components/workspace-tools/WorkspaceSidePanel";
 import { Button } from "../components/ui/button";
 import { useConfirmDialog } from "../components/ui/confirm-dialog";
 import type { WorkspaceCodeEditorOpenRequest } from "../components/workspace-editor/WorkspaceCodeEditorOverlay";
@@ -121,19 +127,19 @@ import {
   type ExecutionMode,
   findProviderModelConfig,
   getChatRuntimeReasoningLevelsForProvider,
-  getRightDockFileTreeState,
-  getRightDockProjectState,
+  getWorkspaceFileTreeState,
+  getWorkspaceToolsProjectState,
   getSshProjectHostIds,
   isAgentDevMode,
   isAgentExecutionMode,
-  isRightDockSingletonTabOpen,
+  isWorkspaceToolsSingletonTabOpen,
   normalizeChatRuntimeControlsForProvider,
   normalizeSelectedModelForProviders,
-  openRightDockSingletonTab,
+  openWorkspaceToolsSingletonTab,
   parseSelectedModelJson,
-  type RightDockFileTreeStatePatch,
-  type RightDockProjectState,
-  removeRightDockProjectState,
+  type WorkspaceFileTreeStatePatch,
+  type WorkspaceToolsProjectState,
+  removeWorkspaceToolsProjectState,
   resolveEffectiveTheme,
   resolveWorkspaceProjects,
   type SelectedModel,
@@ -143,9 +149,8 @@ import {
   updateChatRuntimeControlsForProvider,
   updateCustomSettings,
   updateMemorySettings,
-  updateRightDockFileTreeState,
-  updateRightDockProjectState,
-  updateRightDockWidth,
+  updateWorkspaceFileTreeState,
+  updateWorkspaceToolsProjectState,
   updateSkills,
   updateSshProjectHostIds,
   updateSystem,
@@ -182,6 +187,13 @@ import type { TerminalSession, TerminalShellOption } from "../lib/terminal/types
 import { invokeFs } from "../lib/tools/fsBackend";
 import type { SkillAccessPolicy } from "../lib/tools/skillAccessPolicy";
 import { disposeTodoToolState } from "../lib/tools/todoTools";
+import {
+  answerToolApproval,
+  cancelPendingToolApprovalsForConversation,
+  getToolApprovalVersion,
+  listPendingToolApprovalsForConversation,
+  subscribeToolApprovals,
+} from "../lib/tools/toolApproval";
 import { tauriWorkspaceActivityClient } from "../lib/workspace-activity/tauriWorkspaceActivityClient";
 import {
   fallbackWorkspaceProjectName,
@@ -246,7 +258,7 @@ import {
 } from "./chat/queue/chatTurnQueue";
 import { ChatSidebarContainer } from "./chat/sidebar/ChatSidebarContainer";
 import { McpHubPage } from "./mcp-hub/McpHubPage";
-import type { SectionId } from "./settings/types";
+import type { SectionId, SettingsOpenOptions } from "./settings/types";
 import { SkillsHubPage } from "./skills-hub/SkillsHubPage";
 
 const WorkspaceCodeEditorOverlay = lazy(async () => {
@@ -281,12 +293,14 @@ type ChatPageProps = {
   setSettings: (updater: (prev: AppSettings) => AppSettings) => void;
   /** Reads the authoritative settingsRef (not render-time state) so tools never see a stale snapshot. */
   getMcpSettings: () => AppSettings["mcp"];
+  getToolPolicies: () => AppSettings["system"]["toolPolicies"];
   context: Context;
   setContext: (next: Context) => void;
-  onOpenSettings: (section?: SectionId) => void;
+  onOpenSettings: (section?: SectionId, options?: SettingsOpenOptions) => void;
   onToggleTheme: () => void;
   appUpdate?: AppUpdateController;
   desktopBridgeEnabled: boolean;
+  lanPcCommandHostReady: boolean;
   nativeMobile: boolean;
 };
 
@@ -524,6 +538,8 @@ function buildProviderRuntimeConfig(
   return {
     baseUrl: provider.baseUrl,
     apiKey: provider.apiKey,
+    authMode: provider.authMode,
+    oauthAccountId: provider.oauthAccountId,
     customHeaders: provider.customHeaders,
     requestFormat: provider.requestFormat,
     reasoning: reasoningSupported
@@ -579,14 +595,17 @@ export function ChatPage(props: ChatPageProps) {
     settings,
     setSettings,
     getMcpSettings,
+    getToolPolicies,
     context,
     setContext,
     onOpenSettings,
     onToggleTheme,
     appUpdate,
     desktopBridgeEnabled,
+    lanPcCommandHostReady,
     nativeMobile,
   } = props;
+  const desktopCommandHostAvailable = desktopBridgeEnabled || lanPcCommandHostReady;
   // Monaco reads NLS globals while the lazy editor module imports monaco-editor.
   setPreferredMonacoNlsLocale(settings.locale);
   const effectiveTheme = resolveEffectiveTheme(settings.theme);
@@ -640,12 +659,6 @@ export function ChatPage(props: ChatPageProps) {
   const skillsEnabled = skillsConfigured && isAgentMode;
   const { document: soulDocument } = useSoul();
   const soulPrompt = useMemo(() => buildSoulSystemPrompt(soulDocument), [soulDocument]);
-  const activeAgentPrompt = useMemo(() => {
-    const activeTemplate = settings.agents.find(
-      (template) => template.enabled && template.prompt.trim(),
-    );
-    return activeTemplate?.prompt.trim() ?? "";
-  }, [settings.agents]);
   const selectedSkillNames = useMemo(
     () => (skillsEnabled ? mergeAlwaysEnabledSkillNames(settings.skills.selected) : []),
     [skillsEnabled, settings.skills.selected],
@@ -719,11 +732,25 @@ export function ChatPage(props: ChatPageProps) {
     previousCompactViewportRef.current = compactViewport;
   }, [compactViewport]);
   const [activeView, setActiveView] = useState<"chat" | "skills-hub" | "mcp-hub">("chat");
-  const [rightDockOpen, setRightDockOpen] = useState(false);
+  const [desktopNavigationTarget, setDesktopNavigationTarget] =
+    useState<WorkspaceNavigationTarget>("conversations");
+  const [workspaceToolsOpen, setWorkspaceToolsOpen] = useState(false);
   const [terminalShellOptions, setTerminalShellOptions] = useState<TerminalShellOption[]>([]);
   const [workspaceToolLaunchRequest, setWorkspaceToolLaunchRequest] =
     useState<WorkspaceToolLaunchRequest | null>(null);
   const workspaceToolLaunchNonceRef = useRef(0);
+  const showDesktopWorkspaceTool = useCallback((target: WorkspaceToolTarget, shell?: string) => {
+    workspaceToolLaunchNonceRef.current += 1;
+    setActiveView("chat");
+    setDesktopNavigationTarget(target);
+    setSidebarOpen(true);
+    setWorkspaceToolsOpen(true);
+    setWorkspaceToolLaunchRequest({
+      nonce: workspaceToolLaunchNonceRef.current,
+      target,
+      shell,
+    });
+  }, []);
   const [mobileActivityOpen, setMobileActivityOpen] = useState(false);
   const [mobileFilesOpen, setMobileFilesOpen] = useState(false);
   const [mobileTerminalOpen, setMobileTerminalOpen] = useState(false);
@@ -733,7 +760,7 @@ export function ChatPage(props: ChatPageProps) {
   const [mobileTerminalAutoRun, setMobileTerminalAutoRun] = useState(false);
   const [mobileBrowserSettingsOpen, setMobileBrowserSettingsOpen] = useState(false);
   const [mobileWorkspaceCreateOpen, setMobileWorkspaceCreateOpen] = useState(false);
-  const previousRightDockFileTreeOpenRef = useRef(false);
+  const previousWorkspaceFileTreeOpenRef = useRef(false);
   const [workspaceEditorMounted, setWorkspaceEditorMounted] = useState(false);
   const [workspaceEditorOpen, setWorkspaceEditorOpen] = useState(false);
   const [workspaceEditorCleanupPending, setWorkspaceEditorCleanupPending] = useState(false);
@@ -939,21 +966,20 @@ export function ChatPage(props: ChatPageProps) {
         return;
       }
 
-      setActiveView("chat");
-      setRightDockOpen(true);
+      showDesktopWorkspaceTool("fileTree");
       activateWorkspaceProject(project);
-      setSettings((prev) => openRightDockSingletonTab(prev, pathKey, "fileTree"));
+      setSettings((prev) => openWorkspaceToolsSingletonTab(prev, pathKey, "fileTree"));
     },
-    [activateWorkspaceProject, checkWorkspaceProjectDirectory, setSettings],
+    [activateWorkspaceProject, checkWorkspaceProjectDirectory, setSettings, showDesktopWorkspaceTool],
   );
 
-  const ensureSshTunnelToolTab = useCallback(
+  const ensureSshConnectionToolTab = useCallback(
     (projectPathKey?: string) => {
       const targetProjectPathKey =
         workspaceProjectPathKey(projectPathKey) ||
         workspaceProjectPathKey(activeWorkspaceProjectPath);
       if (!targetProjectPathKey) return;
-      setSettings((prev) => openRightDockSingletonTab(prev, targetProjectPathKey, "sshTunnel"));
+      setSettings((prev) => openWorkspaceToolsSingletonTab(prev, targetProjectPathKey, "sshConnection"));
     },
     [activeWorkspaceProjectPath, setSettings],
   );
@@ -1255,6 +1281,7 @@ export function ChatPage(props: ChatPageProps) {
     captureAbortSnapshot,
     getAbortSnapshot,
     resetLiveTranscript,
+    settleLiveTranscript,
     appendDraftAssistantText,
     batchLiveRoundsUpdate,
     updateToolStatus,
@@ -1304,6 +1331,13 @@ export function ChatPage(props: ChatPageProps) {
   }
 
   const isDraftConversation = !historyItems.some((item) => item.id === currentConversationId);
+  useSyncExternalStore(
+    subscribeToolApprovals,
+    getToolApprovalVersion,
+    getToolApprovalVersion,
+  );
+  const pendingToolApprovals =
+    listPendingToolApprovalsForConversation(currentConversationId);
   const currentConversationPersistedCwd =
     historyItems.find((item) => item.id === currentConversationId)?.cwd?.trim() || "";
   const currentConversationRuntimeWorkdir =
@@ -1320,24 +1354,24 @@ export function ChatPage(props: ChatPageProps) {
   const mobileWorkspacePathKey = mobileWorkspacePath
     ? workspaceProjectPathKey(mobileWorkspacePath)
     : "";
-  // getRightDockProjectState / getRightDockFileTreeState / getSshProjectHostIds
+  // getWorkspaceToolsProjectState / getWorkspaceFileTreeState / getSshProjectHostIds
   // build fresh objects on every call, so memoize on the owning settings slice
-  // + path key: RightDockPanel is memo'd and these references are props.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on settings.customSettings.rightDock (the only slice these getters read) so unrelated settings changes keep the reference stable.
-  const rightDockProjectState = useMemo(
-    () => getRightDockProjectState(settings.customSettings, terminalProjectPathKey),
-    [settings.customSettings.rightDock, terminalProjectPathKey],
+  // + path key: the LL-style workspace side panel receives stable state slices.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on settings.customSettings.workspaceTools (the only slice these getters read) so unrelated settings changes keep the reference stable.
+  const workspaceToolsProjectState = useMemo(
+    () => getWorkspaceToolsProjectState(settings.customSettings, terminalProjectPathKey),
+    [settings.customSettings.workspaceTools, terminalProjectPathKey],
   );
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on settings.customSettings.rightDock (the only slice these getters read) so unrelated settings changes keep the reference stable.
-  const rightDockFileTreeState = useMemo(
-    () => getRightDockFileTreeState(settings.customSettings, terminalProjectPathKey),
-    [settings.customSettings.rightDock, terminalProjectPathKey],
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on settings.customSettings.workspaceTools (the only slice these getters read) so unrelated settings changes keep the reference stable.
+  const workspaceFileTreeState = useMemo(
+    () => getWorkspaceFileTreeState(settings.customSettings, terminalProjectPathKey),
+    [settings.customSettings.workspaceTools, terminalProjectPathKey],
   );
   const mobileFileTreeState = useMemo(
-    () => getRightDockFileTreeState(settings.customSettings, mobileWorkspacePathKey),
-    [mobileWorkspacePathKey, settings.customSettings.rightDock],
+    () => getWorkspaceFileTreeState(settings.customSettings, mobileWorkspacePathKey),
+    [mobileWorkspacePathKey, settings.customSettings.workspaceTools],
   );
-  const rightDockFileTreeOpen = isRightDockSingletonTabOpen(
+  const workspaceFileTreeOpen = isWorkspaceToolsSingletonTabOpen(
     settings.customSettings,
     terminalProjectPathKey,
     "fileTree",
@@ -1362,43 +1396,31 @@ export function ChatPage(props: ChatPageProps) {
       }
       if (terminalDisabledMessage) return;
       if (!desktopBridgeEnabled) return;
-      workspaceToolLaunchNonceRef.current += 1;
-      setActiveView("chat");
-      setRightDockOpen(true);
-      setWorkspaceToolLaunchRequest({
-        nonce: workspaceToolLaunchNonceRef.current,
-        target,
-        shell,
-      });
+      showDesktopWorkspaceTool(target, shell);
     },
-    [desktopBridgeEnabled, mobileWorkspacePathKey, nativeMobile, terminalDisabledMessage],
+    [
+      desktopBridgeEnabled,
+      mobileWorkspacePathKey,
+      nativeMobile,
+      showDesktopWorkspaceTool,
+      terminalDisabledMessage,
+    ],
   );
-  const handleWorkspaceToolLaunchRequestHandled = useCallback((nonce: number) => {
-    setWorkspaceToolLaunchRequest((current) => (current?.nonce === nonce ? null : current));
-  }, []);
-  // RightDockPanel is memo'd: every callback handed to it must be stable or
-  // the memo boundary is void (see the panel-side context useMemo).
-  const handleRightDockWidthChange = useCallback(
-    (nextWidth: number) => {
-      setSettings((prev) => updateRightDockWidth(prev, nextWidth));
-    },
-    [setSettings],
-  );
-  const handleRightDockProjectStateChange = useCallback(
-    (updater: (current: RightDockProjectState) => RightDockProjectState) => {
-      setSettings((prev) => updateRightDockProjectState(prev, terminalProjectPathKey, updater));
+  const handleWorkspaceToolsProjectStateChange = useCallback(
+    (updater: (current: WorkspaceToolsProjectState) => WorkspaceToolsProjectState) => {
+      setSettings((prev) => updateWorkspaceToolsProjectState(prev, terminalProjectPathKey, updater));
     },
     [setSettings, terminalProjectPathKey],
   );
-  const handleRightDockFileTreeStateChange = useCallback(
-    (patch: RightDockFileTreeStatePatch) => {
-      setSettings((prev) => updateRightDockFileTreeState(prev, terminalProjectPathKey, patch));
+  const handleWorkspaceFileTreeStateChange = useCallback(
+    (patch: WorkspaceFileTreeStatePatch) => {
+      setSettings((prev) => updateWorkspaceFileTreeState(prev, terminalProjectPathKey, patch));
     },
     [setSettings, terminalProjectPathKey],
   );
   const handleMobileFileTreeStateChange = useCallback(
-    (patch: RightDockFileTreeStatePatch) => {
-      setSettings((prev) => updateRightDockFileTreeState(prev, mobileWorkspacePathKey, patch));
+    (patch: WorkspaceFileTreeStatePatch) => {
+      setSettings((prev) => updateWorkspaceFileTreeState(prev, mobileWorkspacePathKey, patch));
     },
     [mobileWorkspacePathKey, setSettings],
   );
@@ -1408,14 +1430,14 @@ export function ChatPage(props: ChatPageProps) {
     },
     [setSettings, terminalProjectPathKey],
   );
-  const handleRightDockSessionsChange = useCallback((sessions: TerminalSession[]) => {
+  const handleWorkspaceToolsSessionsChange = useCallback((sessions: TerminalSession[]) => {
     setTerminalSessions(sortTerminalSessions(sessions));
   }, []);
-  const handleRightDockInsertFileMention = useCallback((path: string, kind: "file" | "dir") => {
+  const handleWorkspaceToolsInsertFileMention = useCallback((path: string, kind: "file" | "dir") => {
     composerRef.current?.insertFileMention(path, kind);
     composerRef.current?.focus();
   }, []);
-  const handleRightDockInsertCodeReviewSkill = useCallback(() => {
+  const handleWorkspaceToolsInsertCodeReviewSkill = useCallback(() => {
     const composer = composerRef.current;
     if (!composer || !codeReviewSkill) return;
     setSettings((prev) => {
@@ -1431,11 +1453,11 @@ export function ChatPage(props: ChatPageProps) {
     }
     composer.focus();
   }, [codeReviewSkill, setSettings]);
-  const handleRightDockInsertCommitMention = useCallback((commit: GitCommitContextPayload) => {
+  const handleWorkspaceToolsInsertCommitMention = useCallback((commit: GitCommitContextPayload) => {
     composerRef.current?.insertCommitMention(commit);
     composerRef.current?.focus();
   }, []);
-  const handleRightDockInsertGitFileMention = useCallback((file: GitFileContextPayload) => {
+  const handleWorkspaceToolsInsertGitFileMention = useCallback((file: GitFileContextPayload) => {
     composerRef.current?.insertGitFileMention(file);
     composerRef.current?.focus();
   }, []);
@@ -1558,15 +1580,15 @@ export function ChatPage(props: ChatPageProps) {
   const handleChangedFileOpenDiff = useCallback(
     (path: string | null) => {
       if (!terminalProjectPathKey) return;
-      setRightDockOpen(true);
-      setSettings((prev) => openRightDockSingletonTab(prev, terminalProjectPathKey, "gitReview"));
+      showDesktopWorkspaceTool("gitReview");
+      setSettings((prev) => openWorkspaceToolsSingletonTab(prev, terminalProjectPathKey, "gitReview"));
       gitReviewFocusNonceRef.current += 1;
       setGitReviewFocusRequest({
         path: (path ?? "").trim(),
         nonce: gitReviewFocusNonceRef.current,
       });
     },
-    [setSettings, terminalProjectPathKey],
+    [setSettings, showDesktopWorkspaceTool, terminalProjectPathKey],
   );
   const handleChangedFileReveal = useCallback(
     (path: string) => {
@@ -1576,11 +1598,11 @@ export function ChatPage(props: ChatPageProps) {
         .replace(/\\/g, "/")
         .replace(/^\/+|\/+$/g, "");
       if (!selectedPath) return;
-      setRightDockOpen(true);
+      showDesktopWorkspaceTool("fileTree");
       setSettings((prev) => {
-        const opened = openRightDockSingletonTab(prev, terminalProjectPathKey, "fileTree");
-        const current = getRightDockFileTreeState(opened.customSettings, terminalProjectPathKey);
-        return updateRightDockFileTreeState(opened, terminalProjectPathKey, {
+        const opened = openWorkspaceToolsSingletonTab(prev, terminalProjectPathKey, "fileTree");
+        const current = getWorkspaceFileTreeState(opened.customSettings, terminalProjectPathKey);
+        return updateWorkspaceFileTreeState(opened, terminalProjectPathKey, {
           query: "",
           selectedPath,
           expandedPaths: Array.from(
@@ -1590,7 +1612,7 @@ export function ChatPage(props: ChatPageProps) {
         });
       });
     },
-    [setSettings, terminalProjectPathKey],
+    [setSettings, showDesktopWorkspaceTool, terminalProjectPathKey],
   );
   const changedFilesActions = useMemo<ChangedFilesActions>(
     () => ({
@@ -1622,21 +1644,21 @@ export function ChatPage(props: ChatPageProps) {
     setWorkspaceFilePreviewOpenRequest(null);
   }, []);
   useEffect(() => {
-    const previousOpen = previousRightDockFileTreeOpenRef.current;
-    previousRightDockFileTreeOpenRef.current = rightDockFileTreeOpen;
-    if (rightDockFileTreeOpen && workspaceEditorCleanupPending) {
+    const previousOpen = previousWorkspaceFileTreeOpenRef.current;
+    previousWorkspaceFileTreeOpenRef.current = workspaceFileTreeOpen;
+    if (workspaceFileTreeOpen && workspaceEditorCleanupPending) {
       setWorkspaceEditorCleanupPending(false);
     }
-    if (previousOpen && !rightDockFileTreeOpen && workspaceEditorMounted) {
+    if (previousOpen && !workspaceFileTreeOpen && workspaceEditorMounted) {
       setWorkspaceEditorCleanupPending(true);
       setWorkspaceEditorOpen(true);
       requestWorkspaceEditorClose();
     }
-    if (previousOpen && !rightDockFileTreeOpen && workspaceFilePreviewMounted) {
+    if (previousOpen && !workspaceFileTreeOpen && workspaceFilePreviewMounted) {
       requestWorkspaceFilePreviewClose();
     }
   }, [
-    rightDockFileTreeOpen,
+    workspaceFileTreeOpen,
     requestWorkspaceEditorClose,
     requestWorkspaceFilePreviewClose,
     workspaceEditorCleanupPending,
@@ -1645,7 +1667,7 @@ export function ChatPage(props: ChatPageProps) {
   ]);
   useEffect(() => {
     setTerminalSessionsLoaded(false);
-    if (!desktopBridgeEnabled) {
+    if (!desktopCommandHostAvailable) {
       setTerminalSessions([]);
       setTerminalSessionsLoaded(true);
       return;
@@ -1675,14 +1697,14 @@ export function ChatPage(props: ChatPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [desktopBridgeEnabled, terminalProjectPathKey]);
+  }, [desktopCommandHostAvailable, terminalProjectPathKey]);
   useEffect(() => {
-    if (!desktopBridgeEnabled || !terminalProjectPathKey) return;
+    if (!desktopCommandHostAvailable || !terminalProjectPathKey) return;
     return tauriTerminalClient.subscribe((event) => {
       if (event.kind === "output") return;
       setTerminalSessions((current) => applyTerminalEventToSessions(current, event));
     });
-  }, [desktopBridgeEnabled, terminalProjectPathKey]);
+  }, [desktopCommandHostAvailable, terminalProjectPathKey]);
   useEffect(() => {
     if (!desktopBridgeEnabled) return;
     let cancelled = false;
@@ -1910,6 +1932,7 @@ export function ChatPage(props: ChatPageProps) {
       setPendingUploadsForConversation(key, []);
       memoryExtraction.dispose(key);
       deleteConversationArtifacts(key);
+      cancelPendingToolApprovalsForConversation(key);
       setQueuedChatTurnsState((current) => removeQueuedChatTurnsForConversation(current, key));
     },
     [deleteConversationArtifacts, setPendingUploadsForConversation, setQueuedChatTurnsState],
@@ -2407,7 +2430,7 @@ export function ChatPage(props: ChatPageProps) {
             getDefaultWorkspaceProjectPath(prev.system),
           ),
         };
-        return removeRightDockProjectState(nextSettings, pathKey);
+        return removeWorkspaceToolsProjectState(nextSettings, pathKey);
       });
       setProjectRenamingId((current) => (current === project.id ? null : current));
       setProjectRenameDraft("");
@@ -2501,7 +2524,7 @@ export function ChatPage(props: ChatPageProps) {
             );
           }
           if (pathKey && terminalProjectPathKey === pathKey) {
-            setRightDockOpen(false);
+            setWorkspaceToolsOpen(false);
             setTerminalSessions((current) =>
               current.filter((session) => !terminalSessionBelongsToProject(session, pathKey)),
             );
@@ -2650,7 +2673,7 @@ export function ChatPage(props: ChatPageProps) {
   ]);
 
   useEffect(() => {
-    if (!desktopBridgeEnabled) return;
+    if (!desktopCommandHostAvailable) return;
     const previous = previousSubagentRuntimeConversationRef.current;
     if (previous && previous !== currentConversationId) {
       subagentStoresRef.current.dispose(previous);
@@ -2669,7 +2692,7 @@ export function ChatPage(props: ChatPageProps) {
     if (subagentWarmupSignatureRef.current === warmupSignature) return;
     subagentWarmupSignatureRef.current = warmupSignature;
     subagentStoresRef.current.warmup(currentConversationId);
-  }, [currentConversationId, desktopBridgeEnabled, historyItems, settings.agents]);
+  }, [currentConversationId, desktopCommandHostAvailable, historyItems, settings.agents]);
 
   useEffect(
     () => () => {
@@ -3285,6 +3308,9 @@ export function ChatPage(props: ChatPageProps) {
         runtime: {
           baseUrl: titleProviderConfig.baseUrl,
           apiKey: titleProviderConfig.apiKey,
+          authMode: titleProviderConfig.authMode,
+          oauthAccountId: titleProviderConfig.oauthAccountId,
+          customHeaders: titleProviderConfig.customHeaders,
           requestFormat: titleProviderConfig.requestFormat,
           reasoning: titleProviderConfig.reasoning,
           promptCachingEnabled: titleProviderConfig.promptCachingEnabled,
@@ -3496,7 +3522,6 @@ export function ChatPage(props: ChatPageProps) {
         state,
         tools,
         soulPrompt,
-        activeAgentPrompt,
         skillsPrompt,
         memoryPrompt,
         includeAbortedMessages: options?.includeAbortedMessages,
@@ -3515,7 +3540,6 @@ export function ChatPage(props: ChatPageProps) {
         resumeMessage,
         tools,
         soulPrompt,
-        activeAgentPrompt,
         skillsPrompt,
         memoryPrompt,
         includeAbortedMessages: options?.includeAbortedMessages,
@@ -3529,6 +3553,9 @@ export function ChatPage(props: ChatPageProps) {
       runtime: {
         baseUrl: providerConfig.baseUrl,
         apiKey: providerConfig.apiKey,
+        authMode: providerConfig.authMode,
+        oauthAccountId: providerConfig.oauthAccountId,
+        customHeaders: providerConfig.customHeaders,
         requestFormat: providerConfig.requestFormat,
         reasoning: providerConfig.reasoning,
         promptCachingEnabled: providerConfig.promptCachingEnabled,
@@ -3664,7 +3691,7 @@ export function ChatPage(props: ChatPageProps) {
     }
 
     const hookScope = createHookRunScope({
-      hooks: desktopBridgeEnabled ? getAutomationState().hooks.hooks : [],
+      hooks: desktopCommandHostAvailable ? getAutomationState().hooks.hooks : [],
       conversationId,
       workdir: effectiveWorkdir,
       onWarning: (warning) => {
@@ -3790,6 +3817,9 @@ export function ChatPage(props: ChatPageProps) {
             runtime: {
               baseUrl: providerConfig.baseUrl,
               apiKey: providerConfig.apiKey,
+              authMode: providerConfig.authMode,
+              oauthAccountId: providerConfig.oauthAccountId,
+              customHeaders: providerConfig.customHeaders,
               requestFormat: providerConfig.requestFormat,
               reasoning: providerConfig.reasoning,
               promptCachingEnabled: providerConfig.promptCachingEnabled,
@@ -3814,7 +3844,9 @@ export function ChatPage(props: ChatPageProps) {
             selectedSystemToolIds: effectiveSelectedSystemToolIds,
             cloudExecution: settings.access,
             nativeMobileRuntime: !desktopBridgeEnabled,
+            lanPcCommandHostReady,
             getMcpSettings,
+            getToolPolicies,
             applyMcpOps: (ops) => {
               setSettings((prev) => applyMcpOpsToAppSettings(prev, ops));
             },
@@ -3822,7 +3854,7 @@ export function ChatPage(props: ChatPageProps) {
             associatedSshHostIds: effectiveAssociatedSshHostIds,
             onSshSessionsChanged: (change) => {
               if (change.action === "create") {
-                ensureSshTunnelToolTab(change.projectPathKey);
+                ensureSshConnectionToolTab(change.projectPathKey);
               }
             },
             sessionId,
@@ -3835,7 +3867,7 @@ export function ChatPage(props: ChatPageProps) {
             conversationEvents,
             hookLifecycle,
             conversationDebugLogger,
-            subagentStore: desktopBridgeEnabled
+            subagentStore: desktopCommandHostAvailable
               ? subagentStoresRef.current.get(conversationId)
               : undefined,
             getNextConversationState: () => nextConversationState,
@@ -3844,6 +3876,7 @@ export function ChatPage(props: ChatPageProps) {
             compaction,
             cancellation,
             resetLiveTranscript,
+            settleLiveTranscript,
             batchLiveRoundsUpdate,
             updateToolStatus,
             updateRetryAttempts: updateConversationEventRetryAttempts,
@@ -3864,6 +3897,9 @@ export function ChatPage(props: ChatPageProps) {
             runtime: {
               baseUrl: providerConfig.baseUrl,
               apiKey: providerConfig.apiKey,
+              authMode: providerConfig.authMode,
+              oauthAccountId: providerConfig.oauthAccountId,
+              customHeaders: providerConfig.customHeaders,
               requestFormat: providerConfig.requestFormat,
               reasoning: providerConfig.reasoning,
               promptCachingEnabled: providerConfig.promptCachingEnabled,
@@ -3893,6 +3929,7 @@ export function ChatPage(props: ChatPageProps) {
             compaction,
             cancellation,
             resetLiveTranscript,
+            settleLiveTranscript,
             appendDraftAssistantText,
             batchLiveRoundsUpdate,
             updateConversationEventToolStatus,
@@ -4029,6 +4066,48 @@ export function ChatPage(props: ChatPageProps) {
       setSidebarOpen(false);
     }
   }, [activeWorkspaceProjectPath, compactViewport, isAgentMode, openController]);
+
+  const handleDesktopNavigationSelect = useCallback(
+    (target: WorkspaceNavigationTarget, shell?: string) => {
+      if (desktopNavigationTarget === target && sidebarOpen && !shell) {
+        setSidebarOpen(false);
+        return;
+      }
+      if (target === "conversations") {
+        setActiveView("chat");
+        setWorkspaceToolsOpen(false);
+        setDesktopNavigationTarget(target);
+        setSidebarOpen(true);
+        return;
+      }
+      if (target === "skills" || target === "mcp") {
+        cacheActiveComposerDraft();
+        setActiveView("chat");
+        setWorkspaceToolsOpen(false);
+        setDesktopNavigationTarget(target);
+        setSidebarOpen(true);
+        return;
+      }
+      if (!desktopBridgeEnabled || terminalDisabledMessage) return;
+      showDesktopWorkspaceTool(target, shell);
+    },
+    [
+      cacheActiveComposerDraft,
+      desktopBridgeEnabled,
+      desktopNavigationTarget,
+      showDesktopWorkspaceTool,
+      sidebarOpen,
+      terminalDisabledMessage,
+    ],
+  );
+
+  const handleDesktopNewConversation = useCallback(() => {
+    setActiveView("chat");
+    setWorkspaceToolsOpen(false);
+    setDesktopNavigationTarget("conversations");
+    setSidebarOpen(true);
+    handleNewConversation();
+  }, [handleNewConversation]);
 
   const handleSelectConversation = useCallback(
     (id: string) => {
@@ -4349,6 +4428,21 @@ export function ChatPage(props: ChatPageProps) {
   return (
     <div className="flex h-full min-h-0 w-full overflow-hidden">
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        {!mobileExperience ? (
+          <WorkspaceNavigationRail
+            activeTarget={desktopNavigationTarget}
+            panelOpen={sidebarOpen}
+            workspaceToolsAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
+            fileTreeAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
+            terminalShellOptions={terminalShellOptions}
+            appUpdate={appUpdate}
+            onTogglePanel={handleToggleSidebar}
+            onNewConversation={handleDesktopNewConversation}
+            onSelect={handleDesktopNavigationSelect}
+            onOpenSettings={() => onOpenSettings()}
+            onCreateSoul={() => onOpenSettings("soul", { createSoul: true })}
+          />
+        ) : null}
         <MacOsTitleBarToggle
           sidebarOpen={sidebarOpen}
           onToggle={handleToggleSidebar}
@@ -4356,13 +4450,17 @@ export function ChatPage(props: ChatPageProps) {
             if (mobileExperience) setSidebarOpen(false);
             onOpenSettings();
           }}
+          onCreateSoul={() => {
+            if (mobileExperience) setSidebarOpen(false);
+            onOpenSettings("soul", { createSoul: true });
+          }}
           appUpdate={appUpdate}
         />
         {/* ---- Sidebar ---- */}
         <ChatSidebarContainer
           store={sidebarStore}
           currentConversationId={currentConversationId}
-          isOpen={sidebarOpen}
+          isOpen={sidebarOpen && (mobileExperience || desktopNavigationTarget === "conversations")}
           fontScale={settings.customSettings.fontScale.sidebar}
           activeView={activeView}
           showProjects={isAgentMode}
@@ -4381,7 +4479,7 @@ export function ChatPage(props: ChatPageProps) {
           onSelectProject={handleSelectWorkspaceProject}
           onNewConversationForProject={handleNewConversationForProject}
           onBrowseProjectInFileTree={
-            desktopBridgeEnabled ? handleBrowseWorkspaceProjectInFileTree : undefined
+            desktopCommandHostAvailable ? handleBrowseWorkspaceProjectInFileTree : undefined
           }
           onBrowseProjectInSystemFileManager={
             desktopBridgeEnabled ? handleBrowseWorkspaceProjectInSystemFileManager : undefined
@@ -4415,20 +4513,33 @@ export function ChatPage(props: ChatPageProps) {
           appUpdate={appUpdate}
           onOpenSkillsHub={() => {
             cacheActiveComposerDraft();
-            setRightDockOpen(false);
-            setActiveView("skills-hub");
-            if (mobileExperience) setSidebarOpen(false);
+            setWorkspaceToolsOpen(false);
+            if (mobileExperience) {
+              setActiveView("skills-hub");
+              setSidebarOpen(false);
+            } else {
+              setActiveView("chat");
+              setDesktopNavigationTarget("skills");
+              setSidebarOpen(true);
+            }
           }}
           onOpenMcpHub={() => {
             cacheActiveComposerDraft();
-            setRightDockOpen(false);
-            setActiveView("mcp-hub");
-            if (mobileExperience) setSidebarOpen(false);
+            setWorkspaceToolsOpen(false);
+            if (mobileExperience) {
+              setActiveView("mcp-hub");
+              setSidebarOpen(false);
+            } else {
+              setActiveView("chat");
+              setDesktopNavigationTarget("mcp");
+              setSidebarOpen(true);
+            }
           }}
           mobileExperience={mobileExperience}
-          workspaceToolsAvailable={desktopBridgeEnabled && !terminalDisabledMessage}
+          desktopPanelMode={!mobileExperience}
+          workspaceToolsAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
           fileTreeAvailable={
-            desktopBridgeEnabled
+            desktopCommandHostAvailable
               ? !terminalDisabledMessage
               : nativeMobile && Boolean(mobileWorkspacePathKey)
           }
@@ -4438,45 +4549,54 @@ export function ChatPage(props: ChatPageProps) {
 
         {confirmDialog}
 
-        {desktopBridgeEnabled ? (
-          <RightDockPanel
-            isOpen={activeView === "chat" && rightDockOpen}
-            collapseImmediately={activeView !== "chat"}
-            fontScale={settings.customSettings.fontScale.rightDock}
+        {!mobileExperience && sidebarOpen && desktopNavigationTarget === "skills" ? (
+          <SkillsSidePanel settings={settings} setSettings={setSettings} />
+        ) : null}
+
+        {!mobileExperience && sidebarOpen && desktopNavigationTarget === "mcp" ? (
+          <McpSidePanel settings={settings} setSettings={setSettings} />
+        ) : null}
+
+        {desktopCommandHostAvailable &&
+        activeView === "chat" &&
+        sidebarOpen &&
+        workspaceToolsOpen &&
+        workspaceToolLaunchRequest ? (
+          <WorkspaceSidePanel
+            target={workspaceToolLaunchRequest.target}
+            shell={workspaceToolLaunchRequest.shell}
+            requestNonce={workspaceToolLaunchRequest.nonce}
+            fontScale={settings.customSettings.fontScale.workspaceTools}
             projectPathKey={terminalProjectPathKey}
             cwd={terminalProjectPath}
             sessions={terminalSessions}
             sessionsLoaded={terminalSessionsLoaded}
-            width={settings.customSettings.rightDock.width}
             theme={effectiveTheme}
             disabledMessage={terminalDisabledMessage}
-            projectState={rightDockProjectState}
-            fileTreeState={rightDockFileTreeState}
+            projectState={workspaceToolsProjectState}
+            fileTreeState={workspaceFileTreeState}
             sshHosts={settings.ssh.hosts}
             associatedSshHostIds={associatedSshHostIds}
             client={tauriTerminalClient}
             gitClient={tauriGitClient}
-            gitWriteEnabled
             workspaceActivityClient={tauriWorkspaceActivityClient}
-            onWidthChange={handleRightDockWidthChange}
-            onProjectStateChange={handleRightDockProjectStateChange}
-            onFileTreeStateChange={handleRightDockFileTreeStateChange}
+            settings={settings}
+            setSettings={setSettings}
+            onProjectStateChange={handleWorkspaceToolsProjectStateChange}
+            onFileTreeStateChange={handleWorkspaceFileTreeStateChange}
             onSshProjectHostIdsChange={handleSshProjectHostIdsChange}
             onOpenSshSession={handleOpenSshTerminal}
-            onSessionsChange={handleRightDockSessionsChange}
-            onInsertFileMention={handleRightDockInsertFileMention}
+            onSessionsChange={handleWorkspaceToolsSessionsChange}
+            onInsertFileMention={handleWorkspaceToolsInsertFileMention}
             onOpenFile={handleOpenWorkspaceFile}
             gitReviewFocusRequest={gitReviewFocusRequest}
             onGitReviewFocusRequestHandled={handleGitReviewFocusRequestHandled}
             onInsertCodeReviewSkill={
-              codeReviewSkill ? handleRightDockInsertCodeReviewSkill : undefined
+              codeReviewSkill ? handleWorkspaceToolsInsertCodeReviewSkill : undefined
             }
-            onInsertCommitMention={handleRightDockInsertCommitMention}
-            onInsertGitFileMention={handleRightDockInsertGitFileMention}
-            launchRequest={workspaceToolLaunchRequest}
-            onLaunchRequestHandled={handleWorkspaceToolLaunchRequestHandled}
+            onInsertCommitMention={handleWorkspaceToolsInsertCommitMention}
+            onInsertGitFileMention={handleWorkspaceToolsInsertGitFileMention}
             onShellOptionsChange={setTerminalShellOptions}
-            onClose={() => setRightDockOpen(false)}
           />
         ) : null}
 
@@ -4521,7 +4641,7 @@ export function ChatPage(props: ChatPageProps) {
                 settings={settings}
                 setSettings={setSettings}
                 onOpenSidebar={handleOpenSidebar}
-                allowStdio={!nativeMobile}
+                allowStdio={!nativeMobile || lanPcCommandHostReady}
               />
             ) : (
               <McpHubPage
@@ -4595,7 +4715,7 @@ export function ChatPage(props: ChatPageProps) {
                 <ChatTranscript
                   conversationId={currentConversationId}
                   workspaceRoot={currentConversationWorkspaceRoot}
-                  gitClient={desktopBridgeEnabled ? tauriGitClient : null}
+                  gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
                   followRef={scrollFollowRef}
                   hasModels={hasModels}
                   historyItems={historyRenderItems}
@@ -4628,8 +4748,29 @@ export function ChatPage(props: ChatPageProps) {
                   open={mobileActivityOpen}
                   onOpen={handleOpenMobileActivity}
                   onOpenBrowser={handleOpenBrowser}
+                  onOpenTerminal={() => handleOpenMobileTerminal("terminal")}
                   onClose={handleCloseMobileActivity}
                   bottomOffsetPx={composerOverlayHeight}
+                />
+              ) : null}
+
+              {pendingToolApprovals.length > 0 ? (
+                <ToolApprovalBar
+                  pending={pendingToolApprovals}
+                  onDecide={(toolCallId, decision) =>
+                    Promise.resolve(
+                      answerToolApproval(toolCallId, decision, {
+                        conversationId: currentConversationId,
+                      }),
+                    )
+                  }
+                  onDecideAll={async (decision) => {
+                    for (const item of pendingToolApprovals) {
+                      answerToolApproval(item.toolCallId, decision, {
+                        conversationId: currentConversationId,
+                      });
+                    }
+                  }}
                 />
               ) : null}
 
@@ -4645,8 +4786,10 @@ export function ChatPage(props: ChatPageProps) {
                 chatRuntimeControls={chatRuntimeControlsForCurrentProvider}
                 reasoningOptions={chatRuntimeReasoningOptions}
                 thinkingAlwaysOn={chatRuntimeThinkingAlwaysOn}
-                gitClient={desktopBridgeEnabled ? tauriGitClient : null}
-                workspaceActivityClient={desktopBridgeEnabled ? tauriWorkspaceActivityClient : null}
+                gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
+                workspaceActivityClient={
+                  desktopCommandHostAvailable ? tauriWorkspaceActivityClient : null
+                }
                 onSend={handleSend}
                 onStop={handleStopSending}
                 onComposerBusyChange={handleComposerBusyChange}
@@ -4751,7 +4894,7 @@ export function ChatPage(props: ChatPageProps) {
             terminalClient={tauriTerminalClient}
             workspaceActivityClient={null}
             onFileTreeStateChange={handleMobileFileTreeStateChange}
-            onInsertFileMention={handleRightDockInsertFileMention}
+            onInsertFileMention={handleWorkspaceToolsInsertFileMention}
             onOpenFile={handleOpenMobileWorkspaceFile}
             onClose={() => setMobileFilesOpen(false)}
           />

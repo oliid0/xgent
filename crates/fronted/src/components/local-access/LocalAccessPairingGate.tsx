@@ -95,7 +95,7 @@ export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
         <div>
           <h1 className="text-lg font-semibold">连接到 XAgent</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            输入电脑端“本地访问与移动端”设置中显示的六位配对码。
+            输入电脑端“本地与局域网访问”设置中显示的六位配对码。
           </p>
         </div>
         <label className="block space-y-1.5 text-sm">

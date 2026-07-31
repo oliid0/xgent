@@ -97,6 +97,7 @@ macro_rules! app_invoke_handler {
             // MCP
             commands::mcp::mcp_list_tools,
             commands::mcp::mcp_call_tool,
+            commands::mcp::mcp_cancel_tool,
             commands::mcp::mcp_runtime_status,
             commands::mcp::mcp_stop_server,
             commands::mcp::mcp_test_server,
@@ -228,6 +229,7 @@ macro_rules! app_invoke_handler {
             commands::git::git_stash_pop,
             commands::system::system_pick_folder,
             commands::system::system_pick_file,
+            commands::system::system_home_dir,
             commands::system::system_create_project_folder,
             commands::system::system_import_pasted_texts,
             commands::system::system_import_readable_file_paths,
@@ -253,6 +255,19 @@ macro_rules! app_invoke_handler {
             commands::cloud::cloud_secret_vault_status,
             commands::cloud::cloud_secret_vault_set_github_token,
             commands::cloud::cloud_secret_vault_remove_github_token,
+            commands::lan_pc::lan_pc_status,
+            commands::lan_pc::lan_pc_pair,
+            commands::lan_pc::lan_pc_refresh,
+            commands::lan_pc::lan_pc_disconnect,
+            commands::lan_pc::lan_pc_invoke,
+            commands::lan_pc::lan_pc_subscribe,
+            commands::lan_pc::lan_pc_unsubscribe,
+            commands::provider_oauth::provider_oauth_start_codex,
+            commands::provider_oauth::provider_oauth_poll_codex,
+            commands::provider_oauth::provider_oauth_status_codex,
+            commands::provider_oauth::provider_oauth_set_default_codex_account,
+            commands::provider_oauth::provider_oauth_remove_codex_account,
+            commands::provider_oauth::provider_oauth_logout_codex,
             commands::cloud::cloud_task_start,
             commands::cloud::cloud_task_status,
             commands::cloud::cloud_task_wait,
@@ -348,6 +363,7 @@ macro_rules! app_invoke_handler {
             commands::settings::settings_save_memory,
             commands::mcp::mcp_list_tools,
             commands::mcp::mcp_call_tool,
+            commands::mcp::mcp_cancel_tool,
             commands::mcp::mcp_runtime_status,
             commands::mcp::mcp_stop_server,
             commands::mcp::mcp_test_server,
@@ -355,6 +371,19 @@ macro_rules! app_invoke_handler {
             commands::cloud::cloud_secret_vault_status,
             commands::cloud::cloud_secret_vault_set_github_token,
             commands::cloud::cloud_secret_vault_remove_github_token,
+            commands::lan_pc::lan_pc_status,
+            commands::lan_pc::lan_pc_pair,
+            commands::lan_pc::lan_pc_refresh,
+            commands::lan_pc::lan_pc_disconnect,
+            commands::lan_pc::lan_pc_invoke,
+            commands::lan_pc::lan_pc_subscribe,
+            commands::lan_pc::lan_pc_unsubscribe,
+            commands::provider_oauth::provider_oauth_start_codex,
+            commands::provider_oauth::provider_oauth_poll_codex,
+            commands::provider_oauth::provider_oauth_status_codex,
+            commands::provider_oauth::provider_oauth_set_default_codex_account,
+            commands::provider_oauth::provider_oauth_remove_codex_account,
+            commands::provider_oauth::provider_oauth_logout_codex,
             commands::cloud::cloud_task_start,
             commands::cloud::cloud_task_status,
             commands::cloud::cloud_task_wait,
@@ -365,6 +394,7 @@ macro_rules! app_invoke_handler {
             commands::shell::shell_cancel,
             commands::app::app_runtime_platform,
             commands::system::system_pick_folder,
+            commands::system::system_home_dir,
             commands::system::system_create_project_folder,
             commands::system::system_import_readable_file_paths,
             commands::system::system_import_uploaded_readable_files,
@@ -603,11 +633,21 @@ pub fn run() {
                 let cloud_secret_vault = Arc::new(
                     services::cloud_secret_vault::CloudSecretVault::new(app_data_dir.clone())?,
                 );
-                app.manage(cloud_secret_vault);
+                let provider_oauth = Arc::new(
+                    services::provider_oauth::ProviderOAuthService::new(Arc::clone(
+                        &cloud_secret_vault,
+                    ))?,
+                );
+                let lan_pc_client = Arc::new(services::lan_pc_client::LanPcClient::new(
+                    Arc::clone(&cloud_secret_vault),
+                )?);
+                app.manage(Arc::clone(&cloud_secret_vault));
+                app.manage(Arc::clone(&provider_oauth));
+                app.manage(lan_pc_client);
                 app.manage(Arc::new(
                     services::cloud_execution::CloudExecutionService::new(app_data_dir)?,
                 ));
-                let proxy_server = services::proxy::start_proxy_server()?;
+                let proxy_server = services::proxy::start_proxy_server(provider_oauth)?;
                 app.manage(Arc::clone(&proxy_server));
                 let local_access_controller = Arc::new(
                     services::local_access::LocalAccessController::new(
@@ -728,13 +768,24 @@ pub fn run() {
                     .map_err(|error| format!("initialize XAgent memory store failed: {error}"))?,
             );
             app.manage(memory_store);
-            app.manage(Arc::new(
+            let cloud_secret_vault = Arc::new(
                 services::cloud_secret_vault::CloudSecretVault::new(app_data_dir.clone())?,
-            ));
+            );
+            let provider_oauth = Arc::new(
+                services::provider_oauth::ProviderOAuthService::new(Arc::clone(
+                    &cloud_secret_vault,
+                ))?,
+            );
+            let lan_pc_client = Arc::new(services::lan_pc_client::LanPcClient::new(
+                Arc::clone(&cloud_secret_vault),
+            )?);
+            app.manage(Arc::clone(&cloud_secret_vault));
+            app.manage(Arc::clone(&provider_oauth));
+            app.manage(lan_pc_client);
             app.manage(Arc::new(
                 services::cloud_execution::CloudExecutionService::new(app_data_dir)?,
             ));
-            app.manage(services::proxy::start_proxy_server()?);
+            app.manage(services::proxy::start_proxy_server(provider_oauth)?);
             if let Err(error) = services::skills::ensure_builtin_agent_skills_sync() {
                 eprintln!("failed to seed builtin skills: {error}");
             }

@@ -74,7 +74,6 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
     private val runner by lazy {
         ProotRunner(
             nativeLibraryDir = File(activity.applicationInfo.nativeLibraryDir),
-            nativeRuntimeDir = File(activity.codeCacheDir, "xagent-native-runtime"),
             rootfsDir = rootfsDir,
             tempDir = File(activity.cacheDir, "xagent-proot"),
             allowedHostRoots = {

@@ -1,5 +1,5 @@
-// Right-dock file tree panel: virtualized tree over the useFileTreeData
-// layer, reading its wiring from the right-dock tool context.
+// Workspace navigation file tree: virtualized tree over the useFileTreeData
+// layer, reading its wiring from the workspace-tools context.
 //
 // Shared by every frontend runtime; only relative, npm-package, or
 // @xagent/runtime imports are allowed here.
@@ -14,7 +14,7 @@ import {
   useState,
 } from "react";
 import { useLocale } from "../../../i18n";
-import type { RightDockFileTreeStatePatch } from "../../../lib/settings";
+import type { WorkspaceFileTreeStatePatch } from "../../../lib/settings";
 import { cn } from "../../../lib/shared/utils";
 import { getFileTypeIcon } from "../../chat/fileTypeIcons";
 import {
@@ -33,7 +33,7 @@ import { Button } from "../../ui/button";
 import { useConfirmDialog } from "../../ui/confirm-dialog";
 import { Input } from "../../ui/input";
 import { isWorkspaceImagePath } from "../../workspace-editor/workspaceImagePreview";
-import { useRightDockToolContext } from "../RightDockContext";
+import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
 import { FileTreeContextMenu } from "./ContextMenu";
 import {
   addExpandedPaths,
@@ -63,7 +63,7 @@ type ContextMenuState = {
 
 export function FileTreePanel(props: { active: boolean; touchActions?: boolean }) {
   const { active, touchActions = false } = props;
-  const context = useRightDockToolContext();
+  const context = useWorkspaceToolsContext();
   const { projectPathKey, cwd, fileTree } = context;
   const syncState = fileTree.state;
   const initialized = fileTree.initialized;
@@ -111,7 +111,7 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
   useEffect(() => {
     onStateChangeRef.current = fileTree.onStateChange;
   }, [fileTree.onStateChange]);
-  const emitState = useCallback((patch: RightDockFileTreeStatePatch) => {
+  const emitState = useCallback((patch: WorkspaceFileTreeStatePatch) => {
     onStateChangeRef.current(patch);
   }, []);
 
@@ -215,7 +215,7 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
 
   // External reveal requests arrive as a bump of the persisted revision
   // nonce (state.revision) with selectedPath/expandedPaths already patched
-  // by RightDockPanel.revealPathInFileTree.
+  // by WorkspaceToolsPanel.revealPathInFileTree.
   const lastRevisionRef = useRef(syncState.revision);
   useEffect(() => {
     const previous = lastRevisionRef.current;

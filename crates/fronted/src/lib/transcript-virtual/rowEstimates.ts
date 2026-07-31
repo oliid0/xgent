@@ -8,6 +8,8 @@
 // chrome), tools and thinking blocks as collapsed headers (their bodies stay
 // unmounted until first expand).
 
+import { COLLAPSED_CODE_BLOCK_PREVIEW_LINES } from "../markdownCodeBlockPolicy";
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -58,14 +60,21 @@ export function measureEstimateText(text: string): EstimateTextMeasurement {
   let codeLines = 0;
   let codeFences = 0;
   let inCode = false;
+  let visibleLinesInFence = 0;
   for (const line of text.split("\n")) {
     if (line.trimStart().startsWith("```")) {
-      if (!inCode) codeFences += 1;
+      if (!inCode) {
+        codeFences += 1;
+        visibleLinesInFence = 0;
+      }
       inCode = !inCode;
       continue;
     }
     if (inCode) {
-      codeLines += 1;
+      if (visibleLinesInFence < COLLAPSED_CODE_BLOCK_PREVIEW_LINES) {
+        codeLines += 1;
+        visibleLinesInFence += 1;
+      }
     } else {
       proseChars += line.length + 1;
     }

@@ -180,6 +180,14 @@ private final class BrowserInvocationGate {
     }
 }
 
+private struct BrowserSessionListItem: Encodable {
+    let sessionId: String
+    let url: String
+    let title: String?
+    let visible: Bool
+    let loading: Bool
+}
+
 final class BrowserAutomationPlugin: Plugin {
     @MainActor private var sessions: [String: BrowserSession] = [:]
 
@@ -253,9 +261,10 @@ final class BrowserAutomationPlugin: Plugin {
 
     @objc func listSessions(_ invoke: Invoke) {
         Task { @MainActor in
-            invoke.resolve(sessions.values.map(summary).sorted {
-                ($0["sessionId"] as? String ?? "") < ($1["sessionId"] as? String ?? "")
-            })
+            let payload = sessions.values.map(sessionListItem).sorted {
+                $0.sessionId < $1.sessionId
+            }
+            invoke.resolve(payload)
         }
     }
 
@@ -471,14 +480,17 @@ final class BrowserAutomationPlugin: Plugin {
 
     @MainActor
     private func applyViewport(_ raw: BrowserViewportArgs?, to session: BrowserSession) {
-        let viewport = raw
+        let x = CGFloat(max(0, raw?.x ?? 0))
+        let y = CGFloat(max(0, raw?.y ?? 0))
+        let width = CGFloat(max(1, raw?.width ?? 1))
+        let height = CGFloat(max(1, raw?.height ?? 1))
         session.webView.frame = CGRect(
-            x: max(0, viewport?.x ?? 0),
-            y: max(0, viewport?.y ?? 0),
-            width: max(1, viewport?.width ?? 1),
-            height: max(1, viewport?.height ?? 1)
+            x: x,
+            y: y,
+            width: width,
+            height: height
         )
-        session.visible = viewport?.visible ?? false
+        session.visible = raw?.visible ?? false
         session.webView.isHidden = !session.visible
         if session.visible {
             session.webView.superview?.bringSubviewToFront(session.webView)
@@ -494,6 +506,17 @@ final class BrowserAutomationPlugin: Plugin {
             "visible": session.visible,
             "loading": session.loading,
         ]
+    }
+
+    @MainActor
+    private func sessionListItem(_ session: BrowserSession) -> BrowserSessionListItem {
+        BrowserSessionListItem(
+            sessionId: session.sessionId,
+            url: session.webView.url?.absoluteString ?? "",
+            title: session.title,
+            visible: session.visible,
+            loading: session.loading
+        )
     }
 
     @MainActor

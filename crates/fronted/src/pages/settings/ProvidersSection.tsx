@@ -61,6 +61,7 @@ import {
   CODEX_REQUEST_FORMAT_LABELS,
   type CodexRequestFormat,
   type CustomProvider,
+  type ProviderAuthMode,
   type ProviderId,
   type ProviderModelConfig,
   updateCustomProviders,
@@ -73,6 +74,7 @@ import {
   type CherryProvidersResponse,
   CherryStudioImportModal,
 } from "./CherryStudioImportModal";
+import { CodexOAuthAccounts } from "./CodexOAuthAccounts";
 import { ModelPicker } from "./modelPicker";
 import {
   buildProviderModelsFetchKey,
@@ -237,6 +239,18 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
   const [apiKey, setApiKey] = useState(
     initialUsesRedactedApiKey ? REDACTED_API_KEY_DISPLAY : initialApiKey,
   );
+  const supportsOAuth = providerType === "claude_code" || providerType === "codex";
+  const [authMode, setAuthMode] = useState<ProviderAuthMode>(
+    providerType === "codex" && initialData?.authMode === "oauth-managed"
+      ? "oauth-managed"
+      : supportsOAuth &&
+          (initialData?.authMode === "oauth-token" || initialApiKey.includes("sk-ant-oat"))
+        ? "oauth-token"
+        : "api-key",
+  );
+  const [managedOAuthAccountId, setManagedOAuthAccountId] = useState(
+    initialData?.oauthAccountId ?? "",
+  );
   const [customHeaders, setCustomHeaders] = useState(() =>
     (initialData?.customHeaders ?? []).map((header) => ({ ...header })),
   );
@@ -277,15 +291,28 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
   const headerKeyRefs = useRef<Array<HTMLInputElement | null>>([]);
   const headerValueRefs = useRef<Array<HTMLInputElement | null>>([]);
   const apiKeyIsRedactedDisplay = initialUsesRedactedApiKey && apiKey === REDACTED_API_KEY_DISPLAY;
-  const apiKeyForRequest = apiKeyIsRedactedDisplay ? LOCAL_ACCESS_SECRET_SENTINEL : apiKey.trim();
-  const canFetchModels = baseUrl.trim().length > 0 && apiKeyForRequest.length > 0;
+  const apiKeyForRequest =
+    authMode === "oauth-managed"
+      ? ""
+      : apiKeyIsRedactedDisplay
+        ? LOCAL_ACCESS_SECRET_SENTINEL
+        : apiKey.trim();
+  const modelFetchCredential =
+    authMode === "oauth-managed" ? managedOAuthAccountId.trim() : apiKeyForRequest;
+  const canFetchModels = baseUrl.trim().length > 0 && modelFetchCredential.length > 0;
 
   const doFetch = useCallback(
     async (url: string, key: string) => {
       setFetchingModels(true);
       setFetchError(null);
       try {
-        const list = await fetchModelsFromApi(providerType, url, key, { useSystemProxy });
+        const list = await fetchModelsFromApi(providerType, url, key, {
+          authMode: supportsOAuth ? authMode : "api-key",
+          oauthAccountId:
+            authMode === "oauth-managed" ? managedOAuthAccountId : undefined,
+          customHeaders,
+          useSystemProxy,
+        });
         setModels((prev) => mergeFetchedModels(list, prev));
       } catch (err) {
         setFetchError(err instanceof Error ? err.message : String(err));
@@ -293,14 +320,29 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
         setFetchingModels(false);
       }
     },
-    [providerType, useSystemProxy],
+    [
+      authMode,
+      customHeaders,
+      managedOAuthAccountId,
+      providerType,
+      supportsOAuth,
+      useSystemProxy,
+    ],
   );
 
   useEffect(() => {
     const trimUrl = baseUrl.trim();
     const trimKey = apiKeyForRequest;
-    const key = buildProviderModelsFetchKey(trimUrl, trimKey, useSystemProxy);
-    if (!trimUrl || !trimKey) return;
+    const trimCredential = modelFetchCredential;
+    const key = buildProviderModelsFetchKey(
+      trimUrl,
+      trimKey,
+      useSystemProxy,
+      supportsOAuth ? authMode : "api-key",
+      customHeaders,
+      authMode === "oauth-managed" ? managedOAuthAccountId : undefined,
+    );
+    if (!trimUrl || !trimCredential) return;
     if (key === prevFetchKey.current) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -312,12 +354,22 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [apiKeyForRequest, baseUrl, doFetch, useSystemProxy]);
+  }, [
+    apiKeyForRequest,
+    authMode,
+    baseUrl,
+    customHeaders,
+    doFetch,
+    managedOAuthAccountId,
+    modelFetchCredential,
+    supportsOAuth,
+    useSystemProxy,
+  ]);
 
   function handleRefresh() {
     const trimUrl = baseUrl.trim();
     const trimKey = apiKeyForRequest;
-    if (!trimUrl || !trimKey) {
+    if (!trimUrl || !modelFetchCredential) {
       setFetchError(t("settings.noBaseUrlApiKey"));
       return;
     }
@@ -464,6 +516,24 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
     setHeaderValidationSubmitted(false);
   }
 
+  const manualOAuthAccountId =
+    customHeaders.find((header) => header.key.toLowerCase() === "chatgpt-account-id")?.value ?? "";
+
+  function setManualOAuthAccountId(value: string) {
+    setCustomHeaders((current) => {
+      const index = current.findIndex(
+        (header) => header.key.toLowerCase() === "chatgpt-account-id",
+      );
+      if (index < 0) {
+        return value ? [...current, { key: "chatgpt-account-id", value }] : current;
+      }
+      if (!value) return current.filter((_, headerIndex) => headerIndex !== index);
+      return current.map((header, headerIndex) =>
+        headerIndex === index ? { ...header, value } : header,
+      );
+    });
+  }
+
   function toggleCustomHeaderValue(index: number) {
     setVisibleHeaderValues((prev) => {
       const next = new Set(prev);
@@ -502,17 +572,33 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
       focusCustomHeader(invalidHeaderIndex, "key");
       return;
     }
-    const nextApiKey = apiKeyIsRedactedDisplay ? LOCAL_ACCESS_SECRET_SENTINEL : apiKey.trim();
+    const nextApiKey =
+      authMode === "oauth-managed"
+        ? ""
+        : apiKeyIsRedactedDisplay
+          ? LOCAL_ACCESS_SECRET_SENTINEL
+          : apiKey.trim();
     onSave({
       name: name.trim(),
       type: providerType,
       baseUrl: baseUrl.trim(),
       apiKey: nextApiKey,
       apiKeyConfigured:
+        (authMode === "oauth-managed" && managedOAuthAccountId.trim().length > 0) ||
         nextApiKey.length > 0 ||
         apiKeyIsRedactedDisplay ||
         (isBrowser && initialData?.apiKeyConfigured === true),
-      customHeaders,
+      authMode: supportsOAuth ? authMode : "api-key",
+      oauthAccountId:
+        providerType === "codex" && authMode === "oauth-managed"
+          ? managedOAuthAccountId.trim() || undefined
+          : undefined,
+      customHeaders:
+        providerType === "codex" && authMode !== "oauth-token"
+          ? customHeaders.filter(
+              (header) => header.key.toLowerCase() !== "chatgpt-account-id",
+            )
+          : customHeaders,
       models,
       activeModels: Array.from(activeModels),
       requestFormat: providerType === "codex" ? requestFormat : undefined,
@@ -671,7 +757,58 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                   />
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 max-[720px]:grid-cols-1">
+                {supportsOAuth ? (
+                  <div className="mt-4 space-y-2">
+                    <Label>{t("settings.providerAuthMethod")}</Label>
+                    <div
+                      className={cn(
+                        "grid rounded-xl bg-muted/65 p-1",
+                        providerType === "codex" ? "grid-cols-3" : "grid-cols-2",
+                      )}
+                    >
+                      {(providerType === "codex"
+                        ? (["api-key", "oauth-managed", "oauth-token"] as const)
+                        : (["api-key", "oauth-token"] as const)
+                      ).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          aria-pressed={authMode === mode}
+                          onClick={() => setAuthMode(mode)}
+                          className={cn(
+                            "h-9 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors",
+                            authMode === mode &&
+                              "bg-background text-foreground shadow-sm ring-1 ring-border/50",
+                          )}
+                        >
+                          {mode === "api-key"
+                            ? t("settings.providerAuthApiKey")
+                            : mode === "oauth-managed"
+                              ? t("settings.providerAuthOAuth")
+                              : t("settings.providerAuthToken")}
+                        </button>
+                      ))}
+                    </div>
+                    {authMode === "oauth-managed" ? (
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        {t("settings.providerOAuthManagedHintCodex")}
+                      </p>
+                    ) : authMode === "oauth-token" ? (
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        {providerType === "claude_code"
+                          ? t("settings.providerOAuthHintAnthropic")
+                          : t("settings.providerOAuthHintCodex")}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div
+                  className={cn(
+                    "mt-4 grid gap-3 max-[720px]:grid-cols-1",
+                    authMode === "oauth-managed" ? "grid-cols-1" : "grid-cols-2",
+                  )}
+                >
                   <div className="space-y-1.5">
                     <Label htmlFor="modal-baseurl">Base URL</Label>
                     <Input
@@ -681,37 +818,76 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="modal-apikey">API Key</Label>
-                    <div className="relative">
-                      <Input
-                        id="modal-apikey"
-                        type={showApiKey ? "text" : "password"}
-                        value={apiKey}
-                        disabled={isBrowser}
-                        className="pr-10"
-                        onChange={(event) => setApiKey(event.currentTarget.value)}
-                        onFocus={(event) => {
-                          if (apiKeyIsRedactedDisplay) event.currentTarget.select();
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-10 w-10 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                        onClick={() => setShowApiKey((prev) => !prev)}
-                        disabled={isBrowser}
-                        title={showApiKey ? t("settings.hideApiKey") : t("settings.showApiKey")}
-                        aria-label={
-                          showApiKey ? t("settings.hideApiKey") : t("settings.showApiKey")
-                        }
-                      >
-                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
+                  {authMode !== "oauth-managed" ? (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="modal-apikey">
+                        {authMode === "oauth-token"
+                          ? t("settings.providerOAuthToken")
+                          : "API Key"}
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="modal-apikey"
+                          type={showApiKey ? "text" : "password"}
+                          value={apiKey}
+                          disabled={isBrowser}
+                          className="pr-10"
+                          onChange={(event) => setApiKey(event.currentTarget.value)}
+                          onFocus={(event) => {
+                            if (apiKeyIsRedactedDisplay) event.currentTarget.select();
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-10 w-10 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                          onClick={() => setShowApiKey((prev) => !prev)}
+                          disabled={isBrowser}
+                          title={showApiKey ? t("settings.hideApiKey") : t("settings.showApiKey")}
+                          aria-label={
+                            showApiKey ? t("settings.hideApiKey") : t("settings.showApiKey")
+                          }
+                        >
+                          {showApiKey ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                 </div>
+
+                {providerType === "codex" && authMode === "oauth-managed" ? (
+                  <div className="mt-4 space-y-1.5">
+                    <Label>{t("settings.providerOAuthAccounts")}</Label>
+                    <CodexOAuthAccounts
+                      value={managedOAuthAccountId}
+                      onChange={setManagedOAuthAccountId}
+                      browserRuntime={isBrowser}
+                    />
+                  </div>
+                ) : null}
+
+                {providerType === "codex" && authMode === "oauth-token" ? (
+                  <div className="mt-4 space-y-1.5">
+                    <Label htmlFor="modal-oauth-account-id">
+                      {t("settings.providerOAuthAccountId")}
+                    </Label>
+                    <Input
+                      id="modal-oauth-account-id"
+                      value={manualOAuthAccountId}
+                      disabled={isBrowser}
+                      onChange={(event) => setManualOAuthAccountId(event.currentTarget.value)}
+                      placeholder={t("settings.providerOAuthAccountIdPlaceholder")}
+                    />
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      {t("settings.providerOAuthAccountIdHint")}
+                    </p>
+                  </div>
+                ) : null}
 
                 {providerType === "codex" ? (
                   <div className="mt-4 space-y-1.5">
@@ -825,7 +1001,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                       <div className="px-3 py-8 text-center text-xs text-muted-foreground">
                         {models.length > 0 && modelSearchQuery
                           ? t("settings.noMatchingModels")
-                          : baseUrl.trim() && apiKeyForRequest
+                          : baseUrl.trim() && modelFetchCredential
                             ? t("settings.fetchFailed")
                             : t("settings.fetchHint")}
                       </div>
@@ -1335,7 +1511,10 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
           </Button>
           <Button
             onClick={handleSave}
-            disabled={!name.trim()}
+            disabled={
+              !name.trim() ||
+              (authMode === "oauth-managed" && !managedOAuthAccountId.trim())
+            }
             className="max-[720px]:h-10 max-[720px]:flex-1"
           >
             {t("settings.save")}
