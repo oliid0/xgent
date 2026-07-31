@@ -41,11 +41,11 @@ import {
   buildFontFamilySelectOptions,
   FONT_FAMILY_CUSTOM_SELECT_VALUE,
   FONT_FAMILY_DEFAULT_SELECT_VALUE,
+  type FontFamilySettings,
   fromFontFamilySelectValue,
   listLocalFontFamilies,
   normalizeFontFamily,
   toFontFamilySelectValue,
-  type FontFamilySettings,
 } from "../../lib/system/fontFamily";
 import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
@@ -305,21 +305,37 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
             return (
               <SettingsRow key={key} label={label}>
                 <div className="flex min-w-0 items-center gap-2">
-                  <Select value={selectValue} onValueChange={(value) => handleFontFamilySelect(key, value)}>
+                  <Select
+                    value={selectValue}
+                    onValueChange={(value) => handleFontFamilySelect(key, value)}
+                  >
                     <SelectTrigger className={custom ? "w-40" : "w-60"}>
                       <SelectValue>
                         {(value) => {
-                          if (value === FONT_FAMILY_DEFAULT_SELECT_VALUE) return t("settings.fontFamilyDefault");
-                          if (value === FONT_FAMILY_CUSTOM_SELECT_VALUE) return t("settings.fontFamilyCustom");
-                          return fontFamilyOptions.find((option) => option.value === value)?.label ?? String(value ?? "");
+                          if (value === FONT_FAMILY_DEFAULT_SELECT_VALUE)
+                            return t("settings.fontFamilyDefault");
+                          if (value === FONT_FAMILY_CUSTOM_SELECT_VALUE)
+                            return t("settings.fontFamilyCustom");
+                          return (
+                            fontFamilyOptions.find((option) => option.value === value)?.label ??
+                            String(value ?? "")
+                          );
                         }}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="max-h-72">
-                      <SelectItem value={FONT_FAMILY_DEFAULT_SELECT_VALUE}>{t("settings.fontFamilyDefault")}</SelectItem>
-                      <SelectItem value={FONT_FAMILY_CUSTOM_SELECT_VALUE}>{t("settings.fontFamilyCustom")}</SelectItem>
+                      <SelectItem value={FONT_FAMILY_DEFAULT_SELECT_VALUE}>
+                        {t("settings.fontFamilyDefault")}
+                      </SelectItem>
+                      <SelectItem value={FONT_FAMILY_CUSTOM_SELECT_VALUE}>
+                        {t("settings.fontFamilyCustom")}
+                      </SelectItem>
                       {fontFamilyOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value} style={{ fontFamily: option.value }}>
+                        <SelectItem
+                          key={option.value}
+                          value={option.value}
+                          style={{ fontFamily: option.value }}
+                        >
                           {option.label}
                         </SelectItem>
                       ))}
@@ -332,7 +348,12 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
                       spellCheck={false}
                       autoComplete="off"
                       placeholder={t("settings.fontFamilyPlaceholder")}
-                      onChange={(event) => setCustomFontDrafts((current) => ({ ...current, [key]: event.currentTarget.value }))}
+                      onChange={(event) =>
+                        setCustomFontDrafts((current) => ({
+                          ...current,
+                          [key]: event.currentTarget.value,
+                        }))
+                      }
                       onBlur={() => commitCustomFontFamily(key)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") event.currentTarget.blur();
@@ -931,24 +952,43 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
             );
             const custom = selectValue === FONT_FAMILY_CUSTOM_SELECT_VALUE;
             return (
-              <div key={key} className="rounded-xl border border-border/60 bg-background/80 px-3.5 py-2.5">
+              <div
+                key={key}
+                className="rounded-xl border border-border/60 bg-background/80 px-3.5 py-2.5"
+              >
                 <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
                 <div className="mt-1.5 flex min-w-0 items-center gap-2 max-sm:flex-col max-sm:items-stretch">
-                  <Select value={selectValue} onValueChange={(value) => handleFontFamilySelect(key, value)}>
+                  <Select
+                    value={selectValue}
+                    onValueChange={(value) => handleFontFamilySelect(key, value)}
+                  >
                     <SelectTrigger className={custom ? "w-48 max-sm:w-full" : "w-full"}>
                       <SelectValue>
                         {(value) => {
-                          if (value === FONT_FAMILY_DEFAULT_SELECT_VALUE) return t("settings.fontFamilyDefault");
-                          if (value === FONT_FAMILY_CUSTOM_SELECT_VALUE) return t("settings.fontFamilyCustom");
-                          return fontFamilyOptions.find((option) => option.value === value)?.label ?? String(value ?? "");
+                          if (value === FONT_FAMILY_DEFAULT_SELECT_VALUE)
+                            return t("settings.fontFamilyDefault");
+                          if (value === FONT_FAMILY_CUSTOM_SELECT_VALUE)
+                            return t("settings.fontFamilyCustom");
+                          return (
+                            fontFamilyOptions.find((option) => option.value === value)?.label ??
+                            String(value ?? "")
+                          );
                         }}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="max-h-72">
-                      <SelectItem value={FONT_FAMILY_DEFAULT_SELECT_VALUE}>{t("settings.fontFamilyDefault")}</SelectItem>
-                      <SelectItem value={FONT_FAMILY_CUSTOM_SELECT_VALUE}>{t("settings.fontFamilyCustom")}</SelectItem>
+                      <SelectItem value={FONT_FAMILY_DEFAULT_SELECT_VALUE}>
+                        {t("settings.fontFamilyDefault")}
+                      </SelectItem>
+                      <SelectItem value={FONT_FAMILY_CUSTOM_SELECT_VALUE}>
+                        {t("settings.fontFamilyCustom")}
+                      </SelectItem>
                       {fontFamilyOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value} style={{ fontFamily: option.value }}>
+                        <SelectItem
+                          key={option.value}
+                          value={option.value}
+                          style={{ fontFamily: option.value }}
+                        >
                           {option.label}
                         </SelectItem>
                       ))}
@@ -961,7 +1001,12 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
                       spellCheck={false}
                       autoComplete="off"
                       placeholder={t("settings.fontFamilyPlaceholder")}
-                      onChange={(event) => setCustomFontDrafts((current) => ({ ...current, [key]: event.currentTarget.value }))}
+                      onChange={(event) =>
+                        setCustomFontDrafts((current) => ({
+                          ...current,
+                          [key]: event.currentTarget.value,
+                        }))
+                      }
                       onBlur={() => commitCustomFontFamily(key)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") event.currentTarget.blur();

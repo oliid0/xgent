@@ -216,7 +216,11 @@ export function WorkspaceNavigationRail(props: WorkspaceNavigationRailProps) {
             {[
               { target: "gitReview" as const, label: t("sidebar.gitReview"), icon: GitBranch },
               { target: "sshConnection" as const, label: t("sidebar.sshConnection"), icon: Key },
-              { target: "backgroundTasks" as const, label: t("sidebar.backgroundTasks"), icon: Cpu },
+              {
+                target: "backgroundTasks" as const,
+                label: t("sidebar.backgroundTasks"),
+                icon: Cpu,
+              },
             ].map((item) => (
               <button
                 key={item.target}

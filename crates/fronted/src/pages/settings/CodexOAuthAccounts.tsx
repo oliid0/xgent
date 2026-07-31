@@ -38,11 +38,7 @@ type Props = {
   browserRuntime: boolean;
 };
 
-export function CodexOAuthAccounts({
-  value,
-  onChange,
-  browserRuntime,
-}: Props) {
+export function CodexOAuthAccounts({ value, onChange, browserRuntime }: Props) {
   const { t } = useLocale();
   const [status, setStatus] = useState<CodexOAuthStatus>({
     accounts: [],
@@ -122,10 +118,9 @@ export function CodexOAuthAccounts({
   async function removeAccount(accountId: string) {
     setError(null);
     try {
-      const next = await invoke<CodexOAuthStatus>(
-        "provider_oauth_remove_codex_account",
-        { accountId },
-      );
+      const next = await invoke<CodexOAuthStatus>("provider_oauth_remove_codex_account", {
+        accountId,
+      });
       setStatus(next);
       if (value === accountId) onChange(next.defaultAccountId ?? "");
     } catch (reason) {

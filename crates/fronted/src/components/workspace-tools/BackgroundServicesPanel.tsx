@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Clock3, Cpu, Zap } from "../icons";
-import { BackgroundTasksPanel } from "../project-tools/BackgroundTasksPanel";
 import { useLocale } from "../../i18n";
 import type { AppSettings } from "../../lib/settings";
+import { cn } from "../../lib/shared/utils";
 import { CronSection } from "../../pages/settings/CronSection";
 import { HooksSection } from "../../pages/settings/HooksSection";
-import { cn } from "../../lib/shared/utils";
+import { Clock3, Cpu, Zap } from "../icons";
+import { BackgroundTasksPanel } from "../project-tools/BackgroundTasksPanel";
 
 type BackgroundServicesPanelProps = {
   settings: AppSettings;

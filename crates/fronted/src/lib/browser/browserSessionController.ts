@@ -79,9 +79,7 @@ function mergeSession(
 }
 
 export class BrowserSessionController {
-  constructor(
-    private readonly client: BrowserAutomationClient = localBrowserAutomationClient,
-  ) {}
+  constructor(private readonly client: BrowserAutomationClient = localBrowserAutomationClient) {}
 
   private homePage = DEFAULT_BROWSER_HOME;
   private state: BrowserControllerState = {

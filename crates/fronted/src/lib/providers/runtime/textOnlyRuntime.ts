@@ -142,16 +142,10 @@ export async function streamAssistantMessage(params: {
   const modelId = params.model.trim();
   if (!modelId) throw new Error("No model selected");
   if (!params.runtime.baseUrl.trim()) throw new Error("Base URL cannot be empty");
-  if (
-    params.runtime.authMode !== "oauth-managed" &&
-    !params.runtime.apiKey.trim()
-  ) {
+  if (params.runtime.authMode !== "oauth-managed" && !params.runtime.apiKey.trim()) {
     throw new Error("API Key cannot be empty");
   }
-  if (
-    params.runtime.authMode === "oauth-managed" &&
-    !params.runtime.oauthAccountId?.trim()
-  ) {
+  if (params.runtime.authMode === "oauth-managed" && !params.runtime.oauthAccountId?.trim()) {
     throw new Error("OpenAI OAuth account is not selected");
   }
 
@@ -170,9 +164,7 @@ export async function streamAssistantMessage(params: {
     {
       useSystemProxy: params.runtime.useSystemProxy === true,
       oauthAccountId:
-        params.runtime.authMode === "oauth-managed"
-          ? params.runtime.oauthAccountId
-          : undefined,
+        params.runtime.authMode === "oauth-managed" ? params.runtime.oauthAccountId : undefined,
     },
   );
 
@@ -359,16 +351,10 @@ export async function completeAssistantMessage(params: {
   const modelId = params.model.trim();
   if (!modelId) throw new Error("No model selected");
   if (!params.runtime.baseUrl.trim()) throw new Error("Base URL cannot be empty");
-  if (
-    params.runtime.authMode !== "oauth-managed" &&
-    !params.runtime.apiKey.trim()
-  ) {
+  if (params.runtime.authMode !== "oauth-managed" && !params.runtime.apiKey.trim()) {
     throw new Error("API Key cannot be empty");
   }
-  if (
-    params.runtime.authMode === "oauth-managed" &&
-    !params.runtime.oauthAccountId?.trim()
-  ) {
+  if (params.runtime.authMode === "oauth-managed" && !params.runtime.oauthAccountId?.trim()) {
     throw new Error("OpenAI OAuth account is not selected");
   }
 
@@ -387,9 +373,7 @@ export async function completeAssistantMessage(params: {
     {
       useSystemProxy: params.runtime.useSystemProxy === true,
       oauthAccountId:
-        params.runtime.authMode === "oauth-managed"
-          ? params.runtime.oauthAccountId
-          : undefined,
+        params.runtime.authMode === "oauth-managed" ? params.runtime.oauthAccountId : undefined,
     },
   );
 

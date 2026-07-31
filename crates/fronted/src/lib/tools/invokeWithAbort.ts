@@ -26,10 +26,7 @@ export function createToolRunId(prefix: string, toolCallId: string) {
   return `${normalizedPrefix}:${normalizedToolCallId}:${crypto.randomUUID()}`;
 }
 
-export function waitForAbortablePromise<T>(
-  promise: Promise<T>,
-  signal?: AbortSignal,
-): Promise<T> {
+export function waitForAbortablePromise<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
   throwIfToolInvocationAborted(signal);
   if (!signal) return promise;
   return new Promise<T>((resolve, reject) => {

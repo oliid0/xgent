@@ -16,7 +16,6 @@ import {
   type ChangedFilesActions,
   ChangedFilesActionsProvider,
 } from "../components/chat/ChangedFilesCard";
-import { ToolApprovalBar } from "../components/chat/ToolApprovalBar";
 import type {
   MentionComposerCommitMention,
   MentionComposerDraft,
@@ -25,6 +24,7 @@ import type {
   MentionComposerLargePaste,
 } from "../components/chat/MentionComposer";
 import { type NotifyItem, NotifyToast } from "../components/chat/NotifyToast";
+import { ToolApprovalBar } from "../components/chat/ToolApprovalBar";
 import { Ban, Globe, Terminal, Upload } from "../components/icons";
 import { MacOsTitleBarSpacer, MacOsTitleBarToggle } from "../components/MacOsTitleBarSpacer";
 import type {
@@ -38,16 +38,16 @@ import {
   type WorkspaceToolLaunchRequest,
   type WorkspaceToolTarget,
 } from "../components/project-tools/workspaceToolsModel";
-import { McpSidePanel } from "../components/workspace-tools/McpSidePanel";
-import { SkillsSidePanel } from "../components/workspace-tools/SkillsSidePanel";
-import { WorkspaceNavigationRail } from "../components/workspace-tools/WorkspaceNavigationRail";
-import { WorkspaceSidePanel } from "../components/workspace-tools/WorkspaceSidePanel";
 import { Button } from "../components/ui/button";
 import { useConfirmDialog } from "../components/ui/confirm-dialog";
 import type { WorkspaceCodeEditorOpenRequest } from "../components/workspace-editor/WorkspaceCodeEditorOverlay";
 import type { WorkspaceFilePreviewOpenRequest } from "../components/workspace-editor/WorkspaceFilePreviewOverlay";
 import type { WorkspaceSshTerminalOpenRequest } from "../components/workspace-editor/WorkspaceSshTerminalOverlay";
 import { isWorkspacePreviewPath } from "../components/workspace-editor/workspaceImagePreview";
+import { McpSidePanel } from "../components/workspace-tools/McpSidePanel";
+import { SkillsSidePanel } from "../components/workspace-tools/SkillsSidePanel";
+import { WorkspaceNavigationRail } from "../components/workspace-tools/WorkspaceNavigationRail";
+import { WorkspaceSidePanel } from "../components/workspace-tools/WorkspaceSidePanel";
 import { useLocale } from "../i18n";
 import type { AppUpdateController } from "../lib/appUpdates";
 import { getAutomationState } from "../lib/automation";
@@ -127,9 +127,9 @@ import {
   type ExecutionMode,
   findProviderModelConfig,
   getChatRuntimeReasoningLevelsForProvider,
+  getSshProjectHostIds,
   getWorkspaceFileTreeState,
   getWorkspaceToolsProjectState,
-  getSshProjectHostIds,
   isAgentDevMode,
   isAgentExecutionMode,
   isWorkspaceToolsSingletonTabOpen,
@@ -137,8 +137,6 @@ import {
   normalizeSelectedModelForProviders,
   openWorkspaceToolsSingletonTab,
   parseSelectedModelJson,
-  type WorkspaceFileTreeStatePatch,
-  type WorkspaceToolsProjectState,
   removeWorkspaceToolsProjectState,
   resolveEffectiveTheme,
   resolveWorkspaceProjects,
@@ -149,12 +147,14 @@ import {
   updateChatRuntimeControlsForProvider,
   updateCustomSettings,
   updateMemorySettings,
-  updateWorkspaceFileTreeState,
-  updateWorkspaceToolsProjectState,
   updateSkills,
   updateSshProjectHostIds,
   updateSystem,
+  updateWorkspaceFileTreeState,
+  updateWorkspaceToolsProjectState,
+  type WorkspaceFileTreeStatePatch,
   type WorkspaceProject,
+  type WorkspaceToolsProjectState,
   workspaceProjectPathKey,
 } from "../lib/settings";
 import { tauriSftpClient } from "../lib/sftp/tauriSftpClient";
@@ -970,7 +970,12 @@ export function ChatPage(props: ChatPageProps) {
       activateWorkspaceProject(project);
       setSettings((prev) => openWorkspaceToolsSingletonTab(prev, pathKey, "fileTree"));
     },
-    [activateWorkspaceProject, checkWorkspaceProjectDirectory, setSettings, showDesktopWorkspaceTool],
+    [
+      activateWorkspaceProject,
+      checkWorkspaceProjectDirectory,
+      setSettings,
+      showDesktopWorkspaceTool,
+    ],
   );
 
   const ensureSshConnectionToolTab = useCallback(
@@ -979,7 +984,9 @@ export function ChatPage(props: ChatPageProps) {
         workspaceProjectPathKey(projectPathKey) ||
         workspaceProjectPathKey(activeWorkspaceProjectPath);
       if (!targetProjectPathKey) return;
-      setSettings((prev) => openWorkspaceToolsSingletonTab(prev, targetProjectPathKey, "sshConnection"));
+      setSettings((prev) =>
+        openWorkspaceToolsSingletonTab(prev, targetProjectPathKey, "sshConnection"),
+      );
     },
     [activeWorkspaceProjectPath, setSettings],
   );
@@ -1331,13 +1338,8 @@ export function ChatPage(props: ChatPageProps) {
   }
 
   const isDraftConversation = !historyItems.some((item) => item.id === currentConversationId);
-  useSyncExternalStore(
-    subscribeToolApprovals,
-    getToolApprovalVersion,
-    getToolApprovalVersion,
-  );
-  const pendingToolApprovals =
-    listPendingToolApprovalsForConversation(currentConversationId);
+  useSyncExternalStore(subscribeToolApprovals, getToolApprovalVersion, getToolApprovalVersion);
+  const pendingToolApprovals = listPendingToolApprovalsForConversation(currentConversationId);
   const currentConversationPersistedCwd =
     historyItems.find((item) => item.id === currentConversationId)?.cwd?.trim() || "";
   const currentConversationRuntimeWorkdir =
@@ -1408,7 +1410,9 @@ export function ChatPage(props: ChatPageProps) {
   );
   const handleWorkspaceToolsProjectStateChange = useCallback(
     (updater: (current: WorkspaceToolsProjectState) => WorkspaceToolsProjectState) => {
-      setSettings((prev) => updateWorkspaceToolsProjectState(prev, terminalProjectPathKey, updater));
+      setSettings((prev) =>
+        updateWorkspaceToolsProjectState(prev, terminalProjectPathKey, updater),
+      );
     },
     [setSettings, terminalProjectPathKey],
   );
@@ -1433,10 +1437,13 @@ export function ChatPage(props: ChatPageProps) {
   const handleWorkspaceToolsSessionsChange = useCallback((sessions: TerminalSession[]) => {
     setTerminalSessions(sortTerminalSessions(sessions));
   }, []);
-  const handleWorkspaceToolsInsertFileMention = useCallback((path: string, kind: "file" | "dir") => {
-    composerRef.current?.insertFileMention(path, kind);
-    composerRef.current?.focus();
-  }, []);
+  const handleWorkspaceToolsInsertFileMention = useCallback(
+    (path: string, kind: "file" | "dir") => {
+      composerRef.current?.insertFileMention(path, kind);
+      composerRef.current?.focus();
+    },
+    [],
+  );
   const handleWorkspaceToolsInsertCodeReviewSkill = useCallback(() => {
     const composer = composerRef.current;
     if (!composer || !codeReviewSkill) return;
@@ -1581,7 +1588,9 @@ export function ChatPage(props: ChatPageProps) {
     (path: string | null) => {
       if (!terminalProjectPathKey) return;
       showDesktopWorkspaceTool("gitReview");
-      setSettings((prev) => openWorkspaceToolsSingletonTab(prev, terminalProjectPathKey, "gitReview"));
+      setSettings((prev) =>
+        openWorkspaceToolsSingletonTab(prev, terminalProjectPathKey, "gitReview"),
+      );
       gitReviewFocusNonceRef.current += 1;
       setGitReviewFocusRequest({
         path: (path ?? "").trim(),

@@ -308,8 +308,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
       try {
         const list = await fetchModelsFromApi(providerType, url, key, {
           authMode: supportsOAuth ? authMode : "api-key",
-          oauthAccountId:
-            authMode === "oauth-managed" ? managedOAuthAccountId : undefined,
+          oauthAccountId: authMode === "oauth-managed" ? managedOAuthAccountId : undefined,
           customHeaders,
           useSystemProxy,
         });
@@ -320,14 +319,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
         setFetchingModels(false);
       }
     },
-    [
-      authMode,
-      customHeaders,
-      managedOAuthAccountId,
-      providerType,
-      supportsOAuth,
-      useSystemProxy,
-    ],
+    [authMode, customHeaders, managedOAuthAccountId, providerType, supportsOAuth, useSystemProxy],
   );
 
   useEffect(() => {
@@ -595,9 +587,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
           : undefined,
       customHeaders:
         providerType === "codex" && authMode !== "oauth-token"
-          ? customHeaders.filter(
-              (header) => header.key.toLowerCase() !== "chatgpt-account-id",
-            )
+          ? customHeaders.filter((header) => header.key.toLowerCase() !== "chatgpt-account-id")
           : customHeaders,
       models,
       activeModels: Array.from(activeModels),
@@ -821,9 +811,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                   {authMode !== "oauth-managed" ? (
                     <div className="space-y-1.5">
                       <Label htmlFor="modal-apikey">
-                        {authMode === "oauth-token"
-                          ? t("settings.providerOAuthToken")
-                          : "API Key"}
+                        {authMode === "oauth-token" ? t("settings.providerOAuthToken") : "API Key"}
                       </Label>
                       <div className="relative">
                         <Input
@@ -1512,8 +1500,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
           <Button
             onClick={handleSave}
             disabled={
-              !name.trim() ||
-              (authMode === "oauth-managed" && !managedOAuthAccountId.trim())
+              !name.trim() || (authMode === "oauth-managed" && !managedOAuthAccountId.trim())
             }
             className="max-[720px]:h-10 max-[720px]:flex-1"
           >

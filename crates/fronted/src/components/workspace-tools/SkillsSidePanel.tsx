@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale } from "../../i18n";
 import { type AppSettings, updateSkills } from "../../lib/settings";
+import { cn } from "../../lib/shared/utils";
 import {
   discoverSkills,
   isAlwaysEnabledSkillName,
@@ -8,9 +9,8 @@ import {
   readSkillText,
   type SkillSummary,
 } from "../../lib/skills";
-import { cn } from "../../lib/shared/utils";
-import { Markdown } from "../Markdown";
 import { ArrowLeft, Check, Loader2, RefreshCw, Search, SkillIcon } from "../icons";
+import { Markdown } from "../Markdown";
 
 type SkillsSidePanelProps = {
   settings: AppSettings;
@@ -110,7 +110,9 @@ export function SkillsSidePanel(props: SkillsSidePanelProps) {
 
       {preview ? (
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <p className="mb-4 text-sm leading-6 text-muted-foreground">{preview.skill.description}</p>
+          <p className="mb-4 text-sm leading-6 text-muted-foreground">
+            {preview.skill.description}
+          </p>
           <Markdown
             content={preview.content}
             className="text-sm leading-6 text-foreground/90"

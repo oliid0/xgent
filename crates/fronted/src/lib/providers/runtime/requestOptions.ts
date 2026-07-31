@@ -40,8 +40,8 @@ export function buildProviderRequestHeaders(
     authMode === "oauth-managed"
       ? {}
       : authMode === "oauth-token" && providerId !== "gemini"
-      ? { Authorization: `Bearer ${apiKey}` }
-      : buildProviderAuthHeaders(providerId, apiKey);
+        ? { Authorization: `Bearer ${apiKey}` }
+        : buildProviderAuthHeaders(providerId, apiKey);
   if (providerId === "claude_code") {
     if (isAnthropicOAuthApiKey(apiKey)) return {};
     return {

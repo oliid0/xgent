@@ -4,9 +4,9 @@
 import { createContext, useContext } from "react";
 import type { GitClient } from "../../lib/git/types";
 import type {
+  SshHostConfig,
   WorkspaceFileTreeState,
   WorkspaceFileTreeStatePatch,
-  SshHostConfig,
 } from "../../lib/settings";
 import type { TerminalClient, TerminalSession, TerminalSnapshot } from "../../lib/terminal/types";
 import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types";

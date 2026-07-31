@@ -137,8 +137,8 @@ test("provider model fetch identity changes when system proxy routing changes", 
     true,
   );
 
-  assert.equal(direct, "https://relay.example.com/v1||test-key||direct");
-  assert.equal(proxied, "https://relay.example.com/v1||test-key||proxy");
+  assert.equal(direct, "https://relay.example.com/v1||test-key||direct||api-key||||");
+  assert.equal(proxied, "https://relay.example.com/v1||test-key||proxy||api-key||||");
   assert.notEqual(direct, proxied);
 });
 

@@ -1,10 +1,11 @@
 import { isBrowserRuntime } from "@xagent/runtime";
 import { mergeCustomHeaders } from "../../lib/providers/customHeaders";
+import { sortModelsByActiveStateAndVendor } from "../../lib/providers/modelVendor";
 import { prepareProxyRequest } from "../../lib/providers/proxy";
 import {
+  type CustomProvider,
   createProviderModelConfig,
   normalizeProviderModelConfigs,
-  type CustomProvider,
   type ProviderAuthMode,
   type ProviderId,
   type ProviderModelConfig,
@@ -267,8 +268,12 @@ function normalizeGeminiFetchedModels(items: unknown): ProviderModelConfig[] {
     seen.add(id);
 
     const draft = createProviderModelConfig("gemini", id);
+    const ownedBy =
+      (typeof obj.ownedBy === "string" ? obj.ownedBy.trim() : "") ||
+      (typeof obj.owned_by === "string" ? obj.owned_by.trim() : "");
     out.push({
       id,
+      ...(ownedBy ? { ownedBy } : {}),
       contextWindow: normalizePositiveInteger(obj.inputTokenLimit) ?? draft.contextWindow,
       maxOutputToken: normalizePositiveInteger(obj.outputTokenLimit) ?? draft.maxOutputToken,
     });
@@ -288,7 +293,15 @@ export function mergeFetchedModels(
   for (const model of fetched) {
     if (seen.has(model.id)) continue;
     seen.add(model.id);
-    merged.push(existingById.get(model.id) ?? model);
+    const existingModel = existingById.get(model.id);
+    merged.push(
+      existingModel
+        ? {
+            ...existingModel,
+            ...(model.ownedBy ? { ownedBy: model.ownedBy } : {}),
+          }
+        : model,
+    );
   }
 
   for (const model of existing) {
@@ -304,15 +317,7 @@ export function sortModelsBySelection(
   models: ProviderModelConfig[],
   activeModels: ReadonlySet<string>,
 ): ProviderModelConfig[] {
-  const selected: ProviderModelConfig[] = [];
-  const unselected: ProviderModelConfig[] = [];
-
-  for (const model of models) {
-    if (activeModels.has(model.id)) selected.push(model);
-    else unselected.push(model);
-  }
-
-  return [...selected, ...unselected];
+  return sortModelsByActiveStateAndVendor(models, activeModels);
 }
 
 export function createDraftModelConfig(
@@ -352,8 +357,7 @@ export async function fetchModelsFromApi(
   for (const attempt of attempts) {
     const proxyRequest = await prepareProxyRequest(type, normalizedUrl, attempt.headers, {
       useSystemProxy: options?.useSystemProxy === true,
-      oauthAccountId:
-        options?.authMode === "oauth-managed" ? options.oauthAccountId : undefined,
+      oauthAccountId: options?.authMode === "oauth-managed" ? options.oauthAccountId : undefined,
     });
     const modelsUrl = buildProviderModelsUrl(type, proxyRequest.baseUrl, attempt.kind);
 

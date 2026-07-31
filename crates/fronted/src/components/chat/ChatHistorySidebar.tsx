@@ -1446,9 +1446,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
       <div
         className={cn(
           "chat-history-sidebar-inner flex min-h-0 w-full min-w-0 flex-1 flex-col",
-          desktopPanelMode
-            ? "md:w-[360px] md:min-w-[360px]"
-            : "md:w-[272px] md:min-w-[272px]",
+          desktopPanelMode ? "md:w-[360px] md:min-w-[360px]" : "md:w-[272px] md:min-w-[272px]",
         )}
       >
         <MacOsTitleBarSpacer
@@ -1460,7 +1458,12 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               {t("chat.recentConversation")}
             </div>
           ) : null}
-          <div className={cn("flex items-center justify-between gap-2", desktopPanelMode && "md:hidden")}>
+          <div
+            className={cn(
+              "flex items-center justify-between gap-2",
+              desktopPanelMode && "md:hidden",
+            )}
+          >
             <div className="flex min-w-0 -translate-y-0.5 items-center gap-2">
               <img
                 src={iconSimpleUrl}

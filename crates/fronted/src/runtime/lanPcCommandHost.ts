@@ -127,12 +127,12 @@ export function shouldDelegateEventToLanPc(event: string) {
 function pathStartsWith(path: string, root: string) {
   if (!path || !root) return false;
   if (pathsEqual(path, root)) return true;
-  const comparisonPath =
-    isWindowsPath(path) && isWindowsPath(root) ? path.toLowerCase() : path;
-  const comparisonRoot =
-    isWindowsPath(path) && isWindowsPath(root) ? root.toLowerCase() : root;
-  return comparisonPath.startsWith(`${comparisonRoot}/`) ||
-    comparisonPath.startsWith(`${comparisonRoot}\\`);
+  const comparisonPath = isWindowsPath(path) && isWindowsPath(root) ? path.toLowerCase() : path;
+  const comparisonRoot = isWindowsPath(path) && isWindowsPath(root) ? root.toLowerCase() : root;
+  return (
+    comparisonPath.startsWith(`${comparisonRoot}/`) ||
+    comparisonPath.startsWith(`${comparisonRoot}\\`)
+  );
 }
 
 function joinRemotePath(root: string, suffix: string) {

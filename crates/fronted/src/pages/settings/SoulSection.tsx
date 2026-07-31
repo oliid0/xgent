@@ -4,12 +4,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { useLocale } from "../../i18n";
-import {
-  DEFAULT_SOUL_METADATA,
-  type SoulDraft,
-  useSoul,
-  validateSoulDraft,
-} from "../../lib/soul";
+import { DEFAULT_SOUL_METADATA, type SoulDraft, useSoul, validateSoulDraft } from "../../lib/soul";
 
 type SoulSectionProps = {
   createRequestId?: number;
@@ -61,9 +56,9 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
     ? true
     : soul.document
       ? draft.metadata.name !== soul.document.metadata.name ||
-      draft.metadata.style !== soul.document.metadata.style ||
-      draft.metadata.lang !== soul.document.metadata.lang ||
-      draft.body !== soul.document.body
+        draft.metadata.style !== soul.document.metadata.style ||
+        draft.metadata.lang !== soul.document.metadata.lang ||
+        draft.body !== soul.document.body
       : false;
 
   const updateMetadata = (patch: Partial<SoulDraft["metadata"]>) => {

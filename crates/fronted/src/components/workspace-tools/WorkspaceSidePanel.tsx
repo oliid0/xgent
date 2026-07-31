@@ -1,30 +1,37 @@
 import { openUrl } from "@xagent/runtime";
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
-import type { GitCommitContextPayload, GitFileContextPayload } from "../project-tools/git-review";
+import { useLocale } from "../../i18n";
+import type { GitClient } from "../../lib/git/types";
+import type {
+  AppSettings,
+  SshHostConfig,
+  WorkspaceFileTreeState,
+  WorkspaceFileTreeStatePatch,
+  WorkspaceToolsProjectState,
+} from "../../lib/settings";
+import type {
+  TerminalClient,
+  TerminalSession,
+  TerminalShellOption,
+} from "../../lib/terminal/types";
+import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types";
+import { FolderTree, GitBranch, Key, Plus, Terminal } from "../icons";
 import { FileTreePanel } from "../project-tools/file-tree";
+import type { GitCommitContextPayload, GitFileContextPayload } from "../project-tools/git-review";
 import { GitReviewPanel } from "../project-tools/git-review";
+import { SshConnectionPanel } from "../project-tools/SshConnectionPanel";
+import { useWorkspaceToolSessions } from "../project-tools/useWorkspaceToolSessions";
 import {
   type GitReviewFocusRequest,
   WorkspaceToolsContext,
   type WorkspaceToolsContextValue,
 } from "../project-tools/WorkspaceToolsContext";
-import { SshConnectionPanel } from "../project-tools/SshConnectionPanel";
+import {
+  expandedPathsForFileTreePath,
+  type WorkspaceToolTarget,
+} from "../project-tools/workspaceToolsModel";
 import { XTermViewport } from "../project-tools/XTermViewport";
-import { expandedPathsForFileTreePath, type WorkspaceToolTarget } from "../project-tools/workspaceToolsModel";
-import { useWorkspaceToolSessions } from "../project-tools/useWorkspaceToolSessions";
 import { Button } from "../ui/button";
-import { FolderTree, GitBranch, Key, Plus, Terminal } from "../icons";
-import { useLocale } from "../../i18n";
-import type { GitClient } from "../../lib/git/types";
-import type {
-  AppSettings,
-  WorkspaceFileTreeState,
-  WorkspaceFileTreeStatePatch,
-  WorkspaceToolsProjectState,
-  SshHostConfig,
-} from "../../lib/settings";
-import type { TerminalClient, TerminalSession, TerminalShellOption } from "../../lib/terminal/types";
-import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types";
 import { BackgroundServicesPanel } from "./BackgroundServicesPanel";
 
 type WorkspaceSidePanelProps = {
@@ -47,7 +54,9 @@ type WorkspaceSidePanelProps = {
   workspaceActivityClient?: WorkspaceActivityClient | null;
   settings: AppSettings;
   setSettings: (updater: (current: AppSettings) => AppSettings) => void;
-  onProjectStateChange: (updater: (current: WorkspaceToolsProjectState) => WorkspaceToolsProjectState) => void;
+  onProjectStateChange: (
+    updater: (current: WorkspaceToolsProjectState) => WorkspaceToolsProjectState,
+  ) => void;
   onFileTreeStateChange: (patch: WorkspaceFileTreeStatePatch) => void;
   onSshProjectHostIdsChange: (hostIds: string[]) => void;
   onOpenSshSession: (session: TerminalSession, kind?: "bash" | "sftp") => void;
@@ -63,13 +72,18 @@ type WorkspaceSidePanelProps = {
 };
 
 function normalizeTreePath(path: string) {
-  return path.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  return path
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\/+|\/+$/g, "");
 }
 
 export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
   const { t } = useLocale();
   const [fileTreeInitialized, setFileTreeInitialized] = useState(true);
-  const projectReady = Boolean(props.projectPathKey.trim() && props.cwd.trim() && !props.disabledMessage);
+  const projectReady = Boolean(
+    props.projectPathKey.trim() && props.cwd.trim() && !props.disabledMessage,
+  );
   const terminalReady = projectReady;
   const sessions = useWorkspaceToolSessions({
     client: props.client,

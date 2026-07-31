@@ -35,6 +35,7 @@ test("access settings clamp ports and cloud artifact retention", () => {
     webUiScope: "loopback",
     webUiPort: 65_535,
     lanControlUrl: "",
+    preferLanPcExecution: false,
     allowTerminal: true,
     allowBrowserAutomation: false,
     allowSsh: false,

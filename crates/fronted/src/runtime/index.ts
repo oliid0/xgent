@@ -59,10 +59,10 @@ export async function listenFileDrop(
   return (await loadRuntime()).listenFileDrop(handler);
 }
 
-export type { RuntimeEvent, RuntimeFileDropEvent, RuntimeUnlisten } from "./types";
 export {
   configureLanPcCommandHost,
   getLanPcCommandHostConfig,
   isLanPcCommandHostReady,
   LAN_PC_SESSION_CHANGED_EVENT,
 } from "./lanPcCommandHost";
+export type { RuntimeEvent, RuntimeFileDropEvent, RuntimeUnlisten } from "./types";

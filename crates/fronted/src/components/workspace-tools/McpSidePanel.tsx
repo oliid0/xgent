@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { useLocale } from "../../i18n";
-import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
-import { Cable, Plus } from "../icons";
-import { ToolPolicyToggle } from "../hub/ToolPolicyToggle";
-import { McpServerEditModal, McpServersForm } from "../../pages/mcp-hub/McpServersForm";
-import { updateSystem } from "../../lib/settings";
+import {
+  type AppSettings,
+  type McpServerConfig,
+  updateMcp,
+  updateSystem,
+} from "../../lib/settings";
 import { toolGroupPolicyKey } from "../../lib/tools/toolPolicy";
+import { McpServerEditModal, McpServersForm } from "../../pages/mcp-hub/McpServersForm";
+import { ToolPolicyToggle } from "../hub/ToolPolicyToggle";
+import { Cable, Plus } from "../icons";
 
 type EditingState = { mode: "add" } | { mode: "edit"; index: number; server: McpServerConfig };
 
@@ -17,8 +21,7 @@ type McpSidePanelProps = {
 export function McpSidePanel(props: McpSidePanelProps) {
   const { t } = useLocale();
   const [editing, setEditing] = useState<EditingState | null>(null);
-  const groupPolicy =
-    props.settings.system.toolPolicies?.[toolGroupPolicyKey("mcp")] ?? "allow";
+  const groupPolicy = props.settings.system.toolPolicies?.[toolGroupPolicyKey("mcp")] ?? "allow";
 
   const save = (server: McpServerConfig) => {
     props.setSettings((current) => {

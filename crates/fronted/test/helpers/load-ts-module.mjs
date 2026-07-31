@@ -216,6 +216,14 @@ export function createTsModuleLoader(options = {}) {
   const cache = new Map();
   const defaultMocks = createDefaultMocks();
   const mocks = new Map(Object.entries(defaultMocks));
+  const emptyLanPcCommandHostConfig = () => ({
+    enabled: false,
+    endpoint: "",
+    token: "",
+    localWorkdir: "",
+    remoteWorkdir: "",
+  });
+  let lanPcCommandHostConfig = emptyLanPcCommandHostConfig();
   // Tests conventionally override a mocked module by supplying only the
   // handful of exports they care about (e.g. { getModel() {...} } for
   // "@earendil-works/pi-ai"), expecting every other default export — like
@@ -263,6 +271,17 @@ export function createTsModuleLoader(options = {}) {
           typeof globalThis.window !== "undefined" &&
           globalThis.window.__TAURI__ === undefined &&
           globalThis.window.__TAURI_INTERNALS__ === undefined,
+        configureLanPcCommandHost: (config) => {
+          lanPcCommandHostConfig = config
+            ? { ...lanPcCommandHostConfig, ...config }
+            : emptyLanPcCommandHostConfig();
+        },
+        getLanPcCommandHostConfig: () => ({ ...lanPcCommandHostConfig }),
+        isLanPcCommandHostReady: () =>
+          lanPcCommandHostConfig.enabled === true &&
+          Boolean(lanPcCommandHostConfig.endpoint) &&
+          Boolean(lanPcCommandHostConfig.remoteWorkdir),
+        LAN_PC_SESSION_CHANGED_EVENT: "xgent://lan-pc-session-changed",
       };
     }
     if (mocks.has(specifier)) return mocks.get(specifier);

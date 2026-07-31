@@ -30,10 +30,7 @@ import { createFsTools } from "./fsTools";
 import { createMcpManagerTools } from "./mcpManagerTools";
 import { createMcpTools } from "./mcpTools";
 import { createMemoryTools } from "./memoryTools";
-import {
-  resolveRuntimeToolCapabilities,
-  resolveRuntimeToolHost,
-} from "./runtimeToolCapabilities";
+import { resolveRuntimeToolCapabilities, resolveRuntimeToolHost } from "./runtimeToolCapabilities";
 import { createShellTools } from "./shellTools";
 import type { SkillAccessPolicy } from "./skillAccessPolicy";
 import { createSkillTools } from "./skillTools";

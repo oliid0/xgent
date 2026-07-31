@@ -1,4 +1,4 @@
-import { workspaceProjectPathKey, type WorkspaceToolKind } from "../../lib/settings";
+import { type WorkspaceToolKind, workspaceProjectPathKey } from "../../lib/settings";
 import type { TerminalSession } from "../../lib/terminal/types";
 
 export const DEFAULT_TERMINAL_COLS = 80;
@@ -18,14 +18,14 @@ export function sortSessions(sessions: TerminalSession[]) {
   return [...sessions].sort((left, right) => left.createdAt - right.createdAt);
 }
 
-export function areSessionsEqual(left: readonly TerminalSession[], right: readonly TerminalSession[]) {
+export function areSessionsEqual(
+  left: readonly TerminalSession[],
+  right: readonly TerminalSession[],
+) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-export function terminalSessionBelongsToProject(
-  session: TerminalSession,
-  projectPathKey: string,
-) {
+export function terminalSessionBelongsToProject(session: TerminalSession, projectPathKey: string) {
   const wantedProjectKey = workspaceProjectPathKey(projectPathKey);
   if (!wantedProjectKey) return false;
   const sessionProjectKey = workspaceProjectPathKey(session.projectPathKey || session.cwd);
@@ -33,7 +33,10 @@ export function terminalSessionBelongsToProject(
 }
 
 export function expandedPathsForFileTreePath(path: string) {
-  const normalized = path.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  const normalized = path
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\/+|\/+$/g, "");
   const parts = normalized.split("/").filter(Boolean);
   const directories = parts.slice(0, -1);
   return ["", ...directories.map((_, index) => parts.slice(0, index + 1).join("/"))];

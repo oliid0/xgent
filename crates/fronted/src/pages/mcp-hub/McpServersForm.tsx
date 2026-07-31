@@ -1,7 +1,7 @@
 import { isBrowserRuntime } from "@xagent/runtime";
 import { type FormEvent, memo, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-
+import { ToolPolicyToggle } from "../../components/hub/ToolPolicyToggle";
 import {
   AlertTriangle,
   Globe2,
@@ -15,7 +15,6 @@ import {
   Wifi,
   X,
 } from "../../components/icons";
-
 import { Button } from "../../components/ui/button";
 import { ConfirmDeletePopover } from "../../components/ui/confirm-action-popover";
 import { Input } from "../../components/ui/input";
@@ -28,7 +27,6 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { Textarea } from "../../components/ui/textarea";
-import { ToolPolicyToggle } from "../../components/hub/ToolPolicyToggle";
 import { useLocale } from "../../i18n";
 import {
   type AppSettings,
@@ -39,10 +37,7 @@ import {
 } from "../../lib/settings";
 import { useModalMotion } from "../../lib/shared/modalMotion";
 import { cn } from "../../lib/shared/utils";
-import {
-  toolGroupPolicyKey,
-  toolServerPolicyKey,
-} from "../../lib/tools/toolPolicy";
+import { toolGroupPolicyKey, toolServerPolicyKey } from "../../lib/tools/toolPolicy";
 
 type SetMcpSettingsFn = (updater: (prev: AppSettings) => AppSettings) => void;
 
@@ -704,8 +699,7 @@ export function McpServersForm(props: McpServersFormProps) {
   const [filter, setFilter] = useState("");
 
   const servers = settings.mcp.servers;
-  const groupPolicy =
-    settings.system.toolPolicies?.[toolGroupPolicyKey("mcp")] ?? "allow";
+  const groupPolicy = settings.system.toolPolicies?.[toolGroupPolicyKey("mcp")] ?? "allow";
   const serverCount = servers.length;
 
   const filtered = useMemo(() => {

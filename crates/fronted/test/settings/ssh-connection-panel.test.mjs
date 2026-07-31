@@ -3,7 +3,7 @@ import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 const loader = createTsModuleLoader();
-const panel = loader.loadModule("src/components/project-tools/SshTunnelPanel.tsx");
+const panel = loader.loadModule("src/components/project-tools/SshConnectionPanel.tsx");
 
 function host(overrides = {}) {
   return {
@@ -33,7 +33,7 @@ function host(overrides = {}) {
   };
 }
 
-test("SSH tunnel panel treats keyboard-interactive hosts as credential ready", () => {
+test("SSH connection panel treats keyboard-interactive hosts as credential ready", () => {
   const keyboardInteractiveHost = host({
     authType: "keyboardInteractive",
     passwordConfigured: false,
@@ -44,7 +44,7 @@ test("SSH tunnel panel treats keyboard-interactive hosts as credential ready", (
   assert.equal(panel.hostStatusMessage(keyboardInteractiveHost, (key) => key), "");
 });
 
-test("SSH tunnel panel does not disable hosts only because proxy is configured", () => {
+test("SSH connection panel does not disable hosts only because proxy is configured", () => {
   const proxyHost = host({
     passwordConfigured: true,
     proxy: {

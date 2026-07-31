@@ -253,9 +253,7 @@ export type BrowserUseToolsOptions = {
   };
 };
 
-export function createBrowserUseTools(
-  options: BrowserUseToolsOptions = {},
-): BuiltinToolBundle {
+export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): BuiltinToolBundle {
   const lanDelegation = options.delegateToLanPc;
   const remoteController =
     lanDelegation?.enabled && lanDelegation.baseUrl.trim()
@@ -340,12 +338,7 @@ export function createBrowserUseTools(
         result = { visible: false, delegated, sessionId };
       } else if (action === "wait_for_dom_stable") {
         await controller.ensureSession({ sessionId });
-        result = await waitForDomStable(
-          controller,
-          sessionId,
-          args.timeout ?? 8_000,
-          signal,
-        );
+        result = await waitForDomStable(controller, sessionId, args.timeout ?? 8_000, signal);
       } else {
         if (action === "navigate") {
           args.url = normalizeBrowserAddress(requiredString(args.url, "url"));
@@ -360,11 +353,10 @@ export function createBrowserUseTools(
         }
         if (action === "execute_js") requiredString(args.script, "script");
 
-        const response = await controller.action(
-          runtimeAction(action),
-          actionInput(args),
-          { sessionId, timeoutMs: args.timeout },
-        );
+        const response = await controller.action(runtimeAction(action), actionInput(args), {
+          sessionId,
+          timeoutMs: args.timeout,
+        });
         screenshotBase64 = response.screenshotBase64;
         const browserResult = screenshotBase64
           ? {

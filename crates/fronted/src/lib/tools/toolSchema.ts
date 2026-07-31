@@ -5,10 +5,7 @@ import type { Tool } from "@earendil-works/pi-ai";
  * TypeBox schema. They are runtime-compatible, but untrusted dynamic schemas
  * still need a structural boundary before being sent to a model provider.
  */
-export function normalizeToolParametersSchema(
-  input: unknown,
-  label: string,
-): Tool["parameters"] {
+export function normalizeToolParametersSchema(input: unknown, label: string): Tool["parameters"] {
   const fallback = { type: "object" as const };
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     if (input !== undefined && input !== null) {

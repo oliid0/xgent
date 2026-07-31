@@ -835,7 +835,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.soulTitle": "Soul 人设",
     "settings.soulPresetsGroup": "人设预设",
     "settings.soulAddPreset": "新建人设",
-    "settings.soulCreateDraftHint": "这是尚未保存的新建草稿。填写完成并点击保存后，才会创建并启用该人设。",
+    "settings.soulCreateDraftHint":
+      "这是尚未保存的新建草稿。填写完成并点击保存后，才会创建并启用该人设。",
     "settings.soulNewDefaultName": "新的人设",
     "settings.soulPresetNoStyle": "未设置回复风格",
     "settings.soulDeletePreset": "删除人设",
@@ -2490,7 +2491,8 @@ export const translations: Record<Locale, Record<string, string>> = {
       "Add or import hosts in Settings > SSH first, then associate them here.",
     "projectTools.sshConnectionCreateTitle": "New SSH Connection",
     "projectTools.sshConnectionCreateHint": "Choose a host and open an interactive SSH terminal.",
-    "projectTools.sshConnectionCreateNoAssociatedHosts": "No SSH hosts associated with this project",
+    "projectTools.sshConnectionCreateNoAssociatedHosts":
+      "No SSH hosts associated with this project",
     "projectTools.sshConnectionCreateNoAssociatedHostsHint":
       "Associate hosts from Settings > SSH before creating an SSH connection here.",
     "projectTools.sshConnectionHost": "SSH host",
@@ -2499,13 +2501,16 @@ export const translations: Record<Locale, Record<string, string>> = {
     "projectTools.sshConnectionNotePlaceholder": "Optional: purpose or access notes",
     "projectTools.sshConnectionCreate": "Create connection",
     "projectTools.sshConnectionCreateCancel": "Cancel",
-    "projectTools.sshConnectionCreateUnavailable": "This is UI-only; startup will be wired in later",
+    "projectTools.sshConnectionCreateUnavailable":
+      "This is UI-only; startup will be wired in later",
     "projectTools.sshConnectionConnect": "Connect",
     "projectTools.sshConnectionConnecting": "Connecting",
     "projectTools.sshConnectionTabTitle": "Tab title",
     "projectTools.sshConnectionTabTitlePlaceholder": "Defaults to the host name",
-    "projectTools.sshConnectionProxyUnsupported": "This host is configured to connect through a proxy.",
-    "projectTools.sshConnectionMissingSecret": "This host is missing saved authentication material.",
+    "projectTools.sshConnectionProxyUnsupported":
+      "This host is configured to connect through a proxy.",
+    "projectTools.sshConnectionMissingSecret":
+      "This host is missing saved authentication material.",
     "projectTools.sshConnectionRunningCount": "{count} SSH connections running",
     "projectTools.sshConnectionConnectionCount": "{count} SSH connections, {connected} connected",
     "projectTools.sshConnectionCloseSession": "Close SSH connection",

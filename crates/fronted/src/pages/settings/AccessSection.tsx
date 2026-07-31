@@ -355,9 +355,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                 disabled={busyAction !== ""}
                 onClick={() =>
                   void runAction("lan-disconnect", async () => {
-                    setLanPcStatus(
-                      await invoke<LanPcClientStatus>("lan_pc_disconnect"),
-                    );
+                    setLanPcStatus(await invoke<LanPcClientStatus>("lan_pc_disconnect"));
                     updateAccess(setSettings, { preferLanPcExecution: false });
                   })
                 }

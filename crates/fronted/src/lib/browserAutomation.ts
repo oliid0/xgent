@@ -88,10 +88,7 @@ export type BrowserAutomationClient = {
   }) => Promise<BrowserSessionSummary>;
   listSessions: () => Promise<BrowserSessionSummary[]>;
   closeSession: (sessionId: string) => Promise<BrowserSessionSummary>;
-  setViewport: (
-    sessionId: string,
-    viewport: BrowserViewport,
-  ) => Promise<BrowserSessionSummary>;
+  setViewport: (sessionId: string, viewport: BrowserViewport) => Promise<BrowserSessionSummary>;
   action: (
     sessionId: string,
     action: BrowserAction,

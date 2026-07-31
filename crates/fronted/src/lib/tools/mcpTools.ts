@@ -9,11 +9,7 @@ import { invoke } from "@xagent/runtime";
 
 import type { McpServerConfig } from "../settings";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
-import {
-  createToolRunId,
-  invokeWithAbort,
-  waitForAbortablePromise,
-} from "./invokeWithAbort";
+import { createToolRunId, invokeWithAbort, waitForAbortablePromise } from "./invokeWithAbort";
 import { normalizeToolParametersSchema } from "./toolSchema";
 
 type McpToolInfo = {
@@ -49,7 +45,10 @@ async function withMcpServerCallLock<T>(
     // Waiting for an earlier call must remain cancellable. The finally block
     // still releases this queue slot, so aborting a queued call cannot
     // deadlock every later call to the same MCP server.
-    await waitForAbortablePromise(previous.catch(() => undefined), signal);
+    await waitForAbortablePromise(
+      previous.catch(() => undefined),
+      signal,
+    );
     return await run();
   } finally {
     release();

@@ -226,9 +226,7 @@ function CollapsibleCodePre({ children }: MarkdownPreProps) {
     <div className="relative w-full">
       <CodeBlockActions code={codeContent} />
       {expanded ? (
-        <div className="w-full">
-          {cloneElement(childElement, { "data-block": "true" })}
-        </div>
+        <div className="w-full">{cloneElement(childElement, { "data-block": "true" })}</div>
       ) : (
         <div
           className="mt-2 w-full overflow-hidden rounded-xl bg-muted/40"

@@ -373,9 +373,7 @@ export function SettingsPage(props: SettingsPageProps) {
                         }}
                         className="group relative flex min-h-12 w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors active:bg-muted"
                       >
-                        <span
-                          className="flex h-7 w-7 shrink-0 items-center justify-center text-foreground/75"
-                        >
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center text-foreground/75">
                           {item.icon}
                         </span>
                         <span className="min-w-0 flex-1">

@@ -16,8 +16,8 @@ import { normalizeFontFamily } from "../system/fontFamily";
 import { SYSTEM_TOOL_OPTIONS, type SystemToolId } from "../tools/systemToolOptions";
 import { normalizeApiKey, normalizeBaseUrl, normalizeModels } from "./normalize";
 
-export type { SystemToolId } from "../tools/systemToolOptions";
 export { normalizeFontFamily } from "../system/fontFamily";
+export type { SystemToolId } from "../tools/systemToolOptions";
 
 export type ProviderId = "codex" | "claude_code" | "gemini";
 export type ProviderAuthMode = "api-key" | "oauth-managed" | "oauth-token";
@@ -212,6 +212,8 @@ export type ProviderModelCost = {
 
 export type ProviderModelConfig = {
   id: string;
+  /** Optional vendor metadata returned by OpenAI-compatible /models endpoints. */
+  ownedBy?: string;
   contextWindow: number;
   maxOutputToken: number;
   /** 用户自填单价：目录外模型（中转/改名）没有官方定价时用于成本展示。 */
@@ -1164,9 +1166,13 @@ export function normalizeProviderModelConfig(
   if (!id) return null;
 
   const defaults = getProviderModelDefaults(providerId, id);
+  const ownedBy =
+    (typeof obj.ownedBy === "string" ? obj.ownedBy.trim() : "") ||
+    (typeof obj.owned_by === "string" ? obj.owned_by.trim() : "");
   const cost = normalizeProviderModelCost(obj.cost);
   return {
     id,
+    ...(ownedBy ? { ownedBy } : {}),
     contextWindow: normalizePositiveInteger(obj.contextWindow, defaults.contextWindow),
     maxOutputToken: normalizePositiveInteger(
       obj.maxOutputToken ?? obj.maxTokens,
@@ -1909,9 +1915,11 @@ export function normalizeWorkspaceToolsProjectState(input: unknown): WorkspaceTo
   const tools: Partial<Record<WorkspaceToolKind, WorkspaceToolTab>> = {};
   for (const kind of WORKSPACE_TOOLS_TOOL_KINDS) {
     const previousSshConnectionState =
-      kind === "sshConnection" ? rawTools.sshTunnel ?? legacyTabs["tool:sshTunnel"] : undefined;
+      kind === "sshConnection" ? (rawTools.sshTunnel ?? legacyTabs["tool:sshTunnel"]) : undefined;
     const raw =
-      rawTools[kind] ?? legacyTabs[WORKSPACE_TOOLS_SINGLETON_TAB_IDS[kind]] ?? previousSshConnectionState;
+      rawTools[kind] ??
+      legacyTabs[WORKSPACE_TOOLS_SINGLETON_TAB_IDS[kind]] ??
+      previousSshConnectionState;
     if (!raw || typeof raw !== "object") continue;
     const legacy = raw as Record<string, unknown>;
     tools[kind] = normalizeWorkspaceToolTab(
@@ -2375,7 +2383,8 @@ export function updateWorkspaceToolsProjectState(
   if (!normalizedPathKey) return prev;
   const current = getWorkspaceToolsProjectState(prev.customSettings, normalizedPathKey);
   const next = normalizeWorkspaceToolsProjectState(updater(current));
-  if (workspaceToolsProjectContentKey(current) === workspaceToolsProjectContentKey(next)) return prev;
+  if (workspaceToolsProjectContentKey(current) === workspaceToolsProjectContentKey(next))
+    return prev;
   return updateCustomSettings(prev, {
     workspaceTools: {
       ...prev.customSettings.workspaceTools,
@@ -2451,7 +2460,10 @@ export function removeWorkspaceToolsProjectState(
     normalizedPathKey,
   );
   if (!hasWorkspaceToolsProject && !hasSshProjectAssociation) return prev;
-  const currentWorkspaceToolsProject = getWorkspaceToolsProjectState(prev.customSettings, normalizedPathKey);
+  const currentWorkspaceToolsProject = getWorkspaceToolsProjectState(
+    prev.customSettings,
+    normalizedPathKey,
+  );
   const hasWorkspaceTools = Object.keys(currentWorkspaceToolsProject.tools).length > 0;
   if (hasWorkspaceToolsProject && !hasWorkspaceTools && !hasSshProjectAssociation) return prev;
 

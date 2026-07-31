@@ -10,9 +10,9 @@ import {
   areSessionsEqual,
   DEFAULT_TERMINAL_COLS,
   DEFAULT_TERMINAL_ROWS,
-  workspaceToolsNeighborTabId,
   sortSessions,
   terminalSessionBelongsToProject,
+  workspaceToolsNeighborTabId,
 } from "./workspaceToolsModel";
 
 const PENDING_CREATE_ACTIVATION_TIMEOUT_MS = 15_000;
