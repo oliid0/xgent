@@ -4450,10 +4450,6 @@ export function ChatPage(props: ChatPageProps) {
             if (mobileExperience) setSidebarOpen(false);
             onOpenSettings();
           }}
-          onCreateSoul={() => {
-            if (mobileExperience) setSidebarOpen(false);
-            onOpenSettings("soul", { createSoul: true });
-          }}
           appUpdate={appUpdate}
         />
         {/* ---- Sidebar ---- */}
@@ -4509,6 +4505,10 @@ export function ChatPage(props: ChatPageProps) {
           onOpenSettings={() => {
             if (mobileExperience) setSidebarOpen(false);
             onOpenSettings();
+          }}
+          onCreateSoul={() => {
+            if (mobileExperience) setSidebarOpen(false);
+            onOpenSettings("soul", { createSoul: true });
           }}
           appUpdate={appUpdate}
           onOpenSkillsHub={() => {

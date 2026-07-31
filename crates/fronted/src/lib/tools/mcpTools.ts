@@ -275,8 +275,9 @@ export async function createMcpTools(params: {
             },
             signal,
             {
-              onAbort: () =>
-                invoke("mcp_cancel_tool", { run_id: runId } as any).catch(() => undefined),
+              onAbort: () => {
+                void invoke("mcp_cancel_tool", { run_id: runId } as any).catch(() => undefined);
+              },
             },
           );
 
