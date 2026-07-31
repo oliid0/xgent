@@ -16,8 +16,6 @@ let package = Package(
     ],
     dependencies: [
         .package(name: "Tauri", path: "../.tauri/tauri-api"),
-        .package(url: "https://github.com/swiftwasm/WasmKit.git", exact: "0.1.6"),
-        .package(url: "https://github.com/apple/swift-system.git", exact: "1.3.0"),
     ],
     targets: [
         .binaryTarget(
@@ -89,10 +87,6 @@ let package = Package(
             name: "tauri-plugin-mobile-execution",
             dependencies: [
                 .byName(name: "Tauri"),
-                .product(name: "WasmKit", package: "WasmKit"),
-                .product(name: "WasmKitWASI", package: "WasmKit"),
-                .product(name: "WAT", package: "WasmKit"),
-                .product(name: "SystemPackage", package: "swift-system"),
                 "ios_system",
                 "awk",
                 "curl_ios",

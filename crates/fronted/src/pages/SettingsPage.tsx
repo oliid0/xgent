@@ -1,28 +1,38 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
+  BookOpen,
   Brain,
+  Cable,
   ChevronRight,
+  Clock3,
   Cloud,
   Cpu,
   Info,
+  Key,
   Mic,
   Search,
   Settings2,
   Sparkles,
   Terminal,
   X,
+  Zap,
 } from "../components/icons";
 
 import { useLocale } from "../i18n";
 import { useCompactViewport } from "../lib/responsive/compactViewport";
 import { AboutSection } from "./settings/AboutSection";
 import { AccessSection } from "./settings/AccessSection";
+import { CronSection } from "./settings/CronSection";
+import { HooksSection } from "./settings/HooksSection";
+import { McpSettingsSection } from "./settings/McpSettingsSection";
 import { MobileAssistantSection } from "./settings/MobileAssistantSection";
 import { MobileExecutionSection } from "./settings/MobileExecutionSection";
 import { MemoryPanel } from "./settings/memory/MemoryPanel";
 import { ProvidersSection } from "./settings/ProvidersSection";
 import { SoulSection } from "./settings/SoulSection";
+import { SkillsSettingsForm } from "./settings/SkillsSettingsForm";
+import { SshSettingsSection } from "./settings/SshSettingsSection";
 import { SystemSettingsForm } from "./settings/SystemSettingsForm";
 import type { SectionId, SettingsPageProps } from "./settings/types";
 
@@ -108,28 +118,63 @@ const NAV_GROUPS: NavGroup[] = [
         accentClass: "bg-blue-500",
         descriptionKey: "settings.mobile.providersDescription",
       },
-      {
-        id: "soul",
-        icon: <Sparkles className="h-3.5 w-3.5" />,
-        accentClass: "bg-violet-500",
-        descriptionKey: "settings.mobile.soulDescription",
-      },
     ],
   },
   {
     labelKey: "settings.groupIntelligence",
     items: [
       {
+        id: "soul",
+        icon: <Sparkles className="h-3.5 w-3.5" />,
+        accentClass: "bg-violet-500",
+        descriptionKey: "settings.mobile.soulDescription",
+      },
+      {
         id: "memory",
         icon: <Brain className="h-3.5 w-3.5" />,
         accentClass: "bg-violet-500",
         descriptionKey: "settings.mobile.memoryDescription",
+      },
+      {
+        id: "skills",
+        icon: <BookOpen className="h-3.5 w-3.5" />,
+        accentClass: "bg-amber-500",
+        descriptionKey: "settings.mobile.skillsDescription",
+      },
+      {
+        id: "mcp",
+        icon: <Cable className="h-3.5 w-3.5" />,
+        accentClass: "bg-cyan-500",
+        descriptionKey: "settings.mobile.mcpDescription",
+      },
+    ],
+  },
+  {
+    labelKey: "settings.groupAutomation",
+    items: [
+      {
+        id: "hooks",
+        icon: <Zap className="h-3.5 w-3.5" />,
+        accentClass: "bg-orange-500",
+        descriptionKey: "settings.mobile.hooksDescription",
+      },
+      {
+        id: "cron",
+        icon: <Clock3 className="h-3.5 w-3.5" />,
+        accentClass: "bg-emerald-500",
+        descriptionKey: "settings.mobile.cronDescription",
       },
     ],
   },
   {
     labelKey: "settings.groupConnectivity",
     items: [
+      {
+        id: "ssh",
+        icon: <Key className="h-3.5 w-3.5" />,
+        accentClass: "bg-emerald-600",
+        descriptionKey: "settings.mobile.sshDescription",
+      },
       {
         id: "access",
         icon: <Cloud className="h-3.5 w-3.5" />,
@@ -191,6 +236,11 @@ export function SettingsPage(props: SettingsPageProps) {
     providers: t("settings.navProviders"),
     soul: t("settings.navSoul"),
     memory: t("settings.navMemory"),
+    skills: t("settings.navSkills"),
+    mcp: "MCP",
+    hooks: t("settings.navHooks"),
+    cron: t("settings.navCron"),
+    ssh: t("settings.navSsh"),
     access: t("settings.navAccess"),
     mobileAssistant: t("settings.navMobileAssistant"),
     mobileExecution: t("settings.navMobileExecution"),
@@ -274,6 +324,22 @@ export function SettingsPage(props: SettingsPageProps) {
             setSettings={setSettings}
           />
         );
+      case "skills":
+        return <SkillsSettingsForm settings={settings} setSettings={setSettings} />;
+      case "mcp":
+        return (
+          <McpSettingsSection
+            settings={settings}
+            setSettings={setSettings}
+            allowStdio={!nativeMobile}
+          />
+        );
+      case "hooks":
+        return <HooksSection settings={settings} setSettings={setSettings} />;
+      case "cron":
+        return <CronSection settings={settings} setSettings={setSettings} />;
+      case "ssh":
+        return <SshSettingsSection settings={settings} setSettings={setSettings} />;
       case "about":
         return <AboutSection settings={settings} setSettings={setSettings} appUpdate={appUpdate} />;
       default: {
@@ -287,11 +353,11 @@ export function SettingsPage(props: SettingsPageProps) {
     return (
       <div
         data-edge-swipe-ignore
-        className="relative flex h-full min-h-0 flex-col overflow-hidden bg-muted/25"
+        className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background"
       >
         {mobileDetailOpen ? (
           <main className="settings-mobile-detail flex min-h-0 flex-1 flex-col bg-background">
-            <header className="relative z-10 flex min-h-14 shrink-0 items-center border-b border-border/45 bg-background/80 px-2.5 backdrop-blur-2xl backdrop-saturate-150">
+            <header className="relative z-10 flex min-h-14 shrink-0 items-center border-b border-border bg-background px-2.5">
               <button
                 type="button"
                 onClick={() => setMobileDetailOpen(false)}
@@ -317,14 +383,14 @@ export function SettingsPage(props: SettingsPageProps) {
               key={section}
               data-settings-section={section}
               className={`settings-section-enter min-h-0 flex-1 px-3.5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-3.5 ${
-                section === "providers" || section === "memory"
+                section === "providers" || section === "memory" || section === "mcp"
                   ? "flex flex-col overflow-hidden"
                   : "overflow-y-auto overscroll-contain"
               }`}
             >
               <div
                 className={`settings-section-shell ${
-                  section === "providers" || section === "memory"
+                  section === "providers" || section === "memory" || section === "mcp"
                     ? "flex min-h-0 flex-1 flex-col"
                     : "min-h-full"
                 }`}
@@ -335,7 +401,7 @@ export function SettingsPage(props: SettingsPageProps) {
           </main>
         ) : (
           <main className="settings-mobile-home min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
-            <header className="sticky top-0 z-10 flex min-h-14 items-center border-b border-border/35 bg-background/75 px-2.5 backdrop-blur-2xl backdrop-saturate-150">
+            <header className="sticky top-0 z-10 flex min-h-14 items-center border-b border-border bg-background px-2.5">
               <button
                 type="button"
                 onClick={onBack}
@@ -362,7 +428,7 @@ export function SettingsPage(props: SettingsPageProps) {
                   <h2 className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/75">
                     {group.label}
                   </h2>
-                  <div className="overflow-hidden rounded-2xl border border-black/[0.045] bg-background/75 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset,0_8px_28px_-24px_rgba(15,23,42,0.32)] backdrop-blur-2xl backdrop-saturate-150 dark:border-white/[0.08] dark:bg-white/[0.045] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
+                  <div className="overflow-hidden rounded-xl border border-border bg-background">
                     {group.items.map((item, index) => (
                       <button
                         key={item.id}
@@ -466,14 +532,14 @@ export function SettingsPage(props: SettingsPageProps) {
         <main
           key={section}
           className={`settings-section-enter min-w-0 flex-1 pr-2 ${
-            section === "providers" || section === "memory"
+            section === "providers" || section === "memory" || section === "mcp"
               ? "flex min-h-0 flex-col overflow-hidden"
               : "overflow-y-auto overscroll-contain"
           }`}
         >
           <div
             className={`settings-section-shell ${
-              section === "providers" || section === "memory"
+              section === "providers" || section === "memory" || section === "mcp"
                 ? "flex min-h-0 flex-1 flex-col"
                 : "min-h-full"
             }`}

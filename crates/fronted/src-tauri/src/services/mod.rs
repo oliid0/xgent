@@ -1,4 +1,3 @@
-#[cfg(desktop)]
 pub mod automation;
 pub mod app_paths;
 pub mod cloud_secret_vault;

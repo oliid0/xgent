@@ -1,6 +1,7 @@
 import { Tooltip } from "@base-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import iconSimpleUrl from "../../../src-tauri/icons/icon-simple.png";
 import { useLocale } from "../../i18n";
 import type { AppUpdateController } from "../../lib/appUpdates";
@@ -16,6 +17,7 @@ import type {
   SidebarMutationKind,
 } from "../../lib/sidebar/types";
 import { useSoul } from "../../lib/soul";
+import type { SoulDocument } from "../../lib/soul/model";
 import type { TerminalShellOption } from "../../lib/terminal/types";
 import { AppUpdateButton } from "../AppUpdateButton";
 import {
@@ -149,6 +151,71 @@ const HISTORY_LOADING_SKELETON_ROWS = [
   { title: "w-40", meta: "w-28" },
   { title: "w-28", meta: "w-20" },
 ] as const;
+
+type SoulPresetPickerProps = {
+  presets: SoulDocument[];
+  activeId: string;
+  saving: boolean;
+  mobile?: boolean;
+  onSelect: (presetId: string) => void;
+  onCreate: () => void;
+};
+
+function SoulPresetPicker(props: SoulPresetPickerProps) {
+  const { t } = useLocale();
+  return (
+    <>
+      <div
+        className={cn(
+          "font-semibold uppercase tracking-[0.08em] text-muted-foreground/70",
+          props.mobile ? "px-1 pb-3 text-[11px]" : "px-2 pb-1 pt-0.5 text-[10px]",
+        )}
+      >
+        {t("sidebar.soulPresets")}
+      </div>
+      <div
+        className={cn("overflow-y-auto", props.mobile ? "space-y-1" : "max-h-36 space-y-0.5")}
+      >
+        {props.presets.map((preset) => {
+          const active = preset.id === props.activeId;
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => props.onSelect(preset.id)}
+              className={cn(
+                "flex w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors active:bg-muted",
+                props.mobile
+                  ? "h-12 text-[15px]"
+                  : "h-8 text-[calc(13px*var(--zone-font-scale,1))]",
+                active ? "bg-muted text-foreground" : "text-foreground/75 hover:bg-muted",
+              )}
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+                {active ? <Check className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{preset.metadata.name || "XGent"}</span>
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={props.onCreate}
+        disabled={props.saving}
+        className={cn(
+          "flex w-full items-center gap-2.5 rounded-lg px-2 text-left text-foreground/85 transition-colors hover:bg-muted disabled:opacity-45",
+          props.mobile
+            ? "mt-2 h-12 text-[15px]"
+            : "h-8 text-[calc(13px*var(--zone-font-scale,1))]",
+        )}
+      >
+        <Plus className="h-4 w-4 text-muted-foreground" />
+        <span>{t("sidebar.addSoul")}</span>
+      </button>
+    </>
+  );
+}
 
 function clampSidebarSectionHeight(height: number, minHeight: number, maxHeight: number) {
   return Math.round(Math.min(Math.max(height, minHeight), Math.max(minHeight, maxHeight)));
@@ -1024,6 +1091,11 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     },
     [],
   );
+  useEffect(() => {
+    if (isOpen) return;
+    setSoulLauncherOpen(false);
+    suppressSoulClickRef.current = false;
+  }, [isOpen]);
   const handleSelectConversation = useStableEvent(onSelectConversation);
   const handleStartRenaming = useStableEvent(onStartRenaming);
   const handleRenameDraftChange = useStableEvent(onRenameDraftChange);
@@ -1871,49 +1943,21 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
             desktopPanelMode && "md:hidden",
           )}
         >
-          {soulLauncherOpen ? (
-            <div className="mb-1.5 space-y-0.5 rounded-xl border border-border/55 bg-background/55 p-1.5 shadow-sm backdrop-blur-xl">
-              <div className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
-                {t("sidebar.soulPresets")}
-              </div>
-              <div className="max-h-36 space-y-0.5 overflow-y-auto">
-                {soul.presets.map((preset) => {
-                  const active = preset.id === soul.activeId;
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => {
-                        void soul.select(preset.id).catch(() => undefined);
-                        setSoulLauncherOpen(false);
-                      }}
-                      className={cn(
-                        "flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] transition-colors hover:bg-foreground/[0.07]",
-                        active ? "text-foreground" : "text-foreground/75",
-                      )}
-                    >
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-500/10 text-violet-500">
-                        {active ? <Check className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate">
-                        {preset.metadata.name || "XGent"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
+          {soulLauncherOpen && !mobileExperience ? (
+            <div className="mb-1.5 space-y-0.5 rounded-xl border border-border bg-background p-1.5 shadow-sm">
+              <SoulPresetPicker
+                presets={soul.presets}
+                activeId={soul.activeId}
+                saving={soul.saving}
+                onSelect={(presetId) => {
+                  void soul.select(presetId).catch(() => undefined);
+                  setSoulLauncherOpen(false);
+                }}
+                onCreate={() => {
                   setSoulLauncherOpen(false);
                   onCreateSoul();
                 }}
-                disabled={soul.saving}
-                className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07] disabled:opacity-45"
-              >
-                <Plus className="h-4 w-4 text-muted-foreground" />
-                <span>{t("sidebar.addSoul")}</span>
-              </button>
+              />
               {!mobileExperience ? (
                 <>
                   <div className="mx-1 my-1 border-t border-border/50" />
@@ -2026,6 +2070,12 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   soulLongPressTimerRef.current = null;
                 }
               }}
+              onPointerMove={() => {
+                if (soulLongPressTimerRef.current !== null) {
+                  window.clearTimeout(soulLongPressTimerRef.current);
+                  soulLongPressTimerRef.current = null;
+                }
+              }}
               onPointerCancel={() => {
                 if (soulLongPressTimerRef.current !== null) {
                   window.clearTimeout(soulLongPressTimerRef.current);
@@ -2071,6 +2121,61 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
           </div>
         </div>
       </div>
+      {mobileExperience && soulLauncherOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[100] flex items-end bg-black/35"
+              role="presentation"
+              onPointerDown={() => {
+                suppressSoulClickRef.current = false;
+                setSoulLauncherOpen(false);
+              }}
+            >
+              <section
+                role="dialog"
+                aria-modal="true"
+                aria-label={t("sidebar.soulPresets")}
+                className="w-full rounded-t-2xl border-t border-border bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-3 shadow-2xl"
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/25" />
+                <div className="mb-2 flex items-center gap-3">
+                  <div className="min-w-0 flex-1 text-[17px] font-semibold">
+                    {t("sidebar.soul")}
+                  </div>
+                  <button
+                    type="button"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground active:bg-muted"
+                    onClick={() => {
+                      suppressSoulClickRef.current = false;
+                      setSoulLauncherOpen(false);
+                    }}
+                    aria-label={t("chat.mobileActivity.close")}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <SoulPresetPicker
+                  mobile
+                  presets={soul.presets}
+                  activeId={soul.activeId}
+                  saving={soul.saving}
+                  onSelect={(presetId) => {
+                    suppressSoulClickRef.current = false;
+                    setSoulLauncherOpen(false);
+                    void soul.select(presetId).catch(() => undefined);
+                  }}
+                  onCreate={() => {
+                    suppressSoulClickRef.current = false;
+                    setSoulLauncherOpen(false);
+                    onCreateSoul();
+                  }}
+                />
+              </section>
+            </div>,
+            document.body,
+          )
+        : null}
     </aside>
   );
 });

@@ -1,5 +1,5 @@
 import { openUrl } from "@xagent/runtime";
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import type { GitClient } from "../../lib/git/types";
 import type {
@@ -97,6 +97,7 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
     onProjectStateChange: props.onProjectStateChange,
     onSessionsChange: props.onSessionsChange,
   });
+  const handledTerminalLaunchRef = useRef<number | null>(null);
 
   useEffect(() => {
     props.onShellOptionsChange?.(sessions.shellOptions);
@@ -104,8 +105,27 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
 
   useEffect(() => {
     if (props.target !== "terminal") return;
-    sessions.createTerminal(props.shell);
-  }, [props.requestNonce, props.shell, props.target, sessions.createTerminal]);
+    if (!terminalReady || !props.sessionsLoaded) return;
+    if (handledTerminalLaunchRef.current === props.requestNonce) return;
+
+    handledTerminalLaunchRef.current = props.requestNonce;
+    if (!props.shell && sessions.localSessions.length > 0) {
+      const session = sessions.activeSession ?? sessions.localSessions.at(-1);
+      if (session) sessions.activateTerminalSession(session);
+      return;
+    }
+    void sessions.createTerminal(props.shell);
+  }, [
+    props.requestNonce,
+    props.sessionsLoaded,
+    props.shell,
+    props.target,
+    sessions.activeSession,
+    sessions.activateTerminalSession,
+    sessions.createTerminal,
+    sessions.localSessions,
+    terminalReady,
+  ]);
 
   const revealPath = useCallback(
     (path: string) => {

@@ -20,10 +20,11 @@ pub use app_commands::system;
 #[cfg(desktop)]
 pub use app_commands::update;
 
-#[cfg(desktop)]
 pub use automation_commands::cron;
 #[cfg(desktop)]
 pub use automation_commands::hook;
+#[cfg(mobile)]
+pub use automation_commands::mobile_hook as hook;
 
 pub use config_commands::settings;
 

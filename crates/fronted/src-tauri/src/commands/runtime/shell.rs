@@ -26,19 +26,33 @@ pub struct ShellCancelResponse {
     cancelled: bool,
 }
 
-#[tauri::command(rename_all = "snake_case")]
 #[cfg(mobile)]
-pub async fn shell_run(
+pub(crate) struct MobileShellRunInput {
+    pub workdir: String,
+    pub command: String,
+    pub cwd: Option<String>,
+    pub timeout_ms: Option<u64>,
+    pub max_timeout_ms: Option<u64>,
+    pub provider_id: Option<String>,
+    pub run_id: Option<String>,
+}
+
+#[cfg(mobile)]
+pub(crate) async fn run_mobile_shell(
     app: AppHandle,
-    lan_pc_client: tauri::State<'_, Arc<LanPcClient>>,
-    workdir: String,
-    command: String,
-    cwd: Option<String>,
-    timeout_ms: Option<u64>,
-    max_timeout_ms: Option<u64>,
-    provider_id: Option<String>,
-    run_id: Option<String>,
+    lan_pc_client: &LanPcClient,
+    input: MobileShellRunInput,
 ) -> Result<ShellRunResponse, String> {
+    let MobileShellRunInput {
+        workdir,
+        command,
+        cwd,
+        timeout_ms,
+        max_timeout_ms,
+        provider_id,
+        run_id,
+    } = input;
+
     let settings = crate::commands::settings::load_access_settings(
         &crate::commands::settings::open_db()?,
     )?;
@@ -150,6 +164,35 @@ pub async fn shell_run(
         effective_timeout_ms: response.effective_timeout_ms,
         duration_ms: u128::from(response.duration_ms),
     })
+}
+
+#[tauri::command(rename_all = "snake_case")]
+#[cfg(mobile)]
+pub async fn shell_run(
+    app: AppHandle,
+    lan_pc_client: tauri::State<'_, Arc<LanPcClient>>,
+    workdir: String,
+    command: String,
+    cwd: Option<String>,
+    timeout_ms: Option<u64>,
+    max_timeout_ms: Option<u64>,
+    provider_id: Option<String>,
+    run_id: Option<String>,
+) -> Result<ShellRunResponse, String> {
+    run_mobile_shell(
+        app,
+        lan_pc_client.inner(),
+        MobileShellRunInput {
+            workdir,
+            command,
+            cwd,
+            timeout_ms,
+            max_timeout_ms,
+            provider_id,
+            run_id,
+        },
+    )
+    .await
 }
 
 #[tauri::command(rename_all = "snake_case")]

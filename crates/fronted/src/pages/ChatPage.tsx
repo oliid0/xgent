@@ -232,10 +232,10 @@ import {
   type ConversationRuntimeSnapshotState,
 } from "./chat/local-access/conversationRuntimeSnapshot";
 import { MobileBrowserSettingsPanel } from "./chat/mobile/MobileBrowserSettingsPanel";
+import { MobileBackgroundTasksPanel } from "./chat/mobile/MobileBackgroundTasksPanel";
 import { MobileFilesPanel } from "./chat/mobile/MobileFilesPanel";
-import { MobileMcpPage } from "./chat/mobile/MobileMcpPage";
+import { MobileGitReviewPanel } from "./chat/mobile/MobileGitReviewPanel";
 import { MobileQuickActions } from "./chat/mobile/MobileQuickActions";
-import { MobileSkillsPage } from "./chat/mobile/MobileSkillsPage";
 import { type MobileShellPanelMode, MobileTerminalPanel } from "./chat/mobile/MobileTerminalPanel";
 import { MobileToolActivity } from "./chat/mobile/MobileToolActivity";
 import { MobileWorkspaceCreateDialog } from "./chat/mobile/MobileWorkspaceCreateDialog";
@@ -303,6 +303,20 @@ type ChatPageProps = {
   lanPcCommandHostReady: boolean;
   nativeMobile: boolean;
 };
+
+type MobileWorkspaceDestination =
+  | { kind: "activity" }
+  | { kind: "background-tasks" }
+  | { kind: "files" }
+  | { kind: "git-review" }
+  | { kind: "browser-settings" }
+  | {
+      kind: "terminal";
+      mode: MobileShellPanelMode;
+      initialCommand: string;
+      autoRun: boolean;
+    }
+  | null;
 
 type ActiveConversationRuntimeRun = {
   conversationId: string;
@@ -751,14 +765,14 @@ export function ChatPage(props: ChatPageProps) {
       shell,
     });
   }, []);
-  const [mobileActivityOpen, setMobileActivityOpen] = useState(false);
-  const [mobileFilesOpen, setMobileFilesOpen] = useState(false);
-  const [mobileTerminalOpen, setMobileTerminalOpen] = useState(false);
-  const [mobileShellPanelMode, setMobileShellPanelMode] =
-    useState<MobileShellPanelMode>("terminal");
-  const [mobileTerminalInitialCommand, setMobileTerminalInitialCommand] = useState("");
-  const [mobileTerminalAutoRun, setMobileTerminalAutoRun] = useState(false);
-  const [mobileBrowserSettingsOpen, setMobileBrowserSettingsOpen] = useState(false);
+  const [mobileWorkspaceDestination, setMobileWorkspaceDestination] =
+    useState<MobileWorkspaceDestination>(null);
+  const mobileActivityOpen = mobileWorkspaceDestination?.kind === "activity";
+  const mobileFilesOpen = mobileWorkspaceDestination?.kind === "files";
+  const mobileBrowserSettingsOpen = mobileWorkspaceDestination?.kind === "browser-settings";
+  const mobileTerminalDestination =
+    mobileWorkspaceDestination?.kind === "terminal" ? mobileWorkspaceDestination : null;
+  const mobileTerminalOpen = mobileTerminalDestination !== null;
   const [mobileWorkspaceCreateOpen, setMobileWorkspaceCreateOpen] = useState(false);
   const previousWorkspaceFileTreeOpenRef = useRef(false);
   const [workspaceEditorMounted, setWorkspaceEditorMounted] = useState(false);
@@ -1389,11 +1403,24 @@ export function ChatPage(props: ChatPageProps) {
       : undefined;
   const handleOpenWorkspaceTool = useCallback(
     (target: WorkspaceToolTarget, shell?: string) => {
-      if (nativeMobile) {
-        if (target !== "fileTree" || !mobileWorkspacePathKey) return;
+      if (mobileExperience) {
+        if (target === "fileTree" && !mobileWorkspacePathKey) return;
         setActiveView("chat");
         setSidebarOpen(false);
-        setMobileFilesOpen(true);
+        if (target === "fileTree") {
+          setMobileWorkspaceDestination({ kind: "files" });
+        } else if (target === "backgroundTasks") {
+          setMobileWorkspaceDestination({ kind: "background-tasks" });
+        } else if (target === "gitReview") {
+          setMobileWorkspaceDestination({ kind: "git-review" });
+        } else {
+          setMobileWorkspaceDestination({
+            kind: "terminal",
+            mode: target === "sshConnection" ? "ssh" : "terminal",
+            initialCommand: shell ?? "",
+            autoRun: false,
+          });
+        }
         return;
       }
       if (terminalDisabledMessage) return;
@@ -1402,8 +1429,8 @@ export function ChatPage(props: ChatPageProps) {
     },
     [
       desktopBridgeEnabled,
+      mobileExperience,
       mobileWorkspacePathKey,
-      nativeMobile,
       showDesktopWorkspaceTool,
       terminalDisabledMessage,
     ],
@@ -1562,7 +1589,7 @@ export function ChatPage(props: ChatPageProps) {
         path,
         imagePaths,
       };
-      setMobileFilesOpen(false);
+      setMobileWorkspaceDestination(null);
       if (isWorkspacePreviewPath(path)) {
         openWorkspaceFilePreview(request);
         return;
@@ -4002,16 +4029,23 @@ export function ChatPage(props: ChatPageProps) {
 
   const handleOpenMobileActivity = useCallback(() => {
     setSidebarOpen(false);
-    setMobileActivityOpen(true);
+    setMobileWorkspaceDestination({ kind: "activity" });
   }, []);
 
   const handleCloseMobileActivity = useCallback(() => {
-    setMobileActivityOpen(false);
+    setMobileWorkspaceDestination((current) =>
+      current?.kind === "activity" ? null : current,
+    );
+  }, []);
+
+  const handleOpenMobileBackgroundTasks = useCallback(() => {
+    setSidebarOpen(false);
+    setMobileWorkspaceDestination({ kind: "background-tasks" });
   }, []);
 
   const handleOpenBrowser = useCallback(() => {
     setSidebarOpen(false);
-    setMobileActivityOpen(false);
+    setMobileWorkspaceDestination(null);
     browserSessionController.openPanel();
   }, []);
 
@@ -4024,27 +4058,29 @@ export function ChatPage(props: ChatPageProps) {
   const handleOpenMobileTerminal = useCallback(
     (mode: MobileShellPanelMode = "terminal", initialCommand = "", autoRun = false) => {
       setSidebarOpen(false);
-      setMobileActivityOpen(false);
-      setMobileFilesOpen(false);
-      setMobileShellPanelMode(mode);
-      setMobileTerminalInitialCommand(initialCommand);
-      setMobileTerminalAutoRun(autoRun);
-      setMobileTerminalOpen(true);
+      setMobileWorkspaceDestination({
+        kind: "terminal",
+        mode,
+        initialCommand,
+        autoRun,
+      });
     },
     [],
   );
 
+  const handleOpenMobileGitReview = useCallback(() => {
+    setSidebarOpen(false);
+    setMobileWorkspaceDestination({ kind: "git-review" });
+  }, []);
+
   const handleOpenMobileSidebar = useCallback(() => {
-    setMobileActivityOpen(false);
+    setMobileWorkspaceDestination(null);
     setSidebarOpen(true);
   }, []);
 
   useEffect(() => {
     if (!mobileExperience) {
-      setMobileActivityOpen(false);
-      setMobileFilesOpen(false);
-      setMobileTerminalOpen(false);
-      setMobileBrowserSettingsOpen(false);
+      setMobileWorkspaceDestination(null);
     }
   }, [mobileExperience]);
 
@@ -4052,8 +4088,7 @@ export function ChatPage(props: ChatPageProps) {
     enabled:
       mobileExperience &&
       activeView === "chat" &&
-      !mobileFilesOpen &&
-      !mobileTerminalOpen &&
+      mobileWorkspaceDestination === null &&
       !workspaceEditorOpen &&
       !workspaceFilePreviewOpen &&
       !workspaceSshTerminalOpen,
@@ -4546,11 +4581,15 @@ export function ChatPage(props: ChatPageProps) {
           }}
           mobileExperience={mobileExperience}
           desktopPanelMode={!mobileExperience}
-          workspaceToolsAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
+          workspaceToolsAvailable={
+            mobileExperience
+              ? nativeMobile || desktopCommandHostAvailable
+              : desktopCommandHostAvailable && !terminalDisabledMessage
+          }
           fileTreeAvailable={
-            desktopCommandHostAvailable
-              ? !terminalDisabledMessage
-              : nativeMobile && Boolean(mobileWorkspacePathKey)
+            mobileExperience
+              ? Boolean(mobileWorkspacePathKey)
+              : desktopCommandHostAvailable && !terminalDisabledMessage
           }
           terminalShellOptions={terminalShellOptions}
           onOpenWorkspaceTool={handleOpenWorkspaceTool}
@@ -4626,59 +4665,35 @@ export function ChatPage(props: ChatPageProps) {
           }
         >
           {activeView === "skills-hub" ? (
-            mobileExperience ? (
-              <MobileSkillsPage
-                settings={settings}
-                setSettings={setSettings}
-                initialSkills={availableSkills}
-                onOpenSidebar={handleOpenSidebar}
-              />
-            ) : (
-              <SkillsHubPage
-                settings={settings}
-                setSettings={setSettings}
-                initialSkills={availableSkills}
-                initialRootDir={skillsRootDir}
-                isAgentMode={isAgentMode}
-                sidebarOpen={sidebarOpen}
-                onOpenSidebar={handleOpenSidebar}
-              />
-            )
+            <SkillsHubPage
+              settings={settings}
+              setSettings={setSettings}
+              initialSkills={availableSkills}
+              initialRootDir={skillsRootDir}
+              isAgentMode={isAgentMode}
+              sidebarOpen={sidebarOpen}
+              onOpenSidebar={handleOpenSidebar}
+            />
           ) : activeView === "mcp-hub" ? (
-            mobileExperience ? (
-              <MobileMcpPage
-                settings={settings}
-                setSettings={setSettings}
-                onOpenSidebar={handleOpenSidebar}
-                allowStdio={!nativeMobile || lanPcCommandHostReady}
-              />
-            ) : (
-              <McpHubPage
-                settings={settings}
-                setSettings={setSettings}
-                isAgentMode={isAgentMode}
-                sidebarOpen={sidebarOpen}
-                onOpenSidebar={handleOpenSidebar}
-              />
-            )
+            <McpHubPage
+              settings={settings}
+              setSettings={setSettings}
+              isAgentMode={isAgentMode}
+              sidebarOpen={sidebarOpen}
+              onOpenSidebar={handleOpenSidebar}
+              allowStdio={!nativeMobile || lanPcCommandHostReady}
+            />
           ) : (
             <>
               <div className="relative z-20">
                 <ChatHeader
                   settings={settings}
                   onSelectExecutionMode={(mode) =>
-                    setSettings((prev) => {
-                      const current = prev.system.executionMode;
-                      if (mode === "text") {
-                        return current === "text"
-                          ? prev
-                          : updateSystem(prev, { executionMode: "text" });
-                      }
-                      // 切回 Agent：仅从 Chat 切换；agent-dev 视为 Agent，保持不降级。
-                      return current === "text"
-                        ? updateSystem(prev, { executionMode: "tools" })
-                        : prev;
-                    })
+                    setSettings((prev) =>
+                      prev.system.executionMode === mode
+                        ? prev
+                        : updateSystem(prev, { executionMode: mode }),
+                    )
                   }
                   hasModels={hasModels}
                   currentModelLabel={currentModelLabel}
@@ -4698,11 +4713,11 @@ export function ChatPage(props: ChatPageProps) {
                         onOpenBrowser={handleOpenBrowser}
                         onOpenBrowserSettings={() => {
                           setSidebarOpen(false);
-                          setMobileBrowserSettingsOpen(true);
+                          setMobileWorkspaceDestination({ kind: "browser-settings" });
                         }}
-                        onOpenGitReview={() => handleOpenMobileTerminal("git")}
+                        onOpenGitReview={handleOpenMobileGitReview}
                         onOpenSsh={() => handleOpenMobileTerminal("ssh")}
-                        onOpenBackgroundTasks={handleOpenMobileActivity}
+                        onOpenBackgroundTasks={handleOpenMobileBackgroundTasks}
                       />
                     ) : (
                       <Button
@@ -4885,15 +4900,23 @@ export function ChatPage(props: ChatPageProps) {
         </div>
 
         <BrowserPanel />
-        {nativeMobile ? (
+        {mobileExperience ? (
+          <MobileBackgroundTasksPanel
+            open={mobileWorkspaceDestination?.kind === "background-tasks"}
+            settings={settings}
+            setSettings={setSettings}
+            onClose={() => setMobileWorkspaceDestination(null)}
+          />
+        ) : null}
+        {mobileExperience ? (
           <MobileBrowserSettingsPanel
             open={mobileBrowserSettingsOpen}
             settings={settings}
             setSettings={setSettings}
-            onClose={() => setMobileBrowserSettingsOpen(false)}
+            onClose={() => setMobileWorkspaceDestination(null)}
           />
         ) : null}
-        {nativeMobile ? (
+        {mobileExperience ? (
           <MobileFilesPanel
             open={mobileFilesOpen}
             projectPathKey={mobileWorkspacePathKey}
@@ -4905,18 +4928,25 @@ export function ChatPage(props: ChatPageProps) {
             onFileTreeStateChange={handleMobileFileTreeStateChange}
             onInsertFileMention={handleWorkspaceToolsInsertFileMention}
             onOpenFile={handleOpenMobileWorkspaceFile}
-            onClose={() => setMobileFilesOpen(false)}
+            onClose={() => setMobileWorkspaceDestination(null)}
           />
         ) : null}
-        {nativeMobile ? (
+        {mobileExperience ? (
+          <MobileGitReviewPanel
+            open={mobileWorkspaceDestination?.kind === "git-review"}
+            workdir={mobileWorkspacePath}
+            onClose={() => setMobileWorkspaceDestination(null)}
+          />
+        ) : null}
+        {mobileExperience ? (
           <MobileTerminalPanel
             open={mobileTerminalOpen}
             workdir={mobileWorkspacePath}
-            mode={mobileShellPanelMode}
+            mode={mobileTerminalDestination?.mode ?? "terminal"}
             sshHosts={settings.ssh.hosts}
-            initialCommand={mobileTerminalInitialCommand}
-            autoRunInitialCommand={mobileTerminalAutoRun}
-            onClose={() => setMobileTerminalOpen(false)}
+            initialCommand={mobileTerminalDestination?.initialCommand ?? ""}
+            autoRunInitialCommand={mobileTerminalDestination?.autoRun ?? false}
+            onClose={() => setMobileWorkspaceDestination(null)}
           />
         ) : null}
         {nativeMobile ? (

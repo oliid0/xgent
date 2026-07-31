@@ -15,6 +15,7 @@ type McpHubPageProps = {
   isAgentMode: boolean;
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
+  allowStdio?: boolean;
 };
 
 type McpHubView = "installed" | "store" | "import";
@@ -210,9 +211,17 @@ export function McpHubPage(props: McpHubPageProps) {
                   onEditServer={openEdit}
                 />
               ) : view === "store" ? (
-                <McpRegistryBrowser settings={settings} setSettings={setSettings} />
+                <McpRegistryBrowser
+                  settings={settings}
+                  setSettings={setSettings}
+                  allowStdio={props.allowStdio}
+                />
               ) : (
-                <McpImportView settings={settings} setSettings={setSettings} />
+                <McpImportView
+                  settings={settings}
+                  setSettings={setSettings}
+                  allowStdio={props.allowStdio}
+                />
               )}
             </div>
           </div>
@@ -224,6 +233,7 @@ export function McpHubPage(props: McpHubPageProps) {
           mode={editing.mode}
           initialServer={editing.mode === "edit" ? editing.server : null}
           existingServers={settings.mcp.servers}
+          allowStdio={props.allowStdio}
           onClose={() => setEditing(null)}
           onSave={handleModalSave}
         />

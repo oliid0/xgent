@@ -656,8 +656,8 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
         : null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 max-[720px]:p-0">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 max-[720px]:p-0">
+      <div className="absolute inset-0 bg-black/35 max-[720px]:hidden" onClick={onClose} />
 
       <div className="relative z-10 flex h-[600px] max-h-[calc(100dvh-2rem)] w-full max-w-[860px] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl max-[720px]:h-[100dvh] max-[720px]:max-h-[100dvh] max-[720px]:max-w-none max-[720px]:rounded-none max-[720px]:border-0">
         <div className="flex shrink-0 items-center justify-between gap-4 border-b px-5 py-4 max-[720px]:px-3.5 max-[720px]:py-3">
@@ -1904,7 +1904,7 @@ function CcsImportModal(props: {
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/35"
         onClick={submitting ? undefined : onClose}
       />
 

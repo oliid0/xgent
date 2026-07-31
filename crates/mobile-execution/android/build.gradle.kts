@@ -24,6 +24,13 @@ android {
         }
     }
 
+    packaging {
+        jniLibs.keepDebugSymbols += setOf(
+            "**/libxagent_proot.so",
+            "**/libxagent_proot_loader.so",
+        )
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11

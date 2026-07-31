@@ -167,6 +167,8 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimer: number | undefined;
+    let consecutiveFailures = 0;
     configureLanPcCommandHost();
     setLanPcCommandHostReady(false);
     if (
@@ -177,47 +179,61 @@ export default function App() {
     ) {
       return () => {
         cancelled = true;
+        if (retryTimer !== undefined) window.clearTimeout(retryTimer);
       };
     }
 
     const baseUrl = settings.access.lanControlUrl.trim();
-    void Promise.all([
-      invoke<{ defaultWorkdir?: unknown }>("lan_pc_invoke", {
-        base_url: baseUrl,
-        command: "settings_load_all",
-        args: {},
-      }),
-      invoke<string>("lan_pc_invoke", {
-        base_url: baseUrl,
-        command: "system_home_dir",
-        args: {},
-      }),
-    ])
-      .then(([snapshot, remoteHomeDir]) => {
+    const scheduleProbe = (delayMs: number) => {
+      if (cancelled) return;
+      retryTimer = window.setTimeout(() => void probe(), delayMs);
+    };
+    const probe = async () => {
+      try {
+        const [snapshot, remoteHomeDir] = await Promise.all([
+          invoke<{ defaultWorkdir?: unknown }>("lan_pc_invoke", {
+            base_url: baseUrl,
+            command: "settings_load_all",
+            args: {},
+          }),
+          invoke<string>("lan_pc_invoke", {
+            base_url: baseUrl,
+            command: "system_home_dir",
+            args: {},
+          }),
+        ]);
         if (cancelled) return;
         const remoteWorkdir =
           typeof snapshot.defaultWorkdir === "string" ? snapshot.defaultWorkdir.trim() : "";
-        if (!remoteWorkdir) {
-          throw new Error("LAN computer did not return a default workspace");
+        if (!remoteWorkdir || !remoteHomeDir.trim()) {
+          throw new Error("LAN computer did not return its workspace capabilities");
         }
+        consecutiveFailures = 0;
         configureLanPcCommandHost({
           enabled: true,
           baseUrl,
           localWorkdir: settings.system.workdir,
           remoteWorkdir,
-          remoteHomeDir,
+          remoteHomeDir: remoteHomeDir.trim(),
         });
         setLanPcCommandHostReady(true);
-      })
-      .catch(() => {
-        if (!cancelled) {
+        scheduleProbe(20_000);
+      } catch {
+        if (cancelled) return;
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= 2) {
           configureLanPcCommandHost();
           setLanPcCommandHostReady(false);
         }
-      });
+        const retryDelay = Math.min(30_000, 2_000 * 2 ** Math.min(consecutiveFailures - 1, 4));
+        scheduleProbe(retryDelay);
+      }
+    };
+    void probe();
 
     return () => {
       cancelled = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
       configureLanPcCommandHost();
     };
   }, [
@@ -433,11 +449,15 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (!settingsReady || (!desktopBridgeEnabled && !lanPcCommandHostReady)) return;
+    if (
+      !settingsReady ||
+      (!desktopBridgeEnabled && !lanPcCommandHostReady && !nativeMobile)
+    )
+      return;
     void initAutomation().catch((error) => {
       console.warn("Failed to initialize automation store", error);
     });
-  }, [desktopBridgeEnabled, lanPcCommandHostReady, settingsReady]);
+  }, [desktopBridgeEnabled, lanPcCommandHostReady, nativeMobile, settingsReady]);
 
   if (!settingsReady || !platformResolved) {
     return (
@@ -493,7 +513,7 @@ export default function App() {
               }}
             >
               <div
-                className={`h-full w-full overflow-hidden bg-background transition-[transform,opacity] duration-200 ease-out md:h-[85vh] md:max-h-[900px] md:w-[min(calc(100vw-2rem),900px)] md:rounded-2xl md:border md:border-white/10 md:shadow-2xl ${
+                className={`h-full w-full overflow-hidden bg-background transition-[transform,opacity] duration-200 ease-out md:h-[85vh] md:max-h-[900px] md:w-[min(calc(100vw-2rem),900px)] md:rounded-2xl md:border md:border-border md:shadow-2xl ${
                   active
                     ? "translate-y-0 scale-100 opacity-100"
                     : "translate-y-6 scale-100 opacity-0 md:translate-y-0 md:scale-95"

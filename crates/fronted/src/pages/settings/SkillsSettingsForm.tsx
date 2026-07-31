@@ -27,7 +27,7 @@ import type { SettingsSectionProps } from "./types";
 export function SkillsSettingsForm(props: SettingsSectionProps) {
   const { settings, setSettings } = props;
   const { t } = useLocale();
-  const skillsLockedByChatMode = settings.system.executionMode === "text";
+  const skillsLockedByChatMode = false;
   const [skills, setSkills] = useState<SkillSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);

@@ -6,9 +6,9 @@ import UIKit
 import UniformTypeIdentifiers
 import ios_system
 
-// WasmKit 0.1.6 has no fuel or external interruption API. Keep the runtime
-// linked for the verified-extension roadmap, but do not accept arbitrary WASI
-// modules until execution can be stopped without killing the application.
+// Arbitrary WASI stays disabled until a runtime with enforceable interruption
+// is available. Keeping it out of the production package also avoids an
+// unnecessary Swift dependency in the iOS archive build.
 private let wasiExecutionAvailable = false
 
 private struct InstallArgs: Decodable {
@@ -149,7 +149,7 @@ private func iosToolchains(
             installed: available && wasiExecutionAvailable,
             installable: false,
             version: "WasmKit 0.1.6",
-            detail: "Reserved for verified extensions; arbitrary modules stay disabled until the runtime supports enforceable interruption"
+            detail: "Reserved for verified extensions; arbitrary modules stay disabled until a cancellable runtime is available"
         ),
         IOSToolchain(
             id: "node",
@@ -205,7 +205,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             "available": available,
             "installed": available,
             "detail": initializationError?.localizedDescription
-                ?? "iOS command frameworks are ready; WasmKit is linked but arbitrary WASI, Node.js/npm, and Linux process APIs remain disabled",
+                ?? "iOS command frameworks are ready; arbitrary WASI, Node.js/npm, and Linux process APIs remain disabled",
             "capabilities": [
                 "shell": available,
                 "wasi": available && wasiExecutionAvailable,

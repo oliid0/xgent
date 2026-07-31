@@ -1,4 +1,4 @@
-import { invoke, isBrowserRuntime } from "@xagent/runtime";
+import { invoke, isBrowserRuntime, listen } from "@xagent/runtime";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -221,6 +221,22 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
     const timer = window.setInterval(() => void refreshLocalStatus(), 5_000);
     return () => window.clearInterval(timer);
   }, [browser, nativeMobile, refreshLocalStatus, settings.access.webUiEnabled]);
+
+  useEffect(() => {
+    if (browser || nativeMobile) return;
+    let disposed = false;
+    let stopListening: (() => void) | undefined;
+    void listen<LocalAccessStatus>("local-access:status", (event) => {
+      if (!disposed) setLocalStatus(event.payload);
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else stopListening = unlisten;
+    });
+    return () => {
+      disposed = true;
+      stopListening?.();
+    };
+  }, [browser, nativeMobile]);
 
   const endpoint = useMemo(
     () => localStatus.urls[0] ?? `http://127.0.0.1:${settings.access.webUiPort}`,

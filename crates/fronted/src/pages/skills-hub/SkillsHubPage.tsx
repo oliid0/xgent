@@ -675,12 +675,13 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     setSettings,
     initialSkills,
     initialRootDir,
-    isAgentMode,
     sidebarOpen,
     onOpenSidebar,
   } = props;
   const { t } = useLocale();
-  const lockedByChatMode = !isAgentMode;
+  // Skills are configuration, so their Hub remains manageable in every chat mode.
+  // The chat runtime still decides whether a selected skill participates in a turn.
+  const lockedByChatMode = false;
 
   const [skills, setSkills] = useState<SkillSummary[]>(initialSkills ?? []);
   const [rootDir, setRootDir] = useState(initialRootDir ?? "");

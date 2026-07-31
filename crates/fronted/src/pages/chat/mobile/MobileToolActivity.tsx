@@ -112,7 +112,7 @@ function ActivityDetail({ item }: { item: ActivityItem }) {
   const failed = toolFailed(item.toolResult);
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-border/50 bg-background/70 shadow-sm backdrop-blur-xl dark:bg-white/[0.035]">
+    <article className="overflow-hidden rounded-xl border border-border bg-background">
       <div className="flex items-start gap-2.5 border-b border-border/45 px-3.5 py-3">
         <span
           className={cn(
@@ -232,28 +232,27 @@ export function MobileToolActivity({
 
       <div
         className={cn(
-          "fixed inset-0 z-[70] bg-black/20 backdrop-blur-[1px] transition-opacity duration-200",
+          "fixed inset-0 z-[70] bg-background transition-opacity duration-150",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         aria-hidden={!open}
-        onClick={onClose}
       >
         <aside
           data-mobile-right-drawer
           className={cn(
-            "absolute inset-y-0 right-0 flex w-[min(92vw,440px)] flex-col overflow-hidden border-l border-white/35 bg-background/86 pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] shadow-[-24px_0_64px_-28px_rgba(15,23,42,0.55)] backdrop-blur-2xl backdrop-saturate-150 transition-transform duration-200 dark:border-white/[0.09] dark:bg-background/82",
-            open ? "translate-x-0" : "translate-x-full",
+            "absolute inset-0 flex w-full flex-col overflow-hidden bg-background pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] transition-transform duration-200",
+            open ? "translate-x-0" : "translate-x-[8%]",
           )}
-          onClick={(event) => event.stopPropagation()}
         >
-          <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/45 px-3.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/12 text-blue-600 dark:text-blue-300">
-              {activeItem ? (
-                <ActivityIcon name={activeItem.toolCall.name} running />
-              ) : (
-                <Wrench className="h-4 w-4" />
-              )}
-            </div>
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors active:bg-muted"
+              aria-label={t("chat.mobileActivity.close")}
+            >
+              <X className="h-4 w-4" />
+            </button>
             <div className="min-w-0 flex-1">
               <div className="text-[15px] font-semibold tracking-tight">
                 {t("chat.mobileActivity.title")}
@@ -262,14 +261,11 @@ export function MobileToolActivity({
                 {activeItem ? t("chat.mobileActivity.running") : t("chat.mobileActivity.recent")}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors active:bg-muted"
-              aria-label={t("chat.mobileActivity.close")}
-            >
-              <X className="h-4 w-4" />
-            </button>
+            {activeItem ? (
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-foreground">
+                <ActivityIcon name={activeItem.toolCall.name} running />
+              </div>
+            ) : null}
           </header>
 
           <div

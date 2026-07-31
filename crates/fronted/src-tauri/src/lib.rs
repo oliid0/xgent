@@ -361,6 +361,19 @@ macro_rules! app_invoke_handler {
             commands::settings::settings_apply_ssh_patch,
             commands::settings::settings_reset_ssh_known_host,
             commands::settings::settings_save_memory,
+            commands::cron::cron_validate_expression,
+            commands::cron::automation_snapshot,
+            commands::cron::automation_cron_apply,
+            commands::cron::automation_hooks_apply,
+            commands::cron::automation_list_runs,
+            commands::cron::automation_clear_runs,
+            commands::cron::automation_run_cron_now,
+            commands::cron::automation_claim_prompt_runs,
+            commands::cron::automation_release_prompt_run,
+            commands::cron::automation_complete_prompt_run,
+            commands::hook::hook_run_script,
+            commands::hook::hook_run_http_requests,
+            commands::hook::hook_cancel_scope,
             commands::mcp::mcp_list_tools,
             commands::mcp::mcp_call_tool,
             commands::mcp::mcp_cancel_tool,
@@ -752,6 +765,7 @@ pub fn run() {
         .plugin(tauri_plugin_mobile_assistant::init())
         .plugin(tauri_plugin_mobile_execution::init())
         .manage(Arc::new(commands::mcp::McpRuntimeManager::default()))
+        .manage(Arc::new(commands::hook::MobileHookScopeRegistry::default()))
         .setup(|app| {
             let app_data_dir = app
                 .path()
@@ -768,6 +782,14 @@ pub fn run() {
                     .map_err(|error| format!("initialize XAgent memory store failed: {error}"))?,
             );
             app.manage(memory_store);
+            let automation_store = Arc::new(
+                services::automation::AutomationStore::open()
+                    .map_err(|error| format!("initialize XAgent automation store failed: {error}"))?,
+            );
+            automation_store.set_notifier(services::automation::AutomationNotifier {
+                app_handle: app.handle().clone(),
+            });
+            app.manage(automation_store);
             let cloud_secret_vault = Arc::new(
                 services::cloud_secret_vault::CloudSecretVault::new(app_data_dir.clone())?,
             );

@@ -1,4 +1,6 @@
-use std::sync::{Mutex, Weak};
+use std::sync::Mutex;
+#[cfg(desktop)]
+use std::sync::Weak;
 
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde_json::Value;
@@ -6,6 +8,7 @@ use tauri::Emitter;
 use uuid::Uuid;
 
 use super::db;
+#[cfg(desktop)]
 use super::scheduler::AutomationScheduler;
 use super::types::*;
 use super::validate;
@@ -15,6 +18,7 @@ use super::validate;
 /// exactly the same broadcast.
 pub struct AutomationNotifier {
     pub app_handle: tauri::AppHandle,
+    #[cfg(desktop)]
     pub scheduler: Weak<AutomationScheduler>,
 }
 
@@ -23,6 +27,7 @@ impl AutomationNotifier {
         if let Err(error) = self.app_handle.emit(CRON_CHANGED_EVENT, snapshot) {
             eprintln!("emit {CRON_CHANGED_EVENT} failed: {error}");
         }
+        #[cfg(desktop)]
         if let Some(scheduler) = self.scheduler.upgrade() {
             scheduler.request_reload();
         }
@@ -98,6 +103,13 @@ impl AutomationStore {
     }
 
     pub fn run_cron_task_now(&self, task_id: &str) -> Result<CronRunNowResponse, String> {
+        #[cfg(mobile)]
+        {
+            let _ = task_id;
+            return Err("Run now requires the paired computer or a native mobile background executor.".to_string());
+        }
+        #[cfg(desktop)]
+        {
         let scheduler = self
             .notifier
             .lock()
@@ -106,6 +118,7 @@ impl AutomationStore {
             .and_then(|notifier| notifier.scheduler.upgrade())
             .ok_or_else(|| "automation scheduler is unavailable".to_string())?;
         scheduler.run_now(task_id)
+        }
     }
 
     fn lock_conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>, String> {

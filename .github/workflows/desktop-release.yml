@@ -468,7 +468,6 @@ jobs:
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       ANDROID_NDK_VERSION: 28.2.13676358
       ANDROID_BUILD_TOOLS_VERSION: 36.0.0
-      PROOT_SOURCE_COMMIT: a89b3732ec6ae1db674510f0843b2f3db54d0a2f
     steps:
       - uses: actions/checkout@v6
         with:
@@ -526,6 +525,19 @@ jobs:
           bash scripts/mobile/prepare-proot-android.sh
           bash scripts/mobile/prepare-alpine-rootfs-android.sh
           bash scripts/mobile/prepare-mobile-legal-notices.sh
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          import re
+
+          with open("crates/mobile-execution/android/src/main/assets/xagent-proot-manifest.json", encoding="utf-8") as stream:
+              manifest = json.load(stream)
+          version = str(manifest["version"])
+          upstream_version = version.split(":", 1)[-1].split("-", 1)[0]
+          source_ref = str(manifest.get("commit") or f"v{upstream_version}")
+          safe_label = re.sub(r"[^A-Za-z0-9._-]+", "-", version)
+          print(f"PROOT_SOURCE_REF={source_ref}")
+          print(f"PROOT_VERSION_LABEL={safe_label}")
+          PY
 
       - name: Initialize Tauri Android project
         working-directory: crates/fronted
@@ -628,9 +640,9 @@ jobs:
       - name: Package PRoot corresponding source
         run: |
           set -euo pipefail
-          source_archive="dist/XAgent-${XAGENT_RELEASE_TAG}-PRoot-${PROOT_SOURCE_COMMIT}-source.tar.gz"
+          source_archive="dist/XAgent-${XAGENT_RELEASE_TAG}-PRoot-${PROOT_VERSION_LABEL}-source.tar.gz"
           curl --fail --location --proto '=https' --tlsv1.2 \
-            "https://codeload.github.com/termux/proot/tar.gz/$PROOT_SOURCE_COMMIT" \
+            "https://codeload.github.com/termux/proot/tar.gz/$PROOT_SOURCE_REF" \
             --output "$source_archive"
           test -s "$source_archive"
           source_name="$(basename "$source_archive")"

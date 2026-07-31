@@ -8,7 +8,6 @@ import {
   MonitorSmartphone,
   Moon,
   OpenaiChatgptIcon,
-  PanelLeft,
   Search,
   Settings,
   Sun,
@@ -21,9 +20,8 @@ import { groupModelOptionsByProvider } from "../../../lib/chat/page/chatPageHelp
 import { type ModelOption, parseModelValue } from "../../../lib/providers/llm";
 import {
   type AppSettings,
+  type ExecutionMode,
   getNextTheme,
-  isAgentDevMode,
-  isAgentExecutionMode,
   type ProviderId,
   type SelectedModel,
   type Theme,
@@ -52,9 +50,8 @@ export const ChatHeader = memo(function ChatHeader(props: {
   selectedValue?: string;
   sidebarOpen: boolean;
   onSelectModel: (selection: SelectedModel) => void;
-  // 模型下拉内嵌的执行模式分段器：请求切到 Chat("text") 或 Agent("tools")。
-  // agent-dev 视为 Agent 的一种，由调用方决定是否保持不降级。
-  onSelectExecutionMode: (mode: "text" | "tools") => void;
+  // The model picker is also the single fast switch for all three runtimes.
+  onSelectExecutionMode: (mode: ExecutionMode) => void;
   onOpenSettings: (section?: SectionId) => void;
   onToggleTheme: () => void;
   onOpenSidebar: () => void;
@@ -126,7 +123,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
       )}
     >
       <div className="flex min-w-0 items-center gap-1.5">
-        {!sidebarOpen && !macOsTauri ? (
+        {mobileExperience && !sidebarOpen && !macOsTauri ? (
           <Button
             variant="ghost"
             size="icon"
@@ -139,14 +136,10 @@ export const ChatHeader = memo(function ChatHeader(props: {
                 : "h-8 w-8 rounded-lg",
             )}
           >
-            {mobileExperience ? (
-              <span className="flex h-5 w-5 flex-col justify-center gap-1.5" aria-hidden="true">
-                <span className="h-0.5 w-5 rounded-full bg-current" />
-                <span className="h-0.5 w-3.5 rounded-full bg-current" />
-              </span>
-            ) : (
-              <PanelLeft className="h-4.5 w-4.5" />
-            )}
+            <span className="flex h-5 w-5 flex-col justify-center gap-1.5" aria-hidden="true">
+              <span className="h-0.5 w-5 rounded-full bg-current" />
+              <span className="h-0.5 w-3.5 rounded-full bg-current" />
+            </span>
           </Button>
         ) : null}
 
@@ -190,8 +183,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
                 className="model-selector-dropdown w-[min(18rem,calc(100vw-1rem))] overflow-hidden rounded-xl border bg-popover p-0 text-xs text-popover-foreground shadow-md outline-none"
               >
                 {(() => {
-                  const isAgent = isAgentExecutionMode(settings.system.executionMode);
-                  const isDev = isAgentDevMode(settings.system.executionMode);
+                  const executionMode = settings.system.executionMode;
                   return (
                     <div className="px-2 pt-2">
                       <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 px-2 py-1.5">
@@ -201,21 +193,21 @@ export const ChatHeader = memo(function ChatHeader(props: {
                         <div
                           role="radiogroup"
                           aria-label={t("settings.executionMode")}
-                          className="flex rounded-md bg-background/80 p-0.5 shadow-sm ring-1 ring-border/40"
+                          className="grid grid-cols-3 rounded-md bg-background p-0.5 ring-1 ring-border"
                         >
                           <label
                             className={cn(
                               "relative cursor-pointer rounded-[5px] px-2.5 py-1 text-[11px] font-medium transition-colors has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40",
-                              isAgent
-                                ? "text-muted-foreground hover:text-foreground"
-                                : "bg-foreground/[0.07] text-foreground",
+                              executionMode === "text"
+                                ? "bg-muted text-foreground"
+                                : "text-muted-foreground hover:text-foreground",
                             )}
                           >
                             <input
                               type="radio"
                               name={executionModeRadioName}
                               value="text"
-                              checked={!isAgent}
+                              checked={executionMode === "text"}
                               onChange={() => onSelectExecutionMode("text")}
                               className="sr-only"
                             />
@@ -224,8 +216,8 @@ export const ChatHeader = memo(function ChatHeader(props: {
                           <label
                             className={cn(
                               "relative cursor-pointer rounded-[5px] px-2.5 py-1 text-[11px] font-medium transition-colors has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40",
-                              isAgent
-                                ? "bg-foreground/[0.07] text-foreground"
+                              executionMode === "tools"
+                                ? "bg-muted text-foreground"
                                 : "text-muted-foreground hover:text-foreground",
                             )}
                           >
@@ -233,11 +225,29 @@ export const ChatHeader = memo(function ChatHeader(props: {
                               type="radio"
                               name={executionModeRadioName}
                               value="tools"
-                              checked={isAgent}
+                              checked={executionMode === "tools"}
                               onChange={() => onSelectExecutionMode("tools")}
                               className="sr-only"
                             />
-                            {isDev ? "Agent·dev" : "Agent"}
+                            Agent
+                          </label>
+                          <label
+                            className={cn(
+                              "relative cursor-pointer rounded-[5px] px-2 py-1 text-[10.5px] font-medium transition-colors has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40",
+                              executionMode === "agent-dev"
+                                ? "bg-muted text-foreground"
+                                : "text-muted-foreground hover:text-foreground",
+                            )}
+                          >
+                            <input
+                              type="radio"
+                              name={executionModeRadioName}
+                              value="agent-dev"
+                              checked={executionMode === "agent-dev"}
+                              onChange={() => onSelectExecutionMode("agent-dev")}
+                              className="sr-only"
+                            />
+                            Agent dev
                           </label>
                         </div>
                       </div>

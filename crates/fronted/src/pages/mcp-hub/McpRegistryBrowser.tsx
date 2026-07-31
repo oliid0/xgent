@@ -51,6 +51,7 @@ const STORE_PAGE_LIMIT = 18;
 type McpRegistryBrowserProps = {
   settings: AppSettings;
   setSettings: (updater: (prev: AppSettings) => AppSettings) => void;
+  allowStdio?: boolean;
 };
 
 type McpConfigModalDraft = {
@@ -243,10 +244,15 @@ function pickInitialTransport(card: McpRegistryCard): McpServerConfig["transport
 function buildModalDraft(
   card: McpRegistryCard,
   existingServers: McpServerConfig[],
+  allowStdio: boolean,
 ): McpConfigModalDraft {
   const configureDraft = configureDraftForCard(card);
   const server = configureDraft?.server;
-  const transport = pickInitialTransport(card);
+  const initialTransport = pickInitialTransport(card);
+  const transport =
+    !allowStdio && initialTransport === "stdio"
+      ? card.transportHints.find((item) => item === "http" || item === "sse") ?? "http"
+      : initialTransport;
   const id = createUniqueMcpServerId(
     server?.id || card.name || card.displayName,
     existingServers.map((item) => item.id),
@@ -349,21 +355,24 @@ function buildServerFromModalDraft(
 function McpConfigureModal(props: {
   card: McpRegistryCard;
   existingServers: McpServerConfig[];
+  allowStdio: boolean;
   onClose: () => void;
   onSave: (server: McpServerConfig) => void;
 }) {
-  const { card, existingServers, onClose, onSave } = props;
+  const { card, existingServers, allowStdio, onClose, onSave } = props;
   const { t } = useLocale();
   const { modalState, requestClose } = useModalMotion(onClose);
   const configureDraft = configureDraftForCard(card);
   const requiredConfig = configureDraft?.requiredConfig ?? [];
-  const [draft, setDraft] = useState(() => buildModalDraft(card, existingServers));
+  const [draft, setDraft] = useState(() =>
+    buildModalDraft(card, existingServers, allowStdio),
+  );
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    setDraft(buildModalDraft(card, existingServers));
+    setDraft(buildModalDraft(card, existingServers, allowStdio));
     setFormError(null);
-  }, [card, existingServers]);
+  }, [allowStdio, card, existingServers]);
 
   function updateDraft(patch: Partial<McpConfigModalDraft>) {
     setFormError(null);
@@ -385,6 +394,9 @@ function McpConfigureModal(props: {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
+      if (!allowStdio && draft.transport === "stdio") {
+        throw new Error(t("mcpHub.mobileNetworkOnly"));
+      }
       const server = buildServerFromModalDraft(draft, requiredConfig, t);
       const configuredDraft: McpRegistryInstallDraft = {
         server,
@@ -472,7 +484,9 @@ function McpConfigureModal(props: {
                     <SelectValue placeholder={t("mcpHub.selectTransport")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="stdio">{t("mcpHub.stdio")}</SelectItem>
+                    <SelectItem value="stdio" disabled={!allowStdio}>
+                      {t("mcpHub.stdio")}
+                    </SelectItem>
                     <SelectItem value="http">{t("mcpHub.http")}</SelectItem>
                     <SelectItem value="sse">{t("mcpHub.sse")}</SelectItem>
                   </SelectContent>
@@ -1279,7 +1293,7 @@ function McpPreviewField(props: { label: string; value?: string | null; mono?: b
 }
 
 export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
-  const { settings, setSettings } = props;
+  const { settings, setSettings, allowStdio = true } = props;
   const { t } = useLocale();
   const [source, setSource] = useState<McpRegistrySource>("official");
   const [query, setQuery] = useState("");
@@ -1411,6 +1425,9 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
       if (!resolved.installDraft) {
         setConfiguringCard(resolved);
         return;
+      }
+      if (!allowStdio && resolved.installDraft.server.transport === "stdio") {
+        throw new Error(t("mcpHub.mobileNetworkOnly"));
       }
       if (resolved.installDraft.status === "needs_config") {
         setConfiguringCard(resolved);
@@ -1601,6 +1618,7 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
         <McpConfigureModal
           card={configuringCard}
           existingServers={settings.mcp.servers}
+          allowStdio={allowStdio}
           onClose={() => setConfiguringCard(null)}
           onSave={(server) => {
             const uniqueServer = {

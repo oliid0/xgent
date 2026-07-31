@@ -66,8 +66,9 @@ function toMcpServerConfig(entry: ExternalMcpServerEntry): McpServerConfig {
 export function McpImportView(props: {
   settings: AppSettings;
   setSettings: (updater: (prev: AppSettings) => AppSettings) => void;
+  allowStdio?: boolean;
 }) {
-  const { settings, setSettings } = props;
+  const { settings, setSettings, allowStdio = true } = props;
   const { t } = useLocale();
 
   const [scans, setScans] = useState<ExternalMcpToolScan[] | null>(null);
@@ -164,9 +165,11 @@ export function McpImportView(props: {
   const importableInActive = useMemo(
     () =>
       (activeScan?.servers ?? []).filter(
-        (server) => !installedIds.has(server.id.trim().toLowerCase()),
+        (server) =>
+          !installedIds.has(server.id.trim().toLowerCase()) &&
+          (allowStdio || server.transport !== "stdio"),
       ),
-    [activeScan, installedIds],
+    [activeScan, allowStdio, installedIds],
   );
   const selectedInActive = importableInActive.filter((server) =>
     selected.has(externalServerKey(activeTool, server)),
@@ -175,6 +178,7 @@ export function McpImportView(props: {
     importableInActive.length > 0 && selectedInActive === importableInActive.length;
 
   function toggleServer(tool: string, server: ExternalMcpServerEntry) {
+    if (!allowStdio && server.transport === "stdio") return;
     const key = externalServerKey(tool, server);
     setSelected((prev) => {
       const next = new Set(prev);
@@ -202,7 +206,11 @@ export function McpImportView(props: {
 
   function importSelected() {
     const targets = allScans.flatMap((scan) =>
-      scan.servers.filter((server) => selected.has(externalServerKey(scan.tool, server))),
+      scan.servers.filter(
+        (server) =>
+          selected.has(externalServerKey(scan.tool, server)) &&
+          (allowStdio || server.transport !== "stdio"),
+      ),
     );
     if (targets.length === 0) return;
 
@@ -233,6 +241,17 @@ export function McpImportView(props: {
               <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
               <span className="text-xs text-destructive">
                 {t("mcpHub.importScanFailed")}: {error}
+              </span>
+            </div>
+          </GlassPanel>
+        ) : null}
+
+        {!allowStdio ? (
+          <GlassPanel tone="muted" className="hub-panel-enter">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="text-xs leading-5 text-muted-foreground">
+                {t("mcpHub.mobileNetworkOnly")}
               </span>
             </div>
           </GlassPanel>
@@ -415,6 +434,7 @@ export function McpImportView(props: {
                     {activeScan.servers.map((server) => {
                       const key = externalServerKey(activeScan.tool, server);
                       const alreadyImported = installedIds.has(server.id.trim().toLowerCase());
+                      const unsupported = !allowStdio && server.transport === "stdio";
                       const checked = selected.has(key);
                       const isStdio = server.transport === "stdio";
                       const preview = isStdio
@@ -433,11 +453,11 @@ export function McpImportView(props: {
                         <button
                           key={key}
                           type="button"
-                          disabled={alreadyImported}
+                          disabled={alreadyImported || unsupported}
                           onClick={() => toggleServer(activeScan.tool, server)}
                           className={cn(
                             "group flex items-start gap-2.5 rounded-xl border p-3 text-left transition-all",
-                            alreadyImported
+                            alreadyImported || unsupported
                               ? "cursor-not-allowed border-border/35 bg-muted/30 opacity-70"
                               : checked
                                 ? "border-primary/60 bg-primary/5 shadow-sm shadow-primary/10"
@@ -478,6 +498,11 @@ export function McpImportView(props: {
                               {alreadyImported ? (
                                 <span className="inline-flex shrink-0 items-center rounded-full bg-foreground/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-foreground/70 ring-1 ring-border/45">
                                   {t("mcpHub.importAlreadyImported")}
+                                </span>
+                              ) : null}
+                              {unsupported ? (
+                                <span className="inline-flex shrink-0 rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                  {t("mcpHub.mobileNetworkOnly")}
                                 </span>
                               ) : null}
                             </span>

@@ -30,19 +30,21 @@ internal data class AndroidRunResult(
 
 internal data class ProotBinaries(
     val executable: File,
+    val loader: File,
 ) {
     val available: Boolean
-        get() = executable.isFile
+        get() = executable.isFile && loader.isFile
 
     companion object {
         fun resolve(nativeLibraryDir: File): ProotBinaries = ProotBinaries(
             executable = File(nativeLibraryDir, "libxagent_proot.so"),
+            loader = File(nativeLibraryDir, "libxagent_proot_loader.so"),
         )
     }
 }
 
 internal class ProotRunner(
-    nativeLibraryDir: File,
+    private val nativeLibraryDir: File,
     private val rootfsDir: File,
     private val tempDir: File,
     private val allowedHostRoots: () -> List<File>,
@@ -74,6 +76,8 @@ internal class ProotRunner(
             .apply {
                 environment().clear()
                 environment()["PROOT_TMP_DIR"] = tempDir.absolutePath
+                environment()["PROOT_LOADER"] = binaries.loader.absolutePath
+                environment()["LD_LIBRARY_PATH"] = nativeLibraryDir.absolutePath
                 environment()["TMPDIR"] = tempDir.absolutePath
             }
             .start()
