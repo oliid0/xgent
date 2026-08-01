@@ -9,6 +9,8 @@ const headerSources = [
   ),
 ];
 
+const executionModes = ["text", "tools", "agent-dev"];
+
 test("model pickers use popover semantics instead of menu semantics", () => {
   for (const source of headerSources) {
     assert.match(source, /import \{ Popover \} from "@base-ui\/react"/);
@@ -23,11 +25,15 @@ test("execution mode switchers expose a native radio group", () => {
   for (const source of headerSources) {
     assert.match(source, /role="radiogroup"/);
     assert.match(source, /aria-label=\{t\("settings\.executionMode"\)\}/);
-    assert.equal((source.match(/type="radio"/g) ?? []).length, 2);
-    assert.match(source, /checked=\{!isAgent\}/);
-    assert.match(source, /checked=\{isAgent\}/);
-    assert.match(source, /onChange=\{\(\) => onSelectExecutionMode\("text"\)\}/);
-    assert.match(source, /onChange=\{\(\) => onSelectExecutionMode\("tools"\)\}/);
+    assert.equal((source.match(/type="radio"/g) ?? []).length, executionModes.length);
+    for (const mode of executionModes) {
+      assert.match(source, new RegExp(`value="${mode}"`));
+      assert.match(source, new RegExp(`checked=\\{executionMode === "${mode}"\\}`));
+      assert.match(
+        source,
+        new RegExp(`onChange=\\{\\(\\) => onSelectExecutionMode\\("${mode}"\\)\\}`),
+      );
+    }
     assert.match(source, /has-\[:focus-visible\]:ring-2/);
   }
 });
