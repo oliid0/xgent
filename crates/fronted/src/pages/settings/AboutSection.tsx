@@ -1,4 +1,5 @@
 import { openUrl } from "@xagent/runtime";
+import iconSimpleUrl from "../../../src-tauri/icons/icon-simple.png";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -17,7 +18,6 @@ import { updateUpdateSettings } from "../../lib/settings";
 import { formatReleaseDate } from "./aboutDate";
 import { AgentActivationSwitch } from "./shared";
 import type { SettingsSectionProps } from "./types";
-import iconSimpleUrl from "../../../src-tauri/icons/icon-simple.png";
 
 type AboutSectionProps = SettingsSectionProps & {
   appUpdate: AppUpdateController;

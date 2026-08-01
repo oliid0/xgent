@@ -83,8 +83,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
     [hosts, selectedHostId],
   );
   const associatedSet = useMemo(
-    () =>
-      new Set(associatedHostIds.filter((id) => hosts.some((host) => host.id === id))),
+    () => new Set(associatedHostIds.filter((id) => hosts.some((host) => host.id === id))),
     [associatedHostIds, hosts],
   );
   const orderedHosts = useMemo(
@@ -158,9 +157,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
     if (!projectPathKey) return;
     const current = associatedHostIds.filter((id) => hosts.some((host) => host.id === id));
     onAssociatedHostIdsChange(
-      associatedSet.has(hostId)
-        ? current.filter((id) => id !== hostId)
-        : [...current, hostId],
+      associatedSet.has(hostId) ? current.filter((id) => id !== hostId) : [...current, hostId],
     );
   };
 
@@ -323,11 +320,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
                             : t("chat.mobileSsh.associateHost")
                         }
                       >
-                        {associated ? (
-                          <Check className="h-4 w-4" />
-                        ) : (
-                          <Link2 className="h-4 w-4" />
-                        )}
+                        {associated ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
                       </button>
                     </div>
                   );

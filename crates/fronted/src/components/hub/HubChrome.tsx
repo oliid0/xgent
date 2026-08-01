@@ -66,7 +66,9 @@ export function HubHeader(props: {
               </p>
             ) : null}
           </div>
-          {actions ? <div className="hub-header-actions flex items-center gap-2">{actions}</div> : null}
+          {actions ? (
+            <div className="hub-header-actions flex items-center gap-2">{actions}</div>
+          ) : null}
         </div>
       </div>
     </>
