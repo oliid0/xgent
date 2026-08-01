@@ -92,18 +92,21 @@ function BackgroundTaskLogDialog(props: {
   const [error, setError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<LogContextMenuState | null>(null);
 
-  const refresh = useCallback((silent = false) => {
-    if (!silent) {
-      setLoading(true);
-      setError(null);
-    }
-    readManagedProcessLog(process.id)
-      .then(setLog)
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
-      .finally(() => {
-        if (!silent) setLoading(false);
-      });
-  }, [process.id]);
+  const refresh = useCallback(
+    (silent = false) => {
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
+      readManagedProcessLog(process.id)
+        .then(setLog)
+        .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+        .finally(() => {
+          if (!silent) setLoading(false);
+        });
+    },
+    [process.id],
+  );
 
   const lines = useMemo(() => {
     if (!log?.content.trim()) return [];
