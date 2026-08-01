@@ -468,6 +468,23 @@ fn request_app_exit(
 }
 
 #[cfg(desktop)]
+fn exit_app_from_tray(
+    app: &tauri::AppHandle,
+    allow_exit: &AtomicBool,
+    terminal_registry: &runtime::terminal::TerminalSessionRegistry,
+) {
+    // Selecting Quit from the tray is already an explicit confirmation. Do not
+    // restore a hidden window or enter the title-bar close confirmation flow.
+    // Best-effort terminal cleanup still happens before the run loop is allowed
+    // to perform the remaining managed-process and power-activity cleanup.
+    if let Err(error) = terminal_registry.close_all() {
+        eprintln!("failed to close terminal sessions while quitting from tray: {error}");
+    }
+    allow_exit.store(true, Ordering::SeqCst);
+    app.exit(0);
+}
+
+#[cfg(desktop)]
 fn record_tray_left_click(last_click_at: &Mutex<Option<Instant>>) -> bool {
     let now = Instant::now();
     let mut last_click_at = last_click_at.lock().unwrap();
@@ -502,7 +519,7 @@ fn configure_system_tray(
                 }
             }
             TRAY_QUIT_ID => {
-                request_app_exit(app, &allow_exit, &terminal_registry);
+                exit_app_from_tray(app, &allow_exit, &terminal_registry);
             }
             _ => {}
         })
