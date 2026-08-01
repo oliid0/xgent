@@ -82,21 +82,13 @@ export function HubPanel(props: {
       case "amber":
       case "violet":
       case "neutral":
-        return active
-          ? "border-foreground/20 bg-card shadow-sm"
-          : "border-border bg-card";
+        return active ? "border-foreground/20 bg-card shadow-sm" : "border-border bg-card";
       default:
         return "border-border bg-card";
     }
   })();
   return (
-    <div
-      className={cn(
-        "hub-panel rounded-xl border px-4 py-3.5",
-        toneClass,
-        className,
-      )}
-    >
+    <div className={cn("hub-panel rounded-xl border px-4 py-3.5", toneClass, className)}>
       {children}
     </div>
   );

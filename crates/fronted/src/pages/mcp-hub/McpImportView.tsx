@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  HubPanel,
-  HubSegmentedButton,
-  HubSegmentedControl,
-} from "../../components/hub/HubChrome";
+import { HubPanel, HubSegmentedButton, HubSegmentedControl } from "../../components/hub/HubChrome";
 import {
   AlertTriangle,
   Check,

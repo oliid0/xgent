@@ -231,8 +231,8 @@ import {
   buildConversationRuntimeSnapshotEntries,
   type ConversationRuntimeSnapshotState,
 } from "./chat/local-access/conversationRuntimeSnapshot";
-import { MobileBrowserSettingsPanel } from "./chat/mobile/MobileBrowserSettingsPanel";
 import { MobileBackgroundTasksPanel } from "./chat/mobile/MobileBackgroundTasksPanel";
+import { MobileBrowserSettingsPanel } from "./chat/mobile/MobileBrowserSettingsPanel";
 import { MobileFilesPanel } from "./chat/mobile/MobileFilesPanel";
 import { MobileGitReviewPanel } from "./chat/mobile/MobileGitReviewPanel";
 import { MobileQuickActions } from "./chat/mobile/MobileQuickActions";
@@ -4038,9 +4038,7 @@ export function ChatPage(props: ChatPageProps) {
   }, []);
 
   const handleCloseMobileActivity = useCallback(() => {
-    setMobileWorkspaceDestination((current) =>
-      current?.kind === "activity" ? null : current,
-    );
+    setMobileWorkspaceDestination((current) => (current?.kind === "activity" ? null : current));
   }, []);
 
   const handleOpenMobileBackgroundTasks = useCallback(() => {

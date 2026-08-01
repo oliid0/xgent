@@ -173,9 +173,7 @@ function SoulPresetPicker(props: SoulPresetPickerProps) {
       >
         {t("sidebar.soulPresets")}
       </div>
-      <div
-        className={cn("overflow-y-auto", props.mobile ? "space-y-1" : "max-h-36 space-y-0.5")}
-      >
+      <div className={cn("overflow-y-auto", props.mobile ? "space-y-1" : "max-h-36 space-y-0.5")}>
         {props.presets.map((preset) => {
           const active = preset.id === props.activeId;
           return (
@@ -205,9 +203,7 @@ function SoulPresetPicker(props: SoulPresetPickerProps) {
         disabled={props.saving}
         className={cn(
           "flex w-full items-center gap-2.5 rounded-lg px-2 text-left text-foreground/85 transition-colors hover:bg-muted disabled:opacity-45",
-          props.mobile
-            ? "mt-2 h-12 text-[15px]"
-            : "h-8 text-[calc(13px*var(--zone-font-scale,1))]",
+          props.mobile ? "mt-2 h-12 text-[15px]" : "h-8 text-[calc(13px*var(--zone-font-scale,1))]",
         )}
       >
         <Plus className="h-4 w-4 text-muted-foreground" />

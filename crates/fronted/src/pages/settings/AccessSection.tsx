@@ -208,12 +208,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
     if (browser) return;
     void refreshVaultStatus();
     if (nativeMobile) void refreshLanPcStatus();
-  }, [
-    browser,
-    nativeMobile,
-    refreshLanPcStatus,
-    refreshVaultStatus,
-  ]);
+  }, [browser, nativeMobile, refreshLanPcStatus, refreshVaultStatus]);
 
   useEffect(() => {
     if (browser || nativeMobile) return;
@@ -486,7 +481,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                   : localStatusPhase === "failed"
                     ? "bg-destructive/10 text-destructive"
-                  : "bg-muted/50 text-muted-foreground"
+                    : "bg-muted/50 text-muted-foreground"
               }`}
               title={localStatus.lastError ?? undefined}
             >

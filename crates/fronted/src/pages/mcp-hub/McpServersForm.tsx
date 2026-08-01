@@ -35,9 +35,9 @@ import {
   updateSystem,
 } from "../../lib/settings";
 import { useModalMotion } from "../../lib/shared/modalMotion";
-import { SettingsModalShell } from "../settings/SettingsModalShell";
 import { cn } from "../../lib/shared/utils";
 import { toolGroupPolicyKey, toolServerPolicyKey } from "../../lib/tools/toolPolicy";
+import { SettingsModalShell } from "../settings/SettingsModalShell";
 
 type SetMcpSettingsFn = (updater: (prev: AppSettings) => AppSettings) => void;
 
@@ -477,10 +477,7 @@ export function McpServerEditModal(props: {
 
   return (
     <SettingsModalShell onClose={requestClose} state={modalState} ariaLabel={title}>
-      <form
-        onSubmit={handleSubmit}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-      >
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]">
             <Plug className="h-5 w-5" />

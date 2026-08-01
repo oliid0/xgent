@@ -77,7 +77,7 @@ function gitCommand(args: string) {
 
 function parseStatus(output: string): GitSnapshot {
   const lines = output.replaceAll("\r\n", "\n").split("\n");
-  const header = lines[0]?.startsWith("## ") ? lines.shift()?.slice(3) ?? "" : "";
+  const header = lines[0]?.startsWith("## ") ? (lines.shift()?.slice(3) ?? "") : "";
   const branchPart = header.split("...")[0]?.trim() ?? "";
   const upstreamMatch = header.match(/\.\.\.([^\s[]+)/);
   const aheadMatch = header.match(/ahead (\d+)/);
@@ -196,9 +196,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
     try {
       const output = await run(
         "history",
-        gitCommand(
-          "log -n 60 --date=iso-strict --pretty=format:'%H%x1f%h%x1f%an%x1f%ad%x1f%s'",
-        ),
+        gitCommand("log -n 60 --date=iso-strict --pretty=format:'%H%x1f%h%x1f%an%x1f%ad%x1f%s'"),
       );
       setHistory(parseHistory(output));
       setError("");

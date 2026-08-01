@@ -44,8 +44,8 @@ import {
 } from "../../lib/mcpRegistry";
 import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
 import { useModalMotion } from "../../lib/shared/modalMotion";
-import { SettingsModalShell } from "../settings/SettingsModalShell";
 import { cn } from "../../lib/shared/utils";
+import { SettingsModalShell } from "../settings/SettingsModalShell";
 
 const STORE_PAGE_LIMIT = 18;
 
@@ -252,7 +252,7 @@ function buildModalDraft(
   const initialTransport = pickInitialTransport(card);
   const transport =
     !allowStdio && initialTransport === "stdio"
-      ? card.transportHints.find((item) => item === "http" || item === "sse") ?? "http"
+      ? (card.transportHints.find((item) => item === "http" || item === "sse") ?? "http")
       : initialTransport;
   const id = createUniqueMcpServerId(
     server?.id || card.name || card.displayName,
@@ -365,9 +365,7 @@ function McpConfigureModal(props: {
   const { modalState, requestClose } = useModalMotion(onClose);
   const configureDraft = configureDraftForCard(card);
   const requiredConfig = configureDraft?.requiredConfig ?? [];
-  const [draft, setDraft] = useState(() =>
-    buildModalDraft(card, existingServers, allowStdio),
-  );
+  const [draft, setDraft] = useState(() => buildModalDraft(card, existingServers, allowStdio));
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -426,10 +424,7 @@ function McpConfigureModal(props: {
       state={modalState}
       ariaLabel={t("mcpHub.storeConfigureTitle")}
     >
-      <form
-        onSubmit={handleSubmit}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-      >
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]">
             <Sparkles className="h-5 w-5" />

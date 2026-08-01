@@ -43,8 +43,8 @@ import {
   parseHttpRequestDrafts,
   requestToDraft,
 } from "./httpRequestEditor";
-import { SettingsModalShell } from "./SettingsModalShell";
 import { ModelPicker, type ModelPickerOption } from "./modelPicker";
+import { SettingsModalShell } from "./SettingsModalShell";
 
 export type CronPromptModelOption = ModelPickerOption;
 
@@ -304,558 +304,556 @@ export function CronTaskModal({
 
   return (
     <SettingsModalShell onClose={requestClose} state={modalState} ariaLabel={modalTitle}>
-        {/* Header */}
-        <div className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
-            <Clock3 className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base font-semibold">{modalTitle}</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {t("settings.cronExpressionHint")}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={requestClose}
-            title={t("settings.cancel")}
-            aria-label={t("settings.cancel")}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
+      {/* Header */}
+      <div className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
+          <Clock3 className="h-5 w-5" />
         </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-semibold">{modalTitle}</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t("settings.cronExpressionHint")}</p>
+        </div>
+        <button
+          type="button"
+          onClick={requestClose}
+          title={t("settings.cancel")}
+          aria-label={t("settings.cancel")}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
 
-        {/* Body */}
-        <div className="settings-modal-body flex-1 overflow-y-auto">
-          {/* Step 1: Basic Info */}
-          <div className="border-b border-border/30 px-6 py-5">
-            <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
-                1
-              </div>
-              <span className="text-sm font-semibold">{t("settings.cronStepBasic")}</span>
+      {/* Body */}
+      <div className="settings-modal-body flex-1 overflow-y-auto">
+        {/* Step 1: Basic Info */}
+        <div className="border-b border-border/30 px-6 py-5">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
+              1
             </div>
-
-            <div className="space-y-4">
-              <div className="settings-form-grid grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem]">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">
-                    {t("settings.cronTaskName")}
-                  </Label>
-                  <Input
-                    value={name}
-                    placeholder={t("settings.cronTaskNamePlaceholder")}
-                    onChange={(e) => {
-                      setFormError(null);
-                      setName(e.currentTarget.value);
-                    }}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">
-                    {t("settings.cronExpression")}
-                  </Label>
-                  <Input
-                    value={cron}
-                    placeholder={t("settings.cronExpressionPlaceholder")}
-                    className="font-mono"
-                    onChange={(e) => {
-                      setFormError(null);
-                      setCron(e.currentTarget.value);
-                    }}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">
-                    {t("settings.cronRemainingExecutions")}
-                  </Label>
-                  <Input
-                    value={remainingExecutions}
-                    inputMode="numeric"
-                    placeholder={t("settings.cronRemainingExecutionsPlaceholder")}
-                    onChange={(e) => {
-                      const next = e.currentTarget.value.trim();
-                      if (next && !/^\d+$/.test(next)) return;
-                      setFormError(null);
-                      setRemainingExecutions(next);
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="settings-form-grid grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">
-                    {t("settings.cronTaskDesc")}
-                  </Label>
-                  <Input
-                    value={description}
-                    placeholder={t("settings.cronTaskDescPlaceholder")}
-                    onChange={(e) => {
-                      setFormError(null);
-                      setDescription(e.currentTarget.value);
-                    }}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">
-                    {t("settings.cronTimeoutSeconds")}
-                  </Label>
-                  <Input
-                    value={timeoutSeconds}
-                    inputMode="numeric"
-                    placeholder={String(DEFAULT_CRON_TIMEOUT_SECONDS)}
-                    onChange={(e) => {
-                      const next = e.currentTarget.value.trim();
-                      if (next && !/^\d+$/.test(next)) return;
-                      setFormError(null);
-                      setTimeoutSeconds(next);
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
+            <span className="text-sm font-semibold">{t("settings.cronStepBasic")}</span>
           </div>
 
-          {/* Step 2: Task Type */}
-          <div className="border-b border-border/30 px-6 py-5">
-            <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
-                2
-              </div>
-              <span className="text-sm font-semibold">{t("settings.cronStepType")}</span>
-            </div>
-
-            <div className="settings-choice-grid settings-cron-type-grid grid grid-cols-3 gap-3">
-              {/* Bash */}
-              <button
-                type="button"
-                onClick={() => {
-                  setFormError(null);
-                  setType("bash");
-                }}
-                className={`group relative flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-                  type === "bash"
-                    ? "border-blue-500/50 bg-blue-500/5 shadow-sm shadow-blue-500/10"
-                    : "border-border/60 bg-background hover:border-border hover:bg-muted/20"
-                }`}
-              >
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                    type === "bash"
-                      ? "bg-blue-500/15 text-blue-500"
-                      : "bg-muted/60 text-muted-foreground"
-                  }`}
-                >
-                  <Terminal className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div
-                    className={`text-sm font-semibold ${type === "bash" ? "text-blue-600 dark:text-blue-400" : "text-foreground"}`}
-                  >
-                    {t("settings.cronTypeBash")}
-                  </div>
-                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                    {t("settings.cronTypeBashHint")}
-                  </p>
-                </div>
-                {type === "bash" ? (
-                  <div className="absolute right-3 top-3">
-                    <CheckCircle2 className="h-4.5 w-4.5 text-blue-500" />
-                  </div>
-                ) : null}
-              </button>
-
-              {/* HTTP */}
-              <button
-                type="button"
-                onClick={() => {
-                  setFormError(null);
-                  setType("http");
-                }}
-                className={`group relative flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-                  type === "http"
-                    ? "border-emerald-500/50 bg-emerald-500/5 shadow-sm shadow-emerald-500/10"
-                    : "border-border/60 bg-background hover:border-border hover:bg-muted/20"
-                }`}
-              >
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                    type === "http"
-                      ? "bg-emerald-500/15 text-emerald-500"
-                      : "bg-muted/60 text-muted-foreground"
-                  }`}
-                >
-                  <Globe className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div
-                    className={`text-sm font-semibold ${type === "http" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}
-                  >
-                    {t("settings.cronTypeHttp")}
-                  </div>
-                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                    {t("settings.cronTypeHttpHint")}
-                  </p>
-                </div>
-                {type === "http" ? (
-                  <div className="absolute right-3 top-3">
-                    <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500" />
-                  </div>
-                ) : null}
-              </button>
-
-              {/* Prompt */}
-              <button
-                type="button"
-                onClick={() => {
-                  setFormError(null);
-                  setType("prompt");
-                }}
-                className={`group relative flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-                  type === "prompt"
-                    ? "border-violet-500/50 bg-violet-500/5 shadow-sm shadow-violet-500/10"
-                    : "border-border/60 bg-background hover:border-border hover:bg-muted/20"
-                }`}
-              >
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                    type === "prompt"
-                      ? "bg-violet-500/15 text-violet-500"
-                      : "bg-muted/60 text-muted-foreground"
-                  }`}
-                >
-                  <MessageSquare className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div
-                    className={`text-sm font-semibold ${type === "prompt" ? "text-violet-600 dark:text-violet-400" : "text-foreground"}`}
-                  >
-                    {t("settings.cronTypePrompt")}
-                  </div>
-                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                    {t("settings.cronTypePromptHint")}
-                  </p>
-                </div>
-                {type === "prompt" ? (
-                  <div className="absolute right-3 top-3">
-                    <CheckCircle2 className="h-4.5 w-4.5 text-violet-500" />
-                  </div>
-                ) : null}
-              </button>
-            </div>
-
-            {/* Prompt-type run semantics belong to the type choice, not the config step */}
-            {type === "prompt" ? (
-              <div className="mt-3 rounded-xl border border-violet-500/15 bg-violet-500/[0.04] px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
-                {t("settings.cronPromptRunHint")}
-              </div>
-            ) : null}
-          </div>
-
-          {/* Step 3: Configuration */}
-          <div className="px-6 py-5">
-            <div className="settings-modal-step-row mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
-                  3
-                </div>
-                <span className="text-sm font-semibold">{t("settings.cronStepConfig")}</span>
-              </div>
-
-              {type === "bash" ? (
-                <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400">
-                  {scriptLineCount} {t("settings.cronCommandsCount")}
-                </span>
-              ) : type === "http" ? (
-                <div className="flex items-center gap-2">
-                  <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                    {requests.length} {t("settings.cronRequestsCount")}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 gap-1 px-2.5 text-xs"
-                    onClick={() => {
-                      setFormError(null);
-                      const draft = createEmptyRequestDraft();
-                      setRequests((prev) => [...prev, draft]);
-                      setExpandedRequest(draft.id);
-                    }}
-                  >
-                    <Plus className="h-3 w-3" />
-                    {t("settings.add")}
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Workspace pin — first row of the config step; bash/prompt run
-                inside a directory, http does not */}
-            {type !== "http" ? (
-              <div className="mb-4 space-y-1.5">
+          <div className="space-y-4">
+            <div className="settings-form-grid grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem]">
+              <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground">
-                  {t("settings.cronWorkdirLabel")}
+                  {t("settings.cronTaskName")}
                 </Label>
-                <Select
-                  value={
-                    customWorkdir ? CUSTOM_WORKDIR_VALUE : workdir || FOLLOW_ACTIVE_WORKSPACE_VALUE
-                  }
-                  onValueChange={(value) => {
-                    setFormError(null);
-                    if (value === FOLLOW_ACTIVE_WORKSPACE_VALUE) {
-                      setCustomWorkdir(false);
-                      setWorkdir("");
-                    } else if (value === CUSTOM_WORKDIR_VALUE) {
-                      setCustomWorkdir(true);
-                    } else {
-                      setCustomWorkdir(false);
-                      setWorkdir(value);
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-10">
-                    <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                      <span
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors ${
-                          customWorkdir || workdir
-                            ? "bg-amber-500/10 text-amber-500"
-                            : "bg-muted/60 text-muted-foreground"
-                        }`}
-                      >
-                        <Folder className="h-3.5 w-3.5" />
-                      </span>
-                      <SelectValue
-                        className="truncate"
-                        placeholder={t("settings.cronWorkdirFollowActive")}
-                      >
-                        {customWorkdir
-                          ? t("settings.cronWorkdirCustom")
-                          : selectedWorkspaceOption
-                            ? selectedWorkspaceOption.name
-                            : t("settings.cronWorkdirFollowActive")}
-                      </SelectValue>
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    <SelectItem
-                      value={FOLLOW_ACTIVE_WORKSPACE_VALUE}
-                      className="py-2 text-muted-foreground focus:text-foreground data-[highlighted]:text-foreground"
-                    >
-                      {t("settings.cronWorkdirFollowActive")}
-                    </SelectItem>
-                    <SelectItem value={CUSTOM_WORKDIR_VALUE} className="py-2">
-                      {t("settings.cronWorkdirCustom")}
-                    </SelectItem>
-                    {workspaceOptions.length > 0 ? (
-                      <div className="mx-2 my-1 h-px bg-border/60" />
-                    ) : null}
-                    {workspaceOptions.map((option) => (
-                      <SelectItem
-                        key={option.path}
-                        value={option.path}
-                        title={option.path}
-                        description={<span className="font-mono">{option.path}</span>}
-                        className="py-2"
-                      >
-                        {option.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {customWorkdir ? (
-                  <div className="flex items-center gap-1.5">
-                    <Input
-                      value={workdir}
-                      placeholder={t("settings.cronWorkdirCustomPlaceholder")}
-                      className="flex-1 font-mono text-xs"
-                      onChange={(e) => {
-                        setFormError(null);
-                        setWorkdir(e.currentTarget.value);
-                      }}
-                    />
-                    {onPickWorkdir ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9 shrink-0"
-                        title={t("settings.cronWorkdirBrowse")}
-                        aria-label={t("settings.cronWorkdirBrowse")}
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              const picked = await onPickWorkdir(workdir.trim());
-                              const path = picked?.trim();
-                              if (!path) return;
-                              setFormError(null);
-                              setWorkdir(path);
-                            } catch (err) {
-                              setFormError(err instanceof Error ? err.message : String(err));
-                            }
-                          })();
-                        }}
-                      >
-                        <FolderOpen className="h-4 w-4" />
-                      </Button>
-                    ) : null}
-                  </div>
-                ) : workdir ? (
-                  <div
-                    className="truncate font-mono text-[11px] text-muted-foreground/80"
-                    title={workdir}
-                  >
-                    {workdir}
-                  </div>
-                ) : (
-                  <div className="text-[11px] text-muted-foreground/60">
-                    {t("settings.cronWorkdirHint")}
-                  </div>
-                )}
-              </div>
-            ) : null}
-
-            {/* Shell script config */}
-            {type === "bash" ? (
-              <div className="overflow-hidden rounded-xl border border-border/60 bg-muted/20">
-                <div className="flex items-center justify-between border-b border-border/30 px-3 py-2">
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Terminal className="h-3 w-3" />
-                    <span className="font-medium">{t("settings.cronCommandList")}</span>
-                  </div>
-                  <span className="text-[11px] text-muted-foreground/60">
-                    {t("settings.cronCommandHint")}
-                  </span>
-                </div>
-                <Textarea
-                  value={scriptText}
-                  placeholder={"pnpm install\npnpm build\npnpm test"}
-                  className="min-h-[180px] resize-y rounded-none border-0 bg-transparent font-mono text-xs leading-relaxed focus-visible:ring-0"
+                <Input
+                  value={name}
+                  placeholder={t("settings.cronTaskNamePlaceholder")}
                   onChange={(e) => {
                     setFormError(null);
-                    setScriptText(e.currentTarget.value);
+                    setName(e.currentTarget.value);
                   }}
                 />
               </div>
-            ) : null}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">
+                  {t("settings.cronExpression")}
+                </Label>
+                <Input
+                  value={cron}
+                  placeholder={t("settings.cronExpressionPlaceholder")}
+                  className="font-mono"
+                  onChange={(e) => {
+                    setFormError(null);
+                    setCron(e.currentTarget.value);
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">
+                  {t("settings.cronRemainingExecutions")}
+                </Label>
+                <Input
+                  value={remainingExecutions}
+                  inputMode="numeric"
+                  placeholder={t("settings.cronRemainingExecutionsPlaceholder")}
+                  onChange={(e) => {
+                    const next = e.currentTarget.value.trim();
+                    if (next && !/^\d+$/.test(next)) return;
+                    setFormError(null);
+                    setRemainingExecutions(next);
+                  }}
+                />
+              </div>
+            </div>
+            <div className="settings-form-grid grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">
+                  {t("settings.cronTaskDesc")}
+                </Label>
+                <Input
+                  value={description}
+                  placeholder={t("settings.cronTaskDescPlaceholder")}
+                  onChange={(e) => {
+                    setFormError(null);
+                    setDescription(e.currentTarget.value);
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">
+                  {t("settings.cronTimeoutSeconds")}
+                </Label>
+                <Input
+                  value={timeoutSeconds}
+                  inputMode="numeric"
+                  placeholder={String(DEFAULT_CRON_TIMEOUT_SECONDS)}
+                  onChange={(e) => {
+                    const next = e.currentTarget.value.trim();
+                    if (next && !/^\d+$/.test(next)) return;
+                    setFormError(null);
+                    setTimeoutSeconds(next);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
 
-            {/* HTTP request config */}
-            {type === "http" ? (
-              <HttpRequestListEditor
-                requests={requests}
-                expandedRequestId={expandedRequest}
-                onExpand={setExpandedRequest}
-                onChange={setRequests}
-                onDirty={() => setFormError(null)}
-                urlPlaceholder="https://example.com/webhook"
-              />
-            ) : null}
+        {/* Step 2: Task Type */}
+        <div className="border-b border-border/30 px-6 py-5">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
+              2
+            </div>
+            <span className="text-sm font-semibold">{t("settings.cronStepType")}</span>
+          </div>
 
-            {/* Prompt config */}
-            {type === "prompt" ? (
-              <div className="space-y-3">
-                {!autoPromptSupported ? (
-                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-3.5 py-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
-                    {t("settings.cronPromptAgentModeOnlyHint")}
-                  </div>
-                ) : null}
-
-                <div className="settings-form-grid grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground">
-                      {t("settings.cronPromptModelLabel")}
-                    </Label>
-                    <ModelPicker
-                      options={promptModelOptions}
-                      value={selectedModelValue}
-                      disabled={promptModelOptions.length === 0}
-                      placeholder={t("settings.cronPromptModelPlaceholder")}
-                      onChange={(value) => {
-                        setFormError(null);
-                        setSelectedModelValue(value);
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground">
-                      {t("settings.cronReasoningLabel")}
-                    </Label>
-                    <Select
-                      value={reasoning}
-                      onValueChange={(value) => {
-                        setFormError(null);
-                        if (isCronReasoningLevel(value)) {
-                          setReasoning(value);
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="h-10">
-                        <SelectValue>{t(REASONING_LEVEL_I18N_KEYS[reasoning])}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60">
-                        {CRON_REASONING_LEVELS.map((level) => (
-                          <SelectItem key={level} value={level}>
-                            {t(REASONING_LEVEL_I18N_KEYS[level])}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+          <div className="settings-choice-grid settings-cron-type-grid grid grid-cols-3 gap-3">
+            {/* Bash */}
+            <button
+              type="button"
+              onClick={() => {
+                setFormError(null);
+                setType("bash");
+              }}
+              className={`group relative flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+                type === "bash"
+                  ? "border-blue-500/50 bg-blue-500/5 shadow-sm shadow-blue-500/10"
+                  : "border-border/60 bg-background hover:border-border hover:bg-muted/20"
+              }`}
+            >
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                  type === "bash"
+                    ? "bg-blue-500/15 text-blue-500"
+                    : "bg-muted/60 text-muted-foreground"
+                }`}
+              >
+                <Terminal className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div
+                  className={`text-sm font-semibold ${type === "bash" ? "text-blue-600 dark:text-blue-400" : "text-foreground"}`}
+                >
+                  {t("settings.cronTypeBash")}
                 </div>
-                {promptModelOptions.length === 0 ? (
-                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                    {t("settings.cronPromptModelEmpty")}
-                  </div>
-                ) : null}
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                  {t("settings.cronTypeBashHint")}
+                </p>
+              </div>
+              {type === "bash" ? (
+                <div className="absolute right-3 top-3">
+                  <CheckCircle2 className="h-4.5 w-4.5 text-blue-500" />
+                </div>
+              ) : null}
+            </button>
 
-                <div className="overflow-hidden rounded-xl border border-border/60 bg-muted/20">
-                  <div className="flex items-center gap-1.5 border-b border-border/30 px-3 py-2 text-[11px] text-muted-foreground">
-                    <MessageSquare className="h-3 w-3" />
-                    <span className="font-medium">{t("settings.cronPromptLabel")}</span>
-                  </div>
-                  <Textarea
-                    value={prompt}
-                    placeholder={t("settings.cronPromptPlaceholder")}
-                    className="min-h-[180px] resize-y rounded-none border-0 bg-transparent text-sm leading-relaxed focus-visible:ring-0"
+            {/* HTTP */}
+            <button
+              type="button"
+              onClick={() => {
+                setFormError(null);
+                setType("http");
+              }}
+              className={`group relative flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+                type === "http"
+                  ? "border-emerald-500/50 bg-emerald-500/5 shadow-sm shadow-emerald-500/10"
+                  : "border-border/60 bg-background hover:border-border hover:bg-muted/20"
+              }`}
+            >
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                  type === "http"
+                    ? "bg-emerald-500/15 text-emerald-500"
+                    : "bg-muted/60 text-muted-foreground"
+                }`}
+              >
+                <Globe className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div
+                  className={`text-sm font-semibold ${type === "http" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}
+                >
+                  {t("settings.cronTypeHttp")}
+                </div>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                  {t("settings.cronTypeHttpHint")}
+                </p>
+              </div>
+              {type === "http" ? (
+                <div className="absolute right-3 top-3">
+                  <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500" />
+                </div>
+              ) : null}
+            </button>
+
+            {/* Prompt */}
+            <button
+              type="button"
+              onClick={() => {
+                setFormError(null);
+                setType("prompt");
+              }}
+              className={`group relative flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+                type === "prompt"
+                  ? "border-violet-500/50 bg-violet-500/5 shadow-sm shadow-violet-500/10"
+                  : "border-border/60 bg-background hover:border-border hover:bg-muted/20"
+              }`}
+            >
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                  type === "prompt"
+                    ? "bg-violet-500/15 text-violet-500"
+                    : "bg-muted/60 text-muted-foreground"
+                }`}
+              >
+                <MessageSquare className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div
+                  className={`text-sm font-semibold ${type === "prompt" ? "text-violet-600 dark:text-violet-400" : "text-foreground"}`}
+                >
+                  {t("settings.cronTypePrompt")}
+                </div>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                  {t("settings.cronTypePromptHint")}
+                </p>
+              </div>
+              {type === "prompt" ? (
+                <div className="absolute right-3 top-3">
+                  <CheckCircle2 className="h-4.5 w-4.5 text-violet-500" />
+                </div>
+              ) : null}
+            </button>
+          </div>
+
+          {/* Prompt-type run semantics belong to the type choice, not the config step */}
+          {type === "prompt" ? (
+            <div className="mt-3 rounded-xl border border-violet-500/15 bg-violet-500/[0.04] px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
+              {t("settings.cronPromptRunHint")}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Step 3: Configuration */}
+        <div className="px-6 py-5">
+          <div className="settings-modal-step-row mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
+                3
+              </div>
+              <span className="text-sm font-semibold">{t("settings.cronStepConfig")}</span>
+            </div>
+
+            {type === "bash" ? (
+              <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                {scriptLineCount} {t("settings.cronCommandsCount")}
+              </span>
+            ) : type === "http" ? (
+              <div className="flex items-center gap-2">
+                <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                  {requests.length} {t("settings.cronRequestsCount")}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 px-2.5 text-xs"
+                  onClick={() => {
+                    setFormError(null);
+                    const draft = createEmptyRequestDraft();
+                    setRequests((prev) => [...prev, draft]);
+                    setExpandedRequest(draft.id);
+                  }}
+                >
+                  <Plus className="h-3 w-3" />
+                  {t("settings.add")}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Workspace pin — first row of the config step; bash/prompt run
+                inside a directory, http does not */}
+          {type !== "http" ? (
+            <div className="mb-4 space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">
+                {t("settings.cronWorkdirLabel")}
+              </Label>
+              <Select
+                value={
+                  customWorkdir ? CUSTOM_WORKDIR_VALUE : workdir || FOLLOW_ACTIVE_WORKSPACE_VALUE
+                }
+                onValueChange={(value) => {
+                  setFormError(null);
+                  if (value === FOLLOW_ACTIVE_WORKSPACE_VALUE) {
+                    setCustomWorkdir(false);
+                    setWorkdir("");
+                  } else if (value === CUSTOM_WORKDIR_VALUE) {
+                    setCustomWorkdir(true);
+                  } else {
+                    setCustomWorkdir(false);
+                    setWorkdir(value);
+                  }
+                }}
+              >
+                <SelectTrigger className="h-10">
+                  <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors ${
+                        customWorkdir || workdir
+                          ? "bg-amber-500/10 text-amber-500"
+                          : "bg-muted/60 text-muted-foreground"
+                      }`}
+                    >
+                      <Folder className="h-3.5 w-3.5" />
+                    </span>
+                    <SelectValue
+                      className="truncate"
+                      placeholder={t("settings.cronWorkdirFollowActive")}
+                    >
+                      {customWorkdir
+                        ? t("settings.cronWorkdirCustom")
+                        : selectedWorkspaceOption
+                          ? selectedWorkspaceOption.name
+                          : t("settings.cronWorkdirFollowActive")}
+                    </SelectValue>
+                  </span>
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem
+                    value={FOLLOW_ACTIVE_WORKSPACE_VALUE}
+                    className="py-2 text-muted-foreground focus:text-foreground data-[highlighted]:text-foreground"
+                  >
+                    {t("settings.cronWorkdirFollowActive")}
+                  </SelectItem>
+                  <SelectItem value={CUSTOM_WORKDIR_VALUE} className="py-2">
+                    {t("settings.cronWorkdirCustom")}
+                  </SelectItem>
+                  {workspaceOptions.length > 0 ? (
+                    <div className="mx-2 my-1 h-px bg-border/60" />
+                  ) : null}
+                  {workspaceOptions.map((option) => (
+                    <SelectItem
+                      key={option.path}
+                      value={option.path}
+                      title={option.path}
+                      description={<span className="font-mono">{option.path}</span>}
+                      className="py-2"
+                    >
+                      {option.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {customWorkdir ? (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    value={workdir}
+                    placeholder={t("settings.cronWorkdirCustomPlaceholder")}
+                    className="flex-1 font-mono text-xs"
                     onChange={(e) => {
                       setFormError(null);
-                      setPrompt(e.currentTarget.value);
+                      setWorkdir(e.currentTarget.value);
+                    }}
+                  />
+                  {onPickWorkdir ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0"
+                      title={t("settings.cronWorkdirBrowse")}
+                      aria-label={t("settings.cronWorkdirBrowse")}
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            const picked = await onPickWorkdir(workdir.trim());
+                            const path = picked?.trim();
+                            if (!path) return;
+                            setFormError(null);
+                            setWorkdir(path);
+                          } catch (err) {
+                            setFormError(err instanceof Error ? err.message : String(err));
+                          }
+                        })();
+                      }}
+                    >
+                      <FolderOpen className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                </div>
+              ) : workdir ? (
+                <div
+                  className="truncate font-mono text-[11px] text-muted-foreground/80"
+                  title={workdir}
+                >
+                  {workdir}
+                </div>
+              ) : (
+                <div className="text-[11px] text-muted-foreground/60">
+                  {t("settings.cronWorkdirHint")}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {/* Shell script config */}
+          {type === "bash" ? (
+            <div className="overflow-hidden rounded-xl border border-border/60 bg-muted/20">
+              <div className="flex items-center justify-between border-b border-border/30 px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <Terminal className="h-3 w-3" />
+                  <span className="font-medium">{t("settings.cronCommandList")}</span>
+                </div>
+                <span className="text-[11px] text-muted-foreground/60">
+                  {t("settings.cronCommandHint")}
+                </span>
+              </div>
+              <Textarea
+                value={scriptText}
+                placeholder={"pnpm install\npnpm build\npnpm test"}
+                className="min-h-[180px] resize-y rounded-none border-0 bg-transparent font-mono text-xs leading-relaxed focus-visible:ring-0"
+                onChange={(e) => {
+                  setFormError(null);
+                  setScriptText(e.currentTarget.value);
+                }}
+              />
+            </div>
+          ) : null}
+
+          {/* HTTP request config */}
+          {type === "http" ? (
+            <HttpRequestListEditor
+              requests={requests}
+              expandedRequestId={expandedRequest}
+              onExpand={setExpandedRequest}
+              onChange={setRequests}
+              onDirty={() => setFormError(null)}
+              urlPlaceholder="https://example.com/webhook"
+            />
+          ) : null}
+
+          {/* Prompt config */}
+          {type === "prompt" ? (
+            <div className="space-y-3">
+              {!autoPromptSupported ? (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-3.5 py-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                  {t("settings.cronPromptAgentModeOnlyHint")}
+                </div>
+              ) : null}
+
+              <div className="settings-form-grid grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    {t("settings.cronPromptModelLabel")}
+                  </Label>
+                  <ModelPicker
+                    options={promptModelOptions}
+                    value={selectedModelValue}
+                    disabled={promptModelOptions.length === 0}
+                    placeholder={t("settings.cronPromptModelPlaceholder")}
+                    onChange={(value) => {
+                      setFormError(null);
+                      setSelectedModelValue(value);
                     }}
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    {t("settings.cronReasoningLabel")}
+                  </Label>
+                  <Select
+                    value={reasoning}
+                    onValueChange={(value) => {
+                      setFormError(null);
+                      if (isCronReasoningLevel(value)) {
+                        setReasoning(value);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue>{t(REASONING_LEVEL_I18N_KEYS[reasoning])}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {CRON_REASONING_LEVELS.map((level) => (
+                        <SelectItem key={level} value={level}>
+                          {t(REASONING_LEVEL_I18N_KEYS[level])}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            ) : null}
-          </div>
-        </div>
+              {promptModelOptions.length === 0 ? (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                  {t("settings.cronPromptModelEmpty")}
+                </div>
+              ) : null}
 
-        {/* Footer */}
-        <div className="settings-modal-footer flex items-center justify-between border-t border-border/40 px-6 py-4">
-          <div className="min-w-0 flex-1">
-            {formError ? (
-              <div className="flex items-center gap-1.5 text-xs text-destructive">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{formError}</span>
+              <div className="overflow-hidden rounded-xl border border-border/60 bg-muted/20">
+                <div className="flex items-center gap-1.5 border-b border-border/30 px-3 py-2 text-[11px] text-muted-foreground">
+                  <MessageSquare className="h-3 w-3" />
+                  <span className="font-medium">{t("settings.cronPromptLabel")}</span>
+                </div>
+                <Textarea
+                  value={prompt}
+                  placeholder={t("settings.cronPromptPlaceholder")}
+                  className="min-h-[180px] resize-y rounded-none border-0 bg-transparent text-sm leading-relaxed focus-visible:ring-0"
+                  onChange={(e) => {
+                    setFormError(null);
+                    setPrompt(e.currentTarget.value);
+                  }}
+                />
               </div>
-            ) : formReady ? (
-              <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-                <Check className="h-3.5 w-3.5" />
-                <span>{t("settings.agentsReady")}</span>
-              </div>
-            ) : null}
-          </div>
-          <div className="settings-modal-actions flex items-center gap-2">
-            <Button variant="outline" onClick={requestClose}>
-              {t("settings.cancel")}
-            </Button>
-            <Button
-              onClick={() => void handleSave()}
-              disabled={!name.trim() || !cron.trim() || isSaving || isClosing}
-            >
-              {t("settings.save")}
-            </Button>
-          </div>
+            </div>
+          ) : null}
         </div>
+      </div>
+
+      {/* Footer */}
+      <div className="settings-modal-footer flex items-center justify-between border-t border-border/40 px-6 py-4">
+        <div className="min-w-0 flex-1">
+          {formError ? (
+            <div className="flex items-center gap-1.5 text-xs text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{formError}</span>
+            </div>
+          ) : formReady ? (
+            <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+              <Check className="h-3.5 w-3.5" />
+              <span>{t("settings.agentsReady")}</span>
+            </div>
+          ) : null}
+        </div>
+        <div className="settings-modal-actions flex items-center gap-2">
+          <Button variant="outline" onClick={requestClose}>
+            {t("settings.cancel")}
+          </Button>
+          <Button
+            onClick={() => void handleSave()}
+            disabled={!name.trim() || !cron.trim() || isSaving || isClosing}
+          >
+            {t("settings.save")}
+          </Button>
+        </div>
+      </div>
     </SettingsModalShell>
   );
 }

@@ -622,12 +622,8 @@ async function executeSSHManager(
       }
       const command = requireString(args, "command");
       const cwd = normalizeOptionalString(args.cwd);
-      const remoteCommand = cwd
-        ? `cd '${cwd.replaceAll("'", `'\\''`)}' && ${command}`
-        : command;
-      const runId = `ssh-tool-${toolCall.id}`
-        .replace(/[^A-Za-z0-9._-]/g, "-")
-        .slice(0, 120);
+      const remoteCommand = cwd ? `cd '${cwd.replaceAll("'", `'\\''`)}' && ${command}` : command;
+      const runId = `ssh-tool-${toolCall.id}`.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 120);
       const cancel = () => {
         void invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
       };

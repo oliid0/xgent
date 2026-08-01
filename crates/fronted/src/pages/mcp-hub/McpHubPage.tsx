@@ -80,9 +80,7 @@ export function McpHubPage(props: McpHubPageProps) {
             <div
               className={cn(
                 "hub-panel-enter relative overflow-hidden rounded-xl border bg-card",
-                ready
-                  ? "border-border shadow-sm"
-                  : "border-border",
+                ready ? "border-border shadow-sm" : "border-border",
               )}
             >
               <div className="flex items-center gap-3 px-4 py-3.5 sm:gap-x-5 sm:px-5">

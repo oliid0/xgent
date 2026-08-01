@@ -695,14 +695,8 @@ type SkillsHubPageProps = {
 };
 
 export function SkillsHubPage(props: SkillsHubPageProps) {
-  const {
-    settings,
-    setSettings,
-    initialSkills,
-    initialRootDir,
-    sidebarOpen,
-    onOpenSidebar,
-  } = props;
+  const { settings, setSettings, initialSkills, initialRootDir, sidebarOpen, onOpenSidebar } =
+    props;
   const { t } = useLocale();
   // Skills are configuration, so their Hub remains manageable in every chat mode.
   // The chat runtime still decides whether a selected skill participates in a turn.
@@ -1857,9 +1851,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
             <div
               className={cn(
                 "hub-panel-enter relative overflow-hidden rounded-xl border bg-card",
-                skillsEnabled
-                  ? "border-border shadow-sm"
-                  : "border-border",
+                skillsEnabled ? "border-border shadow-sm" : "border-border",
               )}
             >
               <div className="flex items-center gap-3 px-4 py-3.5 sm:gap-x-5 sm:px-5">

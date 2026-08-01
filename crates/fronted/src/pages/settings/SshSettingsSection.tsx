@@ -17,12 +17,12 @@ import { useLocale } from "../../i18n";
 import { type SshHostConfig, updateSsh } from "../../lib/settings";
 import { createUuid } from "../../lib/shared/id";
 import {
+  type SshImportCandidate,
   scanSshImportCandidates,
   sshHostIdentityKey,
-  type SshImportCandidate,
 } from "../../lib/ssh/scan";
-import type { SettingsSectionProps } from "./types";
 import { ConfirmActionPopover } from "./shared";
+import type { SettingsSectionProps } from "./types";
 
 type SshSettingsView = "list" | "edit" | "import";
 
@@ -149,7 +149,9 @@ export function SshSettingsSection(props: SettingsSectionProps) {
       const result = await scanSshImportCandidates(settings.ssh.hosts);
       setImportCandidates(result.candidates);
       setSelectedImports(
-        new Set(result.candidates.filter((candidate) => !candidate.duplicate).map((item) => item.id)),
+        new Set(
+          result.candidates.filter((candidate) => !candidate.duplicate).map((item) => item.id),
+        ),
       );
     } catch (cause) {
       setImportCandidates([]);
@@ -167,7 +169,9 @@ export function SshSettingsSection(props: SettingsSectionProps) {
 
   const importSelected = () => {
     const selected = importCandidates.filter(
-      (candidate) => selectedImports.has(candidate.id) && !existingIdentityKeys.has(sshHostIdentityKey(candidate)),
+      (candidate) =>
+        selectedImports.has(candidate.id) &&
+        !existingIdentityKeys.has(sshHostIdentityKey(candidate)),
     );
     if (selected.length === 0) return;
     setSettings((previous) =>
@@ -208,7 +212,9 @@ export function SshSettingsSection(props: SettingsSectionProps) {
             <span>{t("settings.sshName")}</span>
             <Input
               value={draft.name}
-              onChange={(event) => setDraft((current) => ({ ...current, name: event.currentTarget.value }))}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, name: event.currentTarget.value }))
+              }
               placeholder={t("settings.sshNamePlaceholder")}
             />
           </label>
@@ -216,7 +222,9 @@ export function SshSettingsSection(props: SettingsSectionProps) {
             <span>{t("settings.sshHost")}</span>
             <Input
               value={draft.host}
-              onChange={(event) => setDraft((current) => ({ ...current, host: event.currentTarget.value }))}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, host: event.currentTarget.value }))
+              }
               placeholder={t("settings.sshHostPlaceholder")}
             />
           </label>
@@ -299,7 +307,12 @@ export function SshSettingsSection(props: SettingsSectionProps) {
                 <span className="text-xs font-medium text-muted-foreground">
                   {t("settings.sshPrivateKey")}
                 </span>
-                <Button type="button" variant="outline" size="sm" onClick={() => keyInputRef.current?.click()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => keyInputRef.current?.click()}
+                >
                   <Upload className="mr-1.5 h-3.5 w-3.5" />
                   {t("settings.sshPrivateKeyImport")}
                 </Button>
@@ -477,7 +490,13 @@ export function SshSettingsSection(props: SettingsSectionProps) {
             <h2 className="text-base font-semibold">{t("settings.sshImport")}</h2>
             <p className="text-xs text-muted-foreground">{t("settings.sshImportDesc")}</p>
           </div>
-          <Button type="button" variant="outline" size="sm" disabled={importLoading} onClick={() => void scanImports()}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={importLoading}
+            onClick={() => void scanImports()}
+          >
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${importLoading ? "animate-spin" : ""}`} />
             {t("settings.sshImport")}
           </Button>
@@ -489,7 +508,11 @@ export function SshSettingsSection(props: SettingsSectionProps) {
             {t("settings.sshImportScanning")}
           </div>
         ) : null}
-        {importError ? <div className="rounded-xl border border-destructive/30 p-4 text-xs text-destructive">{importError}</div> : null}
+        {importError ? (
+          <div className="rounded-xl border border-destructive/30 p-4 text-xs text-destructive">
+            {importError}
+          </div>
+        ) : null}
         {!importLoading && !importError && importCandidates.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border p-8 text-center">
             <FileText className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
@@ -499,9 +522,13 @@ export function SshSettingsSection(props: SettingsSectionProps) {
         ) : null}
         <div className="space-y-2">
           {importCandidates.map((candidate) => {
-            const duplicate = candidate.duplicate || existingIdentityKeys.has(sshHostIdentityKey(candidate));
+            const duplicate =
+              candidate.duplicate || existingIdentityKeys.has(sshHostIdentityKey(candidate));
             return (
-              <label key={candidate.id} className="flex items-center gap-3 rounded-xl border border-border bg-background p-3">
+              <label
+                key={candidate.id}
+                className="flex items-center gap-3 rounded-xl border border-border bg-background p-3"
+              >
                 <input
                   type="checkbox"
                   checked={!duplicate && selectedImports.has(candidate.id)}
@@ -519,10 +546,15 @@ export function SshSettingsSection(props: SettingsSectionProps) {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{candidate.name}</span>
                   <span className="block truncate font-mono text-xs text-muted-foreground">
-                    {candidate.username ? `${candidate.username}@` : ""}{candidate.host}:{candidate.port}
+                    {candidate.username ? `${candidate.username}@` : ""}
+                    {candidate.host}:{candidate.port}
                   </span>
                 </span>
-                {duplicate ? <span className="text-xs text-muted-foreground">{t("settings.sshImportDuplicate")}</span> : null}
+                {duplicate ? (
+                  <span className="text-xs text-muted-foreground">
+                    {t("settings.sshImportDuplicate")}
+                  </span>
+                ) : null}
               </label>
             );
           })}
@@ -571,17 +603,26 @@ export function SshSettingsSection(props: SettingsSectionProps) {
       ) : (
         <div className="space-y-2">
           {settings.ssh.hosts.map((host) => (
-            <article key={host.id} className="flex items-center gap-3 rounded-xl border border-border bg-background p-3">
+            <article
+              key={host.id}
+              className="flex items-center gap-3 rounded-xl border border-border bg-background p-3"
+            >
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
                 <Server className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{host.name}</div>
                 <div className="truncate font-mono text-xs text-muted-foreground">
-                  {host.username ? `${host.username}@` : ""}{host.host}:{host.port}
+                  {host.username ? `${host.username}@` : ""}
+                  {host.host}:{host.port}
                 </div>
               </div>
-              <button type="button" onClick={() => openEdit(host)} className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted" aria-label={t("settings.sshEdit")}>
+              <button
+                type="button"
+                onClick={() => openEdit(host)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
+                aria-label={t("settings.sshEdit")}
+              >
                 <Pencil className="h-4 w-4" />
               </button>
               <ConfirmActionPopover
@@ -591,7 +632,12 @@ export function SshSettingsSection(props: SettingsSectionProps) {
                 onConfirm={() => removeHost(host.id)}
               >
                 {(open) => (
-                  <button type="button" onClick={open} className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={t("settings.delete")}>
+                  <button
+                    type="button"
+                    onClick={open}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={t("settings.delete")}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 )}

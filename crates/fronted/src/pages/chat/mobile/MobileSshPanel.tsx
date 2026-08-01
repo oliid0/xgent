@@ -309,8 +309,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
               type={activeRunId ? "button" : "submit"}
               onClick={activeRunId ? () => void cancel() : undefined}
               disabled={
-                !activeRunId &&
-                (!command.trim() || selectedHost.authType === "keyboardInteractive")
+                !activeRunId && (!command.trim() || selectedHost.authType === "keyboardInteractive")
               }
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-foreground text-background disabled:bg-muted disabled:text-muted-foreground"
               aria-label={

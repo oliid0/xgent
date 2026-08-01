@@ -6,7 +6,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { SettingsModalShell } from "../SettingsModalShell";
 import {
   formatMemoryError,
   type MemoryQuotaSummaryResponse,
@@ -22,6 +21,7 @@ import {
   type MemoryOrganizerScope,
   updateMemorySettings,
 } from "../../../lib/settings";
+import { SettingsModalShell } from "../SettingsModalShell";
 import { OrganizerHistoryModal } from "./OrganizerHistoryModal";
 import {
   formatTime,
@@ -567,40 +567,40 @@ export function MemorySettingsDrawer(props: {
           panelClassName="max-w-md"
           showScrim={false}
         >
-            <div className="flex items-start gap-3 border-b px-5 py-4">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
+          <div className="flex items-start gap-3 border-b px-5 py-4">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div id="memory-drawer-wipe-confirm-title" className="text-sm font-semibold">
+                {t("settings.memoryWipeConfirmTitle")}
               </div>
-              <div className="min-w-0 flex-1">
-                <div id="memory-drawer-wipe-confirm-title" className="text-sm font-semibold">
-                  {t("settings.memoryWipeConfirmTitle")}
-                </div>
-                <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  {t("settings.memoryWipeConfirmDescription")}
-                </div>
+              <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {t("settings.memoryWipeConfirmDescription")}
               </div>
             </div>
-            <div className="flex justify-end gap-2 px-5 py-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setDrawerWipeConfirmOpen(false)}
-                disabled={saving}
-              >
-                {t("settings.memoryCancel")}
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => {
-                  setDrawerWipeConfirmOpen(false);
-                  void onRequestWipe();
-                }}
-                disabled={saving}
-              >
-                {t("settings.memoryWipeAll")}
-              </Button>
-            </div>
+          </div>
+          <div className="flex justify-end gap-2 px-5 py-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDrawerWipeConfirmOpen(false)}
+              disabled={saving}
+            >
+              {t("settings.memoryCancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                setDrawerWipeConfirmOpen(false);
+                void onRequestWipe();
+              }}
+              disabled={saving}
+            >
+              {t("settings.memoryWipeAll")}
+            </Button>
+          </div>
         </SettingsModalShell>
       ) : null}
     </div>,

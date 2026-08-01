@@ -449,10 +449,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (
-      !settingsReady ||
-      (!desktopBridgeEnabled && !lanPcCommandHostReady && !nativeMobile)
-    )
+    if (!settingsReady || (!desktopBridgeEnabled && !lanPcCommandHostReady && !nativeMobile))
       return;
     void initAutomation().catch((error) => {
       console.warn("Failed to initialize automation store", error);

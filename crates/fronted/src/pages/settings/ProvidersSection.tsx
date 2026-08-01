@@ -1894,10 +1894,7 @@ function CcsImportModal(props: {
 
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/35"
-        onClick={submitting ? undefined : onClose}
-      />
+      <div className="absolute inset-0 bg-black/35" onClick={submitting ? undefined : onClose} />
 
       <div className="relative z-10 flex h-[min(35rem,85vh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
         <div className="flex items-center gap-3 border-b px-6 py-4">
