@@ -7,7 +7,7 @@
 import { useSyncExternalStore } from "react";
 
 import { backend } from "./backend";
-import type { ManagedProcessLog, ManagedProcessState } from "./types";
+import type { ManagedProcessLog, ManagedProcessRecord, ManagedProcessState } from "./types";
 
 const EMPTY_STATE: ManagedProcessState = {
   ready: false,
@@ -76,6 +76,11 @@ export function ensureManagedProcessInit(): Promise<void> {
 
 export async function stopManagedProcess(id: string): Promise<void> {
   const next = await backend.stop(id);
+  if (next) feedManagedProcessState(next);
+}
+
+export async function retryManagedProcess(process: ManagedProcessRecord): Promise<void> {
+  const next = await backend.retry(process);
   if (next) feedManagedProcessState(next);
 }
 

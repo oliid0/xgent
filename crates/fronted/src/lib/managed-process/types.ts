@@ -33,6 +33,8 @@ export type ManagedProcessLog = {
 
 export type ManagedProcessBackend = {
   fetchState(): Promise<ManagedProcessState>;
+  /** Starts the same command again from the record's effective cwd. */
+  retry(process: ManagedProcessRecord): Promise<ManagedProcessState | null>;
   /** Returns the refreshed state when the transport carries one, else null. */
   stop(id: string): Promise<ManagedProcessState | null>;
   /** Clears one finished record, or every finished record when id is omitted. */

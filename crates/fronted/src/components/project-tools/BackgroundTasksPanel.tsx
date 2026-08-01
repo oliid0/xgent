@@ -12,6 +12,7 @@ import { useLocale } from "../../i18n";
 import {
   clearManagedProcesses,
   readManagedProcessLog,
+  retryManagedProcess,
   stopManagedProcess,
   useManagedProcesses,
 } from "../../lib/managed-process/store";
@@ -91,13 +92,17 @@ function BackgroundTaskLogDialog(props: {
   const [error, setError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<LogContextMenuState | null>(null);
 
-  const refresh = useCallback(() => {
-    setLoading(true);
-    setError(null);
+  const refresh = useCallback((silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     readManagedProcessLog(process.id)
       .then(setLog)
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
   }, [process.id]);
 
   const lines = useMemo(() => {
@@ -110,8 +115,14 @@ function BackgroundTaskLogDialog(props: {
   }, [log?.content]);
 
   useEffect(() => {
-    refresh();
+    refresh(false);
   }, [refresh]);
+
+  useEffect(() => {
+    if (!process.running) return;
+    const timer = window.setInterval(() => refresh(true), 1000);
+    return () => window.clearInterval(timer);
+  }, [process.running, refresh]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -205,7 +216,7 @@ function BackgroundTaskLogDialog(props: {
             size="sm"
             disabled={actionsDisabled || loading}
             className="h-8 shrink-0 gap-1.5 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"
-            onClick={refresh}
+            onClick={() => refresh(false)}
           >
             {loading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -343,6 +354,7 @@ function BackgroundTaskRow(props: {
   const { t } = useLocale();
   const [pendingStop, setPendingStop] = useState(false);
   const [stopping, setStopping] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -387,6 +399,11 @@ function BackgroundTaskRow(props: {
   const handleClear = useCallback(() => {
     void runAction(() => clearManagedProcesses(process.id));
   }, [process.id, runAction]);
+
+  const handleRetry = useCallback(() => {
+    setRetrying(true);
+    void runAction(() => retryManagedProcess(process)).finally(() => setRetrying(false));
+  }, [process, runAction]);
 
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-border/60 bg-background/60 px-2.5 py-2">
@@ -456,17 +473,30 @@ function BackgroundTaskRow(props: {
             {pendingStop ? t("projectTools.bgTaskStopConfirm") : t("projectTools.bgTaskStop")}
           </Button>
         ) : (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={actionsDisabled}
-            className={ROW_ACTION_CLASS}
-            onClick={handleClear}
-          >
-            <Trash2 className="h-3 w-3" />
-            {t("projectTools.bgTaskClear")}
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={actionsDisabled || retrying}
+              className={ROW_ACTION_CLASS}
+              onClick={handleRetry}
+            >
+              <RefreshCw className={cn("h-3 w-3", retrying && "animate-spin")} />
+              {t("projectTools.bgTaskRetry")}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={actionsDisabled || retrying}
+              className={ROW_ACTION_CLASS}
+              onClick={handleClear}
+            >
+              <Trash2 className="h-3 w-3" />
+              {t("projectTools.bgTaskClear")}
+            </Button>
+          </>
         )}
         <Button
           type="button"
@@ -505,6 +535,9 @@ export const BackgroundTasksPanel = memo(function BackgroundTasksPanel(
   const state = useManagedProcesses();
   const [now, setNow] = useState(() => Date.now());
   const [logProcess, setLogProcess] = useState<ManagedProcessRecord | null>(null);
+  const liveLogProcess = logProcess
+    ? (state.processes.find((process) => process.id === logProcess.id) ?? logProcess)
+    : null;
   const hasRunning = state.processes.some((process) => process.running);
   const hasFinished = state.processes.some((process) => !process.running);
   const actionsDisabled = !state.agentOnline;
@@ -575,9 +608,9 @@ export const BackgroundTasksPanel = memo(function BackgroundTasksPanel(
           ))
         )}
       </div>
-      {logProcess ? (
+      {liveLogProcess ? (
         <BackgroundTaskLogDialog
-          process={logProcess}
+          process={liveLogProcess}
           actionsDisabled={actionsDisabled}
           onClose={handleCloseLog}
         />

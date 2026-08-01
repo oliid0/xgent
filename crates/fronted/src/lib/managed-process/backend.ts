@@ -69,6 +69,17 @@ export const backend: ManagedProcessBackend = {
     return normalizeSnapshot(await invoke<RawManagedProcessSnapshot>("managed_process_snapshot"));
   },
 
+  async retry(process: ManagedProcessRecord): Promise<ManagedProcessState | null> {
+    await invoke("managed_process_start", {
+      workdir: process.cwd,
+      command: process.command,
+      cwd: null,
+      label: process.label || null,
+      isolated: process.isolated,
+    });
+    return normalizeSnapshot(await invoke<RawManagedProcessSnapshot>("managed_process_snapshot"));
+  },
+
   async stop(id: string): Promise<ManagedProcessState | null> {
     // The stop response carries a single record; the refreshed snapshot
     // arrives through the change event the stop triggers.
