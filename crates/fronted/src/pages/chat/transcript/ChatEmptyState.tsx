@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import iconSimpleUrl from "../../../../src-tauri/icons/icon-simple.png";
 import { FolderTree, Lightbulb, Settings, Wrench } from "../../../components/icons";
@@ -42,21 +42,21 @@ const SUGGESTION_CARDS = [
   {
     key: "explore",
     icon: FolderTree,
-    chipClassName: "text-sky-600 dark:text-sky-400",
+    chipClassName: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
     titleKey: "chat.suggestExploreTitle",
     promptKey: "chat.suggestExplorePrompt",
   },
   {
     key: "fix",
     icon: Wrench,
-    chipClassName: "text-amber-600 dark:text-amber-400",
+    chipClassName: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
     titleKey: "chat.suggestFixTitle",
     promptKey: "chat.suggestFixPrompt",
   },
   {
     key: "ideate",
     icon: Lightbulb,
-    chipClassName: "text-emerald-600 dark:text-emerald-400",
+    chipClassName: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
     titleKey: "chat.suggestIdeateTitle",
     promptKey: "chat.suggestIdeatePrompt",
   },
@@ -80,10 +80,8 @@ export function ChatEmptyState({
   const period = useGreetingPeriod();
 
   return (
-    <div className="relative flex w-full flex-col items-center">
-      <div className="chat-hero-logo-enter relative mb-5 flex h-14 w-14 items-center justify-center">
-        {/* Idle float lives on an inner wrapper so its transform never fights
-            the entrance animation on the outer node. */}
+    <div className="chat-empty-state relative flex w-full flex-col items-center">
+      <div className="chat-hero-logo-enter relative mb-5 flex h-16 w-16 items-center justify-center">
         <div className="chat-hero-logo-float relative flex h-full w-full items-center justify-center">
           <div
             aria-hidden="true"
@@ -94,7 +92,7 @@ export function ChatEmptyState({
             alt=""
             aria-hidden="true"
             draggable={false}
-            className="relative h-12 w-12 select-none object-contain"
+            className="relative h-14 w-14 select-none object-contain"
           />
         </div>
       </div>
@@ -114,7 +112,7 @@ export function ChatEmptyState({
             <button
               type="button"
               onClick={() => onOpenSettings("providers")}
-              className="chat-hero-cta-enter mt-5 inline-flex h-8 items-center gap-2 rounded-lg bg-foreground/[0.05] px-3 text-sm font-normal text-foreground/85 transition-colors hover:bg-foreground/[0.08] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="chat-hero-cta-enter mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-foreground/[0.05] px-4 text-sm font-medium text-foreground/85 transition-[color,background-color,transform] duration-150 hover:bg-foreground/[0.08] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-[0.97]"
             >
               <Settings className="h-4 w-4 text-foreground/65" />
               {t("chat.goToSettings")}
@@ -123,27 +121,31 @@ export function ChatEmptyState({
         </>
       ) : (
         <>
-          <div className="chat-hero-title-enter whitespace-nowrap text-center text-[calc(20px*var(--zone-font-scale,1))] font-semibold leading-7 tracking-tight text-foreground">
+          <div className="chat-hero-title-enter px-5 text-center text-[calc(22px*var(--zone-font-scale,1))] font-semibold leading-8 tracking-tight text-foreground">
             {t(GREETING_KEYS[period])}，{t("chat.greetingSubtitle")}
           </div>
           {onSuggestionSelect ? (
-            <div className="mt-7 grid w-full max-w-[520px] grid-cols-1 gap-2 px-6 sm:grid-cols-3 sm:px-4">
-              {SUGGESTION_CARDS.map((card, index) => (
+            <div className="chat-suggestion-grid mt-8 grid w-full max-w-[720px] grid-cols-1 gap-2.5 px-5 sm:grid-cols-3 sm:px-4">
+              {SUGGESTION_CARDS.map((card) => (
                 <button
                   key={card.key}
                   type="button"
                   disabled={suggestionsDisabled}
                   onClick={() => onSuggestionSelect(t(card.promptKey))}
-                  style={{ "--chat-hero-delay": `${0.26 + index * 0.08}s` } as CSSProperties}
-                  className="chat-hero-card-enter flex h-11 items-center gap-2 rounded-lg bg-foreground/[0.025] px-2.5 text-left text-foreground/85 transition-colors hover:bg-foreground/[0.055] hover:text-foreground focus-visible:bg-foreground/[0.055] focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+                  className="chat-suggestion-card chat-hero-card-enter flex min-h-[76px] items-center gap-3 rounded-2xl border border-border/40 bg-card/55 px-3.5 py-3 text-left text-foreground/85 shadow-[inset_0_1px_0_hsl(var(--background)/0.72)] transition-[color,background-color,border-color,transform] duration-150 hover:border-border/65 hover:bg-card/80 hover:text-foreground focus-visible:bg-card/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50"
                 >
                   <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center ${card.chipClassName}`}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${card.chipClassName}`}
                   >
                     <card.icon className="h-4 w-4" />
                   </span>
-                  <span className="min-w-0 truncate text-[calc(14px*var(--zone-font-scale,1))] font-medium leading-5 text-foreground/90">
-                    {t(card.titleKey)}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[calc(14px*var(--zone-font-scale,1))] font-semibold leading-5 text-foreground/90">
+                      {t(card.titleKey)}
+                    </span>
+                    <span className="mt-0.5 block overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-4 text-muted-foreground">
+                      {t(card.promptKey)}
+                    </span>
                   </span>
                 </button>
               ))}

@@ -86,9 +86,9 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-2">
+    <div className="settings-skills-section space-y-5">
+      <div className="settings-skills-header flex items-start justify-between gap-4">
+        <div className="settings-skills-actions flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
             <Sparkles className="h-4 w-4 text-primary" />
           </div>
@@ -138,7 +138,7 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
           <Button
             variant="outline"
             size="sm"
-            className={`gap-1.5 transition-all ${loading ? "border-primary/40 bg-primary/5 text-primary" : ""}`}
+            className={`settings-section-action gap-1.5 transition-[color,background-color,border-color] ${loading ? "border-primary/40 bg-primary/5 text-primary" : ""}`}
             onClick={() => void refresh()}
             disabled={loading || skillsLockedByChatMode}
           >
@@ -279,7 +279,7 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
                       </div>
                     ) : (
                       <div
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all ${
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-[color,background-color,border-color] duration-150 ${
                           checked
                             ? "border-primary bg-primary text-primary-foreground"
                             : "border-border bg-background group-hover:border-muted-foreground/40"
@@ -307,7 +307,7 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
                     key={`${skill.name}-${scanGeneration}`}
                     type="button"
                     onClick={() => toggleSkill(skill.name, !checked)}
-                    className={`skill-card-enter group flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                    className={`skill-card-enter group flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-[color,background-color,border-color,box-shadow,transform] duration-150 ${
                       checked
                         ? "border-primary/40 bg-primary/5 shadow-xs"
                         : "border-border/60 bg-background hover:border-border hover:bg-accent/30"

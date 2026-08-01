@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   Download,
   ExternalLink,
-  Info,
   Loader2,
   RefreshCw,
   Shield,
@@ -18,6 +17,7 @@ import { updateUpdateSettings } from "../../lib/settings";
 import { formatReleaseDate } from "./aboutDate";
 import { AgentActivationSwitch } from "./shared";
 import type { SettingsSectionProps } from "./types";
+import iconSimpleUrl from "../../../src-tauri/icons/icon-simple.png";
 
 type AboutSectionProps = SettingsSectionProps & {
   appUpdate: AppUpdateController;
@@ -125,21 +125,26 @@ export function AboutSection(props: AboutSectionProps) {
                     : latestResult?.message || t("settings.aboutUpdaterNotConfiguredDesc");
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-            <Info className="h-5 w-5 text-primary" />
-          </div>
+    <div className="settings-about-section space-y-6">
+      <div className="settings-about-header flex flex-wrap items-start justify-between gap-4">
+        <div className="settings-about-identity flex min-w-0 items-center gap-3">
+          <img
+            src={iconSimpleUrl}
+            alt=""
+            className="settings-about-app-icon h-14 w-14 shrink-0 rounded-[15px] shadow-[0_12px_30px_-18px_rgba(0,0,0,0.65)]"
+          />
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold">{t("settings.aboutTitle")}</h3>
+            <h3 className="text-lg font-semibold tracking-tight">XGent</h3>
+            <div className="mt-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+              v{currentVersion}
+            </div>
             <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
               {t("settings.aboutDescription")}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="settings-about-header-actions flex items-center gap-2">
           {latestResult?.releaseUrl ? (
             <Button
               type="button"
@@ -168,9 +173,9 @@ export function AboutSection(props: AboutSectionProps) {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="space-y-4 rounded-2xl border border-border/60 bg-card p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="settings-about-grid grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="settings-about-card space-y-4 rounded-2xl border border-border/60 bg-card p-4">
+          <div className="settings-about-version-row flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {t("settings.aboutCurrentVersion")}
@@ -185,7 +190,7 @@ export function AboutSection(props: AboutSectionProps) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-border/60 bg-background/70 p-4">
+          <div className="settings-about-status-card rounded-xl border border-border/60 bg-background/70 p-4">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
                 {checkState.status === "error" ? (
@@ -245,7 +250,7 @@ export function AboutSection(props: AboutSectionProps) {
           </div>
 
           {latestReleaseNotes ? (
-            <div className="space-y-2 rounded-xl border border-border/60 bg-background/70 p-4">
+            <div className="settings-about-release-notes space-y-2 rounded-xl border border-border/60 bg-background/70 p-4">
               <div className="text-sm font-semibold">{releaseTitle(latestResult)}</div>
               <div className="max-h-48 overflow-auto pr-2">
                 <Markdown
@@ -258,7 +263,7 @@ export function AboutSection(props: AboutSectionProps) {
         </section>
 
         <aside className="space-y-4">
-          <section className="rounded-2xl border border-border/60 bg-card p-4">
+          <section className="settings-about-card rounded-2xl border border-border/60 bg-card p-4">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-sm font-medium">
@@ -283,7 +288,7 @@ export function AboutSection(props: AboutSectionProps) {
             </div>
           </section>
 
-          <section className="space-y-3 rounded-2xl border border-border/60 bg-card p-4">
+          <section className="settings-about-card space-y-3 rounded-2xl border border-border/60 bg-card p-4">
             <div className="text-sm font-semibold">{t("settings.aboutNotesTitle")}</div>
             <p className="text-xs leading-relaxed text-muted-foreground">
               {t("settings.aboutNotesBody")}

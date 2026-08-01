@@ -26,8 +26,8 @@ export function McpSettingsSection(props: SettingsSectionProps & { allowStdio: b
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="flex items-start justify-between gap-3">
+    <div className="settings-mcp-section flex min-h-0 flex-1 flex-col gap-4">
+      <div className="settings-mcp-header flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted">
             <Cable className="h-4 w-4" />
@@ -37,7 +37,12 @@ export function McpSettingsSection(props: SettingsSectionProps & { allowStdio: b
             <p className="text-xs text-muted-foreground">{t("mcpHub.subtitle")}</p>
           </div>
         </div>
-        <Button type="button" size="sm" onClick={() => setEditing({ mode: "add" })}>
+        <Button
+          type="button"
+          size="sm"
+          className="settings-section-action"
+          onClick={() => setEditing({ mode: "add" })}
+        >
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           {t("mcpHub.add")}
         </Button>

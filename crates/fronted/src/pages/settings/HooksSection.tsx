@@ -247,6 +247,45 @@ export function HooksSection(_props: SettingsSectionProps) {
         </div>
       ) : null}
 
+      <div
+        className="settings-hooks-compact-events hidden gap-2 overflow-x-auto pb-1"
+        role="tablist"
+        aria-label={t("settings.hooksLifecycle")}
+      >
+        {orderedEvents.map(({ event, phase }) => {
+          const selected = activeEvent === event;
+          const eventHookCount = hooks.filter((hook) => hook.event === event).length;
+          return (
+            <button
+              key={event}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setActiveEvent(event)}
+              className={`settings-hooks-compact-event flex min-h-12 shrink-0 items-center gap-2 rounded-xl px-3 text-left ${
+                selected
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                  : "text-muted-foreground"
+              }`}
+            >
+              <span
+                className={`flex h-7 w-7 items-center justify-center rounded-lg ${phase.bgColor} ${phase.color}`}
+              >
+                {phase.icon}
+              </span>
+              <span className="max-w-32 truncate text-xs font-medium">
+                {getHookEventLabel(t, event)}
+              </span>
+              {eventHookCount > 0 ? (
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">
+                  {eventHookCount}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="settings-hooks-grid grid min-h-0 flex-1 gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="settings-hooks-lifecycle flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card">
           <div className="settings-hooks-lifecycle-header shrink-0 border-b border-border/40 px-4 py-3">
@@ -314,7 +353,7 @@ export function HooksSection(_props: SettingsSectionProps) {
                               <button
                                 type="button"
                                 onClick={() => setActiveEvent(event)}
-                                className={`settings-hooks-event-button group relative flex w-full items-center gap-2.5 rounded-lg py-2 pl-7 pr-2.5 text-left transition-all ${
+                                className={`settings-hooks-event-button group relative flex w-full items-center gap-2.5 rounded-lg py-2 pl-7 pr-2.5 text-left transition-[color,background-color,box-shadow,transform] duration-150 ${
                                   selected ? "bg-primary/10 shadow-sm" : "hover:bg-muted/30"
                                 }`}
                               >
@@ -329,7 +368,7 @@ export function HooksSection(_props: SettingsSectionProps) {
                                     />
                                   ) : null}
                                   <span
-                                    className={`settings-hooks-event-dot-core relative block h-full w-full rounded-full ring-2 ring-card transition-all duration-200 ${
+                                    className={`settings-hooks-event-dot-core relative block h-full w-full rounded-full ring-2 ring-card transition-[color,background-color,border-color,opacity] duration-150 ${
                                       selected
                                         ? group.phase.dotColor
                                         : hasHooks
@@ -434,7 +473,7 @@ export function HooksSection(_props: SettingsSectionProps) {
                   return (
                     <div
                       key={hook.id}
-                      className={`settings-hooks-card group rounded-xl border bg-background/80 p-4 transition-all hover:shadow-sm ${
+                      className={`settings-hooks-card group rounded-xl border bg-background/80 p-4 transition-[border-color,box-shadow,opacity] duration-150 hover:shadow-sm ${
                         hook.enabled
                           ? "border-border/60 hover:border-border"
                           : "border-border/40 opacity-60"

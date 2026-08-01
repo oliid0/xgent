@@ -6,6 +6,7 @@ import { Check, ChevronDown } from "../../../components/icons";
 
 export {
   AlertTriangle,
+  ArrowLeft,
   BookOpen,
   Brain,
   BrushCleaning,

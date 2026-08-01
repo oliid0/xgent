@@ -1004,49 +1004,45 @@
     }
   }
 
-  /* Chat empty-state hero entrance choreography. The logo pops in with a
-   * springy overshoot, then the greeting
-   * rises, then the suggestion cards cascade. Steady-state motion stays
-   * transform/opacity-only: a slow float on the logo plus a halo breathe. */
+  /* The empty state is intentionally calm: one short reveal, no idle motion. */
   .chat-hero-logo-enter {
-    animation: chatHeroLogoIn 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+    animation: chatHeroLogoIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) backwards;
     will-change: transform, opacity;
   }
 
   /* Float and breathe share one 6s clock, delayed past the entrance so the
    * pop settles before the idle motion takes over. */
   .chat-hero-logo-float {
-    animation: chatHeroFloat 6s ease-in-out 1.2s infinite;
+    animation: none;
   }
 
   .chat-hero-halo-breathe {
-    animation: chatHeroHaloBreathe 6s ease-in-out 1.2s infinite;
+    animation: none;
   }
 
   .chat-hero-title-enter {
-    animation: chatHeroRiseIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.12s backwards;
+    animation: chatHeroRiseIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) 30ms backwards;
     will-change: transform, opacity;
   }
 
   .chat-hero-line-enter {
-    animation: chatHeroRiseIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s backwards;
+    animation: chatHeroRiseIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) 45ms backwards;
   }
 
   .chat-hero-cta-enter {
-    animation: chatHeroRiseIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.28s backwards;
+    animation: chatHeroRiseIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) 60ms backwards;
   }
 
   /* Suggestion cards: --chat-hero-delay is staggered per card from JSX.
    * `backwards` (not `both`) so hover styles win once the entrance ends. */
   .chat-hero-card-enter {
-    animation: chatHeroCardIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) var(--chat-hero-delay, 0.26s)
-      backwards;
+    animation: chatHeroCardIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) backwards;
   }
 
   @keyframes chatHeroLogoIn {
     from {
       opacity: 0;
-      transform: translateY(10px) scale(0.72);
+      transform: translateY(4px) scale(0.96);
     }
     to {
       opacity: 1;
@@ -1077,7 +1073,7 @@
   @keyframes chatHeroRiseIn {
     from {
       opacity: 0;
-      transform: translateY(12px);
+      transform: translateY(4px);
     }
     to {
       opacity: 1;
@@ -1088,7 +1084,7 @@
   @keyframes chatHeroCardIn {
     from {
       opacity: 0;
-      transform: translateY(14px) scale(0.96);
+      transform: translateY(4px) scale(0.985);
     }
     to {
       opacity: 1;
@@ -1098,7 +1094,7 @@
 
   /* Settings page section transitions */
   .settings-section-enter {
-    animation: settingsSectionIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: settingsSectionIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
     /*
      * No `will-change` here: this class sits on the settings scroll container
      * itself, and a permanent layer promotion on a scroller makes Android
@@ -1195,11 +1191,11 @@
   @keyframes settingsSectionIn {
     from {
       opacity: 0;
-      transform: translateY(14px) scale(0.985);
+      transform: translateY(3px);
     }
     to {
       opacity: 1;
-      transform: translateY(0) scale(1);
+      transform: translateY(0);
     }
   }
 
@@ -1839,28 +1835,28 @@
   }
 
   .hub-page-enter {
-    animation: hubPageIn 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: hubPageIn 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .hub-page-enter .hub-header {
-    animation: hubPanelIn 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: none;
   }
 
   .hub-page-enter .hub-content-stage {
-    animation: hubPanelIn 420ms cubic-bezier(0.16, 1, 0.3, 1) 70ms both;
+    animation: none;
   }
 
   .hub-panel-enter,
   .hub-empty-state-enter {
-    animation: hubPanelIn 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: hubPanelIn 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .hub-panel-enter-delayed {
-    animation-delay: 110ms;
+    animation-delay: 0ms;
   }
 
   .hub-chip-enter {
-    animation: hubChipIn 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: none;
   }
   .hub-chip-enter:nth-child(1) {
     animation-delay: 0ms;
@@ -2108,11 +2104,8 @@
 
   @keyframes skillCardCheckIn {
     0% {
-      transform: scale(0);
+      transform: scale(0.92);
       opacity: 0;
-    }
-    60% {
-      transform: scale(1.15);
     }
     100% {
       transform: scale(1);
@@ -2162,32 +2155,32 @@
   }
 
   .skill-card-enter {
-    animation: skillCardIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: skillCardIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
   .skill-card-enter:nth-child(1) {
     animation-delay: 0ms;
   }
   .skill-card-enter:nth-child(2) {
-    animation-delay: 50ms;
+    animation-delay: 0ms;
   }
   .skill-card-enter:nth-child(3) {
-    animation-delay: 100ms;
+    animation-delay: 0ms;
   }
   .skill-card-enter:nth-child(4) {
-    animation-delay: 150ms;
+    animation-delay: 0ms;
   }
   .skill-card-enter:nth-child(5) {
-    animation-delay: 200ms;
+    animation-delay: 0ms;
   }
   .skill-card-enter:nth-child(6) {
-    animation-delay: 250ms;
+    animation-delay: 0ms;
   }
   .skill-card-enter:nth-child(n + 7) {
-    animation-delay: 300ms;
+    animation-delay: 0ms;
   }
 
   .skill-check-enter {
-    animation: skillCardCheckIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: skillCardCheckIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .skills-scan-dot {
@@ -2249,7 +2242,7 @@
     animation: skillsDrawerBackdropOut 200ms cubic-bezier(0.4, 0, 1, 1) both;
   }
   .skills-drawer-panel {
-    animation: skillsDrawerPanelIn 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: skillsDrawerPanelIn 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
   .skills-drawer-panel-closing {
     animation: skillsDrawerPanelOut 220ms cubic-bezier(0.4, 0, 1, 1) both;
@@ -2696,6 +2689,828 @@
 }
 
 /*
+ * Settings visual language: grouped surfaces on compact screens and a
+ * restrained two-pane workspace on larger screens. These semantic rules are
+ * intentionally unlayered so they can refine utility classes consistently.
+ */
+.settings-page {
+  color: hsl(var(--foreground));
+}
+
+.settings-page-desktop {
+  background:
+    radial-gradient(circle at 82% 0%, hsl(var(--primary) / 0.045), transparent 30%),
+    hsl(var(--background));
+}
+
+.settings-page-desktop > header {
+  border-color: hsl(var(--border) / 0.38);
+  background: hsl(var(--background) / 0.82);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+
+.settings-page-desktop .settings-sidebar {
+  width: 248px;
+  padding: 10px;
+  border: 1px solid hsl(var(--border) / 0.42);
+  border-radius: 18px;
+  background: hsl(var(--card) / 0.68);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--background) / 0.72),
+    0 18px 42px -34px hsl(var(--foreground) / 0.3);
+}
+
+.settings-page-desktop .settings-nav-item {
+  min-height: 44px;
+  gap: 10px;
+  border-radius: 12px;
+  padding-inline: 9px;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    transform 100ms ease;
+}
+
+.settings-page-desktop .settings-nav-item-active {
+  background: hsl(var(--background) / 0.92);
+  box-shadow:
+    inset 0 0 0 1px hsl(var(--border) / 0.38),
+    0 5px 16px -13px hsl(var(--foreground) / 0.4);
+}
+
+.settings-nav-icon,
+.settings-mobile-row-icon {
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.28),
+    0 3px 8px -5px hsl(0 0% 0% / 0.6);
+}
+
+.settings-page-desktop .settings-section-shell {
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+.settings-page-desktop .settings-section-hero,
+.settings-page-desktop .settings-hooks-lifecycle,
+.settings-page-desktop .settings-hooks-detail,
+.settings-page-desktop .settings-memory-summary-card,
+.settings-page-desktop .settings-memory-list-section,
+.settings-page-desktop .settings-memory-detail-section,
+.settings-page-desktop .settings-cron-card,
+.settings-page-desktop .settings-ssh-host-card,
+.settings-page-desktop .settings-about-card {
+  border-color: hsl(var(--border) / 0.42);
+  background: hsl(var(--card) / 0.72);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--background) / 0.72),
+    0 16px 36px -32px hsl(var(--foreground) / 0.36);
+}
+
+.settings-mobile-toolbar {
+  border-bottom: 1px solid hsl(var(--border) / 0.32);
+  background: hsl(var(--background) / 0.82);
+  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  backdrop-filter: blur(20px) saturate(1.25);
+}
+
+.settings-mobile-group {
+  border: 1px solid hsl(var(--border) / 0.4);
+  background: hsl(var(--card) / 0.82);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--background) / 0.76),
+    0 14px 32px -28px hsl(var(--foreground) / 0.4);
+}
+
+.settings-mobile-row {
+  transition:
+    background-color 140ms ease,
+    transform 100ms ease;
+}
+
+.settings-mobile-row:active,
+.settings-memory-back:active,
+.settings-page-compact .settings-section-action:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings-mobile-row:hover {
+    background: hsl(var(--muted) / 0.42);
+  }
+
+  .settings-page-desktop .settings-nav-item:hover {
+    background: hsl(var(--background) / 0.7);
+  }
+}
+
+@media (max-width: 720px) {
+  .settings-mobile-home > div {
+    padding-top: 4px;
+  }
+
+  .settings-mobile-home section {
+    padding-top: 18px;
+  }
+
+  .settings-mobile-home section > h2 {
+    margin-bottom: 7px;
+    padding-inline: 12px;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.055em;
+  }
+
+  .settings-mobile-detail [data-settings-section] {
+    padding: 12px 12px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .settings-mobile-detail [data-settings-section="memory"] {
+    padding-inline: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .settings-memory-panel {
+    gap: 12px;
+  }
+
+  .settings-memory-compact-hidden {
+    display: none !important;
+  }
+
+  .settings-memory-layout {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+  }
+
+  .settings-memory-list-section,
+  .settings-memory-detail-section {
+    width: 100%;
+    min-height: 0;
+    border-width: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .settings-memory-summary-card {
+    margin-inline: 12px;
+    border-color: hsl(var(--border) / 0.42);
+    border-radius: 16px;
+    background: hsl(var(--card) / 0.82);
+    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
+  }
+
+  .settings-memory-summary-actions {
+    width: 100%;
+  }
+
+  .settings-memory-summary-actions button,
+  .settings-memory-list-section button,
+  .settings-memory-detail-section button {
+    min-height: 44px;
+  }
+
+  .settings-memory-entry-list {
+    padding: 10px 12px 18px;
+  }
+
+  .settings-memory-entry-list > div > button,
+  .settings-memory-entry-list details {
+    border-color: hsl(var(--border) / 0.38);
+    border-radius: 14px;
+    background: hsl(var(--card) / 0.78);
+  }
+
+  .settings-memory-compact-toolbar {
+    border-color: hsl(var(--border) / 0.34);
+    background: hsl(var(--background) / 0.76);
+  }
+
+  .settings-memory-detail-section > div:not(.settings-memory-compact-toolbar) {
+    padding-inline: 14px;
+  }
+
+  .settings-hooks-section {
+    height: auto;
+    gap: 12px;
+  }
+
+  .settings-hooks-section .settings-section-hero {
+    gap: 12px;
+    border-color: hsl(var(--border) / 0.4);
+    border-radius: 16px;
+    padding: 14px;
+    background: hsl(var(--card) / 0.82);
+    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
+  }
+
+  .settings-hooks-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .settings-hooks-stat {
+    min-width: 0;
+    justify-content: center;
+    border-width: 0;
+    padding: 8px 4px;
+  }
+
+  .settings-hooks-stat-label {
+    display: none;
+  }
+
+  .settings-hooks-grid {
+    display: flex;
+    min-height: auto;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .settings-hooks-compact-events {
+    display: flex;
+    margin-inline: -12px;
+    padding-inline: 12px;
+    scroll-padding-inline: 12px;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  .settings-hooks-compact-events::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-hooks-compact-event {
+    border: 1px solid hsl(var(--border) / 0.36);
+    background: hsl(var(--card) / 0.7);
+    transition:
+      color 140ms ease,
+      background-color 140ms ease,
+      transform 100ms ease;
+  }
+
+  .settings-hooks-compact-event:active {
+    transform: scale(0.97);
+  }
+
+  .settings-hooks-lifecycle,
+  .settings-hooks-detail {
+    overflow: visible;
+    border-color: hsl(var(--border) / 0.4);
+    border-radius: 16px;
+    background: hsl(var(--card) / 0.82);
+    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
+  }
+
+  .settings-hooks-lifecycle {
+    display: none;
+  }
+
+  .settings-hooks-lifecycle-body,
+  .settings-hooks-detail-body {
+    overflow: visible;
+  }
+
+  .settings-hooks-phase-button,
+  .settings-hooks-event-button {
+    min-height: 44px;
+  }
+
+  .settings-hooks-detail-header {
+    padding: 14px;
+  }
+
+  .settings-hooks-detail-body {
+    padding: 12px;
+  }
+
+  .settings-hooks-card {
+    padding: 0;
+    border-color: hsl(var(--border) / 0.36);
+    border-radius: 14px;
+    background: hsl(var(--background) / 0.48);
+  }
+
+  .settings-hooks-card-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .settings-hooks-card-main {
+    min-width: calc(100% - 52px);
+  }
+
+  .settings-hooks-card-actions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 8px;
+    border-top: 1px solid hsl(var(--border) / 0.32);
+  }
+
+  .settings-hooks-card-actions button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .settings-cron-section,
+  .settings-ssh-section,
+  .settings-about-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .settings-cron-section > .settings-section-heading-row,
+  .settings-ssh-section > .settings-section-heading-row {
+    gap: 14px;
+    padding: 2px 2px 4px;
+  }
+
+  .settings-cron-section .settings-section-actions,
+  .settings-ssh-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .settings-cron-section .settings-section-actions > div:first-child,
+  .settings-ssh-actions > div:first-child {
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .settings-cron-section .settings-section-actions > button,
+  .settings-ssh-actions > button {
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .settings-cron-section .settings-section-actions > button {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .settings-ssh-actions {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .settings-ssh-view-toggle {
+    display: none;
+  }
+
+  .settings-cron-card,
+  .settings-ssh-host-card {
+    border-color: hsl(var(--border) / 0.4);
+    border-radius: 16px;
+    background: hsl(var(--card) / 0.82);
+    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
+  }
+
+  .settings-cron-card-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 13px;
+  }
+
+  .settings-cron-card-main {
+    min-width: calc(100% - 52px);
+  }
+
+  .settings-cron-mobile-meta {
+    display: flex;
+  }
+
+  .settings-cron-card-actions {
+    order: 4;
+    width: calc(100% - 54px);
+    justify-content: flex-start;
+    margin-left: 52px;
+    padding-top: 8px;
+    border-top: 1px solid hsl(var(--border) / 0.32);
+  }
+
+  .settings-cron-action,
+  .settings-ssh-host-action {
+    width: 44px;
+    height: 44px;
+    border-radius: 11px;
+  }
+
+  .settings-cron-card-row > span:last-child {
+    order: 5;
+    margin-left: auto;
+    margin-top: -44px;
+  }
+
+  .settings-ssh-host-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .settings-ssh-host-card:hover {
+    border-color: hsl(var(--border) / 0.4);
+    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
+  }
+
+  .settings-ssh-host-card .settings-card-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 13px;
+  }
+
+  .settings-ssh-host-card .settings-card-row > div:nth-child(2) {
+    min-width: calc(100% - 52px);
+  }
+
+  .settings-ssh-host-actions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 8px;
+    border-top: 1px solid hsl(var(--border) / 0.32);
+  }
+
+  .settings-about-header {
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 10px 4px;
+    text-align: center;
+  }
+
+  .settings-about-identity {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .settings-about-app-icon {
+    width: 76px;
+    height: 76px;
+    border-radius: 20px;
+  }
+
+  .settings-about-header-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-about-header-actions button {
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .settings-about-header-actions button:only-child {
+    grid-column: 1 / -1;
+  }
+
+  .settings-about-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .settings-about-card {
+    border-color: hsl(var(--border) / 0.4);
+    border-radius: 16px;
+    padding: 14px;
+    background: hsl(var(--card) / 0.82);
+    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
+  }
+
+  .settings-about-version-row {
+    display: none;
+  }
+
+  .settings-about-status-card,
+  .settings-about-release-notes {
+    border-width: 0;
+    border-radius: 13px;
+    background: hsl(var(--background) / 0.54);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .settings-mobile-toolbar,
+  .settings-page-desktop > header {
+    background: hsl(var(--background));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .settings-mobile-group,
+  .settings-page-desktop .settings-sidebar,
+  .settings-page-desktop .settings-section-hero,
+  .settings-page-desktop .settings-memory-summary-card,
+  .settings-page-desktop .settings-memory-list-section,
+  .settings-page-desktop .settings-memory-detail-section {
+    border-color: hsl(var(--foreground) / 0.42);
+  }
+}
+
+/* Skills and MCP share one platform-adaptive hub chrome. */
+.hub-backdrop {
+  background: hsl(var(--hub-canvas, var(--background)));
+}
+
+.hub-backdrop[data-hub-tone="violet"] {
+  background:
+    radial-gradient(circle at 86% 0%, hsl(270 82% 60% / 0.055), transparent 31%),
+    hsl(var(--hub-canvas, var(--background)));
+}
+
+.hub-backdrop[data-hub-tone="amber"] {
+  background:
+    radial-gradient(circle at 86% 0%, hsl(38 92% 55% / 0.06), transparent 31%),
+    hsl(var(--hub-canvas, var(--background)));
+}
+
+.hub-header {
+  border-bottom: 1px solid hsl(var(--border) / 0.36);
+  background: hsl(var(--background) / 0.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  backdrop-filter: blur(20px) saturate(1.25);
+}
+
+.hub-header-icon {
+  border: 1px solid hsl(var(--border) / 0.42);
+  background: hsl(var(--muted) / 0.62);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--background) / 0.78),
+    0 8px 20px -17px hsl(var(--foreground) / 0.45);
+}
+
+.hub-header-icon[data-hub-tone="violet"] {
+  color: hsl(270 70% 55%);
+  background: hsl(270 82% 60% / 0.09);
+}
+
+.hub-header-icon[data-hub-tone="amber"] {
+  color: hsl(38 86% 48%);
+  background: hsl(38 92% 55% / 0.1);
+}
+
+.hub-status-panel,
+.hub-panel,
+.mcp-server-card,
+.hub-skill-card {
+  border-color: hsl(var(--border) / 0.42);
+  background: hsl(var(--card) / 0.72);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--background) / 0.72),
+    0 16px 36px -32px hsl(var(--foreground) / 0.34);
+}
+
+.hub-segmented-control {
+  border: 1px solid hsl(var(--border) / 0.34);
+  background: hsl(var(--muted) / 0.58);
+}
+
+.hub-segmented-button:active {
+  transform: scale(0.97);
+}
+
+.chat-empty-state {
+  padding-block: 8px;
+}
+
+.chat-empty-state .chat-hero-logo-enter img {
+  filter: drop-shadow(0 12px 18px hsl(0 0% 0% / 0.12));
+}
+
+@media (max-width: 720px) {
+  .hub-header {
+    min-height: 58px;
+    padding: 9px 12px;
+  }
+
+  .hub-header > .mx-auto {
+    gap: 10px;
+  }
+
+  .hub-header-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+  }
+
+  .hub-header h1 {
+    font-size: 17px;
+    line-height: 22px;
+  }
+
+  .hub-header p {
+    max-width: min(58vw, 360px);
+    font-size: 11px;
+  }
+
+  .hub-header > button {
+    left: 8px;
+    top: 7px;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+
+  .hub-scroll {
+    padding: 10px 12px calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hub-content-stage {
+    gap: 10px;
+  }
+
+  .hub-status-panel {
+    border-radius: 16px;
+  }
+
+  .hub-status-panel > div {
+    min-height: 68px;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 11px 12px;
+  }
+
+  .hub-status-panel > div > button,
+  .hub-status-panel > div > div:last-child button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .hub-tab-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .hub-tab-row > .hub-segmented-control {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+    border-radius: 13px;
+  }
+
+  .hub-tab-row > .hub-segmented-control .hub-segmented-button {
+    min-width: 0;
+    min-height: 42px;
+    padding-inline: 6px;
+  }
+
+  .hub-tab-row > .hub-segmented-control .hub-segmented-button > span:nth-child(2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hub-view-stage {
+    margin-inline: -2px;
+  }
+
+  .mcp-server-card {
+    border-radius: 16px;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .mcp-server-card-row {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .mcp-server-toggle {
+    width: 42px;
+    height: 24px;
+  }
+
+  .mcp-server-body {
+    min-width: calc(100% - 54px);
+    min-height: 44px;
+  }
+
+  .mcp-server-actions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 8px;
+    border-top: 1px solid hsl(var(--border) / 0.3);
+  }
+
+  .mcp-server-action {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+  }
+
+  .hub-skill-card {
+    min-height: 112px;
+    border-radius: 16px;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .settings-mcp-header,
+  .settings-skills-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .settings-mcp-header > button {
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .settings-skills-actions {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .settings-skills-actions > div:first-child {
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .settings-skills-actions > button[role="switch"] {
+    align-self: center;
+    justify-self: end;
+  }
+
+  .settings-skills-actions > button:last-child {
+    min-height: 44px;
+    justify-content: center;
+    grid-column: 1 / -1;
+  }
+
+  .settings-skills-section > div:not(.settings-skills-header) > button,
+  .settings-skills-section .skill-card-enter {
+    min-height: 64px;
+  }
+
+  .chat-empty-state {
+    padding-block: 0;
+  }
+
+  .chat-empty-state .chat-hero-title-enter {
+    max-width: 340px;
+    font-size: calc(20px * var(--zone-font-scale, 1));
+    line-height: 28px;
+  }
+
+  .chat-suggestion-grid {
+    max-width: 430px;
+    margin-top: 26px;
+    padding-inline: 18px;
+  }
+
+  .chat-suggestion-card {
+    min-height: 68px;
+    border-radius: 15px;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .hub-skill-card:hover,
+  .mcp-server-card:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .hub-header,
+  .hub-status-panel,
+  .hub-panel,
+  .mcp-server-card,
+  .hub-skill-card {
+    background: hsl(var(--background));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .hub-header,
+  .hub-status-panel,
+  .hub-panel,
+  .mcp-server-card,
+  .hub-skill-card,
+  .hub-segmented-control {
+    border-color: hsl(var(--foreground) / 0.42);
+  }
+}
+
+/*
  * Streamdown mermaid / table fullscreen fix — macOS WebKit (Tauri WKWebView)
  *
  * The streamdown library creates fullscreen overlays via createPortal to
@@ -3101,6 +3916,161 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   .mobile-quick-actions-menu,
   .mobile-soul-anchor-menu,
   [data-mobile-left-drawer].chat-history-sidebar {
+    border-color: hsl(var(--foreground) / 0.42);
+  }
+}
+
+/* Main conversation chrome shared by desktop and compact runtimes. */
+.chat-workspace-main {
+  background:
+    radial-gradient(circle at 75% -10%, hsl(var(--primary) / 0.035), transparent 32%),
+    hsl(var(--background));
+}
+
+.chat-header {
+  min-height: 52px;
+  border-bottom: 1px solid hsl(var(--border) / 0.3);
+  background: hsl(var(--background) / 0.76);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.model-selector-dropdown {
+  transform-origin: var(--transform-origin);
+}
+
+.composer-glass-card {
+  border-color: hsl(var(--border) / 0.5);
+  background: hsl(var(--background) / 0.76);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--background) / 0.82),
+    0 20px 50px -28px hsl(var(--foreground) / 0.38),
+    0 5px 16px -12px hsl(var(--foreground) / 0.22);
+}
+
+@media (max-width: 720px) {
+  [data-mobile-chat-header="true"].chat-header {
+    min-height: calc(58px + env(safe-area-inset-top, 0px));
+    padding-inline: 10px;
+    border-color: hsl(var(--border) / 0.3);
+    background: hsl(var(--background) / 0.82);
+  }
+
+  [data-mobile-chat-header="true"] .model-selector-trigger {
+    min-height: 44px;
+    max-width: min(48vw, 220px);
+    border-radius: 12px;
+    padding-inline: 10px;
+    font-size: 13px;
+  }
+
+  [data-mobile-chat-header="true"] > div:first-child > button,
+  [data-mobile-chat-header="true"] > div:last-child > button {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+
+  .model-selector-dropdown {
+    width: calc(100vw - 24px);
+    max-width: 420px;
+    border-radius: 16px;
+  }
+
+  .model-selector-dropdown input {
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .model-selector-dropdown .model-selector-group-label,
+  .model-selector-dropdown .model-selector-item {
+    min-height: 44px;
+  }
+
+  .chat-transcript-content {
+    padding-inline: 14px;
+    padding-top: 10px;
+  }
+
+  .chat-empty-state-stage {
+    min-height: calc(100dvh - 224px);
+  }
+
+  .chat-composer-layer {
+    padding-inline: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .composer-glass-card {
+    border-radius: 20px;
+    background: hsl(var(--background) / 0.86);
+    box-shadow:
+      inset 0 1px 0 hsl(var(--background) / 0.86),
+      0 14px 36px -22px hsl(var(--foreground) / 0.44);
+  }
+
+  .composer-glass-card > button {
+    width: 44px;
+    height: 44px;
+    top: 2px;
+    right: 5px;
+  }
+
+  .composer-glass-card > div:last-child {
+    gap: 4px;
+    padding: 3px 7px 7px;
+  }
+
+  .composer-glass-card > div:last-child > div:first-child {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  .composer-glass-card > div:last-child > div:first-child::-webkit-scrollbar {
+    display: none;
+  }
+
+  .composer-toolbar-action,
+  .composer-primary-action {
+    width: 44px;
+    height: 44px;
+  }
+
+  .composer-reasoning-trigger {
+    min-height: 44px;
+  }
+
+  .chat-upload-file {
+    width: min(72vw, 280px);
+    min-width: min(72vw, 280px);
+    min-height: 48px;
+  }
+
+  .chat-upload-remove {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .chat-header,
+  .composer-glass-card {
+    background: hsl(var(--background));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .chat-header,
+  .composer-glass-card,
+  .chat-suggestion-card,
+  .model-selector-dropdown {
     border-color: hsl(var(--foreground) / 0.42);
   }
 }

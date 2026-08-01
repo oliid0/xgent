@@ -118,7 +118,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
       data-tauri-drag-region
       data-mobile-chat-header={mobileExperience ? "true" : undefined}
       className={cn(
-        "flex items-center justify-between gap-2 pr-4",
+        "chat-header flex items-center justify-between gap-2 pr-4",
         mobileExperience ? "pb-2.5 pt-[calc(0.625rem+env(safe-area-inset-top,0px))]" : "py-2.5",
         !sidebarOpen && macOsTauri ? "pl-[232px]" : "pl-4",
       )}
@@ -151,7 +151,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
                 variant="ghost"
                 disabled={!hasModels}
                 className={cn(
-                  "model-selector-trigger h-8 max-w-[min(20rem,calc(100vw-8.5rem))] -translate-y-px justify-between gap-1.5 overflow-hidden rounded-lg px-2.5 py-1 cursor-pointer text-xs font-normal text-foreground transition-all duration-200 ease-out hover:bg-muted/60 dark:text-white",
+                  "model-selector-trigger h-8 max-w-[min(20rem,calc(100vw-8.5rem))] -translate-y-px justify-between gap-1.5 overflow-hidden rounded-lg px-2.5 py-1 cursor-pointer text-xs font-normal text-foreground transition-[color,background-color,transform] duration-150 ease-out hover:bg-muted/60 dark:text-white",
                   isModelPickerOpen && "bg-muted/60",
                 )}
               />

@@ -726,8 +726,10 @@ function SshImportModal(props: {
                         }`}
                       >
                         <Check
-                          className={`h-3.5 w-3.5 transition-transform duration-150 ${
-                            selectedIds.has(candidate.id) ? "scale-100" : "scale-0"
+                          className={`h-3.5 w-3.5 transition-[transform,opacity] duration-150 ${
+                            selectedIds.has(candidate.id)
+                              ? "scale-100 opacity-100"
+                              : "scale-90 opacity-0"
                           }`}
                         />
                       </span>
@@ -797,7 +799,7 @@ function SshHostCard(props: {
   const hasFooter = hasMeta || resetStatus;
 
   const actions = (
-    <div className="settings-hover-actions flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+    <div className="settings-hover-actions settings-ssh-host-actions flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
       <ConfirmActionPopover
         title={t("settings.sshKnownHostResetTitle")}
         description={t("settings.sshKnownHostResetDesc")}
@@ -808,7 +810,7 @@ function SshHostCard(props: {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            className="settings-ssh-host-action h-7 w-7 text-muted-foreground hover:text-foreground"
             onClick={open}
             title={t("settings.sshKnownHostReset")}
             aria-label={t("settings.sshKnownHostReset")}
@@ -821,7 +823,7 @@ function SshHostCard(props: {
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+        className="settings-ssh-host-action h-7 w-7 text-muted-foreground hover:text-foreground"
         onClick={onEdit}
         title={t("settings.edit")}
       >
@@ -832,7 +834,7 @@ function SshHostCard(props: {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            className="settings-ssh-host-action h-7 w-7 text-muted-foreground hover:text-destructive"
             onClick={open}
             title={t("settings.delete")}
           >
@@ -862,10 +864,10 @@ function SshHostCard(props: {
 
   if (viewMode === "grid") {
     return (
-      <div className="group relative z-0 flex flex-col rounded-xl border border-border/60 bg-card p-4 transition-all duration-200 hover:z-10 hover:border-emerald-500/40 hover:shadow-md hover:shadow-emerald-500/10">
+      <div className="settings-ssh-host-card group relative z-0 flex flex-col rounded-xl border border-border/60 bg-card p-4 transition-[border-color,box-shadow] duration-150 hover:z-10 hover:border-emerald-500/40 hover:shadow-md hover:shadow-emerald-500/10">
         <div className="absolute right-3 top-3">{actions}</div>
         <div className="flex items-start gap-3 pr-12">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500 transition-transform duration-200 group-hover:scale-105">
+          <div className="settings-ssh-host-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
             <Server className="h-[18px] w-[18px]" />
           </div>
           <div className="min-w-0 flex-1">
@@ -890,9 +892,9 @@ function SshHostCard(props: {
   }
 
   return (
-    <div className="group relative z-0 rounded-xl border border-border/60 bg-card transition-all duration-200 hover:z-10 hover:border-emerald-500/40 hover:shadow-md hover:shadow-emerald-500/10">
+    <div className="settings-ssh-host-card group relative z-0 rounded-xl border border-border/60 bg-card transition-[border-color,box-shadow] duration-150 hover:z-10 hover:border-emerald-500/40 hover:shadow-md hover:shadow-emerald-500/10">
       <div className="settings-card-row flex items-center gap-3 px-4 py-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500 transition-transform duration-200 group-hover:scale-105">
+        <div className="settings-ssh-host-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
           <Server className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
@@ -927,7 +929,7 @@ function SshViewModeToggle(props: { value: SshViewMode; onChange: (value: SshVie
   ];
 
   return (
-    <fieldset className="relative isolate grid min-w-0 grid-cols-2 rounded-lg border border-border/60 bg-muted/30 p-0.5 shadow-inner shadow-black/5">
+    <fieldset className="settings-ssh-view-toggle relative isolate grid min-w-0 grid-cols-2 rounded-lg border border-border/60 bg-muted/30 p-0.5 shadow-inner shadow-black/5">
       <legend className="sr-only">{groupLabel}</legend>
       <span
         aria-hidden="true"
@@ -1151,7 +1153,7 @@ export function SshSettingsSection(props: SettingsSectionProps) {
             </div>
           </div>
 
-          <div className="settings-section-actions flex items-center gap-2">
+          <div className="settings-section-actions settings-ssh-actions flex items-center gap-2">
             {hosts.length > 0 ? (
               <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs text-muted-foreground">
                 <span className="tabular-nums font-medium text-foreground">{hosts.length}</span>
@@ -1204,7 +1206,9 @@ export function SshSettingsSection(props: SettingsSectionProps) {
           </div>
         ) : (
           <div
-            className={viewMode === "grid" ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : "space-y-2"}
+            className={`settings-ssh-host-list ${
+              viewMode === "grid" ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : "space-y-2"
+            }`}
           >
             {hosts.map((host) => (
               <SshHostCard

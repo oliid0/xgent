@@ -2,7 +2,9 @@ import { invoke } from "@xagent/runtime";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  Check,
   Key,
+  Link2,
   Loader2,
   Send,
   Settings2,
@@ -34,7 +36,10 @@ type SshCommandEntry = {
 type MobileSshPanelProps = {
   open: boolean;
   workdir: string;
+  projectPathKey: string;
   hosts: SshHostConfig[];
+  associatedHostIds: string[];
+  onAssociatedHostIdsChange: (hostIds: string[]) => void;
   onOpenSettings: () => void;
   onClose: () => void;
 };
@@ -56,7 +61,16 @@ function authLabel(host: SshHostConfig, t: (key: string) => string) {
 }
 
 export function MobileSshPanel(props: MobileSshPanelProps) {
-  const { open, workdir, hosts, onOpenSettings, onClose } = props;
+  const {
+    open,
+    workdir,
+    projectPathKey,
+    hosts,
+    associatedHostIds,
+    onAssociatedHostIdsChange,
+    onOpenSettings,
+    onClose,
+  } = props;
   const { t } = useLocale();
   const [selectedHostId, setSelectedHostId] = useState("");
   const [command, setCommand] = useState("");
@@ -67,6 +81,18 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
   const selectedHost = useMemo(
     () => hosts.find((host) => host.id === selectedHostId) ?? null,
     [hosts, selectedHostId],
+  );
+  const associatedSet = useMemo(
+    () =>
+      new Set(associatedHostIds.filter((id) => hosts.some((host) => host.id === id))),
+    [associatedHostIds, hosts],
+  );
+  const orderedHosts = useMemo(
+    () => [
+      ...hosts.filter((host) => associatedSet.has(host.id)),
+      ...hosts.filter((host) => !associatedSet.has(host.id)),
+    ],
+    [associatedSet, hosts],
   );
 
   useEffect(() => {
@@ -126,6 +152,16 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
   const close = () => {
     if (activeRunId) void invoke("shell_cancel", { run_id: activeRunId }).catch(() => undefined);
     onClose();
+  };
+
+  const toggleHostAssociation = (hostId: string) => {
+    if (!projectPathKey) return;
+    const current = associatedHostIds.filter((id) => hosts.some((host) => host.id === id));
+    onAssociatedHostIdsChange(
+      associatedSet.has(hostId)
+        ? current.filter((id) => id !== hostId)
+        : [...current, hostId],
+    );
   };
 
   if (!open) return null;
@@ -210,32 +246,93 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
               </button>
             </div>
           ) : (
-            <div className="space-y-2">
-              {hosts.map((host) => {
-                return (
-                  <button
-                    key={host.id}
-                    type="button"
-                    onClick={() => setSelectedHostId(host.id)}
-                    className="flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left active:bg-muted"
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                      <Key className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium">
-                        {host.name || host.host}
-                      </span>
-                      <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">
-                        {endpoint(host)}
-                      </span>
-                      <span className="mt-1 block text-[10px] text-muted-foreground">
-                        {authLabel(host, t)}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 rounded-2xl bg-muted/45 px-3 py-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-background text-muted-foreground shadow-sm ring-1 ring-border/55">
+                  <Link2 className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-semibold text-foreground">
+                    {t("projectTools.sshConnectionScopeProject")}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">
+                    {projectPathKey
+                      ? t("projectTools.sshConnectionConfiguredHosts").replace(
+                          "{count}",
+                          String(associatedSet.size),
+                        )
+                      : t("projectTools.sshConnectionNoProject")}
+                  </span>
+                </span>
+              </div>
+              <div className="space-y-2">
+                {orderedHosts.map((host) => {
+                  const associated = associatedSet.has(host.id);
+                  return (
+                    <div
+                      key={host.id}
+                      className={`flex min-h-16 w-full items-center rounded-2xl border bg-background transition-colors ${
+                        associated ? "border-emerald-500/35" : "border-border"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedHostId(host.id)}
+                        className="flex min-w-0 flex-1 items-center gap-3 self-stretch rounded-l-2xl p-3 text-left active:bg-muted"
+                      >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                          <Key className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="truncate text-[13px] font-medium">
+                              {host.name || host.host}
+                            </span>
+                            {associated ? (
+                              <span className="shrink-0 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700 dark:text-emerald-300">
+                                {t("chat.mobileSsh.associated")}
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">
+                            {endpoint(host)}
+                          </span>
+                          <span className="mt-1 block text-[10px] text-muted-foreground">
+                            {authLabel(host, t)}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleHostAssociation(host.id)}
+                        disabled={!projectPathKey}
+                        className={`mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-35 ${
+                          associated
+                            ? "bg-emerald-500 text-white"
+                            : "bg-muted text-muted-foreground active:bg-muted/70"
+                        }`}
+                        aria-pressed={associated}
+                        aria-label={
+                          associated
+                            ? t("chat.mobileSsh.removeAssociation")
+                            : t("chat.mobileSsh.associateHost")
+                        }
+                        title={
+                          associated
+                            ? t("chat.mobileSsh.removeAssociation")
+                            : t("chat.mobileSsh.associateHost")
+                        }
+                      >
+                        {associated ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <Link2 className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

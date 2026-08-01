@@ -1841,6 +1841,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
           icon={<Blend className="h-6 w-6" />}
           title={t("settings.skillsHubTitle")}
           subtitle={rootDir ? rootDir : t("settings.skillsHubSubtitle")}
+          tone="amber"
           sidebarOpen={sidebarOpen}
           onOpenSidebar={onOpenSidebar}
         />
@@ -1850,7 +1851,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
             {/* Status pill row */}
             <div
               className={cn(
-                "hub-panel-enter relative overflow-hidden rounded-xl border bg-card",
+                "hub-status-panel hub-panel-enter relative overflow-hidden rounded-xl border bg-card",
                 skillsEnabled ? "border-border shadow-sm" : "border-border",
               )}
             >
@@ -1962,7 +1963,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
               </div>
             </div>
 
-            <div className="hub-panel-enter flex items-center justify-between gap-3 max-sm:flex-col max-sm:items-stretch max-sm:gap-2">
+            <div className="hub-tab-row hub-panel-enter flex items-center justify-between gap-3 max-sm:flex-col max-sm:items-stretch max-sm:gap-2">
               <HubSegmentedControl className="shrink-0 max-sm:max-w-full max-sm:overflow-x-auto max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden">
                 {[
                   {
@@ -2096,7 +2097,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
               ) : null}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-hidden">
+            <div className="hub-view-stage min-h-0 flex-1 overflow-hidden">
               {lockedByChatMode ? (
                 <div className="h-full min-h-0 overflow-y-auto pb-4 pr-1">
                   <GlassPanel tone="muted" className="hub-panel-enter">

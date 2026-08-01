@@ -269,19 +269,20 @@ const McpServerCard = memo(function McpServerCard(props: {
   return (
     <div
       className={cn(
-        "skill-card-enter group rounded-2xl border backdrop-blur-xl transition-all",
+        "mcp-server-card skill-card-enter group rounded-2xl border backdrop-blur-xl transition-[border-color,background-color,box-shadow] duration-150",
         enabled
           ? "border-border/55 bg-background/80 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset,0_4px_18px_-12px_rgba(15,23,42,0.16)] dark:border-white/[0.10] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_4px_18px_-12px_rgba(0,0,0,0.5)]"
           : "border-border/40 bg-background/55 hover:border-border/55 hover:bg-background/70 dark:border-white/[0.05] dark:bg-white/[0.03] dark:hover:border-white/[0.10] dark:hover:bg-white/[0.06]",
       )}
     >
-      <div className="flex items-center gap-3 px-4 py-3">
+      <div className="mcp-server-card-row flex items-center gap-3 px-4 py-3">
         {/* Toggle */}
         <button
           type="button"
           title={enabled ? t("settings.disable") : t("settings.enable")}
           onClick={() => patchServer({ enabled: !enabled })}
           className={cn(
+            "mcp-server-toggle",
             "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full ring-1 transition-colors",
             enabled
               ? "bg-foreground/80 ring-foreground/30 shadow-[0_2px_8px_-3px_rgba(15,23,42,0.4)] dark:shadow-[0_2px_8px_-3px_rgba(0,0,0,0.6)]"
@@ -301,7 +302,7 @@ const McpServerCard = memo(function McpServerCard(props: {
           type="button"
           onClick={onEdit}
           title={t("settings.edit")}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left outline-hidden"
+          className="mcp-server-body flex min-w-0 flex-1 items-center gap-3 text-left outline-hidden"
         >
           <div
             className={cn(
@@ -359,7 +360,7 @@ const McpServerCard = memo(function McpServerCard(props: {
           </div>
         ) : null}
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="mcp-server-actions flex shrink-0 items-center gap-1">
           <ToolPolicyToggle
             value={policy}
             size="sm"
@@ -379,7 +380,7 @@ const McpServerCard = memo(function McpServerCard(props: {
             type="button"
             onClick={onEdit}
             title={t("settings.edit")}
-            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+            className="mcp-server-action rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
@@ -400,7 +401,7 @@ const McpServerCard = memo(function McpServerCard(props: {
               <button
                 type="button"
                 onClick={open}
-                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                className="mcp-server-action rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 title={t("settings.delete")}
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -718,7 +719,7 @@ export function McpServersForm(props: McpServersFormProps) {
               value={filter}
               onChange={(e) => setFilter(e.currentTarget.value)}
               placeholder={t("mcpHub.searchInstalled")}
-              className="h-10 w-full rounded-xl border border-border/40 bg-background/60 pl-10 pr-3 text-[13px] outline-hidden backdrop-blur-xl transition-all placeholder:text-muted-foreground/60 focus:border-border/60 focus:bg-background/85 focus:ring-2 focus:ring-foreground/10"
+              className="h-10 w-full rounded-xl border border-border/40 bg-background/60 pl-10 pr-3 text-[13px] outline-hidden backdrop-blur-xl transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground/60 focus:border-border/60 focus:bg-background/85 focus:ring-2 focus:ring-foreground/10"
             />
           </div>
         ) : null}

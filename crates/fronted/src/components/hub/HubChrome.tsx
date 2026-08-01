@@ -6,8 +6,13 @@ import { isMacOsTauri, MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
 import { Button } from "../ui/button";
 
 export function HubBackdrop(props: { tone?: "amber" | "violet" | "neutral" }) {
-  void props;
-  return <div className="pointer-events-none absolute inset-0 bg-background" />;
+  return (
+    <div
+      aria-hidden="true"
+      data-hub-tone={props.tone ?? "neutral"}
+      className="hub-backdrop pointer-events-none absolute inset-0"
+    />
+  );
 }
 
 export function HubHeader(props: {
@@ -19,14 +24,14 @@ export function HubHeader(props: {
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
 }) {
-  const { icon, title, subtitle, actions, sidebarOpen, onOpenSidebar } = props;
+  const { icon, title, subtitle, tone = "neutral", actions, sidebarOpen, onOpenSidebar } = props;
   const { t } = useLocale();
   const isMacTitleBarOverlay = isMacOsTauri();
   const showSidebarButton = !sidebarOpen && !isMacTitleBarOverlay;
   return (
     <>
       <MacOsTitleBarSpacer />
-      <div className="hub-header relative z-10 border-b border-border bg-background px-4 pb-3 pt-4 sm:px-6 lg:px-8 xl:px-10">
+      <div className="hub-header relative z-10 px-4 pb-3 pt-4 sm:px-6 lg:px-8 xl:px-10">
         {showSidebarButton ? (
           <Button
             type="button"
@@ -45,7 +50,10 @@ export function HubHeader(props: {
             showSidebarButton && "pl-11 lg:pl-0",
           )}
         >
-          <div className="hub-header-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/45 text-foreground/80">
+          <div
+            data-hub-tone={tone}
+            className="hub-header-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-foreground/80"
+          >
             {icon}
           </div>
           <div className="min-w-0 flex-1">
@@ -58,7 +66,7 @@ export function HubHeader(props: {
               </p>
             ) : null}
           </div>
-          {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+          {actions ? <div className="hub-header-actions flex items-center gap-2">{actions}</div> : null}
         </div>
       </div>
     </>
@@ -101,7 +109,7 @@ export function HubSegmentedControl(props: { children: ReactNode; className?: st
   return (
     <div
       className={cn(
-        "inline-flex min-w-0 items-center rounded-xl border border-border bg-muted p-1",
+        "hub-segmented-control inline-flex min-w-0 items-center rounded-xl bg-muted p-1",
         props.className,
       )}
     >
@@ -126,7 +134,7 @@ export function HubSegmentedButton(props: {
       title={props.title}
       onClick={props.onClick}
       className={cn(
-        "inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-[12.5px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        "hub-segmented-button inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-[12.5px] font-medium transition-[color,background-color,box-shadow,transform] duration-150 disabled:cursor-not-allowed disabled:opacity-50",
         props.active
           ? "bg-background text-foreground shadow-sm ring-1 ring-border"
           : "text-muted-foreground hover:bg-background/70 hover:text-foreground",

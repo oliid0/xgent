@@ -1402,6 +1402,10 @@ export function ChatPage(props: ChatPageProps) {
     () => getSshProjectHostIds(settings.ssh, terminalProjectPathKey),
     [settings.ssh, terminalProjectPathKey],
   );
+  const mobileAssociatedSshHostIds = useMemo(
+    () => getSshProjectHostIds(settings.ssh, mobileWorkspacePathKey),
+    [mobileWorkspacePathKey, settings.ssh],
+  );
   const terminalDisabledMessage = !isAgentMode
     ? "Project tools require Agent project mode."
     : !terminalProjectPath
@@ -1509,6 +1513,13 @@ export function ChatPage(props: ChatPageProps) {
       setSettings((prev) => updateSshProjectHostIds(prev, terminalProjectPathKey, hostIds));
     },
     [setSettings, terminalProjectPathKey],
+  );
+  const handleMobileSshProjectHostIdsChange = useCallback(
+    (hostIds: string[]) => {
+      if (!mobileWorkspacePathKey) return;
+      setSettings((prev) => updateSshProjectHostIds(prev, mobileWorkspacePathKey, hostIds));
+    },
+    [mobileWorkspacePathKey, setSettings],
   );
   const handleWorkspaceToolsSessionsChange = useCallback((sessions: TerminalSession[]) => {
     setTerminalSessions(sortTerminalSessions(sessions));
@@ -4716,7 +4727,7 @@ export function ChatPage(props: ChatPageProps) {
             像素字号，整列缩放会造成混排（聊天区设置也只应影响聊天区）。 */}
         <div
           className={cn(
-            "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background",
+            "chat-workspace-main relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background",
             activeView === "chat" && "zone-font-scale",
           )}
           style={
@@ -5006,7 +5017,10 @@ export function ChatPage(props: ChatPageProps) {
           <MobileSshPanel
             open={mobileWorkspaceDestination?.kind === "ssh"}
             workdir={mobileWorkspacePath}
+            projectPathKey={mobileWorkspacePathKey}
             hosts={settings.ssh.hosts}
+            associatedHostIds={mobileAssociatedSshHostIds}
+            onAssociatedHostIdsChange={handleMobileSshProjectHostIdsChange}
             onOpenSettings={() => {
               setMobileWorkspaceDestination(null);
               onOpenSettings("ssh");

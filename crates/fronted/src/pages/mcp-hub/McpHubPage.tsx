@@ -70,6 +70,7 @@ export function McpHubPage(props: McpHubPageProps) {
           icon={<Cable className="h-5 w-5" />}
           title="MCP Hub"
           subtitle={t("mcpHub.subtitle")}
+          tone="violet"
           sidebarOpen={sidebarOpen}
           onOpenSidebar={onOpenSidebar}
         />
@@ -79,7 +80,7 @@ export function McpHubPage(props: McpHubPageProps) {
             {/* Status banner */}
             <div
               className={cn(
-                "hub-panel-enter relative overflow-hidden rounded-xl border bg-card",
+                "hub-status-panel hub-panel-enter relative overflow-hidden rounded-xl border bg-card",
                 ready ? "border-border shadow-sm" : "border-border",
               )}
             >
@@ -141,7 +142,7 @@ export function McpHubPage(props: McpHubPageProps) {
             </div>
 
             {/* Tab bar */}
-            <div className="hub-panel-enter flex items-center justify-between gap-3">
+            <div className="hub-tab-row hub-panel-enter flex items-center justify-between gap-3">
               <HubSegmentedControl className="shrink-0">
                 {[
                   {
@@ -200,7 +201,7 @@ export function McpHubPage(props: McpHubPageProps) {
             </div>
 
             {/* Content */}
-            <div className="min-h-0 flex-1 overflow-hidden">
+            <div className="hub-view-stage min-h-0 flex-1 overflow-hidden">
               {view === "installed" ? (
                 <McpServersForm
                   settings={settings}

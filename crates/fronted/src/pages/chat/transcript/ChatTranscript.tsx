@@ -218,13 +218,13 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
   return (
     <div
       ref={transcriptRootRef}
-      className="relative min-h-0 flex-1"
+      className="chat-transcript-root relative min-h-0 flex-1"
       onContextMenu={handleTranscriptContextMenu}
     >
       <ScrollArea ref={setScrollAreaRoot} viewportRef={setScrollViewport} className="h-full">
-        <div className="mx-auto w-full max-w-[768px] px-5 py-4">
+        <div className="chat-transcript-content mx-auto w-full max-w-[768px] px-5 py-4">
           {showNoModelsState || showStartChatState ? (
-            <div className="flex min-h-[calc(100vh-220px)] flex-col items-center justify-center">
+            <div className="chat-empty-state-stage flex min-h-[calc(100vh-220px)] flex-col items-center justify-center">
               {/* Keyed per conversation so the hero entrance replays when
                   switching between empty conversations, not just on mount. */}
               <ChatEmptyState

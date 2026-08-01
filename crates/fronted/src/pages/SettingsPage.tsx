@@ -64,11 +64,12 @@ function getSaveIndicator(state: SettingsPageProps["saveState"], t: (key: string
 type NavItemProps = {
   icon: ReactNode;
   label: string;
+  accentClass: string;
   active: boolean;
   onClick: () => void;
 };
 
-function NavItem({ icon, label, active, onClick }: NavItemProps) {
+function NavItem({ icon, label, accentClass, active, onClick }: NavItemProps) {
   return (
     <button
       type="button"
@@ -80,9 +81,7 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
       }`}
     >
       <span
-        className={`flex h-6 w-6 shrink-0 items-center justify-center transition-colors ${
-          active ? "text-foreground" : "text-foreground/75 group-hover:text-foreground"
-        }`}
+        className={`settings-nav-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white shadow-sm ${accentClass}`}
       >
         {icon}
       </span>
@@ -331,6 +330,7 @@ export function SettingsPage(props: SettingsPageProps) {
             workdir={settings.system.workdir}
             settings={settings}
             setSettings={setSettings}
+            compact={compactSettings}
           />
         );
       case "skills":
@@ -362,11 +362,11 @@ export function SettingsPage(props: SettingsPageProps) {
     return (
       <div
         data-edge-swipe-ignore
-        className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background"
+        className="settings-page settings-page-compact relative flex h-full min-h-0 flex-col overflow-hidden bg-background"
       >
         {mobileDetailOpen ? (
           <main className="settings-mobile-detail flex min-h-0 flex-1 flex-col bg-background">
-            <header className="relative z-10 flex min-h-14 shrink-0 items-center border-b border-border bg-background px-2.5">
+            <header className="settings-mobile-toolbar relative z-10 flex min-h-14 shrink-0 items-center px-2.5">
               <button
                 type="button"
                 onClick={() => setMobileDetailOpen(false)}
@@ -410,7 +410,7 @@ export function SettingsPage(props: SettingsPageProps) {
           </main>
         ) : (
           <main className="settings-mobile-home min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
-            <header className="sticky top-0 z-10 flex min-h-14 items-center border-b border-border bg-background px-2.5">
+            <header className="settings-mobile-toolbar sticky top-0 z-10 flex min-h-14 items-center px-2.5">
               <button
                 type="button"
                 onClick={onBack}
@@ -437,7 +437,7 @@ export function SettingsPage(props: SettingsPageProps) {
                   <h2 className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/75">
                     {group.label}
                   </h2>
-                  <div className="overflow-hidden rounded-xl border border-border bg-background">
+                  <div className="settings-mobile-group overflow-hidden rounded-2xl bg-card">
                     {group.items.map((item, index) => (
                       <button
                         key={item.id}
@@ -446,22 +446,24 @@ export function SettingsPage(props: SettingsPageProps) {
                           setSection(item.id);
                           setMobileDetailOpen(true);
                         }}
-                        className="group relative flex min-h-12 w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors active:bg-muted"
+                        className="settings-mobile-row group relative flex min-h-16 w-full items-center gap-3 px-3 py-2.5 text-left text-sm"
                       >
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center text-foreground/75">
+                        <span
+                          className={`settings-mobile-row-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] text-white shadow-sm ${item.accentClass}`}
+                        >
                           {item.icon}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-medium leading-5 text-foreground">
+                          <span className="block text-[15px] font-medium leading-5 text-foreground">
                             {item.label}
                           </span>
-                          <span className="mt-0.5 block truncate text-[11px] leading-4 text-muted-foreground">
+                          <span className="mt-0.5 block truncate text-xs leading-4 text-muted-foreground">
                             {item.description}
                           </span>
                         </span>
                         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/45 transition-transform group-active:translate-x-0.5" />
                         {index < group.items.length - 1 ? (
-                          <span className="pointer-events-none absolute inset-x-0 bottom-0 ml-[50px] h-px bg-border/45" />
+                          <span className="pointer-events-none absolute inset-x-0 bottom-0 ml-[56px] h-px bg-border/45" />
                         ) : null}
                       </button>
                     ))}
@@ -481,7 +483,7 @@ export function SettingsPage(props: SettingsPageProps) {
       role="dialog"
       aria-modal="true"
       aria-label={t("settings.title")}
-      className="flex h-full min-h-0 flex-col overflow-hidden bg-background"
+      className="settings-page settings-page-desktop flex h-full min-h-0 flex-col overflow-hidden bg-background"
     >
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-border/60 px-5">
         <h1 className="text-lg font-medium tracking-tight">{t("settings.title")}</h1>
@@ -523,6 +525,7 @@ export function SettingsPage(props: SettingsPageProps) {
                         key={item.id}
                         icon={item.icon}
                         label={item.label}
+                        accentClass={item.accentClass}
                         active={section === item.id}
                         onClick={() => setSection(item.id)}
                       />

@@ -5,7 +5,7 @@
 // Shared by every frontend runtime. Platform differences belong in the
 // runtime boundary, never in this panel.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocale } from "../../../i18n";
 import type { MemoryMeta } from "../../../lib/memory/api";
 import { MEMORY_TYPES, type MemoryType } from "../../../lib/memory/schema";
@@ -32,6 +32,7 @@ import {
 } from "./panelModel";
 import {
   AlertTriangle,
+  ArrowLeft,
   BookOpen,
   Brain,
   Button,
@@ -61,6 +62,7 @@ export function MemoryPanel(props: {
   workdir?: string;
   settings: AppSettings;
   setSettings: (updater: (prev: AppSettings) => AppSettings) => void;
+  compact?: boolean;
 }) {
   const { t } = useLocale();
   const workdir = props.workdir?.trim() || undefined;
@@ -69,6 +71,7 @@ export function MemoryPanel(props: {
   const [showCreate, setShowCreate] = useState(false);
   const [wipeConfirmOpen, setWipeConfirmOpen] = useState(false);
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
+  const [compactDetailOpen, setCompactDetailOpen] = useState(false);
   const [draft, setDraft] = useState<MemoryCreateDraft>(EMPTY_CREATE_DRAFT);
   const {
     entries,
@@ -163,10 +166,17 @@ export function MemoryPanel(props: {
   );
   const quotaStatus = strongestQuotaLevel(quotaItems);
 
+  useEffect(() => {
+    if (props.compact && !selected && !showCreate) {
+      setCompactDetailOpen(false);
+    }
+  }, [props.compact, selected, showCreate]);
+
   async function handleCreateEntry() {
     const created = await createEntry(draft);
     if (created) {
       setShowCreate(false);
+      setCompactDetailOpen(true);
       setDraft(EMPTY_CREATE_DRAFT);
     }
   }
@@ -184,7 +194,10 @@ export function MemoryPanel(props: {
       <button
         key={entryKey(entry)}
         type="button"
-        onClick={() => openEntry(entry)}
+        onClick={() => {
+          openEntry(entry);
+          if (props.compact) setCompactDetailOpen(true);
+        }}
         className={`w-full rounded-lg border px-3 py-2.5 text-left transition-colors ${
           nested ? "ml-3 w-[calc(100%-0.75rem)]" : ""
         } ${
@@ -222,7 +235,11 @@ export function MemoryPanel(props: {
   return (
     <>
       <div className="settings-memory-panel flex min-h-0 flex-1 flex-col gap-4">
-        <div className="settings-memory-summary-card shrink-0 rounded-xl border border-border/60 bg-card p-4">
+        <div
+          className={`settings-memory-summary-card shrink-0 rounded-xl border border-border/60 bg-card p-4 ${
+            props.compact && compactDetailOpen ? "settings-memory-compact-hidden" : ""
+          }`}
+        >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
               <div className="flex items-center gap-2 text-sm font-semibold">
@@ -306,7 +323,11 @@ export function MemoryPanel(props: {
         </div>
 
         <div className="settings-memory-layout grid min-h-0 flex-1 gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
-          <section className="settings-memory-list-section flex min-h-0 flex-col rounded-xl border border-border/60 bg-card">
+          <section
+            className={`settings-memory-list-section flex min-h-0 flex-col rounded-xl border border-border/60 bg-card ${
+              props.compact && compactDetailOpen ? "settings-memory-compact-hidden" : ""
+            }`}
+          >
             <div className="shrink-0 space-y-3 border-b border-border/40 p-3">
               <div className="grid grid-cols-3 gap-1 rounded-lg bg-muted/50 p-1">
                 <button
@@ -357,7 +378,10 @@ export function MemoryPanel(props: {
                   size="icon"
                   variant="outline"
                   title={t("settings.memoryNew")}
-                  onClick={() => setShowCreate((value) => !value)}
+                  onClick={() => {
+                    setShowCreate(true);
+                    if (props.compact) setCompactDetailOpen(true);
+                  }}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -401,7 +425,27 @@ export function MemoryPanel(props: {
             </div>
           </section>
 
-          <section className="settings-memory-detail-section flex min-h-0 flex-col rounded-xl border border-border/60 bg-card">
+          <section
+            className={`settings-memory-detail-section flex min-h-0 flex-col rounded-xl border border-border/60 bg-card ${
+              props.compact && !compactDetailOpen ? "settings-memory-compact-hidden" : ""
+            }`}
+          >
+            {props.compact ? (
+              <div className="settings-memory-compact-toolbar flex min-h-12 shrink-0 items-center border-b border-border/40 px-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCompactDetailOpen(false);
+                    setShowCreate(false);
+                  }}
+                  className="settings-memory-back inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2.5 text-sm font-medium text-primary"
+                  aria-label={t("settings.memoryTitle")}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  {t("settings.memoryTitle")}
+                </button>
+              </div>
+            ) : null}
             {showCreate ? (
               <div className="shrink-0 border-b border-border/40 p-4">
                 <div className="mb-3 text-sm font-semibold">{t("settings.memoryNew")}</div>

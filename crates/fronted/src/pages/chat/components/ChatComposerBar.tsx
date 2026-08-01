@@ -554,7 +554,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     <div
       ref={rootRef}
       className={cn(
-        "pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-4",
+        "chat-composer-layer pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-4",
         // 展开态从头部下沿一路铺到底部，把整个聊天区让给输入框。
         isComposerExpanded && "top-14",
       )}
@@ -573,7 +573,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
               <div
                 key={file.relativePath}
                 title={file.relativePath}
-                className="group flex w-[calc(25%-6px)] min-w-[calc(25%-6px)] items-center gap-2 rounded-xl border border-white/45 bg-white/55 px-2.5 py-1.5 text-[calc(11px*var(--zone-font-scale,1))] shadow-[0_2px_8px_-2px_rgba(15,23,42,0.06)] backdrop-blur-2xl backdrop-saturate-150 transition-all hover:bg-white/75 hover:shadow-[0_4px_14px_-4px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.10]"
+                className="chat-upload-file group flex w-[calc(25%-6px)] min-w-[calc(25%-6px)] items-center gap-2 rounded-xl border border-white/45 bg-white/55 px-2.5 py-1.5 text-[calc(11px*var(--zone-font-scale,1))] shadow-[0_2px_8px_-2px_rgba(15,23,42,0.06)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,box-shadow,border-color] duration-150 hover:bg-white/75 hover:shadow-[0_4px_14px_-4px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.10]"
               >
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-sky-500/12 dark:bg-sky-400/15">
                   <Paperclip className="h-3 w-3 text-sky-600 dark:text-sky-400" />
@@ -590,7 +590,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                   type="button"
                   disabled={isInputDisabled}
                   onClick={() => onRemovePendingUpload(file.relativePath)}
-                  className="shrink-0 rounded-full p-1 text-muted-foreground/70 opacity-0 transition-all hover:bg-foreground/5 hover:text-foreground group-hover:opacity-100 disabled:pointer-events-none"
+                  className="chat-upload-remove shrink-0 rounded-full p-1 text-muted-foreground/70 opacity-0 transition-[color,background-color,opacity,transform] duration-150 hover:bg-foreground/5 hover:text-foreground group-hover:opacity-100 active:scale-[0.97] disabled:pointer-events-none"
                   aria-label={`${t("chat.upload.removeFile")} ${file.fileName}`}
                   title={t("chat.upload.removeFile")}
                 >
@@ -1047,7 +1047,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                       : undefined
                 }
                 className={cn(
-                  "h-8 w-8 shrink-0 rounded-full border-0 p-0 shadow-none transition-all",
+                  "composer-primary-action h-8 w-8 shrink-0 rounded-full border-0 p-0 shadow-none transition-[color,background-color,filter,opacity,transform] duration-150",
                   canQueueDraftWhileSending
                     ? "hover:brightness-105 active:scale-95"
                     : isSending

@@ -139,7 +139,7 @@ export function CronSection(props: SettingsSectionProps) {
   const enabledCount = tasks.filter((task) => task.enabled).length;
 
   return (
-    <div className="space-y-5">
+    <div className="settings-cron-section space-y-5">
       {/* Header */}
       <div className="settings-section-heading-row flex items-center justify-between gap-4">
         <div className="settings-section-title-group flex items-center gap-3">
@@ -214,13 +214,13 @@ export function CronSection(props: SettingsSectionProps) {
             return (
               <div
                 key={task.id}
-                className={`group rounded-xl border transition-all ${
+                className={`settings-cron-card group rounded-xl border transition-[border-color,background-color,box-shadow,opacity] ${
                   task.enabled
                     ? "border-border/60 bg-card hover:border-border hover:shadow-sm"
                     : "border-border/40 bg-muted/20 opacity-60 hover:opacity-80"
                 }`}
               >
-                <div className="settings-card-row flex items-center gap-3 px-4 py-3">
+                <div className="settings-card-row settings-cron-card-row flex items-center gap-3 px-4 py-3">
                   {/* Icon */}
                   <div
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tone.bg} ${tone.text}`}
@@ -229,7 +229,7 @@ export function CronSection(props: SettingsSectionProps) {
                   </div>
 
                   {/* Content */}
-                  <div className="min-w-0 flex-1">
+                  <div className="settings-cron-card-main min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-medium text-foreground">
                         {task.name}
@@ -252,6 +252,23 @@ export function CronSection(props: SettingsSectionProps) {
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
                       {task.description}
                     </p>
+                    <div className="settings-cron-mobile-meta mt-2 hidden flex-wrap items-center gap-1.5">
+                      <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 font-mono text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                        <Clock3 className="h-3 w-3 shrink-0" />
+                        {task.cron}
+                      </span>
+                      <span
+                        className={`inline-flex min-h-7 items-center rounded-full px-2.5 text-[11px] font-medium ${
+                          exhausted
+                            ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                            : task.remainingExecutions == null
+                              ? "bg-muted text-muted-foreground"
+                              : "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                        }`}
+                      >
+                        {formatRemainingExecutionsLabel(t, task)}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Cron Expression - fixed width for alignment */}
@@ -278,11 +295,11 @@ export function CronSection(props: SettingsSectionProps) {
                   </div>
 
                   {/* Actions */}
-                  <div className="settings-hover-actions flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                  <div className="settings-hover-actions settings-cron-card-actions flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
                     <button
                       type="button"
                       onClick={() => setModal({ open: true, mode: "view", taskId: task.id })}
-                      className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                      className="settings-cron-action flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                       title={t("settings.cronView")}
                     >
                       <Eye className="h-3.5 w-3.5" />
@@ -290,7 +307,7 @@ export function CronSection(props: SettingsSectionProps) {
                     <button
                       type="button"
                       onClick={() => setModal({ open: true, mode: "edit", task })}
-                      className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                      className="settings-cron-action flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                       title={t("settings.cronEdit")}
                     >
                       <Pencil className="h-3.5 w-3.5" />
@@ -300,7 +317,7 @@ export function CronSection(props: SettingsSectionProps) {
                         <button
                           type="button"
                           onClick={open}
-                          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          className="settings-cron-action flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                           title={t("settings.cronDelete")}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
