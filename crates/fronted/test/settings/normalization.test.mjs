@@ -5,7 +5,7 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 const loader = createTsModuleLoader();
 const settings = loader.loadModule("src/lib/settings/index.ts");
 
-test("default settings keep external access closed while mobile sandboxes are ready", () => {
+test("default settings keep external access and mobile sandboxes closed", () => {
   const value = settings.getDefaultSettings();
   assert.equal(value.system.executionMode, "tools");
   assert.equal(value.access.webUiEnabled, false);
@@ -13,8 +13,9 @@ test("default settings keep external access closed while mobile sandboxes are re
   assert.equal(value.access.webUiPort, 28_367);
   assert.equal(value.access.cloudExecutionEnabled, false);
   assert.equal(value.access.githubRepository, "agent-temp");
-  assert.equal(value.access.androidProotEnabled, true);
-  assert.equal(value.access.iosAShellEnabled, true);
+  assert.equal(value.access.androidProotEnabled, false);
+  assert.equal(value.access.iosAShellEnabled, false);
+  assert.equal(value.system.terminalShell, "auto");
 });
 
 test("access settings clamp ports and cloud artifact retention", () => {

@@ -109,6 +109,10 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
   );
 
   function toggleEnabled() {
+    if (!enabled && status && !status.installed) {
+      void installEnvironment();
+      return;
+    }
     if (platform === "android") {
       updateAccess(setSettings, { androidProotEnabled: !settings.access.androidProotEnabled });
     } else if (platform === "ios") {
@@ -121,6 +125,11 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
     setError("");
     try {
       await installMobileEnvironment();
+      if (platform === "android") {
+        updateAccess(setSettings, { androidProotEnabled: true });
+      } else if (platform === "ios") {
+        updateAccess(setSettings, { iosAShellEnabled: true });
+      }
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -213,6 +222,7 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
           <AgentActivationSwitch
             checked={enabled}
             title={t("settings.mobileEnable")}
+            disabled={!status?.available || busy !== ""}
             onToggle={toggleEnabled}
           />
         ) : null}
@@ -256,7 +266,7 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
               <RefreshCw className="h-3.5 w-3.5" />
               {t("settings.mobileRefresh")}
             </button>
-            {platform === "android" && status && !status.installed ? (
+            {status && !status.installed ? (
               <button
                 type="button"
                 disabled={!status.available || busy !== ""}

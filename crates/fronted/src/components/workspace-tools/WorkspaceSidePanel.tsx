@@ -15,7 +15,7 @@ import type {
   TerminalShellOption,
 } from "../../lib/terminal/types";
 import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types";
-import { FolderTree, GitBranch, Key, Plus, Terminal } from "../icons";
+import { FolderTree, GitBranch, Key, Terminal } from "../icons";
 import { FileTreePanel } from "../project-tools/file-tree";
 import type { GitCommitContextPayload, GitFileContextPayload } from "../project-tools/git-review";
 import { GitReviewPanel } from "../project-tools/git-review";
@@ -97,6 +97,10 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
     onProjectStateChange: props.onProjectStateChange,
     onSessionsChange: props.onSessionsChange,
   });
+  const activeLocalSession =
+    sessions.localSessions.find((session) => session.id === sessions.activeSession?.id) ??
+    sessions.localSessions.at(-1) ??
+    null;
   const handledTerminalLaunchRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -109,8 +113,8 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
     if (handledTerminalLaunchRef.current === props.requestNonce) return;
 
     handledTerminalLaunchRef.current = props.requestNonce;
-    if (!props.shell && sessions.localSessions.length > 0) {
-      const session = sessions.activeSession ?? sessions.localSessions.at(-1);
+    if (sessions.localSessions.length > 0) {
+      const session = activeLocalSession;
       if (session) sessions.activateTerminalSession(session);
       return;
     }
@@ -120,7 +124,7 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
     props.sessionsLoaded,
     props.shell,
     props.target,
-    sessions.activeSession,
+    activeLocalSession,
     sessions.activateTerminalSession,
     sessions.createTerminal,
     sessions.localSessions,
@@ -291,40 +295,15 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
           </div>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col bg-zinc-950 text-zinc-100">
-            <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-white/10 p-2">
-              {sessions.localSessions.map((session) => (
-                <button
-                  key={session.id}
-                  type="button"
-                  onClick={() => sessions.activateTerminalSession(session)}
-                  className={`shrink-0 rounded-md px-2.5 py-1.5 text-xs ${
-                    sessions.activeSession?.id === session.id
-                      ? "bg-white/12 text-white"
-                      : "text-zinc-400 hover:bg-white/[0.07] hover:text-zinc-200"
-                  }`}
-                >
-                  {session.title || t("projectTools.terminalTitle")}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => sessions.createTerminal()}
-                disabled={sessions.creating}
-                className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-40"
-                title={t("projectTools.newTerminal")}
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            {sessions.activeSession ? (
+            {activeLocalSession ? (
               <div className="relative min-h-0 flex-1">
                 <XTermViewport
                   client={props.client}
-                  session={sessions.activeSession}
+                  session={activeLocalSession}
                   theme={props.theme}
                   isActive
                   initialSnapshot={
-                    sessions.initialTerminalSnapshotsRef.current.get(sessions.activeSession.id) ??
+                    sessions.initialTerminalSnapshotsRef.current.get(activeLocalSession.id) ??
                     undefined
                   }
                   onError={(_sessionId, message) => sessions.setError(message)}

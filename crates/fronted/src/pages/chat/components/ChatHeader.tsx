@@ -116,6 +116,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
   return (
     <header
       data-tauri-drag-region
+      data-mobile-chat-header={mobileExperience ? "true" : undefined}
       className={cn(
         "flex items-center justify-between gap-2 pr-4",
         mobileExperience ? "pb-2.5 pt-[calc(0.625rem+env(safe-area-inset-top,0px))]" : "py-2.5",

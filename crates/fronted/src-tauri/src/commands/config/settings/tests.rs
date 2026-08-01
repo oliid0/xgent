@@ -912,7 +912,7 @@ mod tests {
         };
         let loaded = load_system(&conn).expect("load system");
 
-        assert_eq!(row_count, 9);
+        assert_eq!(row_count, 11);
         assert_eq!(
             keys,
             vec![
@@ -923,6 +923,8 @@ mod tests {
                 SYSTEM_MISSING_WORKSPACE_PROJECT_PATHS_KEY.to_string(),
                 SYSTEM_SELECTED_TOOLS_KEY.to_string(),
                 SYSTEM_SYSTEM_PROXY_KEY.to_string(),
+                SYSTEM_TERMINAL_SHELL_KEY.to_string(),
+                SYSTEM_TOOL_POLICIES_KEY.to_string(),
                 SYSTEM_WORKDIR_KEY.to_string(),
                 SYSTEM_WORKSPACE_PROJECTS_KEY.to_string(),
             ]
@@ -935,6 +937,8 @@ mod tests {
                 "hiddenWorkspaceProjectPaths": [],
                 "missingWorkspaceProjectPaths": [],
                 "archivedWorkspaceProjectPaths": [],
+                "terminalShell": "auto",
+                "toolPolicies": {},
                 "systemProxy": default_system_proxy_json(),
                 "workdir": default_workdir.clone(),
                 "selectedSystemTools": ["http_get_test"],
@@ -1004,6 +1008,8 @@ mod tests {
                 "hiddenWorkspaceProjectPaths": [],
                 "missingWorkspaceProjectPaths": [],
                 "archivedWorkspaceProjectPaths": [],
+                "terminalShell": "auto",
+                "toolPolicies": {},
                 "systemProxy": default_system_proxy_json(),
                 "workdir": "/tmp/xagent-default-project",
                 "selectedSystemTools": [],
@@ -1056,6 +1062,8 @@ mod tests {
                 "hiddenWorkspaceProjectPaths": [],
                 "missingWorkspaceProjectPaths": [],
                 "archivedWorkspaceProjectPaths": [],
+                "terminalShell": "auto",
+                "toolPolicies": {},
                 "systemProxy": default_system_proxy_json(),
                 "workdir": "/tmp/xagent-default-project",
                 "selectedSystemTools": [],
@@ -1089,6 +1097,8 @@ mod tests {
                 "hiddenWorkspaceProjectPaths": [],
                 "missingWorkspaceProjectPaths": [],
                 "archivedWorkspaceProjectPaths": [],
+                "terminalShell": "auto",
+                "toolPolicies": {},
                 "systemProxy": default_system_proxy_json(),
                 "workdir": "/tmp/xagent-default-project",
                 "selectedSystemTools": [],

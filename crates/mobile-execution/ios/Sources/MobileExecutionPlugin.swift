@@ -178,6 +178,7 @@ private func iosToolchainPayload(
 }
 
 final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
+    private let installationPreferenceKey = "xagent.mobileExecution.iosShellInstalled"
     private let executionQueue = DispatchQueue(label: "com.ohi.xagent.mobile-execution")
     private let stateLock = NSLock()
     private let initializationLock = NSLock()
@@ -191,30 +192,34 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private var pendingWorkspaceAllowWrite = true
 
     @objc func status(_ invoke: Invoke) {
-        let initializationError: Error?
-        do {
-            try initializeBackendIfNeeded()
-            initializationError = nil
-        } catch {
-            initializationError = error
+        let available = bundledBackendAvailable()
+        var initializationError: Error?
+        if available && environmentInstalled {
+            do {
+                try initializeBackendIfNeeded()
+            } catch {
+                initializationError = error
+            }
         }
-        let available = initializationError == nil
+        let installed = available && environmentInstalled && initializationError == nil
         let resources = shellResourceStatus()
         invoke.resolve([
             "backend": "ios-a-shell",
             "available": available,
-            "installed": available,
+            "installed": installed,
             "detail": initializationError?.localizedDescription
-                ?? "iOS command frameworks are ready; arbitrary WASI, Node.js/npm, and Linux process APIs remain disabled",
+                ?? (installed
+                    ? "The a-Shell command environment is initialized; arbitrary WASI, Node.js/npm, and Linux process APIs remain disabled"
+                    : "The bundled a-Shell environment is available but must be installed and initialized before use"),
             "capabilities": [
-                "shell": available,
-                "wasi": available && wasiExecutionAvailable,
-                "network": available && resources.certificateBundle,
+                "shell": installed,
+                "wasi": installed && wasiExecutionAvailable,
+                "network": installed && resources.certificateBundle,
                 "childProcesses": false,
                 "userSelectedWorkspaces": true,
                 "packageManagement": false,
             ],
-            "toolchains": iosToolchainPayload(available: available, resources: resources),
+            "toolchains": iosToolchainPayload(available: installed, resources: resources),
             "environmentVersion": "XAgent iOS shell core 1",
             "diskUsageBytes": NSNull(),
         ])
@@ -223,6 +228,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     @objc func install(_ invoke: Invoke) throws {
         _ = try invoke.parseArgs(InstallArgs.self)
         try initializeBackendIfNeeded()
+        UserDefaults.standard.set(true, forKey: installationPreferenceKey)
         invoke.resolve([
             "backend": "ios-a-shell",
             "installed": true,
@@ -232,6 +238,11 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
 
     @objc func installToolchains(_ invoke: Invoke) throws {
         let request = try invoke.parseArgs(InstallToolchainsArgs.self)
+        guard environmentInstalled else {
+            throw MobileExecutionError.invalidRequest(
+                "Install and initialize the iOS shell environment first"
+            )
+        }
         try initializeBackendIfNeeded()
         try validateRunId(request.runId)
         guard request.timeoutMs >= 1_000, request.timeoutMs <= 1_800_000 else {
@@ -343,6 +354,11 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
 
     @objc func run(_ invoke: Invoke) throws {
         let request = try invoke.parseArgs(RunArgs.self)
+        guard environmentInstalled else {
+            throw MobileExecutionError.invalidRequest(
+                "Install and initialize the iOS shell environment first"
+            )
+        }
         try validate(request)
         stateLock.lock()
         let inserted = scheduledRuns.insert(request.runId).inserted
@@ -382,6 +398,11 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     }
 
     private func execute(_ request: RunArgs) throws -> [String: Any] {
+        guard environmentInstalled else {
+            throw MobileExecutionError.invalidRequest(
+                "Install and initialize the iOS shell environment first"
+            )
+        }
         try initializeBackendIfNeeded()
         if request.wasi != nil && !wasiExecutionAvailable {
             throw MobileExecutionError.invalidRequest(
@@ -539,6 +560,16 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             }
         }
         initialized = true
+    }
+
+    private var environmentInstalled: Bool {
+        UserDefaults.standard.bool(forKey: installationPreferenceKey)
+    }
+
+    private func bundledBackendAvailable() -> Bool {
+        ["commandDictionary", "extraCommandsDictionary"].allSatisfy { resource in
+            Bundle.module.path(forResource: resource, ofType: "plist") != nil
+        }
     }
 
     private func scheduleTimeout(runId: String, pid: Int32, timeoutMs: UInt64) {

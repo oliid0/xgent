@@ -173,11 +173,6 @@ pub(crate) fn resolve_shell(shell: Option<String>) -> Result<ShellSpec, String> 
             "Bypass".to_string(),
         ];
         match requested.as_str() {
-            "pwsh" => Ok(ShellSpec {
-                label: "PowerShell 7".to_string(),
-                command: "pwsh.exe".to_string(),
-                args: powershell_args,
-            }),
             "powershell" | "default" => Ok(ShellSpec {
                 label: "PowerShell".to_string(),
                 command: "powershell.exe".to_string(),
@@ -191,19 +186,13 @@ pub(crate) fn resolve_shell(shell: Option<String>) -> Result<ShellSpec, String> 
             other => Err(format!("unsupported Windows terminal shell: {other}")),
         }
     } else {
-        let command = std::env::var("SHELL")
-            .ok()
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty() && Path::new(value).is_absolute())
-            .or_else(resolve_unix_shell_fallback)
-            .ok_or_else(|| "failed to resolve login shell".to_string())?;
-        let label = Path::new(&command)
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or("shell")
-            .to_string();
+        if !matches!(requested.as_str(), "bash" | "default") {
+            return Err(format!("unsupported Unix terminal shell: {requested}"));
+        }
+        let command = resolve_bash_shell()
+            .ok_or_else(|| "failed to resolve Bash for the terminal".to_string())?;
         Ok(ShellSpec {
-            label,
+            label: "Bash".to_string(),
             args: unix_shell_args(&command),
             command,
         })
@@ -226,20 +215,22 @@ pub(crate) fn is_zsh_shell(command: &str) -> bool {
 }
 
 pub(crate) fn resolve_unix_shell_fallback() -> Option<String> {
-    let candidates: &[&str] = if cfg!(target_os = "macos") {
-        &["/bin/zsh", "/bin/bash", "/bin/sh"]
-    } else {
-        &["/bin/bash", "/bin/zsh", "/bin/sh"]
-    };
+    let candidates: &[&str] = &["/bin/bash", "/usr/bin/bash"];
     candidates
         .iter()
         .find(|candidate| Path::new(candidate).exists())
         .map(|value| (*value).to_string())
 }
 
+fn resolve_bash_shell() -> Option<String> {
+    resolve_unix_shell_fallback().or_else(|| {
+        is_program_on_path("bash").then(|| "bash".to_string())
+    })
+}
+
 pub fn terminal_shell_options() -> TerminalShellOptionsResponse {
     if cfg!(windows) {
-        let mut options = vec![
+        let options = vec![
             TerminalShellOption {
                 id: "powershell".to_string(),
                 label: "PowerShell".to_string(),
@@ -251,30 +242,20 @@ pub fn terminal_shell_options() -> TerminalShellOptionsResponse {
                 command: "cmd.exe".to_string(),
             },
         ];
-        if is_program_on_path("pwsh.exe") {
-            options.insert(
-                0,
-                TerminalShellOption {
-                    id: "pwsh".to_string(),
-                    label: "PowerShell 7".to_string(),
-                    command: "pwsh.exe".to_string(),
-                },
-            );
-        }
         TerminalShellOptionsResponse {
             default_shell: "powershell".to_string(),
             options,
         }
     } else {
         let shell = resolve_shell(None).unwrap_or_else(|_| ShellSpec {
-            label: "sh".to_string(),
-            command: "/bin/sh".to_string(),
+            label: "Bash".to_string(),
+            command: "bash".to_string(),
             args: Vec::new(),
         });
         TerminalShellOptionsResponse {
-            default_shell: "default".to_string(),
+            default_shell: "bash".to_string(),
             options: vec![TerminalShellOption {
-                id: "default".to_string(),
+                id: "bash".to_string(),
                 label: shell.label,
                 command: shell.command,
             }],

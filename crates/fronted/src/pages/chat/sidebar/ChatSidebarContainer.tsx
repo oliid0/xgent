@@ -20,7 +20,6 @@ import {
 import type { SidebarSnapshot, SidebarStore } from "../../../lib/sidebar/store";
 import type { SidebarConversation } from "../../../lib/sidebar/types";
 import { useSidebarSelector } from "../../../lib/sidebar/useSidebarSelector";
-import type { TerminalShellOption } from "../../../lib/terminal/types";
 import { sortWorkspaceProjectsByActivity } from "../../../lib/workspaceProjects";
 
 type ChatSidebarContainerProps = {
@@ -70,7 +69,6 @@ type ChatSidebarContainerProps = {
   desktopPanelMode?: boolean;
   workspaceToolsAvailable?: boolean;
   fileTreeAvailable?: boolean;
-  terminalShellOptions?: TerminalShellOption[];
   onOpenWorkspaceTool?: (target: WorkspaceToolTarget, shell?: string) => void;
 };
 
@@ -252,7 +250,6 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         desktopPanelMode={props.desktopPanelMode}
         workspaceToolsAvailable={props.workspaceToolsAvailable}
         fileTreeAvailable={props.fileTreeAvailable}
-        terminalShellOptions={props.terminalShellOptions}
         onOpenWorkspaceTool={props.onOpenWorkspaceTool}
       />
     </Fragment>

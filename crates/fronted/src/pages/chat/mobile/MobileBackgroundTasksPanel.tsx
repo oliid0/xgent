@@ -9,6 +9,7 @@ type MobileBackgroundTasksPanelProps = {
   open: boolean;
   settings: AppSettings;
   setSettings: (updater: (previous: AppSettings) => AppSettings) => void;
+  managedProcessesAvailable: boolean;
   onClose: () => void;
 };
 
@@ -31,7 +32,7 @@ export function MobileBackgroundTasksPanel(props: MobileBackgroundTasksPanelProp
         <BackgroundServicesPanel
           settings={props.settings}
           setSettings={props.setSettings}
-          managedProcessesAvailable={false}
+          managedProcessesAvailable={props.managedProcessesAvailable}
         />
       </div>
     </MobileFullscreenPanel>

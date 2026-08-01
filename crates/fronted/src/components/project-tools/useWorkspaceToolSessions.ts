@@ -281,6 +281,12 @@ export function useWorkspaceToolSessions(options: UseWorkspaceToolSessionsOption
   const createTerminal = useCallback(
     (shell?: string) => {
       if (!terminalReady || creating) return;
+      const existing =
+        localSessions.find((session) => session.id === activeSession?.id) ?? localSessions[0];
+      if (existing) {
+        activateTerminalSession(existing);
+        return;
+      }
       setCreating(true);
       setError(null);
       pendingCreateActivationRef.current = {
@@ -305,6 +311,7 @@ export function useWorkspaceToolSessions(options: UseWorkspaceToolSessionsOption
     },
     [
       activateTerminalSession,
+      activeSession?.id,
       client,
       creating,
       cwd,

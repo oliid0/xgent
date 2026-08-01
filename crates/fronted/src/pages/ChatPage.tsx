@@ -44,8 +44,6 @@ import type { WorkspaceCodeEditorOpenRequest } from "../components/workspace-edi
 import type { WorkspaceFilePreviewOpenRequest } from "../components/workspace-editor/WorkspaceFilePreviewOverlay";
 import type { WorkspaceSshTerminalOpenRequest } from "../components/workspace-editor/WorkspaceSshTerminalOverlay";
 import { isWorkspacePreviewPath } from "../components/workspace-editor/workspaceImagePreview";
-import { McpSidePanel } from "../components/workspace-tools/McpSidePanel";
-import { SkillsSidePanel } from "../components/workspace-tools/SkillsSidePanel";
 import { WorkspaceNavigationRail } from "../components/workspace-tools/WorkspaceNavigationRail";
 import { WorkspaceSidePanel } from "../components/workspace-tools/WorkspaceSidePanel";
 import { useLocale } from "../i18n";
@@ -107,6 +105,7 @@ import { createStreamDebugLogger } from "../lib/debug/agentDebug";
 import { tauriGitClient } from "../lib/git/tauriGitClient";
 import { memoryDeleteProject } from "../lib/memory/api";
 import { buildMemoryOverviewSection } from "../lib/memory/prompts/injection";
+import { mobileExecutionStatus } from "../lib/mobileExecution";
 import {
   lockMonacoNlsLocale,
   preparePreferredMonacoNlsLocale,
@@ -752,6 +751,13 @@ export function ChatPage(props: ChatPageProps) {
     useState<WorkspaceNavigationTarget>("conversations");
   const [workspaceToolsOpen, setWorkspaceToolsOpen] = useState(false);
   const [terminalShellOptions, setTerminalShellOptions] = useState<TerminalShellOption[]>([]);
+  const preferredTerminalShell = useMemo(() => {
+    const configured = settings.system.terminalShell;
+    if (configured === "auto") return undefined;
+    return terminalShellOptions.some((option) => option.id === configured)
+      ? configured
+      : undefined;
+  }, [settings.system.terminalShell, terminalShellOptions]);
   const [workspaceToolLaunchRequest, setWorkspaceToolLaunchRequest] =
     useState<WorkspaceToolLaunchRequest | null>(null);
   const workspaceToolLaunchNonceRef = useRef(0);
@@ -1403,39 +1409,79 @@ export function ChatPage(props: ChatPageProps) {
     : !terminalProjectPath
       ? "Select a project to use project tools."
       : undefined;
+  const ensureNativeMobileShellReady = useCallback(async () => {
+    if (!nativeMobile) return true;
+    try {
+      const status = await mobileExecutionStatus();
+      const enabled =
+        status.backend === "android-proot"
+          ? settings.access.androidProotEnabled
+          : status.backend === "ios-a-shell"
+            ? settings.access.iosAShellEnabled
+            : false;
+      if (enabled && status.installed && status.capabilities.shell) return true;
+    } catch (cause) {
+      setErrorMessage(asErrorMessage(cause, "Unable to inspect the mobile shell environment."));
+    }
+    setSidebarOpen(false);
+    setMobileWorkspaceDestination(null);
+    onOpenSettings("mobileExecution");
+    return false;
+  }, [
+    nativeMobile,
+    onOpenSettings,
+    settings.access.androidProotEnabled,
+    settings.access.iosAShellEnabled,
+  ]);
   const handleOpenWorkspaceTool = useCallback(
     (target: WorkspaceToolTarget, shell?: string) => {
       if (mobileExperience) {
         if (target === "fileTree" && !mobileWorkspacePathKey) return;
-        setActiveView("chat");
-        setSidebarOpen(false);
-        if (target === "fileTree") {
-          setMobileWorkspaceDestination({ kind: "files" });
-        } else if (target === "backgroundTasks") {
-          setMobileWorkspaceDestination({ kind: "background-tasks" });
-        } else if (target === "gitReview") {
-          setMobileWorkspaceDestination({ kind: "git-review" });
-        } else if (target === "sshConnection" && nativeMobile) {
-          setMobileWorkspaceDestination({ kind: "ssh" });
-        } else {
-          setMobileWorkspaceDestination({
-            kind: "terminal",
-            mode: target === "sshConnection" ? "ssh" : "terminal",
-            initialCommand: shell ?? "",
-            autoRun: false,
+        const open = () => {
+          setActiveView("chat");
+          setSidebarOpen(false);
+          if (target === "fileTree") {
+            setMobileWorkspaceDestination({ kind: "files" });
+          } else if (target === "backgroundTasks") {
+            setMobileWorkspaceDestination({ kind: "background-tasks" });
+          } else if (target === "gitReview") {
+            setMobileWorkspaceDestination({ kind: "git-review" });
+          } else if (target === "sshConnection" && nativeMobile) {
+            setMobileWorkspaceDestination({ kind: "ssh" });
+          } else {
+            setMobileWorkspaceDestination({
+              kind: "terminal",
+              mode: target === "sshConnection" ? "ssh" : "terminal",
+              initialCommand: shell ?? "",
+              autoRun: false,
+            });
+          }
+        };
+        const needsShell =
+          target === "terminal" || target === "gitReview" || target === "sshConnection";
+        if (nativeMobile && needsShell) {
+          void ensureNativeMobileShellReady().then((ready) => {
+            if (ready) open();
           });
+        } else {
+          open();
         }
         return;
       }
       if (terminalDisabledMessage) return;
       if (!desktopBridgeEnabled) return;
-      showDesktopWorkspaceTool(target, shell);
+      showDesktopWorkspaceTool(
+        target,
+        target === "terminal" ? (shell ?? preferredTerminalShell) : shell,
+      );
     },
     [
       desktopBridgeEnabled,
+      ensureNativeMobileShellReady,
       mobileExperience,
       mobileWorkspacePathKey,
       nativeMobile,
+      preferredTerminalShell,
       showDesktopWorkspaceTool,
       terminalDisabledMessage,
     ],
@@ -1739,6 +1785,24 @@ export function ChatPage(props: ChatPageProps) {
       cancelled = true;
     };
   }, [desktopCommandHostAvailable, terminalProjectPathKey]);
+  useEffect(() => {
+    if (!desktopCommandHostAvailable) {
+      setTerminalShellOptions([]);
+      return;
+    }
+    let cancelled = false;
+    void tauriTerminalClient
+      .shellOptions()
+      .then((response) => {
+        if (!cancelled) setTerminalShellOptions(response.options);
+      })
+      .catch(() => {
+        if (!cancelled) setTerminalShellOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [desktopCommandHostAvailable]);
   useEffect(() => {
     if (!desktopCommandHostAvailable || !terminalProjectPathKey) return;
     return tauriTerminalClient.subscribe((event) => {
@@ -4060,26 +4124,35 @@ export function ChatPage(props: ChatPageProps) {
 
   const handleOpenMobileTerminal = useCallback(
     (mode: MobileShellPanelMode = "terminal", initialCommand = "", autoRun = false) => {
-      setSidebarOpen(false);
-      setMobileWorkspaceDestination({
-        kind: "terminal",
-        mode,
-        initialCommand,
-        autoRun,
+      void ensureNativeMobileShellReady().then((ready) => {
+        if (!ready) return;
+        setSidebarOpen(false);
+        setMobileWorkspaceDestination({
+          kind: "terminal",
+          mode,
+          initialCommand,
+          autoRun,
+        });
       });
     },
-    [],
+    [ensureNativeMobileShellReady],
   );
 
   const handleOpenMobileGitReview = useCallback(() => {
-    setSidebarOpen(false);
-    setMobileWorkspaceDestination({ kind: "git-review" });
-  }, []);
+    void ensureNativeMobileShellReady().then((ready) => {
+      if (!ready) return;
+      setSidebarOpen(false);
+      setMobileWorkspaceDestination({ kind: "git-review" });
+    });
+  }, [ensureNativeMobileShellReady]);
 
   const handleOpenMobileSsh = useCallback(() => {
-    setSidebarOpen(false);
-    setMobileWorkspaceDestination({ kind: "ssh" });
-  }, []);
+    void ensureNativeMobileShellReady().then((ready) => {
+      if (!ready) return;
+      setSidebarOpen(false);
+      setMobileWorkspaceDestination({ kind: "ssh" });
+    });
+  }, [ensureNativeMobileShellReady]);
 
   const handleOpenMobileSidebar = useCallback(() => {
     setMobileWorkspaceDestination(null);
@@ -4134,19 +4207,23 @@ export function ChatPage(props: ChatPageProps) {
       }
       if (target === "skills" || target === "mcp") {
         cacheActiveComposerDraft();
-        setActiveView("chat");
+        setActiveView(target === "skills" ? "skills-hub" : "mcp-hub");
         setWorkspaceToolsOpen(false);
         setDesktopNavigationTarget(target);
-        setSidebarOpen(true);
+        setSidebarOpen(false);
         return;
       }
       if (!desktopBridgeEnabled || terminalDisabledMessage) return;
-      showDesktopWorkspaceTool(target, shell);
+      showDesktopWorkspaceTool(
+        target,
+        target === "terminal" ? (shell ?? preferredTerminalShell) : shell,
+      );
     },
     [
       cacheActiveComposerDraft,
       desktopBridgeEnabled,
       desktopNavigationTarget,
+      preferredTerminalShell,
       showDesktopWorkspaceTool,
       sidebarOpen,
       terminalDisabledMessage,
@@ -4486,7 +4563,6 @@ export function ChatPage(props: ChatPageProps) {
             panelOpen={sidebarOpen}
             workspaceToolsAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
             fileTreeAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
-            terminalShellOptions={terminalShellOptions}
             appUpdate={appUpdate}
             onTogglePanel={handleToggleSidebar}
             onNewConversation={handleDesktopNewConversation}
@@ -4566,26 +4642,16 @@ export function ChatPage(props: ChatPageProps) {
           onOpenSkillsHub={() => {
             cacheActiveComposerDraft();
             setWorkspaceToolsOpen(false);
-            if (mobileExperience) {
-              setActiveView("skills-hub");
-              setSidebarOpen(false);
-            } else {
-              setActiveView("chat");
-              setDesktopNavigationTarget("skills");
-              setSidebarOpen(true);
-            }
+            setActiveView("skills-hub");
+            setDesktopNavigationTarget("skills");
+            setSidebarOpen(false);
           }}
           onOpenMcpHub={() => {
             cacheActiveComposerDraft();
             setWorkspaceToolsOpen(false);
-            if (mobileExperience) {
-              setActiveView("mcp-hub");
-              setSidebarOpen(false);
-            } else {
-              setActiveView("chat");
-              setDesktopNavigationTarget("mcp");
-              setSidebarOpen(true);
-            }
+            setActiveView("mcp-hub");
+            setDesktopNavigationTarget("mcp");
+            setSidebarOpen(false);
           }}
           mobileExperience={mobileExperience}
           desktopPanelMode={!mobileExperience}
@@ -4599,19 +4665,10 @@ export function ChatPage(props: ChatPageProps) {
               ? Boolean(mobileWorkspacePathKey)
               : desktopCommandHostAvailable && !terminalDisabledMessage
           }
-          terminalShellOptions={terminalShellOptions}
           onOpenWorkspaceTool={handleOpenWorkspaceTool}
         />
 
         {confirmDialog}
-
-        {!mobileExperience && sidebarOpen && desktopNavigationTarget === "skills" ? (
-          <SkillsSidePanel settings={settings} setSettings={setSettings} />
-        ) : null}
-
-        {!mobileExperience && sidebarOpen && desktopNavigationTarget === "mcp" ? (
-          <McpSidePanel settings={settings} setSettings={setSettings} />
-        ) : null}
 
         {desktopCommandHostAvailable &&
         activeView === "chat" &&
@@ -4913,6 +4970,7 @@ export function ChatPage(props: ChatPageProps) {
             open={mobileWorkspaceDestination?.kind === "background-tasks"}
             settings={settings}
             setSettings={setSettings}
+            managedProcessesAvailable={!nativeMobile && desktopCommandHostAvailable}
             onClose={() => setMobileWorkspaceDestination(null)}
           />
         ) : null}

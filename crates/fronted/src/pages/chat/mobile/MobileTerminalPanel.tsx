@@ -293,7 +293,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
 
   return (
     <MobileFullscreenPanel open label={panelTitle} className="bg-zinc-950 text-zinc-100">
-      <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-white/10 bg-zinc-950 px-3">
+      <header className="mobile-panel-header mobile-terminal-header flex min-h-14 shrink-0 items-center gap-3 border-b border-white/10 bg-zinc-950/92 px-3 backdrop-blur-xl">
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
           <PanelIcon className="h-4 w-4" />
         </span>

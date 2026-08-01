@@ -32,11 +32,14 @@ import {
   isValidSystemProxyHost,
   type SystemProxyConfig,
   type SystemProxyType,
+  type TerminalShellPreference,
   THEME_OPTIONS,
   type Theme,
   updateCustomSettings,
   updateSystem,
 } from "../../lib/settings";
+import { tauriTerminalClient } from "../../lib/terminal/tauriTerminalClient";
+import type { TerminalShellOption } from "../../lib/terminal/types";
 import {
   buildFontFamilySelectOptions,
   FONT_FAMILY_CUSTOM_SELECT_VALUE,
@@ -60,6 +63,12 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
   const { settings, setSettings, compact = false } = props;
   const { t } = useLocale();
   const browser = isBrowserRuntime();
+  const [terminalShellOptions, setTerminalShellOptions] = useState<TerminalShellOption[]>([]);
+  const terminalShellSelectValue =
+    settings.system.terminalShell === "auto" ||
+    terminalShellOptions.some((option) => option.id === settings.system.terminalShell)
+      ? settings.system.terminalShell
+      : "auto";
 
   const executionMode = settings.system.executionMode;
   const isClassicAgentMode = executionMode === "tools";
@@ -108,6 +117,20 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
     void listLocalFontFamilies().then((families) => {
       if (!cancelled) setLocalFontFamilies(families);
     });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    void tauriTerminalClient
+      .shellOptions()
+      .then((response) => {
+        if (!cancelled) setTerminalShellOptions(response.options);
+      })
+      .catch(() => {
+        if (!cancelled) setTerminalShellOptions([]);
+      });
     return () => {
       cancelled = true;
     };
@@ -249,6 +272,36 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
             </Select>
           </SettingsRow>
         </SettingsRowGroup>
+
+        {terminalShellOptions.length > 0 ? (
+          <SettingsRowGroup title={t("settings.terminalShell")}>
+            <SettingsRow
+              label={t("settings.terminalShell")}
+              description={t("settings.terminalShellDesc")}
+            >
+              <Select
+                value={terminalShellSelectValue}
+                onValueChange={(value) =>
+                  setSettings((prev) =>
+                    updateSystem(prev, { terminalShell: value as TerminalShellPreference }),
+                  )
+                }
+              >
+                <SelectTrigger className="w-52">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">{t("settings.terminalShellAuto")}</SelectItem>
+                  {terminalShellOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingsRow>
+          </SettingsRowGroup>
+        ) : null}
 
         <SettingsRowGroup title={t("settings.appearance")}>
           <SettingsRow label={t("settings.appearance")}>
@@ -626,6 +679,44 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
       </div>
 
       <div className="settings-system-divider border-t" />
+
+      {terminalShellOptions.length > 0 ? (
+        <section className="settings-terminal-card settings-system-card rounded-2xl border border-border/60 bg-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+              <Terminal className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-foreground">
+                {t("settings.terminalShell")}
+              </div>
+              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                {t("settings.terminalShellDesc")}
+              </p>
+            </div>
+            <Select
+              value={terminalShellSelectValue}
+              onValueChange={(value) =>
+                setSettings((prev) =>
+                  updateSystem(prev, { terminalShell: value as TerminalShellPreference }),
+                )
+              }
+            >
+              <SelectTrigger className="w-36 shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">{t("settings.terminalShellAuto")}</SelectItem>
+                {terminalShellOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </section>
+      ) : null}
 
       <div className="settings-appearance-grid grid gap-4 md:grid-cols-2">
         <section className="settings-system-card space-y-3 rounded-2xl border border-border/60 bg-card p-4">

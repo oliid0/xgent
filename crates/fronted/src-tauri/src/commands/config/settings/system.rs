@@ -242,6 +242,18 @@ fn system_value_with_defaults(raw: Option<Value>, default_workdir: &str) -> Valu
         );
     }
 
+    let terminal_shell = system
+        .get(SYSTEM_TERMINAL_SHELL_KEY)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or_default();
+    if !matches!(terminal_shell, "auto" | "powershell" | "cmd" | "bash") {
+        system.insert(
+            SYSTEM_TERMINAL_SHELL_KEY.to_string(),
+            Value::String("auto".to_string()),
+        );
+    }
+
     let workdir = system
         .get(SYSTEM_WORKDIR_KEY)
         .and_then(Value::as_str)
@@ -397,6 +409,7 @@ fn save_system_with_default_workdir(
         SYSTEM_HIDDEN_WORKSPACE_PROJECT_PATHS_KEY,
         SYSTEM_MISSING_WORKSPACE_PROJECT_PATHS_KEY,
         SYSTEM_ARCHIVED_WORKSPACE_PROJECT_PATHS_KEY,
+        SYSTEM_TERMINAL_SHELL_KEY,
         SYSTEM_SYSTEM_PROXY_KEY,
     ] {
         let value = system.get(key).cloned().unwrap_or(Value::Null);

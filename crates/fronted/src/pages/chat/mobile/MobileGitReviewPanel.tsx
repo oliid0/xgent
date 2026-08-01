@@ -141,6 +141,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   const [commitMessage, setCommitMessage] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [notRepository, setNotRepository] = useState(false);
   const [notice, setNotice] = useState("");
   const [discardPath, setDiscardPath] = useState("");
   const activeRunIdRef = useRef("");
@@ -182,13 +183,16 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
       );
       const next = parseStatus(output);
       setSnapshot(next);
+      setNotRepository(false);
       setSelectedPath((current) =>
         current && next.changes.some((change) => change.path === current) ? current : "",
       );
       setError("");
     } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
       setSnapshot(null);
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setNotRepository(message.toLowerCase().includes("not a git repository"));
+      setError(message);
     }
   }, [run]);
 
@@ -213,6 +217,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
     setSelectedPath("");
     setSelectedCommit(null);
     setNotice("");
+    setNotRepository(false);
     void refreshStatus();
   }, [open, refreshStatus]);
 
@@ -235,9 +240,11 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
       try {
         const path = shellQuote(change.path);
         const commands = [
-          change.staged ? `git diff --cached --no-ext-diff -- ${path}` : "",
-          change.working && !change.untracked ? `git diff --no-ext-diff -- ${path}` : "",
-          change.untracked ? `git diff --no-index -- /dev/null ${path} || true` : "",
+          change.staged ? gitCommand(`diff --cached --no-ext-diff -- ${path}`) : "",
+          change.working && !change.untracked
+            ? gitCommand(`diff --no-ext-diff -- ${path}`)
+            : "",
+          change.untracked ? `${gitCommand(`diff --no-index -- /dev/null ${path}`)} || true` : "",
         ].filter(Boolean);
         const output = await run("diff", commands.join("\n"), true);
         setDetail(output.trim() || t("projectTools.gitReview.noDiff"));
@@ -306,6 +313,14 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
     }
   };
 
+  const initializeRepository = async () => {
+    await mutate(
+      "init",
+      gitCommand("init"),
+      t("projectTools.gitReview.initSuccessMessage"),
+    );
+  };
+
   const close = () => {
     const id = activeRunIdRef.current;
     if (id) void invoke("shell_cancel", { run_id: id }).catch(() => undefined);
@@ -318,7 +333,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
 
   return (
     <MobileFullscreenPanel open label={t("chat.mobileGit.title")}>
-      <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
+      <header className="mobile-panel-header flex min-h-14 shrink-0 items-center gap-3 border-b border-border/55 bg-background/90 px-3 backdrop-blur-xl">
         {showingDetail ? (
           <button
             type="button"
@@ -397,7 +412,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
         </div>
       ) : null}
 
-      {error ? (
+      {error && !notRepository ? (
         <div className="mx-3 mt-3 flex shrink-0 items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/[0.06] px-3 py-2.5 text-xs text-destructive">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span className="min-w-0 flex-1 break-words">{error}</span>
@@ -524,6 +539,28 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
               <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 {t("chat.mobileTerminal.running")}
+              </div>
+            ) : notRepository ? (
+              <div className="mx-auto flex h-full max-w-sm flex-col items-center justify-center gap-3 text-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                  <GitBranch className="h-5 w-5" />
+                </span>
+                <div>
+                  <div className="text-sm font-semibold">
+                    {t("git.branchSelector.initRepositoryTitle")}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    {t("git.branchSelector.initRepositoryDescription")}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={Boolean(busy)}
+                  onClick={() => void initializeRepository()}
+                  className="min-h-11 rounded-xl bg-foreground px-4 text-sm font-medium text-background disabled:opacity-45"
+                >
+                  {t("git.branchSelector.initRepository")}
+                </button>
               </div>
             ) : snapshot?.changes.length === 0 ? (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">

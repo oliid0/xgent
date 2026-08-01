@@ -15,7 +15,7 @@ fn default_cloud_artifact_retention_days() -> u16 {
 }
 
 fn default_mobile_execution_enabled() -> bool {
-    true
+    false
 }
 
 impl Default for AccessSettingsPayload {

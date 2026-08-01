@@ -154,6 +154,7 @@ export type UpdateSettings = {
 };
 
 export type SystemProxyType = "socks5" | "http";
+export type TerminalShellPreference = "auto" | "powershell" | "cmd" | "bash";
 
 // 系统级出站代理：注入本地 shell 命令 env，并供勾选了 useSystemProxy 的
 // 供应商模型请求走代理（代理连接由桌面 Rust 侧完成，凭据不进前端请求）。
@@ -180,6 +181,7 @@ export type SystemSettings = {
   // Archived workspaces (path-keyed, like hidden/missing). Archived rows stay
   // in the merged list but render disabled and can never be active.
   archivedWorkspaceProjectPaths: string[];
+  terminalShell: TerminalShellPreference;
   systemProxy: SystemProxyConfig;
 };
 
@@ -1042,8 +1044,8 @@ export function normalizeAccessSettings(input: unknown): AccessSettings {
     githubOwner: normalizeOptionalText(obj.githubOwner),
     githubRepository: normalizeOptionalText(obj.githubRepository) || "agent-temp",
     cloudArtifactRetentionDays: normalizeIntegerInRange(obj.cloudArtifactRetentionDays, 1, 90, 7),
-    androidProotEnabled: obj.androidProotEnabled !== false,
-    iosAShellEnabled: obj.iosAShellEnabled !== false,
+    androidProotEnabled: obj.androidProotEnabled === true,
+    iosAShellEnabled: obj.iosAShellEnabled === true,
   };
 }
 
@@ -1509,6 +1511,12 @@ export function normalizeSystemSettings(input: unknown): SystemSettings {
     archivedWorkspaceProjectPaths: normalizeArchivedWorkspaceProjectPaths(
       obj.archivedWorkspaceProjectPaths,
     ),
+    terminalShell:
+      obj.terminalShell === "powershell" ||
+      obj.terminalShell === "cmd" ||
+      obj.terminalShell === "bash"
+        ? obj.terminalShell
+        : "auto",
     systemProxy: normalizeSystemProxyConfig(obj.systemProxy),
   };
 }
@@ -2077,6 +2085,7 @@ export function getDefaultSettings(): AppSettings {
       hiddenWorkspaceProjectPaths: [],
       missingWorkspaceProjectPaths: [],
       archivedWorkspaceProjectPaths: [],
+      terminalShell: "auto",
       systemProxy: getDefaultSystemProxyConfig(),
     },
     customProviders,

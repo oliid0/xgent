@@ -22,7 +22,7 @@ export function MobileFullscreenPanel(props: MobileFullscreenPanelProps) {
       aria-label={props.label}
       aria-hidden={!props.open}
       className={cn(
-        "fixed inset-0 z-[74] flex min-h-0 flex-col overflow-hidden bg-background pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] text-foreground",
+        "mobile-fullscreen-panel fixed inset-0 z-[74] flex min-h-0 flex-col overflow-hidden bg-background pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] text-foreground",
         !props.open && "pointer-events-none translate-x-[8%] opacity-0",
         props.className,
       )}
@@ -44,14 +44,14 @@ export function MobilePanelHeader(props: {
   return (
     <header
       className={cn(
-        "flex min-h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-3",
+        "mobile-panel-header flex min-h-14 shrink-0 items-center gap-3 border-b border-border/55 bg-background/90 px-3 backdrop-blur-xl",
         props.className,
       )}
     >
       <button
         type="button"
         onClick={props.onBack}
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors active:bg-muted active:text-foreground"
+        className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground transition-colors active:bg-muted active:text-foreground"
         aria-label={props.backLabel}
       >
         <ArrowLeft className="h-5 w-5" />

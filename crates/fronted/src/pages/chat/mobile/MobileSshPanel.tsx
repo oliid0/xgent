@@ -60,6 +60,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
   const { t } = useLocale();
   const [selectedHostId, setSelectedHostId] = useState("");
   const [command, setCommand] = useState("");
+  const [keyboardResponse, setKeyboardResponse] = useState("");
   const [entries, setEntries] = useState<SshCommandEntry[]>([]);
   const [activeRunId, setActiveRunId] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -82,7 +83,14 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
   const run = async (event: FormEvent) => {
     event.preventDefault();
     const remoteCommand = command.trim();
-    if (!selectedHost || !remoteCommand || activeRunId || !workdir.trim()) return;
+    if (
+      !selectedHost ||
+      !remoteCommand ||
+      activeRunId ||
+      !workdir.trim() ||
+      (selectedHost.authType === "keyboardInteractive" && !keyboardResponse.trim())
+    )
+      return;
     const id = createRunId();
     setCommand("");
     setActiveRunId(id);
@@ -92,6 +100,8 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
         host_id: selectedHost.id,
         workdir,
         remote_command: remoteCommand,
+        keyboard_response:
+          selectedHost.authType === "keyboardInteractive" ? keyboardResponse : null,
         timeout_ms: 300_000,
         run_id: id,
       });
@@ -122,13 +132,14 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
 
   return (
     <MobileFullscreenPanel open label={t("chat.mobileSsh.title")}>
-      <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
+      <header className="mobile-panel-header flex min-h-14 shrink-0 items-center gap-3 border-b border-border/55 bg-background/90 px-3 backdrop-blur-xl">
         {selectedHost ? (
           <button
             type="button"
             onClick={() => {
               if (activeRunId) return;
               setSelectedHostId("");
+              setKeyboardResponse("");
               setEntries([]);
             }}
             className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted disabled:opacity-45"
@@ -201,7 +212,6 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
           ) : (
             <div className="space-y-2">
               {hosts.map((host) => {
-                const interactive = host.authType === "keyboardInteractive";
                 return (
                   <button
                     key={host.id}
@@ -221,7 +231,6 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
                       </span>
                       <span className="mt-1 block text-[10px] text-muted-foreground">
                         {authLabel(host, t)}
-                        {interactive ? ` · ${t("chat.mobileSsh.interactiveUnsupported")}` : ""}
                       </span>
                     </span>
                   </button>
@@ -243,7 +252,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
                 </div>
                 <div className="mt-1 text-[11px] leading-5">
                   {selectedHost.authType === "keyboardInteractive"
-                    ? t("chat.mobileSsh.interactiveUnsupported")
+                    ? t("chat.mobileSsh.keyboardResponseHint")
                     : t("chat.mobileSsh.commandHint")}
                 </div>
               </div>
@@ -288,6 +297,22 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
             })}
           </div>
 
+          {selectedHost.authType === "keyboardInteractive" ? (
+            <label className="shrink-0 border-t border-border bg-background px-3 pt-3">
+              <span className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
+                {t("chat.mobileSsh.keyboardResponse")}
+              </span>
+              <input
+                type="password"
+                value={keyboardResponse}
+                onChange={(event) => setKeyboardResponse(event.currentTarget.value)}
+                disabled={Boolean(activeRunId)}
+                autoComplete="off"
+                className="h-11 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-primary"
+                placeholder={t("chat.mobileSsh.keyboardResponsePlaceholder")}
+              />
+            </label>
+          ) : null}
           <form
             onSubmit={(event) => void run(event)}
             className="flex shrink-0 items-end gap-2 border-t border-border bg-background px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3"
@@ -297,7 +322,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
               <input
                 value={command}
                 onChange={(event) => setCommand(event.currentTarget.value)}
-                disabled={Boolean(activeRunId) || selectedHost.authType === "keyboardInteractive"}
+                disabled={Boolean(activeRunId)}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
@@ -309,7 +334,9 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
               type={activeRunId ? "button" : "submit"}
               onClick={activeRunId ? () => void cancel() : undefined}
               disabled={
-                !activeRunId && (!command.trim() || selectedHost.authType === "keyboardInteractive")
+                !activeRunId &&
+                (!command.trim() ||
+                  (selectedHost.authType === "keyboardInteractive" && !keyboardResponse.trim()))
               }
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-foreground text-background disabled:bg-muted disabled:text-muted-foreground"
               aria-label={

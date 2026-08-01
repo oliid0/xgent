@@ -3,7 +3,6 @@ import { useLocale } from "../../i18n";
 import type { AppUpdateController } from "../../lib/appUpdates";
 import { cn } from "../../lib/shared/utils";
 import { useSoul } from "../../lib/soul";
-import type { TerminalShellOption } from "../../lib/terminal/types";
 import { AppUpdateButton } from "../AppUpdateButton";
 import {
   Cable,
@@ -32,7 +31,6 @@ type WorkspaceNavigationRailProps = {
   panelOpen: boolean;
   workspaceToolsAvailable: boolean;
   fileTreeAvailable: boolean;
-  terminalShellOptions: TerminalShellOption[];
   appUpdate?: AppUpdateController;
   onTogglePanel: () => void;
   onNewConversation: () => void;
@@ -203,16 +201,6 @@ export function WorkspaceNavigationRail(props: WorkspaceNavigationRailProps) {
               <Terminal className="h-4 w-4 text-muted-foreground" />
               {t("sidebar.terminal")}
             </button>
-            {props.terminalShellOptions.slice(0, 4).map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => selectFromSoulMenu("terminal", option.id)}
-                className="flex h-7 w-full items-center rounded-lg pl-8 pr-2 text-left text-xs text-muted-foreground hover:bg-foreground/[0.07] hover:text-foreground"
-              >
-                <span className="truncate">{option.label}</span>
-              </button>
-            ))}
             {[
               { target: "gitReview" as const, label: t("sidebar.gitReview"), icon: GitBranch },
               { target: "sshConnection" as const, label: t("sidebar.sshConnection"), icon: Key },

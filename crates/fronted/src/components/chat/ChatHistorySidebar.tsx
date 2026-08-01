@@ -18,7 +18,6 @@ import type {
 } from "../../lib/sidebar/types";
 import { useSoul } from "../../lib/soul";
 import type { SoulDocument } from "../../lib/soul/model";
-import type { TerminalShellOption } from "../../lib/terminal/types";
 import { AppUpdateButton } from "../AppUpdateButton";
 import {
   Archive,
@@ -128,7 +127,6 @@ type ChatHistorySidebarProps = {
   desktopPanelMode?: boolean;
   workspaceToolsAvailable?: boolean;
   fileTreeAvailable?: boolean;
-  terminalShellOptions?: TerminalShellOption[];
   onOpenWorkspaceTool?: (target: WorkspaceToolTarget, shell?: string) => void;
 };
 
@@ -180,6 +178,7 @@ function SoulPresetPicker(props: SoulPresetPickerProps) {
             <button
               key={preset.id}
               type="button"
+              role={props.mobile ? "menuitem" : undefined}
               onClick={() => props.onSelect(preset.id)}
               className={cn(
                 "flex w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors active:bg-muted",
@@ -199,6 +198,7 @@ function SoulPresetPicker(props: SoulPresetPickerProps) {
       </div>
       <button
         type="button"
+        role={props.mobile ? "menuitem" : undefined}
         onClick={props.onCreate}
         disabled={props.saving}
         className={cn(
@@ -1042,7 +1042,6 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     desktopPanelMode = false,
     workspaceToolsAvailable = false,
     fileTreeAvailable = workspaceToolsAvailable,
-    terminalShellOptions = [],
     onOpenWorkspaceTool,
   } = props;
   const { t } = useLocale();
@@ -1053,8 +1052,8 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   const [pendingProjectRemoveId, setPendingProjectRemoveId] = useState<string | null>(null);
   const [showAllProjects, setShowAllProjects] = useState(false);
   const [soulLauncherOpen, setSoulLauncherOpen] = useState(false);
-  const [terminalLauncherOpen, setTerminalLauncherOpen] = useState(false);
   const soulLongPressTimerRef = useRef<number | null>(null);
+  const soulLongPressStartRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const suppressSoulClickRef = useRef(false);
   const [projectSectionHeight, setProjectSectionHeight] = useState<number | null>(null);
   const [isProjectSectionResizing, setIsProjectSectionResizing] = useState(false);
@@ -1520,7 +1519,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
         <MacOsTitleBarSpacer
           className={cn("bg-[hsl(var(--sidebar-bg))]", desktopPanelMode && "md:hidden")}
         />
-        <div className="shrink-0 border-b border-border/50 px-2 pb-3 pt-3">
+        <div className="chat-sidebar-header shrink-0 border-b border-border/50 px-2 pb-3 pt-3">
           {desktopPanelMode ? (
             <div className="hidden h-8 items-center px-2 text-base font-semibold md:flex">
               {t("chat.recentConversation")}
@@ -1559,7 +1558,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
             )}
           </div>
 
-          <div className="mt-3 flex flex-col gap-0.5">
+          <div className="chat-sidebar-primary-nav mt-3 flex flex-col gap-0.5">
             <Button
               type="button"
               variant="ghost"
@@ -1575,27 +1574,6 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               <span className="chat-history-new-conversation-label">
                 {t("chat.newConversation")}
               </span>
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenMcpHub?.()}
-              className={cn(
-                "sidebar-hub-menu-item h-[30px] w-full justify-start gap-3 rounded-lg px-3 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 shadow-none transition-colors",
-                desktopPanelMode && "md:hidden",
-                activeView === "mcp-hub"
-                  ? "bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]"
-                  : "text-foreground/80 hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]",
-              )}
-              title="MCP Hub"
-            >
-              <Cable
-                className={cn(
-                  "h-4 w-4 shrink-0",
-                  activeView === "mcp-hub" ? "text-violet-500" : "text-foreground/85",
-                )}
-              />
-              <span className="truncate">MCP</span>
             </Button>
             <Button
               type="button"
@@ -1617,6 +1595,27 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                 )}
               />
               <span className="truncate">Skills</span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenMcpHub?.()}
+              className={cn(
+                "sidebar-hub-menu-item h-[30px] w-full justify-start gap-3 rounded-lg px-3 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 shadow-none transition-colors",
+                desktopPanelMode && "md:hidden",
+                activeView === "mcp-hub"
+                  ? "bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]"
+                  : "text-foreground/80 hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]",
+              )}
+              title="MCP Hub"
+            >
+              <Cable
+                className={cn(
+                  "h-4 w-4 shrink-0",
+                  activeView === "mcp-hub" ? "text-violet-500" : "text-foreground/85",
+                )}
+              />
+              <span className="truncate">MCP</span>
             </Button>
             <Button
               type="button"
@@ -1959,51 +1958,16 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   <div className="mx-1 my-1 border-t border-border/50" />
                   <button
                     type="button"
-                    aria-expanded={terminalLauncherOpen}
-                    onClick={() => setTerminalLauncherOpen((open) => !open)}
+                    onClick={() => {
+                      onOpenWorkspaceTool?.("terminal");
+                      setSoulLauncherOpen(false);
+                    }}
                     disabled={!workspaceToolsAvailable || !onOpenWorkspaceTool}
                     className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07] disabled:opacity-45"
                   >
                     <Terminal className="h-4 w-4 text-muted-foreground" />
                     <span className="min-w-0 flex-1">{t("sidebar.terminal")}</span>
-                    <ChevronRight
-                      className={cn(
-                        "h-3.5 w-3.5 text-muted-foreground transition-transform",
-                        terminalLauncherOpen && "rotate-90",
-                      )}
-                    />
                   </button>
-                  {terminalLauncherOpen ? (
-                    <div className="space-y-0.5 pb-1 pl-6">
-                      {terminalShellOptions.length > 0 ? (
-                        terminalShellOptions.map((option) => (
-                          <button
-                            key={option.id}
-                            type="button"
-                            onClick={() => {
-                              onOpenWorkspaceTool?.("terminal", option.id);
-                              setSoulLauncherOpen(false);
-                            }}
-                            className="flex h-7 w-full items-center rounded-md px-2 text-left text-[calc(12px*var(--zone-font-scale,1))] text-muted-foreground transition-colors hover:bg-foreground/[0.07] hover:text-foreground"
-                            title={option.command || option.label}
-                          >
-                            <span className="truncate">{option.label}</span>
-                          </button>
-                        ))
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onOpenWorkspaceTool?.("terminal");
-                            setSoulLauncherOpen(false);
-                          }}
-                          className="flex h-7 w-full items-center rounded-md px-2 text-left text-[calc(12px*var(--zone-font-scale,1))] text-muted-foreground transition-colors hover:bg-foreground/[0.07] hover:text-foreground"
-                        >
-                          {t("sidebar.defaultTerminal")}
-                        </button>
-                      )}
-                    </div>
-                  ) : null}
                   {[
                     {
                       target: "gitReview" as const,
@@ -2048,16 +2012,23 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               ) : null}
             </div>
           ) : null}
-          <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+          <div className="mobile-chat-sidebar-footer grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
             <Button
               type="button"
               variant="ghost"
-              onPointerDown={() => {
+              onPointerDown={(event) => {
                 if (!mobileExperience) return;
                 suppressSoulClickRef.current = false;
+                soulLongPressStartRef.current = {
+                  pointerId: event.pointerId,
+                  x: event.clientX,
+                  y: event.clientY,
+                };
                 soulLongPressTimerRef.current = window.setTimeout(() => {
+                  soulLongPressTimerRef.current = null;
                   suppressSoulClickRef.current = true;
                   setSoulLauncherOpen(true);
+                  navigator.vibrate?.(8);
                 }, 520);
               }}
               onPointerUp={() => {
@@ -2065,9 +2036,16 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   window.clearTimeout(soulLongPressTimerRef.current);
                   soulLongPressTimerRef.current = null;
                 }
+                soulLongPressStartRef.current = null;
               }}
-              onPointerMove={() => {
-                if (soulLongPressTimerRef.current !== null) {
+              onPointerMove={(event) => {
+                const start = soulLongPressStartRef.current;
+                if (
+                  start &&
+                  start.pointerId === event.pointerId &&
+                  Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10 &&
+                  soulLongPressTimerRef.current !== null
+                ) {
                   window.clearTimeout(soulLongPressTimerRef.current);
                   soulLongPressTimerRef.current = null;
                 }
@@ -2077,6 +2055,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   window.clearTimeout(soulLongPressTimerRef.current);
                   soulLongPressTimerRef.current = null;
                 }
+                soulLongPressStartRef.current = null;
               }}
               onClick={() => {
                 if (suppressSoulClickRef.current) {
@@ -2119,37 +2098,28 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
       </div>
       {mobileExperience && soulLauncherOpen && typeof document !== "undefined"
         ? createPortal(
-            <div
-              className="fixed inset-0 z-[100] flex items-end bg-black/35"
-              role="presentation"
-              onPointerDown={() => {
-                suppressSoulClickRef.current = false;
-                setSoulLauncherOpen(false);
-              }}
-            >
+            <div className="pointer-events-none fixed inset-0 z-[100]" role="presentation">
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-label={t("chat.mobileActivity.close")}
+                className="pointer-events-auto absolute inset-0 cursor-default bg-transparent"
+                onClick={() => {
+                  suppressSoulClickRef.current = false;
+                  setSoulLauncherOpen(false);
+                }}
+              />
               <section
-                role="dialog"
-                aria-modal="true"
+                role="menu"
                 aria-label={t("sidebar.soulPresets")}
-                className="w-full rounded-t-2xl border-t border-border bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-3 shadow-2xl"
+                className="mobile-soul-anchor-menu pointer-events-auto absolute bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] left-[calc(0.75rem+env(safe-area-inset-left,0px))] w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-border/70 bg-popover/95 p-2.5 text-popover-foreground shadow-2xl backdrop-blur-2xl"
                 onPointerDown={(event) => event.stopPropagation()}
               >
-                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/25" />
-                <div className="mb-2 flex items-center gap-3">
-                  <div className="min-w-0 flex-1 text-[17px] font-semibold">
-                    {t("sidebar.soul")}
-                  </div>
-                  <button
-                    type="button"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground active:bg-muted"
-                    onClick={() => {
-                      suppressSoulClickRef.current = false;
-                      setSoulLauncherOpen(false);
-                    }}
-                    aria-label={t("chat.mobileActivity.close")}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                <div className="mb-2 flex items-center gap-2 px-1 pt-0.5">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-500/10 text-violet-500">
+                    <Sparkles className="h-3.5 w-3.5" />
+                  </span>
+                  <div className="min-w-0 flex-1 text-sm font-semibold">{t("sidebar.soul")}</div>
                 </div>
                 <SoulPresetPicker
                   mobile

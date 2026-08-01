@@ -81,6 +81,7 @@ fn build_mobile_ssh_command(
     host: &crate::commands::settings::RuntimeSshHostConfig,
     remote_command: &str,
     run_id: &str,
+    keyboard_response: Option<&str>,
 ) -> Result<String, String> {
     let endpoint = if host.username.trim().is_empty() {
         host.host.trim().to_string()
@@ -199,9 +200,21 @@ fn build_mobile_ssh_command(
             );
         }
         "keyboardInteractive" => {
-            return Err(
-                "Keyboard-interactive SSH requires a live terminal; choose password or private-key authentication for mobile command execution"
-                    .to_string(),
+            let response = keyboard_response.map(str::trim).unwrap_or_default();
+            if response.is_empty() {
+                return Err("A keyboard-interactive response is required".to_string());
+            }
+            let askpass = format!(
+                "#!/bin/sh\nprintf '%s\\n' {}\n",
+                mobile_shell_quote(response)
+            );
+            setup.push(encoded_shell_file(&askpass_path, &askpass, true));
+            options.push(
+                "-o PreferredAuthentications=keyboard-interactive,password".to_string(),
+            );
+            options.push("-o KbdInteractiveAuthentication=yes".to_string());
+            environment = format!(
+                "SSH_ASKPASS={askpass_path} SSH_ASKPASS_REQUIRE=force DISPLAY=x "
             );
         }
         other => return Err(format!("Unsupported SSH authentication method: {other}")),
@@ -383,6 +396,7 @@ pub async fn mobile_ssh_exec(
     host_id: String,
     workdir: String,
     remote_command: String,
+    keyboard_response: Option<String>,
     timeout_ms: Option<u64>,
     run_id: Option<String>,
 ) -> Result<ShellRunResponse, String> {
@@ -397,6 +411,7 @@ pub async fn mobile_ssh_exec(
         &host,
         &remote_command,
         &normalized_run_id,
+        keyboard_response.as_deref(),
     )?;
     run_mobile_shell(
         app,

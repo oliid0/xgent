@@ -169,7 +169,7 @@ internal class ProotRunner(
             "LC_ALL=C.UTF-8",
             "/bin/sh",
             "-c",
-            "cd -- \"\$1\" && exec /bin/sh -c \"\$2\"",
+            "cd -- \"\$1\" && if [ -x /bin/bash ]; then exec /bin/bash -lc \"\$2\"; else exec /bin/sh -c \"\$2\"; fi",
             "xagent",
             cwd.guestPath,
             request.command,
