@@ -958,7 +958,7 @@ function SshViewModeToggle(props: { value: SshViewMode; onChange: (value: SshVie
   );
 }
 
-export function SshSection(props: SettingsSectionProps) {
+export function SshSettingsSection(props: SettingsSectionProps) {
   const { settings, setSettings } = props;
   const { t } = useLocale();
   const [viewMode, setViewMode] = useState<SshViewMode>("list");
