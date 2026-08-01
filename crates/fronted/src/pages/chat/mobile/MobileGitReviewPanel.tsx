@@ -241,9 +241,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
         const path = shellQuote(change.path);
         const commands = [
           change.staged ? gitCommand(`diff --cached --no-ext-diff -- ${path}`) : "",
-          change.working && !change.untracked
-            ? gitCommand(`diff --no-ext-diff -- ${path}`)
-            : "",
+          change.working && !change.untracked ? gitCommand(`diff --no-ext-diff -- ${path}`) : "",
           change.untracked ? `${gitCommand(`diff --no-index -- /dev/null ${path}`)} || true` : "",
         ].filter(Boolean);
         const output = await run("diff", commands.join("\n"), true);
@@ -314,11 +312,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   };
 
   const initializeRepository = async () => {
-    await mutate(
-      "init",
-      gitCommand("init"),
-      t("projectTools.gitReview.initSuccessMessage"),
-    );
+    await mutate("init", gitCommand("init"), t("projectTools.gitReview.initSuccessMessage"));
   };
 
   const close = () => {

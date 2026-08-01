@@ -3053,9 +3053,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     flex-wrap: wrap;
   }
 
-  .settings-system-form[data-compact="true"]
-    .settings-terminal-card
-    button[role="combobox"] {
+  .settings-system-form[data-compact="true"] .settings-terminal-card button[role="combobox"] {
     width: 100%;
     min-height: 44px;
     margin-top: 2px;

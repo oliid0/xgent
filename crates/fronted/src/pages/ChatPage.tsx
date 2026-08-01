@@ -754,9 +754,7 @@ export function ChatPage(props: ChatPageProps) {
   const preferredTerminalShell = useMemo(() => {
     const configured = settings.system.terminalShell;
     if (configured === "auto") return undefined;
-    return terminalShellOptions.some((option) => option.id === configured)
-      ? configured
-      : undefined;
+    return terminalShellOptions.some((option) => option.id === configured) ? configured : undefined;
   }, [settings.system.terminalShell, terminalShellOptions]);
   const [workspaceToolLaunchRequest, setWorkspaceToolLaunchRequest] =
     useState<WorkspaceToolLaunchRequest | null>(null);

@@ -38,8 +38,6 @@ import {
   updateCustomSettings,
   updateSystem,
 } from "../../lib/settings";
-import { tauriTerminalClient } from "../../lib/terminal/tauriTerminalClient";
-import type { TerminalShellOption } from "../../lib/terminal/types";
 import {
   buildFontFamilySelectOptions,
   FONT_FAMILY_CUSTOM_SELECT_VALUE,
@@ -50,6 +48,8 @@ import {
   normalizeFontFamily,
   toFontFamilySelectValue,
 } from "../../lib/system/fontFamily";
+import { tauriTerminalClient } from "../../lib/terminal/tauriTerminalClient";
+import type { TerminalShellOption } from "../../lib/terminal/types";
 import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
 

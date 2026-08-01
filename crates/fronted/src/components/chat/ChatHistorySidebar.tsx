@@ -2109,7 +2109,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   setSoulLauncherOpen(false);
                 }}
               />
-              <section
+              <div
                 role="menu"
                 aria-label={t("sidebar.soulPresets")}
                 className="mobile-soul-anchor-menu pointer-events-auto absolute bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] left-[calc(0.75rem+env(safe-area-inset-left,0px))] w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-border/70 bg-popover/95 p-2.5 text-popover-foreground shadow-2xl backdrop-blur-2xl"
@@ -2137,7 +2137,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     onCreateSoul();
                   }}
                 />
-              </section>
+              </div>
             </div>,
             document.body,
           )
