@@ -130,7 +130,6 @@ export function McpImportView(props: {
 
   // 扫描结果就绪后自动定位到第一个有配置的工具；用户手动切换后不再干预
   useEffect(() => {
-  useEffect(() => {
     if (userChoseToolRef.current || !scans || scans.length === 0) return;
     const preferred =
       scans.find((scan) => scan.servers.length > 0) ??

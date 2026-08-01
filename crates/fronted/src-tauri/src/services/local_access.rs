@@ -43,6 +43,7 @@ const LOCAL_ACCESS_SECRET_SENTINEL: &str = "__XAGENT_LOCAL_ACCESS_SECRET__";
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalAccessStatus {
+    pub enabled: bool,
     pub running: bool,
     pub bind_address: String,
     pub port: u16,
@@ -175,6 +176,7 @@ impl LocalAccessController {
             proxy_client: reqwest::Client::new(),
             config: Mutex::new(AccessSettingsPayload::default()),
             status: Mutex::new(LocalAccessStatus {
+                enabled: false,
                 running: false,
                 bind_address: String::new(),
                 port: DEFAULT_PORT,
@@ -266,11 +268,17 @@ impl LocalAccessController {
     }
 
     pub fn status(&self) -> Result<LocalAccessStatus, String> {
+        let enabled = self
+            .config
+            .lock()
+            .map_err(|_| "local access config lock poisoned".to_string())?
+            .web_ui_enabled;
         let mut status = self
             .status
             .lock()
             .map_err(|_| "local access status lock poisoned".to_string())?
             .clone();
+        status.enabled = enabled;
         status.paired_devices = count_paired_devices()?;
         let pairing = self.current_pairing_code()?;
         status.pairing_code = pairing.as_ref().map(|value| value.plaintext.clone());

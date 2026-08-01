@@ -28,6 +28,7 @@ import { AgentActivationSwitch } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 type LocalAccessStatus = {
+  enabled: boolean;
   running: boolean;
   bindAddress: string;
   port: number;
@@ -51,6 +52,7 @@ type LanPcClientStatus = {
 };
 
 const EMPTY_LOCAL_STATUS: LocalAccessStatus = {
+  enabled: false,
   running: false,
   bindAddress: "",
   port: 28_367,
@@ -204,39 +206,43 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
 
   useEffect(() => {
     if (browser) return;
-    if (!nativeMobile) void refreshLocalStatus();
     void refreshVaultStatus();
     if (nativeMobile) void refreshLanPcStatus();
   }, [
     browser,
     nativeMobile,
     refreshLanPcStatus,
-    refreshLocalStatus,
     refreshVaultStatus,
-    settings.access.webUiEnabled,
   ]);
-
-  useEffect(() => {
-    if (browser || nativeMobile || !settings.access.webUiEnabled) return;
-    const timer = window.setInterval(() => void refreshLocalStatus(), 5_000);
-    return () => window.clearInterval(timer);
-  }, [browser, nativeMobile, refreshLocalStatus, settings.access.webUiEnabled]);
 
   useEffect(() => {
     if (browser || nativeMobile) return;
     let disposed = false;
     let stopListening: (() => void) | undefined;
+    let statusTimer: number | undefined;
     void listen<LocalAccessStatus>("local-access:status", (event) => {
       if (!disposed) setLocalStatus(event.payload);
-    }).then((unlisten) => {
-      if (disposed) unlisten();
-      else stopListening = unlisten;
-    });
+    })
+      .then((unlisten) => {
+        if (disposed) {
+          unlisten();
+          return;
+        }
+        stopListening = unlisten;
+        return refreshLocalStatus();
+      })
+      .catch(() => refreshLocalStatus())
+      .finally(() => {
+        if (!disposed && settings.access.webUiEnabled) {
+          statusTimer = window.setInterval(() => void refreshLocalStatus(), 2_000);
+        }
+      });
     return () => {
       disposed = true;
+      if (statusTimer !== undefined) window.clearInterval(statusTimer);
       stopListening?.();
     };
-  }, [browser, nativeMobile]);
+  }, [browser, nativeMobile, refreshLocalStatus, settings.access.webUiEnabled]);
 
   const endpoint = useMemo(
     () => localStatus.urls[0] ?? `http://127.0.0.1:${settings.access.webUiPort}`,
@@ -256,6 +262,13 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
     lanPcStatus.paired &&
     Boolean(normalizedConfiguredLanUrl) &&
     normalizedConfiguredLanUrl === pairedLanUrl;
+  const localStatusPhase = localStatus.running
+    ? "running"
+    : localStatus.lastError
+      ? "failed"
+      : localStatus.enabled || settings.access.webUiEnabled
+        ? "starting"
+        : "stopped";
 
   async function runAction(name: string, action: () => Promise<void>) {
     setActionError("");
@@ -469,18 +482,26 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
             </div>
             <div
               className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
-                localStatus.running
+                localStatusPhase === "running"
                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  : localStatusPhase === "failed"
+                    ? "bg-destructive/10 text-destructive"
                   : "bg-muted/50 text-muted-foreground"
               }`}
               title={localStatus.lastError ?? undefined}
             >
-              {localStatus.running ? (
+              {localStatusPhase === "running" ? (
                 <Wifi className="h-3.5 w-3.5" />
               ) : (
                 <WifiOff className="h-3.5 w-3.5" />
               )}
-              {localStatus.running ? t("settings.accessRunning") : t("settings.accessStopped")}
+              {localStatusPhase === "running"
+                ? t("settings.accessRunning")
+                : localStatusPhase === "starting"
+                  ? t("settings.accessStarting")
+                  : localStatusPhase === "failed"
+                    ? t("settings.accessFailed")
+                    : t("settings.accessStopped")}
             </div>
           </div>
 

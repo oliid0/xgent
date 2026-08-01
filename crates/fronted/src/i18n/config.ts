@@ -1715,6 +1715,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.accessLanPairingHint":
       "电脑端先开启 Web UI（局域网），首次打开时在控制界面输入电脑显示的六位配对码。",
     "settings.accessRunning": "Web UI 运行中",
+    "settings.accessStarting": "Web UI 启动中",
+    "settings.accessFailed": "Web UI 启动失败",
     "settings.accessStopped": "Web UI 已关闭",
     "settings.accessNativeOnly": "安全凭据和服务开关只能在原生 XAgent 客户端中管理。",
     "settings.accessWebUi": "开启 Web UI",
@@ -3920,6 +3922,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.accessLanPairingHint":
       "Enable LAN Web UI on the computer first. On first use, enter the six-digit pairing code shown by the computer.",
     "settings.accessRunning": "Web UI running",
+    "settings.accessStarting": "Web UI starting",
+    "settings.accessFailed": "Web UI failed to start",
     "settings.accessStopped": "Web UI stopped",
     "settings.accessNativeOnly":
       "Security credentials and service switches can only be managed in the native XAgent app.",
