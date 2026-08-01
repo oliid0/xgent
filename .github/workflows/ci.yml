@@ -39,6 +39,8 @@ jobs:
   frontend:
     name: Unified Frontend
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
 
@@ -79,6 +81,24 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+      - name: Persist frontend lint fixes on main
+        if: steps.frontend_lint.outcome == 'failure' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- crates/fronted/src
+          if ! git diff --cached --quiet; then
+            git commit -m "style: apply frontend lint fixes"
+            git push
+          fi
+
+      - name: Verify generated frontend lint fixes
+        id: frontend_lint_verify
+        if: steps.frontend_lint.outcome == 'failure' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        working-directory: crates/fronted
+        run: pnpm lint
+
       - name: Test frontend modules
         id: frontend_tests
         continue-on-error: true
@@ -90,7 +110,11 @@ jobs:
         run: pnpm test:release
 
       - name: Enforce frontend validation result
-        if: steps.frontend_lint.outcome == 'failure' || steps.frontend_tests.outcome == 'failure'
+        if: >-
+          steps.frontend_tests.outcome == 'failure' ||
+          (steps.frontend_lint.outcome == 'failure' &&
+          (github.event_name != 'push' || github.ref != 'refs/heads/main' ||
+          steps.frontend_lint_verify.outcome != 'success'))
         run: exit 1
 
   tauri-rust:
