@@ -1,17 +1,13 @@
-import { isBrowserRuntime } from "@xagent/runtime";
 import { prepareUpstreamProxyRequest } from "./providers/proxy";
 
-// Skills/MCP Hub outbound adapter. Native runtimes route requests through the
-// local proxy so system-proxy settings are honored. A paired browser keeps
-// normal browser networking for public Hub resources; privileged provider
-// requests use the authenticated local provider proxy elsewhere.
+// Skills/MCP Hub outbound adapter. Native runtimes use the loopback proxy and
+// paired WebUI clients use its authenticated, same-origin local-access facade.
+// Keeping both paths on the same adapter avoids third-party CORS failures and
+// makes the application's system-proxy policy consistent across every client.
 //
 // The signature is intentionally narrower than `fetch`: native URL rewriting
 // cannot faithfully preserve an arbitrary Request object's body and headers.
 export async function hubFetch(input: string | URL, init?: RequestInit): Promise<Response> {
-  if (isBrowserRuntime()) {
-    return fetch(input, init);
-  }
   const prepared = await prepareUpstreamProxyRequest(
     typeof input === "string" ? input : input.toString(),
   );

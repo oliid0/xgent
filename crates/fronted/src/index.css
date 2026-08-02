@@ -3302,7 +3302,7 @@
 @media (max-width: 720px) {
   .hub-header {
     min-height: 58px;
-    padding: 9px 12px;
+    padding: calc(9px + env(safe-area-inset-top, 0px)) 12px 9px;
   }
 
   .hub-header > .mx-auto {
@@ -3325,12 +3325,27 @@
     font-size: 11px;
   }
 
-  .hub-header > button {
+  .hub-header-sidebar-button {
     left: 8px;
-    top: 7px;
+    top: calc(7px + env(safe-area-inset-top, 0px));
     width: 44px;
     height: 44px;
     border-radius: 12px;
+  }
+
+  .hub-header[data-close-navigation="true"] {
+    min-height: calc(68px + env(safe-area-inset-top, 0px));
+    border-bottom-color: hsl(var(--border) / 0.24);
+    background: hsl(var(--background) / 0.92);
+  }
+
+  .hub-header[data-close-navigation="true"] > .mx-auto {
+    min-height: 50px;
+  }
+
+  .hub-header[data-close-navigation="true"] h1 {
+    font-size: 19px;
+    line-height: 24px;
   }
 
   .hub-scroll {

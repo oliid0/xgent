@@ -144,7 +144,7 @@ export class ClawHubHttpError extends Error {
 }
 
 async function fetchClawHubJson(url: URL): Promise<unknown> {
-  // 经 hubFetch 出网：桌面端由本地反代按应用代理配置转发，WebUI 浏览器直连。
+  // 经 hubFetch 出网：原生端走本地反代，WebUI 走已配对的同源反代入口。
   const response = await hubFetch(url.toString(), {
     headers: { Accept: "application/json" },
   });

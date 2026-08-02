@@ -4115,11 +4115,6 @@ export function ChatPage(props: ChatPageProps) {
     setMobileWorkspaceDestination((current) => (current?.kind === "activity" ? null : current));
   }, []);
 
-  const handleOpenMobileBackgroundTasks = useCallback(() => {
-    setSidebarOpen(false);
-    setMobileWorkspaceDestination({ kind: "background-tasks" });
-  }, []);
-
   const handleOpenBrowser = useCallback(() => {
     setSidebarOpen(false);
     setMobileWorkspaceDestination(null);
@@ -4147,22 +4142,6 @@ export function ChatPage(props: ChatPageProps) {
     },
     [ensureNativeMobileShellReady],
   );
-
-  const handleOpenMobileGitReview = useCallback(() => {
-    void ensureNativeMobileShellReady().then((ready) => {
-      if (!ready) return;
-      setSidebarOpen(false);
-      setMobileWorkspaceDestination({ kind: "git-review" });
-    });
-  }, [ensureNativeMobileShellReady]);
-
-  const handleOpenMobileSsh = useCallback(() => {
-    void ensureNativeMobileShellReady().then((ready) => {
-      if (!ready) return;
-      setSidebarOpen(false);
-      setMobileWorkspaceDestination({ kind: "ssh" });
-    });
-  }, [ensureNativeMobileShellReady]);
 
   const handleOpenMobileSidebar = useCallback(() => {
     setMobileWorkspaceDestination(null);
@@ -4756,6 +4735,14 @@ export function ChatPage(props: ChatPageProps) {
               isAgentMode={isAgentMode}
               sidebarOpen={sidebarOpen}
               onOpenSidebar={handleOpenSidebar}
+              onClose={
+                mobileExperience
+                  ? () => {
+                      setActiveView("chat");
+                      setSidebarOpen(false);
+                    }
+                  : undefined
+              }
             />
           ) : activeView === "mcp-hub" ? (
             <McpHubPage
@@ -4764,6 +4751,14 @@ export function ChatPage(props: ChatPageProps) {
               isAgentMode={isAgentMode}
               sidebarOpen={sidebarOpen}
               onOpenSidebar={handleOpenSidebar}
+              onClose={
+                mobileExperience
+                  ? () => {
+                      setActiveView("chat");
+                      setSidebarOpen(false);
+                    }
+                  : undefined
+              }
               allowStdio={!nativeMobile || lanPcCommandHostReady}
             />
           ) : (
@@ -4789,18 +4784,22 @@ export function ChatPage(props: ChatPageProps) {
                   onOpenSidebar={handleOpenSidebar}
                   mobileExperience={mobileExperience}
                   trailingActions={
-                    nativeMobile ? (
+                    mobileExperience ? (
                       <MobileQuickActions
-                        onOpenTerminal={() => handleOpenMobileTerminal("terminal")}
-                        onOpenRootfs={() => onOpenSettings("mobileExecution")}
+                        onOpenTerminal={() => handleOpenWorkspaceTool("terminal")}
+                        onOpenRootfs={() => {
+                          setSidebarOpen(false);
+                          setMobileWorkspaceDestination(null);
+                          onOpenSettings(nativeMobile ? "mobileExecution" : "system");
+                        }}
                         onOpenBrowser={handleOpenBrowser}
                         onOpenBrowserSettings={() => {
                           setSidebarOpen(false);
                           setMobileWorkspaceDestination({ kind: "browser-settings" });
                         }}
-                        onOpenGitReview={handleOpenMobileGitReview}
-                        onOpenSsh={handleOpenMobileSsh}
-                        onOpenBackgroundTasks={handleOpenMobileBackgroundTasks}
+                        onOpenGitReview={() => handleOpenWorkspaceTool("gitReview")}
+                        onOpenSsh={() => handleOpenWorkspaceTool("sshConnection")}
+                        onOpenBackgroundTasks={() => handleOpenWorkspaceTool("backgroundTasks")}
                       />
                     ) : (
                       <Button

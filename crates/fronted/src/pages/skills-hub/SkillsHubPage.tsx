@@ -692,6 +692,7 @@ type SkillsHubPageProps = {
   isAgentMode: boolean;
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
+  onClose?: () => void;
   embedded?: boolean;
 };
 
@@ -703,6 +704,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     initialRootDir,
     sidebarOpen,
     onOpenSidebar,
+    onClose,
     embedded = false,
   } = props;
   const { t } = useLocale();
@@ -1859,6 +1861,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
             tone="amber"
             sidebarOpen={sidebarOpen}
             onOpenSidebar={onOpenSidebar}
+            onClose={onClose}
           />
         ) : null}
 

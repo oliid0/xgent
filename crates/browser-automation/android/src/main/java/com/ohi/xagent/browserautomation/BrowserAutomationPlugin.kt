@@ -209,7 +209,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
         activity.runOnUiThread {
             val payload = JSONArray()
             sessions.values.forEach { payload.put(summary(it)) }
-            invoke.resolve(payload)
+            invoke.resolveObject(payload)
         }
     }
 

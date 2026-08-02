@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useLocale } from "../../i18n";
 import { cn } from "../../lib/shared/utils";
-import { PanelLeft } from "../icons";
+import { PanelLeft, X } from "../icons";
 import { isMacOsTauri, MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
 import { Button } from "../ui/button";
 
@@ -23,15 +23,30 @@ export function HubHeader(props: {
   actions?: ReactNode;
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
+  onClose?: () => void;
+  closeLabel?: string;
 }) {
-  const { icon, title, subtitle, tone = "neutral", actions, sidebarOpen, onOpenSidebar } = props;
+  const {
+    icon,
+    title,
+    subtitle,
+    tone = "neutral",
+    actions,
+    sidebarOpen,
+    onOpenSidebar,
+    onClose,
+    closeLabel,
+  } = props;
   const { t } = useLocale();
   const isMacTitleBarOverlay = isMacOsTauri();
-  const showSidebarButton = !sidebarOpen && !isMacTitleBarOverlay;
+  const showSidebarButton = !onClose && !sidebarOpen && !isMacTitleBarOverlay;
   return (
     <>
       <MacOsTitleBarSpacer />
-      <div className="hub-header relative z-10 px-4 pb-3 pt-4 sm:px-6 lg:px-8 xl:px-10">
+      <div
+        data-close-navigation={onClose ? "true" : undefined}
+        className="hub-header relative z-10 px-4 pb-3 pt-4 sm:px-6 lg:px-8 xl:px-10"
+      >
         {showSidebarButton ? (
           <Button
             type="button"
@@ -39,7 +54,7 @@ export function HubHeader(props: {
             size="icon"
             onClick={onOpenSidebar}
             title={t("tooltip.openSidebar")}
-            className="absolute left-3 top-3 h-10 w-10 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="hub-header-sidebar-button absolute left-3 top-3 h-10 w-10 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <PanelLeft className="h-4.5 w-4.5" />
           </Button>
@@ -50,24 +65,46 @@ export function HubHeader(props: {
             showSidebarButton && "pl-11 lg:pl-0",
           )}
         >
-          <div
-            data-hub-tone={tone}
-            className="hub-header-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-foreground/80"
-          >
-            {icon}
-          </div>
-          <div className="min-w-0 flex-1">
+          {onClose ? <span className="h-11 w-11 shrink-0" aria-hidden="true" /> : null}
+          {!onClose ? (
+            <div
+              data-hub-tone={tone}
+              className="hub-header-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-foreground/80"
+            >
+              {icon}
+            </div>
+          ) : null}
+          <div className={cn("min-w-0 flex-1", onClose && "text-center")}>
             <h1 className="text-[21px] font-semibold leading-tight tracking-tight text-foreground">
               {title}
             </h1>
             {subtitle ? (
-              <p className="mt-0.5 truncate text-[12px] text-muted-foreground" title={subtitle}>
+              <p
+                className={cn(
+                  "mt-0.5 truncate text-[12px] text-muted-foreground",
+                  onClose && "hidden",
+                )}
+                title={subtitle}
+              >
                 {subtitle}
               </p>
             ) : null}
           </div>
           {actions ? (
             <div className="hub-header-actions flex items-center gap-2">{actions}</div>
+          ) : null}
+          {onClose ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              title={closeLabel ?? t("settings.close")}
+              aria-label={closeLabel ?? t("settings.close")}
+              className="hub-header-close-button h-11 w-11 shrink-0 rounded-full border border-border/60 bg-background/80 text-foreground shadow-sm transition-[background-color,color,box-shadow] duration-150 active:bg-muted"
+            >
+              <X className="h-5 w-5" />
+            </Button>
           ) : null}
         </div>
       </div>

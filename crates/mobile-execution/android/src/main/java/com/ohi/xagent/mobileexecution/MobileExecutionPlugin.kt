@@ -199,7 +199,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun listExternalWorkspaces(invoke: Invoke) {
-        invoke.resolve(externalWorkspaces.payload())
+        invoke.resolveObject(externalWorkspaces.payload())
     }
 
     @Command

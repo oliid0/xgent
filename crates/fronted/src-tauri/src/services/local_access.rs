@@ -1140,6 +1140,7 @@ fn authorize_local_command(
         || command == "system_create_soul"
         || command == "system_select_soul"
         || command == "system_delete_soul"
+        || command == "system_manage_skill"
         || command == "cron_validate_expression"
         || crate::commands::settings::is_local_access_settings_write(command)
         || ALWAYS_ALLOWED_PREFIXES

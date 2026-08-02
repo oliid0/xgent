@@ -2,20 +2,33 @@
 
 import PackageDescription
 
+// Tauri compiles the Swift plugin into libapp.a, but binary dependencies of
+// that static archive do not become dependencies of the generated Xcode app.
+// The iOS project therefore consumes this binary-only product directly.
 let package = Package(
-    name: "tauri-plugin-mobile-execution",
+    name: "XAgentMobileShellFrameworks",
     platforms: [
         .iOS(.v14),
     ],
     products: [
         .library(
-            name: "tauri-plugin-mobile-execution",
-            type: .static,
-            targets: ["tauri-plugin-mobile-execution"]
+            name: "XAgentMobileShellFrameworks",
+            targets: [
+                "ios_system",
+                "awk",
+                "curl_ios",
+                "files",
+                "shell",
+                "tar",
+                "text",
+                "ssh_cmd",
+                "dash",
+                "vim",
+                "lg2",
+                "ffmpeg",
+                "ffprobe",
+            ]
         ),
-    ],
-    dependencies: [
-        .package(name: "Tauri", path: "../.tauri/tauri-api"),
     ],
     targets: [
         .binaryTarget(
@@ -82,38 +95,6 @@ let package = Package(
             name: "ffprobe",
             url: "https://github.com/holzschu/ios_system/releases/download/Auxiliary/ffprobe.xcframework.zip",
             checksum: "c66df5198becb1e0432c27c8f0df628fa185224c9f0bcff2039e3bd21246b130"
-        ),
-        .target(
-            name: "tauri-plugin-mobile-execution",
-            dependencies: [
-                .byName(name: "Tauri"),
-                "ios_system",
-                "awk",
-                "curl_ios",
-                "files",
-                "shell",
-                "tar",
-                "text",
-                "ssh_cmd",
-                "dash",
-                "vim",
-                "lg2",
-                "ffmpeg",
-                "ffprobe",
-            ],
-            path: "Sources",
-            resources: [
-                // SwiftPM's `.process` rule flattens directory resources. Vim's
-                // runtime intentionally contains duplicate basenames in
-                // different subdirectories, so those trees must be copied while
-                // preserving their hierarchy.
-                .process("Resources/commandDictionary.plist"),
-                .process("Resources/extraCommandsDictionary.plist"),
-                .copy("Resources/vim"),
-                .copy("Resources/terminfo"),
-                .copy("Resources/cacert.pem"),
-                .copy("Resources/Legal"),
-            ]
         ),
     ]
 )

@@ -20,6 +20,7 @@ type McpHubPageProps = {
   isAgentMode: boolean;
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
+  onClose?: () => void;
   allowStdio?: boolean;
   embedded?: boolean;
 };
@@ -29,7 +30,8 @@ type McpHubView = "installed" | "store" | "import";
 type EditingState = { mode: "add" } | { mode: "edit"; idx: number; server: McpServerConfig };
 
 export function McpHubPage(props: McpHubPageProps) {
-  const { settings, setSettings, sidebarOpen, onOpenSidebar, embedded = false } = props;
+  const { settings, setSettings, sidebarOpen, onOpenSidebar, onClose, embedded = false } =
+    props;
   const { t } = useLocale();
   const [view, setView] = useState<McpHubView>("installed");
   const [editing, setEditing] = useState<EditingState | null>(null);
@@ -81,6 +83,7 @@ export function McpHubPage(props: McpHubPageProps) {
             tone="violet"
             sidebarOpen={sidebarOpen}
             onOpenSidebar={onOpenSidebar}
+            onClose={onClose}
           />
         ) : null}
 

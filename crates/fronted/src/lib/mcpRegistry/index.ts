@@ -126,7 +126,7 @@ async function fetchJson(
   url: string,
   params: { fetchImpl?: typeof fetch; headers?: Record<string, string> } = {},
 ): Promise<unknown> {
-  // 默认经 hubFetch 出网（桌面端走本地反代+应用代理，WebUI 直连）；测试注入 fetchImpl。
+  // 默认经 hubFetch 出网（原生端走本地反代，WebUI 走已配对的同源入口）；测试注入 fetchImpl。
   const fetchImpl = params.fetchImpl ?? hubFetch;
   const response = await fetchImpl(url, {
     headers: {
