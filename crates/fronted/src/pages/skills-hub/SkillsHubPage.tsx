@@ -692,11 +692,19 @@ type SkillsHubPageProps = {
   isAgentMode: boolean;
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
+  embedded?: boolean;
 };
 
 export function SkillsHubPage(props: SkillsHubPageProps) {
-  const { settings, setSettings, initialSkills, initialRootDir, sidebarOpen, onOpenSidebar } =
-    props;
+  const {
+    settings,
+    setSettings,
+    initialSkills,
+    initialRootDir,
+    sidebarOpen,
+    onOpenSidebar,
+    embedded = false,
+  } = props;
   const { t } = useLocale();
   // Skills are configuration, so their Hub remains manageable in every chat mode.
   // The chat runtime still decides whether a selected skill participates in a turn.
@@ -1833,18 +1841,26 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
       : null;
 
   return (
-    <div className="hub-page hub-page-enter relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+    <div
+      data-hub-embedded={embedded ? "true" : undefined}
+      className={cn(
+        "hub-page hub-page-enter relative flex h-full min-h-0 flex-1 flex-col overflow-hidden",
+        embedded && "hub-page-embedded",
+      )}
+    >
       <HubBackdrop tone="amber" />
 
       <div className="relative z-10 flex h-full min-h-0 flex-col overflow-hidden">
-        <HubHeader
-          icon={<Blend className="h-6 w-6" />}
-          title={t("settings.skillsHubTitle")}
-          subtitle={rootDir ? rootDir : t("settings.skillsHubSubtitle")}
-          tone="amber"
-          sidebarOpen={sidebarOpen}
-          onOpenSidebar={onOpenSidebar}
-        />
+        {!embedded ? (
+          <HubHeader
+            icon={<Blend className="h-6 w-6" />}
+            title={t("settings.skillsHubTitle")}
+            subtitle={rootDir ? rootDir : t("settings.skillsHubSubtitle")}
+            tone="amber"
+            sidebarOpen={sidebarOpen}
+            onOpenSidebar={onOpenSidebar}
+          />
+        ) : null}
 
         <div className="hub-scroll min-h-0 flex-1 overflow-hidden px-5 pb-6 pt-2 sm:px-6 lg:px-8 xl:px-10">
           <div className="hub-content-stage mx-auto flex h-full min-h-0 w-full max-w-[1320px] flex-col gap-4">

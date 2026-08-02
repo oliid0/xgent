@@ -21,6 +21,7 @@ type McpHubPageProps = {
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
   allowStdio?: boolean;
+  embedded?: boolean;
 };
 
 type McpHubView = "installed" | "store" | "import";
@@ -28,7 +29,7 @@ type McpHubView = "installed" | "store" | "import";
 type EditingState = { mode: "add" } | { mode: "edit"; idx: number; server: McpServerConfig };
 
 export function McpHubPage(props: McpHubPageProps) {
-  const { settings, setSettings, sidebarOpen, onOpenSidebar } = props;
+  const { settings, setSettings, sidebarOpen, onOpenSidebar, embedded = false } = props;
   const { t } = useLocale();
   const [view, setView] = useState<McpHubView>("installed");
   const [editing, setEditing] = useState<EditingState | null>(null);
@@ -62,18 +63,26 @@ export function McpHubPage(props: McpHubPageProps) {
   }
 
   return (
-    <div className="hub-page hub-page-enter relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+    <div
+      data-hub-embedded={embedded ? "true" : undefined}
+      className={cn(
+        "hub-page hub-page-enter relative flex h-full min-h-0 flex-1 flex-col overflow-hidden",
+        embedded && "hub-page-embedded",
+      )}
+    >
       <HubBackdrop tone="violet" />
 
       <div className="relative z-10 flex h-full min-h-0 flex-col overflow-hidden">
-        <HubHeader
-          icon={<Cable className="h-5 w-5" />}
-          title="MCP Hub"
-          subtitle={t("mcpHub.subtitle")}
-          tone="violet"
-          sidebarOpen={sidebarOpen}
-          onOpenSidebar={onOpenSidebar}
-        />
+        {!embedded ? (
+          <HubHeader
+            icon={<Cable className="h-5 w-5" />}
+            title="MCP Hub"
+            subtitle={t("mcpHub.subtitle")}
+            tone="violet"
+            sidebarOpen={sidebarOpen}
+            onOpenSidebar={onOpenSidebar}
+          />
+        ) : null}
 
         <div className="hub-scroll min-h-0 flex-1 overflow-hidden px-5 pb-6 pt-2 sm:px-6 lg:px-8 xl:px-10">
           <div className="hub-content-stage mx-auto flex h-full min-h-0 w-full max-w-[1320px] flex-col gap-4">

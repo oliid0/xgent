@@ -14,8 +14,11 @@ import type {
   TerminalSession,
   TerminalShellOption,
 } from "../../lib/terminal/types";
+import type { SkillSummary } from "../../lib/skills";
 import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types";
-import { FolderTree, GitBranch, Key, Terminal } from "../icons";
+import { McpHubPage } from "../../pages/mcp-hub/McpHubPage";
+import { SkillsHubPage } from "../../pages/skills-hub/SkillsHubPage";
+import { Cable, FolderTree, GitBranch, Key, SkillIcon, Terminal } from "../icons";
 import { FileTreePanel } from "../project-tools/file-tree";
 import type { GitCommitContextPayload, GitFileContextPayload } from "../project-tools/git-review";
 import { GitReviewPanel } from "../project-tools/git-review";
@@ -28,14 +31,14 @@ import {
 } from "../project-tools/WorkspaceToolsContext";
 import {
   expandedPathsForFileTreePath,
-  type WorkspaceToolTarget,
+  type WorkspacePanelTarget,
 } from "../project-tools/workspaceToolsModel";
 import { XTermViewport } from "../project-tools/XTermViewport";
 import { Button } from "../ui/button";
 import { BackgroundServicesPanel } from "./BackgroundServicesPanel";
 
 type WorkspaceSidePanelProps = {
-  target: WorkspaceToolTarget;
+  target: WorkspacePanelTarget;
   shell?: string;
   requestNonce: number;
   fontScale?: number;
@@ -69,6 +72,9 @@ type WorkspaceSidePanelProps = {
   gitReviewFocusRequest?: GitReviewFocusRequest | null;
   onGitReviewFocusRequestHandled?: (nonce: number) => void;
   onShellOptionsChange?: (options: TerminalShellOption[]) => void;
+  initialSkills?: SkillSummary[];
+  initialSkillsRootDir?: string;
+  isAgentMode: boolean;
 };
 
 function normalizeTreePath(path: string) {
@@ -90,7 +96,7 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
     cwd: props.cwd,
     externalSessions: props.sessions,
     externalSessionsLoaded: props.sessionsLoaded,
-    isOpen: true,
+    isOpen: props.target !== "skills" && props.target !== "mcp",
     projectPathKey: props.projectPathKey,
     projectState: props.projectState,
     terminalReady,
@@ -227,32 +233,40 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
     ],
   );
 
-  const title =
-    props.target === "fileTree"
-      ? t("sidebar.myFiles")
-      : props.target === "gitReview"
-        ? t("sidebar.gitReview")
-        : props.target === "sshConnection"
-          ? t("sidebar.sshConnection")
-          : props.target === "backgroundTasks"
-            ? t("sidebar.backgroundTasks")
-            : t("sidebar.terminal");
-  const Icon =
-    props.target === "fileTree"
-      ? FolderTree
-      : props.target === "gitReview"
-        ? GitBranch
-        : props.target === "sshConnection"
-          ? Key
-          : props.target === "backgroundTasks"
-            ? Terminal
-            : Terminal;
+  let title = t("sidebar.terminal");
+  let Icon = Terminal;
+  switch (props.target) {
+    case "fileTree":
+      title = t("sidebar.myFiles");
+      Icon = FolderTree;
+      break;
+    case "gitReview":
+      title = t("sidebar.gitReview");
+      Icon = GitBranch;
+      break;
+    case "sshConnection":
+      title = t("sidebar.sshConnection");
+      Icon = Key;
+      break;
+    case "backgroundTasks":
+      title = t("sidebar.backgroundTasks");
+      break;
+    case "skills":
+      title = "Skills";
+      Icon = SkillIcon;
+      break;
+    case "mcp":
+      title = "MCP";
+      Icon = Cable;
+      break;
+  }
 
   return (
     <WorkspaceToolsContext.Provider value={context}>
       <aside
         data-workspace-side-panel
-        className="zone-font-scale relative flex h-full w-[min(38vw,420px)] min-w-[340px] shrink-0 flex-col overflow-hidden border-r border-border/55 bg-[hsl(var(--sidebar-bg))]"
+        data-workspace-tool={props.target}
+        className="zone-font-scale workspace-side-panel relative flex h-full w-[min(38vw,420px)] min-w-[340px] shrink-0 flex-col overflow-hidden border-r border-border/55 bg-[hsl(var(--sidebar-bg))]"
         style={{ "--zone-font-scale": props.fontScale ?? 1 } as CSSProperties}
       >
         <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/55 px-3">
@@ -260,7 +274,32 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
           <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</h2>
         </header>
 
-        {!projectReady && props.target !== "backgroundTasks" ? (
+        {props.target === "skills" ? (
+          <div className="min-h-0 flex-1">
+            <SkillsHubPage
+              settings={props.settings}
+              setSettings={props.setSettings}
+              initialSkills={props.initialSkills}
+              initialRootDir={props.initialSkillsRootDir}
+              isAgentMode={props.isAgentMode}
+              sidebarOpen
+              onOpenSidebar={() => undefined}
+              embedded
+            />
+          </div>
+        ) : props.target === "mcp" ? (
+          <div className="min-h-0 flex-1">
+            <McpHubPage
+              settings={props.settings}
+              setSettings={props.setSettings}
+              isAgentMode={props.isAgentMode}
+              sidebarOpen
+              onOpenSidebar={() => undefined}
+              allowStdio
+              embedded
+            />
+          </div>
+        ) : !projectReady && props.target !== "backgroundTasks" ? (
           <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
             {props.disabledMessage ?? t("projectTools.noProjectSelected")}
           </div>

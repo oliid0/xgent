@@ -6,11 +6,13 @@ export const DEFAULT_TERMINAL_ROWS = 24;
 
 export type WorkspaceToolTarget = WorkspaceToolKind | "terminal" | "backgroundTasks";
 
-export type WorkspaceNavigationTarget = "conversations" | "skills" | "mcp" | WorkspaceToolTarget;
+export type WorkspacePanelTarget = WorkspaceToolTarget | "skills" | "mcp";
+
+export type WorkspaceNavigationTarget = "conversations" | WorkspacePanelTarget;
 
 export type WorkspaceToolLaunchRequest = {
   nonce: number;
-  target: WorkspaceToolTarget;
+  target: WorkspacePanelTarget;
   shell?: string;
 };
 

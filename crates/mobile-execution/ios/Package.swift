@@ -11,7 +11,27 @@ let package = Package(
         .library(
             name: "tauri-plugin-mobile-execution",
             type: .static,
-            targets: ["tauri-plugin-mobile-execution"]
+            // Keep every binary target in the exported product. Tauri links
+            // the plugin product into the generated application target; if
+            // the frameworks only appear as implementation dependencies of
+            // the Swift target, Xcode compiles the module imports but omits
+            // their framework search paths from the final application link.
+            targets: [
+                "tauri-plugin-mobile-execution",
+                "ios_system",
+                "awk",
+                "curl_ios",
+                "files",
+                "shell",
+                "tar",
+                "text",
+                "ssh_cmd",
+                "dash",
+                "vim",
+                "lg2",
+                "ffmpeg",
+                "ffprobe",
+            ]
         ),
     ],
     dependencies: [

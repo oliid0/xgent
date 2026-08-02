@@ -6,11 +6,6 @@ mod services;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 #[cfg(desktop)]
-use std::sync::Mutex;
-#[cfg(desktop)]
-use std::time::{Duration, Instant};
-
-#[cfg(desktop)]
 use tauri::menu::{Menu, MenuItem};
 #[cfg(desktop)]
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -26,8 +21,6 @@ const MAIN_WINDOW_LABEL: &str = "main";
 const TRAY_SHOW_ID: &str = "tray-show";
 #[cfg(desktop)]
 const TRAY_QUIT_ID: &str = "tray-quit";
-#[cfg(desktop)]
-const TRAY_DOUBLE_CLICK_INTERVAL_MS: u64 = 500;
 #[cfg(desktop)]
 const TRAY_SHOW_MENU_ON_LEFT_CLICK: bool = !cfg!(target_os = "windows");
 #[cfg(desktop)]
@@ -435,8 +428,8 @@ macro_rules! app_invoke_handler {
 #[cfg(desktop)]
 fn show_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
-        window.show()?;
         window.unminimize()?;
+        window.show()?;
         window.set_focus()?;
     }
 
@@ -471,43 +464,23 @@ fn request_app_exit(
 fn exit_app_from_tray(
     app: &tauri::AppHandle,
     allow_exit: &AtomicBool,
-    terminal_registry: &runtime::terminal::TerminalSessionRegistry,
 ) {
     // Selecting Quit from the tray is already an explicit confirmation. Do not
-    // restore a hidden window or enter the title-bar close confirmation flow.
-    // Best-effort terminal cleanup still happens before the run loop is allowed
-    // to perform the remaining managed-process and power-activity cleanup.
-    if let Err(error) = terminal_registry.close_all() {
-        eprintln!("failed to close terminal sessions while quitting from tray: {error}");
-    }
+    // restore a hidden window, enter the title-bar confirmation flow, or block
+    // the native menu event thread while waiting for child processes to stop.
+    // The normal RunEvent exit path owns process and power cleanup.
     allow_exit.store(true, Ordering::SeqCst);
     app.exit(0);
-}
-
-#[cfg(desktop)]
-fn record_tray_left_click(last_click_at: &Mutex<Option<Instant>>) -> bool {
-    let now = Instant::now();
-    let mut last_click_at = last_click_at.lock().unwrap();
-    let is_double_click = last_click_at
-        .map(|previous| now.duration_since(previous))
-        .is_some_and(|elapsed| elapsed <= Duration::from_millis(TRAY_DOUBLE_CLICK_INTERVAL_MS));
-
-    *last_click_at = if is_double_click { None } else { Some(now) };
-
-    is_double_click
 }
 
 #[cfg(desktop)]
 fn configure_system_tray(
     app: &tauri::App,
     allow_exit: Arc<AtomicBool>,
-    terminal_registry: Arc<runtime::terminal::TerminalSessionRegistry>,
 ) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, TRAY_SHOW_ID, "显示", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, TRAY_QUIT_ID, "退出", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &quit])?;
-    let last_left_click_at = Arc::new(Mutex::new(None));
-
     let mut tray_builder = TrayIconBuilder::new()
         .tooltip("XAgent")
         .menu(&menu)
@@ -519,36 +492,21 @@ fn configure_system_tray(
                 }
             }
             TRAY_QUIT_ID => {
-                exit_app_from_tray(app, &allow_exit, &terminal_registry);
+                exit_app_from_tray(app, &allow_exit);
             }
             _ => {}
         })
-        .on_tray_icon_event({
-            let last_left_click_at = Arc::clone(&last_left_click_at);
-            move |tray, event| match event {
-                TrayIconEvent::DoubleClick {
-                    button: MouseButton::Left,
-                    ..
-                } => {
-                    if let Err(error) = show_main_window(tray.app_handle()) {
-                        eprintln!("failed to show XAgent window from tray double-click: {error}");
-                    }
+        .on_tray_icon_event(|tray, event| match event {
+            TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } if !TRAY_SHOW_MENU_ON_LEFT_CLICK => {
+                if let Err(error) = show_main_window(tray.app_handle()) {
+                    eprintln!("failed to show XAgent window from tray click: {error}");
                 }
-                TrayIconEvent::Click {
-                    button: MouseButton::Left,
-                    button_state: MouseButtonState::Down,
-                    ..
-                } => {
-                    if record_tray_left_click(&last_left_click_at) {
-                        if let Err(error) = show_main_window(tray.app_handle()) {
-                            eprintln!(
-                                "failed to show XAgent window from tray left double-click: {error}"
-                            );
-                        }
-                    }
-                }
-                _ => {}
             }
+            _ => {}
         });
 
     #[cfg(target_os = "macos")]
@@ -653,7 +611,6 @@ pub fn run() {
                 configure_system_tray(
                     app,
                     Arc::clone(&allow_exit),
-                    Arc::clone(&terminal_registry),
                 )?;
                 #[cfg(target_os = "windows")]
                 configure_windows_window_chrome(app)?;

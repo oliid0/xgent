@@ -35,6 +35,7 @@ import type { GitReviewFocusRequest } from "../components/project-tools/Workspac
 import {
   expandedPathsForFileTreePath,
   type WorkspaceNavigationTarget,
+  type WorkspacePanelTarget,
   type WorkspaceToolLaunchRequest,
   type WorkspaceToolTarget,
 } from "../components/project-tools/workspaceToolsModel";
@@ -759,7 +760,7 @@ export function ChatPage(props: ChatPageProps) {
   const [workspaceToolLaunchRequest, setWorkspaceToolLaunchRequest] =
     useState<WorkspaceToolLaunchRequest | null>(null);
   const workspaceToolLaunchNonceRef = useRef(0);
-  const showDesktopWorkspaceTool = useCallback((target: WorkspaceToolTarget, shell?: string) => {
+  const showDesktopWorkspaceTool = useCallback((target: WorkspacePanelTarget, shell?: string) => {
     workspaceToolLaunchNonceRef.current += 1;
     setActiveView("chat");
     setDesktopNavigationTarget(target);
@@ -4215,11 +4216,7 @@ export function ChatPage(props: ChatPageProps) {
         return;
       }
       if (target === "skills" || target === "mcp") {
-        cacheActiveComposerDraft();
-        setActiveView(target === "skills" ? "skills-hub" : "mcp-hub");
-        setWorkspaceToolsOpen(false);
-        setDesktopNavigationTarget(target);
-        setSidebarOpen(false);
+        showDesktopWorkspaceTool(target);
         return;
       }
       if (!desktopBridgeEnabled || terminalDisabledMessage) return;
@@ -4229,7 +4226,6 @@ export function ChatPage(props: ChatPageProps) {
       );
     },
     [
-      cacheActiveComposerDraft,
       desktopBridgeEnabled,
       desktopNavigationTarget,
       preferredTerminalShell,
@@ -4649,18 +4645,26 @@ export function ChatPage(props: ChatPageProps) {
           }}
           appUpdate={appUpdate}
           onOpenSkillsHub={() => {
-            cacheActiveComposerDraft();
-            setWorkspaceToolsOpen(false);
-            setActiveView("skills-hub");
-            setDesktopNavigationTarget("skills");
-            setSidebarOpen(false);
+            if (mobileExperience) {
+              cacheActiveComposerDraft();
+              setWorkspaceToolsOpen(false);
+              setActiveView("skills-hub");
+              setDesktopNavigationTarget("skills");
+              setSidebarOpen(false);
+            } else {
+              showDesktopWorkspaceTool("skills");
+            }
           }}
           onOpenMcpHub={() => {
-            cacheActiveComposerDraft();
-            setWorkspaceToolsOpen(false);
-            setActiveView("mcp-hub");
-            setDesktopNavigationTarget("mcp");
-            setSidebarOpen(false);
+            if (mobileExperience) {
+              cacheActiveComposerDraft();
+              setWorkspaceToolsOpen(false);
+              setActiveView("mcp-hub");
+              setDesktopNavigationTarget("mcp");
+              setSidebarOpen(false);
+            } else {
+              showDesktopWorkspaceTool("mcp");
+            }
           }}
           mobileExperience={mobileExperience}
           desktopPanelMode={!mobileExperience}
@@ -4679,11 +4683,13 @@ export function ChatPage(props: ChatPageProps) {
 
         {confirmDialog}
 
-        {desktopCommandHostAvailable &&
-        activeView === "chat" &&
+        {activeView === "chat" &&
         sidebarOpen &&
         workspaceToolsOpen &&
-        workspaceToolLaunchRequest ? (
+        workspaceToolLaunchRequest &&
+        (desktopCommandHostAvailable ||
+          workspaceToolLaunchRequest.target === "skills" ||
+          workspaceToolLaunchRequest.target === "mcp") ? (
           <WorkspaceSidePanel
             target={workspaceToolLaunchRequest.target}
             shell={workspaceToolLaunchRequest.shell}
@@ -4719,6 +4725,9 @@ export function ChatPage(props: ChatPageProps) {
             onInsertCommitMention={handleWorkspaceToolsInsertCommitMention}
             onInsertGitFileMention={handleWorkspaceToolsInsertGitFileMention}
             onShellOptionsChange={setTerminalShellOptions}
+            initialSkills={availableSkills}
+            initialSkillsRootDir={skillsRootDir}
+            isAgentMode={isAgentMode}
           />
         ) : null}
 

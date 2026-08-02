@@ -1,6 +1,6 @@
 plugins {
-    id("com.android.library") version "8.9.1"
-    id("org.jetbrains.kotlin.android") version "2.1.21"
+    id("com.android.library")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
