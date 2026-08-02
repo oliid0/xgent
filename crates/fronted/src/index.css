@@ -2752,11 +2752,10 @@
 }
 
 .settings-page-desktop .settings-section-hero,
-.settings-page-desktop .settings-hooks-lifecycle,
+.settings-page-desktop .settings-hooks-event-selector,
 .settings-page-desktop .settings-hooks-detail,
-.settings-page-desktop .settings-memory-summary-card,
-.settings-page-desktop .settings-memory-list-section,
-.settings-page-desktop .settings-memory-detail-section,
+.settings-page-desktop .settings-memory-status-group,
+.settings-page-desktop .settings-memory-layout,
 .settings-page-desktop .settings-cron-card,
 .settings-page-desktop .settings-ssh-host-card,
 .settings-page-desktop .settings-about-card {
@@ -2834,6 +2833,14 @@
     gap: 12px;
   }
 
+  .settings-memory-overview {
+    padding-inline: 12px;
+  }
+
+  .settings-memory-overview > .settings-section-heading-row {
+    padding: 2px 2px 0;
+  }
+
   .settings-memory-compact-hidden {
     display: none !important;
   }
@@ -2842,6 +2849,10 @@
     display: flex;
     min-height: 0;
     flex: 1;
+    border-width: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .settings-memory-list-section,
@@ -2854,16 +2865,14 @@
     box-shadow: none;
   }
 
-  .settings-memory-summary-card {
-    margin-inline: 12px;
-    border-color: hsl(var(--border) / 0.42);
-    border-radius: 16px;
+  .settings-memory-status-group {
+    border-color: hsl(var(--border) / 0.4);
     background: hsl(var(--card) / 0.82);
     box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
   }
 
-  .settings-memory-summary-actions {
-    width: 100%;
+  .settings-memory-quota-row + .settings-memory-quota-row {
+    border-top: 1px solid hsl(var(--border) / 0.34);
   }
 
   .settings-memory-summary-actions button,
@@ -2893,110 +2902,36 @@
   }
 
   .settings-hooks-section {
-    height: auto;
-    gap: 12px;
-  }
-
-  .settings-hooks-section .settings-section-hero {
-    gap: 12px;
-    border-color: hsl(var(--border) / 0.4);
-    border-radius: 16px;
-    padding: 14px;
-    background: hsl(var(--card) / 0.82);
-    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
-  }
-
-  .settings-hooks-stats {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
-  }
-
-  .settings-hooks-stat {
-    min-width: 0;
-    justify-content: center;
-    border-width: 0;
-    padding: 8px 4px;
-  }
-
-  .settings-hooks-stat-label {
-    display: none;
-  }
-
-  .settings-hooks-grid {
     display: flex;
-    min-height: auto;
+    min-width: 0;
     flex-direction: column;
     gap: 12px;
   }
 
-  .settings-hooks-compact-events {
-    display: flex;
-    margin-inline: -12px;
-    padding-inline: 12px;
-    scroll-padding-inline: 12px;
-    overscroll-behavior-inline: contain;
-    scrollbar-width: none;
-  }
-
-  .settings-hooks-compact-events::-webkit-scrollbar {
-    display: none;
-  }
-
-  .settings-hooks-compact-event {
-    border: 1px solid hsl(var(--border) / 0.36);
-    background: hsl(var(--card) / 0.7);
-    transition:
-      color 140ms ease,
-      background-color 140ms ease,
-      transform 100ms ease;
-  }
-
-  .settings-hooks-compact-event:active {
+  .settings-hooks-event-option:active {
     transform: scale(0.97);
   }
 
-  .settings-hooks-lifecycle,
+  .settings-hooks-event-selector,
   .settings-hooks-detail {
-    overflow: visible;
     border-color: hsl(var(--border) / 0.4);
     border-radius: 16px;
     background: hsl(var(--card) / 0.82);
     box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
   }
 
-  .settings-hooks-lifecycle {
-    display: none;
-  }
-
-  .settings-hooks-lifecycle-body,
-  .settings-hooks-detail-body {
-    overflow: visible;
-  }
-
-  .settings-hooks-phase-button,
-  .settings-hooks-event-button {
-    min-height: 44px;
+  .settings-hooks-event-option {
+    min-height: 58px;
   }
 
   .settings-hooks-detail-header {
     padding: 14px;
   }
 
-  .settings-hooks-detail-body {
-    padding: 12px;
-  }
-
   .settings-hooks-card {
-    padding: 0;
-    border-color: hsl(var(--border) / 0.36);
-    border-radius: 14px;
-    background: hsl(var(--background) / 0.48);
-  }
-
-  .settings-hooks-card-row {
     flex-wrap: wrap;
     gap: 10px;
+    padding: 14px;
   }
 
   .settings-hooks-card-main {
@@ -3208,9 +3143,8 @@
   .settings-mobile-group,
   .settings-page-desktop .settings-sidebar,
   .settings-page-desktop .settings-section-hero,
-  .settings-page-desktop .settings-memory-summary-card,
-  .settings-page-desktop .settings-memory-list-section,
-  .settings-page-desktop .settings-memory-detail-section {
+  .settings-page-desktop .settings-memory-status-group,
+  .settings-page-desktop .settings-memory-layout {
     border-color: hsl(var(--foreground) / 0.42);
   }
 }

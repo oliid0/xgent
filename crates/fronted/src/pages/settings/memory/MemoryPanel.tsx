@@ -198,14 +198,14 @@ export function MemoryPanel(props: {
           openEntry(entry);
           if (props.compact) setCompactDetailOpen(true);
         }}
-        className={`w-full rounded-lg border px-3 py-2.5 text-left transition-colors ${
+        className={`settings-memory-entry w-full rounded-xl border border-transparent px-3 py-2.5 text-left transition-[color,background-color,border-color] duration-150 ${
           nested ? "ml-3 w-[calc(100%-0.75rem)]" : ""
         } ${
           active
-            ? "border-primary/50 bg-primary/5 shadow-xs"
+            ? "border-primary/15 bg-primary/[0.08]"
             : entry.unreviewed
-              ? "border-amber-500/20 bg-amber-500/[0.05] hover:bg-amber-500/[0.08]"
-              : "border-border/50 bg-background/70 hover:bg-muted/35"
+              ? "bg-amber-500/[0.06] hover:bg-amber-500/[0.1]"
+              : "hover:bg-muted/40"
         }`}
       >
         <div className="flex items-center justify-between gap-2">
@@ -234,43 +234,25 @@ export function MemoryPanel(props: {
 
   return (
     <>
-      <div className="settings-memory-panel flex min-h-0 flex-1 flex-col gap-4">
+      <div className="settings-memory-panel flex min-h-0 flex-1 flex-col gap-5">
         <div
-          className={`settings-memory-summary-card shrink-0 rounded-xl border border-border/60 bg-card p-4 ${
+          className={`settings-memory-overview shrink-0 space-y-4 ${
             props.compact && compactDetailOpen ? "settings-memory-compact-hidden" : ""
           }`}
         >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 space-y-1">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Brain className="h-4 w-4 text-muted-foreground" />
-                {t("settings.memoryTitle")}
+          <div className="settings-section-heading-row flex items-center justify-between gap-4">
+            <div className="settings-section-title-group flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-300">
+                <Brain className="h-[18px] w-[18px]" />
               </div>
-              <div className="break-all text-xs text-muted-foreground">
-                {pathsInfo?.root ?? "~/.xagent/memory"}
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold">{t("settings.memoryTitle")}</h2>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {t("settings.mobile.memoryDescription")}
+                </p>
               </div>
             </div>
-            <div className="settings-memory-summary-actions flex flex-wrap items-center gap-2">
-              {quotaItems.map((item) => {
-                const level = quotaLevel(item);
-                const label =
-                  item.scope === "global"
-                    ? t("settings.memoryQuotaGlobal")
-                    : t("settings.memoryQuotaProject");
-                return (
-                  <div
-                    key={`${item.scope}:${item.workdirHash}`}
-                    className={`rounded-md border px-2.5 py-1.5 text-xs ${quotaPillClass(level)}`}
-                  >
-                    {label} {item.used} / {item.limit}
-                  </div>
-                );
-              })}
-              <div
-                className={`rounded-md border px-2.5 py-1.5 text-xs ${quotaStatusClass(quotaStatus)}`}
-              >
-                {t(quotaStatusLabelKey(quotaStatus))}
-              </div>
+            <div className="settings-memory-summary-actions flex shrink-0 items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => reload()} disabled={loading}>
                 <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
                 {t("settings.memoryRefresh")}
@@ -288,20 +270,61 @@ export function MemoryPanel(props: {
             </div>
           </div>
 
+          <div className="settings-memory-status-group overflow-hidden rounded-2xl border border-border/60 bg-card">
+            <div className="settings-memory-status-row flex min-w-0 items-center gap-3 px-4 py-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
+                <Folder className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-medium">{t("settings.memoryTitle")}</div>
+                <div className="truncate font-mono text-[11px] text-muted-foreground">
+                  {pathsInfo?.root ?? "~/.xagent/memory"}
+                </div>
+              </div>
+              <div
+                className={`shrink-0 rounded-md border px-2 py-1 text-[11px] ${quotaStatusClass(quotaStatus)}`}
+              >
+                {t(quotaStatusLabelKey(quotaStatus))}
+              </div>
+            </div>
+            <div className="settings-memory-quota-grid grid border-t border-border/45 sm:grid-cols-2">
+              {quotaItems.map((item) => {
+                const level = quotaLevel(item);
+                const label =
+                  item.scope === "global"
+                    ? t("settings.memoryQuotaGlobal")
+                    : t("settings.memoryQuotaProject");
+                return (
+                  <div
+                    key={`${item.scope}:${item.workdirHash}`}
+                    className="settings-memory-quota-row flex min-w-0 items-center justify-between gap-3 px-4 py-3 sm:[&+&]:border-l sm:[&+&]:border-border/45"
+                  >
+                    <span className="truncate text-xs text-muted-foreground">{label}</span>
+                    <span
+                      className={`shrink-0 rounded-md border px-2 py-1 text-[11px] tabular-nums ${quotaPillClass(level)}`}
+                    >
+                      {item.used} / {item.limit}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {unreviewedCount > 0 ? (
-            <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300">
               {unreviewedCount} {t("settings.memoryAwaitingReview")}
             </div>
           ) : null}
           {pathsInfo?.isInCloud ? (
-            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <div className="flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {t("settings.memoryCloudWarningPrefix")}{" "}
               {pathsInfo.cloudProvider ?? t("settings.memoryCloudSyncFolder")}
             </div>
           ) : null}
           {quotaStatus === "full" || quotaStatus === "danger" ? (
-            <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/[0.06] px-3 py-2 text-xs text-red-700 dark:text-red-300">
+            <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-3 py-2.5 text-xs text-red-700 dark:text-red-300">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {t(
                 quotaStatus === "full"
@@ -310,21 +333,21 @@ export function MemoryPanel(props: {
               )}
             </div>
           ) : quotaStatus === "warning" ? (
-            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <div className="flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {t("settings.memoryQuotaWarningMessage")}
             </div>
           ) : null}
           {error ? (
-            <div className="mt-3 whitespace-pre-wrap rounded-lg border border-destructive/20 bg-destructive/[0.05] px-3 py-2 text-xs text-destructive">
+            <div className="whitespace-pre-wrap rounded-xl border border-destructive/20 bg-destructive/[0.05] px-3 py-2.5 text-xs text-destructive">
               {error}
             </div>
           ) : null}
         </div>
 
-        <div className="settings-memory-layout grid min-h-0 flex-1 gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
+        <div className="settings-memory-layout grid min-h-0 flex-1 overflow-hidden rounded-2xl border border-border/60 bg-card lg:grid-cols-[340px_minmax(0,1fr)]">
           <section
-            className={`settings-memory-list-section flex min-h-0 flex-col rounded-xl border border-border/60 bg-card ${
+            className={`settings-memory-list-section flex min-h-0 min-w-0 flex-col border-r border-border/45 ${
               props.compact && compactDetailOpen ? "settings-memory-compact-hidden" : ""
             }`}
           >
@@ -426,7 +449,7 @@ export function MemoryPanel(props: {
           </section>
 
           <section
-            className={`settings-memory-detail-section flex min-h-0 flex-col rounded-xl border border-border/60 bg-card ${
+            className={`settings-memory-detail-section flex min-h-0 min-w-0 flex-col ${
               props.compact && !compactDetailOpen ? "settings-memory-compact-hidden" : ""
             }`}
           >
