@@ -30,8 +30,7 @@ type McpHubView = "installed" | "store" | "import";
 type EditingState = { mode: "add" } | { mode: "edit"; idx: number; server: McpServerConfig };
 
 export function McpHubPage(props: McpHubPageProps) {
-  const { settings, setSettings, sidebarOpen, onOpenSidebar, onClose, embedded = false } =
-    props;
+  const { settings, setSettings, sidebarOpen, onOpenSidebar, onClose, embedded = false } = props;
   const { t } = useLocale();
   const [view, setView] = useState<McpHubView>("installed");
   const [editing, setEditing] = useState<EditingState | null>(null);
