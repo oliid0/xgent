@@ -9,12 +9,12 @@ import type {
   WorkspaceFileTreeStatePatch,
   WorkspaceToolsProjectState,
 } from "../../lib/settings";
+import type { SkillSummary } from "../../lib/skills";
 import type {
   TerminalClient,
   TerminalSession,
   TerminalShellOption,
 } from "../../lib/terminal/types";
-import type { SkillSummary } from "../../lib/skills";
 import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types";
 import { McpHubPage } from "../../pages/mcp-hub/McpHubPage";
 import { SkillsHubPage } from "../../pages/skills-hub/SkillsHubPage";
