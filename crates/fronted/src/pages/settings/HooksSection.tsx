@@ -186,7 +186,7 @@ export function HooksSection(_props: SettingsSectionProps) {
       ) : null}
 
       <div
-        className="settings-hooks-event-selector grid min-w-0 grid-cols-2 gap-1.5 rounded-2xl border border-border/60 bg-card p-2 sm:grid-cols-4"
+        className="settings-hooks-event-selector grid min-w-0 grid-cols-4 gap-1.5 rounded-2xl border border-border/60 bg-card p-2"
         role="tablist"
         aria-label={t("settings.hooksLifecycle")}
       >

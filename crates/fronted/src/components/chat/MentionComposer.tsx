@@ -192,6 +192,7 @@ export interface MentionComposerProps {
   workdir: string;
   enabledSkills?: MentionComposerSkill[];
   className?: string;
+  preferNativeContextMenu?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2072,6 +2073,7 @@ export const MentionComposer = memo(
       workdir,
       enabledSkills = [],
       className,
+      preferNativeContextMenu = false,
     }: MentionComposerProps,
     ref,
   ) {
@@ -2977,6 +2979,7 @@ export const MentionComposer = memo(
     // ---- Event handlers ----
     const handleContextMenu = useCallback(
       (event: MouseEvent<HTMLDivElement>) => {
+        if (preferNativeContextMenu) return;
         event.preventDefault();
 
         const el = editorRef.current;
@@ -3009,7 +3012,7 @@ export const MentionComposer = memo(
           hasContent: !editorTextIsEmpty(el),
         });
       },
-      [closeCommitTooltip, closeMentionSession],
+      [closeCommitTooltip, closeMentionSession, preferNativeContextMenu],
     );
 
     // Large-paste chips can be removed by native editing paths (select +
@@ -3528,7 +3531,7 @@ export const MentionComposer = memo(
             onMouseLeave={scheduleCommitTooltipClose}
           />
         ) : null}
-        {composerContextMenu && contextMenuPosition
+        {!preferNativeContextMenu && composerContextMenu && contextMenuPosition
           ? createPortal(
               <div
                 ref={composerContextMenuRef}
@@ -3624,6 +3627,7 @@ export const MentionComposer = memo(
           onMouseUp={handleMouseUp}
           onPaste={handlePaste}
           onContextMenu={handleContextMenu}
+          data-native-context-menu={preferNativeContextMenu ? "true" : undefined}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           onBlur={handleBlur}

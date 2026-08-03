@@ -26,6 +26,7 @@ export type FileTreeRowProps = {
   onSelect: (path: string) => void;
   onOpen: (path: string) => void;
   onContextMenu: (event: ReactMouseEvent, path: string) => void;
+  openFilesOnSingleClick?: boolean;
 };
 
 export const FileTreeRow = memo(function FileTreeRow(props: FileTreeRowProps) {
@@ -43,6 +44,7 @@ export const FileTreeRow = memo(function FileTreeRow(props: FileTreeRowProps) {
     onSelect,
     onOpen,
     onContextMenu,
+    openFilesOnSingleClick = false,
   } = props;
   const { t } = useLocale();
   const TypeIcon = getFileTypeIcon(path, kind, { expanded });
@@ -87,8 +89,12 @@ export const FileTreeRow = memo(function FileTreeRow(props: FileTreeRowProps) {
           hidden && "opacity-60 group-hover:opacity-80",
         )}
         title={title}
-        onClick={() => onSelect(path)}
+        onClick={() => {
+          onSelect(path);
+          if (openFilesOnSingleClick && kind === "file") onOpen(path);
+        }}
         onDoubleClick={() => {
+          if (openFilesOnSingleClick) return;
           if (kind === "dir") {
             onToggle(path, expanded);
             return;

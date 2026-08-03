@@ -15,5 +15,6 @@ export async function hubFetch(input: string | URL, init?: RequestInit): Promise
   for (const [name, value] of Object.entries(prepared.headers)) {
     headers.set(name, value);
   }
-  return fetch(prepared.url, { ...init, headers });
+  headers.set("x-xagent-upstream-user-agent", "XAgent-Hub/1.0");
+  return fetch(prepared.url, { credentials: "same-origin", ...init, headers });
 }

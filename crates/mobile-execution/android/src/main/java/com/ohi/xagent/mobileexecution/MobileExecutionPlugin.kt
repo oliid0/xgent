@@ -11,7 +11,6 @@ import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 import java.io.File
-import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import org.json.JSONArray
@@ -99,24 +98,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
         }
         worker.execute {
             runCatching {
-                val rootfs = installer.install()
-                if (!File(rootfsDir, "bin/bash").isFile) {
-                    val workspace = File(backendDir, "environment-workspace").apply { mkdirs() }
-                    val result = runner.execute(
-                        AndroidRunRequest(
-                            runId = "environment-${UUID.randomUUID()}",
-                            workdir = workspace.absolutePath,
-                            command = "apk add --no-cache bash",
-                            cwd = "",
-                            timeoutMs = 300_000,
-                            stdin = null,
-                        ),
-                    )
-                    check(result.exitCode == 0 && !result.timedOut && !result.cancelled) {
-                        result.stderr.trim().ifEmpty { "Could not initialize Bash in the PRoot environment" }
-                    }
-                }
-                rootfs
+                installer.install()
             }
                 .onSuccess { rootfs ->
                     refreshInventoryBestEffort()
@@ -312,7 +294,8 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
     private fun statusPayload(): JSObject {
         val binaries = ProotBinaries.resolve(File(activity.applicationInfo.nativeLibraryDir))
         val rootfsInstalled = File(rootfsDir, "bin/sh").isFile
-        val installed = rootfsInstalled && File(rootfsDir, "bin/bash").isFile
+        val bashInstalled = File(rootfsDir, "bin/bash").isFile
+        val installed = rootfsInstalled
         val bundledRootfs = installer.bundledRootfsStatus()
         val available = binaries.available && (rootfsInstalled || bundledRootfs.isSuccess)
         val detail = when {
@@ -320,8 +303,8 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
             !rootfsInstalled && bundledRootfs.isFailure ->
                 "The verified Alpine rootfs is missing from this application build"
             !rootfsInstalled -> "PRoot is available; install the verified Alpine rootfs to enable local execution"
-            !installed -> "The Alpine rootfs is present; initialize Bash to enable local execution"
-            else -> "Android PRoot execution is ready"
+            !bashInstalled -> "Android PRoot is ready with Alpine sh; install Linux essentials to add Bash and common tools"
+            else -> "Android PRoot execution is ready with Bash"
         }
         return JSObject().apply {
             put("backend", BACKEND)

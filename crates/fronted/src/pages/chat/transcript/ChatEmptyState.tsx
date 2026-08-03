@@ -112,9 +112,9 @@ export function ChatEmptyState({
             <button
               type="button"
               onClick={() => onOpenSettings("providers")}
-              className="chat-hero-cta-enter mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-foreground/[0.05] px-4 text-sm font-medium text-foreground/85 transition-[color,background-color,transform] duration-150 hover:bg-foreground/[0.08] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-[0.97]"
+              className="chat-hero-cta-enter mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-[background-color,transform] duration-150 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-[0.97]"
             >
-              <Settings className="h-4 w-4 text-foreground/65" />
+              <Settings className="h-4 w-4" />
               {t("chat.goToSettings")}
             </button>
           ) : null}

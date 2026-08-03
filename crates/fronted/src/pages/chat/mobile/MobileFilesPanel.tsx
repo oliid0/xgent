@@ -1,5 +1,6 @@
 import { openUrl } from "@xagent/runtime";
 import { useCallback, useMemo } from "react";
+import { HubHeader } from "../../../components/hub/HubChrome";
 import { FolderTree } from "../../../components/icons";
 import { FileTreePanel } from "../../../components/project-tools/file-tree";
 import {
@@ -11,7 +12,7 @@ import { useLocale } from "../../../i18n";
 import type { WorkspaceFileTreeState, WorkspaceFileTreeStatePatch } from "../../../lib/settings";
 import type { TerminalClient } from "../../../lib/terminal/types";
 import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
-import { MobileFullscreenPanel, MobilePanelHeader } from "./MobilePanelScaffold";
+import { MobileFullscreenPanel } from "./MobilePanelScaffold";
 
 type MobileFilesPanelProps = {
   open: boolean;
@@ -132,16 +133,14 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
   return (
     <WorkspaceToolsContext.Provider value={context}>
       <MobileFullscreenPanel open label={t("sidebar.myFiles")}>
-        <MobilePanelHeader
+        <HubHeader
+          icon={<FolderTree className="h-5 w-5" />}
           title={t("sidebar.myFiles")}
           subtitle={cwd || undefined}
-          backLabel={t("chat.cancel")}
-          onBack={onClose}
-          leading={
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-foreground">
-              <FolderTree className="h-4 w-4" />
-            </span>
-          }
+          sidebarOpen
+          onOpenSidebar={() => undefined}
+          onClose={onClose}
+          closeLabel={t("chat.cancel")}
         />
 
         <div className="min-h-0 flex-1 pb-[env(safe-area-inset-bottom,0px)]">

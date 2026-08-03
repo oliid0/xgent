@@ -460,9 +460,10 @@ const HistoryRow = memo(function HistoryRow(props: {
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                side="right"
-                align="start"
-                sideOffset={8}
+                side={touchActions ? "bottom" : "right"}
+                align={touchActions ? "end" : "start"}
+                sideOffset={touchActions ? 4 : 8}
+                collisionPadding={12}
                 className="sidebar-context-menu min-w-[10rem] rounded-xl border-border/60 bg-background/95 backdrop-blur-xl"
               >
                 <DropdownMenuItem
@@ -839,9 +840,10 @@ const ProjectRow = memo(function ProjectRow(props: {
                     <MoreHorizontal className="h-3.5 w-3.5" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
-                    side="right"
-                    align="start"
-                    sideOffset={6}
+                    side={touchActions ? "bottom" : "right"}
+                    align={touchActions ? "end" : "start"}
+                    sideOffset={touchActions ? 4 : 6}
+                    collisionPadding={12}
                     className="sidebar-context-menu"
                   >
                     {!isDefaultProject ? (

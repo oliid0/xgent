@@ -10,6 +10,7 @@ import {
   listExternalMobileWorkspaces,
   type MobileExecutionStatus,
   mobileExecutionStatus,
+  pickExternalMobileWorkspace,
   removeExternalMobileWorkspace,
 } from "../../lib/mobileExecution";
 import { normalizeRuntimePlatform, type RuntimePlatform } from "../../lib/runtimePlatform";
@@ -180,7 +181,7 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
     setBusy("environment");
     setError("");
     try {
-      await invoke<string | null>("system_pick_folder", { initial_workdir: null });
+      await pickExternalMobileWorkspace(true);
       setExternalWorkspaces(await listExternalMobileWorkspaces());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));

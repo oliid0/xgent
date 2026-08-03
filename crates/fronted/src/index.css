@@ -332,6 +332,13 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  @media (hover: none) and (pointer: coarse) {
+    :where(button, a, [role="button"], summary, label[for]) {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+  }
+
   code,
   pre,
   kbd,
@@ -2805,11 +2812,11 @@
 
 @media (max-width: 720px) {
   .settings-mobile-home > div {
-    padding-top: 4px;
+    padding-top: 2px;
   }
 
   .settings-mobile-home section {
-    padding-top: 18px;
+    padding-top: 12px;
   }
 
   .settings-mobile-home section > h2 {
@@ -2921,7 +2928,63 @@
   }
 
   .settings-hooks-event-option {
-    min-height: 58px;
+    min-width: min(72vw, 220px);
+    min-height: 52px;
+  }
+
+  .settings-mobile-home .settings-mobile-row {
+    min-height: 54px;
+    padding-block: 7px;
+  }
+
+  .settings-mobile-home .settings-mobile-row > span:nth-child(2) > span:first-child {
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  .settings-mobile-home .settings-mobile-row > span:nth-child(2) > span:last-child {
+    display: none;
+  }
+
+  .settings-modal-panel {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .settings-modal-header,
+  .settings-modal-footer {
+    padding: 12px 14px;
+  }
+
+  .settings-modal-body > div {
+    padding: 14px;
+  }
+
+  .settings-modal-actions {
+    flex: 0 0 auto;
+  }
+
+  .settings-modal-actions > button {
+    min-height: 44px;
+  }
+
+  .settings-hooks-event-selector {
+    display: flex;
+    margin-inline: -12px;
+    padding-inline: 12px;
+    border-inline: 0;
+    border-radius: 0;
+    scrollbar-width: none;
+    scroll-padding-inline: 12px;
+    overscroll-behavior-inline: contain;
+  }
+
+  .settings-hooks-event-selector::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-hooks-event-selector .settings-hooks-event-option {
+    flex: 0 0 min(72vw, 220px);
   }
 
   .settings-hooks-detail-header {
@@ -2945,9 +3008,15 @@
     border-top: 1px solid hsl(var(--border) / 0.32);
   }
 
-  .settings-hooks-card-actions button {
+  .settings-hooks-card-actions button:not([role="switch"]) {
     width: 44px;
     height: 44px;
+  }
+
+  .settings-hooks-card-actions button[role="switch"] {
+    width: 48px;
+    height: 28px;
+    margin-right: auto;
   }
 
   .settings-cron-section,
@@ -3879,6 +3948,20 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     min-height: 52px;
   }
 
+  .sidebar-context-menu {
+    max-width: calc(100vw - 24px);
+    max-height: min(var(--available-height), calc(100dvh - 24px));
+    border-radius: 14px;
+    padding: 6px;
+  }
+
+  .sidebar-context-menu [role="menuitem"] {
+    min-height: 44px;
+    border-radius: 10px;
+    padding-inline: 12px;
+    font-size: 14px;
+  }
+
   [data-mobile-chat-header="true"] {
     min-height: calc(58px + env(safe-area-inset-top, 0px));
     padding-inline: 12px;
@@ -3979,7 +4062,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 
 @media (max-width: 720px) {
   [data-mobile-chat-header="true"].chat-header {
-    min-height: calc(58px + env(safe-area-inset-top, 0px));
+    min-height: 56px;
     padding-inline: 10px;
     border-color: hsl(var(--border) / 0.3);
     background: hsl(var(--background) / 0.82);

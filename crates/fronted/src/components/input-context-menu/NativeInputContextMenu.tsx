@@ -87,11 +87,12 @@ function setNativeValue(el: MenuTarget, value: string, caret: number) {
  * custom context menu keep it (stopPropagation / preventDefault upstream),
  * everything else keeps the historical suppressed-menu behavior.
  */
-export function useNativeInputContextMenu(): {
+export function useNativeInputContextMenu(options: { enabled?: boolean } = {}): {
   onRootContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
   onRootMouseDownCapture: (event: ReactMouseEvent<HTMLElement>) => void;
   menu: ReactNode;
 } {
+  const enabled = options.enabled ?? true;
   const { t } = useLocale();
   const [snapshot, setSnapshot] = useState<InputMenuSnapshot | null>(null);
   const targetRef = useRef<MenuTarget | null>(null);
@@ -111,6 +112,10 @@ export function useNativeInputContextMenu(): {
     setSnapshot(null);
   }, []);
 
+  useEffect(() => {
+    if (!enabled) closeMenu();
+  }, [closeMenu, enabled]);
+
   // Right-mousedown must not disturb the caret/selection before the menu
   // opens — Chromium moves the caret on the default action (cancellable),
   // while macOS WebKit selects the word/token under the pointer during
@@ -119,31 +124,35 @@ export function useNativeInputContextMenu(): {
   // here so the contextmenu handler can restore it over whatever the engine
   // selected in between. Capture phase so inner stopPropagation cannot skip
   // it.
-  const onRootMouseDownCapture = useCallback((event: ReactMouseEvent<HTMLElement>) => {
-    if (event.button !== 2) return;
-    if (event.defaultPrevented) return;
-    const target = resolveMenuTarget(event.target);
-    if (!target) return;
-    let start: number | null = null;
-    let end: number | null = null;
-    try {
-      start = target.selectionStart;
-      end = target.selectionEnd;
-    } catch {
-      // Selection API unsupported; treated as no selection downstream.
-    }
-    preClickRef.current = {
-      target,
-      wasFocused: document.activeElement === target,
-      start,
-      end,
-      at: Date.now(),
-    };
-    event.preventDefault();
-  }, []);
+  const onRootMouseDownCapture = useCallback(
+    (event: ReactMouseEvent<HTMLElement>) => {
+      if (!enabled || event.button !== 2) return;
+      if (event.defaultPrevented) return;
+      const target = resolveMenuTarget(event.target);
+      if (!target) return;
+      let start: number | null = null;
+      let end: number | null = null;
+      try {
+        start = target.selectionStart;
+        end = target.selectionEnd;
+      } catch {
+        // Selection API unsupported; treated as no selection downstream.
+      }
+      preClickRef.current = {
+        target,
+        wasFocused: document.activeElement === target,
+        start,
+        end,
+        at: Date.now(),
+      };
+      event.preventDefault();
+    },
+    [enabled],
+  );
 
   const onRootContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLElement>) => {
+      if (!enabled) return;
       // A surface that already owns a custom menu may preventDefault without
       // stopPropagation (e.g. the composer) — leave it alone.
       if (event.defaultPrevented) return;
@@ -220,7 +229,7 @@ export function useNativeInputContextMenu(): {
         isPassword: target instanceof HTMLInputElement && target.type === "password",
       });
     },
-    [closeMenu],
+    [closeMenu, enabled],
   );
 
   // Clamp against the measured size after render (no hard-coded dimensions —

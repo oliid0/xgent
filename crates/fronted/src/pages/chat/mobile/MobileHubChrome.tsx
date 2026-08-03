@@ -15,7 +15,7 @@ type MobileHubHeaderProps = {
  */
 export function MobileHubHeader(props: MobileHubHeaderProps) {
   return (
-    <header className="shrink-0 border-b border-border bg-background px-4 pb-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))]">
+    <header className="shrink-0 border-b border-border bg-background px-4 pb-4 pt-3">
       <div className="flex min-h-12 items-center gap-3">
         <button
           type="button"
@@ -69,13 +69,15 @@ export function MobileToggle(props: {
       aria-label={props.label}
       disabled={props.disabled}
       onClick={() => props.onChange(!props.checked)}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors disabled:opacity-45 ${
-        props.checked ? "bg-blue-500" : "bg-muted-foreground/25"
+      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-[background-color,border-color] duration-150 disabled:opacity-45 ${
+        props.checked
+          ? "border-blue-500 bg-blue-500"
+          : "border-border bg-muted-foreground/[0.28]"
       }`}
     >
       <span
-        className={`h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${
-          props.checked ? "translate-x-[1.4rem]" : "translate-x-0.5"
+        className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.32)] transition-transform duration-150 ${
+          props.checked ? "translate-x-5" : "translate-x-0"
         }`}
       />
     </button>

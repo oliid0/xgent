@@ -119,7 +119,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
       data-mobile-chat-header={mobileExperience ? "true" : undefined}
       className={cn(
         "chat-header flex items-center justify-between gap-2 pr-4",
-        mobileExperience ? "pb-2.5 pt-[calc(0.625rem+env(safe-area-inset-top,0px))]" : "py-2.5",
+        mobileExperience ? "py-2" : "py-2.5",
         !sidebarOpen && macOsTauri ? "pl-[232px]" : "pl-4",
       )}
     >
@@ -173,15 +173,15 @@ export const ChatHeader = memo(function ChatHeader(props: {
           <Popover.Portal>
             <Popover.Positioner
               side="bottom"
-              align="start"
+              align={mobileExperience ? "center" : "start"}
               sideOffset={4}
-              collisionPadding={8}
+              collisionPadding={mobileExperience ? 12 : 8}
               className="z-[9999]"
             >
               <Popover.Popup
                 initialFocus={searchInputRef}
                 aria-label={t("chat.selectModel")}
-                className="model-selector-dropdown w-[min(18rem,calc(100vw-1rem))] overflow-hidden rounded-xl border bg-popover p-0 text-xs text-popover-foreground shadow-md outline-none"
+                className="model-selector-dropdown max-h-[calc(100dvh-5.5rem)] w-[min(18rem,calc(100vw-1rem))] overflow-hidden rounded-xl border bg-popover p-0 text-xs text-popover-foreground shadow-md outline-none"
               >
                 {(() => {
                   const executionMode = settings.system.executionMode;

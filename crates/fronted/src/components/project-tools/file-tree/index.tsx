@@ -607,7 +607,13 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
                   )}
                   style={{ minHeight: FILE_TREE_ROW_HEIGHT }}
                   title={entry.path}
-                  onClick={() => void revealPath(entry.path, entry.kind)}
+                  onClick={() => {
+                    if (touchActions && entry.kind === "file") {
+                      handleOpenFile(entry.path);
+                      return;
+                    }
+                    void revealPath(entry.path, entry.kind);
+                  }}
                 >
                   <TypeIcon className="h-3.5 w-3.5 shrink-0" />
                   <span className="min-w-0 truncate">{entry.path}</span>
@@ -670,6 +676,7 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
                   onSelect={selectPath}
                   onOpen={handleOpenFile}
                   onContextMenu={openContextMenu}
+                  openFilesOnSingleClick={touchActions}
                 />
               </div>
             );
