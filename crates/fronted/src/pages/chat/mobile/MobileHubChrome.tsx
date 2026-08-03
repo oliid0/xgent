@@ -70,9 +70,7 @@ export function MobileToggle(props: {
       disabled={props.disabled}
       onClick={() => props.onChange(!props.checked)}
       className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-[background-color,border-color] duration-150 disabled:opacity-45 ${
-        props.checked
-          ? "border-blue-500 bg-blue-500"
-          : "border-border bg-muted-foreground/[0.28]"
+        props.checked ? "border-blue-500 bg-blue-500" : "border-border bg-muted-foreground/[0.28]"
       }`}
     >
       <span
