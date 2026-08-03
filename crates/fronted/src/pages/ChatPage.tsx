@@ -4911,6 +4911,7 @@ export function ChatPage(props: ChatPageProps) {
                 onEditQueuedTurn={editQueuedTurn}
                 onRemoveQueuedTurn={removeQueuedTurn}
                 onHeightChange={setComposerOverlayHeight}
+                mobileExperience={mobileExperience}
               />
               {isFileDropActive ? (
                 <div

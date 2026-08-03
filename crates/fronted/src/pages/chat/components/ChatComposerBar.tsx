@@ -166,6 +166,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   onEditQueuedTurn: (id: string) => void;
   onRemoveQueuedTurn: (id: string) => void;
   onHeightChange?: (height: number) => void;
+  mobileExperience?: boolean;
 }) {
   const {
     composerRef,
@@ -198,6 +199,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     onEditQueuedTurn,
     onRemoveQueuedTurn,
     onHeightChange,
+    mobileExperience = false,
   } = props;
   const { t } = useLocale();
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -776,20 +778,22 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
             className="pointer-events-none absolute inset-0 rounded-[24px] bg-gradient-to-b from-white/18 to-transparent opacity-70 dark:from-white/[0.04] dark:opacity-100"
           />
 
-          <button
-            type="button"
-            onClick={toggleComposerExpanded}
-            title={toggleComposerExpandTooltip}
-            aria-label={toggleComposerExpandTooltip}
-            aria-expanded={isComposerExpanded}
-            className="absolute right-3 top-2 z-20 inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground/70 outline-hidden transition-[background-color,color,scale] hover:bg-muted/60 hover:text-foreground active:scale-90 focus-visible:bg-muted/60"
-          >
-            {isComposerExpanded ? (
-              <Minimize2 className="h-4 w-4" />
-            ) : (
-              <Maximize2 className="h-4 w-4" />
-            )}
-          </button>
+          {!mobileExperience ? (
+            <button
+              type="button"
+              onClick={toggleComposerExpanded}
+              title={toggleComposerExpandTooltip}
+              aria-label={toggleComposerExpandTooltip}
+              aria-expanded={isComposerExpanded}
+              className="absolute right-3 top-2 z-20 inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground/70 outline-hidden transition-[background-color,color,scale] hover:bg-muted/60 hover:text-foreground active:scale-90 focus-visible:bg-muted/60"
+            >
+              {isComposerExpanded ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </button>
+          ) : null}
 
           {/* 常驻 flex-1：动画把卡片钳在中间高度时由本区吸收伸缩，工具栏才能
               全程贴住卡片底边。min-h-0 只在展开态加——折叠态靠自动最小高度
@@ -806,7 +810,12 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
               disabled={isInputDisabled}
               workdir={workdir}
               enabledSkills={enabledSkills}
-              className={cn("px-0 py-0 pr-8", isComposerExpanded && "h-full max-h-none")}
+              preferNativeContextMenu={mobileExperience}
+              className={cn(
+                "px-0 py-0",
+                !mobileExperience && "pr-8",
+                isComposerExpanded && "h-full max-h-none",
+              )}
             />
           </div>
 

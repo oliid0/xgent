@@ -53,10 +53,12 @@ function asErrorMessage(error: unknown, fallback: string) {
   return text || fallback;
 }
 
-function AppChrome(props: { children: ReactNode }) {
+function AppChrome(props: { children: ReactNode; nativeMobile?: boolean }) {
   // Plain inputs get a shared cut/copy/paste menu; everything else keeps the
   // suppressed native menu (surfaces with their own menus opt out upstream).
-  const { onRootContextMenu, onRootMouseDownCapture, menu } = useNativeInputContextMenu();
+  const { onRootContextMenu, onRootMouseDownCapture, menu } = useNativeInputContextMenu({
+    enabled: !props.nativeMobile,
+  });
   return (
     <div
       className="app-safe-area relative flex h-full w-full flex-col overflow-hidden bg-background"
@@ -459,7 +461,7 @@ export default function App() {
   if (!settingsReady || !platformResolved) {
     return (
       <LocaleContext.Provider value={localeContextValue}>
-        <AppChrome>
+        <AppChrome nativeMobile={nativeMobile}>
           <div className="flex h-full w-full items-center justify-center bg-background text-sm text-muted-foreground">
             {translate("chat.loading", settings.locale)}
           </div>
@@ -474,7 +476,7 @@ export default function App() {
   return (
     <LocaleContext.Provider value={localeContextValue}>
       <SoulProvider>
-        <AppChrome>
+        <AppChrome nativeMobile={nativeMobile}>
           <CronPromptRunner settings={settings} />
           <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
           <AppErrorBoundary>

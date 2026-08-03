@@ -88,17 +88,18 @@ export function AgentActivationSwitch(props: {
       aria-label={title}
       disabled={disabled}
       onClick={disabled ? undefined : onToggle}
-      className={`relative h-5 w-9 shrink-0 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
+      className={`relative h-7 w-12 shrink-0 rounded-full border transition-[background-color,border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
         checked
-          ? "bg-sky-500"
+          ? "border-sky-500 bg-sky-500 shadow-inner"
           : disabled
-            ? "bg-muted-foreground/15"
-            : "bg-muted-foreground/20 hover:bg-muted-foreground/30"
+            ? "border-border/55 bg-muted/65"
+            : "border-border bg-muted-foreground/[0.28] hover:bg-muted-foreground/[0.36]"
       } ${disabled ? "cursor-not-allowed opacity-60" : ""} ${className ?? ""}`}
     >
       <span
-        className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-          checked ? "translate-x-4" : "translate-x-0"
+        aria-hidden="true"
+        className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.32)] transition-transform duration-150 ${
+          checked ? "translate-x-5" : "translate-x-0"
         }`}
       />
     </button>

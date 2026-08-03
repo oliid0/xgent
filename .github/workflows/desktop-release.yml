@@ -543,6 +543,10 @@ jobs:
         working-directory: crates/fronted
         run: pnpm tauri android init --ci
 
+      - name: Apply and verify XAgent Android project resources
+        working-directory: crates/fronted
+        run: node ../../scripts/mobile/apply-android-project-overrides.mjs src-tauri
+
       - name: Build unsigned release APK
         working-directory: crates/fronted
         run: pnpm tauri android build --ci --apk --target aarch64 --target x86_64 --config "$XAGENT_TAURI_VERSION_CONFIG"

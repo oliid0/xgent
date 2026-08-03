@@ -85,6 +85,12 @@ export function listExternalMobileWorkspaces() {
   return invoke<ExternalMobileWorkspace[]>(`${PLUGIN_COMMAND}list_external_workspaces`);
 }
 
+export function pickExternalMobileWorkspace(allowWrite = true) {
+  return invoke<ExternalMobileWorkspace>(`${PLUGIN_COMMAND}pick_external_workspace`, {
+    request: { allowWrite },
+  });
+}
+
 export function removeExternalMobileWorkspace(id: string) {
   return invoke<{ removed: boolean }>(`${PLUGIN_COMMAND}remove_external_workspace`, {
     request: { id },

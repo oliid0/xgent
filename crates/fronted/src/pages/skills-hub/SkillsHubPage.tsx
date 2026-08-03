@@ -132,9 +132,8 @@ function readFileAsBase64(file: File): Promise<string> {
 const STORE_SORT_OPTIONS: Array<{ value: ClawHubSort; labelKey: string }> = [
   { value: "downloads", labelKey: "settings.skillsStoreSortMostDownloaded" },
   { value: "stars", labelKey: "settings.skillsStoreSortMostStarred" },
-  { value: "installs", labelKey: "settings.skillsStoreSortMostInstalled" },
+  { value: "trending", labelKey: "settings.skillsStoreSortTrending" },
   { value: "updated", labelKey: "settings.skillsStoreSortRecentlyUpdated" },
-  { value: "newest", labelKey: "settings.skillsStoreSortNewest" },
 ];
 
 const INSTALLED_SORT_OPTIONS: Array<{ value: InstalledSkillSort; labelKey: string }> = [

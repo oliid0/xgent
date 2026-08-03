@@ -1,6 +1,6 @@
 import { hubFetch } from "../hubFetch";
 
-export type ClawHubSort = "downloads" | "stars" | "installs" | "updated" | "newest";
+export type ClawHubSort = "downloads" | "stars" | "updated" | "trending";
 
 export type ClawHubSkillCard = {
   slug: string;
@@ -51,6 +51,14 @@ function asNullableNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function asTimestamp(value: unknown): number | null {
+  const numeric = asNullableNumber(value);
+  if (numeric !== null) return numeric;
+  if (typeof value !== "string" || !value.trim()) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.map((item) => asString(item)).filter((item): item is string => Boolean(item))
@@ -84,7 +92,10 @@ export function normalizeClawHubSkillCard(raw: unknown): ClawHubSkillCard | null
     summary: asString(item.summary) ?? "",
     topics: asStringArray(item.topics),
     latestVersion:
-      asString(latestVersion.version) ?? asString(tags.latest) ?? asString(item.version),
+      asString(latestVersion.version) ??
+      asString(item.latestVersion) ??
+      asString(tags.latest) ??
+      asString(item.version),
     downloads: asNullableNumber(item.downloads) ?? asNullableNumber(stats.downloads) ?? 0,
     stars: asNullableNumber(item.stars) ?? asNullableNumber(stats.stars) ?? 0,
     installsCurrent:
@@ -93,7 +104,7 @@ export function normalizeClawHubSkillCard(raw: unknown): ClawHubSkillCard | null
       asNullableNumber(stats.installsCurrent) ??
       asNullableNumber(stats.installs) ??
       0,
-    updatedAt: asNullableNumber(item.updatedAt),
+    updatedAt: asTimestamp(item.updatedAt),
     ownerHandle,
     webUrl: asString(item.webUrl) ?? buildClawHubWebUrl(ownerHandle, slug),
     downloadUrl: asString(item.downloadUrl) ?? buildClawHubDownloadUrl(slug, ownerHandle),
@@ -117,8 +128,8 @@ function normalizeSkillDetail(raw: unknown): ClawHubSkillDetail | null {
 
   return {
     ...card,
-    createdAt: asNullableNumber(item.createdAt),
-    latestVersionCreatedAt: asNullableNumber(latestVersion.createdAt),
+    createdAt: asTimestamp(item.createdAt),
+    latestVersionCreatedAt: asTimestamp(latestVersion.createdAt),
     latestVersionChangelog: asString(latestVersion.changelog),
     license: asString(latestVersion.license),
     ownerDisplayName: asString(owner.displayName),
@@ -126,7 +137,11 @@ function normalizeSkillDetail(raw: unknown): ClawHubSkillDetail | null {
     supportedOs: asStringArray(metadata.os),
     supportedSystems: asStringArray(metadata.systems),
     moderationStatus:
-      asString(moderation.status) ?? asString(moderation.result) ?? asString(moderation.state),
+      asString(moderation.status) ??
+      asString(moderation.result) ??
+      asString(moderation.state) ??
+      asString(payload.moderation) ??
+      asString(item.moderation),
   };
 }
 
@@ -168,9 +183,11 @@ export async function listClawHubSkills(params: {
     url.searchParams.set("cursor", params.cursor);
   }
 
-  const json = asRecord(await fetchClawHubJson(url));
-  const items = Array.isArray(json.items)
-    ? json.items
+  const raw = await fetchClawHubJson(url);
+  const json = asRecord(raw);
+  const rawItems = Array.isArray(raw) ? raw : json.items;
+  const items = Array.isArray(rawItems)
+    ? rawItems
         .map(normalizeClawHubSkillCard)
         .filter((item): item is ClawHubSkillCard => Boolean(item))
     : [];
@@ -189,9 +206,11 @@ export async function searchClawHubSkills(params: {
   url.searchParams.set("limit", String(params.limit ?? 24));
   url.searchParams.set("nonSuspiciousOnly", "true");
 
-  const json = asRecord(await fetchClawHubJson(url));
-  return Array.isArray(json.results)
-    ? json.results
+  const raw = await fetchClawHubJson(url);
+  const json = asRecord(raw);
+  const rawResults = Array.isArray(raw) ? raw : json.results;
+  return Array.isArray(rawResults)
+    ? rawResults
         .map(normalizeClawHubSkillCard)
         .filter((item): item is ClawHubSkillCard => Boolean(item))
     : [];
@@ -282,7 +301,6 @@ export async function getClawHubSkillDetail(
 export function buildClawHubDownloadUrl(slug: string, ownerHandle?: string | null) {
   const url = new URL("/api/v1/download", CLAWHUB_API_BASE);
   url.searchParams.set("slug", slug);
-  url.searchParams.set("tag", "latest");
   if (ownerHandle) {
     url.searchParams.set("ownerHandle", ownerHandle);
   }
