@@ -98,7 +98,10 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
         }
         worker.execute {
             runCatching {
-                installer.install()
+                val rootfs = installer.install()
+                verifyInstalledEnvironment()
+                readinessMarker().writeText("$READINESS_VERSION\n")
+                rootfs
             }
                 .onSuccess { rootfs ->
                     refreshInventoryBestEffort()
@@ -139,7 +142,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
         }
         val timeoutMs = (args.timeoutMs ?: TOOLCHAIN_INSTALL_TIMEOUT_MS)
             .coerceIn(MIN_TIMEOUT_MS, MAX_TOOLCHAIN_INSTALL_TIMEOUT_MS)
-        if (!File(rootfsDir, "sbin/apk").isFile) {
+        if (!environmentReady()) {
             invoke.reject("Install the bundled Alpine rootfs before adding toolchains")
             return
         }
@@ -293,7 +296,8 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
 
     private fun statusPayload(): JSObject {
         val binaries = ProotBinaries.resolve(File(activity.applicationInfo.nativeLibraryDir))
-        val rootfsInstalled = File(rootfsDir, "bin/sh").isFile
+        val rootfsPresent = File(rootfsDir, "bin/sh").isFile
+        val rootfsInstalled = rootfsPresent && environmentReady()
         val bashInstalled = File(rootfsDir, "bin/bash").isFile
         val installed = rootfsInstalled
         val bundledRootfs = installer.bundledRootfsStatus()
@@ -413,6 +417,44 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
             }
     }
 
+    private fun readinessMarker(): File = File(rootfsDir, READINESS_MARKER)
+
+    private fun environmentReady(): Boolean =
+        runCatching {
+            readinessMarker().takeIf { it.isFile }?.readText()?.trim() == READINESS_VERSION
+        }.getOrDefault(false)
+
+    private fun verifyInstalledEnvironment() {
+        readinessMarker().delete()
+        val workspace = File(backendDir, "install-probe").apply { mkdirs() }
+        require(workspace.isDirectory) { "could not create the PRoot verification workspace" }
+        val result = runner.execute(
+            AndroidRunRequest(
+                runId = "install-probe-${System.currentTimeMillis()}",
+                workdir = workspace.absolutePath,
+                command = "printf '$READINESS_TOKEN'",
+                cwd = "",
+                timeoutMs = INSTALL_PROBE_TIMEOUT_MS,
+                stdin = null,
+            ),
+        )
+        val diagnostics = result.stderr.trim().ifEmpty { result.stdout.trim() }
+        require(
+            result.exitCode == 0 &&
+                !result.timedOut &&
+                !result.cancelled &&
+                result.stdout == READINESS_TOKEN
+        ) {
+            buildString {
+                append("PRoot started but failed its Alpine shell verification")
+                append(" (exit=${result.exitCode}, abi=")
+                append(android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")
+                append(")")
+                if (diagnostics.isNotEmpty()) append(": ${diagnostics.take(2_000)}")
+            }
+        }
+    }
+
     private fun cancelledPayload(request: AndroidRunRequest): JSObject =
         AndroidRunResult(
             exitCode = -1,
@@ -454,6 +496,10 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
         private const val MAX_TOOLCHAIN_INSTALL_TIMEOUT_MS = 1_800_000L
         private const val MAX_STDIN_BYTES = 1024 * 1024
         private const val MAX_COMMAND_CHARS = 256 * 1024
+        private const val READINESS_MARKER = ".xagent-runtime-ready"
+        private const val READINESS_VERSION = "android-proot-alpine-v1"
+        private const val READINESS_TOKEN = "xagent-android-shell-ready"
+        private const val INSTALL_PROBE_TIMEOUT_MS = 15_000L
         private val RUN_ID_PATTERN = Regex("[A-Za-z0-9._-]{1,128}")
     }
 }

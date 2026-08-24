@@ -162,6 +162,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
           max_timeout_ms: 600_000,
           provider_id: null,
           run_id: id,
+          sandbox: false,
+          sandbox_allow_network: true,
         });
         if (!allowNonZero && exitCode(response) !== 0) {
           throw new Error(response.stderr.trim() || response.stdout.trim() || label);

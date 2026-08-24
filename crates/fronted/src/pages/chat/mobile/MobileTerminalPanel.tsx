@@ -226,6 +226,8 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           max_timeout_ms: 1_800_000,
           provider_id: null,
           run_id: id,
+          sandbox: false,
+          sandbox_allow_network: true,
         });
         setEntries((current) =>
           current.map((entry) => (entry.id === id ? { ...entry, response } : entry)),

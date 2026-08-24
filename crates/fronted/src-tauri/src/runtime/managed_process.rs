@@ -1083,6 +1083,7 @@ mod tests {
                 None,
                 Some("test process".to_string()),
                 false,
+                None,
             )
             .expect("process should start");
         let process_id = started.process.id.clone();
@@ -1126,6 +1127,7 @@ mod tests {
                     None,
                     Some("drop test process".to_string()),
                     false,
+                    None,
                 )
                 .expect("process should start");
             let pid = started.process.pid;
@@ -1151,6 +1153,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .expect("process should start");
         let pid = started.process.pid;
@@ -1184,6 +1187,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .expect("process should start");
         let pid = started.process.pid;
@@ -1216,6 +1220,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .expect("process should start");
         let pid = started.process.pid;
@@ -1245,6 +1250,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .expect("plain process should start");
         let isolated = registry
@@ -1254,6 +1260,7 @@ mod tests {
                 None,
                 None,
                 true,
+                None,
             )
             .expect("isolated process should start");
 
@@ -1286,6 +1293,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .expect("plain process should start");
             let isolated = registry
@@ -1295,6 +1303,7 @@ mod tests {
                     None,
                     Some("isolated service".to_string()),
                     true,
+                    None,
                 )
                 .expect("isolated process should start");
             let ids = (
@@ -1352,6 +1361,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .expect("short process should start");
         let running = registry
@@ -1361,6 +1371,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .expect("long process should start");
 

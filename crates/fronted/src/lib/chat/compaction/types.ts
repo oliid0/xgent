@@ -13,6 +13,7 @@ export type CompactionIntent = "optimization" | "protection";
 
 export type ProviderRuntimeConfig = {
   baseUrl: string;
+  isFullUrl: boolean;
   apiKey: string;
   authMode?: ProviderAuthMode;
   oauthAccountId?: string;

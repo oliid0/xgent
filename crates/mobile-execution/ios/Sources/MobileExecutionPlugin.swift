@@ -179,6 +179,9 @@ private func iosToolchainPayload(
 
 final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private let installationPreferenceKey = "xagent.mobileExecution.iosShellInstalled"
+    private let installationVerificationKey = "xagent.mobileExecution.iosShellVerification"
+    private let installationVerificationVersion = "ios-a-shell-v1"
+    private let installationProbeToken = "xagent-ios-shell-ready"
     private let executionQueue = DispatchQueue(label: "com.ohi.xagent.mobile-execution")
     private let stateLock = NSLock()
     private let initializationLock = NSLock()
@@ -227,13 +230,58 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
 
     @objc func install(_ invoke: Invoke) throws {
         _ = try invoke.parseArgs(InstallArgs.self)
-        try initializeBackendIfNeeded()
-        UserDefaults.standard.set(true, forKey: installationPreferenceKey)
-        invoke.resolve([
-            "backend": "ios-a-shell",
-            "installed": true,
-            "detail": "The iOS execution backend is bundled with XAgent",
-        ])
+        executionQueue.async { [weak self] in
+            guard let self else {
+                invoke.reject("The mobile execution backend is unavailable")
+                return
+            }
+            do {
+                try self.initializeBackendIfNeeded()
+                let workspace = try self.installationProbeWorkspace()
+                let request = RunArgs(
+                    runId: "install-probe",
+                    workdir: workspace.path,
+                    command: "echo \(self.installationProbeToken)",
+                    cwd: nil,
+                    timeoutMs: 15_000,
+                    stdinBase64: nil,
+                    wasi: nil
+                )
+                let result = try self.executeShell(
+                    request,
+                    workspace: workspace,
+                    cwd: workspace,
+                    stdin: nil
+                )
+                let output = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard result.exitCode == 0,
+                      !result.timedOut,
+                      !result.cancelled,
+                      output == self.installationProbeToken else {
+                    let diagnostics = result.stderr
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    throw MobileExecutionError.io(
+                        "a-Shell started but failed its command verification "
+                            + "(exit=\(result.exitCode))"
+                            + (diagnostics.isEmpty ? "" : ": \(diagnostics.prefix(2_000))")
+                    )
+                }
+                UserDefaults.standard.set(true, forKey: self.installationPreferenceKey)
+                UserDefaults.standard.set(
+                    self.installationVerificationVersion,
+                    forKey: self.installationVerificationKey
+                )
+                invoke.resolve([
+                    "backend": "ios-a-shell",
+                    "installed": true,
+                    "detail": "The bundled iOS shell executed its installation verification command successfully",
+                ])
+            } catch {
+                UserDefaults.standard.set(false, forKey: self.installationPreferenceKey)
+                UserDefaults.standard.removeObject(forKey: self.installationVerificationKey)
+                invoke.reject("iOS shell installation failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     @objc func installToolchains(_ invoke: Invoke) throws {
@@ -564,6 +612,31 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
 
     private var environmentInstalled: Bool {
         UserDefaults.standard.bool(forKey: installationPreferenceKey)
+            && UserDefaults.standard.string(forKey: installationVerificationKey)
+                == installationVerificationVersion
+    }
+
+    private func installationProbeWorkspace() throws -> URL {
+        guard let applicationSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
+            throw MobileExecutionError.io("Could not locate iOS application support storage")
+        }
+        let workspace = applicationSupport
+            .appendingPathComponent("mobile-execution", isDirectory: true)
+            .appendingPathComponent("install-probe", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(
+                at: workspace,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            throw MobileExecutionError.io(
+                "Could not create the iOS shell verification workspace: \(error.localizedDescription)"
+            )
+        }
+        return try resolveWorkspace(workspace.path)
     }
 
     private func bundledBackendAvailable() -> Bool {
