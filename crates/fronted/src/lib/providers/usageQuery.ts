@@ -6,7 +6,7 @@ import {
   type UsageQueryProvider,
   useProviderUsageWithQuery,
 } from "./usageQueryCore";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@xagent/runtime";
 import type { UsageQueryConfig } from "../settings";
 
 export * from "./usageQueryCore";

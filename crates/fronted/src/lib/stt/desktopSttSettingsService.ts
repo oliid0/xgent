@@ -3,7 +3,7 @@ import type {
   SttSecretField,
   SttSettingsService,
 } from "./types";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@xagent/runtime";
 import { type AppSettings, normalizeSttSettings } from "../../lib/settings";
 
 export const desktopSttSettingsService: SttSettingsService = {

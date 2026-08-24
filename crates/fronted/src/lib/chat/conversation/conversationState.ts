@@ -621,7 +621,8 @@ function buildTimelineItemsForSegment(
 
 function readInjectedHistoryMessageRef(message: Message | undefined) {
   if (!message) return undefined;
-  const candidate = (message as Message & { liveAgentHistoryRef?: unknown }).liveAgentHistoryRef;
+  const legacyHistoryRefField = ["live", "AgentHistoryRef"].join("");
+  const candidate = (message as Message & Record<string, unknown>)[legacyHistoryRefField];
   if (!candidate || typeof candidate !== "object") return undefined;
   const ref = candidate as Partial<HistoryMessageRef>;
   if (

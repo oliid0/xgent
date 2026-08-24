@@ -320,7 +320,7 @@ export function useConversationHistoryActions(params: UseConversationHistoryActi
         includeActiveSegment: false,
       });
       if (page.oldestOffset >= transcript.oldestMessageOffset) {
-        throw new Error("鍘嗗彶鍒嗛〉娓告爣鏈悜鍓嶆帹杩?);
+        throw new Error("历史分页游标未向前推进");
       }
       const projection = createTranscriptProjection({
         segments: page.segments,

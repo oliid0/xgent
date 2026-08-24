@@ -57,7 +57,18 @@ jobs:
 
       - name: Typecheck and build Web frontend
         working-directory: crates/fronted
-        run: pnpm build:web
+        shell: bash
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/frontend-build.log"
+          if ! pnpm build:web 2>&1 | tee "$log"; then
+            message="$(tail -n 160 "$log")"
+            message="${message//'%'/'%25'}"
+            message="${message//$'\r'/'%0D'}"
+            message="${message//$'\n'/'%0A'}"
+            echo "::error file=crates/fronted/package.json,line=1,title=Frontend build failed::$message"
+            exit 1
+          fi
 
       - name: Lint unified frontend
         id: frontend_lint
@@ -121,6 +132,8 @@ jobs:
     name: Tauri Rust Check
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
 
@@ -142,7 +155,18 @@ jobs:
       - name: Check Tauri backend tests
         env:
           CARGO_TERM_COLOR: always
-        run: cargo check --manifest-path crates/fronted/src-tauri/Cargo.toml --tests
+        shell: bash
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/tauri-check.log"
+          if ! cargo check --manifest-path crates/fronted/src-tauri/Cargo.toml --tests 2>&1 | tee "$log"; then
+            message="$(tail -n 200 "$log")"
+            message="${message//'%'/'%25'}"
+            message="${message//$'\r'/'%0D'}"
+            message="${message//$'\n'/'%0A'}"
+            echo "::error file=crates/fronted/src-tauri/Cargo.toml,line=1,title=Tauri Rust check failed::$message"
+            exit 1
+          fi
 
       # Local toolchains are intentionally not required for this repository.
       # Upload Cargo's resolved lockfile so dependency changes discovered by
@@ -155,6 +179,17 @@ jobs:
           path: Cargo.lock
           if-no-files-found: error
           retention-days: 1
+
+      - name: Persist resolved Cargo lockfile on main
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- Cargo.lock
+          if ! git diff --cached --quiet; then
+            git commit -m "build: refresh Cargo lockfile"
+            git push
+          fi
 
       - name: Test Tauri history migrations
         env:
@@ -172,7 +207,18 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Check single-frontend boundaries
-        run: node scripts/check-architecture.mjs
+        shell: bash
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/architecture.log"
+          if ! node scripts/check-architecture.mjs 2>&1 | tee "$log"; then
+            message="$(tail -n 120 "$log")"
+            message="${message//'%'/'%25'}"
+            message="${message//$'\r'/'%0D'}"
+            message="${message//$'\n'/'%0A'}"
+            echo "::error file=scripts/check-architecture.mjs,line=1,title=Architecture guard failed::$message"
+            exit 1
+          fi
 
   whitespace:
     name: Diff Hygiene

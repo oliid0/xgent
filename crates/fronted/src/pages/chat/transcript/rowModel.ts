@@ -114,7 +114,9 @@ export type TranscriptRowsSnapshot = {
 
 export type LiveTailInput = LiveTranscriptState & {
   isSending: boolean;
-  // 鎵嬪姩鍘嬬缉绌洪棽鎬侊細live store 鍙疆 running銆佷笉缃?isSending锛屼絾浠嶈鏄剧ず銆屾鍦?  // 鍘嬬缉銆嶇姸鎬佽銆傝鏍囪鍙苟鍏?live tail 鍙鎬?gate锛屼笉鏀瑰彉鍏朵粬 isSending 璇箟銆?  isCompactionRunning?: boolean;
+  // 手动压缩空闲态：live store 只置 running、不置 isSending，但仍要显示「正在
+  // 压缩」状态行。该标记只并入 live tail 可见性 gate，不改变其他 isSending 语义。
+  isCompactionRunning?: boolean;
 };
 
 function buildReplyText(rounds: (UiRound | LiveRound)[]): string {
@@ -602,19 +604,28 @@ export function createTranscriptRowModel(options?: TranscriptRowModelOptions): T
         settlingUnits: null,
       };
     } else if (!liveTailVisible && activeTurn) {
-      // 钀藉畾浜ゆ帴锛氫涪寮?activeTurn 鐨勫垽鎹槸銆屽巻鍙茶嚜 historyLenAtStart 璧锋湁娌℃湁
-      // 鏂板鐨勩€佸皻鏈璁ら鐨?assistant 瀛敓椤广€嶁€斺€攁doptSettledTwin 鐨勮繑鍥炲€兼鏄?      // 杩欎釜鍒ゆ嵁锛堣棰嗘垚鍔?鈬?绐楀彛鍐呮湁鍙鍏诲鐢熼」锛夈€備笉鑳芥敼鐢ㄣ€宭ive 鍗曞厓閲屾湁娌℃湁
-      // 鍙 block銆嶏細瀛樺湪闆跺彲瑙?block 鍗存湁鐪熷疄瀛敓琛岀殑 turn鈥斺€旇鍙栨秷鐨?run 浼?      // 鎸佷箙鍖栦腑姝㈡彁绀?assistant 椤癸紱浠呰緭鍑?Task 宸ュ叿鐨?run 鍏跺潡琚?      // isVisibleGroupedBlock 鍏ㄩ儴杩囨护銆傝繖绫?turn 鑻ヨ璇垽涓㈠純锛屽鐢熻姘镐笉琚鍏?      // 鈫?浠ュ叏鏂?key 閲嶆寕杞斤紙杩濆弽闆?remount锛夛紝persist 婊炲悗鏃舵洿浼氭紡杩涗笅涓€涓?run 鐨?      // historyLenAtStart 绐楀彛琚敊浣嶈棰嗐€?      const adopted = adoptSettledTwin(historyItems, activeTurn);
+      // 落定交接：丢弃 activeTurn 的判据是「历史自 historyLenAtStart 起有没有
+      // 新增的、尚未被认领的 assistant 孪生项」——adoptSettledTwin 的返回值正是
+      // 这个判据（认领成功 ⇔ 窗口内有可领养孪生项）。不能改用「live 单元里有没有
+      // 可见 block」：存在零可见 block 却有真实孪生行的 turn——被取消的 run 会
+      // 持久化中止提示 assistant 项；仅输出 Task 工具的 run 其块被
+      // isVisibleGroupedBlock 全部过滤。这类 turn 若被误判丢弃，孪生行永不被领养
+      // → 以全新 key 重挂载（违反零 remount），persist 滞后时更会漏进下一个 run 的
+      // historyLenAtStart 窗口被错位认领。
+      const adopted = adoptSettledTwin(historyItems, activeTurn);
       if (adopted) {
         activeTurn = null;
       } else if (activeTurn.lastLiveUnits.some((row) => row.unit.kind === "block")) {
-        // 浜у嚭杩囧唴瀹?鉄?鐪熷疄鍥炲蹇呭皢鎸佷箙鍖栵細瀛敓琛屽皻鏈惤搴擄紙persist 婊炲悗锛夋椂
-        // 鐧昏 pendingSettle锛屽緟鍏惰惤搴撳悗鎸夊悓涓€ replyKey 璁ら锛堥浂 remount锛夈€?        pendingSettle = {
+        // 产出过内容 ⟹ 真实回复必将持久化：孪生行尚未落库（persist 滞后）时
+        // 登记 pendingSettle，待其落库后按同一 replyKey 认领（零 remount）。
+        pendingSettle = {
           replyKey: activeTurn.replyKey,
           historyLenAtStart: activeTurn.historyLenAtStart,
         };
       } else {
-        // 鏃㈡病浜у嚭鍐呭銆佸巻鍙蹭篃娌℃湁鍙鍏诲鐢熼」锛堢┖闂叉墜鍔ㄥ帇缂╄惤瀹氭垚妫€鏌ョ偣鍗＄墖銆?        // 鎴栦骇鍑哄墠鍗宠鍙栨秷鐨?run锛夆啋 鐩存帴娓呮帀锛岄伩鍏嶅簳閮ㄧ暀涓嬪喕缁撶殑 settling 鐘舵€佽銆?        activeTurn = null;
+        // 既没产出内容、历史也没有可领养孪生项（空闲手动压缩落定成检查点卡片、
+        // 或产出前即被取消的 run）→ 直接清掉，避免底部留下冻结的 settling 状态行。
+        activeTurn = null;
       }
     } else if (!liveTailVisible && pendingSettle) {
       if (adoptSettledTwin(historyItems, pendingSettle)) pendingSettle = null;

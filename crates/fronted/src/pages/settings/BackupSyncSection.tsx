@@ -24,7 +24,7 @@ import {
 } from "../../components/ui/select";
 import { Switch } from "../../components/ui/switch";
 import { useLocale } from "../../i18n";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "@xagent/runtime";
 import { useCallback, useEffect, useState } from "react";
 import {
   applyBackupImport,

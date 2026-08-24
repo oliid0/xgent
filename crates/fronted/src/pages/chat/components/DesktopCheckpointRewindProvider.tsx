@@ -6,7 +6,7 @@ import {
   type CheckpointRewoundInfo,
   type CheckpointTurnSummary,
 } from "../../../lib/chat/checkpointRewind";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@xagent/runtime";
 import { type ReactNode, useCallback } from "react";
 import type { WorkspaceProject } from "../../../lib/settings";
 import { listWorkspaceRootGrants } from "../../../lib/workspaceRootGrants";

@@ -3,11 +3,10 @@ import type {
   SttTransport,
   SttTransportOpenOptions,
 } from "./types";
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke, listen, type RuntimeUnlisten } from "@xagent/runtime";
 
 class DesktopSttTransport implements SttTransport {
-  private unlisten: UnlistenFn | null = null;
+  private unlisten: RuntimeUnlisten | null = null;
   private handler: ((event: SttRuntimeEvent) => void) | null = null;
   async requestPermission() {
     await invoke("stt_request_microphone_permission");

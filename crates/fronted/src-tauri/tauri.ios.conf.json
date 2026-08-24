@@ -16,7 +16,7 @@
     "iOS": {
       "minimumSystemVersion": "14.0",
       "infoPlist": "Info.ios.plist",
-      "template": "src-tauri/ios.project.yml"
+      "template": "ios.project.yml"
     }
   }
 }

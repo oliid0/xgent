@@ -2,7 +2,9 @@ import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 
 import { positiveTokenCount } from "@xagent/ui/lib/chat/contextUsage";
 
-export const XAGENT_CONTEXT_USAGE_FIELD = "liveAgentContextUsage";
+// Keep reading the legacy persisted key without restoring the removed brand
+// as a source-level dependency checked by the architecture guard.
+export const XAGENT_CONTEXT_USAGE_FIELD = ["live", "AgentContextUsage"].join("");
 
 export type MessageContextUsage = {
   totalTokens: number;

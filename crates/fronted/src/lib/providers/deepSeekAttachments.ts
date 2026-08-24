@@ -4,7 +4,7 @@ import {
   type PendingUploadedFile,
   parsePastedTextDisplayReferences,
 } from "@xagent/ui/lib/chat/uploadedFiles";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@xagent/runtime";
 
 type NativeAttachmentCommandResponse = {
   mimeType: string;

@@ -704,11 +704,33 @@ jobs:
 
       - name: Initialize Tauri iOS project
         working-directory: crates/fronted
-        run: pnpm tauri ios init --ci
+        shell: bash
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/ios-init.log"
+          if ! pnpm tauri ios init --ci 2>&1 | tee "$log"; then
+            message="$(tail -n 200 "$log")"
+            message="${message//'%'/'%25'}"
+            message="${message//$'\r'/'%0D'}"
+            message="${message//$'\n'/'%0A'}"
+            echo "::error file=crates/fronted/src-tauri/ios.project.yml,line=1,title=iOS project initialization failed::$message"
+            exit 1
+          fi
 
       - name: Build unsigned iOS IPA
         working-directory: crates/fronted
-        run: pnpm tauri ios build --ci --no-sign --target aarch64 --build-number "${{ github.run_number }}" --config "$XAGENT_TAURI_VERSION_CONFIG"
+        shell: bash
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/ios-build.log"
+          if ! pnpm tauri ios build --ci --no-sign --target aarch64 --build-number "${{ github.run_number }}" --config "$XAGENT_TAURI_VERSION_CONFIG" 2>&1 | tee "$log"; then
+            message="$(tail -n 240 "$log")"
+            message="${message//'%'/'%25'}"
+            message="${message//$'\r'/'%0D'}"
+            message="${message//$'\n'/'%0A'}"
+            echo "::error file=crates/fronted/src-tauri/tauri.ios.conf.json,line=1,title=iOS IPA build failed::$message"
+            exit 1
+          fi
 
       - name: Stage and inspect IPA
         run: |

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@xagent/runtime";
 import type { WorkspaceProject } from "./settings";
 import { isWindowsDrivePath, normalizeComparablePath } from "./tools/pathNormalization";
 

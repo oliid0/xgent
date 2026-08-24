@@ -16,7 +16,7 @@ import { readMessageContextUsage, writeAssistantContextUsage } from "./contextUs
 // 这里 re-export 文本估算保持既有调用方与测试不动。
 export { estimateTextTokens, estimateTextTokenUnits };
 
-// liveAgentContextUsage 印章的不变量：totalTokens 只记录 usage 派生的权威值
+// 兼容上下文用量印章的不变量：totalTokens 只记录 usage 派生的权威值
 //（fixedTokens 随印章携带，供跨端 rebase 补偿 system/tools 开销变化），绝不写
 // 估算——印章随会话持久化且读取侧优先于 usage，一旦写入估算便永久遮蔽后到的
 // 真实读数，且没有任何纠正路径。
