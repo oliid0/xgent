@@ -563,8 +563,8 @@ mod tests {
         .expect("apply patch");
 
         assert_eq!(
-            response.conflict.as_deref(),
-            Some(SSH_SYNC_CONFLICT_MESSAGE)
+            response.conflict,
+            Some(SshPatchConflictCode::SettingsChanged)
         );
         assert_eq!(response.ssh["hosts"][0]["name"], "Prod New");
     }
@@ -648,8 +648,8 @@ mod tests {
         .expect("apply patch");
 
         assert_eq!(
-            response.conflict.as_deref(),
-            Some(SSH_SYNC_CONFLICT_MESSAGE)
+            response.conflict,
+            Some(SshPatchConflictCode::SettingsChanged)
         );
     }
 
