@@ -551,9 +551,7 @@ export function normalizeModelFailoverSettings(
   const source = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const normalizeProvider = (providerId: ProviderId): ModelFailoverProviderSettings => {
     const raw = (
-      source[providerId] && typeof source[providerId] === "object"
-        ? source[providerId]
-        : {}
+      source[providerId] && typeof source[providerId] === "object" ? source[providerId] : {}
     ) as Record<string, unknown>;
     const eligibleIds = new Set(
       providers.filter((provider) => provider.type === providerId).map((provider) => provider.id),
@@ -932,9 +930,10 @@ function normalizeWorkspaceProjectGroups(input: unknown): WorkspaceProjectGroup[
 function normalizeWorkspaceResourceSettings(
   input: unknown,
 ): Record<string, WorkspaceResourceSetting> {
-  const raw = (
-    input && typeof input === "object" && !Array.isArray(input) ? input : {}
-  ) as Record<string, unknown>;
+  const raw = (input && typeof input === "object" && !Array.isArray(input) ? input : {}) as Record<
+    string,
+    unknown
+  >;
   const settings: Record<string, WorkspaceResourceSetting> = {};
   const canonicalKeys = new Set<string>();
   for (const [rawPath, value] of Object.entries(raw)) {
@@ -1606,10 +1605,7 @@ export function normalizeCustomProvider(input: unknown): CustomProvider {
   const type = normalizeProviderId(obj.type);
   const codexRouting =
     type === "codex" || type === "xai"
-      ? normalizeCodexRouting(
-          obj.baseUrl,
-          type === "xai" ? "openai-responses" : obj.requestFormat,
-        )
+      ? normalizeCodexRouting(obj.baseUrl, type === "xai" ? "openai-responses" : obj.requestFormat)
       : undefined;
   const models = normalizeProviderModelConfigs(obj.models, type);
   const validModelIds = new Set(models.map((model) => model.id));
@@ -1625,9 +1621,7 @@ export function normalizeCustomProvider(input: unknown): CustomProvider {
       : normalizeBaseUrl(typeof obj.baseUrl === "string" ? obj.baseUrl : ""),
     isFullUrl: obj.isFullUrl === true,
     modelsUrl:
-      typeof obj.modelsUrl === "string" && obj.modelsUrl.trim()
-        ? obj.modelsUrl.trim()
-        : undefined,
+      typeof obj.modelsUrl === "string" && obj.modelsUrl.trim() ? obj.modelsUrl.trim() : undefined,
     apiKey,
     apiKeyConfigured: apiKey.length > 0 || obj.apiKeyConfigured === true,
     authMode:
@@ -2709,9 +2703,13 @@ export function updateWorkspaceResourceSettings(
   const next: WorkspaceResourceSetting = {
     mode,
     skillNames:
-      mode === "custom" ? Array.from(new Set(draft.skillNames.map((name) => name.trim()).filter(Boolean))) : [],
+      mode === "custom"
+        ? Array.from(new Set(draft.skillNames.map((name) => name.trim()).filter(Boolean)))
+        : [],
     mcpServerIds:
-      mode === "custom" ? Array.from(new Set(draft.mcpServerIds.map((id) => id.trim()).filter(Boolean))) : [],
+      mode === "custom"
+        ? Array.from(new Set(draft.mcpServerIds.map((id) => id.trim()).filter(Boolean)))
+        : [],
     stateVersion: (current?.stateVersion ?? 0) + 1,
     writerId: current?.writerId || createUuid(),
     updatedAt: Date.now(),

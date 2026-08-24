@@ -8,11 +8,11 @@ import { ChatHistorySidebar } from "../../../components/chat/ChatHistorySidebar"
 import type { WorkspaceToolTarget } from "../../../components/project-tools/workspaceToolsModel";
 import { useLocale } from "../../../i18n";
 import type { AppUpdateController } from "../../../lib/appUpdates";
-import { normalizeConversationTitle } from "../../../lib/chat/page/chatPageHelpers";
 import {
   type ChatHistorySearchMatch,
   searchChatHistory,
 } from "../../../lib/chat/history/chatHistory";
+import { normalizeConversationTitle } from "../../../lib/chat/page/chatPageHelpers";
 import type { WorkspaceProject, WorkspaceProjectGroup } from "../../../lib/settings";
 import {
   selectConversations,
@@ -111,9 +111,7 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
   const [renameDraft, setRenameDraft] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ChatHistorySearchMatch[]>([]);
-  const [searchStatus, setSearchStatus] = useState<"idle" | "loading" | "ready" | "error">(
-    "idle",
-  );
+  const [searchStatus, setSearchStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   useEffect(() => {
     const query = searchQuery.trim();

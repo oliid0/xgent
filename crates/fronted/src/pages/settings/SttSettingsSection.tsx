@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Check, Loader2, Mic } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
@@ -6,10 +7,9 @@ import {
   type SttProviderId,
   type SttProviderSettings,
 } from "../../lib/settings";
+import { cn } from "../../lib/shared/utils";
 import { desktopSttSettingsService } from "../../lib/stt/desktopSttSettingsService";
 import type { SttSecretField } from "../../lib/stt/types";
-import { cn } from "../../lib/shared/utils";
-import { useState } from "react";
 import type { SettingsSectionProps } from "./types";
 
 const PROVIDER_LABELS: Record<SttProviderId, string> = {
@@ -145,7 +145,9 @@ export function SttSettingsSection({ settings, setSettings }: SettingsSectionPro
             const next = event.target.value as SttProviderId;
             if (!STT_PROVIDER_IDS.includes(next)) return;
             setTestResult(null);
-            setSettings((prev) => normalizeSettings({ ...prev, stt: { ...prev.stt, provider: next } }));
+            setSettings((prev) =>
+              normalizeSettings({ ...prev, stt: { ...prev.stt, provider: next } }),
+            );
           }}
           className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-rose-500/50"
         >
@@ -182,11 +184,17 @@ export function SttSettingsSection({ settings, setSettings }: SettingsSectionPro
             onClick={() => void testConnection()}
             className="inline-flex h-9 items-center gap-2 rounded-xl bg-foreground px-3 text-xs font-medium text-background disabled:opacity-50"
           >
-            {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+            {testing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Check className="h-3.5 w-3.5" />
+            )}
             {t("settings.stt.test")}
           </button>
           {testResult ? (
-            <span className={cn("text-xs", testResult.ok ? "text-emerald-600" : "text-destructive")}>
+            <span
+              className={cn("text-xs", testResult.ok ? "text-emerald-600" : "text-destructive")}
+            >
               {testResult.message}
             </span>
           ) : null}

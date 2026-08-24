@@ -1,9 +1,9 @@
 import { memo, useMemo } from "react";
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
 import { CloudArtifactsCard } from "../../../components/chat/CloudArtifactsCard";
+import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { HistoryMessageRef } from "../../../lib/chat/conversation/conversationState";
 import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
-import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import { collectChangedFiles } from "../../../lib/chat/messages/changedFiles";
 import { collectCloudArtifacts } from "../../../lib/chat/messages/cloudArtifacts";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
@@ -49,7 +49,11 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
     <div className={cn("group/assistant w-full max-w-full", compacted && "opacity-70")}>
       {hasCards ? (
         <div className="flex w-full max-w-full items-start gap-3">
-          {showAvatar ? <AssistantAvatar /> : <div aria-hidden="true" className="h-7 w-7 shrink-0" />}
+          {showAvatar ? (
+            <AssistantAvatar />
+          ) : (
+            <div aria-hidden="true" className="h-7 w-7 shrink-0" />
+          )}
           <div className={cn("min-w-0 flex-1 space-y-2", showAvatar ? "pt-0.5" : "")}>
             {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
             {cloudArtifacts.length > 0 ? <CloudArtifactsCard artifacts={cloudArtifacts} /> : null}

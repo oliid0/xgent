@@ -1,9 +1,9 @@
 import { Tooltip } from "@base-ui/react";
 import {
   memo,
-  type RefObject,
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
+  type RefObject,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -66,11 +66,11 @@ import {
   type ReasoningLevel,
   type SttSettings,
 } from "../../../lib/settings";
-import {
-  startDesktopSttCapture,
-  type DesktopSttCapture,
-} from "../../../lib/stt/desktopAudioCapture";
 import { cn } from "../../../lib/shared/utils";
+import {
+  type DesktopSttCapture,
+  startDesktopSttCapture,
+} from "../../../lib/stt/desktopAudioCapture";
 import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
 
 const REASONING_I18N_KEYS: Record<ReasoningLevel, string> = {
@@ -145,9 +145,7 @@ function ContextUsageIndicator(props: {
   const percent = Math.round(ratio * 100);
   const color = ratio >= 0.9 ? "#ef4444" : ratio >= 0.7 ? "#f59e0b" : "#10b981";
   const usageLabel = `${t("chat.contextUsage")}: ${formatCompactTokens(tokens)} / ${formatCompactTokens(contextWindow)} tokens (${percent}%)`;
-  const label = props.onManualCompact
-    ? `${usageLabel} · ${t("chat.manualCompact")}`
-    : usageLabel;
+  const label = props.onManualCompact ? `${usageLabel} · ${t("chat.manualCompact")}` : usageLabel;
 
   const indicator = (
     <>
@@ -1009,7 +1007,8 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
               {voiceInputAvailable ? (
                 <RuntimeControlTooltip
                   label={
-                    voiceInputError ?? voiceInputPartial ??
+                    voiceInputError ??
+                    voiceInputPartial ??
                     (voiceInputActive
                       ? t("chat.composer.voiceListening")
                       : t("chat.composer.voiceInput"))

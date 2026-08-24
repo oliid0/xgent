@@ -12,6 +12,7 @@
 // answerPlanDecision(approve → 宿主批准 handler;reject → 反馈作为消息发送)。
 
 import type { Message, Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import { ASK_USER_QUESTION_TOOL_NAME } from "../chat/askUserQuestion";
 import {
   EXIT_PLAN_MODE_TOOL_NAME,
@@ -19,7 +20,6 @@ import {
   resolvePlanDecisionAnswer,
   sanitizePlanMarkdown,
 } from "../chat/planMode";
-import { Type } from "typebox";
 import type { ToolChoice } from "../providers/runtime/types";
 import { AGENT_TOOL_NAME, SEND_MESSAGE_TOOL_NAME } from "../subagents/types";
 import {

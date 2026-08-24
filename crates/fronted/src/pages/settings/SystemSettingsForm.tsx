@@ -591,9 +591,7 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
                 <AgentActivationSwitch
                   checked={trayPrefs.showRunningBadge}
                   title={t("settings.trayRunningBadge")}
-                  onToggle={() =>
-                    writeTrayPrefs({ showRunningBadge: !trayPrefs.showRunningBadge })
-                  }
+                  onToggle={() => writeTrayPrefs({ showRunningBadge: !trayPrefs.showRunningBadge })}
                 />
               </SettingsRow>
             ) : null}

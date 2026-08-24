@@ -34,7 +34,10 @@ export type RawSshLocalForwardAction = unknown;
 export type RawSshLocalForwardEvent = unknown;
 
 export type SshLocalForwardClient = {
-  list: (params?: { sessionId?: string; projectPathKey?: string }) => Promise<SshLocalForwardSnapshot>;
+  list: (params?: {
+    sessionId?: string;
+    projectPathKey?: string;
+  }) => Promise<SshLocalForwardSnapshot>;
   start: (params: {
     sessionId: string;
     projectPathKey?: string;

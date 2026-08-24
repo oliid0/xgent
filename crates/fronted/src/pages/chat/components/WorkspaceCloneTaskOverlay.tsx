@@ -42,10 +42,17 @@ export function WorkspaceCloneTaskOverlay(props: { onOpenWorkspace: (path: strin
         const running = task.status === "running" || task.status === "cancelling";
         const completed = task.status === "completed";
         return (
-          <div key={task.id} className="rounded-2xl border bg-background/95 p-3 shadow-2xl backdrop-blur">
+          <div
+            key={task.id}
+            className="rounded-2xl border bg-background/95 p-3 shadow-2xl backdrop-blur"
+          >
             <div className="flex items-start gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
+                {running ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FolderOpen className="h-4 w-4" />
+                )}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold">{task.repositoryName}</div>
@@ -78,9 +85,15 @@ export function WorkspaceCloneTaskOverlay(props: { onOpenWorkspace: (path: strin
                   type="button"
                   disabled={task.status === "cancelling"}
                   className="mt-2 text-xs font-medium text-destructive disabled:opacity-50"
-                  onClick={() => void cancelGitClone(task.id).then((next) => setTasks((prev) => prev.map((item) => item.id === next.id ? next : item)))}
+                  onClick={() =>
+                    void cancelGitClone(task.id).then((next) =>
+                      setTasks((prev) => prev.map((item) => (item.id === next.id ? next : item))),
+                    )
+                  }
                 >
-                  {task.status === "cancelling" ? t("chat.clone.cancelling") : t("chat.clone.cancel")}
+                  {task.status === "cancelling"
+                    ? t("chat.clone.cancelling")
+                    : t("chat.clone.cancel")}
                 </button>
               </div>
             ) : completed ? (

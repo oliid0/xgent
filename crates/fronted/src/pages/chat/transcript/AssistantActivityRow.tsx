@@ -1,7 +1,7 @@
 import { memo } from "react";
+import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { HistoryMessageRef } from "../../../lib/chat/conversation/conversationState";
 import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
-import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
 import { AssistantRenderUnit } from "./AssistantRenderUnit";
 import type { AssistantActivityRow as AssistantActivityRowModel } from "./rowModel";

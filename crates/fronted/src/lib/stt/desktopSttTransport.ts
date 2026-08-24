@@ -1,9 +1,5 @@
-import type {
-  SttRuntimeEvent,
-  SttTransport,
-  SttTransportOpenOptions,
-} from "./types";
 import { invoke, listen, type RuntimeUnlisten } from "@xagent/runtime";
+import type { SttRuntimeEvent, SttTransport, SttTransportOpenOptions } from "./types";
 
 class DesktopSttTransport implements SttTransport {
   private unlisten: RuntimeUnlisten | null = null;

@@ -1,13 +1,21 @@
-import { Check, Copy, GitBranch, Loader2, Pencil, RefreshCw, Undo2 } from "../../../components/icons";
+import { useState } from "react";
+import {
+  Check,
+  Copy,
+  GitBranch,
+  Loader2,
+  Pencil,
+  RefreshCw,
+  Undo2,
+} from "../../../components/icons";
 import { ConfirmActionPopover } from "../../../components/ui/confirm-action-popover";
 import { useLocale } from "../../../i18n";
+import { useCheckpointRewind } from "../../../lib/chat/checkpointRewind";
 import type {
   HistoryMessageRef,
   RenderUserMessage,
 } from "../../../lib/chat/conversation/conversationState";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
-import { useCheckpointRewind } from "../../../lib/chat/checkpointRewind";
-import { useState } from "react";
 import { useRowInteraction } from "./rowInteraction";
 import { formatMessageTimestamp } from "./transcriptUtils";
 import { useCopiedFlag } from "./useCopiedFlag";

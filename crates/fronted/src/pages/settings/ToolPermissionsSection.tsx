@@ -1,15 +1,8 @@
 import { Shield } from "../../components/icons";
 import { useLocale } from "../../i18n";
-import {
-  type CommandSafetyMode,
-  type ToolPolicy,
-  updateSystem,
-} from "../../lib/settings";
-import {
-  BUILTIN_TOOL_CATALOG,
-  BUILTIN_TOOL_CATEGORIES,
-} from "../../lib/tools/builtinToolCatalog";
+import { type CommandSafetyMode, type ToolPolicy, updateSystem } from "../../lib/settings";
 import { cn } from "../../lib/shared/utils";
+import { BUILTIN_TOOL_CATALOG, BUILTIN_TOOL_CATEGORIES } from "../../lib/tools/builtinToolCatalog";
 import type { SettingsSectionProps } from "./types";
 
 const POLICY_OPTIONS: readonly ToolPolicy[] = ["allow", "ask", "deny"];

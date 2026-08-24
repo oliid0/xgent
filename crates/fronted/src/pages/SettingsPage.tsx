@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft,
   Archive,
+  ArrowLeft,
   BookOpen,
   Brain,
   Cable,
@@ -9,10 +9,10 @@ import {
   Clock3,
   Cloud,
   Cpu,
+  FolderTree,
   Info,
   Key,
   Keyboard,
-  FolderTree,
   Mic,
   Search,
   Settings2,
@@ -27,24 +27,24 @@ import {
 import { useLocale } from "../i18n";
 import { useCompactViewport } from "../lib/responsive/compactViewport";
 import { AboutSection } from "./settings/AboutSection";
-import { BackupSyncSection } from "./settings/BackupSyncSection";
 import { AccessSection } from "./settings/AccessSection";
+import { BackupSyncSection } from "./settings/BackupSyncSection";
 import { CronSection } from "./settings/CronSection";
-import { HooksSection } from "./settings/HooksSection";
 import { GlobalShortcutsSection } from "./settings/GlobalShortcutsSection";
+import { HooksSection } from "./settings/HooksSection";
 import { McpSettingsSection } from "./settings/McpSettingsSection";
 import { MobileAssistantSection } from "./settings/MobileAssistantSection";
 import { MobileExecutionSection } from "./settings/MobileExecutionSection";
-import { MemoryPanel } from "./settings/memory/MemoryPanel";
-import { ProvidersSection } from "./settings/ProvidersSection";
 import { ModelFailoverSection } from "./settings/ModelFailoverSection";
-import { ProviderUsageSection } from "./settings/ProviderUsageSection";
+import { MemoryPanel } from "./settings/memory/MemoryPanel";
 import { ProjectRootsSection } from "./settings/ProjectRootsSection";
+import { ProvidersSection } from "./settings/ProvidersSection";
+import { ProviderUsageSection } from "./settings/ProviderUsageSection";
 import { SkillsSettingsForm } from "./settings/SkillsSettingsForm";
 import { SoulSection } from "./settings/SoulSection";
 import { SshSettingsSection } from "./settings/SshSettingsSection";
-import { SystemSettingsForm } from "./settings/SystemSettingsForm";
 import { SttSettingsSection } from "./settings/SttSettingsSection";
+import { SystemSettingsForm } from "./settings/SystemSettingsForm";
 import { ToolPermissionsSection } from "./settings/ToolPermissionsSection";
 import type { SectionId, SettingsPageProps } from "./settings/types";
 

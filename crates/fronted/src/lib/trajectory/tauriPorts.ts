@@ -4,8 +4,8 @@
  * 落盘失败一律吞掉：轨迹是诊断视图，宁可缺一段记录也不该影响对话。
  */
 
-import type { TrajectoryEvent, TrajectorySection } from "@xagent/ui/lib/trajectory/types";
 import { invoke } from "@xagent/runtime";
+import type { TrajectoryEvent, TrajectorySection } from "@xagent/ui/lib/trajectory/types";
 import type { TrajectoryRecorderPorts } from "./recorder";
 
 export type TrajectoryPublish = (events: readonly TrajectoryEvent[]) => void;

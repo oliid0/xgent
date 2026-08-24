@@ -1,11 +1,6 @@
 import type { SttProviderId, SttSettings } from "../settings";
 
-export type SttSecretField =
-  | "apiKey"
-  | "secretId"
-  | "secretKey"
-  | "accessToken"
-  | "baiduApiKey";
+export type SttSecretField = "apiKey" | "secretId" | "secretKey" | "accessToken" | "baiduApiKey";
 
 export type SttConnectionTestResult =
   | "connected"

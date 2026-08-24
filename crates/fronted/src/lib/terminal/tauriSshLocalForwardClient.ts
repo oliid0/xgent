@@ -1,3 +1,4 @@
+import { invoke, listen } from "@xagent/runtime";
 import type {
   RawSshLocalForwardAction,
   RawSshLocalForwardEvent,
@@ -9,7 +10,6 @@ import {
   normalizeSshLocalForwardEvent,
   normalizeSshLocalForwardSnapshot,
 } from "./sshLocalForwardTypes";
-import { invoke, listen } from "@xagent/runtime";
 
 export const tauriSshLocalForwardClient: SshLocalForwardClient = {
   async list(params) {

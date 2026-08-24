@@ -36,8 +36,8 @@ import {
   persistSettings,
   type SettingsSaveState,
 } from "./lib/settings/storage";
-import { SoulProvider } from "./lib/soul";
 import { applyStoredGlobalShortcuts } from "./lib/shortcuts/globalShortcuts";
+import { SoulProvider } from "./lib/soul";
 import { applyFontFamilies } from "./lib/system/fontFamily";
 import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";

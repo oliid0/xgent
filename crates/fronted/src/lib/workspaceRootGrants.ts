@@ -120,7 +120,9 @@ export function buildDroppedWorkspaceRootDrafts(params: {
       result.skippedInsideWorkspace.push(folderPath);
       continue;
     }
-    if (acceptedPaths.some((existing) => pathContains(existing, path) || pathContains(path, existing))) {
+    if (
+      acceptedPaths.some((existing) => pathContains(existing, path) || pathContains(path, existing))
+    ) {
       result.skippedOverlapping.push(folderPath);
       continue;
     }

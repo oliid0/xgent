@@ -144,21 +144,23 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
             <X className="h-4 w-4" />
           </button>
         </div>
-        {cloneAvailable ? <div className="mt-4 grid grid-cols-2 rounded-xl bg-muted/60 p-1">
-          {(["new", "clone"] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => {
-                setMode(value);
-                setError("");
-              }}
-              className={`h-9 rounded-lg text-xs font-semibold transition-colors ${mode === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
-            >
-              {value === "new" ? t("chat.clone.newTab") : t("chat.clone.cloneTab")}
-            </button>
-          ))}
-        </div> : null}
+        {cloneAvailable ? (
+          <div className="mt-4 grid grid-cols-2 rounded-xl bg-muted/60 p-1">
+            {(["new", "clone"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => {
+                  setMode(value);
+                  setError("");
+                }}
+                className={`h-9 rounded-lg text-xs font-semibold transition-colors ${mode === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+              >
+                {value === "new" ? t("chat.clone.newTab") : t("chat.clone.cloneTab")}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {mode === "clone" ? (
           <>
             <label className="mt-4 block">
@@ -170,7 +172,12 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
                   const value = event.currentTarget.value;
                   setRemoteUrl(value);
                   if (!name.trim()) {
-                    const inferred = value.trim().replace(/[\\/]+$/, "").split(/[\\/]/).pop()?.replace(/\.git$/i, "");
+                    const inferred = value
+                      .trim()
+                      .replace(/[\\/]+$/, "")
+                      .split(/[\\/]/)
+                      .pop()
+                      ?.replace(/\.git$/i, "");
                     if (inferred) setName(inferred);
                   }
                 }}
@@ -189,7 +196,9 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
                   className="h-11 w-full rounded-2xl border border-border/60 bg-muted/35 px-3.5 text-sm outline-none focus:border-primary/45 focus:ring-2 focus:ring-primary/15"
                 />
                 <datalist id="workspace-clone-branches">
-                  {remoteBranches.map((item) => <option key={item} value={item} />)}
+                  {remoteBranches.map((item) => (
+                    <option key={item} value={item} />
+                  ))}
                 </datalist>
               </label>
               <button
@@ -198,7 +207,11 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
                 onClick={() => void loadBranches()}
                 className="flex h-11 shrink-0 items-center gap-1.5 rounded-2xl border px-3 text-xs font-semibold disabled:opacity-40"
               >
-                {loadingBranches ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitBranch className="h-3.5 w-3.5" />}
+                {loadingBranches ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <GitBranch className="h-3.5 w-3.5" />
+                )}
                 {t("chat.clone.loadBranches")}
               </button>
             </div>
@@ -232,36 +245,45 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
         >
           {mode === "clone" ? <GitBranch className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
           {busy
-            ? mode === "clone" ? t("chat.clone.starting") : t("chat.mobileWorkspace.creating")
-            : mode === "clone" ? t("chat.clone.start") : t("chat.mobileWorkspace.create")}
+            ? mode === "clone"
+              ? t("chat.clone.starting")
+              : t("chat.mobileWorkspace.creating")
+            : mode === "clone"
+              ? t("chat.clone.start")
+              : t("chat.mobileWorkspace.create")}
         </button>
-        {cloneAvailable ? <button
-          type="button"
-          disabled={busy}
-          onClick={() => void pickDestination()}
-          className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-2xl border border-border/60 text-xs font-semibold active:bg-muted disabled:opacity-40"
-        >
-          <FolderOpen className="h-3.5 w-3.5" />
-          {t("chat.clone.chooseDestination")}
-        </button> : null}
-        {mode === "new" ? <><div className="my-3 flex items-center gap-3 text-[11px] text-muted-foreground">
-          <span className="h-px flex-1 bg-border/50" />
-          {t("chat.mobileWorkspace.or")}
-          <span className="h-px flex-1 bg-border/50" />
-        </div>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void pickExternal()}
-          className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-border/60 bg-background text-sm font-semibold active:bg-muted disabled:opacity-40"
-        >
-          <FolderOpen className="h-4 w-4" />
-          {t("chat.mobileWorkspace.chooseFolder")}
-        </button>
-        <p className="mt-2 px-1 text-[10.5px] leading-4 text-muted-foreground">
-          {t("chat.mobileWorkspace.chooseFolderHint")}
-        </p>
-        </> : null}
+        {cloneAvailable ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void pickDestination()}
+            className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-2xl border border-border/60 text-xs font-semibold active:bg-muted disabled:opacity-40"
+          >
+            <FolderOpen className="h-3.5 w-3.5" />
+            {t("chat.clone.chooseDestination")}
+          </button>
+        ) : null}
+        {mode === "new" ? (
+          <>
+            <div className="my-3 flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span className="h-px flex-1 bg-border/50" />
+              {t("chat.mobileWorkspace.or")}
+              <span className="h-px flex-1 bg-border/50" />
+            </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void pickExternal()}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-border/60 bg-background text-sm font-semibold active:bg-muted disabled:opacity-40"
+            >
+              <FolderOpen className="h-4 w-4" />
+              {t("chat.mobileWorkspace.chooseFolder")}
+            </button>
+            <p className="mt-2 px-1 text-[10.5px] leading-4 text-muted-foreground">
+              {t("chat.mobileWorkspace.chooseFolderHint")}
+            </p>
+          </>
+        ) : null}
       </form>
     </div>
   );

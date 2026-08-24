@@ -3,8 +3,8 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Lightbulb, RefreshCw } from "../../../../components/icons";
 import { Markdown } from "../../../../components/Markdown";
 import { useLocale } from "../../../../i18n";
-import type { RetryAttemptRecord } from "../../../../lib/chat/conversation/liveTranscriptStore";
 import type { ChatFileLink } from "../../../../lib/chat/chatFileLinks";
+import type { RetryAttemptRecord } from "../../../../lib/chat/conversation/liveTranscriptStore";
 import type { ToolTraceItem, UiRound } from "../../../../lib/chat/messages/uiMessages";
 import { normalizeLiveToolStatus, VIBING_STATUS } from "../../../../lib/chat/page/chatPageHelpers";
 import { type GroupedRoundBlock, groupRoundBlocks } from "./assistantBubbleUtils";
@@ -177,17 +177,12 @@ export const RoundBlockContent = memo(function RoundBlockContent(props: {
   }
   if (block.kind === "toolGroup") {
     return (
-      <ToolTraceGroup
-        items={block.items}
-        runningToolCallIds={isLive ? runningToolCallIds : []}
-      />
+      <ToolTraceGroup items={block.items} runningToolCallIds={isLive ? runningToolCallIds : []} />
     );
   }
   if (block.kind === "hostedSearch" || block.kind === "hostedSearchGroup") {
     return (
-      <HostedSearchGroupView
-        items={block.kind === "hostedSearch" ? [block.item] : block.items}
-      />
+      <HostedSearchGroupView items={block.kind === "hostedSearch" ? [block.item] : block.items} />
     );
   }
   if (!block.text.trim()) return null;

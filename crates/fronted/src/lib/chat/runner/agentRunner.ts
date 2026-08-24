@@ -740,11 +740,7 @@ export async function runAssistantWithTools(params: {
   } | null>;
   onToolStatus?: (status: string | null) => void;
   onRetryAttempts?: (round: number, attempts: RetryAttemptRecord[]) => void;
-  onRequestStart?: (params: {
-    round: number;
-    context: Context;
-    toolsSuffix: string;
-  }) => void;
+  onRequestStart?: (params: { round: number; context: Context; toolsSuffix: string }) => void;
   signal?: AbortSignal;
   debugLogger?: StreamDebugLogger;
   subagentScheduler?: SubagentScheduler;

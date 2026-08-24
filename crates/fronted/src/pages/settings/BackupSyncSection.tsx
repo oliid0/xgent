@@ -1,3 +1,5 @@
+import { listen } from "@xagent/runtime";
+import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
   Archive,
@@ -24,8 +26,6 @@ import {
 } from "../../components/ui/select";
 import { Switch } from "../../components/ui/switch";
 import { useLocale } from "../../i18n";
-import { listen } from "@xagent/runtime";
-import { useCallback, useEffect, useState } from "react";
 import {
   applyBackupImport,
   BACKUP_SYNC_STATUS_EVENT,

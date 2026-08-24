@@ -1,4 +1,3 @@
-import { EXIT_PLAN_MODE_TOOL_NAME } from "../planMode";
 import { buildMemoryToolsSuffixSection } from "../../memory/prompts/injection";
 import {
   inferRuntimePlatform,
@@ -7,6 +6,7 @@ import {
   runtimePlatformLabel,
 } from "../../runtimePlatform";
 import type { AdditionalProjectRoot } from "../../tools/additionalProjectRoots";
+import { EXIT_PLAN_MODE_TOOL_NAME } from "../planMode";
 
 export function buildToolsSuffix(
   workdir: string,

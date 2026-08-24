@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-
+import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type {
   HistoryMessageRef,
   RenderTimelineItem,
@@ -8,7 +8,6 @@ import type { LiveTranscriptStore } from "../../../lib/chat/conversation/liveTra
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
 import type { ScrollFollowHandle } from "../../../lib/chat-scroll/useScrollFollow";
 import type { GitClient } from "../../../lib/git/types";
-import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { SectionId } from "../../settings/types";
 
 export type ChatTranscriptProps = {

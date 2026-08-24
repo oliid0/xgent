@@ -18,15 +18,12 @@ export function isNativeDropInsideUploadZone(
 ) {
   const targetDocument = options?.document ?? document;
   const point = logicalNativeDropPoint(position, options?.scaleFactor ?? window.devicePixelRatio);
-  return Array.from(targetDocument.querySelectorAll<HTMLElement>(FILE_UPLOAD_DROP_ZONE_SELECTOR)).some(
-    (element) => {
-      const rect = element.getBoundingClientRect();
-      return (
-        point.x >= rect.left &&
-        point.x <= rect.right &&
-        point.y >= rect.top &&
-        point.y <= rect.bottom
-      );
-    },
-  );
+  return Array.from(
+    targetDocument.querySelectorAll<HTMLElement>(FILE_UPLOAD_DROP_ZONE_SELECTOR),
+  ).some((element) => {
+    const rect = element.getBoundingClientRect();
+    return (
+      point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom
+    );
+  });
 }

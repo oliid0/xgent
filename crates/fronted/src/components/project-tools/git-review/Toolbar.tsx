@@ -8,10 +8,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocale } from "../../../i18n";
-import type {
-  GitBranch as GitBranchInfo,
-  GitWorktreeInfo,
-} from "../../../lib/git/types";
+import type { GitBranch as GitBranchInfo, GitWorktreeInfo } from "../../../lib/git/types";
 import { gitDiscoveredRepositoryLabel, selectedGitRepositoryLabel } from "../../../lib/git/types";
 import { cn } from "../../../lib/shared/utils";
 import {
@@ -458,11 +455,7 @@ export function GitBranchSwitchConflictModal(props: {
   );
 }
 
-function GitWorktreeModal(props: {
-  data: GitReviewData;
-  open: boolean;
-  onClose: () => void;
-}) {
+function GitWorktreeModal(props: { data: GitReviewData; open: boolean; onClose: () => void }) {
   const { data, open, onClose } = props;
   const { cwd, gitClient, state } = data;
   const { t } = useLocale();
@@ -487,7 +480,9 @@ function GitWorktreeModal(props: {
     if (!open) return;
     setError("");
     setRemovingPath("");
-    void reload().catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
+    void reload().catch((cause) =>
+      setError(cause instanceof Error ? cause.message : String(cause)),
+    );
   }, [open, reload]);
 
   if (!open) return null;
@@ -535,13 +530,22 @@ function GitWorktreeModal(props: {
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[10000] flex items-end justify-center p-3 md:items-center md:p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={busy ? undefined : onClose} />
+    <div
+      className="fixed inset-0 z-[10000] flex items-end justify-center p-3 md:items-center md:p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+        onClick={busy ? undefined : onClose}
+      />
       <div className="relative z-10 max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-2xl border bg-background shadow-2xl">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div>
             <div className="text-sm font-semibold">{t("projectTools.gitReview.worktrees")}</div>
-            <div className="mt-0.5 max-w-[70vw] truncate text-xs text-muted-foreground">{state.repoRoot}</div>
+            <div className="mt-0.5 max-w-[70vw] truncate text-xs text-muted-foreground">
+              {state.repoRoot}
+            </div>
           </div>
           <Button type="button" variant="ghost" size="icon" onClick={onClose} disabled={busy}>
             <X className="h-4 w-4" />
@@ -549,7 +553,9 @@ function GitWorktreeModal(props: {
         </div>
         <div className="space-y-4 p-4">
           <section className="rounded-xl border p-3">
-            <div className="mb-3 text-xs font-semibold">{t("projectTools.gitReview.createWorktree")}</div>
+            <div className="mb-3 text-xs font-semibold">
+              {t("projectTools.gitReview.createWorktree")}
+            </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <Input
                 value={branch}
@@ -583,7 +589,11 @@ function GitWorktreeModal(props: {
               disabled={busy || !branch.trim() || !directoryName.trim()}
               onClick={() => void create()}
             >
-              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Folder className="h-3.5 w-3.5" />}
+              {busy ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Folder className="h-3.5 w-3.5" />
+              )}
               {t("projectTools.gitReview.createWorktree")}
             </Button>
           </section>
@@ -592,32 +602,82 @@ function GitWorktreeModal(props: {
               <div className="rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
                 {t("projectTools.gitReview.noWorktrees")}
               </div>
-            ) : worktrees.map((worktree) => (
-              <div key={worktree.path} className="rounded-xl border px-3 py-2.5">
-                <div className="flex items-start gap-2">
-                  <Folder className="mt-0.5 h-4 w-4 shrink-0 text-sky-500" />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs font-semibold">{worktree.branch || t("projectTools.gitReview.unresolved")}</div>
-                    <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground" title={worktree.path}>{worktree.path}</div>
-                  </div>
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" disabled={busy} onClick={() => setRemovingPath(worktree.path)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-                {removingPath === worktree.path ? (
-                  <div className="mt-2 rounded-lg bg-muted/50 p-2 text-xs">
-                    <label className="flex items-center gap-2 py-1"><input type="checkbox" checked={deleteBranch} onChange={(event) => setDeleteBranch(event.currentTarget.checked)} />{t("projectTools.gitReview.deleteWorktreeBranch")}</label>
-                    <label className="flex items-center gap-2 py-1"><input type="checkbox" checked={force} onChange={(event) => setForce(event.currentTarget.checked)} />{t("projectTools.gitReview.forceRemoveWorktree")}</label>
-                    <div className="mt-2 flex justify-end gap-2">
-                      <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setRemovingPath("")}>{t("chat.cancel")}</Button>
-                      <Button type="button" variant="destructive" size="sm" disabled={busy} onClick={() => void remove(worktree)}>{t("settings.delete")}</Button>
+            ) : (
+              worktrees.map((worktree) => (
+                <div key={worktree.path} className="rounded-xl border px-3 py-2.5">
+                  <div className="flex items-start gap-2">
+                    <Folder className="mt-0.5 h-4 w-4 shrink-0 text-sky-500" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-semibold">
+                        {worktree.branch || t("projectTools.gitReview.unresolved")}
+                      </div>
+                      <div
+                        className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground"
+                        title={worktree.path}
+                      >
+                        {worktree.path}
+                      </div>
                     </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      disabled={busy}
+                      onClick={() => setRemovingPath(worktree.path)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                ) : null}
-              </div>
-            ))}
+                  {removingPath === worktree.path ? (
+                    <div className="mt-2 rounded-lg bg-muted/50 p-2 text-xs">
+                      <label className="flex items-center gap-2 py-1">
+                        <input
+                          type="checkbox"
+                          checked={deleteBranch}
+                          onChange={(event) => setDeleteBranch(event.currentTarget.checked)}
+                        />
+                        {t("projectTools.gitReview.deleteWorktreeBranch")}
+                      </label>
+                      <label className="flex items-center gap-2 py-1">
+                        <input
+                          type="checkbox"
+                          checked={force}
+                          onChange={(event) => setForce(event.currentTarget.checked)}
+                        />
+                        {t("projectTools.gitReview.forceRemoveWorktree")}
+                      </label>
+                      <div className="mt-2 flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => setRemovingPath("")}
+                        >
+                          {t("chat.cancel")}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => void remove(worktree)}
+                        >
+                          {t("settings.delete")}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
           </section>
-          {error ? <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-destructive">{error}</div> : null}
+          {error ? (
+            <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              {error}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>,
@@ -694,64 +754,68 @@ function GitReviewBranchMenu(props: { data: GitReviewData; writeDisabled: boolea
 
   return (
     <>
-      <GitWorktreeModal data={data} open={worktreeModalOpen} onClose={() => setWorktreeModalOpen(false)} />
-    <DropdownMenu
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) void loadBranches();
-      }}
-    >
-      <DropdownMenuTrigger
-        disabled={operationBusy}
-        className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[calc(12px*var(--zone-font-scale,1))] font-medium outline-hidden transition-colors hover:bg-muted/70 focus-visible:bg-muted/70 disabled:pointer-events-none disabled:opacity-60"
-        title={t("projectTools.gitReview.switchBranch")}
-        aria-label={t("projectTools.gitReview.switchBranch")}
+      <GitWorktreeModal
+        data={data}
+        open={worktreeModalOpen}
+        onClose={() => setWorktreeModalOpen(false)}
+      />
+      <DropdownMenu
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (next) void loadBranches();
+        }}
       >
-        <span className="min-w-0 flex-1 truncate text-left">{title}</span>
-        <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground opacity-70" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-56 max-w-72">
-        <DropdownMenuLabel className="px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          {t("projectTools.gitReview.switchBranch")}
-        </DropdownMenuLabel>
-        {branchesLoading ? (
-          <div className="flex items-center justify-center px-2 py-3">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          </div>
-        ) : branchesError ? (
-          <div className="px-2 py-2 text-xs text-destructive">{branchesError}</div>
-        ) : (
-          <>
-            {localBranches.length > 0 ? (
-              <DropdownMenuLabel className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground/70">
-                {t("git.branchSelector.localBranches")}
-              </DropdownMenuLabel>
-            ) : null}
-            {localBranches.map((branch) => renderBranchRow(branch, branch.current, branch.name))}
-            {remoteBranches.length > 0 ? (
-              <DropdownMenuLabel className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground/70">
-                {t("git.branchSelector.remoteBranches")}
-              </DropdownMenuLabel>
-            ) : null}
-            {remoteBranches.slice(0, GIT_REVIEW_REMOTE_BRANCH_DISPLAY_LIMIT).map((branch) => {
-              const isCurrentUpstream =
-                branch.current || (state.upstream !== "" && branch.fullName === state.upstream);
-              return renderBranchRow(branch, isCurrentUpstream, branch.fullName);
-            })}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              disabled={operationBusy || writeDisabled}
-              className="gap-2 text-xs"
-              onSelect={() => setWorktreeModalOpen(true)}
-            >
-              <Folder className="h-3.5 w-3.5 text-muted-foreground" />
-              {t("projectTools.gitReview.manageWorktrees")}
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+        <DropdownMenuTrigger
+          disabled={operationBusy}
+          className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[calc(12px*var(--zone-font-scale,1))] font-medium outline-hidden transition-colors hover:bg-muted/70 focus-visible:bg-muted/70 disabled:pointer-events-none disabled:opacity-60"
+          title={t("projectTools.gitReview.switchBranch")}
+          aria-label={t("projectTools.gitReview.switchBranch")}
+        >
+          <span className="min-w-0 flex-1 truncate text-left">{title}</span>
+          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground opacity-70" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-56 max-w-72">
+          <DropdownMenuLabel className="px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {t("projectTools.gitReview.switchBranch")}
+          </DropdownMenuLabel>
+          {branchesLoading ? (
+            <div className="flex items-center justify-center px-2 py-3">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : branchesError ? (
+            <div className="px-2 py-2 text-xs text-destructive">{branchesError}</div>
+          ) : (
+            <>
+              {localBranches.length > 0 ? (
+                <DropdownMenuLabel className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground/70">
+                  {t("git.branchSelector.localBranches")}
+                </DropdownMenuLabel>
+              ) : null}
+              {localBranches.map((branch) => renderBranchRow(branch, branch.current, branch.name))}
+              {remoteBranches.length > 0 ? (
+                <DropdownMenuLabel className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground/70">
+                  {t("git.branchSelector.remoteBranches")}
+                </DropdownMenuLabel>
+              ) : null}
+              {remoteBranches.slice(0, GIT_REVIEW_REMOTE_BRANCH_DISPLAY_LIMIT).map((branch) => {
+                const isCurrentUpstream =
+                  branch.current || (state.upstream !== "" && branch.fullName === state.upstream);
+                return renderBranchRow(branch, isCurrentUpstream, branch.fullName);
+              })}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={operationBusy || writeDisabled}
+                className="gap-2 text-xs"
+                onSelect={() => setWorktreeModalOpen(true)}
+              >
+                <Folder className="h-3.5 w-3.5 text-muted-foreground" />
+                {t("projectTools.gitReview.manageWorktrees")}
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </>
   );
 }

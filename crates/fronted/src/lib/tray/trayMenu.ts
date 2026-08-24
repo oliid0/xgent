@@ -1,11 +1,11 @@
 import { invoke } from "@xagent/runtime";
-import type { CronTask } from "../automation/types";
 import type { Locale } from "../../i18n/config";
 import { t } from "../../i18n/config";
-import type { SidebarConversation } from "../sidebar/types";
+import type { CronTask } from "../automation/types";
 import type { Theme, WorkspaceProject } from "../settings";
 import { workspaceProjectPathKey } from "../settings";
 import { readGlobalShortcutBindings } from "../shortcuts/globalShortcuts";
+import type { SidebarConversation } from "../sidebar/types";
 import type { TrayPrefs } from "./trayPrefs";
 
 const TRAY_RECENT_LIMIT = 8;

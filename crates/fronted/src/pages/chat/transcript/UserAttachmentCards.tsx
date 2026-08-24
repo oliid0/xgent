@@ -42,36 +42,33 @@ function UserImageAttachmentCard({
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const labeledPreview = `${previewLabel}: ${file.fileName}`;
-  const previewSlides = useMemo<ImagePreviewSlide[]>(
-    () => {
-      if (!imageSrc) return [];
-      const nativeRequest =
-        workspaceRoot?.trim() && file.absolutePath?.trim()
-          ? { workdir: workspaceRoot, absolutePath: file.absolutePath }
-          : null;
-      return [
-        {
-          src: imageSrc,
-          alt: file.fileName,
-          title: file.fileName,
-          onPrepare:
-            nativeRequest && supportsDirectUploadedImageCopy
-              ? () => prepareUploadedImagePreviewCopy(nativeRequest)
-              : undefined,
-          onCopy:
-            nativeRequest && supportsDirectUploadedImageCopy
-              ? () => copyUploadedImagePreview(nativeRequest)
-              : () => copyImagePreviewSource(imageSrc),
-          onSave: () => saveImagePreviewSource(imageSrc, file.fileName),
-          onOpen:
-            nativeRequest && supportsSystemImageOpen
-              ? () => openUploadedImageInSystemViewer(nativeRequest)
-              : undefined,
-        },
-      ];
-    },
-    [file.absolutePath, file.fileName, imageSrc, workspaceRoot],
-  );
+  const previewSlides = useMemo<ImagePreviewSlide[]>(() => {
+    if (!imageSrc) return [];
+    const nativeRequest =
+      workspaceRoot?.trim() && file.absolutePath?.trim()
+        ? { workdir: workspaceRoot, absolutePath: file.absolutePath }
+        : null;
+    return [
+      {
+        src: imageSrc,
+        alt: file.fileName,
+        title: file.fileName,
+        onPrepare:
+          nativeRequest && supportsDirectUploadedImageCopy
+            ? () => prepareUploadedImagePreviewCopy(nativeRequest)
+            : undefined,
+        onCopy:
+          nativeRequest && supportsDirectUploadedImageCopy
+            ? () => copyUploadedImagePreview(nativeRequest)
+            : () => copyImagePreviewSource(imageSrc),
+        onSave: () => saveImagePreviewSource(imageSrc, file.fileName),
+        onOpen:
+          nativeRequest && supportsSystemImageOpen
+            ? () => openUploadedImageInSystemViewer(nativeRequest)
+            : undefined,
+      },
+    ];
+  }, [file.absolutePath, file.fileName, imageSrc, workspaceRoot]);
   return (
     <div
       title={file.relativePath}

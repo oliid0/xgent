@@ -1,6 +1,6 @@
+import { invoke } from "@xagent/runtime";
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { invoke } from "@xagent/runtime";
 import App from "./App";
 import { LocalAccessPairingGate } from "./components/local-access/LocalAccessPairingGate";
 import "./index.css";

@@ -14,11 +14,7 @@ type StreamTransport = {
   initialTransportReady?: boolean;
   sendInput(bytes: Uint8Array): Promise<void>;
   sendResize(size: { cols: number; rows: number }): Promise<void>;
-  onInputSendError?: (
-    error: unknown,
-    bytes: Uint8Array,
-    buffer: TerminalStreamBuffer,
-  ) => void;
+  onInputSendError?: (error: unknown, bytes: Uint8Array, buffer: TerminalStreamBuffer) => void;
 };
 
 export class TerminalStreamBuffer implements TerminalStreamHandle {

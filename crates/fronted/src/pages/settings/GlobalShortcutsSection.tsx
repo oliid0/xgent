@@ -1,15 +1,4 @@
 import {
-  Keyboard,
-  MonitorSmartphone,
-  Pin,
-  SquarePen,
-  X,
-  Zap,
-} from "../../components/icons";
-import { useLocale } from "../../i18n";
-import { cn } from "../../lib/shared/utils";
-import { AgentActivationSwitch } from "./shared";
-import {
   type ReactNode,
   useCallback,
   useEffect,
@@ -18,7 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { Keyboard, MonitorSmartphone, Pin, SquarePen, X, Zap } from "../../components/icons";
+import { useLocale } from "../../i18n";
 import { inferRuntimePlatform } from "../../lib/runtimePlatform";
+import { cn } from "../../lib/shared/utils";
 import {
   applyGlobalShortcuts,
   GLOBAL_SHORTCUT_ACTIONS,
@@ -32,6 +24,7 @@ import {
   type ShortcutModifier,
   writeGlobalShortcutBindings,
 } from "../../lib/shortcuts/globalShortcuts";
+import { AgentActivationSwitch } from "./shared";
 
 /* ============================== 键盘布局数据 ============================== */
 

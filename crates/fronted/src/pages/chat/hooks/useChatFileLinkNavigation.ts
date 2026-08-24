@@ -30,12 +30,8 @@ export function useChatFileLinkNavigation(params: {
   terminalProjectPathKey: string;
   notifyError: (message: string) => void;
   onRevealInFileTree: (path: string) => void;
-  openWorkspaceEditorFile: (
-    request: Omit<WorkspaceCodeEditorOpenRequest, "id">,
-  ) => void;
-  openWorkspaceFilePreview: (
-    request: Omit<WorkspaceFilePreviewOpenRequest, "id">,
-  ) => void;
+  openWorkspaceEditorFile: (request: Omit<WorkspaceCodeEditorOpenRequest, "id">) => void;
+  openWorkspaceFilePreview: (request: Omit<WorkspaceFilePreviewOpenRequest, "id">) => void;
 }) {
   const {
     conversationId,

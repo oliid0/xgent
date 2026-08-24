@@ -9,13 +9,6 @@ import {
   toolResultMessageToText,
 } from "../../../../lib/chat/messages/uiMessages";
 import { cn } from "../../../../lib/shared/utils";
-import {
-  answerPlanDecision,
-  getPlanDecisionVersion,
-  isPlanApprovalToolCall,
-  isPlanDecisionPending,
-  subscribePlanDecisions,
-} from "../../../../lib/tools/planModeTools";
 import type {
   SubagentBatchDetails,
   SubagentCardDetails,
@@ -37,6 +30,13 @@ import type {
   TodoWriteResultDetails,
   WriteResultDetails,
 } from "../../../../lib/tools/builtinTypes";
+import {
+  answerPlanDecision,
+  getPlanDecisionVersion,
+  isPlanApprovalToolCall,
+  isPlanDecisionPending,
+  subscribePlanDecisions,
+} from "../../../../lib/tools/planModeTools";
 import {
   getBuiltinResultKind,
   getStableValueSignature,

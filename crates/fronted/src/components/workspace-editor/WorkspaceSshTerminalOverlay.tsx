@@ -248,17 +248,19 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
         if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason));
       });
     let unlisten: (() => void) | undefined;
-    void localForwardClient.subscribe((event) => {
-      if (cancelled || event.forward.projectPathKey !== projectPathKey) return;
-      setForwardSnapshot((previous) => {
-        const forwards = previous.forwards.filter((item) => item.id !== event.forward.id);
-        forwards.push(event.forward);
-        return { forwards, revision: Math.max(previous.revision, event.revision) };
+    void localForwardClient
+      .subscribe((event) => {
+        if (cancelled || event.forward.projectPathKey !== projectPathKey) return;
+        setForwardSnapshot((previous) => {
+          const forwards = previous.forwards.filter((item) => item.id !== event.forward.id);
+          forwards.push(event.forward);
+          return { forwards, revision: Math.max(previous.revision, event.revision) };
+        });
+      })
+      .then((dispose) => {
+        if (cancelled) dispose();
+        else unlisten = dispose;
       });
-    }).then((dispose) => {
-      if (cancelled) dispose();
-      else unlisten = dispose;
-    });
     return () => {
       cancelled = true;
       unlisten?.();
@@ -499,7 +501,8 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
                   className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-2 py-1.5 text-xs"
                 >
                   <span className="font-mono">
-                    {forward.address || `${forward.localHost}:${forward.localPort}`} → {forward.remoteHost}:{forward.remotePort}
+                    {forward.address || `${forward.localHost}:${forward.localPort}`} →{" "}
+                    {forward.remoteHost}:{forward.remotePort}
                   </span>
                   <button
                     type="button"

@@ -1,14 +1,3 @@
-import {
-  type GroupedRoundBlock,
-  groupRoundBlocks,
-} from "../components/assistant-bubble/assistantBubbleUtils";
-import { isTaskToolBlock } from "../../../lib/chat/taskProgress";
-import {
-  CHECKPOINT_ROW_ESTIMATE_PX,
-  estimateAssistantRowHeight,
-  estimateUserRowHeight,
-  measureEstimateText,
-} from "../../../lib/transcript-virtual/rowEstimates";
 import type {
   RenderSummaryCard,
   RenderTimelineItem,
@@ -16,6 +5,17 @@ import type {
 } from "../../../lib/chat/conversation/conversationState";
 import type { LiveTranscriptState } from "../../../lib/chat/conversation/liveTranscriptStore";
 import { getRoundText, type LiveRound, type UiRound } from "../../../lib/chat/messages/uiMessages";
+import { isTaskToolBlock } from "../../../lib/chat/taskProgress";
+import {
+  CHECKPOINT_ROW_ESTIMATE_PX,
+  estimateAssistantRowHeight,
+  estimateUserRowHeight,
+  measureEstimateText,
+} from "../../../lib/transcript-virtual/rowEstimates";
+import {
+  type GroupedRoundBlock,
+  groupRoundBlocks,
+} from "../components/assistant-bubble/assistantBubbleUtils";
 
 const TRANSCRIPT_ROW_GAP_PX = 24;
 const ASSISTANT_UNIT_GAP_PX = 8;

@@ -220,10 +220,7 @@ export type GitClient = {
   init(workdir: string, options?: GitInitOptions): Promise<GitOperationResponse>;
   switchBranch(workdir: string, branch: string, kind?: string): Promise<GitOperationResponse>;
   createBranch(workdir: string, branch: string, startPoint?: string): Promise<GitOperationResponse>;
-  createWorktree(
-    workdir: string,
-    options: GitWorktreeCreateOptions,
-  ): Promise<GitWorktreeResponse>;
+  createWorktree(workdir: string, options: GitWorktreeCreateOptions): Promise<GitWorktreeResponse>;
   removeWorktree(
     workdir: string,
     worktreePath: string,
@@ -386,10 +383,7 @@ export function normalizeGitWorktreeInfo(input: unknown): GitWorktreeInfo {
   };
 }
 
-export function normalizeGitWorktreeResponse(
-  input: unknown,
-  workdir = "",
-): GitWorktreeResponse {
+export function normalizeGitWorktreeResponse(input: unknown, workdir = ""): GitWorktreeResponse {
   const source = asObject(input);
   return {
     ...normalizeGitOperationResponse(source, workdir),

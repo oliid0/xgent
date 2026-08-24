@@ -194,7 +194,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "chat.contextUsage": "上下文用量",
     "settings.navFailover": "模型故障转移",
     "settings.failover.title": "模型自动故障转移",
-    "settings.failover.desc": "当前供应商不可用时，按优先级切换到同协议供应商，并在恢复冷却期后重新尝试。",
+    "settings.failover.desc":
+      "当前供应商不可用时，按优先级切换到同协议供应商，并在恢复冷却期后重新尝试。",
     "settings.failover.vendorDesc": "仅在同一协议和相同模型可用的供应商之间切换。",
     "settings.failover.enabled": "启用故障转移",
     "settings.failover.maxSwitches": "单次最多切换",
@@ -207,7 +208,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.failover.remove": "移除",
     "settings.navProjectRoots": "附加项目目录",
     "settings.projectRoots.title": "附加项目目录授权",
-    "settings.projectRoots.desc": "按项目向结构化文件工具授权额外目录。Shell 与进程工具不会获得这些权限。",
+    "settings.projectRoots.desc":
+      "按项目向结构化文件工具授权额外目录。Shell 与进程工具不会获得这些权限。",
     "settings.projectRoots.project": "项目",
     "settings.projectRoots.grants": "已授权目录",
     "settings.projectRoots.add": "添加目录",
@@ -223,7 +225,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.projectRoots.state.missing": "目录已不存在",
     "settings.projectRoots.state.changed": "目录身份已变化，请重新保存确认",
     "settings.projectRoots.resources": "工作空间资源",
-    "settings.projectRoots.resourcesDesc": "为当前项目单独选择可用的 Skills 和 MCP 服务；继承模式继续使用全局设置。",
+    "settings.projectRoots.resourcesDesc":
+      "为当前项目单独选择可用的 Skills 和 MCP 服务；继承模式继续使用全局设置。",
     "settings.projectRoots.resources.inherit": "继承全局设置",
     "settings.projectRoots.resources.custom": "单独配置",
     "settings.projectRoots.skills": "Skills",
@@ -244,11 +247,13 @@ export const translations: Record<Locale, Record<string, string>> = {
     "chat.planMode.approved": "计划已批准",
     "chat.planMode.updated": "计划已更新",
     "chat.planMode.approve": "批准并开始执行",
-    "chat.planMode.executePrompt": "计划已批准。现在按已批准的计划开始执行；保留当前功能和设计，并在完成后验证结果。",
+    "chat.planMode.executePrompt":
+      "计划已批准。现在按已批准的计划开始执行；保留当前功能和设计，并在完成后验证结果。",
     "chat.tasks.ready": "任务计划已就绪",
     "chat.tasks.progress": "任务完成进度",
     "chat.checkpointRewind.title": "回退此轮代码改动",
-    "chat.checkpointRewind.description": "将把此消息开始至今由助手改动的文件恢复到修改前。并发修改的文件会被安全跳过。",
+    "chat.checkpointRewind.description":
+      "将把此消息开始至今由助手改动的文件恢复到修改前。并发修改的文件会被安全跳过。",
     "chat.checkpointRewind.confirm": "预览并回退",
     "chat.checkpointRewind.done": "代码回退完成：已处理 {changed} 个文件，{failed} 个冲突或失败。",
     "chat.sendMessage": "发送消息",
@@ -806,7 +811,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "workspaceSshTerminal.forwardAuto": "自动",
     "workspaceSshTerminal.forwardStart": "启动转发",
     "workspaceSshTerminal.forwardStop": "停止",
-    "workspaceSshTerminal.forwardHelp": "仅监听本机 127.0.0.1；本地端口留空自动分配，远端主机留空默认 SSH 服务器自身的 127.0.0.1。",
+    "workspaceSshTerminal.forwardHelp":
+      "仅监听本机 127.0.0.1；本地端口留空自动分配，远端主机留空默认 SSH 服务器自身的 127.0.0.1。",
     "workspaceSshTerminal.forwardInvalidRemotePort": "远端端口必须为 1–65535。",
     "workspaceSshTerminal.forwardInvalidLocalPort": "本地端口必须留空或为 1–65535。",
     "workspaceSshTerminal.forwardPortBusy": "该本地端口已被占用。",
@@ -936,7 +942,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.navVoice": "语音输入",
     "settings.navUsage": "用量与余额",
     "settings.commandSafety.title": "命令执行安全模式",
-    "settings.commandSafety.desc": "控制 Bash 等命令工具是否需要确认，以及是否在隔离环境中执行。单项工具权限仍会优先拦截拒绝项。",
+    "settings.commandSafety.desc":
+      "控制 Bash 等命令工具是否需要确认，以及是否在隔离环境中执行。单项工具权限仍会优先拦截拒绝项。",
     "settings.commandSafety.auto": "自动",
     "settings.commandSafety.autoDesc": "只对风险命令询问，普通命令直接执行。",
     "settings.commandSafety.ask": "始终询问",
@@ -957,7 +964,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.stt.test.network_failed": "网络连接失败",
     "settings.stt.test.protocol_failed": "供应商协议错误",
     "settings.usage.title": "供应商用量与余额",
-    "settings.usage.desc": "通过供应商 API 查询套餐、余额和已用额度；支持内置方案与自定义查询脚本。",
+    "settings.usage.desc":
+      "通过供应商 API 查询套餐、余额和已用额度；支持内置方案与自定义查询脚本。",
     "settings.usage.mode": "查询方式",
     "settings.usage.mode.coding-plan": "编程套餐",
     "settings.usage.mode.balance": "标准余额 API",
@@ -974,7 +982,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.usage.test": "测试查询",
     "settings.usage.refresh": "刷新用量",
     "settings.toolPermissionsTitle": "系统工具权限",
-    "settings.toolPermissionsDesc": "分别控制每个系统工具是直接允许、执行前询问，还是始终拒绝。权限会在工具调用时即时生效。",
+    "settings.toolPermissionsDesc":
+      "分别控制每个系统工具是直接允许、执行前询问，还是始终拒绝。权限会在工具调用时即时生效。",
     "settings.toolPermissionsReset": "恢复默认",
     "settings.toolPermissionsApplyCategory": "整组设为",
     "settings.toolPolicyAllowDesc": "允许：直接执行",
@@ -1520,7 +1529,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.providerUseSystemProxyDesc":
       "该供应商的模型请求经应用代理出网；应用代理未启用时保持直连。",
     "settings.providerFullUrl": "完整请求地址",
-    "settings.providerFullUrlDesc": "Base URL 已包含最终接口路径时启用，发送请求时不再自动拼接路径。",
+    "settings.providerFullUrlDesc":
+      "Base URL 已包含最终接口路径时启用，发送请求时不再自动拼接路径。",
     "settings.providerModelsUrl": "模型列表地址（可选）",
     "settings.closeWindowBehavior": "关闭窗口",
     "settings.closeWindowMinimize": "最小化到托盘",
@@ -2468,7 +2478,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "app.settingsLoadFailed": "Failed to load settings; defaults are being used.",
     "app.settingsSaveFailed": "Failed to save settings.",
     "app.settingsReloadFailed": "Failed to reload settings; showing the previous values.",
-    "app.settingsSshSettingsChanged": "SSH settings changed elsewhere. Review the latest values and retry.",
+    "app.settingsSshSettingsChanged":
+      "SSH settings changed elsewhere. Review the latest values and retry.",
     "tray.show": "Show Main Window",
     "tray.newChat": "New Chat",
     "tray.pin": "Pin Window",
@@ -2662,20 +2673,24 @@ export const translations: Record<Locale, Record<string, string>> = {
     "chat.contextUsage": "Context usage",
     "settings.navFailover": "Model Failover",
     "settings.failover.title": "Automatic model failover",
-    "settings.failover.desc": "Switch to same-protocol providers by priority when the current provider is unavailable, then retry after its cooldown.",
-    "settings.failover.vendorDesc": "Failover only uses providers with the same protocol and model.",
+    "settings.failover.desc":
+      "Switch to same-protocol providers by priority when the current provider is unavailable, then retry after its cooldown.",
+    "settings.failover.vendorDesc":
+      "Failover only uses providers with the same protocol and model.",
     "settings.failover.enabled": "Enable failover",
     "settings.failover.maxSwitches": "Maximum switches",
     "settings.failover.failureThreshold": "Breaker failures",
     "settings.failover.cooldown": "Recovery cooldown (seconds)",
     "settings.failover.queue": "Provider priority",
-    "settings.failover.needProviders": "Configure at least two providers of this protocol to build a fallback queue.",
+    "settings.failover.needProviders":
+      "Configure at least two providers of this protocol to build a fallback queue.",
     "settings.failover.moveUp": "Move up",
     "settings.failover.moveDown": "Move down",
     "settings.failover.remove": "Remove",
     "settings.navProjectRoots": "Additional Roots",
     "settings.projectRoots.title": "Additional project-root grants",
-    "settings.projectRoots.desc": "Grant structured file tools access to extra folders per project. Shell and process tools do not receive these permissions.",
+    "settings.projectRoots.desc":
+      "Grant structured file tools access to extra folders per project. Shell and process tools do not receive these permissions.",
     "settings.projectRoots.project": "Project",
     "settings.projectRoots.grants": "Granted folders",
     "settings.projectRoots.add": "Add folder",
@@ -2691,7 +2706,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.projectRoots.state.missing": "Folder no longer exists",
     "settings.projectRoots.state.changed": "Folder identity changed; save again to confirm",
     "settings.projectRoots.resources": "Workspace resources",
-    "settings.projectRoots.resourcesDesc": "Choose the Skills and MCP servers available to this project, or inherit the global settings.",
+    "settings.projectRoots.resourcesDesc":
+      "Choose the Skills and MCP servers available to this project, or inherit the global settings.",
     "settings.projectRoots.resources.inherit": "Inherit global settings",
     "settings.projectRoots.resources.custom": "Configure separately",
     "settings.projectRoots.skills": "Skills",
@@ -2712,13 +2728,16 @@ export const translations: Record<Locale, Record<string, string>> = {
     "chat.planMode.approved": "Plan approved",
     "chat.planMode.updated": "Plan updated",
     "chat.planMode.approve": "Approve and execute",
-    "chat.planMode.executePrompt": "The plan is approved. Execute the approved plan now, preserve the existing features and design, and verify the result when complete.",
+    "chat.planMode.executePrompt":
+      "The plan is approved. Execute the approved plan now, preserve the existing features and design, and verify the result when complete.",
     "chat.tasks.ready": "Task plan ready",
     "chat.tasks.progress": "Task completion progress",
     "chat.checkpointRewind.title": "Rewind code changes",
-    "chat.checkpointRewind.description": "Restore assistant-edited files from this message onward. Concurrently changed files are safely skipped.",
+    "chat.checkpointRewind.description":
+      "Restore assistant-edited files from this message onward. Concurrently changed files are safely skipped.",
     "chat.checkpointRewind.confirm": "Preview and rewind",
-    "chat.checkpointRewind.done": "Code rewind complete: {changed} files handled, {failed} conflicts or failures.",
+    "chat.checkpointRewind.done":
+      "Code rewind complete: {changed} files handled, {failed} conflicts or failures.",
     "chat.sendMessage": "Send Message",
     "chat.send": "Send",
     "chat.stopGeneration": "Stop Generation",
@@ -2834,7 +2853,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "chat.workspaceMountDropNoProject": "Select a project before dropping an additional folder.",
     "chat.workspaceMountDropSuccess": "Mounted {count} additional read-only folder(s).",
     "chat.workspaceMountDropSkippedInside": "Skipped {count} folder(s) already inside the project.",
-    "chat.workspaceMountDropSkippedOverlap": "Skipped {count} folder(s) overlapping an existing grant.",
+    "chat.workspaceMountDropSkippedOverlap":
+      "Skipped {count} folder(s) overlapping an existing grant.",
     "chat.workspaceMountDropFailed": "Failed to process dropped content",
     "chat.image.loading": "Image loading",
     "chat.image.preparing": "Preparing image",
@@ -3292,9 +3312,11 @@ export const translations: Record<Locale, Record<string, string>> = {
     "workspaceSshTerminal.forwardAuto": "Auto",
     "workspaceSshTerminal.forwardStart": "Start forward",
     "workspaceSshTerminal.forwardStop": "Stop",
-    "workspaceSshTerminal.forwardHelp": "Listens on local 127.0.0.1 only. Leave the local port empty for auto assignment; leave the remote host empty for 127.0.0.1 on the SSH server.",
+    "workspaceSshTerminal.forwardHelp":
+      "Listens on local 127.0.0.1 only. Leave the local port empty for auto assignment; leave the remote host empty for 127.0.0.1 on the SSH server.",
     "workspaceSshTerminal.forwardInvalidRemotePort": "Remote port must be between 1 and 65535.",
-    "workspaceSshTerminal.forwardInvalidLocalPort": "Local port must be empty or between 1 and 65535.",
+    "workspaceSshTerminal.forwardInvalidLocalPort":
+      "Local port must be empty or between 1 and 65535.",
     "workspaceSshTerminal.forwardPortBusy": "That local port is already in use.",
     "workspaceSftp.local": "Local Project",
     "workspaceSftp.remote": "Remote Device",
@@ -3426,7 +3448,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.navVoice": "Voice Input",
     "settings.navUsage": "Usage & Balance",
     "settings.commandSafety.title": "Command execution safety",
-    "settings.commandSafety.desc": "Control confirmation and isolation for command tools such as Bash. Per-tool deny rules still take precedence.",
+    "settings.commandSafety.desc":
+      "Control confirmation and isolation for command tools such as Bash. Per-tool deny rules still take precedence.",
     "settings.commandSafety.auto": "Automatic",
     "settings.commandSafety.autoDesc": "Ask for risky commands and run routine commands directly.",
     "settings.commandSafety.ask": "Always ask",
@@ -3434,9 +3457,11 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.commandSafety.sandbox": "Sandbox",
     "settings.commandSafety.sandboxDesc": "Run commands in the system sandbox with network access.",
     "settings.commandSafety.sandboxOffline": "Offline sandbox",
-    "settings.commandSafety.sandboxOfflineDesc": "Run commands in the system sandbox without network access.",
+    "settings.commandSafety.sandboxOfflineDesc":
+      "Run commands in the system sandbox without network access.",
     "settings.stt.title": "Live cloud speech recognition",
-    "settings.stt.desc": "Use your own cloud credentials to transcribe microphone audio into the composer. Transcripts are never sent automatically.",
+    "settings.stt.desc":
+      "Use your own cloud credentials to transcribe microphone audio into the composer. Transcripts are never sent automatically.",
     "settings.stt.provider": "Speech provider",
     "settings.stt.secretSaved": "Stored securely; leave blank to keep it",
     "settings.stt.test": "Save and test",
@@ -3447,7 +3472,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.stt.test.network_failed": "Network connection failed",
     "settings.stt.test.protocol_failed": "Provider protocol error",
     "settings.usage.title": "Provider usage and balance",
-    "settings.usage.desc": "Query plans, balances, and consumed quota through provider APIs, using built-in modes or a custom query script.",
+    "settings.usage.desc":
+      "Query plans, balances, and consumed quota through provider APIs, using built-in modes or a custom query script.",
     "settings.usage.mode": "Query mode",
     "settings.usage.mode.coding-plan": "Coding plan",
     "settings.usage.mode.balance": "Standard balance API",
@@ -3460,11 +3486,13 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.usage.providerCredential": "Blank uses provider credentials",
     "settings.usage.script": "Query script",
     "settings.usage.scriptRequired": "Custom mode requires a script",
-    "settings.usage.scriptPreset": "Leave blank for the built-in template, or enter an editable copy",
+    "settings.usage.scriptPreset":
+      "Leave blank for the built-in template, or enter an editable copy",
     "settings.usage.test": "Test query",
     "settings.usage.refresh": "Refresh usage",
     "settings.toolPermissionsTitle": "System Tool Permissions",
-    "settings.toolPermissionsDesc": "Choose whether each system tool runs automatically, asks before running, or is always blocked. Changes apply to new tool calls immediately.",
+    "settings.toolPermissionsDesc":
+      "Choose whether each system tool runs automatically, asks before running, or is always blocked. Changes apply to new tool calls immediately.",
     "settings.toolPermissionsReset": "Reset defaults",
     "settings.toolPermissionsApplyCategory": "Set category to",
     "settings.toolPolicy.allow": "Allow",
@@ -4170,15 +4198,18 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.builtinTool.todo_write.name": "Task List",
     "settings.builtinTool.todo_write.desc": "Create and update a task list for the current session",
     "settings.builtinTool.task_create.name": "Create Task",
-    "settings.builtinTool.task_create.desc": "Add a step to the authoritative task list for this run",
+    "settings.builtinTool.task_create.desc":
+      "Add a step to the authoritative task list for this run",
     "settings.builtinTool.task_update.name": "Update Task",
     "settings.builtinTool.task_update.desc": "Update status and content by stable task ID",
     "settings.builtinTool.task_list.name": "Read Tasks",
     "settings.builtinTool.task_list.desc": "Read the authoritative task list for this run",
     "settings.builtinTool.tool_search.name": "Tool Search",
-    "settings.builtinTool.tool_search.desc": "Find and activate tools on demand in large MCP catalogs",
+    "settings.builtinTool.tool_search.desc":
+      "Find and activate tools on demand in large MCP catalogs",
     "settings.builtinTool.exit_plan_mode.name": "Submit Plan",
-    "settings.builtinTool.exit_plan_mode.desc": "Submit a plan for approval or revision in plan mode",
+    "settings.builtinTool.exit_plan_mode.desc":
+      "Submit a plan for approval or revision in plan mode",
     "settings.builtinTool.todo_write.detail":
       "Lets the model plan multi-step work as a task list and advance each item's status as it goes, shown as a live checklist card in the conversation. The list lives only in the current conversation and is not carried across conversations; chat sessions only.",
     "settings.builtinTool.cron_task_manager.name": "Scheduled Tasks",

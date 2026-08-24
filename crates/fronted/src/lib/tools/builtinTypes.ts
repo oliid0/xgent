@@ -98,12 +98,7 @@ export function createBuiltinMetadataMap(
 }
 
 export type FsEntryKind = "file" | "dir";
-export type PathScope =
-  | "workspace"
-  | "project-root"
-  | "skill"
-  | "external"
-  | "uploads";
+export type PathScope = "workspace" | "project-root" | "skill" | "external" | "uploads";
 
 export type ResolvedPathResultDetails = {
   scope?: PathScope;

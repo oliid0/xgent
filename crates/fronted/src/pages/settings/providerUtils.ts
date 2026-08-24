@@ -366,8 +366,7 @@ export async function fetchModelsFromApi(
       attempt.headers,
       {
         useSystemProxy: options?.useSystemProxy === true,
-        oauthAccountId:
-          options?.authMode === "oauth-managed" ? options.oauthAccountId : undefined,
+        oauthAccountId: options?.authMode === "oauth-managed" ? options.oauthAccountId : undefined,
       },
     );
     const modelsUrl = exactModelsUrl

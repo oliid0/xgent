@@ -179,7 +179,9 @@ export function normalizeTerminalSnapshot(
     output: input.output ?? "",
     outputBytes: normalizeBytes(input.outputBytes ?? input.output_bytes),
     truncated: input.truncated === true,
-    outputStartOffset: normalizeOptionalOffset(input.outputStartOffset ?? input.output_start_offset),
+    outputStartOffset: normalizeOptionalOffset(
+      input.outputStartOffset ?? input.output_start_offset,
+    ),
     outputEndOffset: normalizeOptionalOffset(input.outputEndOffset ?? input.output_end_offset),
   };
 }
@@ -252,7 +254,9 @@ export function normalizeTerminalEvent(input: RawTerminalEvent): TerminalEvent |
       session?.projectPathKey ??
       sshTabs.projectPathKey,
     session,
-    outputStartOffset: normalizeOptionalOffset(input.outputStartOffset ?? input.output_start_offset),
+    outputStartOffset: normalizeOptionalOffset(
+      input.outputStartOffset ?? input.output_start_offset,
+    ),
     outputEndOffset: normalizeOptionalOffset(input.outputEndOffset ?? input.output_end_offset),
     sshTabs: input.sshTabs || input.ssh_tabs ? sshTabs : undefined,
   };

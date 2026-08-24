@@ -10,6 +10,7 @@ import { ASK_USER_QUESTION_TOOL_NAME } from "../../../lib/chat/askUserQuestion";
 import type { CompactionController } from "../../../lib/chat/compaction/controller";
 import { estimateTextTokenUnits } from "../../../lib/chat/compaction/tokenLedger";
 import type { ProviderRuntimeConfig } from "../../../lib/chat/compaction/types";
+import { resolveTailBlockAnchorId } from "../../../lib/chat/context/contextTailBlock";
 import {
   isAbortedAssistantMessage,
   type SuppressedToolTraceSnapshot,
@@ -28,7 +29,6 @@ import type {
   ConversationHookLifecycle,
 } from "../../../lib/chat/conversation/run";
 import type { TurnCancellation } from "../../../lib/chat/conversation/turnCancellation";
-import { resolveTailBlockAnchorId } from "../../../lib/chat/context/contextTailBlock";
 import { memoryExtraction } from "../../../lib/chat/memory/extractionController";
 import type {
   MemoryExtractionModelConfig,
@@ -76,8 +76,8 @@ import {
   type SubagentConversationStore,
   type SubagentTemplate,
 } from "../../../lib/subagents";
-import { buildBuiltinToolRegistry } from "../../../lib/tools/builtinRegistry";
 import type { AdditionalProjectRoot } from "../../../lib/tools/additionalProjectRoots";
+import { buildBuiltinToolRegistry } from "../../../lib/tools/builtinRegistry";
 import type { BuiltinToolExecutionContext } from "../../../lib/tools/builtinTypes";
 import { createFileToolState } from "../../../lib/tools/fileToolState";
 import {
@@ -101,16 +101,16 @@ import {
   NOOP_TRAJECTORY_RECORDER,
   type TrajectoryRecorder,
 } from "../../../lib/trajectory/recorder";
-import type { TrajectoryUsage } from "../../../lib/trajectory/types";
 import {
   composeTrajectorySystemPrompt,
   serializeToolCatalog,
 } from "../../../lib/trajectory/sections";
+import type { TrajectoryUsage } from "../../../lib/trajectory/types";
 import {
   appendSystemPrompt,
   buildPartialAssistantMessage,
-  createEmptyAssistantUsage,
   type ConversationRuntimeEntry,
+  createEmptyAssistantUsage,
 } from "../runtime/chatPageRuntime";
 import { buildToolCallPreviewArguments } from "./toolCallPreview";
 import { buildTrajectoryRuntimeContext } from "./trajectoryRuntimeContext";
@@ -427,7 +427,9 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       ...(params.trajectoryMessageIndex === undefined
         ? {}
         : { messageIndex: params.trajectoryMessageIndex }),
-      ...(params.trajectoryMessageId === undefined ? {} : { messageId: params.trajectoryMessageId }),
+      ...(params.trajectoryMessageId === undefined
+        ? {}
+        : { messageId: params.trajectoryMessageId }),
     });
   }
 
@@ -655,15 +657,13 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     enabledMcpServerCount: selectEnabledMcpServers(getMcpSettings()).length,
   });
   const toolPoliciesSnapshot = getToolPolicies?.();
-  const combinedTools = builtinRegistry.tools.filter(
-    (tool) => {
-      const metadata = builtinRegistry.metadataByName.get(tool.name);
-      return (
-        (!planModeEnabled || isPlanModeAllowedTool(tool.name, metadata)) &&
-        resolveToolPolicy(tool.name, metadata, toolPoliciesSnapshot) !== "deny"
-      );
-    },
-  );
+  const combinedTools = builtinRegistry.tools.filter((tool) => {
+    const metadata = builtinRegistry.metadataByName.get(tool.name);
+    return (
+      (!planModeEnabled || isPlanModeAllowedTool(tool.name, metadata)) &&
+      resolveToolPolicy(tool.name, metadata, toolPoliciesSnapshot) !== "deny"
+    );
+  });
 
   const preCompactionStartedAt = perfNowMs();
   await compaction.maybeCompactPreSend({
@@ -723,11 +723,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       const repeatGate = planRunPolicy.guardRepeatedToolCall(toolCall);
       if (!repeatGate.allow) return repeatGate;
     }
-    const policy = resolveToolPolicy(
-      toolCall.name,
-      metadata,
-      getToolPolicies?.(),
-    );
+    const policy = resolveToolPolicy(toolCall.name, metadata, getToolPolicies?.());
     if (policy === "deny") {
       return {
         allow: false,
@@ -1017,7 +1013,9 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
             toolCatalog,
           };
           const actualSystemPrompt =
-            typeof requestContext.systemPrompt === "string" ? requestContext.systemPrompt : undefined;
+            typeof requestContext.systemPrompt === "string"
+              ? requestContext.systemPrompt
+              : undefined;
           const reconstructed = composeTrajectorySystemPrompt(segmentedHeader);
           const headerId = trajectory.captureHeader(
             actualSystemPrompt !== undefined && reconstructed !== actualSystemPrompt

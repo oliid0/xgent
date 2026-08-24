@@ -60,8 +60,8 @@ import {
 import {
   appendMessagesToConversation,
   buildRequestContext,
-  clearTaskListState,
   type ConversationViewState,
+  clearTaskListState,
   createConversationStateFromContext,
   getActiveSegment,
   type HistoryMessageRef,
@@ -81,8 +81,8 @@ import {
   setChatHistoryModel,
 } from "../lib/chat/history/chatHistory";
 import { memoryExtraction } from "../lib/chat/memory/extractionController";
-import { memoryTurnInjection } from "../lib/chat/memory/injectionController";
 import type { MemoryExtractionStatusKey } from "../lib/chat/memory/extractionEngine";
+import { memoryTurnInjection } from "../lib/chat/memory/injectionController";
 import {
   type CodeMentionReference,
   escapeMarkdownReferenceLabel,
@@ -105,9 +105,9 @@ import {
   getFirstUserMessageText,
   isAbortLikeError,
 } from "../lib/chat/page/chatPageHelpers";
+import type { AgentRunnerFailoverParams } from "../lib/chat/runner/agentRunner";
 import type { ScrollFollowHandle } from "../lib/chat-scroll/useScrollFollow";
 import { createStreamDebugLogger } from "../lib/debug/agentDebug";
-import type { AgentRunnerFailoverParams } from "../lib/chat/runner/agentRunner";
 import { tauriGitClient } from "../lib/git/tauriGitClient";
 import { memoryDeleteProject } from "../lib/memory/api";
 import { buildMemoryOverviewSection } from "../lib/memory/prompts/injection";
@@ -146,8 +146,8 @@ import {
   removeWorkspaceResourceReferences,
   removeWorkspaceToolsProjectState,
   resolveEffectiveTheme,
-  resolveWorkspaceResources,
   resolveWorkspaceProjects,
+  resolveWorkspaceResources,
   type SelectedModel,
   type SystemToolId,
   serializeSelectedModelJson,
@@ -169,8 +169,6 @@ import {
 import { tauriSftpClient } from "../lib/sftp/tauriSftpClient";
 import { createUuid } from "../lib/shared/id";
 import { cn } from "../lib/shared/utils";
-import { buildTrayMenuModel, syncTrayMenu } from "../lib/tray/trayMenu";
-import { useTrayPrefs } from "../lib/tray/trayPrefs";
 import { createGuiSidebarBackend } from "../lib/sidebar/guiSidebarBackend";
 import {
   type ConversationOpenState,
@@ -197,17 +195,18 @@ import {
   sortTerminalSessions,
   terminalSessionBelongsToProject,
 } from "../lib/terminal/sessionStore";
-import { tauriTerminalClient } from "../lib/terminal/tauriTerminalClient";
 import { tauriSshLocalForwardClient } from "../lib/terminal/tauriSshLocalForwardClient";
+import { tauriTerminalClient } from "../lib/terminal/tauriTerminalClient";
 import type { TerminalSession, TerminalShellOption } from "../lib/terminal/types";
+import type { AdditionalProjectRoot } from "../lib/tools/additionalProjectRoots";
 import { invokeFs } from "../lib/tools/fsBackend";
-import type { SkillAccessPolicy } from "../lib/tools/skillAccessPolicy";
 import {
   answerPlanDecision,
   getPendingPlanForConversation,
   isPlanApprovalMessage,
   registerPlanDecisionHandlers,
 } from "../lib/tools/planModeTools";
+import type { SkillAccessPolicy } from "../lib/tools/skillAccessPolicy";
 import { disposeTodoToolState } from "../lib/tools/todoTools";
 import {
   answerToolApproval,
@@ -216,15 +215,30 @@ import {
   listPendingToolApprovalsForConversation,
   subscribeToolApprovals,
 } from "../lib/tools/toolApproval";
+import {
+  clearLocalTrajectory,
+  invalidateDesktopTrajectory,
+} from "../lib/trajectory/liveTrajectory";
+import {
+  acquireTrajectoryRecorder,
+  releaseTrajectoryRecorder,
+  resolveTrajectoryTurnNumber,
+  trajectorySlotCapture,
+  updateTrajectoryRecorderSegment,
+} from "../lib/trajectory/recorderRegistry";
+import { buildTrayMenuModel, syncTrayMenu } from "../lib/tray/trayMenu";
+import { useTrayPrefs } from "../lib/tray/trayPrefs";
 import { tauriWorkspaceActivityClient } from "../lib/workspace-activity/tauriWorkspaceActivityClient";
-import { CurrentTaskProgress } from "./chat/components/CurrentTaskProgress";
-import { DesktopCheckpointRewindProvider } from "./chat/components/DesktopCheckpointRewindProvider";
-import { WorkspaceCloneTaskOverlay } from "./chat/components/WorkspaceCloneTaskOverlay";
 import {
   fallbackWorkspaceProjectName,
   findWorkspaceProject,
   mergeWorkspaceProjectsWithHistory,
 } from "../lib/workspaceProjects";
+import {
+  applyWorkspaceRootGrants,
+  buildDroppedWorkspaceRootDrafts,
+  listWorkspaceRootGrants,
+} from "../lib/workspaceRootGrants";
 import {
   buildErrorAssistantMessage,
   buildPreparedContext as buildPreparedConversationContext,
@@ -251,33 +265,16 @@ import {
   useLiveTranscriptController,
   usePendingUploads,
 } from "./chat";
-import { useContextUsageTokensSource } from "./chat/hooks/useContextUsageTokensSource";
-import { useChatFileLinkNavigation } from "./chat/hooks/useChatFileLinkNavigation";
-import { syncMovedConversationRuntimeWorkdir } from "./chat/runtime/chatPageRuntime";
+import { BrowserPanel } from "./chat/browser/BrowserPanel";
+import { CurrentTaskProgress } from "./chat/components/CurrentTaskProgress";
+import { DesktopCheckpointRewindProvider } from "./chat/components/DesktopCheckpointRewindProvider";
+import { WorkspaceCloneTaskOverlay } from "./chat/components/WorkspaceCloneTaskOverlay";
 import {
   isNativeDropInsideUploadZone,
   nativeDropPositionScaleFactor,
 } from "./chat/hooks/nativeFileDropRouting";
-import { useManualCompaction } from "./chat/runtime/useManualCompaction";
-import { buildModelFailoverPlan } from "./chat/runtime/providerRuntimeConfig";
-import type { AdditionalProjectRoot } from "../lib/tools/additionalProjectRoots";
-import {
-  acquireTrajectoryRecorder,
-  releaseTrajectoryRecorder,
-  resolveTrajectoryTurnNumber,
-  trajectorySlotCapture,
-  updateTrajectoryRecorderSegment,
-} from "../lib/trajectory/recorderRegistry";
-import {
-  clearLocalTrajectory,
-  invalidateDesktopTrajectory,
-} from "../lib/trajectory/liveTrajectory";
-import {
-  applyWorkspaceRootGrants,
-  buildDroppedWorkspaceRootDrafts,
-  listWorkspaceRootGrants,
-} from "../lib/workspaceRootGrants";
-import { BrowserPanel } from "./chat/browser/BrowserPanel";
+import { useChatFileLinkNavigation } from "./chat/hooks/useChatFileLinkNavigation";
+import { useContextUsageTokensSource } from "./chat/hooks/useContextUsageTokensSource";
 import {
   buildConversationRuntimeSnapshotEntries,
   type ConversationRuntimeSnapshotState,
@@ -308,6 +305,9 @@ import {
   resolveQueuedChatTurnSlotIndex,
   takeNextQueuedChatTurn,
 } from "./chat/queue/chatTurnQueue";
+import { syncMovedConversationRuntimeWorkdir } from "./chat/runtime/chatPageRuntime";
+import { buildModelFailoverPlan } from "./chat/runtime/providerRuntimeConfig";
+import { useManualCompaction } from "./chat/runtime/useManualCompaction";
 import { ChatSidebarContainer } from "./chat/sidebar/ChatSidebarContainer";
 import { McpHubPage } from "./mcp-hub/McpHubPage";
 import type { SectionId, SettingsOpenOptions } from "./settings/types";
@@ -1097,10 +1097,7 @@ export function ChatPage(props: ChatPageProps) {
       setMobileWorkspaceCreateOpen(true);
       return;
     }
-  }, [
-    desktopBridgeEnabled,
-    nativeMobile,
-  ]);
+  }, [desktopBridgeEnabled, nativeMobile]);
 
   const commitWorkspaceProjectRename = useCallback(
     (project: WorkspaceProject, nextNameInput: string) => {
@@ -1352,10 +1349,7 @@ export function ChatPage(props: ChatPageProps) {
             planModeEnabled: false,
           },
         }));
-        pendingPlanContinuationsRef.current.set(
-          conversationId,
-          t("chat.planMode.executePrompt"),
-        );
+        pendingPlanContinuationsRef.current.set(conversationId, t("chat.planMode.executePrompt"));
         setPlanContinuationVersion((version) => version + 1);
       },
       onReject: ({ conversationId, feedback }) => {
@@ -1381,10 +1375,7 @@ export function ChatPage(props: ChatPageProps) {
           .then((accepted) => {
             if (!accepted && !store.has(conversationId)) {
               store.set(conversationId, text);
-              window.setTimeout(
-                () => setPlanContinuationVersion((version) => version + 1),
-                750,
-              );
+              window.setTimeout(() => setPlanContinuationVersion((version) => version + 1), 750);
             }
           })
           .catch((error) => {
@@ -3519,9 +3510,7 @@ export function ChatPage(props: ChatPageProps) {
     const effectiveIsAgentDevExecutionMode = isAgentDevMode(effectiveExecutionMode);
     const workspaceResources = resolveWorkspaceResources(settings, effectiveWorkdir);
     const effectiveSkillsEnabled = workspaceResources.skillsEnabled && effectiveIsAgentMode;
-    const effectiveSelectedSkillNames = effectiveSkillsEnabled
-      ? workspaceResources.skillNames
-      : [];
+    const effectiveSelectedSkillNames = effectiveSkillsEnabled ? workspaceResources.skillNames : [];
     const getEffectiveMcpSettings = () =>
       filterMcpSettingsForWorkspace(getMcpSettings(), workspaceResources);
     const conversationRunId = createConversationRunId(conversationId);
@@ -3606,11 +3595,7 @@ export function ChatPage(props: ChatPageProps) {
     );
     const runtimeControls = overrides?.runtimeControlsOverride ?? settings.chatRuntimeControls;
     const providerConfig = buildProviderRuntimeConfig(provider, model, runtimeControls);
-    const failoverPlan = buildModelFailoverPlan(
-      settings,
-      effectiveSelectedModel,
-      runtimeControls,
-    );
+    const failoverPlan = buildModelFailoverPlan(settings, effectiveSelectedModel, runtimeControls);
     const failoverParams: AgentRunnerFailoverParams | undefined = failoverPlan
       ? {
           config: failoverPlan.config,
@@ -4430,9 +4415,7 @@ export function ChatPage(props: ChatPageProps) {
               setSettings((prev) =>
                 removeWorkspaceResourceReferences(
                   updateSkills(prev, {
-                    selected: prev.skills.selected.filter(
-                      (name) => !change.names.includes(name),
-                    ),
+                    selected: prev.skills.selected.filter((name) => !change.names.includes(name)),
                   }),
                   { skillNames: change.names },
                 ),
@@ -4448,9 +4431,7 @@ export function ChatPage(props: ChatPageProps) {
             commandSafetyMode: settings.system.commandSafetyMode,
             planModeEnabled: runtimeControls.planModeEnabled,
             applyMcpOps: (ops) => {
-              const removedIds = ops
-                .filter((op) => op.kind === "remove")
-                .map((op) => op.serverId);
+              const removedIds = ops.filter((op) => op.kind === "remove").map((op) => op.serverId);
               setSettings((prev) =>
                 removeWorkspaceResourceReferences(applyMcpOpsToAppSettings(prev, ops), {
                   mcpServerIds: removedIds,
@@ -4497,10 +4478,7 @@ export function ChatPage(props: ChatPageProps) {
             persistConversationWithHistorySync,
             trajectory: trajectoryRecording?.recorder,
             trajectoryTurn,
-            trajectoryMessageIndex: Math.max(
-              0,
-              nextConversationState.meta.totalMessageCount - 1,
-            ),
+            trajectoryMessageIndex: Math.max(0, nextConversationState.meta.totalMessageCount - 1),
             trajectoryMessageId: pendingUserMessage.id,
             readTrajectorySlots: trajectoryRecording?.readSlots,
           },
@@ -4559,10 +4537,7 @@ export function ChatPage(props: ChatPageProps) {
             persistConversationWithHistorySync,
             trajectory: trajectoryRecording?.recorder,
             trajectoryTurn,
-            trajectoryMessageIndex: Math.max(
-              0,
-              nextConversationState.meta.totalMessageCount - 1,
-            ),
+            trajectoryMessageIndex: Math.max(0, nextConversationState.meta.totalMessageCount - 1),
             trajectoryMessageId: pendingUserMessage.id,
             readTrajectorySlots: trajectoryRecording?.readSlots,
           },
@@ -4948,7 +4923,11 @@ export function ChatPage(props: ChatPageProps) {
     }
     if (conversationId) consumeConversationStop(conversationId);
     void sendActionRef.current();
-  }, [enqueueCurrentComposerTurn, isConversationRunning, settings.chatRuntimeControls.planModeEnabled]);
+  }, [
+    enqueueCurrentComposerTurn,
+    isConversationRunning,
+    settings.chatRuntimeControls.planModeEnabled,
+  ]);
 
   const handleStopSending = useCallback(() => {
     stopSendingActionRef.current();
@@ -5190,14 +5169,7 @@ export function ChatPage(props: ChatPageProps) {
         setErrorMessage(asErrorMessage(error, t("chat.workspaceMountDropFailed")));
       }
     },
-    [
-      activeWorkspaceProject,
-      addNotify,
-      canDropUpload,
-      fileDropTitle,
-      importReadableFilePaths,
-      t,
-    ],
+    [activeWorkspaceProject, addNotify, canDropUpload, fileDropTitle, importReadableFilePaths, t],
   );
 
   useEffect(() => {
@@ -5612,35 +5584,37 @@ export function ChatPage(props: ChatPageProps) {
               >
                 <ChangedFilesActionsProvider value={changedFilesActions}>
                   <ChatTranscript
-                  conversationId={currentConversationId}
-                  workspaceRoot={currentConversationWorkspaceRoot}
-                  gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
-                  followRef={scrollFollowRef}
-                  hasModels={hasModels}
-                  historyItems={historyRenderItems}
-                  hasMoreHistory={conversationState.transcript.hasMoreBefore}
-                  onLoadEarlierHistory={handleLoadEarlierHistory}
-                  isHistorySwitching={conversationOpenState.showOverlay}
-                  isSending={isSending}
-                  isAgentMode={isAgentMode}
-                  showUsage={isAgentDevExecutionMode}
-                  usageContextWindow={currentModelContextWindow}
-                  liveTranscriptStore={liveTranscriptStore}
-                  isCompactionRunning={isCompactionRunning}
-                  bottomReservePx={composerOverlayHeight}
-                  onOpenFileLink={desktopCommandHostAvailable ? handleOpenChatFileLink : undefined}
-                  onResendFromEdit={handleResendFromEdit}
-                  onBranchConversation={
-                    // 水合中/水合失败时 handler 只会静默 return——直接不传，
-                    // 让 AssistantRow 的 disabled 分支给出可见的禁用态。
-                    isConversationHydrating || isConversationHydrationFailed
-                      ? undefined
-                      : handleBranchConversation
-                  }
-                  branchPendingMessageId={branchPendingMessageId}
-                  onOpenSettings={onOpenSettings}
-                  onSuggestionSelect={handleEmptyStateSuggestion}
-                  suggestionsDisabled={isSuggestionTyping}
+                    conversationId={currentConversationId}
+                    workspaceRoot={currentConversationWorkspaceRoot}
+                    gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
+                    followRef={scrollFollowRef}
+                    hasModels={hasModels}
+                    historyItems={historyRenderItems}
+                    hasMoreHistory={conversationState.transcript.hasMoreBefore}
+                    onLoadEarlierHistory={handleLoadEarlierHistory}
+                    isHistorySwitching={conversationOpenState.showOverlay}
+                    isSending={isSending}
+                    isAgentMode={isAgentMode}
+                    showUsage={isAgentDevExecutionMode}
+                    usageContextWindow={currentModelContextWindow}
+                    liveTranscriptStore={liveTranscriptStore}
+                    isCompactionRunning={isCompactionRunning}
+                    bottomReservePx={composerOverlayHeight}
+                    onOpenFileLink={
+                      desktopCommandHostAvailable ? handleOpenChatFileLink : undefined
+                    }
+                    onResendFromEdit={handleResendFromEdit}
+                    onBranchConversation={
+                      // 水合中/水合失败时 handler 只会静默 return——直接不传，
+                      // 让 AssistantRow 的 disabled 分支给出可见的禁用态。
+                      isConversationHydrating || isConversationHydrationFailed
+                        ? undefined
+                        : handleBranchConversation
+                    }
+                    branchPendingMessageId={branchPendingMessageId}
+                    onOpenSettings={onOpenSettings}
+                    onSuggestionSelect={handleEmptyStateSuggestion}
+                    suggestionsDisabled={isSuggestionTyping}
                   />
                 </ChangedFilesActionsProvider>
               </DesktopCheckpointRewindProvider>
@@ -5662,9 +5636,7 @@ export function ChatPage(props: ChatPageProps) {
                 liveTranscriptStore={liveTranscriptStore}
                 isConversationRunning={
                   isSending ||
-                  (currentConversationId
-                    ? isConversationRunning(currentConversationId)
-                    : false)
+                  (currentConversationId ? isConversationRunning(currentConversationId) : false)
                 }
                 persistedState={conversationState.meta.taskList}
               />

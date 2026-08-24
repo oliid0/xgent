@@ -378,8 +378,7 @@ export async function buildBuiltinToolRegistry(
             conversationId: params.toolSearch.conversationId,
             entries: mcpBusinessBundle.tools.map((tool) => ({
               tool,
-              serverLabel:
-                mcpBusinessBundle.metadataByName.get(tool.name)?.serverId ?? "MCP",
+              serverLabel: mcpBusinessBundle.metadataByName.get(tool.name)?.serverId ?? "MCP",
             })),
           }),
         ]
@@ -425,38 +424,40 @@ export async function buildBuiltinToolRegistry(
       })
     : null;
   const parentBundles = parentMessageBundle ? [...baseBundles, parentMessageBundle] : baseBundles;
-  return finalizeRegistry(createBuiltinToolRegistry([
-    ...parentBundles,
-    ...chatBundles,
-    createSubagentTools({
-      providerId: subagentRuntime.providerId,
-      model: subagentRuntime.model,
-      runtime: subagentRuntime.runtime,
-      runtimePlatform: params.runtimePlatform,
-      workdir: params.workdir,
-      resolveHomeDir,
-      sessionId: subagentRuntime.sessionId,
-      templates: subagentRuntime.templates,
-      store: subagentRuntime.store,
-      scheduler: subagentRuntime.scheduler,
-      forceReadonly: planModeActive,
-      baseTools: baseRegistry.tools,
-      executeToolCall: baseRegistry.executeToolCall,
-      metadataByName: baseRegistry.metadataByName,
-      createSubagentToolRegistry: async (workdir) =>
-        createBuiltinToolRegistry(
-          await buildBaseBuiltinToolBundles({
-            ...params,
-            workdir,
-            checkpoint: undefined,
-            fileState: createFileToolState(),
-            skillsEnabled: false,
-            applyMcpOps: undefined,
-            selectedSystemToolIds: [],
-            mcpLoadFailureMode: "continue",
-            memoryToolMode: "ro",
-          }),
-        ),
-    }),
-  ]));
+  return finalizeRegistry(
+    createBuiltinToolRegistry([
+      ...parentBundles,
+      ...chatBundles,
+      createSubagentTools({
+        providerId: subagentRuntime.providerId,
+        model: subagentRuntime.model,
+        runtime: subagentRuntime.runtime,
+        runtimePlatform: params.runtimePlatform,
+        workdir: params.workdir,
+        resolveHomeDir,
+        sessionId: subagentRuntime.sessionId,
+        templates: subagentRuntime.templates,
+        store: subagentRuntime.store,
+        scheduler: subagentRuntime.scheduler,
+        forceReadonly: planModeActive,
+        baseTools: baseRegistry.tools,
+        executeToolCall: baseRegistry.executeToolCall,
+        metadataByName: baseRegistry.metadataByName,
+        createSubagentToolRegistry: async (workdir) =>
+          createBuiltinToolRegistry(
+            await buildBaseBuiltinToolBundles({
+              ...params,
+              workdir,
+              checkpoint: undefined,
+              fileState: createFileToolState(),
+              skillsEnabled: false,
+              applyMcpOps: undefined,
+              selectedSystemToolIds: [],
+              mcpLoadFailureMode: "continue",
+              memoryToolMode: "ro",
+            }),
+          ),
+      }),
+    ]),
+  );
 }

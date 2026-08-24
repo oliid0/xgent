@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { resolveStreamingRenderDelay } from "../../../lib/chat/streamingRenderPolicy";
 import { createCompactionControllerRegistry } from "../../../lib/chat/compaction/controller";
 import {
   cloneLiveRoundSnapshots,
@@ -11,6 +10,7 @@ import {
   type RetryAttemptRecord,
 } from "../../../lib/chat/conversation/liveTranscriptStore";
 import type { LiveRound } from "../../../lib/chat/messages/uiMessages";
+import { resolveStreamingRenderDelay } from "../../../lib/chat/streamingRenderPolicy";
 import { clearDesktopLiveTrajectory } from "../../../lib/trajectory/liveTrajectory";
 import { discardTrajectoryRecorder } from "../../../lib/trajectory/recorderRegistry";
 

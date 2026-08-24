@@ -46,9 +46,7 @@ export async function dismissGitClone(taskId: string): Promise<GitCloneTask[]> {
   return Array.isArray(tasks) ? tasks.map(normalizeGitCloneTask) : [];
 }
 
-export async function listGitRemoteBranches(
-  remoteUrl: string,
-): Promise<GitRemoteBranchesResponse> {
+export async function listGitRemoteBranches(remoteUrl: string): Promise<GitRemoteBranchesResponse> {
   return normalizeGitRemoteBranchesResponse(
     await invoke("git_list_remote_branches", { remote_url: remoteUrl }),
   );

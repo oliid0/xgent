@@ -1,5 +1,5 @@
-import type { MentionComposerHandle } from "../../../components/chat/MentionComposer";
 import { type MutableRefObject, useCallback, useEffect, useRef } from "react";
+import type { MentionComposerHandle } from "../../../components/chat/MentionComposer";
 import type { ConversationDraftStore } from "../conversations/conversationDraftStore";
 
 type UseComposerDraftCacheParams = {

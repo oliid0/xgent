@@ -19,9 +19,7 @@ function decodeLinkPath(value: string) {
   }
 }
 
-function parseLocation(
-  fragment: string,
-): Pick<ChatFileLink, "line" | "endLine" | "column"> {
+function parseLocation(fragment: string): Pick<ChatFileLink, "line" | "endLine" | "column"> {
   const value = fragment.trim();
   let match = value.match(/^L?(\d+)(?:[-:]L?(\d+))?(?::?C(\d+))?$/i);
   if (!match) match = value.match(/^line-(\d+)(?:-(\d+))?(?:-column-(\d+))?$/i);

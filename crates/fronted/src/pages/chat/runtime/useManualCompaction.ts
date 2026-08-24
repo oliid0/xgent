@@ -1,5 +1,5 @@
 import { deriveContextUsageTokens } from "@xagent/ui/lib/chat/contextUsage";
-import { useCallback, type MutableRefObject } from "react";
+import { type MutableRefObject, useCallback } from "react";
 import { readMessageContextUsage } from "../../../lib/chat/compaction/contextUsageMetadata";
 import type {
   CompactionController,
@@ -194,11 +194,7 @@ export function useManualCompaction(params: {
           conversationSelectedModel: runtimeEntry.selectedModel,
         });
         const { provider, providerId, model, selectedModel } = effective;
-        const runtime = createProviderRuntimeConfig(
-          provider,
-          model,
-          settings.chatRuntimeControls,
-        );
+        const runtime = createProviderRuntimeConfig(provider, model, settings.chatRuntimeControls);
         const promptInputs = await resolveManualCompactionPromptInputs({
           isCurrentConversation: isCurrentConversation(),
           workdir: runtimeEntry.workdir,

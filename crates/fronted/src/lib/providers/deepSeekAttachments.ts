@@ -1,10 +1,10 @@
 import type { Context, UserMessage } from "@earendil-works/pi-ai";
+import { invoke } from "@xagent/runtime";
 import {
   getUserMessageAttachments,
   type PendingUploadedFile,
   parsePastedTextDisplayReferences,
 } from "@xagent/ui/lib/chat/uploadedFiles";
-import { invoke } from "@xagent/runtime";
 
 type NativeAttachmentCommandResponse = {
   mimeType: string;

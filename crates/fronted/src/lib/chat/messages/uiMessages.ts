@@ -5,8 +5,6 @@ import type {
   ToolResultMessage,
   Usage,
 } from "@earendil-works/pi-ai";
-import { assistantMessageToText } from "../../providers/llm";
-import { isProviderNativeWebSearchToolName } from "../../providers/nativeWebSearch";
 import {
   enrichHostedSearchContentWithText,
   type HostedSearchBlock,
@@ -24,6 +22,8 @@ import {
   type SubagentBatchDetails,
   type SubagentCardDetails,
 } from "@xagent/ui/lib/subagents/protocol";
+import { assistantMessageToText } from "../../providers/llm";
+import { isProviderNativeWebSearchToolName } from "../../providers/nativeWebSearch";
 import { isSubagentCardToolCall } from "../../subagents/card";
 import { GLOBAL_BASH_MAX_TIMEOUT_MS, MIN_BASH_TIMEOUT_MS } from "../../tools/bashTimeoutPolicy";
 import { readMessageContextUsage } from "../compaction/contextUsageMetadata";
@@ -882,15 +882,11 @@ function upsertToolBlock(
 }
 
 export function getRoundText(round: Pick<UiRound, "blocks">) {
-  return round.blocks
-    .flatMap((block) => (block.kind === "text" ? [block.text] : []))
-    .join("");
+  return round.blocks.flatMap((block) => (block.kind === "text" ? [block.text] : [])).join("");
 }
 
 export function getRoundThinkingText(round: Pick<UiRound, "blocks">) {
-  return round.blocks
-    .flatMap((block) => (block.kind === "thinking" ? [block.text] : []))
-    .join("");
+  return round.blocks.flatMap((block) => (block.kind === "thinking" ? [block.text] : [])).join("");
 }
 
 export function getRoundToolTrace(round: Pick<UiRound, "blocks">): ToolTraceItem[] {
@@ -961,12 +957,11 @@ export function markToolCallRunningInRound<
   let runningToolCallIds = round.runningToolCallIds;
   for (const id of runningCandidateIds) {
     if (!visibleToolCallIds.has(id) || runningToolCallIds.includes(id)) continue;
-    if (runningToolCallIds === round.runningToolCallIds) runningToolCallIds = runningToolCallIds.slice();
+    if (runningToolCallIds === round.runningToolCallIds)
+      runningToolCallIds = runningToolCallIds.slice();
     runningToolCallIds.push(id);
   }
-  return runningToolCallIds === round.runningToolCallIds
-    ? round
-    : { ...round, runningToolCallIds };
+  return runningToolCallIds === round.runningToolCallIds ? round : { ...round, runningToolCallIds };
 }
 
 export function attachToolResultToRound<TRound extends Pick<UiRound, "blocks">>(

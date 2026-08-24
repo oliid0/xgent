@@ -1,7 +1,7 @@
-import { Check, Loader2 } from "../icons";
 import { useLocale } from "../../i18n";
 import type { TaskProgressSnapshot } from "../../lib/chat/taskProgress";
 import { cn } from "../../lib/shared/utils";
+import { Check, Loader2 } from "../icons";
 
 export function TaskProgressBar(props: {
   snapshot: TaskProgressSnapshot | null;

@@ -2,19 +2,10 @@ import { ChevronDown, ChevronUp, Waypoints } from "../../components/icons";
 import { Input } from "../../components/ui/input";
 import { Switch } from "../../components/ui/switch";
 import { useLocale } from "../../i18n";
-import type {
-  ModelFailoverProviderSettings,
-  ProviderId,
-} from "../../lib/settings";
+import type { ModelFailoverProviderSettings, ProviderId } from "../../lib/settings";
 import type { SettingsSectionProps } from "./types";
 
-const PROVIDER_TYPES: readonly ProviderId[] = [
-  "claude_code",
-  "codex",
-  "gemini",
-  "xai",
-  "deepseek",
-];
+const PROVIDER_TYPES: readonly ProviderId[] = ["claude_code", "codex", "gemini", "xai", "deepseek"];
 
 const PROVIDER_LABELS: Record<ProviderId, string> = {
   claude_code: "Anthropic",
@@ -88,10 +79,7 @@ export function ModelFailoverSection({ settings, setSettings }: SettingsSectionP
         );
 
         return (
-          <section
-            key={providerType}
-            className="rounded-2xl border border-border/60 bg-card p-4"
-          >
+          <section key={providerType} className="rounded-2xl border border-border/60 bg-card p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h3 className="text-sm font-semibold">{PROVIDER_LABELS[providerType]}</h3>
@@ -130,10 +118,7 @@ export function ModelFailoverSection({ settings, setSettings }: SettingsSectionP
                   value={config.failureThreshold}
                   onChange={(event) =>
                     updateProvider(providerType, {
-                      failureThreshold: Math.min(
-                        10,
-                        Math.max(1, Number(event.target.value) || 1),
-                      ),
+                      failureThreshold: Math.min(10, Math.max(1, Number(event.target.value) || 1)),
                     })
                   }
                 />
@@ -147,10 +132,7 @@ export function ModelFailoverSection({ settings, setSettings }: SettingsSectionP
                   value={config.cooldownSeconds}
                   onChange={(event) =>
                     updateProvider(providerType, {
-                      cooldownSeconds: Math.min(
-                        3600,
-                        Math.max(5, Number(event.target.value) || 5),
-                      ),
+                      cooldownSeconds: Math.min(3600, Math.max(5, Number(event.target.value) || 5)),
                     })
                   }
                 />

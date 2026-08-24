@@ -40,7 +40,8 @@ export function useProviderUsageWithQuery(
 ) {
   const [states, setStates] = useState<Record<string, ProviderUsageViewState>>({});
   const enabledIds = useMemo(
-    () => providers.filter((provider) => provider.usageQuery?.enabled).map((provider) => provider.id),
+    () =>
+      providers.filter((provider) => provider.usageQuery?.enabled).map((provider) => provider.id),
     [providers],
   );
 

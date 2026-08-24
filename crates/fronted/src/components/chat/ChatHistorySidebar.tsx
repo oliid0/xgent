@@ -395,8 +395,8 @@ const HistoryRow = memo(function HistoryRow(props: {
         isSelected
           ? "bg-primary/10 text-foreground ring-1 ring-inset ring-primary/20"
           : isActive
-          ? "bg-foreground/[0.07] text-foreground hover:bg-foreground/[0.09]"
-          : "text-foreground/85 hover:bg-foreground/[0.05] hover:text-foreground",
+            ? "bg-foreground/[0.07] text-foreground hover:bg-foreground/[0.09]"
+            : "text-foreground/85 hover:bg-foreground/[0.05] hover:text-foreground",
       )}
     >
       {isRenaming ? (
@@ -1367,11 +1367,9 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   const handleUnarchiveProject = useStableEvent((project: WorkspaceProject) => {
     onUnarchiveProject?.(project);
   });
-  const handleMoveProjectToGroup = useStableEvent(
-    (projectPath: string, groupId: string | null) => {
-      onMoveProjectToGroup?.(projectPath, groupId);
-    },
-  );
+  const handleMoveProjectToGroup = useStableEvent((projectPath: string, groupId: string | null) => {
+    onMoveProjectToGroup?.(projectPath, groupId);
+  });
   // Archived rows are split into their own collapsed group at the list end;
   // the render cap only applies to the active rows.
   const activeProjects = useMemo(
@@ -2247,9 +2245,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                                 onSetProjectPinned={handleSetProjectPinned}
                                 onRemoveProject={handleRemoveProject}
                                 workspaceProjectGroups={workspaceProjectGroups}
-                                currentGroupId={
-                                  activeProjectGroupIds.get(pathKey) ?? null
-                                }
+                                currentGroupId={activeProjectGroupIds.get(pathKey) ?? null}
                                 onMoveProjectToGroup={
                                   onMoveProjectToGroup ? handleMoveProjectToGroup : undefined
                                 }

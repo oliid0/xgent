@@ -97,7 +97,9 @@ type DeepSeekOpenAIResponsesOptions = OpenAIResponsesOptions & {
   toolChoice?: DeepSeekResponsesToolChoice;
 };
 
-function mapToolChoice(toolChoice: ToolChoice | undefined): DeepSeekResponsesToolChoice | undefined {
+function mapToolChoice(
+  toolChoice: ToolChoice | undefined,
+): DeepSeekResponsesToolChoice | undefined {
   if (!toolChoice) return undefined;
   if (toolChoice === "any") return "required";
   if (toolChoice === "auto" || toolChoice === "none") return toolChoice;

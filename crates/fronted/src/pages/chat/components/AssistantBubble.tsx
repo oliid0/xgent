@@ -2,15 +2,12 @@ import { memo, useMemo } from "react";
 
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
 import { CloudArtifactsCard } from "../../../components/chat/CloudArtifactsCard";
-import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
 import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
+import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
 import { collectChangedFiles } from "../../../lib/chat/messages/changedFiles";
 import { collectCloudArtifacts } from "../../../lib/chat/messages/cloudArtifacts";
 import type { UiRound } from "../../../lib/chat/messages/uiMessages";
-import {
-  normalizeLiveToolStatus,
-  VIBING_STATUS,
-} from "../../../lib/chat/page/chatPageHelpers";
+import { normalizeLiveToolStatus, VIBING_STATUS } from "../../../lib/chat/page/chatPageHelpers";
 import { cn } from "../../../lib/shared/utils";
 import type { AssistantUnitRow } from "../transcript/rowModel";
 
@@ -20,11 +17,7 @@ import {
   RoundBlockContent,
   RoundContent,
 } from "./assistant-bubble/RoundContent";
-import {
-  AssistantStatus,
-  CompactingText,
-  VibingText,
-} from "./assistant-bubble/StatusText";
+import { AssistantStatus, CompactingText, VibingText } from "./assistant-bubble/StatusText";
 import { UsagePanel } from "./assistant-bubble/UsagePanel";
 
 export { AssistantAvatar } from "./assistant-bubble/AssistantAvatar";

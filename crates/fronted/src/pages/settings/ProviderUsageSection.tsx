@@ -1,20 +1,20 @@
+import { useState } from "react";
 import { Loader2, RefreshCw, Wallet } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
+  type ProviderUsageResult,
   testProviderUsage,
   useProviderUsage,
-  type ProviderUsageResult,
 } from "../../lib/providers/usageQuery";
 import {
+  type CustomProvider,
   getDefaultUsageQueryConfig,
   normalizeUsageQueryConfig,
-  type CustomProvider,
   type UsageQueryConfig,
   type UsageQueryMode,
   updateCustomProviders,
 } from "../../lib/settings";
 import { cn } from "../../lib/shared/utils";
-import { useState } from "react";
 import type { SettingsSectionProps } from "./types";
 
 const MODES: UsageQueryMode[] = ["coding-plan", "balance", "general", "newapi", "custom"];
@@ -30,8 +30,13 @@ function UsageResultView({ result }: { result: ProviderUsageResult | null }) {
   return (
     <div className="mt-3 grid gap-2 sm:grid-cols-2">
       {result.data.map((item, index) => (
-        <div key={`${item.planName ?? "usage"}-${index}`} className="rounded-xl bg-muted/45 p-3 text-xs">
-          <div className="font-medium text-foreground">{item.planName || item.extra || "Usage"}</div>
+        <div
+          key={`${item.planName ?? "usage"}-${index}`}
+          className="rounded-xl bg-muted/45 p-3 text-xs"
+        >
+          <div className="font-medium text-foreground">
+            {item.planName || item.extra || "Usage"}
+          </div>
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
             <span>Remaining: {formatAmount(item.remaining, item.unit)}</span>
             <span>Used: {formatAmount(item.used, item.unit)}</span>
@@ -114,7 +119,11 @@ export function ProviderUsageSection({ settings, setSettings }: SettingsSectionP
         const liveState = usage.getState(provider.id);
         const shownResult = testResults[provider.id] ?? liveState.result;
         return (
-          <details key={provider.id} className="group rounded-2xl border border-border/60 bg-card" open={config.enabled}>
+          <details
+            key={provider.id}
+            className="group rounded-2xl border border-border/60 bg-card"
+            open={config.enabled}
+          >
             <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{provider.name}</div>
@@ -122,7 +131,9 @@ export function ProviderUsageSection({ settings, setSettings }: SettingsSectionP
                   {provider.baseUrl || provider.type} · {t(`settings.usage.mode.${config.mode}`)}
                 </div>
               </div>
-              {liveState.loading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+              {liveState.loading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : null}
               <button
                 type="button"
                 role="switch"
@@ -136,7 +147,12 @@ export function ProviderUsageSection({ settings, setSettings }: SettingsSectionP
                   config.enabled ? "bg-emerald-500" : "bg-muted-foreground/25",
                 )}
               >
-                <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", config.enabled ? "translate-x-5" : "translate-x-0.5")} />
+                <span
+                  className={cn(
+                    "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+                    config.enabled ? "translate-x-5" : "translate-x-0.5",
+                  )}
+                />
               </button>
             </summary>
 
@@ -146,10 +162,16 @@ export function ProviderUsageSection({ settings, setSettings }: SettingsSectionP
                   <span className="text-xs font-medium">{t("settings.usage.mode")}</span>
                   <select
                     value={config.mode}
-                    onChange={(event) => patchProvider(provider.id, { mode: event.target.value as UsageQueryMode })}
+                    onChange={(event) =>
+                      patchProvider(provider.id, { mode: event.target.value as UsageQueryMode })
+                    }
                     className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
                   >
-                    {MODES.map((mode) => <option key={mode} value={mode}>{t(`settings.usage.mode.${mode}`)}</option>)}
+                    {MODES.map((mode) => (
+                      <option key={mode} value={mode}>
+                        {t(`settings.usage.mode.${mode}`)}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label>
@@ -159,44 +181,163 @@ export function ProviderUsageSection({ settings, setSettings }: SettingsSectionP
                     min={2}
                     max={30}
                     value={config.timeoutSecs ?? 10}
-                    onChange={(event) => patchProvider(provider.id, { timeoutSecs: Number(event.target.value) })}
+                    onChange={(event) =>
+                      patchProvider(provider.id, { timeoutSecs: Number(event.target.value) })
+                    }
                     className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
                   />
                 </label>
                 <label className="sm:col-span-2">
                   <span className="text-xs font-medium">{t("settings.usage.baseUrl")}</span>
-                  <input value={config.baseUrl} onChange={(event) => patchProvider(provider.id, { baseUrl: event.target.value })} placeholder={provider.baseUrl} className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" />
+                  <input
+                    value={config.baseUrl}
+                    onChange={(event) =>
+                      patchProvider(provider.id, { baseUrl: event.target.value })
+                    }
+                    placeholder={provider.baseUrl}
+                    className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                  />
                 </label>
                 <label>
                   <span className="text-xs font-medium">API Key</span>
-                  <input type="password" value={config.apiKey} onChange={(event) => patchProvider(provider.id, { apiKey: event.target.value })} placeholder={config.apiKeyConfigured ? t("settings.usage.secretSaved") : t("settings.usage.providerCredential")} className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" />
+                  <input
+                    type="password"
+                    value={config.apiKey}
+                    onChange={(event) => patchProvider(provider.id, { apiKey: event.target.value })}
+                    placeholder={
+                      config.apiKeyConfigured
+                        ? t("settings.usage.secretSaved")
+                        : t("settings.usage.providerCredential")
+                    }
+                    className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                  />
                 </label>
                 {config.mode === "newapi" ? (
                   <>
-                    <label><span className="text-xs font-medium">Access Token</span><input type="password" value={config.accessToken} onChange={(event) => patchProvider(provider.id, { accessToken: event.target.value })} className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" /></label>
-                    <label><span className="text-xs font-medium">User ID</span><input value={config.userId} onChange={(event) => patchProvider(provider.id, { userId: event.target.value })} className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" /></label>
+                    <label>
+                      <span className="text-xs font-medium">Access Token</span>
+                      <input
+                        type="password"
+                        value={config.accessToken}
+                        onChange={(event) =>
+                          patchProvider(provider.id, { accessToken: event.target.value })
+                        }
+                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                      />
+                    </label>
+                    <label>
+                      <span className="text-xs font-medium">User ID</span>
+                      <input
+                        value={config.userId}
+                        onChange={(event) =>
+                          patchProvider(provider.id, { userId: event.target.value })
+                        }
+                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                      />
+                    </label>
                   </>
                 ) : null}
                 {config.mode === "coding-plan" ? (
                   <>
-                    <label><span className="text-xs font-medium">Plan Provider</span><input value={config.codingPlanProvider} onChange={(event) => patchProvider(provider.id, { codingPlanProvider: event.target.value })} placeholder="auto / zhipu_team / zenmux" className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" /></label>
-                    <label><span className="text-xs font-medium">Organization ID</span><input value={config.teamOrganizationId} onChange={(event) => patchProvider(provider.id, { teamOrganizationId: event.target.value })} className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" /></label>
-                    <label><span className="text-xs font-medium">Project ID</span><input value={config.teamProjectId} onChange={(event) => patchProvider(provider.id, { teamProjectId: event.target.value })} className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" /></label>
-                    <label><span className="text-xs font-medium">Access Key ID</span><input value={config.accessKeyId} onChange={(event) => patchProvider(provider.id, { accessKeyId: event.target.value })} className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" /></label>
-                    <label><span className="text-xs font-medium">Secret Access Key</span><input type="password" value={config.secretAccessKey} onChange={(event) => patchProvider(provider.id, { secretAccessKey: event.target.value })} className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" /></label>
+                    <label>
+                      <span className="text-xs font-medium">Plan Provider</span>
+                      <input
+                        value={config.codingPlanProvider}
+                        onChange={(event) =>
+                          patchProvider(provider.id, { codingPlanProvider: event.target.value })
+                        }
+                        placeholder="auto / zhipu_team / zenmux"
+                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                      />
+                    </label>
+                    <label>
+                      <span className="text-xs font-medium">Organization ID</span>
+                      <input
+                        value={config.teamOrganizationId}
+                        onChange={(event) =>
+                          patchProvider(provider.id, { teamOrganizationId: event.target.value })
+                        }
+                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                      />
+                    </label>
+                    <label>
+                      <span className="text-xs font-medium">Project ID</span>
+                      <input
+                        value={config.teamProjectId}
+                        onChange={(event) =>
+                          patchProvider(provider.id, { teamProjectId: event.target.value })
+                        }
+                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                      />
+                    </label>
+                    <label>
+                      <span className="text-xs font-medium">Access Key ID</span>
+                      <input
+                        value={config.accessKeyId}
+                        onChange={(event) =>
+                          patchProvider(provider.id, { accessKeyId: event.target.value })
+                        }
+                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                      />
+                    </label>
+                    <label>
+                      <span className="text-xs font-medium">Secret Access Key</span>
+                      <input
+                        type="password"
+                        value={config.secretAccessKey}
+                        onChange={(event) =>
+                          patchProvider(provider.id, { secretAccessKey: event.target.value })
+                        }
+                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                      />
+                    </label>
                   </>
                 ) : null}
-                {(config.mode === "general" || config.mode === "newapi" || config.mode === "custom") ? (
-                  <label className="sm:col-span-2"><span className="text-xs font-medium">{t("settings.usage.script")}</span><textarea value={config.script} onChange={(event) => patchProvider(provider.id, { script: event.target.value })} rows={8} placeholder={config.mode === "custom" ? t("settings.usage.scriptRequired") : t("settings.usage.scriptPreset")} className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2 font-mono text-xs" /></label>
+                {config.mode === "general" ||
+                config.mode === "newapi" ||
+                config.mode === "custom" ? (
+                  <label className="sm:col-span-2">
+                    <span className="text-xs font-medium">{t("settings.usage.script")}</span>
+                    <textarea
+                      value={config.script}
+                      onChange={(event) =>
+                        patchProvider(provider.id, { script: event.target.value })
+                      }
+                      rows={8}
+                      placeholder={
+                        config.mode === "custom"
+                          ? t("settings.usage.scriptRequired")
+                          : t("settings.usage.scriptPreset")
+                      }
+                      className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2 font-mono text-xs"
+                    />
+                  </label>
                 ) : null}
               </div>
 
               <div className="mt-4 flex gap-2">
-                <button type="button" disabled={testingId === provider.id} onClick={() => void runTest(provider)} className="inline-flex h-9 items-center gap-2 rounded-xl bg-foreground px-3 text-xs font-medium text-background disabled:opacity-50">
-                  {testingId === provider.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                <button
+                  type="button"
+                  disabled={testingId === provider.id}
+                  onClick={() => void runTest(provider)}
+                  className="inline-flex h-9 items-center gap-2 rounded-xl bg-foreground px-3 text-xs font-medium text-background disabled:opacity-50"
+                >
+                  {testingId === provider.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
                   {t("settings.usage.test")}
                 </button>
-                {config.enabled ? <button type="button" onClick={() => void usage.refresh(provider.id)} className="h-9 rounded-xl border border-border px-3 text-xs">{t("settings.usage.refresh")}</button> : null}
+                {config.enabled ? (
+                  <button
+                    type="button"
+                    onClick={() => void usage.refresh(provider.id)}
+                    className="h-9 rounded-xl border border-border px-3 text-xs"
+                  >
+                    {t("settings.usage.refresh")}
+                  </button>
+                ) : null}
               </div>
               <UsageResultView result={shownResult} />
             </div>

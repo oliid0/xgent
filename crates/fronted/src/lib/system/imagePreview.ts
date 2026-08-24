@@ -30,9 +30,7 @@ type UploadedImagePreviewRequest = {
   absolutePath: string;
 };
 
-let preparedUploadedImage:
-  | { key: string; data: Promise<ImagePreviewCopyData> }
-  | undefined;
+let preparedUploadedImage: { key: string; data: Promise<ImagePreviewCopyData> } | undefined;
 
 function base64ToBytes(dataBase64: string) {
   const binary = window.atob(dataBase64);

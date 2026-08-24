@@ -1,10 +1,10 @@
+import { invoke } from "@xagent/runtime";
 import type { MentionComposerLargePaste } from "../../../components/chat/MentionComposer";
 import {
   buildPastedTextFileName,
   validateImportedPastedTextFiles,
 } from "../../../lib/chat/composerDraft";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
-import { invoke } from "@xagent/runtime";
 
 export {
   buildTextFromComposerDraft,

@@ -1,6 +1,6 @@
+import type { TaskItem, TaskListResultDetails, TaskListState } from "../tools/builtinTypes";
 import type { RenderTimelineItem } from "./conversation/conversationState";
 import type { LiveRound, UiRound } from "./messages/uiMessages";
-import type { TaskItem, TaskListResultDetails, TaskListState } from "../tools/builtinTypes";
 
 export type TaskProgressSnapshot = {
   runId: string;

@@ -286,26 +286,23 @@ export function ToolResultImagePreview(props: {
   const src = getImageDataUrl(image);
   const estimatedBytes = sizeBytes ?? estimateBase64Bytes(image.data);
   const imageDetail = `${alt} · ${formatToolResultBytes(estimatedBytes)}`;
-  const slides = useMemo<ImagePreviewSlide[]>(
-    () => {
-      const fileName = imagePreviewFileName(alt, image.mimeType, "generated-image");
-      const previewData = {
-        dataBase64: image.data,
-        fileName,
-        mimeType: image.mimeType,
-      };
-      return [
-        {
-          src,
-          alt,
-          title: alt,
-          onCopy: () => copyImagePreviewData(previewData),
-          onSave: () => saveImagePreviewData(previewData),
-        },
-      ];
-    },
-    [alt, image.data, image.mimeType, src],
-  );
+  const slides = useMemo<ImagePreviewSlide[]>(() => {
+    const fileName = imagePreviewFileName(alt, image.mimeType, "generated-image");
+    const previewData = {
+      dataBase64: image.data,
+      fileName,
+      mimeType: image.mimeType,
+    };
+    return [
+      {
+        src,
+        alt,
+        title: alt,
+        onCopy: () => copyImagePreviewData(previewData),
+        onSave: () => saveImagePreviewData(previewData),
+      },
+    ];
+  }, [alt, image.data, image.mimeType, src]);
 
   useEffect(() => {
     setImageStatus(src ? "loading" : "error");

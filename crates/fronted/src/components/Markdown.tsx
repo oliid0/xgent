@@ -25,7 +25,7 @@ import {
   type StreamdownTranslations,
 } from "streamdown";
 import { useLocale } from "../i18n";
-import { parseChatFileLink, type ChatFileLink } from "../lib/chat/chatFileLinks";
+import { type ChatFileLink, parseChatFileLink } from "../lib/chat/chatFileLinks";
 import {
   getCollapsedCodeBlockPreview,
   resolveCodeBlockRenderPolicy,

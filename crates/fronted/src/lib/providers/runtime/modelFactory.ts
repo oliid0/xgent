@@ -15,15 +15,15 @@ import {
   resolveAnthropicWireModelId,
 } from "../anthropicModels";
 import {
-  applyDeepSeekModelDefaults,
-  isDeepSeekCodexTarget,
-  resolveDeepSeekOpenAICompletionsOverrides,
-} from "../deepSeekProviderAdapter";
-import {
   DEEPSEEK_RESPONSES_API,
   isOfficialDeepSeekBaseUrl,
   normalizeDeepSeekResponsesBaseUrl,
 } from "../deepSeekNative";
+import {
+  applyDeepSeekModelDefaults,
+  isDeepSeekCodexTarget,
+  resolveDeepSeekOpenAICompletionsOverrides,
+} from "../deepSeekProviderAdapter";
 import { isXaiProviderTarget } from "./xaiResponsesPayload";
 
 const CODEX_RESPONSES_SUFFIX = "/responses";

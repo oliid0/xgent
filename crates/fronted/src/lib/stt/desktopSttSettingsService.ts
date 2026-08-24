@@ -1,10 +1,6 @@
-import type {
-  SttConnectionTestResponse,
-  SttSecretField,
-  SttSettingsService,
-} from "./types";
 import { invoke } from "@xagent/runtime";
 import { type AppSettings, normalizeSttSettings } from "../../lib/settings";
+import type { SttConnectionTestResponse, SttSecretField, SttSettingsService } from "./types";
 
 export const desktopSttSettingsService: SttSettingsService = {
   runtimeLabel: "当前桌面设备",

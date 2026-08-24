@@ -10,10 +10,7 @@ import {
   formatFileMentionToken,
   formatMarkdownReferenceDestination,
 } from "./messages/mentionReferences";
-import {
-  type PendingUploadedFile,
-  withPastedTextDisplayMetadata,
-} from "./messages/uploadedFiles";
+import { type PendingUploadedFile, withPastedTextDisplayMetadata } from "./messages/uploadedFiles";
 
 export function buildPastedTextFileName(paste: MentionComposerLargePaste, index: number) {
   const baseName = paste.label

@@ -1,11 +1,4 @@
-import {
-  createContext,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 
 export type CheckpointTurnSummary = {
   turnSeq: number;
@@ -95,7 +88,8 @@ export function CheckpointRewindProvider(props: {
         const turn = turns.find((item) => item.turnId === turnId);
         if (!turn) throw new Error("This message has no recoverable code checkpoint.");
         const authorizedRoots = await props.resolveAuthorizedRoots();
-        if (authorizedRoots.length === 0) throw new Error("No writable workspace root is authorized.");
+        if (authorizedRoots.length === 0)
+          throw new Error("No writable workspace root is authorized.");
         const preview = await props.client.preview({
           conversationId: props.conversationId,
           turnSeq: turn.turnSeq,
@@ -118,7 +112,8 @@ export function CheckpointRewindProvider(props: {
       } finally {
         setBusyTurnId(null);
       }
-    }, [props],
+    },
+    [props],
   );
   const value = useMemo(
     () => ({ available: !props.disabled, busyTurnId, rewindTurn }),

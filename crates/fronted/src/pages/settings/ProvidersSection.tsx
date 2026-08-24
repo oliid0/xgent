@@ -1738,10 +1738,10 @@ function providerFromCcs(item: CcsProviderImportItem, existingIds: Set<string>):
       providerType === "xai"
         ? "openai-responses"
         : providerType === "codex"
-        ? item.requestFormat === "openai-completions"
-          ? "openai-completions"
-          : "openai-responses"
-        : undefined,
+          ? item.requestFormat === "openai-completions"
+            ? "openai-completions"
+            : "openai-responses"
+          : undefined,
     reasoning: "off",
     promptCachingEnabled:
       providerType !== "gemini" && providerType !== "xai" && providerType !== "deepseek",
@@ -1809,10 +1809,10 @@ function providerFromCherry(
       providerType === "xai"
         ? "openai-responses"
         : providerType === "codex"
-        ? item.requestFormat === "openai-completions"
-          ? "openai-completions"
-          : "openai-responses"
-        : undefined,
+          ? item.requestFormat === "openai-completions"
+            ? "openai-completions"
+            : "openai-responses"
+          : undefined,
     reasoning: existing?.reasoning ?? "off",
     promptCachingEnabled:
       providerType === "deepseek" || providerType === "xai" || providerType === "gemini"

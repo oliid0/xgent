@@ -5,8 +5,8 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { useLocale } from "../../i18n";
 import {
-  type WorkspaceProject,
   updateWorkspaceResourceSettings,
+  type WorkspaceProject,
   workspaceProjectPathKey,
 } from "../../lib/settings";
 import { discoverSkills, type SkillSummary } from "../../lib/skills";
@@ -26,7 +26,11 @@ type EditableRoot = WorkspaceRootGrantDraft & {
 };
 
 function pathAlias(path: string, used: ReadonlySet<string>) {
-  const leaf = path.split(/[\\/]+/).filter(Boolean).pop() ?? "root";
+  const leaf =
+    path
+      .split(/[\\/]+/)
+      .filter(Boolean)
+      .pop() ?? "root";
   let base = leaf
     .toLowerCase()
     .replace(/[^a-z0-9_-]+/g, "-")
@@ -231,7 +235,12 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
       <section className="rounded-2xl border border-border/60 bg-card p-4">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-semibold">{t("settings.projectRoots.grants")}</h3>
-          <Button size="sm" variant="outline" disabled={!project || loading || saving} onClick={addRoot}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!project || loading || saving}
+            onClick={addRoot}
+          >
             <FolderTree className="mr-1.5 h-4 w-4" />
             {t("settings.projectRoots.add")}
           </Button>

@@ -14,8 +14,8 @@ import {
   findProviderModelConfig,
   isAgentDevMode,
   isAgentExecutionMode,
-  resolveWorkspaceResources,
   type ReasoningLevel,
+  resolveWorkspaceResources,
 } from "../../lib/settings";
 import {
   buildSkillsSystemPrompt,
@@ -58,9 +58,7 @@ function buildCronSystemPrompt(taskName: string) {
 
 async function buildCronSkillsContext(settings: AppSettings, workdir: string) {
   const resources = resolveWorkspaceResources(settings, workdir);
-  const selectedSkillNames = resources.skillNames.filter(
-    (name) => !isAlwaysEnabledSkillName(name),
-  );
+  const selectedSkillNames = resources.skillNames.filter((name) => !isAlwaysEnabledSkillName(name));
   if (!resources.skillsEnabled || selectedSkillNames.length === 0) {
     return {
       enabled: false,
