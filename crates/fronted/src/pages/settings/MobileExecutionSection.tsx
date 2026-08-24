@@ -205,12 +205,12 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
 
   return (
     <section className="settings-mobile-execution-card space-y-4 rounded-xl border border-border/60 bg-card p-5">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-muted-foreground" />
-          <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2">
+          <Terminal className="mt-0.5 h-4 w-4 text-muted-foreground" />
+          <div className="min-w-0">
             <div className="text-sm font-medium">{t("settings.accessMobileExecution")}</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="break-words text-xs leading-relaxed text-muted-foreground">
               {platform === "android"
                 ? t("settings.accessAndroidProotHint")
                 : platform === "ios"

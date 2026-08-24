@@ -340,7 +340,9 @@ export type RunAgentConversationTurnParams = {
     conversationId: string,
     updater: (prev: ConversationRuntimeEntry) => ConversationRuntimeEntry,
   ) => ConversationRuntimeEntry;
-  persistConversationWithHistorySync: (params: PersistConversationParams) => Promise<boolean>;
+  persistConversationWithHistorySync: (
+    params: PersistConversationParams,
+  ) => Promise<ConversationViewState | null>;
   memoryExtractionModel?: MemoryExtractionModelConfig;
   onMemoryExtractionModelFailure?: (model: MemoryExtractionModelConfig) => void;
   memoryExtractionStatusText?: MemoryExtractionStatusText;

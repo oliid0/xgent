@@ -54,7 +54,7 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
   };
 
   return (
-    <div className="space-y-5">
+    <div className="settings-tool-permissions space-y-5">
       <section className="rounded-2xl border border-border/60 bg-card p-4">
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-300">
@@ -130,9 +130,9 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
             key={category.id}
             className="overflow-hidden rounded-2xl border border-border/60 bg-card"
           >
-            <div className="flex items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
+            <div className="settings-tool-permissions-category-header flex items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
               <h3 className="text-sm font-semibold text-foreground">{t(category.labelKey)}</h3>
-              <div className="flex shrink-0 items-center rounded-lg bg-muted/45 p-0.5">
+              <div className="settings-tool-permissions-category-actions flex shrink-0 items-center rounded-lg bg-muted/45 p-0.5">
                 {POLICY_OPTIONS.map((policy) => (
                   <button
                     key={policy}
@@ -157,7 +157,7 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
                 return (
                   <div
                     key={tool.id}
-                    className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center"
+                    className="settings-tool-permissions-row flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -173,7 +173,7 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
                       </p>
                     </div>
                     <div
-                      className="grid shrink-0 grid-cols-3 rounded-xl bg-muted/45 p-1"
+                      className="settings-tool-permissions-policies grid shrink-0 grid-cols-3 rounded-xl bg-muted/45 p-1"
                       role="radiogroup"
                       aria-label={tool.toolName}
                     >

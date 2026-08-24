@@ -1467,6 +1467,22 @@ mod tests {
         }
     }
 
+    fn branch_request_anchor(
+        segment_index: i64,
+        message_index: i64,
+        segment_id: &str,
+        message: &Value,
+    ) -> ChatHistoryBranchAnchor {
+        ChatHistoryBranchAnchor {
+            segment_index,
+            message_index,
+            segment_id: segment_id.to_string(),
+            message_id: history_message_id_for_ref(message).expect("branch anchor message id"),
+            role: "user".to_string(),
+            content_hash: history_message_content_hash(message),
+        }
+    }
+
     fn segment_message_ids(messages_json: &str) -> Vec<String> {
         serde_json::from_str::<Value>(messages_json)
             .expect("parse branch segment messages")
@@ -2254,7 +2270,7 @@ mod tests {
             )],
         );
 
-        let anchor = branch_anchor(0, 0, "seg-0", &u1);
+        let anchor = branch_request_anchor(0, 0, "seg-0", &u1);
         let summary =
             chat_history_branch_sync(&mut conn, "conv-source", &anchor).expect("branch prefix");
 
@@ -2302,7 +2318,7 @@ mod tests {
             )],
         );
 
-        let anchor = branch_anchor(0, 2, "seg-0", &u2);
+        let anchor = branch_request_anchor(0, 2, "seg-0", &u2);
         let summary =
             chat_history_branch_sync(&mut conn, "conv-source", &anchor).expect("branch full copy");
 
@@ -2335,7 +2351,7 @@ mod tests {
             )],
         );
 
-        let anchor = branch_anchor(0, 2, "seg-0", &u2);
+        let anchor = branch_request_anchor(0, 2, "seg-0", &u2);
         let error = chat_history_branch_sync(&mut conn, "conv-source", &anchor)
             .expect_err("branch should fail while the reply is unpersisted");
         assert!(error.contains("尚未写入"), "unexpected error: {error}");
@@ -2369,7 +2385,7 @@ mod tests {
             ],
         );
 
-        let anchor = branch_anchor(0, 2, "seg-0", &u2);
+        let anchor = branch_request_anchor(0, 2, "seg-0", &u2);
         let summary = chat_history_branch_sync(&mut conn, "conv-source", &anchor)
             .expect("branch drops next segment");
 
@@ -2402,7 +2418,7 @@ mod tests {
             ],
         );
 
-        let anchor = branch_anchor(1, 0, "seg-1", &u2);
+        let anchor = branch_request_anchor(1, 0, "seg-1", &u2);
         let summary = chat_history_branch_sync(&mut conn, "conv-source", &anchor)
             .expect("branch slices mid segment");
 
@@ -2435,7 +2451,7 @@ mod tests {
             &[branch_segment_record(0, "seg-0", None, &[u1.clone(), a1])],
         );
 
-        let mut anchor = branch_anchor(0, 0, "seg-0", &u1);
+        let mut anchor = branch_request_anchor(0, 0, "seg-0", &u1);
         anchor.content_hash = "fnv1a32:deadbeef".to_string();
         let error = chat_history_branch_sync(&mut conn, "conv-source", &anchor)
             .expect_err("mismatched anchor should fail");
@@ -2471,7 +2487,7 @@ mod tests {
             )],
         );
 
-        let anchor = branch_anchor(0, 0, "seg-0", &u1);
+        let anchor = branch_request_anchor(0, 0, "seg-0", &u1);
         let summary = chat_history_branch_sync(&mut conn, "conv-source", &anchor)
             .expect("branch copies conversation fields");
 
@@ -2533,7 +2549,7 @@ mod tests {
             ),
         ];
 
-        let anchor = branch_anchor(0, 2, "seg-0", &u2);
+        let anchor = branch_request_anchor(0, 2, "seg-0", &u2);
         let (kept, total_message_count) =
             build_branch_segments(&segments, &anchor).expect("build branch segments");
 

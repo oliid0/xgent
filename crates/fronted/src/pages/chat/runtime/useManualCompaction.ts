@@ -242,6 +242,7 @@ export function useManualCompaction(params: {
               createdAt: runtimeEntry.createdAt,
               titlePromise: null,
             }),
+          onCompacted: () => memoryTurnInjection.invalidate(conversationId),
         };
 
         const compactionController = getCompactionController(conversationId);
@@ -306,9 +307,6 @@ export function useManualCompaction(params: {
           },
         );
 
-        if (outcome.status === "compacted") {
-          memoryTurnInjection.invalidate(conversationId);
-        }
         const result = mapOutcome(outcome, failureMessage);
         if (result.status === "failed" && result.message && isCurrentConversation()) {
           setErrorMessage(result.message);

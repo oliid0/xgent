@@ -58,6 +58,7 @@ function AppChrome(props: { children: ReactNode; nativeMobile?: boolean }) {
   });
   return (
     <div
+      data-native-mobile={props.nativeMobile ? "true" : undefined}
       className="app-safe-area relative flex h-full w-full flex-col overflow-hidden bg-background"
       onContextMenu={onRootContextMenu}
       onMouseDownCapture={onRootMouseDownCapture}

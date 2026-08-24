@@ -1,5 +1,9 @@
 import type { Context, UserMessage } from "@earendil-works/pi-ai";
-import { positiveTokenCount } from "@xagent/ui/lib/chat/contextUsage";
+import {
+  canManualCompact,
+  contextUsageRatio,
+  positiveTokenCount,
+} from "@xagent/ui/lib/chat/contextUsage";
 import type { PendingUploadedFile } from "@xagent/ui/lib/chat/uploadedFiles";
 import type { StreamDebugLogger } from "../../debug/agentDebug";
 import type { ProviderId } from "../../settings";
@@ -45,13 +49,16 @@ export type CompactionSinks = {
   applyStateMidRun?: (state: ConversationViewState) => void;
   publishStatus?: (status: CompactionStatus) => void;
   setLiveToolStatus?: (status: string | null, isCompaction?: boolean) => void;
-  queueCheckpoint?: (state: ConversationViewState) => void;
-  persist?: (state: ConversationViewState) => Promise<unknown>;
+  queueCheckpoint?: (state: ConversationViewState, contextUsageTokens: number) => void;
+  persist?: (
+    state: ConversationViewState,
+  ) => Promise<ConversationViewState | boolean | null | undefined>;
   restoreComposer?: (
     composerText: string | undefined,
     uploadedFiles: PendingUploadedFile[],
   ) => void;
   persistRollback?: (state: ConversationViewState) => Promise<unknown>;
+  onCompacted?: () => void;
 };
 
 export type CompactionPreSendBinding = {
@@ -412,12 +419,16 @@ export class CompactionController {
         pruned ?? pruneConversationState(presend.baseState, resolvePruneOptions(this.pressure));
       if (fallback.applied) {
         binding.sinks.applyState?.(presend.composeAppliedState(fallback.state));
-        this.settleFailed("pre-send", PRUNE_FALLBACK_NOTICE);
+        this.settleFailed("pre-send", PRUNE_FALLBACK_NOTICE, operationId);
         binding.sinks.setLiveToolStatus?.(buildPruneFallbackStatus(fallback.prunedMessageCount));
         return true;
       }
       console.warn("发送前上下文压缩失败，继续使用原始上下文", error);
-      this.settleFailed("pre-send", error instanceof Error ? error.message : String(error));
+      this.settleFailed(
+        "pre-send",
+        error instanceof Error ? error.message : String(error),
+        operationId,
+      );
       return false;
     } finally {
       scope.release();
@@ -543,51 +554,139 @@ export class CompactionController {
         complete: binding.complete,
       });
 
-      await binding.sinks.persist?.(outcome.state);
-      this.rollbackSnapshot = null;
-      binding.sinks.applyStateMidRun?.(outcome.state);
-      this.settleCompleted(params.trigger, outcome.newSegmentIndex);
-      binding.sinks.queueCheckpoint?.(outcome.state);
+      const { checkpointState } = await this.finalizeCheckpoint({
+        binding,
+        trigger: params.trigger,
+        state: outcome.state,
+        newSegmentIndex: outcome.newSegmentIndex,
+        tools: params.tools,
+        buildOptions,
+        fixedTokens: manualFixedTokens,
+        operationId,
+        apply: (state) => binding.sinks.applyStateMidRun?.(state),
+      });
 
       const resumeMessage = createSyntheticContinueUserMessage(
         (outcome.checkpointMessage.timestamp ?? now) + 1,
       );
-      const resumeContext = binding.buildResumeContext(outcome.state, resumeMessage, params.tools, {
-        includeUploadedFilesMetadata: params.includeUploadedFilesMetadata,
-      });
-      this.notePostCompactionPressure(resumeContext, outcome.state, decision.threshold);
-      return { context: resumeContext, shouldDisableProtection: false };
+      const resumeContext = binding.buildResumeContext(
+        checkpointState,
+        resumeMessage,
+        params.tools,
+        {
+          includeUploadedFilesMetadata: params.includeUploadedFilesMetadata,
+        },
+      );
+      this.notePostCompactionPressure(
+        resumeContext,
+        checkpointState,
+        decision.threshold,
+        manualFixedTokens,
+      );
+      return { context: resumeContext, shouldDisableProtection: false, outcome: "compacted" };
     } catch (error) {
       if (this.isAbortOutcome(scope.controller.signal, error)) {
         throw error;
       }
       this.rollbackSnapshot = null;
-      const fallback =
-        pruned ?? pruneConversationState(workingState, resolvePruneOptions(this.pressure));
-      if (fallback.applied) {
-        binding.sinks.applyStateMidRun?.(fallback.state);
-        this.settleFailed(params.trigger, PRUNE_FALLBACK_NOTICE);
-        binding.sinks.setLiveToolStatus?.(buildPruneFallbackStatus(fallback.prunedMessageCount));
-        return {
-          context: buildFallbackContext(fallback.state),
-          shouldDisableProtection: false,
-        };
+      if (params.trigger !== "manual") {
+        const fallback =
+          pruned ?? pruneConversationState(workingState, resolvePruneOptions(this.pressure));
+        if (fallback.applied) {
+          binding.sinks.applyStateMidRun?.(fallback.state);
+          this.settleFailed(params.trigger, PRUNE_FALLBACK_NOTICE, operationId);
+          binding.sinks.setLiveToolStatus?.(buildPruneFallbackStatus(fallback.prunedMessageCount));
+          return {
+            context: buildFallbackContext(fallback.state),
+            shouldDisableProtection: false,
+            outcome: "failed",
+          };
+        }
       }
       this.settleFailed(
         params.trigger,
         (error instanceof Error ? error.message : String(error)) || "压缩失败",
+        operationId,
       );
       return params.trigger === "mid-stream"
         ? {
             context: buildFallbackContext(workingState),
             shouldDisableProtection: true,
+            outcome: "failed",
           }
-        : { context: null, shouldDisableProtection: false };
+        : { context: null, shouldDisableProtection: false, outcome: "failed" };
     } finally {
       scope.release();
       this.inFlight = false;
       this.binding?.sinks.setLiveToolStatus?.(null);
     }
+  }
+
+  async compactManually(
+    binding: Omit<CompactionTurnBinding, "presend">,
+    state: ConversationViewState,
+    contextUsage?: ManualContextUsageSnapshot,
+    options?: {
+      tools?: Context["tools"];
+      onProceed?: () => void;
+    },
+  ): Promise<ManualCompactionOutcome> {
+    if (this.binding || this.inFlight) return { status: "busy" };
+    this.bindTurn(binding);
+    try {
+      const probe = this.probeManualDecision(binding, state, contextUsage, options?.tools);
+      if (!probe.shouldCompact) {
+        return { status: "skipped", reason: probe.reason };
+      }
+      options?.onProceed?.();
+      const result = await this.compactDuringRun({
+        trigger: "manual",
+        state,
+        tools: options?.tools,
+        manualContextUsage: contextUsage,
+      });
+      switch (result.outcome) {
+        case "compacted":
+          return { status: "compacted" };
+        case "skipped":
+          return { status: "skipped", reason: result.reason ?? "disabled" };
+        default:
+          return { status: "failed" };
+      }
+    } catch {
+      await this.handleTurnAbort();
+      return binding.cancellation.userStop.signal.aborted
+        ? { status: "failed", aborted: true }
+        : { status: "failed" };
+    } finally {
+      this.unbindTurn();
+    }
+  }
+
+  private probeManualDecision(
+    binding: Omit<CompactionTurnBinding, "presend">,
+    state: ConversationViewState,
+    contextUsage?: ManualContextUsageSnapshot,
+    tools?: Context["tools"],
+  ) {
+    const probeLedger = new TokenLedger();
+    probeLedger.rebase(binding.buildPreparedContext(state, tools), {
+      fixedTokens: contextUsage?.fixedTokens,
+    });
+    this.updateTurnMeta(state);
+    return this.decideManual(
+      positiveTokenCount(contextUsage?.totalTokens) ?? probeLedger.total(),
+      Date.now(),
+    );
+  }
+
+  private decideManual(totalTokens: number, now: number): CompactionDecision {
+    const decision = this.decide("optimization", totalTokens, now, true);
+    if (!decision.shouldCompact) return decision;
+    if (canManualCompact(contextUsageRatio(decision.totalTokens, decision.contextWindow))) {
+      return decision;
+    }
+    return { ...decision, shouldCompact: false, reason: "below-manual-threshold" };
   }
 
   // 用户中止后的统一善后：有快照则回滚（恢复状态/输入框/可选持久化）并返回 true。
@@ -596,18 +695,13 @@ export class CompactionController {
     const snapshot = this.rollbackSnapshot;
     this.rollbackSnapshot = null;
     this.inFlight = false;
+    this.settleAbortedIfRunning();
     if (!binding) return false;
 
-    if (!snapshot) {
-      if (this.statusPhase === "running") {
-        this.publishStatus({ phase: "idle" });
-      }
-      return false;
-    }
+    if (!snapshot) return false;
 
     binding.sinks.applyStateMidRun?.(snapshot.state);
     binding.sinks.setLiveToolStatus?.(null, false);
-    this.publishStatus({ phase: "idle" });
     binding.sinks.restoreComposer?.(snapshot.composerText, snapshot.uploadedFiles ?? []);
     if (snapshot.persistOnRollback) {
       await binding.sinks.persistRollback?.(snapshot.state);

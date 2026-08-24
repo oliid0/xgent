@@ -2816,6 +2816,12 @@
     padding-top: 2px;
   }
 
+  .xagent-icon {
+    display: block;
+    flex-shrink: 0;
+    color: inherit;
+  }
+
   .settings-mobile-home section {
     padding-top: 12px;
   }
@@ -4190,4 +4196,136 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   .model-selector-dropdown {
     border-color: hsl(var(--foreground) / 0.42);
   }
+}
+
+/*
+ * Native shells always render the compact/mobile component tree, including
+ * on tablets and in landscape where CSS-pixel width can exceed web breakpoints.
+ * Keep its geometry independent from desktop media queries.
+ */
+[data-native-mobile="true"] {
+  width: 100%;
+  min-width: 0;
+  max-width: 100vw;
+  min-height: 0;
+}
+
+[data-native-mobile="true"] .mobile-fullscreen-panel,
+[data-native-mobile="true"] .settings-page-compact,
+[data-native-mobile="true"] .settings-mobile-home,
+[data-native-mobile="true"] .settings-mobile-detail {
+  width: 100%;
+  min-width: 0;
+  max-width: 100vw;
+}
+
+[data-native-mobile="true"] [data-mobile-left-drawer].chat-history-sidebar {
+  width: min(88vw, 344px);
+  border-right-color: hsl(var(--border) / 0.42);
+  background: hsl(var(--background) / 0.94);
+  box-shadow: 20px 0 52px -32px hsl(var(--foreground) / 0.52);
+}
+
+[data-native-mobile="true"] [data-mobile-chat-header="true"].chat-header {
+  min-height: 56px;
+  padding-inline: 10px;
+  border-color: hsl(var(--border) / 0.3);
+  background: hsl(var(--background) / 0.82);
+}
+
+[data-native-mobile="true"] [data-mobile-chat-header="true"] .model-selector-trigger {
+  min-height: 44px;
+  max-width: min(48vw, 220px);
+  border-radius: 12px;
+  padding-inline: 10px;
+  font-size: 13px;
+}
+
+[data-native-mobile="true"] [data-mobile-chat-header="true"] > div:first-child > button,
+[data-native-mobile="true"] [data-mobile-chat-header="true"] > div:last-child > button,
+[data-native-mobile="true"] .composer-toolbar-action,
+[data-native-mobile="true"] .composer-primary-action {
+  width: 44px;
+  height: 44px;
+}
+
+[data-native-mobile="true"] .chat-transcript-content {
+  padding-right: max(14px, env(safe-area-inset-right, 0px));
+  padding-left: max(14px, env(safe-area-inset-left, 0px));
+  padding-top: 10px;
+}
+
+[data-native-mobile="true"] .chat-composer-layer {
+  padding-right: max(10px, env(safe-area-inset-right, 0px));
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(10px, env(safe-area-inset-left, 0px));
+}
+
+[data-native-mobile="true"] .settings-mobile-home,
+[data-native-mobile="true"] .settings-mobile-detail {
+  background:
+    radial-gradient(circle at 100% 0%, hsl(var(--primary) / 0.055), transparent 34%),
+    hsl(var(--muted) / 0.22);
+}
+
+[data-native-mobile="true"] .settings-mobile-detail [data-settings-section] {
+  padding: 12px max(12px, env(safe-area-inset-right, 0px))
+    calc(18px + env(safe-area-inset-bottom, 0px))
+    max(12px, env(safe-area-inset-left, 0px));
+}
+
+[data-native-mobile="true"] .settings-mobile-detail .settings-section-shell {
+  width: 100%;
+  min-width: 0;
+  max-width: 680px;
+  margin-inline: auto;
+}
+
+[data-native-mobile="true"] .settings-access-section,
+[data-native-mobile="true"] .settings-mobile-execution-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+[data-native-mobile="true"] .settings-mobile-execution-card {
+  border-color: hsl(var(--border) / 0.55);
+  border-radius: 16px;
+  padding: 13px;
+  background: hsl(var(--card) / 0.84);
+}
+
+[data-native-mobile="true"] .settings-mobile-detail input,
+[data-native-mobile="true"] .settings-mobile-detail textarea,
+[data-native-mobile="true"] .settings-mobile-detail select {
+  max-width: 100%;
+  font-size: 16px;
+}
+
+.settings-page-compact .settings-tool-permissions-category-header {
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.settings-page-compact .settings-tool-permissions-category-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.settings-page-compact .settings-tool-permissions-category-actions > button,
+.settings-page-compact .settings-tool-permissions-policies > button {
+  min-width: 0;
+  min-height: 40px;
+}
+
+.settings-page-compact .settings-tool-permissions-row {
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.settings-page-compact .settings-tool-permissions-policies {
+  width: 100%;
 }

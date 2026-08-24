@@ -52,7 +52,7 @@ export type PersistConversationParams = {
 
 export type PersistConversationAction = (
   params: PersistConversationParams,
-) => Promise<boolean>;
+) => Promise<ConversationViewState | null>;
 
 type IdleSchedulerWindow = Window & {
   requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
@@ -374,7 +374,9 @@ export function useConversationHistoryActions(params: UseConversationHistoryActi
     }
   }
 
-  async function persistConversation(params: PersistConversationParams): Promise<boolean> {
+  async function persistConversation(
+    params: PersistConversationParams,
+  ): Promise<ConversationViewState | null> {
     const {
       conversationId,
       sessionId,
@@ -409,6 +411,7 @@ export function useConversationHistoryActions(params: UseConversationHistoryActi
       turnSelectedModel: selectedModel,
     });
 
+    let stampedState: ConversationViewState;
     try {
       const summary = await persistConversationState({
         conversationId,
@@ -425,7 +428,7 @@ export function useConversationHistoryActions(params: UseConversationHistoryActi
         commitPersistedState: (persisted) =>
           persistedConversationStateRef.current.set(conversationId, persisted),
       });
-      const stampedState: ConversationViewState = {
+      stampedState = {
         ...state,
         transcript: {
           ...state.transcript,
@@ -457,10 +460,10 @@ export function useConversationHistoryActions(params: UseConversationHistoryActi
         ...prev,
         errorMessage: persistFailedMessage,
       }));
-      return false;
+      return null;
     }
 
-    if (!titlePromise) return true;
+    if (!titlePromise) return stampedState;
 
     const initialStoredTitle = titleToStore;
     void titlePromise
@@ -494,7 +497,7 @@ export function useConversationHistoryActions(params: UseConversationHistoryActi
         }
       });
 
-    return true;
+    return stampedState;
   }
 
   async function replaceConversationAtMessage(

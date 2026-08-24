@@ -4176,6 +4176,7 @@ export function ChatPage(props: ChatPageProps) {
             titlePromise,
           });
         },
+        onCompacted: () => memoryTurnInjection.invalidate(conversationId),
       },
     });
 

@@ -22,7 +22,7 @@ export function MobileFullscreenPanel(props: MobileFullscreenPanelProps) {
       aria-label={props.label}
       aria-hidden={!props.open}
       className={cn(
-        "mobile-fullscreen-panel fixed inset-0 z-[74] flex min-h-0 flex-col overflow-hidden bg-background pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] text-foreground",
+        "mobile-fullscreen-panel fixed inset-0 z-[74] flex h-[100dvh] w-screen min-h-0 flex-col overflow-hidden bg-background pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] pt-[env(safe-area-inset-top,0px)] text-foreground",
         !props.open && "pointer-events-none translate-x-[8%] opacity-0",
         props.className,
       )}

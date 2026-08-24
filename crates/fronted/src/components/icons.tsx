@@ -136,8 +136,11 @@ type IconProps = SVGProps<SVGSVGElement> & {
 export type IconComponent = ComponentType<IconProps>;
 
 function createIcon(Source: IconSource): IconComponent {
-  return function Icon({ height, size, width, ...props }) {
-    const nextProps: IconProps = { ...props };
+  return function Icon({ className, height, size, width, ...props }) {
+    const nextProps: IconProps = {
+      ...props,
+      className: ["xagent-icon", className].filter(Boolean).join(" "),
+    };
     if (size !== undefined) {
       nextProps.width = width ?? size;
       nextProps.height = height ?? size;

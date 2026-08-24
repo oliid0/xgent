@@ -148,14 +148,12 @@ const NAV_GROUPS: NavGroup[] = [
         icon: <Archive className="h-3.5 w-3.5" />,
         accentClass: "bg-teal-600",
         descriptionKey: "settings.backupSyncDesc",
-        desktopOnly: true,
       },
       {
         id: "toolPermissions",
         icon: <Shield className="h-3.5 w-3.5" />,
         accentClass: "bg-indigo-500",
         descriptionKey: "settings.toolPermissionsDesc",
-        desktopOnly: true,
       },
       {
         id: "projectRoots",
@@ -176,7 +174,6 @@ const NAV_GROUPS: NavGroup[] = [
         icon: <Cloud className="h-3.5 w-3.5" />,
         accentClass: "bg-emerald-500",
         descriptionKey: "settings.usage.desc",
-        desktopOnly: true,
       },
     ],
   },
@@ -453,21 +450,21 @@ export function SettingsPage(props: SettingsPageProps) {
       >
         {mobileDetailOpen ? (
           <main className="settings-mobile-detail flex min-h-0 flex-1 flex-col bg-background">
-            <header className="settings-mobile-toolbar relative z-10 flex min-h-14 shrink-0 items-center px-2.5">
+            <header className="settings-mobile-toolbar relative z-10 flex min-h-14 shrink-0 items-center gap-1 px-2.5">
               <button
                 type="button"
                 onClick={() => setMobileDetailOpen(false)}
-                className="inline-flex h-10 min-w-10 items-center justify-center gap-1 rounded-full px-2.5 text-sm text-primary transition-colors active:bg-primary/10"
+                className="inline-flex h-10 min-w-10 max-w-[38%] shrink-0 items-center justify-center gap-1 rounded-full px-2.5 text-sm text-primary transition-colors active:bg-primary/10"
                 aria-label={t("settings.mobile.backToSettings")}
               >
                 <ArrowLeft className="h-4 w-4" />
-                <span>{t("settings.title")}</span>
+                <span className="truncate">{t("settings.title")}</span>
               </button>
-              <div className="pointer-events-none absolute inset-x-24 text-center text-[15px] font-semibold tracking-tight">
+              <div className="pointer-events-none min-w-0 flex-1 truncate text-center text-[15px] font-semibold tracking-tight">
                 {sectionLabels[section]}
               </div>
               <div
-                className="ml-auto flex items-center gap-1.5 px-2 text-[11px] text-muted-foreground"
+                className="flex w-10 shrink-0 items-center justify-end gap-1.5 px-2 text-[11px] text-muted-foreground"
                 title={saveIndicator.title}
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${saveIndicator.dotClass}`} />
@@ -497,7 +494,7 @@ export function SettingsPage(props: SettingsPageProps) {
           </main>
         ) : (
           <main className="settings-mobile-home min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
-            <header className="settings-mobile-toolbar sticky top-0 z-10 flex min-h-14 items-center px-2.5">
+            <header className="settings-mobile-toolbar sticky top-0 z-10 flex min-h-14 items-center gap-1 px-2.5">
               <button
                 type="button"
                 onClick={onBack}
@@ -506,11 +503,11 @@ export function SettingsPage(props: SettingsPageProps) {
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <div className="pointer-events-none absolute inset-x-16 text-center text-[17px] font-semibold tracking-tight">
+              <div className="pointer-events-none min-w-0 flex-1 truncate text-center text-[17px] font-semibold tracking-tight">
                 {t("settings.title")}
               </div>
               <div
-                className="ml-auto flex h-10 items-center gap-1.5 px-2 text-[11px] text-muted-foreground"
+                className="flex h-10 shrink-0 items-center gap-1.5 px-2 text-[11px] text-muted-foreground"
                 title={saveIndicator.title}
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${saveIndicator.dotClass}`} />
