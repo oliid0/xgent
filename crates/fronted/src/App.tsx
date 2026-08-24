@@ -593,6 +593,7 @@ export default function App() {
                   <SettingsPage
                     settings={settings}
                     setSettings={setSettings}
+                    reloadSettings={reloadPersistedSettings}
                     saveState={settingsSaveState}
                     onBack={closeSettings}
                     initialSection={settingsSection}

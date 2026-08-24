@@ -1,4 +1,4 @@
-import type { Context, Model } from "@earendil-works/pi-ai";
+import type { Api, Context, Model } from "@earendil-works/pi-ai";
 import { invoke } from "@xagent/runtime";
 
 import {
@@ -6,7 +6,7 @@ import {
   type PendingUploadedFile,
 } from "../chat/messages/uploadedFiles";
 
-type PayloadHook = (payload: unknown, model: Model<any>) => unknown | Promise<unknown>;
+type PayloadHook = (payload: unknown, model: Model<Api>) => unknown | Promise<unknown>;
 
 export type StreamOptionsWithPayloadHook = {
   onPayload?: PayloadHook;

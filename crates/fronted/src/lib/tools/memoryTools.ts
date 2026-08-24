@@ -461,7 +461,7 @@ export function createMemoryTools(params: {
       };
     }
 
-    const args = asRecord(toolCall.arguments);
+    const args = asRecord(toolCall.arguments) ?? {};
     const action = asString(args.action);
     const readonlyAction = action === "list" || action === "read" || action === "search";
     if (mode === "ro" && !readonlyAction) {

@@ -9,7 +9,9 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 use uuid::Uuid;
 
 #[cfg(desktop)]
-use crate::runtime::shell_runner::{run_shell_script, ShellRunResponse};
+use crate::runtime::sandbox;
+#[cfg(desktop)]
+use crate::runtime::shell_runner::{run_shell_script_with_envs, ShellRunResponse};
 #[cfg(desktop)]
 use crate::runtime::task_runner::{
     build_http_client, resolve_workdir, run_single_http_request, HttpExecutionFailure,

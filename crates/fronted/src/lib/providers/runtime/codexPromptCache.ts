@@ -78,7 +78,9 @@ function isExplicitNoCacheOptions(value: unknown): boolean {
 function supportsExplicitNoCache(baseUrl: string, model: Model<Api> | undefined): boolean {
   if (!model || model.api !== "openai-responses") return false;
   if (!isOfficialOpenAIHostname(parseHostname(baseUrl))) return false;
-  const compat = model.compat as OpenAIResponsesCompat | undefined;
+  const compat = model.compat as
+    | (OpenAIResponsesCompat & { supportsExplicitPromptCacheMode?: boolean })
+    | undefined;
   return compat?.supportsExplicitPromptCacheMode === true;
 }
 

@@ -172,6 +172,9 @@ export async function streamAssistantMessage(params: {
   onHostedSearch?: (block: HostedSearchBlock) => void;
   onRetryStatus?: (attempt: number, maxAttempts: number, errorMessage: string) => void;
   onRetryRecovered?: () => void;
+  /** Exact provider boundary after the mandatory text-only suffix is appended. */
+  onRequestStart?: (info: { context: Context; systemSuffix: string }) => void;
+  failover?: TextStreamFailoverParams;
 }) {
   const modelId = params.model.trim();
   if (!modelId) throw new Error("No model selected");
@@ -183,24 +186,19 @@ export async function streamAssistantMessage(params: {
     throw new Error("OpenAI OAuth account is not selected");
   }
 
-  const proxyRequest = await prepareProxyRequest(
-    params.providerId,
-    params.runtime.baseUrl.trim(),
-    mergeCustomHeaders(
-      buildProviderRequestHeaders(
-        params.providerId,
-        params.runtime.apiKey,
-        params.sessionId,
-        params.runtime.authMode,
-      ),
-      params.runtime.customHeaders,
-    ),
-    {
-      useSystemProxy: params.runtime.useSystemProxy === true,
-      oauthAccountId:
-        params.runtime.authMode === "oauth-managed" ? params.runtime.oauthAccountId : undefined,
-    },
-  );
+  const systemSuffix = buildTextOnlySystemSuffix(params.allowJsonOutput);
+  const callContext = buildTextOnlyCallContext(params.context, {
+    allowJsonOutput: params.allowJsonOutput,
+  });
+  try {
+    params.onRequestStart?.({ context: callContext, systemSuffix });
+  } catch (error) {
+    console.warn("text-only request observer failed; continuing without diagnostics", error);
+  }
+
+  const proxyRequest = await prepareProviderRequest(params.providerId, params.runtime, {
+    sessionId: params.sessionId,
+  });
 
   const m = createModelFromConfig(
     params.providerId,
@@ -548,24 +546,9 @@ export async function completeAssistantMessage(params: {
     throw new Error("OpenAI OAuth account is not selected");
   }
 
-  const proxyRequest = await prepareProxyRequest(
-    params.providerId,
-    params.runtime.baseUrl.trim(),
-    mergeCustomHeaders(
-      buildProviderRequestHeaders(
-        params.providerId,
-        params.runtime.apiKey,
-        params.sessionId,
-        params.runtime.authMode,
-      ),
-      params.runtime.customHeaders,
-    ),
-    {
-      useSystemProxy: params.runtime.useSystemProxy === true,
-      oauthAccountId:
-        params.runtime.authMode === "oauth-managed" ? params.runtime.oauthAccountId : undefined,
-    },
-  );
+  const proxyRequest = await prepareProviderRequest(params.providerId, params.runtime, {
+    sessionId: params.sessionId,
+  });
 
   const m = createModelFromConfig(
     params.providerId,

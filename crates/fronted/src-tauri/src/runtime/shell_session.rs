@@ -13,8 +13,8 @@ use crate::runtime::process::{terminate_child_process_tree, terminate_process_tr
 use crate::runtime::sandbox::{SandboxOptions, SandboxSpec};
 use crate::runtime::shell_runner::{
     canonical_workdir, resolve_shell_cwd, spawn_platform_shell_command, ShellExecutionProfile,
-    MAX_SHELL_TIMEOUT_MS, MIN_SHELL_TIMEOUT_MS,
 };
+use crate::runtime::shell_types::{MAX_SHELL_TIMEOUT_MS, MIN_SHELL_TIMEOUT_MS};
 
 const DEFAULT_START_YIELD_MS: u64 = 10_000;
 const MIN_START_YIELD_MS: u64 = 250;

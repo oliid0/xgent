@@ -6,7 +6,8 @@ import type {
   ToolResultMessage,
 } from "@earendil-works/pi-ai";
 import { invoke } from "@xagent/runtime";
-import { Type } from "typebox";
+import { type TProperties, Type } from "typebox";
+import type { AdditionalProjectRoot } from "./additionalProjectRoots";
 import {
   type BuiltinToolBundle,
   type BuiltinToolResultDetails,
@@ -27,6 +28,7 @@ import {
   type WriteResultDetails,
 } from "./builtinTypes";
 import type { FileToolState } from "./fileToolState";
+import { invokeFs, isFsBackendError } from "./fsBackend";
 import { buildFsErrorText, buildRequiresFullReadText, buildWriteDirectoryText } from "./pathErrors";
 import {
   formatPathWithinResolvedRoot,

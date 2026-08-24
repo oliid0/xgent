@@ -129,6 +129,7 @@ function isVisibleGroupedBlock(block: GroupedRoundBlock) {
   if (block.kind === "text" || block.kind === "thinking") {
     return block.text.trim().length > 0;
   }
+  if (block.kind !== "tool" && block.kind !== "toolGroup") return true;
   return !isTaskToolBlock(block);
 }
 

@@ -1,20 +1,30 @@
 import { invoke, listen } from "@xagent/runtime";
+import {
+  buildTerminalCreatePayload,
+  buildTerminalSshCreatePayload,
+  buildTerminalSshPromptAnswerPayload,
+  normalizeOptionalOffset,
+  normalizeSshTerminalTabsSnapshot,
+  normalizeTerminalByteContainer,
+  normalizeTerminalEvent,
+  normalizeTerminalSession,
+  normalizeTerminalShellOptions,
+  normalizeTerminalSnapshot,
+  normalizeTerminalSshCreateResult,
+  normalizeTerminalSshLatency,
+  type RawSshTerminalTabsSnapshot,
+  type RawTerminalEvent,
+  type RawTerminalSession,
+  type RawTerminalShellOptionsResponse,
+  type RawTerminalSnapshot,
+  type RawTerminalSshLatency,
+} from "./normalization";
+import { TerminalStreamBuffer } from "./streamBuffer";
+import { createTerminalStreamHandleRegistry } from "./streamHandleRegistry";
 import type {
-  SshTerminalTab,
-  SshTerminalTabsSnapshot,
   TerminalClient,
   TerminalEvent,
-  TerminalSession,
-  TerminalShellOption,
-  TerminalShellOptions,
-  TerminalSnapshot,
-  TerminalSshCreateResult,
-  TerminalSshLatency,
-  TerminalSshMetadata,
-  TerminalSshPrompt,
   TerminalStreamChunk,
-  TerminalStreamHandle,
-  TerminalStreamInputState,
   TerminalStreamSnapshot,
 } from "./types";
 
@@ -22,18 +32,14 @@ type TerminalEventListener = (event: TerminalEvent) => void;
 
 const globalTerminalListeners = new Set<TerminalEventListener>();
 let globalListenerStarted = false;
-const globalTerminalStreamHandles = new Set<TauriTerminalStreamHandle>();
+const globalTerminalStreamHandles = createTerminalStreamHandleRegistry<TauriTerminalStreamHandle>();
 let globalStreamListenerStarted = false;
-const INPUT_FLUSH_BYTES = 4 * 1024;
-const INPUT_FLUSH_MS = 8;
-const INPUT_HIGH_WATER_BYTES = 256 * 1024;
-const INPUT_LOW_WATER_BYTES = 128 * 1024;
 
 function ensureGlobalTerminalListener() {
   if (globalListenerStarted) return;
   globalListenerStarted = true;
   void listen<RawTerminalEvent>("terminal:event", (event) => {
-    const normalized = normalizeEvent(event.payload);
+    const normalized = normalizeTerminalEvent(event.payload);
     if (!normalized) return;
     for (const listener of globalTerminalListeners) {
       listener(normalized);

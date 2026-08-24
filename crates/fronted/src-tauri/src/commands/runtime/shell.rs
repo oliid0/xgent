@@ -351,6 +351,7 @@ pub(crate) async fn run_mobile_shell(
         platform: response.platform,
         profile: response.profile,
         shell_family: response.shell_family,
+        sandbox: None,
         stdout: response.stdout,
         stderr: response.stderr,
         stdout_truncated: response.stdout_truncated,

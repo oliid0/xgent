@@ -1,6 +1,6 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { invoke } from "@xagent/runtime";
-import { Type } from "typebox";
+import { type TProperties, Type } from "typebox";
 import {
   inferRuntimePlatform,
   normalizeRuntimePlatform,
@@ -8,6 +8,7 @@ import {
   runtimePlatformLabel,
 } from "../runtimePlatform";
 import type { ProviderId } from "../settings";
+import { createUuid } from "../shared/id";
 import {
   type BashTimeoutPolicy,
   GLOBAL_BASH_MAX_TIMEOUT_MS,

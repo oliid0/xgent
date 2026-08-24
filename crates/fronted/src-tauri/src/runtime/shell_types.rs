@@ -11,6 +11,9 @@ pub struct ShellRunResponse {
     pub platform: String,
     pub profile: String,
     pub shell_family: String,
+    /// Effective native sandbox mechanism. Mobile runtimes currently report
+    /// `None` because their process boundary is the application sandbox.
+    pub sandbox: Option<String>,
     pub stdout: String,
     pub stderr: String,
     pub stdout_truncated: bool,

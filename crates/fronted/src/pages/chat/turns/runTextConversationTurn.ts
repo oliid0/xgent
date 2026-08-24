@@ -47,7 +47,10 @@ import {
   NOOP_TRAJECTORY_RECORDER,
   type TrajectoryRecorder,
 } from "../../../lib/trajectory/recorder";
-import { buildPartialAssistantMessage } from "../runtime/chatPageRuntime";
+import {
+  buildPartialAssistantMessage,
+  type ConversationRuntimeEntry,
+} from "../runtime/chatPageRuntime";
 
 export type RuntimeModel = {
   api: AssistantMessage["api"];
@@ -186,6 +189,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
   } = params;
 
   const trajectory = params.trajectory ?? NOOP_TRAJECTORY_RECORDER;
+  const startedTrajectorySteps = new Set<number>();
   if (params.trajectoryTurn !== undefined) {
     trajectory.beginTurn({
       turn: params.trajectoryTurn,
@@ -209,6 +213,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
   let protectionCompactionDisabled = false;
 
   function commitAssistantRoundMeta(assistant: AssistantMessage, round: number) {
+    const contextUsageTokens = compaction.observeContextMessages([assistant]);
     conversationEvents.queueToken("", {
       round,
       provider: assistant.provider,
@@ -538,7 +543,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
     sessionId,
     providerId,
     model,
-    cwd: conversationCwd,
+    cwd: historyCwd,
     state: finalState,
     fallbackTitle,
     createdAt,

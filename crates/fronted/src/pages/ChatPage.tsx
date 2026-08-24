@@ -81,6 +81,7 @@ import {
   setChatHistoryModel,
 } from "../lib/chat/history/chatHistory";
 import { memoryExtraction } from "../lib/chat/memory/extractionController";
+import { memoryTurnInjection } from "../lib/chat/memory/injectionController";
 import type { MemoryExtractionStatusKey } from "../lib/chat/memory/extractionEngine";
 import {
   type CodeMentionReference,
@@ -1273,7 +1274,7 @@ export function ChatPage(props: ChatPageProps) {
     : undefined;
 
   const historyRenderItems = useMemo<RenderTimelineItem[]>(
-    () => conversationState.historyRenderItems,
+    () => conversationState.transcript.items,
     [conversationState],
   );
   // Sent-prompt history for the composer's ↑/↓ recall. Read lazily through a
@@ -3790,6 +3791,7 @@ export function ChatPage(props: ChatPageProps) {
         model: titleModelSelection.model,
         runtime: {
           baseUrl: titleProviderConfig.baseUrl,
+          isFullUrl: titleProviderConfig.isFullUrl,
           apiKey: titleProviderConfig.apiKey,
           authMode: titleProviderConfig.authMode,
           oauthAccountId: titleProviderConfig.oauthAccountId,

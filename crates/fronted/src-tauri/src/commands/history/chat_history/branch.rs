@@ -100,30 +100,19 @@ pub(crate) fn build_branch_segments(
     segments: &[ChatHistorySegmentRecord],
     anchor: &ChatHistoryBranchAnchor,
 ) -> Result<(Vec<ChatHistorySegmentInput>, i64), String> {
-    let target_segment_id = anchor.segment_id.trim();
-    let anchor_segment_pos = segments
-        .iter()
-        .position(|segment| segment.segment_id.trim() == target_segment_id)
-        .ok_or_else(|| "未找到分支锚点所在的历史分段".to_string())?;
-
-    let anchor_messages = parse_branch_segment_messages(&segments[anchor_segment_pos])?;
-    let matches_anchor = |message: &Value| {
-        message_matches_ref(message, &anchor.message_id, "user", &anchor.content_hash)
+    let message_ref = ChatHistoryMessageRef {
+        segment_index: anchor.segment_index,
+        message_index: anchor.message_index,
+        segment_id: anchor.segment_id.clone(),
+        message_id: anchor.message_id.clone(),
+        role: anchor.role.clone(),
+        content_hash: anchor.content_hash.clone(),
     };
-    let hinted_index = usize::try_from(anchor.message_index).ok();
-    let anchor_position = hinted_index
-        .filter(|index| {
-            anchor_messages
-                .get(*index)
-                .map(|message| matches_anchor(message))
-                .unwrap_or(false)
-        })
-        .or_else(|| {
-            anchor_messages
-                .iter()
-                .position(|message| matches_anchor(message))
-        })
-        .ok_or_else(|| "未找到匹配的分支锚点消息".to_string())?;
+    let location = locate_history_message_ref(segments, &message_ref)
+        .map_err(|error| format!("未找到匹配的分支锚点消息：{error}"))?;
+    let anchor_segment_pos = location.segment_position;
+    let anchor_messages = location.messages;
+    let anchor_position = location.message_index;
 
     // 独占切点：锚点之后（跨分段）的第一条 user 消息；没有则整会话复制。
     // 顺带记录切点前是否存在非 user 消息：桌面 done 先于落盘（persist-lag），

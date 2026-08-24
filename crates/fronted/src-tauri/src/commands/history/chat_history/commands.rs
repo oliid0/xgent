@@ -342,30 +342,37 @@ pub async fn chat_history_upsert_active_segment(
     chat_history_upsert_active_segment_inner(input).await
 }
 
+fn append_chat_history_segment_sync(
+    conn: &mut Connection,
+    input: &ChatHistoryAppendSegmentInput,
+) -> Result<ChatHistorySummary, String> {
+    validate_append_segment_input(input)?;
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("开启 append segment 事务失败：{e}"))?;
+
+    validate_append_segment_preconditions(&tx, input)?;
+    upsert_single_segment(
+        &tx,
+        input.conversation.id.trim(),
+        &input.previous_segment,
+    )?;
+    upsert_chat_history_header(&tx, &input.conversation)?;
+    insert_single_segment(&tx, input.conversation.id.trim(), &input.segment)?;
+    verify_chat_history_consistency(&tx, input.conversation.id.trim())?;
+
+    tx.commit()
+        .map_err(|e| format!("提交 append segment 事务失败：{e}"))?;
+
+    get_summary_by_id(conn, input.conversation.id.trim())
+}
+
 pub(crate) async fn chat_history_append_segment_inner(
     input: ChatHistoryAppendSegmentInput,
 ) -> Result<ChatHistorySummary, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        validate_append_segment_input(&input)?;
         let mut conn = open_db()?;
-        let tx = conn
-            .transaction()
-            .map_err(|e| format!("开启 append segment 事务失败：{e}"))?;
-
-        validate_append_segment_preconditions(&tx, &input)?;
-        upsert_single_segment(
-            &tx,
-            input.conversation.id.trim(),
-            &input.previous_segment,
-        )?;
-        upsert_chat_history_header(&tx, &input.conversation)?;
-        insert_single_segment(&tx, input.conversation.id.trim(), &input.segment)?;
-        verify_chat_history_consistency(&tx, input.conversation.id.trim())?;
-
-        tx.commit()
-            .map_err(|e| format!("提交 append segment 事务失败：{e}"))?;
-
-        get_summary_by_id(&conn, input.conversation.id.trim())
+        append_chat_history_segment_sync(&mut conn, &input)
     })
     .await
     .map_err(|e| format!("chat_history_append_segment join 失败：{e}"))?

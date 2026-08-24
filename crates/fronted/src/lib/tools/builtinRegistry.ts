@@ -253,6 +253,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
             getMcpSettings: params.getMcpSettings,
             applyMcpOps: params.applyMcpOps,
             runtimeScope: params.runtimeScope,
+            sandbox: params.sandbox,
             resolveHomeDir,
             localStdioSupported: capabilities.localMcpStdio,
           }),

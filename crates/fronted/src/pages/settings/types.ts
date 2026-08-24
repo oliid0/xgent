@@ -34,6 +34,7 @@ export type SettingsOpenOptions = {
 export type SettingsPageProps = {
   settings: AppSettings;
   setSettings: SetSettingsFn;
+  reloadSettings?: () => Promise<void>;
   saveState: SettingsSaveState;
   onBack: () => void;
   initialSection?: SectionId;
@@ -46,4 +47,5 @@ export type SettingsPageProps = {
 export type SettingsSectionProps = {
   settings: AppSettings;
   setSettings: SetSettingsFn;
+  reloadSettings?: () => Promise<void>;
 };

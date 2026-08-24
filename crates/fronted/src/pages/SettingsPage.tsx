@@ -271,6 +271,7 @@ export function SettingsPage(props: SettingsPageProps) {
   const {
     settings,
     setSettings,
+    reloadSettings,
     saveState,
     onBack,
     initialSection = "system",
@@ -424,7 +425,13 @@ export function SettingsPage(props: SettingsPageProps) {
       case "shortcuts":
         return <GlobalShortcutsSection />;
       case "backup":
-        return <BackupSyncSection settings={settings} setSettings={setSettings} />;
+        return (
+          <BackupSyncSection
+            settings={settings}
+            setSettings={setSettings}
+            reloadSettings={reloadSettings}
+          />
+        );
       case "toolPermissions":
         return <ToolPermissionsSection settings={settings} setSettings={setSettings} />;
       case "projectRoots":

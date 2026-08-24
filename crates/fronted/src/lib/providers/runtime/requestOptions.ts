@@ -1,39 +1,56 @@
 import type { CacheRetention, SimpleStreamOptions } from "@earendil-works/pi-ai";
-import type { CustomProvider, ProviderAuthMode, ProviderId, ReasoningLevel } from "../../settings";
+import type {
+  CodexRequestFormat,
+  ProviderAuthMode,
+  ProviderId,
+  ReasoningLevel,
+} from "../../settings";
 import { createUuid } from "../../shared/id";
 import {
   ANTHROPIC_DEFAULT_REQUEST_HEADERS,
   CODEX_CONVERSATION_ID_HEADER,
-  CODEX_DEFAULT_USER_AGENT,
   CODEX_SESSION_ID_HEADER,
   isAnthropicOAuthApiKey,
-  mergeCustomHeaders as mergeCustomHeadersBase,
+  mergeCustomHeaders,
 } from "../customHeaders";
+import {
+  normalizeDeepSeekResponsesBaseUrl,
+  normalizeDeepSeekResponsesEndpoint,
+} from "../deepSeekNative";
+import { type PreparedProxyRequest, prepareProxyRequest } from "../proxy";
 import { normalizeSessionId } from "./common";
+import type { ProviderRuntimeConfig } from "./types";
 
 export { isValidCustomHeaderKey } from "../customHeaders";
 
+export function buildAnthropicAuthHeaders(apiKey: string): Record<string, string> {
+  return { "x-api-key": apiKey };
+}
+
+export function buildOpenAIAuthHeaders(apiKey: string): Record<string, string> {
+  return { Authorization: `Bearer ${apiKey}` };
+}
+
+/** Compatibility helper for callers that intentionally target dual-auth relays. */
 export function buildDualAuthHeaders(apiKey: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${apiKey}`,
-    "x-api-key": apiKey,
-  };
+  return { ...buildOpenAIAuthHeaders(apiKey), ...buildAnthropicAuthHeaders(apiKey) };
 }
 
 export function buildGeminiAuthHeaders(apiKey: string): Record<string, string> {
-  return {
-    "x-goog-api-key": apiKey,
-  };
+  return { "x-goog-api-key": apiKey };
 }
 
 function buildProviderAuthHeaders(providerId: ProviderId, apiKey: string): Record<string, string> {
-  return providerId === "gemini" ? buildGeminiAuthHeaders(apiKey) : buildDualAuthHeaders(apiKey);
+  if (providerId === "gemini") return buildGeminiAuthHeaders(apiKey);
+  if (providerId === "claude_code") return buildAnthropicAuthHeaders(apiKey);
+  return buildOpenAIAuthHeaders(apiKey);
 }
 
 export function buildProviderRequestHeaders(
   providerId: ProviderId,
   apiKey: string,
   sessionId?: string,
+  requestFormat?: CodexRequestFormat,
   authMode: ProviderAuthMode = "api-key",
 ): Record<string, string> {
   const authHeaders =
@@ -42,17 +59,15 @@ export function buildProviderRequestHeaders(
       : authMode === "oauth-token" && providerId !== "gemini"
         ? { Authorization: `Bearer ${apiKey}` }
         : buildProviderAuthHeaders(providerId, apiKey);
+
   if (providerId === "claude_code") {
     if (isAnthropicOAuthApiKey(apiKey)) return {};
-    return {
-      ...authHeaders,
-      ...ANTHROPIC_DEFAULT_REQUEST_HEADERS,
-    };
+    return { ...authHeaders, ...ANTHROPIC_DEFAULT_REQUEST_HEADERS };
   }
+
   if (providerId === "codex") {
-    // 标准 Chat Completions 是无状态协议，只需 Authorization——
-    // session_id/conversation_id 是 Responses（Codex CLI）链路专属头，
-    // 不得泄漏进 completions 格式的请求。
+    // Chat Completions is stateless. Codex session headers are only valid for
+    // Responses requests and must never leak into the completions endpoint.
     if (requestFormat === "openai-completions") return authHeaders;
     const requestSessionId = normalizeSessionId(sessionId) ?? createUuid();
     return {
@@ -61,14 +76,11 @@ export function buildProviderRequestHeaders(
       [CODEX_CONVERSATION_ID_HEADER]: requestSessionId,
     };
   }
-  // 其它 OpenAI 兼容端：仅 Bearer。
+
   return authHeaders;
 }
 
-/**
- * 供应商上游请求的唯一装配入口：内置头 → 合并用户自定义头 → 过本地反代。
- * 聊天 / 文本 / 摘要三条链路都走这里，杜绝各自重复装配时漏掉 customHeaders。
- */
+/** Build the provider URL, auth/custom headers and optional native proxy route. */
 export async function prepareProviderRequest(
   providerId: ProviderId,
   runtime: ProviderRuntimeConfig,
@@ -89,12 +101,14 @@ export async function prepareProviderRequest(
         runtime.apiKey,
         options?.sessionId,
         runtime.requestFormat,
+        runtime.authMode,
       ),
       runtime.customHeaders,
     ),
     {
       useSystemProxy: runtime.useSystemProxy === true,
-      isFullUrl: runtime.isFullUrl === true,
+      oauthAccountId:
+        runtime.authMode === "oauth-managed" ? runtime.oauthAccountId : undefined,
     },
   );
 }
@@ -111,15 +125,11 @@ export function resolveProviderCacheRetention(
   requestOverride?: CacheRetention,
   providerPreference?: CacheRetention,
 ): CacheRetention | undefined {
-  // Codex 的 wire 策略由 promptCacheHintMode 处理；这里保留 short 让供应商级
-  // none 仍可被单模型覆盖。请求级 none 则始终优先，供标题/压缩等辅助请求禁用。
   if (providerId !== "claude_code" && providerId !== "codex") return undefined;
   if (providerId === "codex") return requestOverride ?? "short";
   if (promptCachingEnabled === false) return "none";
-  // 请求级 override 优先（压缩/标题等辅助请求强制 none）。
   if (requestOverride) return requestOverride;
-  // 用户可选 long：官方 Anthropic API 上由缓存中间件映射为 1h TTL 断点。
-  if (providerId === "claude_code" && providerPreference === "long") return "long";
+  if (providerPreference === "long") return "long";
   return "short";
 }
 
@@ -129,7 +139,5 @@ export function buildProviderRequestMetadata(
 ): Record<string, unknown> | undefined {
   const normalizedSessionId = normalizeSessionId(sessionId);
   if (providerId !== "claude_code" || !normalizedSessionId) return undefined;
-  return {
-    user_id: normalizedSessionId,
-  };
+  return { user_id: normalizedSessionId };
 }

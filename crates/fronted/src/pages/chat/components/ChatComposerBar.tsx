@@ -1,7 +1,7 @@
 import { Tooltip } from "@base-ui/react";
 import {
-  type MutableRefObject,
   memo,
+  type RefObject,
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
   useCallback,
@@ -216,7 +216,7 @@ function prefersReducedMotion() {
 
 export const ChatComposerBar = memo(function ChatComposerBar(props: {
   conversationId: string;
-  composerRef: MutableRefObject<MentionComposerHandle | null>;
+  composerRef: RefObject<MentionComposerHandle | null>;
   isSending: boolean;
   isUploadingFiles: boolean;
   isInputDisabled: boolean;
@@ -229,6 +229,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   thinkingAlwaysOn: boolean;
   contextUsageTokensSource?: ContextUsageTokensSource;
   contextWindow?: number;
+  sttSettings?: SttSettings;
   gitClient?: GitClient | null;
   gitWriteEnabled?: boolean;
   gitDisabledMessage?: string;

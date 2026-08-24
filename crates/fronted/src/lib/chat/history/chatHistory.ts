@@ -5,6 +5,7 @@ import { normalizeConversationSystemPrompt } from "../context/systemPrompt";
 import {
   type ConversationViewState,
   createTranscriptProjection,
+  getActiveSegment,
   type HistoryMessageRef,
   normalizeConversationState,
   type StoredChatContextMeta,

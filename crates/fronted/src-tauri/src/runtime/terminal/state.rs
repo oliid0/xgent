@@ -33,7 +33,9 @@ pub(crate) enum TerminalSessionBackend {
 }
 
 pub(crate) struct SshSessionRuntime {
-    pub(crate) handle: tokio::sync::Mutex<Option<client::Handle<XAgentSshClient>>>,
+    // Clone the shared handle before an async channel operation so the mutex
+    // never stays held across network I/O.
+    pub(crate) handle: tokio::sync::Mutex<Option<Arc<client::Handle<XAgentSshClient>>>>,
     pub(crate) input_tx: Mutex<Option<tokio::sync::mpsc::Sender<SshSessionInput>>>,
     pub(crate) shutdown_tx: Mutex<Option<tokio::sync::mpsc::Sender<()>>>,
     pub(crate) connection_id: AtomicUsize,
@@ -83,7 +85,7 @@ impl SshSessionRuntime {
         }
     }
 
-    pub(crate) async fn current_handle(&self) -> Option<Arc<client::Handle<LiveAgentSshClient>>> {
+    pub(crate) async fn current_handle(&self) -> Option<Arc<client::Handle<XAgentSshClient>>> {
         self.handle.lock().await.as_ref().map(Arc::clone)
     }
 

@@ -45,6 +45,8 @@ export type McpTransport = "stdio" | "http" | "sse";
 
 export type McpServerConfig = {
   id: string;
+  description?: string;
+  docsUrl?: string;
   enabled: boolean;
   transport: McpTransport;
   command: string;
@@ -152,6 +154,7 @@ export type BrowserExperienceSettings = {
 
 export type CustomSettings = {
   conversationTitleModel?: SelectedModel;
+  commitMessageModel?: SelectedModel;
   chatSidebar: ChatSidebarSettings;
   workspaceTools: WorkspaceToolsSettings;
   interfaceFontFamily: string;
@@ -563,11 +566,27 @@ export function normalizeModelFailoverSettings(
       ),
     );
     return {
+      ...DEFAULT_MODEL_FAILOVER_PROVIDER_SETTINGS,
       enabled: raw.enabled === true,
       queue,
-      maxSwitches: normalizeIntegerSetting(raw.maxSwitches, 1, 10, 3),
-      failureThreshold: normalizeIntegerSetting(raw.failureThreshold, 1, 10, 4),
-      cooldownSeconds: normalizeIntegerSetting(raw.cooldownSeconds, 5, 3600, 60),
+      maxSwitches: normalizeIntegerSetting(
+        raw.maxSwitches,
+        1,
+        10,
+        DEFAULT_MODEL_FAILOVER_PROVIDER_SETTINGS.maxSwitches,
+      ),
+      failureThreshold: normalizeIntegerSetting(
+        raw.failureThreshold,
+        1,
+        10,
+        DEFAULT_MODEL_FAILOVER_PROVIDER_SETTINGS.failureThreshold,
+      ),
+      cooldownSeconds: normalizeIntegerSetting(
+        raw.cooldownSeconds,
+        5,
+        3600,
+        DEFAULT_MODEL_FAILOVER_PROVIDER_SETTINGS.cooldownSeconds,
+      ),
     };
   };
   return {
@@ -1916,6 +1935,8 @@ export function normalizeMcpServerConfig(input: unknown): McpServerConfig {
 
   return {
     id,
+    description: normalizeOptionalText(obj.description),
+    docsUrl: normalizeOptionalText(obj.docsUrl),
     enabled: Boolean(obj.enabled),
     transport: normalizeMcpTransport(obj.transport),
     command: typeof obj.command === "string" ? obj.command.trim() : "",
@@ -2416,6 +2437,10 @@ export function normalizeCustomSettings(
   return {
     conversationTitleModel: normalizeSelectedModelForProviders(
       normalizeSelectedModel(obj.conversationTitleModel),
+      customProviders,
+    ),
+    commitMessageModel: normalizeSelectedModelForProviders(
+      normalizeSelectedModel(obj.commitMessageModel),
       customProviders,
     ),
     chatSidebar: {

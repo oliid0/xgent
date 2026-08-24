@@ -57,7 +57,13 @@ pub struct AccessSettingsPayload {
 #[serde(rename_all = "camelCase")]
 pub struct SshPatchApplyResponse {
     pub ssh: Value,
-    pub conflict: Option<String>,
+    pub conflict: Option<SshPatchConflictCode>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SshPatchConflictCode {
+    SettingsChanged,
 }
 
 #[derive(Debug, Clone)]
@@ -68,6 +74,8 @@ pub(crate) struct RuntimeSshProxyConfig {
     pub username: String,
     pub password: String,
     pub password_configured: bool,
+    /// Reuse the application-wide proxy and ignore the manual SSH proxy.
+    pub use_system_proxy: bool,
 }
 
 #[derive(Debug, Clone)]

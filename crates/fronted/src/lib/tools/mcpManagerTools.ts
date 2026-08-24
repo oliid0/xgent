@@ -16,6 +16,7 @@ import {
 } from "./builtinTypes";
 import { ToolPathResolver } from "./pathUtils";
 import type { ShellSandboxSettings } from "./shellTools";
+import type { SystemToolRuntimeScope } from "./systemToolOptions";
 
 type McpManagerAction =
   | "list"
@@ -642,6 +643,8 @@ export function createMcpManagerTools(params: {
   /** Id-keyed merge commit; absent means this scope cannot modify settings. */
   applyMcpOps?: (ops: McpSettingsOp[]) => void;
   runtimeScope: SystemToolRuntimeScope;
+  /** Same model-driven OS sandbox contract used by Bash and ManagedProcess. */
+  sandbox?: ShellSandboxSettings;
   resolveHomeDir?: () => Promise<string>;
   /** Native mobile currently supports network MCP transports, not local stdio children. */
   localStdioSupported?: boolean;
@@ -927,16 +930,17 @@ export function createMcpManagerTools(params: {
       const serverId = requireServerId(args.server_id);
       const stopped = await invoke<McpStopServerResponse>("mcp_stop_server", {
         server_id: serverId,
-      } as any);
+      });
       return { action, serverId, stopped: stopped.stopped, changed: false };
     }
 
-    if (action === "test" || action === "tools" || action === "restart" || action === "diagnose") {
+    if (RUNTIME_CONNECTING_ACTIONS.has(action)) {
       const hasInlineServer = Boolean(args.server);
       const server = hasInlineServer
         ? await resolveServerCwd(normalizeServerInput(args.server), "McpManager.server.cwd")
         : requireExistingServer(currentSettings(), requireServerId(args.server_id));
       throwIfAborted(signal);
+      assertRuntimeSpawnAllowed(action, server);
       const validation = validateForRuntime(
         server,
         hasInlineServer ? undefined : currentSettings(),

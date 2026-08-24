@@ -46,6 +46,9 @@ import {
 
 type ChildToolExecutor = (toolCall: ToolCall, signal?: AbortSignal) => Promise<ToolResultMessage>;
 
+/** Compatibility name retained for the Agent tool's public runtime contract. */
+export type SubagentProviderRuntime = ProviderRuntimeConfig;
+
 export type SubagentRunEnvironment = {
   providerId: ProviderId;
   model: string;

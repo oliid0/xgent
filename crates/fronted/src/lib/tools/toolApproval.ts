@@ -27,11 +27,20 @@ export type PendingToolApprovalSummary = {
 const pendingByToolCallId = new Map<string, PendingToolApproval>();
 const sessionAllowByConversation = new Map<string, Set<string>>();
 const listeners = new Set<() => void>();
+const listenersByConversation = new Map<string, Set<() => void>>();
+const pendingSnapshotsByConversation = new Map<string, PendingToolApprovalSummary[]>();
+const EMPTY_PENDING_APPROVALS: PendingToolApprovalSummary[] = Object.freeze(
+  [],
+) as PendingToolApprovalSummary[];
 let version = 0;
 
-function emitChange() {
+function emitChange(conversationId: string) {
+  const key = conversationId.trim();
   version += 1;
   for (const listener of listeners) listener();
+  if (!key) return;
+  pendingSnapshotsByConversation.delete(key);
+  for (const listener of listenersByConversation.get(key) ?? []) listener();
 }
 
 export function subscribeToolApprovals(listener: () => void) {
@@ -43,6 +52,21 @@ export function subscribeToolApprovals(listener: () => void) {
 
 export function getToolApprovalVersion() {
   return version;
+}
+
+export function subscribeToolApprovalsForConversation(
+  conversationId: string,
+  listener: () => void,
+) {
+  const key = conversationId.trim();
+  if (!key) return () => undefined;
+  const conversationListeners = listenersByConversation.get(key) ?? new Set<() => void>();
+  conversationListeners.add(listener);
+  listenersByConversation.set(key, conversationListeners);
+  return () => {
+    conversationListeners.delete(listener);
+    if (conversationListeners.size === 0) listenersByConversation.delete(key);
+  };
 }
 
 export function listPendingToolApprovalsForConversation(
@@ -60,6 +84,19 @@ export function listPendingToolApprovalsForConversation(
     });
   }
   return out.sort((left, right) => left.deadlineAt - right.deadlineAt);
+}
+
+export function getPendingToolApprovalsSnapshot(
+  conversationId: string,
+): PendingToolApprovalSummary[] {
+  const key = conversationId.trim();
+  if (!key) return EMPTY_PENDING_APPROVALS;
+  const cached = pendingSnapshotsByConversation.get(key);
+  if (cached) return cached;
+  const pending = listPendingToolApprovalsForConversation(key);
+  if (pending.length === 0) return EMPTY_PENDING_APPROVALS;
+  pendingSnapshotsByConversation.set(key, pending);
+  return pending;
 }
 
 export function isSessionApproved(conversationId: string, toolName: string) {
@@ -123,7 +160,7 @@ export function requestToolApproval(params: {
       if (settlement.kind === "decided" && settlement.decision === "approve_session") {
         rememberSessionApproval(params.conversationId, params.toolName);
       }
-      emitChange();
+      emitChange(params.conversationId);
       resolve(settlement);
     };
     const onAbort = () => settle({ kind: "cancelled" });
@@ -140,6 +177,6 @@ export function requestToolApproval(params: {
     };
     pendingByToolCallId.set(toolCallId, pending);
     params.signal?.addEventListener("abort", onAbort, { once: true });
-    emitChange();
+    emitChange(params.conversationId);
   });
 }

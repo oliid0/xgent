@@ -26,6 +26,29 @@ export function createToolRunId(prefix: string, toolCallId: string) {
   return `${normalizedPrefix}:${normalizedToolCallId}:${crypto.randomUUID()}`;
 }
 
+function delay(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+/** Best-effort bounded cancellation for native runs registered by run_id. */
+export function requestRuntimeCancel(runId: string) {
+  const normalizedRunId = runId.trim();
+  if (!normalizedRunId) return;
+  void (async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        const response = await invoke<{ cancelled: boolean }>("runtime_cancel", {
+          run_id: normalizedRunId,
+        });
+        if (response.cancelled) return;
+      } catch {
+        // Transient IPC failures are retried; the loop remains bounded.
+      }
+      await delay(50);
+    }
+  })();
+}
+
 export function waitForAbortablePromise<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
   throwIfToolInvocationAborted(signal);
   if (!signal) return promise;

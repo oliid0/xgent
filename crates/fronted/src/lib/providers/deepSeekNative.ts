@@ -85,9 +85,19 @@ export function normalizeDeepSeekResponsesEndpoint(endpoint: string): string {
   }
 }
 
-function mapToolChoice(
-  toolChoice: ToolChoice | undefined,
-): OpenAIResponsesOptions["toolChoice"] | undefined {
+type DeepSeekResponsesToolChoice =
+  | "auto"
+  | "none"
+  | "required"
+  | { type: "function"; name: string };
+
+type DeepSeekOpenAIResponsesOptions = OpenAIResponsesOptions & {
+  fetch?: typeof globalThis.fetch;
+  samplingParams?: Record<string, unknown>;
+  toolChoice?: DeepSeekResponsesToolChoice;
+};
+
+function mapToolChoice(toolChoice: ToolChoice | undefined): DeepSeekResponsesToolChoice | undefined {
   if (!toolChoice) return undefined;
   if (toolChoice === "any") return "required";
   if (toolChoice === "auto" || toolChoice === "none") return toolChoice;
@@ -216,7 +226,7 @@ function buildResponsesOptions(
   model: Model<Api>,
   options: StreamOptionsEx,
   fetch: typeof globalThis.fetch,
-): OpenAIResponsesOptions {
+): DeepSeekOpenAIResponsesOptions {
   const reasoningEffort =
     options.deepSeekThinking === "disabled"
       ? undefined

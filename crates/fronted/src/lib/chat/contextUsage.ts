@@ -55,6 +55,43 @@ export function canManualCompact(ratio: number): boolean {
   return Number.isFinite(ratio) && ratio > 0;
 }
 
+/**
+ * Flatten transcript and live-round token anchors into chronological scan
+ * items. Keeping this pure avoids coupling the context ring to a particular
+ * conversation surface (main chat, workbench pane, or mobile compact view).
+ */
+export function buildContextUsageScanItems(
+  transcriptItems: readonly unknown[],
+  liveState?: unknown,
+): unknown[] {
+  const scanItems: unknown[] = [];
+  for (const item of transcriptItems) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    if (positiveTokenCount(record.contextUsageTokens) !== undefined) {
+      scanItems.push({ totalTokens: record.contextUsageTokens });
+    }
+    if (!Array.isArray(record.rounds)) continue;
+    for (const round of record.rounds) {
+      if (!round || typeof round !== "object") continue;
+      const roundRecord = round as Record<string, unknown>;
+      const meta = roundRecord.meta;
+      if (meta && typeof meta === "object") scanItems.push(meta);
+    }
+  }
+  if (liveState && typeof liveState === "object") {
+    const rounds = (liveState as Record<string, unknown>).liveRounds;
+    if (Array.isArray(rounds)) {
+      for (const round of rounds) {
+        if (!round || typeof round !== "object") continue;
+        const meta = (round as Record<string, unknown>).meta;
+        if (meta && typeof meta === "object") scanItems.push(meta);
+      }
+    }
+  }
+  return scanItems;
+}
+
 export function deriveContextUsageTokens(items: readonly unknown[]): number | undefined {
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];

@@ -67,7 +67,6 @@ import {
 import {
   AGENT_TOOL_NAME,
   buildRosterIdentitySection,
-  buildRosterReminder,
   buildRosterRunStatusSection,
   createSubagentScheduler,
   isSubagentCardToolCall,
@@ -416,7 +415,6 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     updateRetryAttempts,
     updatePersistableAgentProgress,
     commitVisibleAbortedConversation,
-    updateConversationRuntimeEntry,
     persistConversationWithHistorySync,
     memoryExtractionModel,
     onMemoryExtractionModelFailure,
