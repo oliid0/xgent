@@ -1,10 +1,7 @@
 import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { createUuid } from "@xagent/ui/lib/shared/id";
 import { isOnlyDsmlOrphanCloseTags } from "./deepSeekDsml";
-import {
-  hasFlattenedToolRequestText,
-  recoverFlattenedToolRequests,
-} from "./flattenedToolCallText";
+import { hasFlattenedToolRequestText, recoverFlattenedToolRequests } from "./flattenedToolCallText";
 
 const SEED_TOOL_CALL_DISPLAY_PATTERN = /<seed:tool_call>[\s\S]*?(?:<\/seed:tool_call>|$)/gi;
 const FUNCTION_PATTERN = /<function\b([^>]*)>([\s\S]*?)(?:<\/function>|$)/i;
