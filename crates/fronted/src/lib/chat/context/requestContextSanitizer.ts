@@ -131,10 +131,16 @@ function sanitizeTextBlocksForModelContext(message: Message): Message {
       return [{ ...block, text }];
     }
 
-    // Signed Anthropic thinking is opaque protocol state. Even text-like cleanup
-    // (including DSML stripping or surrogate replacement) invalidates its
-    // signature, so thinking/redacted-thinking blocks must pass through intact.
-    if (block.type === "thinking") return [block];
+    if (block.type === "thinking" && typeof block.thinking === "string") {
+      // Signed Anthropic thinking is opaque protocol state. Even text-like
+      // cleanup invalidates its signature, while unsigned compatibility-model
+      // thinking must still be sanitized before it is sent back to a provider.
+      if (block.thinkingSignature || block.redacted) return [block];
+      const thinking = sanitizeModelText(block.thinking);
+      if (thinking !== block.thinking) changed = true;
+      if (!thinking.trim()) return [];
+      return [{ ...block, thinking }];
+    }
 
     return [block];
   });

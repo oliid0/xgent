@@ -378,7 +378,14 @@ export function createTsModuleLoader(options = {}) {
         ? resolveLocal(nextSpecifier, dirname)
         : requireFromRoot.resolve(nextSpecifier);
 
-    const wrapped = `(function (exports, require, module, __filename, __dirname) {\n${transpiled.outputText}\n})`;
+    // TypeScript intentionally preserves import.meta.url when lowering to
+    // CommonJS. Focused tests execute the result in a vm.Script, where the
+    // syntax is otherwise rejected before mocks (such as Worker) can run.
+    const executableSource = transpiled.outputText.replace(
+      /\bimport\.meta\.url\b/g,
+      'require("node:url").pathToFileURL(__filename).href',
+    );
+    const wrapped = `(function (exports, require, module, __filename, __dirname) {\n${executableSource}\n})`;
     const script = new vm.Script(wrapped, { filename: filePath });
     const previousWindow = globalThis.window;
     if (typeof globalThis.window === "undefined") {

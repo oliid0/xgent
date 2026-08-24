@@ -31,7 +31,7 @@ test("conversation state builds request context from the active segment", () => 
 
   assert.equal(state.meta.schemaVersion, 3);
   assert.equal(state.meta.totalMessageCount, 2);
-  assert.equal(state.historyRenderItems.length, 2);
+  assert.equal(state.transcript.items.length, 2);
 
   const requestContext = conversationState.buildRequestContext(state);
   assert.equal(requestContext.systemPrompt, "Base prompt");
@@ -77,8 +77,8 @@ test("request context omits legacy silent memory extraction artifacts but keeps 
   });
 
   assert.equal(state.segments[0].messages.length, 5);
-  assert.match(JSON.stringify(state.historyRenderItems), /MemoryManager/);
-  assert.match(JSON.stringify(state.historyRenderItems), /记忆整理完成。/);
+  assert.match(JSON.stringify(state.transcript.items), /MemoryManager/);
+  assert.match(JSON.stringify(state.transcript.items), /记忆整理完成。/);
 
   const requestContext = conversationState.buildRequestContext(state);
   assert.deepEqual(
@@ -151,9 +151,9 @@ test("compaction checkpoint creates a summarized segment and carries summary int
   assert.equal(compacted.segments[1].summary.id, "summary-1");
   assert.equal(compacted.segments[1].summary.content, "Compressed facts");
   assert.equal(compacted.segments[1].summary.summaryMeta.coveredMessageCount, 2);
-  assert.equal(compacted.historyRenderItems[0].kind, "user");
-  assert.equal(compacted.historyRenderItems[0].isFromCompactedSegment, true);
-  assert.equal(compacted.historyRenderItems[2].kind, "summary");
+  assert.equal(compacted.transcript.items[0].kind, "user");
+  assert.equal(compacted.transcript.items[0].isFromCompactedSegment, true);
+  assert.equal(compacted.transcript.items[2].kind, "summary");
 
   const withNextTurn = conversationState.appendMessagesToConversation(compacted, [
     user("next question", 4),
@@ -180,7 +180,7 @@ test("truncateConversationFromMessage removes later segments and rebuilds render
     ],
   });
 
-  const target = state.historyRenderItems.find(
+  const target = state.transcript.items.find(
     (item) => item.kind === "user" && item.text === "three",
   );
   assert.ok(target?.messageRef);
@@ -192,7 +192,7 @@ test("truncateConversationFromMessage removes later segments and rebuilds render
     ["one", [{ type: "text", text: "two" }][0].text],
   );
   assert.equal(truncated.meta.totalMessageCount, 2);
-  assert.equal(truncated.historyRenderItems.length, 2);
+  assert.equal(truncated.transcript.items.length, 2);
 });
 
 test("uploaded file metadata is stripped from request context but preserved for render items", () => {
@@ -214,8 +214,8 @@ test("uploaded file metadata is stripped from request context but preserved for 
     messages: [uploadedMessage],
   });
 
-  assert.equal(state.historyRenderItems[0].text, "Please inspect file.txt");
-  assert.equal(state.historyRenderItems[0].attachments[0].relativePath, "file.txt");
+  assert.equal(state.transcript.items[0].text, "Please inspect file.txt");
+  assert.equal(state.transcript.items[0].attachments[0].relativePath, "file.txt");
 
   const requestContext = conversationState.buildRequestContext(state);
   assert.equal(requestContext.messages[0].xagentDisplayContent, undefined);
@@ -307,11 +307,11 @@ function fullRebuildReference(state) {
   return conversationState.normalizeConversationState({
     meta: { systemPrompt: state.meta.systemPrompt, tools: state.meta.tools },
     segments: state.segments,
-  }).historyRenderItems;
+  }).transcript.items;
 }
 
 function assertMatchesFullRebuild(state) {
-  assert.deepEqual(state.historyRenderItems, fullRebuildReference(state));
+  assert.deepEqual(state.transcript.items, fullRebuildReference(state));
 }
 
 test("incremental append: send twin extends the timeline and preserves item identity", () => {
@@ -321,9 +321,9 @@ test("incremental append: send twin extends the timeline and preserves item iden
   const next = conversationState.appendMessagesToConversation(base, [user("q3", 5)]);
 
   assertMatchesFullRebuild(next);
-  assert.equal(next.historyRenderItems.length, base.historyRenderItems.length + 1);
-  for (let index = 0; index < base.historyRenderItems.length; index += 1) {
-    assert.equal(next.historyRenderItems[index], base.historyRenderItems[index]);
+  assert.equal(next.transcript.items.length, base.transcript.items.length + 1);
+  for (let index = 0; index < base.transcript.items.length; index += 1) {
+    assert.equal(next.transcript.items[index], base.transcript.items[index]);
   }
 });
 
@@ -339,10 +339,10 @@ test("incremental append: settle batch builds only the new assistant group", () 
   ]);
 
   assertMatchesFullRebuild(settled);
-  for (let index = 0; index < withTwin.historyRenderItems.length; index += 1) {
-    assert.equal(settled.historyRenderItems[index], withTwin.historyRenderItems[index]);
+  for (let index = 0; index < withTwin.transcript.items.length; index += 1) {
+    assert.equal(settled.transcript.items[index], withTwin.transcript.items[index]);
   }
-  const lastItem = settled.historyRenderItems[settled.historyRenderItems.length - 1];
+  const lastItem = settled.transcript.items[settled.transcript.items.length - 1];
   assert.equal(lastItem.kind, "assistant");
   assert.equal(lastItem.rounds.length, 2);
 });
@@ -354,12 +354,12 @@ test("incremental append: trailing assistant run extension rebuilds only that it
   const next = conversationState.appendMessagesToConversation(base, [assistant("a2-more", 5)]);
 
   assertMatchesFullRebuild(next);
-  assert.equal(next.historyRenderItems.length, base.historyRenderItems.length);
-  for (let index = 0; index < base.historyRenderItems.length - 1; index += 1) {
-    assert.equal(next.historyRenderItems[index], base.historyRenderItems[index]);
+  assert.equal(next.transcript.items.length, base.transcript.items.length);
+  for (let index = 0; index < base.transcript.items.length - 1; index += 1) {
+    assert.equal(next.transcript.items[index], base.transcript.items[index]);
   }
-  const extended = next.historyRenderItems[next.historyRenderItems.length - 1];
-  assert.notEqual(extended, base.historyRenderItems[base.historyRenderItems.length - 1]);
+  const extended = next.transcript.items[next.transcript.items.length - 1];
+  assert.notEqual(extended, base.transcript.items[base.transcript.items.length - 1]);
   assert.equal(extended.rounds.length, 2);
 });
 
@@ -367,12 +367,12 @@ test("incremental append: contentless trailing run gains content without droppin
   const base = conversationState.createConversationStateFromContext({
     messages: [user("q1", 1), assistant("", 2, { content: [] })],
   });
-  assert.equal(base.historyRenderItems.length, 1);
+  assert.equal(base.transcript.items.length, 1);
 
   const next = conversationState.appendMessagesToConversation(base, [assistant("late", 3)]);
   assertMatchesFullRebuild(next);
-  assert.equal(next.historyRenderItems.length, 2);
-  assert.equal(next.historyRenderItems[0], base.historyRenderItems[0]);
+  assert.equal(next.transcript.items.length, 2);
+  assert.equal(next.transcript.items[0], base.transcript.items[0]);
 });
 
 test("incremental append: compaction checkpoint compacts prior items and appends new segments", () => {
@@ -392,9 +392,9 @@ test("incremental append: compaction checkpoint compacts prior items and appends
 
   assertMatchesFullRebuild(compacted);
   assert.equal(compacted.activeSegmentIndex, 1);
-  const summaryItem = compacted.historyRenderItems.find((item) => item.kind === "summary");
+  const summaryItem = compacted.transcript.items.find((item) => item.kind === "summary");
   assert.ok(summaryItem);
-  for (const item of compacted.historyRenderItems) {
+  for (const item of compacted.transcript.items) {
     if (item.segmentIndex < compacted.activeSegmentIndex && item.kind !== "summary") {
       assert.equal(item.isFromCompactedSegment, true);
     }
@@ -403,9 +403,9 @@ test("incremental append: compaction checkpoint compacts prior items and appends
   // Appending to the already-compacted state keeps compacted items by identity.
   const more = conversationState.appendMessagesToConversation(compacted, [assistant("a3", 7)]);
   assertMatchesFullRebuild(more);
-  for (let index = 0; index < compacted.historyRenderItems.length - 1; index += 1) {
-    if (compacted.historyRenderItems[index].segmentIndex < compacted.activeSegmentIndex) {
-      assert.equal(more.historyRenderItems[index], compacted.historyRenderItems[index]);
+  for (let index = 0; index < compacted.transcript.items.length - 1; index += 1) {
+    if (compacted.transcript.items[index].segmentIndex < compacted.activeSegmentIndex) {
+      assert.equal(more.transcript.items[index], compacted.transcript.items[index]);
     }
   }
 });
@@ -428,8 +428,8 @@ test("incremental append: first post-checkpoint batch does not duplicate the sum
   ]);
 
   assertMatchesFullRebuild(continued);
-  const checkpointSummary = compacted.historyRenderItems.find((item) => item.kind === "summary");
-  const continuedSummaries = continued.historyRenderItems.filter((item) => item.kind === "summary");
+  const checkpointSummary = compacted.transcript.items.find((item) => item.kind === "summary");
+  const continuedSummaries = continued.transcript.items.filter((item) => item.kind === "summary");
   assert.equal(continuedSummaries.length, 1);
   assert.equal(continuedSummaries[0], checkpointSummary);
   assert.equal(continuedSummaries[0].summaryId, "summary-empty-segment");
@@ -438,7 +438,7 @@ test("incremental append: first post-checkpoint batch does not duplicate the sum
     assistant("continued again", 7),
   ]);
   assertMatchesFullRebuild(extended);
-  const extendedSummaries = extended.historyRenderItems.filter((item) => item.kind === "summary");
+  const extendedSummaries = extended.transcript.items.filter((item) => item.kind === "summary");
   assert.equal(extendedSummaries.length, 1);
   assert.equal(extendedSummaries[0], checkpointSummary);
 });
@@ -466,8 +466,8 @@ test("incremental append: sequential turns equal a one-shot build", () => {
       messageRef: messageRef ? { ...messageRef, segmentId: "(segment-id)" } : undefined,
     }));
   assert.deepEqual(
-    withoutSegmentIds(sequential.historyRenderItems),
-    withoutSegmentIds(oneShot.historyRenderItems),
+    withoutSegmentIds(sequential.transcript.items),
+    withoutSegmentIds(oneShot.transcript.items),
   );
   assertMatchesFullRebuild(sequential);
 });
@@ -483,9 +483,9 @@ test("mergeHydratedConversationState reuses warm items for an unchanged active s
 
   const merged = conversationState.mergeHydratedConversationState(warm, full);
   assert.equal(merged.segments, full.segments);
-  assert.deepEqual(merged.historyRenderItems, full.historyRenderItems);
-  for (let index = 0; index < merged.historyRenderItems.length; index += 1) {
-    assert.equal(merged.historyRenderItems[index], warm.historyRenderItems[index]);
+  assert.deepEqual(merged.transcript.items, full.transcript.items);
+  for (let index = 0; index < merged.transcript.items.length; index += 1) {
+    assert.equal(merged.transcript.items[index], warm.transcript.items[index]);
   }
 });
 
@@ -516,8 +516,8 @@ test("mergeHydratedConversationState keeps re-homed warm keys stable across hydr
   });
   assert.equal(conversationState.mergeHydratedConversationState(warmRehomed, full), full);
 
-  const fullKeys = new Set(full.historyRenderItems.map((item) => item.key));
-  for (const item of warmRehomed.historyRenderItems) {
+  const fullKeys = new Set(full.transcript.items.map((item) => item.key));
+  for (const item of warmRehomed.transcript.items) {
     assert.ok(fullKeys.has(item.key), `warm key ${item.key} must survive hydration`);
   }
 });

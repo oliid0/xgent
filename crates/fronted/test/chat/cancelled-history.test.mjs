@@ -287,6 +287,30 @@ test("model request sanitizer strips DSML from text and thinking blocks", () => 
   assert.equal(context.messages[1].content[1].text, "visible  answer");
 });
 
+test("model request sanitizer preserves signed thinking blocks byte-for-byte", () => {
+  const dsml = "\uFF5C\uFF5CDSML\uFF5C\uFF5C";
+  const thinking = `signed <${dsml}tool_calls></${dsml}tool_calls> state`;
+  const signedBlock = {
+    type: "thinking",
+    thinking,
+    thinkingSignature: "provider-signature",
+  };
+  const context = requestContextSanitizer.sanitizeContextForModelRequest({
+    messages: [
+      user("continue", 1),
+      {
+        role: "assistant",
+        content: [signedBlock],
+        stopReason: "stop",
+        timestamp: 2,
+      },
+    ],
+  });
+
+  assert.strictEqual(context.messages[1].content[0], signedBlock);
+  assert.equal(context.messages[1].content[0].thinking, thinking);
+});
+
 test("model request sanitizer drops assistant rounds that only contain hosted search metadata", () => {
   const context = requestContextSanitizer.sanitizeContextForModelRequest({
     messages: [

@@ -269,6 +269,9 @@ const llmMock = {
       maxTokens: 4096,
     };
   },
+  describeProviderCacheShape() {
+    return undefined;
+  },
   finalizeProviderStreamOptions({ options }) {
     return options;
   },

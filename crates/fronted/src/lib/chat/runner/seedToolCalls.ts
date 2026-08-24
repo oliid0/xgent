@@ -1,5 +1,10 @@
 import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { createUuid } from "@xagent/ui/lib/shared/id";
+import { isOnlyDsmlOrphanCloseTags } from "./deepSeekDsml";
+import {
+  hasFlattenedToolRequestText,
+  recoverFlattenedToolRequests,
+} from "./flattenedToolCallText";
 
 const SEED_TOOL_CALL_DISPLAY_PATTERN = /<seed:tool_call>[\s\S]*?(?:<\/seed:tool_call>|$)/gi;
 const FUNCTION_PATTERN = /<function\b([^>]*)>([\s\S]*?)(?:<\/function>|$)/i;
@@ -129,25 +134,38 @@ function parseSeedToolCallMarkup(markup: string): ToolCall | null {
   };
 }
 
-function hasRecoverableToolCallMarkup(text: string) {
-  return text.includes("<seed:tool_call>");
+function isDeepSeekAssistant(assistant: AssistantMessage) {
+  return [assistant.provider, assistant.model, assistant.api].some(
+    (value) => typeof value === "string" && value.toLowerCase().includes("deepseek"),
+  );
 }
 
-function recoverToolCallsFromBlockText(text: string) {
-  if (!hasRecoverableToolCallMarkup(text)) {
-    return {
-      cleanedText: text,
-      toolCalls: [] as ToolCall[],
-    };
-  }
+function recoverToolCallsFromBlockText(
+  text: string,
+  options?: { recoverFlattenedText?: boolean; stripDsmlOrphanCloseTags?: boolean },
+) {
   const toolCalls: ToolCall[] = [];
-  const cleanedText = text.replace(SEED_TOOL_CALL_DISPLAY_PATTERN, (markup) => {
-    const toolCall = parseSeedToolCallMarkup(markup);
-    if (toolCall) {
-      toolCalls.push(toolCall);
-    }
-    return "";
-  });
+  let cleanedText = text;
+
+  if (cleanedText.includes("<seed:tool_call>")) {
+    cleanedText = cleanedText.replace(SEED_TOOL_CALL_DISPLAY_PATTERN, (markup) => {
+      const toolCall = parseSeedToolCallMarkup(markup);
+      if (toolCall) {
+        toolCalls.push(toolCall);
+      }
+      return "";
+    });
+  }
+
+  if (options?.recoverFlattenedText && hasFlattenedToolRequestText(cleanedText)) {
+    const flattened = recoverFlattenedToolRequests(cleanedText);
+    cleanedText = flattened.text;
+    toolCalls.push(...flattened.toolCalls);
+  }
+
+  if (options?.stripDsmlOrphanCloseTags && isOnlyDsmlOrphanCloseTags(cleanedText)) {
+    cleanedText = "";
+  }
 
   return {
     cleanedText: cleanIfChanged(text, cleanedText),
@@ -155,11 +173,11 @@ function recoverToolCallsFromBlockText(text: string) {
   };
 }
 
-export function stripSeedToolCallMarkup(text: string) {
-  if (!hasRecoverableToolCallMarkup(text)) {
-    return text;
-  }
-  return cleanIfChanged(text, text.replace(SEED_TOOL_CALL_DISPLAY_PATTERN, ""));
+export function stripSeedToolCallMarkup(
+  text: string,
+  options?: { recoverFlattenedText?: boolean },
+) {
+  return recoverToolCallsFromBlockText(text, options).cleanedText;
 }
 
 export function recoverAssistantSeedToolCalls(
@@ -171,6 +189,7 @@ export function recoverAssistantSeedToolCalls(
   const recoveredToolCalls: ToolCall[] = [];
   const nextContent: AssistantMessage["content"] = [];
   const seenComparableToolCalls = new Set(existingStructuredToolCalls.map(comparableToolCall));
+  const recoverDeepSeekText = isDeepSeekAssistant(assistant);
   let changed = false;
 
   for (const block of assistant.content) {
@@ -184,7 +203,10 @@ export function recoverAssistantSeedToolCalls(
         nextContent.push(block);
         continue;
       }
-      const recovered = recoverToolCallsFromBlockText(block.thinking);
+      const recovered = recoverToolCallsFromBlockText(block.thinking, {
+        recoverFlattenedText: recoverDeepSeekText,
+        stripDsmlOrphanCloseTags: recoverDeepSeekText,
+      });
       if (recovered.cleanedText !== block.thinking) {
         changed = true;
       }
@@ -208,7 +230,10 @@ export function recoverAssistantSeedToolCalls(
     }
 
     if (block.type === "text") {
-      const recovered = recoverToolCallsFromBlockText(block.text);
+      const recovered = recoverToolCallsFromBlockText(block.text, {
+        recoverFlattenedText: recoverDeepSeekText,
+        stripDsmlOrphanCloseTags: recoverDeepSeekText,
+      });
       if (recovered.cleanedText !== block.text) {
         changed = true;
       }

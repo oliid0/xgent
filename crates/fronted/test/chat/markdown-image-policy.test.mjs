@@ -314,6 +314,6 @@ test("fs tool descriptions keep Image as the only display path for images", () =
   );
   assert.match(
     source,
-    /Use this instead of Bash rm, rmdir, unlink, or find -delete for workspace or Skill files\./,
+    /Always use this instead of Bash, ManagedProcess, shell scripts, or deletion-oriented CLIs such as rm\/rmdir\/unlink\/find -delete\/git rm\/git clean\/PowerShell Remove-Item\/cmd del, erase, or rd\./,
   );
 });
