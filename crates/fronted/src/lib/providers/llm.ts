@@ -1,4 +1,5 @@
 export { providerSupportsNativeWebSearch } from "./nativeWebSearch";
+export { mergeCustomHeaders } from "./customHeaders";
 export {
   attachAnthropicAutomaticCaching,
   describeAnthropicCacheShape,
@@ -31,6 +32,7 @@ export { describeProviderCacheShape } from "./runtime/providerCacheShape";
 export { createProviderRuntimeConfig } from "./runtime/providerRuntimeConfig";
 export {
   buildAnthropicAuthHeaders,
+  buildDualAuthHeaders,
   buildGeminiAuthHeaders,
   buildOpenAIAuthHeaders,
   buildProviderRequestHeaders,

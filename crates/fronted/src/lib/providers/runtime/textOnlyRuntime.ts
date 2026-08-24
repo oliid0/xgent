@@ -8,6 +8,7 @@ import {
 import { buildStreamRequestDebugPayload, type StreamDebugLogger } from "../../debug/agentDebug";
 import type { ProviderId } from "../../settings";
 import { withPowerActivity } from "../../system/powerActivity";
+import { isDeepSeekAnthropicTarget } from "../deepSeekProviderAdapter";
 import {
   createHostedSearchEventAggregator,
   createHostedSearchProbeId,
@@ -33,7 +34,10 @@ import {
   toSimpleStreamReasoning,
 } from "./requestOptions";
 import { streamSimpleByApi } from "./streamByApi";
-import { buildTextModeToolResultsForAssistant } from "./textModeToolRecovery";
+import {
+  buildTextModeToolResultsForAssistant,
+  normalizeTextModeToolResultHistory,
+} from "./textModeToolRecovery";
 import type { ProviderRuntimeConfig, StreamOptionsEx } from "./types";
 
 function buildTextOnlySystemSuffix(allowJsonOutput = false) {
@@ -187,9 +191,17 @@ export async function streamAssistantMessage(params: {
   }
 
   const systemSuffix = buildTextOnlySystemSuffix(params.allowJsonOutput);
-  const callContext = buildTextOnlyCallContext(params.context, {
+  const textOnlyContext = buildTextOnlyCallContext(params.context, {
     allowJsonOutput: params.allowJsonOutput,
   });
+  const callContext = isDeepSeekAnthropicTarget({
+    providerId: params.providerId,
+    api: params.runtime.requestFormat,
+    baseUrl: params.runtime.baseUrl,
+    modelId,
+  })
+    ? normalizeTextModeToolResultHistory(textOnlyContext)
+    : textOnlyContext;
   try {
     params.onRequestStart?.({ context: callContext, systemSuffix });
   } catch (error) {
@@ -559,9 +571,17 @@ export async function completeAssistantMessage(params: {
     params.runtime.baseUrl.trim(),
   );
 
-  const callContext = buildTextOnlyCallContext(params.context, {
+  const textOnlyContext = buildTextOnlyCallContext(params.context, {
     allowJsonOutput: params.allowJsonOutput,
   });
+  const callContext = isDeepSeekAnthropicTarget({
+    providerId: params.providerId,
+    api: params.runtime.requestFormat,
+    baseUrl: params.runtime.baseUrl,
+    modelId,
+  })
+    ? normalizeTextModeToolResultHistory(textOnlyContext)
+    : textOnlyContext;
   const options = buildTextOnlyStreamOptions({
     providerId: params.providerId,
     runtime: params.runtime,

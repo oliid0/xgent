@@ -267,7 +267,9 @@ test("withStreamRetry backoff aborted before it can fire prevents any further at
   const events = await collectEvents(wrapped);
   assert.equal(calls, 1);
   assert.equal(events[0].type, "error");
-  assert.match(events[0].error.errorMessage, /503/);
+  assert.equal(events[0].reason, "aborted");
+  assert.equal(events[0].error.stopReason, "aborted");
+  assert.equal(events[0].error.errorMessage, "Cancelled");
 });
 
 test("withStreamRetry with disabled:true never retries", async () => {

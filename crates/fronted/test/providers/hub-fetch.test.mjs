@@ -115,7 +115,7 @@ test("hubFetch 桌面端透传 init 的 method/body/signal", async () => {
   assert.equal(new Headers(calls[0].init.headers).get("content-type"), "application/json");
 });
 
-test("hubFetch 在 Gateway WebUI 运行时直连、不改写地址不加反代头", async () => {
+test("hubFetch keeps the native proxy boundary when a browser window exists", async () => {
   const calls = [];
   const originalFetch = globalThis.fetch;
   const originalWindow = globalThis.window;
@@ -123,7 +123,6 @@ test("hubFetch 在 Gateway WebUI 运行时直连、不改写地址不加反代�
     calls.push({ url: String(url), init });
     return { ok: true, status: 200 };
   };
-  // 模拟 web main.tsx 在渲染前写入的运行时标记。
   globalThis.window = {};
   try {
     await hubFetchModule.hubFetch("https://clawhub.ai/api/v1/skills?limit=24", {
@@ -139,9 +138,9 @@ test("hubFetch 在 Gateway WebUI 运行时直连、不改写地址不加反代�
   }
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "https://clawhub.ai/api/v1/skills?limit=24");
+  assert.equal(calls[0].url, "http://127.0.0.1:43110/proxy/hub/api/v1/skills?limit=24");
   const headers = new Headers(calls[0].init.headers);
   assert.equal(headers.get("accept"), "application/json");
-  assert.equal(headers.get("x-xagent-upstream-origin"), null);
-  assert.equal(headers.get("x-xagent-use-system-proxy"), null);
+  assert.equal(headers.get("x-xagent-upstream-origin"), "https://clawhub.ai");
+  assert.equal(headers.get("x-xagent-use-system-proxy"), "1");
 });

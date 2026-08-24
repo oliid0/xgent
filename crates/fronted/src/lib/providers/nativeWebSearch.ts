@@ -56,10 +56,37 @@ export function isProviderNativeWebFetchToolName(toolName: string | undefined) {
   );
 }
 
-// Keep the Anthropic server tool on the stable GA contract. Dated dynamic
-// versions are intentionally not sent because compatible Claude relays do not
-// expose a reliable capability signal and reject unsupported versions with 400.
-export const ANTHROPIC_WEB_SEARCH_TOOL_TYPE = "web_search_20250305" as const;
+export const ANTHROPIC_WEB_SEARCH_TOOL_TYPES = {
+  legacy: "web_search_20250305",
+  dynamicFiltering: "web_search_20260318",
+} as const;
+
+/**
+ * Dynamic filtering is part of Anthropic's adaptive-thinking contract.  Keep
+ * compatible relays on the legacy tool unless the model explicitly advertises
+ * that contract; guessing from a model name makes custom endpoints fail with a
+ * hard 400.
+ */
+export function supportsAnthropicDynamicFilteringWebSearch(model: {
+  compat?: unknown;
+}): boolean {
+  const compat = model.compat;
+  return Boolean(
+    compat &&
+      typeof compat === "object" &&
+      !Array.isArray(compat) &&
+      (compat as { forceAdaptiveThinking?: boolean }).forceAdaptiveThinking === true,
+  );
+}
+
+export function resolveAnthropicWebSearchToolType(model: { compat?: unknown }) {
+  return supportsAnthropicDynamicFilteringWebSearch(model)
+    ? ANTHROPIC_WEB_SEARCH_TOOL_TYPES.dynamicFiltering
+    : ANTHROPIC_WEB_SEARCH_TOOL_TYPES.legacy;
+}
+
+/** @deprecated Prefer resolveAnthropicWebSearchToolType(model). */
+export const ANTHROPIC_WEB_SEARCH_TOOL_TYPE = ANTHROPIC_WEB_SEARCH_TOOL_TYPES.legacy;
 
 // ---------------------------------------------------------------------------
 // Request-payload tool detectors (single catalog source; consumed by

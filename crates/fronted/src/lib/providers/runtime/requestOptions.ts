@@ -125,7 +125,10 @@ export function resolveProviderCacheRetention(
   providerPreference?: CacheRetention,
 ): CacheRetention | undefined {
   if (providerId !== "claude_code" && providerId !== "codex") return undefined;
-  if (providerId === "codex") return requestOverride ?? "short";
+  if (providerId === "codex") {
+    if (requestOverride) return requestOverride;
+    return promptCachingEnabled === false ? "none" : "short";
+  }
   if (promptCachingEnabled === false) return "none";
   if (requestOverride) return requestOverride;
   if (providerPreference === "long") return "long";

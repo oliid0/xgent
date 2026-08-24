@@ -76,3 +76,52 @@ export function rejectEmptyOpenAICompletionsResponse(
 
   return output;
 }
+
+function isMissingFinishReasonError(message: AssistantMessage): boolean {
+  return (
+    message.stopReason === "error" &&
+    /(?:missing|without|before).{0,40}finish[_ -]?reason|finish[_ -]?reason.{0,40}(?:missing|without)/i.test(
+      message.errorMessage ?? "",
+    )
+  );
+}
+
+/**
+ * A number of OpenAI-compatible relays omit the final finish_reason even after
+ * sending a complete answer.  Salvage only messages with usable content and
+ * only for that exact protocol error; empty and unrelated failures remain
+ * failures so retry/failover can still handle them.
+ */
+export function recoverOpenAICompletionsMissingFinishReason(
+  source: AssistantMessageEventStream,
+): AssistantMessageEventStream {
+  const output = createAssistantMessageEventStream();
+
+  void (async () => {
+    for await (const event of source) {
+      if (
+        event.type === "error" &&
+        isMissingFinishReasonError(event.error) &&
+        hasUsableAssistantContent(event.error)
+      ) {
+        const stopReason = event.error.content.some((block) => block.type === "toolCall")
+          ? "toolUse"
+          : "stop";
+        const recovered: AssistantMessage = {
+          ...event.error,
+          stopReason,
+          errorMessage: undefined,
+        };
+        output.push({ type: "done", reason: stopReason, message: recovered });
+        return;
+      }
+
+      output.push(event);
+      if (event.type === "done" || event.type === "error") return;
+    }
+
+    output.end(await source.result());
+  })();
+
+  return output;
+}

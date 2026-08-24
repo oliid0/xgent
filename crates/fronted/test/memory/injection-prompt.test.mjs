@@ -36,7 +36,7 @@ function overview(overrides = {}) {
 test("index renders compact lines with slug/type/age markers", () => {
   const text = formatMemoryOverview(overview({ user: [entry()] }));
   assert.ok(text.startsWith("# Memory Index"));
-  assert.ok(text.includes("- 用户叫苏枫 [user-name|u|0d]"));
+  assert.ok(text.includes("- 用户叫苏枫 [user-name|u|d0]"));
 });
 
 test("unreviewed entries carry the *:confidence marker and their own bucket", () => {
@@ -46,7 +46,7 @@ test("unreviewed entries carry the *:confidence marker and their own bucket", ()
     }),
   );
   assert.ok(text.includes("## Unreviewed user memory"));
-  assert.ok(text.includes("[user-editor|u*:m|0d]"));
+  assert.ok(text.includes("[user-editor|u*:m|d0]"));
 });
 
 test("buckets truncate at 30 entries with a recovery hint", () => {

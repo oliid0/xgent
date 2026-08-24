@@ -1,10 +1,10 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ProviderId } from "../../settings";
 import {
-  ANTHROPIC_WEB_SEARCH_TOOL_TYPE,
   hasAnthropicWebSearchTool,
   hasOpenAIResponsesWebSearchTool,
   providerSupportsNativeWebSearch,
+  resolveAnthropicWebSearchToolType,
 } from "../nativeWebSearch";
 import { isRecord } from "./common";
 import { appendGeminiGoogleSearchToolToPayload } from "./geminiToolPayload";
@@ -184,7 +184,7 @@ export function attachProviderNativeWebSearch(
         return appendUniqueTool(
           nextPayload,
           {
-            type: ANTHROPIC_WEB_SEARCH_TOOL_TYPE,
+            type: resolveAnthropicWebSearchToolType(model),
             name: "web_search",
           },
           hasAnthropicWebSearchTool,

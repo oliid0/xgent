@@ -1,5 +1,6 @@
 import type {
   Api,
+  Context,
   Model,
   OpenAICompletionsCompat,
   SimpleStreamOptions,
@@ -143,6 +144,42 @@ export function mapDeepSeekReasoningEffort(
 ) {
   if (!reasoning) return undefined;
   return reasoning === "xhigh" ? "max" : "high";
+}
+
+/**
+ * DeepSeek's Anthropic-compatible endpoint rejects an aborted assistant turn
+ * when it still contains tool calls that never received matching results.
+ * Drop only those unfinished calls (and any orphan results for them), while
+ * preserving completed tool-use history byte-for-byte.
+ */
+export function normalizeDeepSeekAnthropicContext(context: Context): Context {
+  const removedToolCallIds = new Set<string>();
+  let changed = false;
+  const messages = context.messages.flatMap((message) => {
+    if (
+      message.role === "assistant" &&
+      (message.stopReason === "aborted" || message.stopReason === "error")
+    ) {
+      const content = message.content.filter((block) => {
+        if (block.type !== "toolCall") return true;
+        if (block.id) removedToolCallIds.add(block.id);
+        changed = true;
+        return false;
+      });
+      if (content.length !== message.content.length) {
+        return [{ ...message, content, stopReason: "stop" as const, errorMessage: undefined }];
+      }
+    }
+    return [message];
+  });
+
+  if (removedToolCallIds.size === 0) return context;
+  const filtered = messages.filter((message) => {
+    const remove = message.role === "toolResult" && removedToolCallIds.has(message.toolCallId);
+    if (remove) changed = true;
+    return !remove;
+  });
+  return changed ? { ...context, messages: filtered } : context;
 }
 
 function sanitizeTextValue(value: string) {

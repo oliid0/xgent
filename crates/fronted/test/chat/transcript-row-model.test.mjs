@@ -171,7 +171,9 @@ test("row model reports births once and reuses the history array between emits",
   const history = [userItem("u1"), assistantItem("a1", [round("r1", "done")])];
 
   const first = model.build(history, idleLive);
-  assert.deepEqual(births, [[["u1", "a1"], true]]);
+  assert.deepEqual(births, [
+    [["u1", "a1:round:r1:block:text-1", "a1:footer"], true],
+  ]);
 
   // Same history identity → the same rows array comes back, no new births.
   const second = model.build(history, idleLive);
@@ -208,7 +210,7 @@ test("a twin that lands while still sending is re-keyed onto the live row at set
   const midRun = [userItem("u1"), assistantItem("a1", [round("r1", "full reply")])];
   const racing = model.build(midRun, sendingLive);
   const liveKey = racing.rows.at(-1).key;
-  assert.equal(racing.rows[1].key, "a1");
+  assert.equal(racing.rows[1].replyKey, "a1");
 
   // Settle with the same history identity: the twin must adopt the live key
   // in place instead of keeping the stale un-aliased row.

@@ -54,7 +54,10 @@ export function resolvePromptCacheHintMode(
   if (hostname === "openrouter.ai" || hostname?.endsWith(".openrouter.ai")) {
     return "openrouter-session";
   }
-  return "none";
+  // OpenAI-compatible relays commonly implement the same stable cache key even
+  // when they do not expose a separate capability endpoint.  Users can still
+  // disable it explicitly with promptCacheHintMode/cacheRetention = none.
+  return "openai-key";
 }
 
 function isExplicitNoCacheOptions(value: unknown): boolean {

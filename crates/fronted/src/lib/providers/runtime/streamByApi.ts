@@ -13,8 +13,17 @@ import {
   stream as streamOpenAIResponses,
 } from "@earendil-works/pi-ai/api/openai-responses";
 import { DEEPSEEK_RESPONSES_API, streamDeepSeekResponses } from "../deepSeekNative";
+import {
+  attachDeepSeekProviderPayloadAdapter,
+  isDeepSeekAnthropicTarget,
+  normalizeDeepSeekAnthropicContext,
+} from "../deepSeekProviderAdapter";
+import { wrapDeepSeekDsmlToolCallStream } from "../deepSeekDsmlToolCallStream";
 import { resolveMaxTokens } from "./common";
-import { rejectEmptyOpenAICompletionsResponse } from "./openAICompletionsStream";
+import {
+  recoverOpenAICompletionsMissingFinishReason,
+  rejectEmptyOpenAICompletionsResponse,
+} from "./openAICompletionsStream";
 import { withStreamRetry } from "./streamRetry";
 import {
   clampOpenAIReasoningEffort,
@@ -65,12 +74,25 @@ function buildOpenAIBaseOptions(model: Model<Api>, options: StreamOptionsEx) {
 export function streamSimpleByApi(model: Model<Api>, context: Context, options: StreamOptionsEx) {
   switch (model.api) {
     case "anthropic-messages": {
+      const deepSeekTarget = isDeepSeekAnthropicTarget({
+        api: model.api,
+        baseUrl: model.baseUrl,
+        modelId: model.id,
+      });
+      const anthropicContext = deepSeekTarget
+        ? normalizeDeepSeekAnthropicContext(context)
+        : context;
+      const effectiveOptions = attachDeepSeekProviderPayloadAdapter(options, {
+        providerId: "claude_code",
+        baseUrl: model.baseUrl,
+        model,
+      });
       // Anthropic：需要我们自己调用 streamAnthropic()，以便显式传 toolChoice（以及启用/禁用 thinking）。
-      const anthropicThinking = resolveAnthropicThinkingRuntime(model, options);
+      const anthropicThinking = resolveAnthropicThinkingRuntime(model, effectiveOptions);
       // Anthropic 拒绝 extended thinking 与强制工具（"any"/{type:"tool"}）同请求
       // （400）。降级为 auto：有界强制的调用方（plan mode 补提交轮）同时注入了
       // 消息级提醒，语义仍然成立；直接 400 反而会进重试/failover 循环。
-      const requestedToolChoice = options.toolChoice ?? "none";
+      const requestedToolChoice = effectiveOptions.toolChoice ?? "none";
       const anthropicToolChoice =
         anthropicThinking.thinkingEnabled &&
         requestedToolChoice !== "none" &&
@@ -79,17 +101,17 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
           : requestedToolChoice;
       return withStreamRetry(
         () => {
-          return streamAnthropic(model as Model<"anthropic-messages">, context, {
-            temperature: options.temperature,
+          const source = streamAnthropic(model as Model<"anthropic-messages">, anthropicContext, {
+            temperature: effectiveOptions.temperature,
             maxTokens: anthropicThinking.maxTokens,
-            signal: options.signal,
-            apiKey: options.apiKey,
-            cacheRetention: options.cacheRetention,
-            sessionId: options.sessionId,
-            headers: options.headers,
-            onPayload: options.onPayload,
-            maxRetryDelayMs: options.maxRetryDelayMs,
-            metadata: options.metadata,
+            signal: effectiveOptions.signal,
+            apiKey: effectiveOptions.apiKey,
+            cacheRetention: effectiveOptions.cacheRetention,
+            sessionId: effectiveOptions.sessionId,
+            headers: effectiveOptions.headers,
+            onPayload: effectiveOptions.onPayload,
+            maxRetryDelayMs: effectiveOptions.maxRetryDelayMs,
+            metadata: effectiveOptions.metadata,
             thinkingEnabled: anthropicThinking.thinkingEnabled,
             ...(anthropicThinking.effort ? { effort: anthropicThinking.effort } : {}),
             ...(anthropicThinking.thinkingBudgetTokens !== undefined
@@ -97,27 +119,45 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
               : {}),
             toolChoice: anthropicToolChoice,
           });
+          return effectiveOptions.deepSeekDsmlToolCallRepair
+            ? wrapDeepSeekDsmlToolCallStream(source)
+            : source;
         },
-        { signal: options.signal, ...options.streamRetry },
+        { signal: effectiveOptions.signal, ...effectiveOptions.streamRetry },
       );
     }
     case "openai-completions": {
+      const effectiveOptions = attachDeepSeekProviderPayloadAdapter(options, {
+        providerId: "codex",
+        baseUrl: model.baseUrl,
+        model,
+      });
       // 严格校验的 OpenAI 兼容端点（xAI/各类中转网关）对「带 tool_choice 但没带
       // tools」的请求直接 400（"A tool_choice was set on the request but no tools
       // were specified"）——compaction 摘要、标题生成等 text-only 请求没有工具，
       // 会踩中。tool_choice 在无工具时本就无意义，只在请求真正携带 tools 时下发。
       const openAIOptions: OpenAICompletionsOptions = {
-        ...buildOpenAIBaseOptions(model, options),
-        reasoningEffort: clampOpenAIReasoningEffort(model, options.reasoning),
-        toolChoice: context.tools?.length ? mapToolChoiceToOpenAI(options.toolChoice) : undefined,
+        ...buildOpenAIBaseOptions(model, effectiveOptions),
+        reasoningEffort: clampOpenAIReasoningEffort(model, effectiveOptions.reasoning),
+        toolChoice: context.tools?.length
+          ? mapToolChoiceToOpenAI(effectiveOptions.toolChoice)
+          : undefined,
       };
       return withStreamRetry(
         () => {
+          const source = streamOpenAICompletions(
+            model as Model<"openai-completions">,
+            context,
+            openAIOptions,
+          );
+          const compatible = effectiveOptions.recoverMissingFinishReason
+            ? recoverOpenAICompletionsMissingFinishReason(source)
+            : source;
           return rejectEmptyOpenAICompletionsResponse(
-            streamOpenAICompletions(model as Model<"openai-completions">, context, openAIOptions),
+            compatible,
           );
         },
-        { signal: options.signal, ...options.streamRetry },
+        { signal: effectiveOptions.signal, ...effectiveOptions.streamRetry },
       );
     }
     case DEEPSEEK_RESPONSES_API:

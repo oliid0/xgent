@@ -1,6 +1,7 @@
 import type { Api, Context, Model } from "@earendil-works/pi-ai";
 import type { StreamDebugLogger } from "../../debug/agentDebug";
 import type { PromptCacheHintMode, ProviderId } from "../../settings";
+import { attachDeepSeekProviderPayloadAdapter } from "../deepSeekProviderAdapter";
 import {
   attachAnthropicMessagesNativeAttachments,
   attachGeminiGenerativeAINativeAttachments,
@@ -116,6 +117,12 @@ const finalizePayloadMiddlewares = composePayloadMiddlewares([
       model: params.model,
       context: params.context,
     }),
+  (options, params) =>
+    attachDeepSeekProviderPayloadAdapter(options, {
+      providerId: params.providerId,
+      baseUrl: params.baseUrl,
+      model: params.model,
+    }),
   (options, params) => {
     if (!params.context || !params.model) return options;
     let nextOptions = attachOpenAIResponsesNativeAttachments(options, {
@@ -154,5 +161,20 @@ const finalizePayloadMiddlewares = composePayloadMiddlewares([
 export function finalizeProviderStreamOptions(
   params: FinalizeProviderStreamOptionsParams,
 ): StreamOptionsEx {
-  return finalizePayloadMiddlewares(params.options, params);
+  const finalized = finalizePayloadMiddlewares(params.options, params);
+  if (
+    params.providerId !== "codex" ||
+    params.model?.api !== "openai-completions" ||
+    finalized.recoverMissingFinishReason !== undefined
+  ) {
+    return finalized;
+  }
+  try {
+    const hostname = new URL(params.baseUrl).hostname.toLowerCase();
+    return hostname === "api.openai.com" || hostname.endsWith(".api.openai.com")
+      ? finalized
+      : { ...finalized, recoverMissingFinishReason: true };
+  } catch {
+    return finalized;
+  }
 }

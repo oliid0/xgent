@@ -285,6 +285,21 @@ export function createTsModuleLoader(options = {}) {
       };
     }
     if (mocks.has(specifier)) return mocks.get(specifier);
+    if (specifier === "@xagent/ui" || specifier.startsWith("@xagent/ui/")) {
+      const suffix = specifier === "@xagent/ui" ? "" : specifier.slice("@xagent/ui/".length);
+      const aliasTarget = resolveLocal(path.join(rootDir, "src", suffix), rootDir);
+      // Focused tests may mock the same dependency through its former relative
+      // spelling. Match by resolved file so an alias refactor cannot silently
+      // turn a unit test into a real Tauri or network call.
+      for (const [mockSpecifier, value] of mocks) {
+        if (!mockSpecifier.startsWith(".")) continue;
+        try {
+          if (resolveLocal(mockSpecifier, parentDir) === aliasTarget) return value;
+        } catch {
+          // A mock for another module is expected not to resolve here.
+        }
+      }
+    }
     if (specifier.startsWith(".") || path.isAbsolute(specifier)) {
       const resolved = resolveLocal(specifier, parentDir);
       if (mocks.has(resolved)) return mocks.get(resolved);

@@ -31,7 +31,7 @@ function render(messages, overrides = {}) {
     currentAgentName: overrides.currentAgentName,
     maxMessages: overrides.maxMessages,
     maxBodyChars: overrides.maxBodyChars,
-  });
+  }).text;
 }
 
 test("snapshot buckets messages into direct inbox, shared decisions, open questions, and recent", () => {
@@ -171,7 +171,7 @@ test("formatRoster and formatTemplates render bounded description blocks", () =>
 
 test("buildRosterReminder lists agents with latest-run fields and truncates long values", () => {
   assert.equal(
-    roster.buildRosterReminder({ identities: [], latestRunsByAgent: new Map() }),
+    roster.buildRosterIdentitySection({ identities: [] }),
     "",
   );
 
@@ -200,18 +200,19 @@ test("buildRosterReminder lists agents with latest-run fields and truncates long
       },
     ],
   ]);
-  const reminder = roster.buildRosterReminder({ identities, latestRunsByAgent });
-  assert.match(reminder, /Existing delegated agents in this parent conversation:/);
-  assert.match(reminder, /- id=agent-a name=Agent A role=very long role/);
+  const identitySection = roster.buildRosterIdentitySection({ identities });
+  const statusSection = roster.buildRosterRunStatusSection({ identities, latestRunsByAgent });
+  assert.match(identitySection, /Existing delegated agents in this parent conversation:/);
+  assert.match(identitySection, /- id=agent-a name=Agent A role=very long role/);
   // 160-char cap on role, 360 default cap on prompt/summary, whitespace collapsed.
-  assert.match(reminder, new RegExp(`role=${"very long role ".repeat(10).slice(0, 160).trim().slice(0, 20)}`));
-  assert.ok(/role=[^\n]*\.\.\./.test(reminder));
-  assert.match(reminder, /status=completed/);
+  assert.match(identitySection, new RegExp(`role=${"very long role ".repeat(10).slice(0, 160).trim().slice(0, 20)}`));
+  assert.ok(/role=[^\n]*\.\.\./.test(identitySection));
+  assert.match(statusSection, /status=completed/);
   // Newlines and repeated whitespace collapse to single spaces.
-  assert.match(reminder, /last_task=multi line prompt/);
-  assert.ok(/last_task=[^\n]*\.\.\./.test(reminder));
-  assert.ok(/last_summary=[^\n]*\.\.\./.test(reminder));
-  assert.match(reminder, /call Agent again with an `agents` entry per existing id/);
+  assert.match(statusSection, /last_task=multi line prompt/);
+  assert.ok(/last_task=[^\n]*\.\.\./.test(statusSection));
+  assert.ok(/last_summary=[^\n]*\.\.\./.test(statusSection));
+  assert.match(identitySection, /call Agent again with an `agents` entry per existing id/);
 });
 
 test("buildRosterReminder omits entries beyond the cap with an omitted-count line", () => {
@@ -236,10 +237,7 @@ test("buildRosterReminder omits entries beyond the cap with an omitted-count lin
     createdAt: 1,
     updatedAt: 2,
   });
-  const reminder = roster.buildRosterReminder({
-    identities,
-    latestRunsByAgent: new Map(),
-  });
+  const reminder = roster.buildRosterIdentitySection({ identities });
   const agentLines = reminder.split("\n").filter((line) => line.startsWith("- id="));
   assert.equal(agentLines.length, 12);
   assert.match(reminder, /- \.\.\. 3 more omitted/);

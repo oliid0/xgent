@@ -60,4 +60,10 @@ export type StreamOptionsEx = SimpleStreamOptions & {
   workdir?: string;
   /** Escape hatch for the unified provider stream retry in streamByApi.ts. */
   streamRetry?: StreamRetryConfig;
+  /** Recover complete OpenAI-compatible streams whose relay omitted finish_reason. */
+  recoverMissingFinishReason?: boolean;
+  /** Enables DeepSeek DSML-to-structured-tool stream repair. */
+  deepSeekDsmlToolCallRepair?: boolean;
+  /** Marks options that already carry the DeepSeek wire adapter. */
+  deepSeekProviderAdapter?: boolean;
 };

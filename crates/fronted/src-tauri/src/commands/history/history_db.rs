@@ -2,7 +2,7 @@ use rusqlite::{Connection, OptionalExtension};
 use std::{collections::HashSet, fs, path::PathBuf, sync::Mutex, time::Duration};
 
 const DB_FILENAME: &str = "chat-history.sqlite3";
-const HISTORY_DB_SCHEMA_VERSION: i64 = 3;
+const HISTORY_DB_SCHEMA_VERSION: i64 = 4;
 
 static HISTORY_DB_MIGRATION_LOCK: Mutex<()> = Mutex::new(());
 
@@ -92,6 +92,11 @@ fn migrate_history_db_inner(conn: &Connection) -> Result<(), String> {
         set_user_version(conn, 3)?;
     }
 
+    if current_version < 4 {
+        migrate_to_v4(conn)?;
+        set_user_version(conn, 4)?;
+    }
+
     // The subagent schema is versioned independently via subagentMeta and is
     // safe to (re)ensure on every startup.
     ensure_subagent_schema(conn)?;
@@ -116,6 +121,21 @@ fn migrate_to_v2(conn: &Connection) -> Result<(), String> {
 fn migrate_to_v3(conn: &Connection) -> Result<(), String> {
     conn.execute_batch("DROP TABLE IF EXISTS chatHistoryShare;")
         .map_err(|e| format!("移除已废弃的聊天历史分享表失败：{e}"))
+}
+
+// v4 adds per-segment trajectory diagnostics and removes the obsolete
+// monolithic context_json column left by early 1.x databases.  The retired
+// public-share table remains removed: trajectory storage is private and
+// conversation-scoped.
+fn migrate_to_v4(conn: &Connection) -> Result<(), String> {
+    ensure_chat_history_schema(conn)?;
+    let columns = read_table_columns(conn, "chatHistory", "聊天历史主表")?;
+    if columns.contains("context_json") {
+        conn.execute_batch("ALTER TABLE chatHistory DROP COLUMN context_json;")
+            .map_err(|e| format!("移除遗留 chatHistory.context_json 列失败：{e}"))?;
+    }
+    conn.execute_batch("DROP TABLE IF EXISTS chatHistoryShare;")
+        .map_err(|e| format!("保持已废弃聊天历史分享表移除状态失败：{e}"))
 }
 
 fn read_table_columns(
@@ -201,8 +221,21 @@ fn ensure_chat_history_schema(conn: &Connection) -> Result<(), String> {
             end_message_id TEXT,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
+            trajectory_json TEXT NOT NULL DEFAULT '[]',
+            trajectory_truncated INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (conversation_id, segment_index),
             UNIQUE (conversation_id, segment_id),
+            FOREIGN KEY (conversation_id) REFERENCES chatHistory(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS chatTrajectorySection (
+            conversation_id TEXT NOT NULL,
+            section_id TEXT NOT NULL,
+            slot TEXT NOT NULL,
+            content TEXT NOT NULL,
+            bytes INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (conversation_id, section_id),
             FOREIGN KEY (conversation_id) REFERENCES chatHistory(id) ON DELETE CASCADE
         );
 
@@ -220,6 +253,8 @@ fn ensure_chat_history_schema(conn: &Connection) -> Result<(), String> {
             ON chatHistorySegment(conversation_id, updated_at DESC);
         CREATE INDEX IF NOT EXISTS idx_chatHistory_pinned
             ON chatHistory(is_pinned DESC, pinned_at DESC, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_chatTrajectorySection_conversation
+            ON chatTrajectorySection(conversation_id);
         ",
     )
     .map_err(|e| format!("初始化聊天历史索引失败：{e}"))?;
@@ -376,6 +411,14 @@ fn ensure_chat_history_segment_columns(conn: &Connection) -> Result<(), String> 
                 "updated_at",
                 "ALTER TABLE chatHistorySegment ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;",
             ),
+            (
+                "trajectory_json",
+                "ALTER TABLE chatHistorySegment ADD COLUMN trajectory_json TEXT NOT NULL DEFAULT '[]';",
+            ),
+            (
+                "trajectory_truncated",
+                "ALTER TABLE chatHistorySegment ADD COLUMN trajectory_truncated INTEGER NOT NULL DEFAULT 0;",
+            ),
         ],
     )?;
 
@@ -400,6 +443,14 @@ fn ensure_chat_history_segment_columns(conn: &Connection) -> Result<(), String> 
         UPDATE chatHistorySegment
         SET updated_at = created_at
         WHERE updated_at IS NULL;
+
+        UPDATE chatHistorySegment
+        SET trajectory_json = '[]'
+        WHERE trajectory_json IS NULL OR trim(trajectory_json) = '';
+
+        UPDATE chatHistorySegment
+        SET trajectory_truncated = 0
+        WHERE trajectory_truncated IS NULL;
         ",
     )
     .map_err(|e| format!("修复聊天历史分段表默认字段失败：{e}"))?;
@@ -690,6 +741,7 @@ mod tests {
         for table_name in [
             "chatHistory",
             "chatHistorySegment",
+            "chatTrajectorySection",
             "chatHistoryFtsSegmentIndex",
             "subagentMeta",
             "subagentIdentity",
