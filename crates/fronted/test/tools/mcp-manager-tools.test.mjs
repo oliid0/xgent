@@ -4,6 +4,8 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 const baseServer = {
   id: "demo",
+  description: "",
+  docsUrl: "",
   enabled: true,
   transport: "stdio",
   command: "demo-mcp",

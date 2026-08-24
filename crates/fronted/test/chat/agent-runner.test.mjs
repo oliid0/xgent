@@ -275,6 +275,16 @@ const llmMock = {
   normalizeErrorMessage(value, fallback = "Request failed") {
     return typeof value === "string" && value.trim() ? value.trim() : fallback;
   },
+  async prepareProviderRequest(_providerId, runtime) {
+    return {
+      baseUrl: runtime.baseUrl,
+      headers: {
+        Authorization: `Bearer ${runtime.apiKey}`,
+        "x-api-key": runtime.apiKey,
+        "x-xagent-test": "1",
+      },
+    };
+  },
   resolveProviderCacheRetention(_providerId, _enabled, override) {
     return override ?? "none";
   },

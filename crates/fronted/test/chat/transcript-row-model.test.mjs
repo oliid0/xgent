@@ -54,14 +54,19 @@ test("settling a live turn keys the committed twin with the live row key", () =>
   assert.equal(streaming.liveStartIndex, 1);
   const liveKey = streaming.rows[1].key;
   assert.ok(liveKey.startsWith("live-turn-"));
-  assert.equal(streaming.rows[1].renderMode, "streaming");
+  assert.equal(streaming.rows[1].kind, "assistant-activity");
+  assert.equal(streaming.rows[1].units[0].renderMode, "streaming");
 
   const settledHistory = [userItem("u1"), assistantItem("a1", [round("r1", "full reply")])];
   const settled = model.build(settledHistory, idleLive);
   assert.equal(settled.liveStartIndex, -1);
   assert.equal(settled.rows.length, 2);
   assert.equal(settled.rows[1].key, liveKey, "committed twin adopts the live row key");
-  assert.equal(settled.rows[1].renderMode, "streaming", "stream-born rows stay in streaming mode");
+  assert.equal(
+    settled.rows[1].units[0].renderMode,
+    "streaming",
+    "stream-born rows stay in streaming mode",
+  );
 
   // Later rebuilds (new item identities, same item keys) keep the alias.
   const rebuilt = model.build(
@@ -84,7 +89,8 @@ test("persist lag: the alias still lands when history commits a build later", ()
 
   // Run ended but the committed twin has not landed yet.
   const gap = model.build(history, idleLive);
-  assert.equal(gap.rows.length, 1);
+  assert.equal(gap.rows.length, 2);
+  assert.equal(gap.rows[1].key, liveKey, "settling content remains mounted during persist lag");
 
   const settled = model.build(
     [userItem("u1"), assistantItem("a1", [round("r1", "full reply")])],
@@ -113,7 +119,7 @@ test("a new turn supersedes an unresolved settle so aliases never cross turns", 
   assert.equal(settled.rows.at(-1).key, secondLiveKey, "alias belongs to the second turn");
 });
 
-test("draft text synthesizes the round shape buildUiMessages will commit", () => {
+test("draft text synthesizes the block shape buildUiMessages will commit", () => {
   const model = createTranscriptRowModel();
   const streaming = model.build([userItem("u1")], {
     ...idleLive,
@@ -121,9 +127,14 @@ test("draft text synthesizes the round shape buildUiMessages will commit", () =>
     draftAssistantText: "hello",
   });
   const liveRow = streaming.rows[1];
-  assert.equal(liveRow.rounds.length, 1);
-  assert.equal(liveRow.rounds[0].key, "r1");
-  assert.deepEqual(liveRow.rounds[0].blocks, [{ kind: "text", id: "text-1", text: "hello" }]);
+  assert.equal(liveRow.kind, "assistant-activity");
+  assert.equal(liveRow.units.length, 2);
+  assert.deepEqual(liveRow.units[0].unit.block, {
+    kind: "text",
+    key: "text-1",
+    text: "hello",
+  });
+  assert.equal(liveRow.units[1].unit.kind, "status");
 });
 
 test("settled rows reuse identities across builds while streaming", () => {

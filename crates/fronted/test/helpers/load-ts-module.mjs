@@ -292,7 +292,7 @@ export function createTsModuleLoader(options = {}) {
       // spelling. Match by resolved file so an alias refactor cannot silently
       // turn a unit test into a real Tauri or network call.
       for (const [mockSpecifier, value] of mocks) {
-        if (!mockSpecifier.startsWith(".")) continue;
+        if (!mockSpecifier.startsWith(".") && !path.isAbsolute(mockSpecifier)) continue;
         try {
           if (resolveLocal(mockSpecifier, parentDir) === aliasTarget) return value;
         } catch {

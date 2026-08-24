@@ -84,7 +84,7 @@ test("estimateTextTokenUnits is additive across arbitrary splits", () => {
   assert.ok(Math.abs(whole - split) < 1e-9, `whole=${whole} split=${split}`);
 });
 
-test("estimateMessageTokens covers text, tool calls, tool results and details", () => {
+test("estimateMessageTokens covers model-visible text, tool calls, and tool results", () => {
   assert.equal(estimateMessageTokens(user("a".repeat(400))), 100 + 8);
 
   const withToolCall = {
@@ -103,8 +103,8 @@ test("estimateMessageTokens covers text, tool calls, tool results and details", 
   );
 
   const resultWithDetails = { ...toolResult("c".repeat(80)), details: { lines: 12 } };
-  const detailsChars = JSON.stringify({ lines: 12 }).length;
-  assert.equal(estimateMessageTokens(resultWithDetails), Math.ceil((80 + detailsChars) / 4) + 8);
+  // details is UI/accounting metadata and is not sent back to the provider.
+  assert.equal(estimateMessageTokens(resultWithDetails), Math.ceil(80 / 4) + 8);
 });
 
 test("estimateMessageTokens memoizes by object identity", () => {

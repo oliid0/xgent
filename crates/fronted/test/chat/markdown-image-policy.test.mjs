@@ -253,9 +253,9 @@ test("agent tool rules keep workspace and Skills deletion on Delete", () => {
   ]);
   assert.match(
     suffix,
-    /For workspace or Skill deletion, use Delete with the exact path returned by List\/Glob\/Grep\/Read/,
+    /Every intentional deletion of a file or directory inside the workspace, a writable root:\/\/ project root, or an enabled writable Skill MUST use Delete with the exact path/,
   );
-  assert.match(suffix, /Do not run Bash rm, rmdir, unlink, or find -delete/);
+  assert.match(suffix, /NEVER perform such a deletion through Bash, ManagedProcess, a shell script, or a deletion-oriented CLI/);
 });
 
 test("agent tool rules route installed Skill scripts through skill cwd", () => {
@@ -298,7 +298,7 @@ test("fs tool descriptions keep Image as the only display path for images", () =
   );
   assert.match(
     source,
-    /Supports workspace paths, enabled Skill paths, external absolute paths, http\/https URLs, base64 data URLs, and SVG images/,
+    /Supports workspace paths, configured root:\/\/ project paths, enabled Skill paths, external absolute paths, http\/https URLs, base64 data URLs, and SVG images/,
   );
   assert.match(
     source,

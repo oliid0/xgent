@@ -141,7 +141,6 @@ test("provider request helpers normalize auth, metadata, errors, and model value
   assert.deepEqual(
     providers.buildProviderRequestHeaders("claude_code", "secret", "conversation-1"),
     {
-      Authorization: "Bearer secret",
       "x-api-key": "secret",
       "x-app": "cli",
       "User-Agent": "claude-cli/2.1.71 (external, cli)",
@@ -164,8 +163,6 @@ test("provider request helpers normalize auth, metadata, errors, and model value
   );
   assert.deepEqual(providers.buildProviderRequestHeaders("codex", "secret", "conversation-1"), {
     Authorization: "Bearer secret",
-    "x-api-key": "secret",
-    "User-Agent": "codex_cli_rs/0.72.0 (Ubuntu 24.4.0; x86_64) WindowsTerminal",
     session_id: "conversation-1",
     conversation_id: "conversation-1",
   });

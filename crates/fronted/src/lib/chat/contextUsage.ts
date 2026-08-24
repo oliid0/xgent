@@ -10,9 +10,16 @@ export function positiveTokenCount(value: unknown): number | undefined {
 }
 
 export function estimateTextTokenUnits(text: string): number {
-  let units = 0;
-  for (const character of text) units += CJK_CHARACTER.test(character) ? 0.7 : 0.25;
-  return units;
+  let cjkCharacters = 0;
+  let otherCharacters = 0;
+  for (const character of text) {
+    if (CJK_CHARACTER.test(character)) cjkCharacters += 1;
+    else otherCharacters += 1;
+  }
+  // Multiply once per character class so repeated fractional additions cannot
+  // drift just above an integer boundary (for example 100 CJK characters
+  // becoming 70.00000000000013 and therefore incorrectly rounding to 71).
+  return cjkCharacters * 0.7 + otherCharacters * 0.25;
 }
 
 export function estimateTextTokens(text: string): number {
