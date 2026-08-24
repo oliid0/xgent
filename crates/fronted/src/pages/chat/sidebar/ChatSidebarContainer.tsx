@@ -3,13 +3,17 @@
 // ChatPage), the conversation-rename UI state, the delete flow, and the
 // error-code → i18n mapping for every frontend target.
 
-import { Fragment, useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ChatHistorySidebar } from "../../../components/chat/ChatHistorySidebar";
 import type { WorkspaceToolTarget } from "../../../components/project-tools/workspaceToolsModel";
 import { useLocale } from "../../../i18n";
 import type { AppUpdateController } from "../../../lib/appUpdates";
 import { normalizeConversationTitle } from "../../../lib/chat/page/chatPageHelpers";
-import type { WorkspaceProject } from "../../../lib/settings";
+import {
+  type ChatHistorySearchMatch,
+  searchChatHistory,
+} from "../../../lib/chat/history/chatHistory";
+import type { WorkspaceProject, WorkspaceProjectGroup } from "../../../lib/settings";
 import {
   selectConversations,
   selectListState,
@@ -32,6 +36,7 @@ type ChatSidebarContainerProps = {
   // Merged (settings ∪ history workdirs) but unsorted — the container sorts
   // with the store's activity/running inputs.
   projects: WorkspaceProject[];
+  workspaceProjectGroups: WorkspaceProjectGroup[];
   activeProjectId?: string;
   missingProjectPathKeys: ReadonlySet<string>;
   projectRenamingId: string | null;
@@ -41,6 +46,11 @@ type ChatSidebarContainerProps = {
   onProjectsCollapsedChange: (collapsed: boolean) => void;
   onRecentCollapsedChange: (collapsed: boolean) => void;
   onCreateProject?: () => void;
+  onCreateWorkspaceGroup: (name: string) => void;
+  onRenameWorkspaceGroup: (groupId: string, name: string) => void;
+  onDeleteWorkspaceGroup: (groupId: string) => void;
+  onMoveProjectToGroup: (projectPath: string, groupId: string | null) => void;
+  onToggleWorkspaceGroupCollapsed: (groupId: string) => void;
   onSelectProject: (project: WorkspaceProject) => void;
   onNewConversationForProject: (project: WorkspaceProject) => void;
   onBrowseProjectInFileTree?: (project: WorkspaceProject) => void;
@@ -59,6 +69,7 @@ type ChatSidebarContainerProps = {
   // Invoked after the store confirmed a deletion; ChatPage cleans artifacts
   // and replaces the current conversation when needed.
   onConversationDeleted: (id: string) => void;
+  onConversationCwdChanged: (id: string, cwd: string) => void;
   onCloseSidebar: () => void;
   onOpenSettings: () => void;
   onCreateSoul: () => void;
@@ -81,7 +92,7 @@ function selectMutationErrors(snapshot: SidebarSnapshot) {
 }
 
 export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
-  const { store, projects, onConversationDeleted } = props;
+  const { store, projects, onConversationDeleted, onConversationCwdChanged } = props;
   const { t } = useLocale();
 
   const items = useSidebarSelector(store, selectConversations);
@@ -98,6 +109,39 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<ChatHistorySearchMatch[]>([]);
+  const [searchStatus, setSearchStatus] = useState<"idle" | "loading" | "ready" | "error">(
+    "idle",
+  );
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchResults([]);
+      setSearchStatus("idle");
+      return;
+    }
+    let active = true;
+    setSearchStatus("loading");
+    const timer = window.setTimeout(() => {
+      void searchChatHistory(query)
+        .then((matches) => {
+          if (!active) return;
+          setSearchResults(matches);
+          setSearchStatus("ready");
+        })
+        .catch(() => {
+          if (!active) return;
+          setSearchResults([]);
+          setSearchStatus("error");
+        });
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery]);
 
   const sortedProjects = useMemo(
     () =>
@@ -145,6 +189,31 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
     [store],
   );
 
+  const handleMoveToWorkspace = useCallback(
+    (id: string, cwd: string) => {
+      store.clearMutationError(id);
+      void store.setCwd(id, cwd).then((moved) => {
+        if (moved) onConversationCwdChanged(id, cwd);
+      });
+    },
+    [onConversationCwdChanged, store],
+  );
+
+  const handleMoveConversationsToWorkspace = useCallback(
+    async (ids: readonly string[], cwd: string) => {
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          store.clearMutationError(id);
+          const moved = await store.setCwd(id, cwd);
+          if (moved) onConversationCwdChanged(id, cwd);
+          return { id, moved };
+        }),
+      );
+      return results.filter((result) => !result.moved).map((result) => result.id);
+    },
+    [onConversationCwdChanged, store],
+  );
+
   const handleDeleteConversation = useCallback(
     (id: string) => {
       store.clearMutationError(id);
@@ -153,6 +222,21 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
           onConversationDeleted(id);
         }
       });
+    },
+    [onConversationDeleted, store],
+  );
+
+  const handleDeleteConversations = useCallback(
+    async (ids: readonly string[]) => {
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          store.clearMutationError(id);
+          const removed = await store.remove(id);
+          if (removed) onConversationDeleted(id);
+          return { id, removed };
+        }),
+      );
+      return results.filter((result) => !result.removed).map((result) => result.id);
     },
     [onConversationDeleted, store],
   );
@@ -201,6 +285,10 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         errorMessage={errorMessage}
         errorDetail={errorDetail}
         onDismissError={handleDismissError}
+        searchQuery={searchQuery}
+        searchResults={searchResults}
+        searchStatus={searchStatus}
+        onSearchQueryChange={setSearchQuery}
         renamingId={renamingId}
         renameDraft={renameDraft}
         isOpen={props.isOpen}
@@ -208,6 +296,7 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         activeView={props.activeView}
         showProjects={props.showProjects}
         projects={sortedProjects}
+        workspaceProjectGroups={props.workspaceProjectGroups}
         activeProjectId={props.activeProjectId}
         missingProjectPathKeys={props.missingProjectPathKeys}
         runningProjectPathKeys={projectActivityInputs.runningWorkdirPathKeys}
@@ -218,6 +307,11 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         onProjectsCollapsedChange={props.onProjectsCollapsedChange}
         onRecentCollapsedChange={props.onRecentCollapsedChange}
         onCreateProject={props.onCreateProject}
+        onCreateWorkspaceGroup={props.onCreateWorkspaceGroup}
+        onRenameWorkspaceGroup={props.onRenameWorkspaceGroup}
+        onDeleteWorkspaceGroup={props.onDeleteWorkspaceGroup}
+        onMoveProjectToGroup={props.onMoveProjectToGroup}
+        onToggleWorkspaceGroupCollapsed={props.onToggleWorkspaceGroupCollapsed}
         onSelectProject={props.onSelectProject}
         onNewConversationForProject={props.onNewConversationForProject}
         onBrowseProjectInFileTree={props.onBrowseProjectInFileTree}
@@ -238,7 +332,10 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         onCommitRename={handleCommitRename}
         onCancelRename={handleCancelRename}
         onSetPinned={handleSetPinned}
+        onMoveToWorkspace={handleMoveToWorkspace}
+        onMoveConversationsToWorkspace={handleMoveConversationsToWorkspace}
         onDeleteConversation={handleDeleteConversation}
+        onDeleteConversations={handleDeleteConversations}
         onLoadMore={handleLoadMore}
         onCloseSidebar={props.onCloseSidebar}
         onOpenSettings={props.onOpenSettings}

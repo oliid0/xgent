@@ -52,6 +52,7 @@ export type CompactionDecisionReason =
   | "no-active-messages"
   | "in-flight"
   | "below-threshold"
+  | "below-manual-threshold"
   | "cooldown"
   | "threshold-exceeded";
 

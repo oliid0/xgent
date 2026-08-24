@@ -8,7 +8,10 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocale } from "../../../i18n";
-import type { GitBranch as GitBranchInfo } from "../../../lib/git/types";
+import type {
+  GitBranch as GitBranchInfo,
+  GitWorktreeInfo,
+} from "../../../lib/git/types";
 import { gitDiscoveredRepositoryLabel, selectedGitRepositoryLabel } from "../../../lib/git/types";
 import { cn } from "../../../lib/shared/utils";
 import {
@@ -37,6 +40,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../ui/dropdown-menu";
 import { Input } from "../../ui/input";
@@ -454,6 +458,173 @@ export function GitBranchSwitchConflictModal(props: {
   );
 }
 
+function GitWorktreeModal(props: {
+  data: GitReviewData;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { data, open, onClose } = props;
+  const { cwd, gitClient, state } = data;
+  const { t } = useLocale();
+  const [worktrees, setWorktrees] = useState<GitWorktreeInfo[]>([]);
+  const [branch, setBranch] = useState("");
+  const [directoryName, setDirectoryName] = useState("");
+  const [startPoint, setStartPoint] = useState("");
+  const [parentDirectory, setParentDirectory] = useState("");
+  const [deleteBranch, setDeleteBranch] = useState(true);
+  const [force, setForce] = useState(false);
+  const [removingPath, setRemovingPath] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const reload = useCallback(async () => {
+    if (!gitClient || !cwd.trim()) return;
+    const response = await gitClient.branches(cwd);
+    setWorktrees(response.worktrees);
+  }, [cwd, gitClient]);
+
+  useEffect(() => {
+    if (!open) return;
+    setError("");
+    setRemovingPath("");
+    void reload().catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
+  }, [open, reload]);
+
+  if (!open) return null;
+
+  const create = async () => {
+    if (!gitClient || !branch.trim() || !directoryName.trim() || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await gitClient.createWorktree(cwd, {
+        branch: branch.trim(),
+        directoryName: directoryName.trim(),
+        startPoint: startPoint.trim() || undefined,
+        parentDirectory: parentDirectory.trim() || undefined,
+      });
+      if (!result.ok) throw new Error(result.message || result.stderr);
+      setBranch("");
+      setDirectoryName("");
+      setStartPoint("");
+      await reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (worktree: GitWorktreeInfo) => {
+    if (!gitClient || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await gitClient.removeWorktree(cwd, worktree.path, {
+        force,
+        deleteBranch,
+      });
+      if (!result.ok) throw new Error(result.message || result.stderr);
+      setRemovingPath("");
+      await reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-end justify-center p-3 md:items-center md:p-4" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={busy ? undefined : onClose} />
+      <div className="relative z-10 max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-2xl border bg-background shadow-2xl">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <div>
+            <div className="text-sm font-semibold">{t("projectTools.gitReview.worktrees")}</div>
+            <div className="mt-0.5 max-w-[70vw] truncate text-xs text-muted-foreground">{state.repoRoot}</div>
+          </div>
+          <Button type="button" variant="ghost" size="icon" onClick={onClose} disabled={busy}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="space-y-4 p-4">
+          <section className="rounded-xl border p-3">
+            <div className="mb-3 text-xs font-semibold">{t("projectTools.gitReview.createWorktree")}</div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Input
+                value={branch}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setBranch(value);
+                  if (!directoryName) setDirectoryName(value.replace(/[\\/\s]+/g, "-"));
+                }}
+                placeholder={t("projectTools.gitReview.worktreeBranch")}
+              />
+              <Input
+                value={directoryName}
+                onChange={(event) => setDirectoryName(event.currentTarget.value)}
+                placeholder={t("projectTools.gitReview.worktreeDirectory")}
+              />
+              <Input
+                value={startPoint}
+                onChange={(event) => setStartPoint(event.currentTarget.value)}
+                placeholder={t("projectTools.gitReview.worktreeStartPoint")}
+              />
+              <Input
+                value={parentDirectory}
+                onChange={(event) => setParentDirectory(event.currentTarget.value)}
+                placeholder={t("projectTools.gitReview.worktreeParent")}
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              className="mt-3 w-full"
+              disabled={busy || !branch.trim() || !directoryName.trim()}
+              onClick={() => void create()}
+            >
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Folder className="h-3.5 w-3.5" />}
+              {t("projectTools.gitReview.createWorktree")}
+            </Button>
+          </section>
+          <section className="space-y-2">
+            {worktrees.length === 0 ? (
+              <div className="rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
+                {t("projectTools.gitReview.noWorktrees")}
+              </div>
+            ) : worktrees.map((worktree) => (
+              <div key={worktree.path} className="rounded-xl border px-3 py-2.5">
+                <div className="flex items-start gap-2">
+                  <Folder className="mt-0.5 h-4 w-4 shrink-0 text-sky-500" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-semibold">{worktree.branch || t("projectTools.gitReview.unresolved")}</div>
+                    <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground" title={worktree.path}>{worktree.path}</div>
+                  </div>
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" disabled={busy} onClick={() => setRemovingPath(worktree.path)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                {removingPath === worktree.path ? (
+                  <div className="mt-2 rounded-lg bg-muted/50 p-2 text-xs">
+                    <label className="flex items-center gap-2 py-1"><input type="checkbox" checked={deleteBranch} onChange={(event) => setDeleteBranch(event.currentTarget.checked)} />{t("projectTools.gitReview.deleteWorktreeBranch")}</label>
+                    <label className="flex items-center gap-2 py-1"><input type="checkbox" checked={force} onChange={(event) => setForce(event.currentTarget.checked)} />{t("projectTools.gitReview.forceRemoveWorktree")}</label>
+                    <div className="mt-2 flex justify-end gap-2">
+                      <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setRemovingPath("")}>{t("chat.cancel")}</Button>
+                      <Button type="button" variant="destructive" size="sm" disabled={busy} onClick={() => void remove(worktree)}>{t("settings.delete")}</Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </section>
+          {error ? <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-destructive">{error}</div> : null}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // Head title as a branch switcher: branches load lazily when the menu opens
 // and switching runs through runOperation so status/history refresh and
 // errors surface exactly like the other toolbar operations.
@@ -465,6 +636,7 @@ function GitReviewBranchMenu(props: { data: GitReviewData; writeDisabled: boolea
   const [branches, setBranches] = useState<GitBranchInfo[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [branchesError, setBranchesError] = useState("");
+  const [worktreeModalOpen, setWorktreeModalOpen] = useState(false);
   const requestIdRef = useRef(0);
   const operationBusy = busy !== "";
 
@@ -521,6 +693,8 @@ function GitReviewBranchMenu(props: { data: GitReviewData; writeDisabled: boolea
   );
 
   return (
+    <>
+      <GitWorktreeModal data={data} open={worktreeModalOpen} onClose={() => setWorktreeModalOpen(false)} />
     <DropdownMenu
       open={open}
       onOpenChange={(next) => {
@@ -565,10 +739,20 @@ function GitReviewBranchMenu(props: { data: GitReviewData; writeDisabled: boolea
                 branch.current || (state.upstream !== "" && branch.fullName === state.upstream);
               return renderBranchRow(branch, isCurrentUpstream, branch.fullName);
             })}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={operationBusy || writeDisabled}
+              className="gap-2 text-xs"
+              onSelect={() => setWorktreeModalOpen(true)}
+            >
+              <Folder className="h-3.5 w-3.5 text-muted-foreground" />
+              {t("projectTools.gitReview.manageWorktrees")}
+            </DropdownMenuItem>
           </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   );
 }
 

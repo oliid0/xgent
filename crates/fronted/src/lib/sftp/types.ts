@@ -50,6 +50,16 @@ export type SftpActionResponse = {
   transfer?: SftpTransfer | null;
 };
 
+export type SftpReadTextResponse = {
+  path: string;
+  content: string;
+  offset: number;
+  bytesRead: number;
+  sizeBytes: number;
+  truncated: boolean;
+  entry?: SftpEntry | null;
+};
+
 export type SftpClient = {
   list(params: {
     sessionId: string;
@@ -99,5 +109,20 @@ export type SftpClient = {
     overwrite?: boolean;
   }): Promise<SftpTransferResponse>;
   cancelTransfer(params: { sessionId: string; transferId: string }): Promise<void>;
+  readText(params: {
+    sessionId: string;
+    projectPathKey: string;
+    path: string;
+    maxBytes?: number;
+    strictUtf8?: boolean;
+  }): Promise<SftpReadTextResponse>;
+  writeText(params: {
+    sessionId: string;
+    projectPathKey: string;
+    path: string;
+    content: string;
+    expectedMtime?: number;
+    expectedSizeBytes?: number;
+  }): Promise<SftpActionResponse>;
   subscribeTransfers(listener: (event: SftpTransferEvent) => void): () => void;
 };

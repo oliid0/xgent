@@ -1,4 +1,4 @@
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { type Range, useVirtualizer } from "@tanstack/react-virtual";
 import {
   type MutableRefObject,
   memo,
@@ -29,16 +29,15 @@ import {
 } from "../../../lib/chat/messages/userMessageContent";
 import { normalizeLiveToolStatus } from "../../../lib/chat/page/chatPageHelpers";
 import type { GitClient } from "../../../lib/git/types";
+import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import { createEntranceRegistry } from "../../../lib/transcript-virtual/entranceOnce";
-import { extractLiveRange } from "../../../lib/transcript-virtual/liveRangeExtractor";
 import { createLiveRowScrollAdjustPolicy } from "../../../lib/transcript-virtual/liveScrollAdjustPolicy";
 import { createTranscriptMeasurementsLru } from "../../../lib/transcript-virtual/measurementsLru";
-import { AssistantRow } from "./AssistantRow";
+import { AssistantActivityRow } from "./AssistantActivityRow";
+import { AssistantRenderUnit } from "./AssistantRenderUnit";
+import { extractRenderUnitRange } from "./renderUnitRangeExtractor";
 import { createTranscriptRowModel } from "./rowModel";
 import { UserMessageRow } from "./UserMessageRow";
-
-const TRANSCRIPT_ROW_GAP = 24;
-const TRANSCRIPT_ROW_OVERSCAN_COUNT = 5;
 
 // Measured row heights survive conversation switches: saved on unmount,
 // restored (width-gated) on the next open so the switch lays out with exact
@@ -109,6 +108,7 @@ export type TranscriptListProps = {
   usageContextWindow?: number;
   workspaceRoot?: string;
   gitClient?: GitClient | null;
+  onOpenFileLink?: (link: ChatFileLink) => void;
   // 楼层导航：跳转句柄挂载点（与 followRef 同一模式），以及「视口顶部
   // 当前处于哪条用户消息行」变化时的上报回调。
   navRef?: MutableRefObject<TranscriptNavHandle | null>;
@@ -145,6 +145,7 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
     usageContextWindow,
     workspaceRoot,
     gitClient,
+    onOpenFileLink,
     navRef,
     onAnchorUserRowChange,
     onResendFromEdit,
@@ -168,12 +169,23 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
   );
 
   const { rows, liveStartIndex } = useMemo(
-    () => rowModel.build(historyItems, { ...liveState, isSending }),
-    [rowModel, historyItems, liveState, isSending],
+    () => rowModel.build(historyItems, { ...liveState, isSending, isCompactionRunning }),
+    [rowModel, historyItems, liveState, isSending, isCompactionRunning],
   );
 
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
   const liveStartIndexRef = useRef(liveStartIndex);
   liveStartIndexRef.current = liveStartIndex;
+  const extractVirtualRange = useCallback(
+    (range: Range) =>
+      extractRenderUnitRange(
+        range,
+        (index) => rowsRef.current[index]?.renderCost,
+        liveStartIndexRef.current,
+      ),
+    [],
+  );
 
   const [editingMessageKey, setEditingMessageKey] = useState<string | null>(null);
   const commitDetailsCacheRef = useRef(new Map<string, CommitDisplayReference>());
@@ -247,10 +259,13 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollViewport,
-    estimateSize: (index) => rows[index]?.estimate ?? 260,
+    estimateSize: (index) => {
+      const row = rowsRef.current[index];
+      return row ? row.estimate + (index < rowsRef.current.length - 1 ? row.gapAfter : 0) : 260;
+    },
     getItemKey: (index) => rows[index]?.key ?? index,
-    gap: TRANSCRIPT_ROW_GAP,
-    overscan: TRANSCRIPT_ROW_OVERSCAN_COUNT,
+    gap: 0,
+    overscan: 0,
     enabled: scrollViewport !== null,
     initialMeasurementsCache,
     // End-anchored: while the viewport sits within the threshold of the end,
@@ -263,7 +278,7 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
     // already pinned by the reducer.
     anchorTo: "end",
     scrollEndThreshold: 8,
-    rangeExtractor: (range) => extractLiveRange(range, liveStartIndexRef.current),
+    rangeExtractor: extractVirtualRange,
   });
 
   // TanStack exposes the resize-compensation predicate as an instance field,
@@ -279,8 +294,6 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
   // 测量会不断修正总高度，连续若干帧重新对准，让滚动收敛在目标行顶部
   // （对准同一 index 是收敛操作，不会震荡）。收敛期间用户的滚轮/触摸/按键
   // 立即取消收敛；新跳转替换旧收敛；卸载时一并清理。
-  const rowsRef = useRef(rows);
-  rowsRef.current = rows;
   const cancelJumpSettleRef = useRef<() => void>(() => {});
   useLayoutEffect(() => {
     if (!navRef) return;
@@ -487,17 +500,37 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
               />
             </div>
           );
-        } else {
+        } else if (row.kind === "assistant-activity") {
           body = (
             <div className="flex justify-start">
-              <AssistantRow
+              <AssistantActivityRow
                 row={row}
                 showUsage={showUsage}
                 usageContextWindow={usageContextWindow}
                 isAgentMode={isAgentMode}
-                isCompactionRunning={row.live ? isCompactionRunning : false}
-                toolStatus={row.live ? displayedToolStatus : null}
-                retryAttempts={row.live ? liveState.retryAttempts : undefined}
+                isCompactionRunning={isCompactionRunning}
+                toolStatus={displayedToolStatus}
+                retryAttempts={liveState.retryAttempts}
+                workdir={workspaceRoot}
+                onOpenFileLink={onOpenFileLink}
+                onResendFromEdit={onResendFromEdit}
+                onBranchConversation={onBranchConversation}
+              />
+            </div>
+          );
+        } else {
+          body = (
+            <div className="flex justify-start">
+              <AssistantRenderUnit
+                row={row}
+                showUsage={showUsage}
+                usageContextWindow={usageContextWindow}
+                isAgentMode={isAgentMode}
+                isCompactionRunning={row.mutable ? isCompactionRunning : false}
+                toolStatus={row.mutable ? displayedToolStatus : null}
+                retryAttempts={row.mutable ? liveState.retryAttempts : undefined}
+                workdir={workspaceRoot}
+                onOpenFileLink={onOpenFileLink}
                 onResendFromEdit={onResendFromEdit}
                 onBranchConversation={onBranchConversation}
               />
@@ -514,6 +547,9 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
             style={{ transform: `translateY(${virtualRow.start}px)` }}
           >
             {body}
+            {row.gapAfter > 0 && virtualRow.index < rows.length - 1 ? (
+              <div aria-hidden="true" style={{ height: row.gapAfter }} />
+            ) : null}
           </div>
         );
       })}

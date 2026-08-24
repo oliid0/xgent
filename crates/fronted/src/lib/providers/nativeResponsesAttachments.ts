@@ -76,28 +76,28 @@ type GeminiNativeAttachmentCandidate = {
 };
 
 const WORKSPACE_UPLOAD_INSTRUCTION = [
-  "Selected files are available in the workspace at these relative paths.",
-  "Use Read with the paths below before analyzing or modifying them:",
+  "The user attached the files below to this message.",
+  "Use Read with these exact paths before analyzing or modifying them:",
 ].join("\n");
 
 const NATIVE_UPLOAD_INSTRUCTION = [
-  "Selected files are attached to this OpenAI Responses request as native inputs when supported, and are also available in the workspace paths below.",
-  "Analyze the native attachments directly first. Use Read only when you need exact workspace file access, edits, or native attachment content is unavailable:",
+  "The attached files are inlined into this OpenAI Responses request as native inputs when supported, and are also readable at the exact paths below.",
+  "Analyze the native attachments directly first. Use Read only when you need exact file access, edits, or native attachment content is unavailable:",
 ].join("\n");
 
 const OPENAI_CHAT_COMPLETIONS_NATIVE_UPLOAD_INSTRUCTION = [
-  "Selected images are attached to this OpenAI Chat Completions request as native image inputs when supported, and are also available in the workspace paths below.",
-  "Analyze the native image attachments directly first. Use Read only when you need exact workspace file access, edits, or native attachment content is unavailable:",
+  "The attached images are inlined into this OpenAI Chat Completions request as native image inputs when supported, and are also readable at the exact paths below.",
+  "Analyze the native image attachments directly first. Use Read only when you need exact file access, edits, or native attachment content is unavailable:",
 ].join("\n");
 
 const ANTHROPIC_NATIVE_UPLOAD_INSTRUCTION = [
-  "Selected files are attached to this Anthropic Messages request as native image/document inputs when supported, and are also available in the workspace paths below.",
-  "Analyze the native attachments directly first. Use Read only when you need exact workspace file access, edits, or native attachment content is unavailable:",
+  "The attached files are inlined into this Anthropic Messages request as native image/document inputs when supported, and are also readable at the exact paths below.",
+  "Analyze the native attachments directly first. Use Read only when you need exact file access, edits, or native attachment content is unavailable:",
 ].join("\n");
 
 const GEMINI_NATIVE_UPLOAD_INSTRUCTION = [
-  "Selected files are attached to this Gemini request as native inlineData inputs when supported, and are also available in the workspace paths below.",
-  "Analyze the native attachments directly first. Use Read only when you need exact workspace file access, edits, or native attachment content is unavailable:",
+  "The attached files are inlined into this Gemini request as native inlineData inputs when supported, and are also readable at the exact paths below.",
+  "Analyze the native attachments directly first. Use Read only when you need exact file access, edits, or native attachment content is unavailable:",
 ].join("\n");
 
 const GEMINI_INLINE_NATIVE_ATTACHMENT_MAX_REQUEST_BYTES = 20 * 1024 * 1024;
@@ -150,30 +150,34 @@ function normalizeMimeType(value: unknown) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-function isOpenAIResponsesModel(model: Model<any>) {
+function isOpenAIResponsesModel(model: Model<Api>) {
   return model.api === "openai-responses";
 }
 
-function isOpenAICompletionsModel(model: Model<any>) {
+function isOpenAICompletionsModel(model: Model<Api>) {
   return model.api === "openai-completions";
 }
 
-function isAnthropicMessagesModel(model: Model<any>) {
+function isAnthropicMessagesModel(model: Model<Api>) {
   return model.api === "anthropic-messages";
 }
 
-function isGoogleGenerativeAIModel(model: Model<any>) {
+function isGoogleGenerativeAIModel(model: Model<Api>) {
   return model.api === "google-generative-ai";
 }
 
-function modelSupportsImageInput(model: Model<any>) {
+function modelSupportsImageInput(model: Model<Api>) {
   return Array.isArray(model.input) && model.input.includes("image");
 }
 
 function getUserMessageNativeAttachmentBatches(context: Context) {
   return context.messages
     .filter((message) => message.role === "user")
-    .map((message) => getUserMessageAttachments(message as any));
+    .map((message) =>
+      getUserMessageAttachments(
+        message as unknown as Parameters<typeof getUserMessageAttachments>[0],
+      ),
+    );
 }
 
 function buildDataUrl(mimeType: string, data: string) {
@@ -201,12 +205,20 @@ async function readNativeAttachment(params: {
   workdir: string;
   file: PendingUploadedFile;
 }): Promise<NativeAttachmentCommandResponse> {
+  // 附件读取只走导入时返回的绝对路径；旧版本仅持久化 workdir 相对路径的
+  // 附件不再兼容，直接走各 adapter 的 Read-fallback 分支。
+  const absolutePath =
+    typeof params.file.absolutePath === "string" ? params.file.absolutePath.trim() : "";
+  if (!absolutePath) {
+    throw new Error(
+      `attachment ${params.file.relativePath} has no absolute path (legacy upload); re-upload it to inline natively`,
+    );
+  }
   const response = await invoke<NativeAttachmentCommandResponse>(
     "system_read_uploaded_native_attachment",
     {
       workdir: params.workdir,
-      absolute_path: params.file.absolutePath,
-      relative_path: params.file.relativePath,
+      absolute_path: absolutePath,
       kind: params.file.kind,
     },
   );
@@ -220,7 +232,7 @@ async function readNativeAttachment(params: {
 
 async function buildNativeAttachmentContentPart(params: {
   workdir: string;
-  model: Model<any>;
+  model: Model<Api>;
   file: PendingUploadedFile;
 }): Promise<NativeAttachmentContentPart | null> {
   const { file, model, workdir } = params;
@@ -250,7 +262,7 @@ async function buildNativeAttachmentContentPart(params: {
 
 async function buildOpenAIChatCompletionsNativeAttachmentContentPart(params: {
   workdir: string;
-  model: Model<any>;
+  model: Model<Api>;
   file: PendingUploadedFile;
 }): Promise<OpenAIChatCompletionsNativeAttachmentContentPart | null> {
   const { file, model, workdir } = params;
@@ -405,7 +417,7 @@ function isAnthropicToolResultTurn(message: Record<string, unknown>) {
 
 async function buildNativeContentParts(params: {
   workdir: string;
-  model: Model<any>;
+  model: Model<Api>;
   files: PendingUploadedFile[];
 }) {
   const parts: NativeAttachmentContentPart[] = [];
@@ -429,7 +441,7 @@ async function buildNativeContentParts(params: {
 
 async function buildOpenAIChatCompletionsNativeContentParts(params: {
   workdir: string;
-  model: Model<any>;
+  model: Model<Api>;
   files: PendingUploadedFile[];
 }) {
   const parts: OpenAIChatCompletionsNativeAttachmentContentPart[] = [];
@@ -523,7 +535,7 @@ async function buildAnthropicNativeContentParts(params: {
 
 async function buildGeminiNativeAttachmentContentPart(params: {
   workdir: string;
-  model: Model<any>;
+  model: Model<Api>;
   file: PendingUploadedFile;
 }): Promise<GeminiNativeAttachmentCandidate | null> {
   const { file, model, workdir } = params;
@@ -560,7 +572,7 @@ async function buildGeminiNativeAttachmentContentPart(params: {
 
 async function buildGeminiNativeContentParts(params: {
   workdir: string;
-  model: Model<any>;
+  model: Model<Api>;
   files: PendingUploadedFile[];
   availableRequestBytes: number;
 }) {
@@ -616,7 +628,7 @@ function isGeminiSyntheticToolImageTurn(item: Record<string, unknown>) {
 async function applyNativeAttachmentsToResponsesPayload(params: {
   payload: unknown;
   context: Context;
-  model: Model<any>;
+  model: Model<Api>;
   workdir: string;
 }) {
   const payload = params.payload;
@@ -668,7 +680,7 @@ async function applyNativeAttachmentsToResponsesPayload(params: {
 async function applyNativeAttachmentsToOpenAICompletionsPayload(params: {
   payload: unknown;
   context: Context;
-  model: Model<any>;
+  model: Model<Api>;
   workdir: string;
 }) {
   const payload = params.payload;
@@ -726,7 +738,7 @@ async function applyNativeAttachmentsToOpenAICompletionsPayload(params: {
 async function applyNativeAttachmentsToAnthropicPayload(params: {
   payload: unknown;
   context: Context;
-  model: Model<any>;
+  model: Model<Api>;
   workdir: string;
 }) {
   const payload = params.payload;
@@ -777,7 +789,7 @@ async function applyNativeAttachmentsToAnthropicPayload(params: {
 async function applyNativeAttachmentsToGeminiPayload(params: {
   payload: unknown;
   context: Context;
-  model: Model<any>;
+  model: Model<Api>;
   workdir: string;
 }) {
   const payload = params.payload;
@@ -842,13 +854,13 @@ export function attachOpenAIResponsesNativeAttachments<
   options: TOptions,
   params: {
     context?: Context;
-    model: Model<any>;
+    model: Model<Api>;
     providerId: string;
     workdir?: string;
   },
 ): TOptions {
   if (
-    params.providerId !== "codex" ||
+    (params.providerId !== "codex" && params.providerId !== "xai") ||
     !params.context ||
     !isOpenAIResponsesModel(params.model) ||
     !params.workdir?.trim()
@@ -883,7 +895,7 @@ export function attachOpenAICompletionsNativeAttachments<
   options: TOptions,
   params: {
     context?: Context;
-    model: Model<any>;
+    model: Model<Api>;
     providerId: string;
     workdir?: string;
   },
@@ -924,7 +936,7 @@ export function attachAnthropicMessagesNativeAttachments<
   options: TOptions,
   params: {
     context?: Context;
-    model: Model<any>;
+    model: Model<Api>;
     providerId: string;
     workdir?: string;
   },
@@ -965,7 +977,7 @@ export function attachGeminiGenerativeAINativeAttachments<
   options: TOptions,
   params: {
     context?: Context;
-    model: Model<any>;
+    model: Model<Api>;
     providerId: string;
     workdir?: string;
   },

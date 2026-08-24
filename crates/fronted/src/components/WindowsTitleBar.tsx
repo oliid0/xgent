@@ -179,6 +179,7 @@ export function WindowsTitleBar() {
         !isFocused && "text-foreground/55",
       )}
     >
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Native titlebar dragging and double-click maximize are pointer gestures; the adjacent controls remain keyboard accessible. */}
       <div
         className="flex h-full min-w-0 flex-1 items-center gap-1.5 pl-2.5 pr-3"
         onDoubleClick={handleTitleDoubleClick}
@@ -187,7 +188,7 @@ export function WindowsTitleBar() {
         <img
           src={iconSimpleUrl}
           alt=""
-          className="h-[15px] w-[15px] shrink-0 rounded-[3.5px]"
+          className="h-[15px] w-[15px] shrink-0 rounded-xs"
           draggable={false}
         />
         <span className="truncate text-[12px] font-medium leading-[1.45] tracking-[0.01em] text-foreground/80">

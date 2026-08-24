@@ -1,10 +1,10 @@
-import type { Model } from "@earendil-works/pi-ai";
+import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ProviderId } from "../../settings";
 import {
+  ANTHROPIC_WEB_SEARCH_TOOL_TYPE,
   hasAnthropicWebSearchTool,
   hasOpenAIResponsesWebSearchTool,
   providerSupportsNativeWebSearch,
-  resolveAnthropicWebSearchToolType,
 } from "../nativeWebSearch";
 import { isRecord } from "./common";
 import { appendGeminiGoogleSearchToolToPayload } from "./geminiToolPayload";
@@ -96,7 +96,7 @@ function appendOpenAIChatCompletionsNativeWebSearch(
   payload: Record<string, unknown>,
   params: {
     baseUrl?: string;
-    model: Model<any>;
+    model: Model<Api>;
   },
 ) {
   if (
@@ -120,7 +120,7 @@ function isOpenAIWebSearchMinimalReasoningUnsupportedModel(modelId: string) {
   return normalized === "gpt-5" || normalized.startsWith("gpt-5-");
 }
 
-function normalizeOpenAIWebSearchReasoning(payload: Record<string, unknown>, model: Model<any>) {
+function normalizeOpenAIWebSearchReasoning(payload: Record<string, unknown>, model: Model<Api>) {
   if (!isOpenAIWebSearchMinimalReasoningUnsupportedModel(model.id)) return payload;
   if (!isRecord(payload.reasoning) || payload.reasoning.effort !== "minimal") return payload;
   return {
@@ -165,7 +165,7 @@ export function attachProviderNativeWebSearch(
         return nextPayload;
       }
 
-      if (providerId === "codex") {
+      if (providerId === "codex" || providerId === "xai" || providerId === "deepseek") {
         if (model.api === "openai-completions") {
           return appendOpenAIChatCompletionsNativeWebSearch(nextPayload, {
             baseUrl: params?.baseUrl,
@@ -183,7 +183,10 @@ export function attachProviderNativeWebSearch(
       if (providerId === "claude_code") {
         return appendUniqueTool(
           nextPayload,
-          { type: resolveAnthropicWebSearchToolType(model), name: "web_search" },
+          {
+            type: ANTHROPIC_WEB_SEARCH_TOOL_TYPE,
+            name: "web_search",
+          },
           hasAnthropicWebSearchTool,
         );
       }

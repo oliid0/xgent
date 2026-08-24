@@ -11,6 +11,27 @@ export type ConversationContextBuildOptions = {
   includeUploadedFilesMetadata?: boolean;
 };
 
+export type PreparedSystemPromptSlots = {
+  base?: string;
+  agent?: string;
+  skills?: string;
+  memory?: string;
+  runtime?: string;
+};
+
+export function createPreparedSystemPromptSlotHolder(): {
+  capture: (slots: PreparedSystemPromptSlots) => void;
+  read: () => PreparedSystemPromptSlots;
+} {
+  let latest: PreparedSystemPromptSlots = {};
+  return {
+    capture: (slots) => {
+      latest = slots;
+    },
+    read: () => latest,
+  };
+}
+
 export function buildCompactionContext(
   state: ConversationViewState,
   tools?: Context["tools"],
@@ -33,12 +54,20 @@ export function buildPreparedContext(params: {
   memoryPrompt?: string;
   includeAbortedMessages?: boolean;
   includeUploadedFilesMetadata?: boolean;
+  captureSlots?: (slots: PreparedSystemPromptSlots) => void;
 }): Context {
   // AGENTS / Skills prompts are fixed runtime instructions and should not be
   // folded into compaction input or token accounting.
   const withTools = buildCompactionContext(params.state, params.tools, {
     includeAbortedMessages: params.includeAbortedMessages,
     includeUploadedFilesMetadata: params.includeUploadedFilesMetadata,
+  });
+
+  params.captureSlots?.({
+    ...(typeof withTools.systemPrompt === "string" ? { base: withTools.systemPrompt } : {}),
+    ...(params.soulPrompt ? { agent: params.soulPrompt } : {}),
+    ...(params.skillsPrompt ? { skills: params.skillsPrompt } : {}),
+    ...(params.memoryPrompt ? { memory: params.memoryPrompt } : {}),
   });
 
   let systemPrompt = withTools.systemPrompt;
@@ -69,6 +98,7 @@ export function buildResumeContext(params: {
   memoryPrompt?: string;
   includeAbortedMessages?: boolean;
   includeUploadedFilesMetadata?: boolean;
+  captureSlots?: (slots: PreparedSystemPromptSlots) => void;
 }): Context {
   const baseContext = buildPreparedContext({
     ...params,

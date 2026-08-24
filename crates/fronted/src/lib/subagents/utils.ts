@@ -1,13 +1,10 @@
 import type { Message } from "@earendil-works/pi-ai";
 
-import { createUuid } from "../shared/id";
-import { MAX_SUMMARY_CHARS } from "./types";
+import { createUuid } from "@xagent/ui/lib/shared/id";
 
-export function asObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
+export { asRecord as asObject } from "@xagent/ui/lib/shared/value";
+
+import { MAX_SUMMARY_CHARS } from "./types";
 
 export function optionalString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;

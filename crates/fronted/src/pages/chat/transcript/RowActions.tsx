@@ -1,4 +1,4 @@
-import { Check, Copy, GitBranch, Loader2, Pencil, RefreshCw } from "../../../components/icons";
+import { Check, Copy, GitBranch, Loader2, Pencil, RefreshCw, Undo2 } from "../../../components/icons";
 import { ConfirmActionPopover } from "../../../components/ui/confirm-action-popover";
 import { useLocale } from "../../../i18n";
 import type {
@@ -6,6 +6,8 @@ import type {
   RenderUserMessage,
 } from "../../../lib/chat/conversation/conversationState";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
+import { useCheckpointRewind } from "../../../lib/chat/checkpointRewind";
+import { useState } from "react";
 import { useRowInteraction } from "./rowInteraction";
 import { formatMessageTimestamp } from "./transcriptUtils";
 import { useCopiedFlag } from "./useCopiedFlag";
@@ -119,14 +121,17 @@ export type UserRowFooterProps = {
   text: string;
   timestamp: number;
   hasStableRef: boolean;
+  messageId?: string;
   onStartEdit: (key: string) => void;
 };
 
 export function UserRowFooter(props: UserRowFooterProps) {
-  const { itemKey, text, timestamp, hasStableRef, onStartEdit } = props;
+  const { itemKey, text, timestamp, hasStableRef, messageId, onStartEdit } = props;
   const { t } = useLocale();
   const { copied, markCopied } = useCopiedFlag();
   const { isSending } = useRowInteraction();
+  const checkpointRewind = useCheckpointRewind();
+  const [rewindError, setRewindError] = useState<string | null>(null);
 
   const editDisabled = isSending || !hasStableRef;
   const editTitle = hasStableRef ? t("chat.edit") : "旧历史缺少稳定消息标识，无法编辑重发";
@@ -157,6 +162,39 @@ export function UserRowFooter(props: UserRowFooterProps) {
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
+        {checkpointRewind?.available && messageId ? (
+          <ConfirmActionPopover
+            title={t("chat.checkpointRewind.title")}
+            description={rewindError ?? t("chat.checkpointRewind.description")}
+            confirmLabel={t("chat.checkpointRewind.confirm")}
+            tone="destructive"
+            align="end"
+            side="top"
+            onConfirm={async () => {
+              setRewindError(null);
+              try {
+                await checkpointRewind.rewindTurn(messageId);
+              } catch (error) {
+                setRewindError(error instanceof Error ? error.message : String(error));
+              }
+            }}
+          >
+            {() => (
+              <button
+                type="button"
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                title={t("chat.checkpointRewind.title")}
+                disabled={isSending || checkpointRewind.busyTurnId !== null}
+              >
+                {checkpointRewind.busyTurnId === messageId ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Undo2 className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
+          </ConfirmActionPopover>
+        ) : null}
       </div>
       <span className="select-none text-[calc(11px*var(--zone-font-scale,1))] tabular-nums text-muted-foreground/70">
         {formatMessageTimestamp(timestamp)}

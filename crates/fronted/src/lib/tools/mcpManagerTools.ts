@@ -15,7 +15,7 @@ import {
   type McpManagerResultDetails,
 } from "./builtinTypes";
 import { ToolPathResolver } from "./pathUtils";
-import type { SystemToolRuntimeScope } from "./systemToolOptions";
+import type { ShellSandboxSettings } from "./shellTools";
 
 type McpManagerAction =
   | "list"
@@ -101,11 +101,28 @@ const WRITE_ACTIONS = new Set<McpManagerAction>([
 // sharing the process-wide runtime manager, so it is gated like a write.
 const RUNTIME_MUTATING_ACTIONS = new Set<McpManagerAction>(["restart", "stop"]);
 
+// Actions that connect to a server runtime. For `transport: "stdio"` that means
+// spawning a local child process from a free-form `command`/`args` pair, i.e. a
+// general-purpose process spawn primitive that the OS sandbox does not cover
+// (MCP runtimes are pooled process-wide and started outside the shell funnel).
+const RUNTIME_CONNECTING_ACTIONS = new Set<McpManagerAction>([
+  "test",
+  "tools",
+  "restart",
+  "diagnose",
+]);
+
 const MCP_STRING_MAP_SCHEMA = Type.Record(Type.String(), Type.String());
 
 const MCP_SERVER_PARAMETERS = Type.Object(
   {
     id: Type.Optional(Type.String()),
+    description: Type.Optional(
+      Type.String({ description: "Optional operator-facing description of this MCP server." }),
+    ),
+    docsUrl: Type.Optional(
+      Type.String({ description: "Optional project or documentation URL for this MCP server." }),
+    ),
     enabled: Type.Optional(Type.Boolean()),
     transport: Type.Optional(
       Type.Union([Type.Literal("stdio"), Type.Literal("http"), Type.Literal("sse")]),
@@ -124,11 +141,17 @@ const MCP_SERVER_PARAMETERS = Type.Object(
     timeoutMs: Type.Optional(Type.Number({ minimum: 1 })),
     messageUrl: Type.Optional(Type.String()),
   },
-  { description: "Full MCP Server config for create/test/validate." } as any,
+  { description: "Full MCP Server config for create/test/validate." },
 );
 
 const MCP_SERVER_PATCH_PARAMETERS = Type.Object(
   {
+    description: Type.Optional(
+      Type.String({ description: "Optional operator-facing description of this MCP server." }),
+    ),
+    docsUrl: Type.Optional(
+      Type.String({ description: "Optional project or documentation URL for this MCP server." }),
+    ),
     enabled: Type.Optional(Type.Boolean()),
     transport: Type.Optional(
       Type.Union([Type.Literal("stdio"), Type.Literal("http"), Type.Literal("sse")]),
@@ -147,7 +170,7 @@ const MCP_SERVER_PATCH_PARAMETERS = Type.Object(
     timeoutMs: Type.Optional(Type.Number({ minimum: 1 })),
     messageUrl: Type.Optional(Type.String()),
   },
-  { description: "Partial MCP Server config for update. The id field cannot be changed." } as any,
+  { description: "Partial MCP Server config for update. The id field cannot be changed." },
 );
 
 const MCP_MANAGER_PARAMETERS = Type.Object({
@@ -298,9 +321,13 @@ function normalizePatch(input: unknown): Partial<McpServerConfig> {
       case "url":
       case "cwd":
       case "messageUrl":
+      case "description":
+      case "docsUrl":
         if (typeof value !== "string") throw new Error(`McpManager.patch.${key} must be a string.`);
         (patch as Record<string, unknown>)[key] =
-          key === "cwd" || key === "messageUrl" ? value.trim() || undefined : value.trim();
+          key === "cwd" || key === "messageUrl" || key === "description" || key === "docsUrl"
+            ? value.trim() || undefined
+            : value.trim();
         break;
       case "args":
         if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
@@ -438,7 +465,7 @@ async function stopRuntime(serverId: string, warnings: string[]) {
   try {
     const stopped = await invoke<McpStopServerResponse>("mcp_stop_server", {
       server_id: serverId,
-    } as any);
+    });
     return stopped.stopped;
   } catch (err) {
     warnings.push(`failed to stop runtime for ${serverId}: ${asErrorMessage(err)}`);
@@ -447,7 +474,7 @@ async function stopRuntime(serverId: string, warnings: string[]) {
 }
 
 async function runtimeStatus(serverId: string) {
-  return invoke<McpRuntimeStatus>("mcp_runtime_status", { server_id: serverId } as any);
+  return invoke<McpRuntimeStatus>("mcp_runtime_status", { server_id: serverId });
 }
 
 async function runtimeTest(
@@ -460,7 +487,7 @@ async function runtimeTest(
     server,
     include_schema: includeSchema,
     persist,
-  } as any);
+  });
 }
 
 function applyRuntimeTestOutputOptions(
@@ -504,7 +531,12 @@ function buildSuggestions(result: {
 }
 
 function formatServerLine(server: McpServerConfig) {
-  return `- ${server.id} | transport=${server.transport} | enabled=${server.enabled ? "true" : "false"}`;
+  const metadata = [
+    server.description ? `description=${JSON.stringify(server.description)}` : null,
+    server.docsUrl ? `docsUrl=${JSON.stringify(server.docsUrl)}` : null,
+  ].filter(Boolean);
+  const suffix = metadata.length > 0 ? ` | ${metadata.join(" | ")}` : "";
+  return `- ${server.id} | transport=${server.transport} | enabled=${server.enabled ? "true" : "false"}${suffix}`;
 }
 
 function formatJson(value: unknown) {
@@ -664,6 +696,35 @@ export function createMcpManagerTools(params: {
     return params.applyMcpOps;
   }
 
+  /**
+   * 沙箱围栏的对称性守卫(P1#1)。
+   *
+   * `transport: "stdio"` 的运行时探测最终走到 Rust `build_stdio_command` 的裸
+   * `Command::new`,不带任何 SandboxSpec;而 `action: "test"` 允许模型传入自由格式的
+   * `command`/`args`,既不写配置也不持久化 —— 等于在"选了最严格模式"的会话里留下一个
+   * 与 Bash 同样通用、却完全无围栏的进程 spawn 入口(sandboxOffline 下尤其矛盾:
+   * 该模式的全部意义就是内核级断网)。MCP 运行时是进程级共享池,且 http/sse 传输根本
+   * 不落到 shell funnel 上,无法复用同一套沙箱包装,故在沙箱模式下一律 fail-closed 拒绝。
+   *
+   * create / update / enable 同样会把 stdio `command`/`args` 写入设置,下一轮
+   * registry 构建(或同轮 subagent)经 `createMcpTools` → `mcp_list_tools` 自动拉起
+   * 该进程,所以配置写入路径必须走同一守卫,不能只拦运行时探测。
+   *
+   * 非 stdio 传输不 spawn 进程,不在本守卫范围内;用户在设置界面里手动测试 MCP 服务器
+   * 也不受影响(那是显式用户操作,与 hooks / 用户自建 Cron 脚本同一豁免)。
+   */
+  function assertRuntimeSpawnAllowed(action: McpManagerAction, server: McpServerConfig) {
+    if (!params.sandbox?.enabled) return;
+    if (server.transport !== "stdio") return;
+    throw new Error(
+      `McpManager action=${action} would spawn a local stdio process for "${server.id}" ` +
+        `(command: ${server.command || "<empty>"}), but the current command mode runs model-driven ` +
+        `processes inside the OS sandbox and MCP runtimes cannot be fenced. Refused. ` +
+        `Use Bash for sandboxed commands; if this MCP server really needs probing, ask the user ` +
+        `to switch the command mode in the composer, or to test it from Settings → MCP.`,
+    );
+  }
+
   // Write commits are deliberately synchronous: each one re-reads the live
   // settings, validates, and applies its ops without any await in between, so
   // the single-threaded JS runtime guarantees the read-modify-write is atomic
@@ -778,6 +839,7 @@ export function createMcpManagerTools(params: {
       }
 
       const conflict = args.conflict === "overwrite" ? "overwrite" : "fail";
+      assertRuntimeSpawnAllowed(action, server);
       const { existed } = commitCreate(server, conflict);
       const runtimeWarnings: string[] = [];
       const stopped = existed
@@ -798,6 +860,9 @@ export function createMcpManagerTools(params: {
       const serverId = requireServerId(args.server_id);
       const patch = await resolvePatchCwd(normalizePatch(args.patch), "McpManager.patch.cwd");
       throwIfAborted(signal);
+      const existing = requireExistingServer(currentSettings(), serverId);
+      const updatedPreview = normalizeMcpServerConfig({ ...existing, ...patch, id: existing.id });
+      assertRuntimeSpawnAllowed(action, updatedPreview);
       const { server, validation, changed } = commitUpdate(serverId, patch);
       if (!changed) {
         return {
@@ -832,6 +897,12 @@ export function createMcpManagerTools(params: {
     if (action === "enable" || action === "disable") {
       const ids = targetServerIds(args);
       const enable = action === "enable";
+      if (enable) {
+        const settings = currentSettings();
+        for (const id of ids) {
+          assertRuntimeSpawnAllowed(action, requireExistingServer(settings, id));
+        }
+      }
       commitSetEnabled(ids, enable);
       const runtimeWarnings: string[] = [];
       const stopped = enable ? false : await stopRuntimeAfterCommit(ids, runtimeWarnings, signal);

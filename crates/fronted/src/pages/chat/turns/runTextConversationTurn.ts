@@ -1,4 +1,10 @@
 import type { AssistantMessage, Context } from "@earendil-works/pi-ai";
+import type { HostedSearchBlock } from "@xagent/ui/lib/chat/hostedSearch";
+import {
+  composeTrajectorySystemPrompt,
+  serializeToolCatalog,
+} from "@xagent/ui/lib/trajectory/sections";
+import type { TrajectoryUsage } from "@xagent/ui/lib/trajectory/types";
 import type { CompactionController } from "../../../lib/chat/compaction/controller";
 import { estimateTextTokenUnits } from "../../../lib/chat/compaction/tokenLedger";
 import type { ProviderRuntimeConfig } from "../../../lib/chat/compaction/types";
@@ -20,7 +26,6 @@ import type {
   MemoryExtractionModelConfig,
   MemoryExtractionStatusText,
 } from "../../../lib/chat/memory/extractionEngine";
-import type { HostedSearchBlock } from "../../../lib/chat/messages/hostedSearch";
 import {
   appendTextDeltaToRound,
   collapseThinking,
@@ -29,6 +34,7 @@ import {
   upsertHostedSearchToRound,
 } from "../../../lib/chat/messages/uiMessages";
 import { isAbortLikeError } from "../../../lib/chat/page/chatPageHelpers";
+import type { AgentRunnerFailoverParams } from "../../../lib/chat/runner/agentRunner";
 import {
   createDeferredProviderNativeWebSearchStatus,
   resolveProviderNativeWebSearchStatus,
@@ -36,10 +42,12 @@ import {
 import type { StreamDebugLogger } from "../../../lib/debug/agentDebug";
 import { assistantMessageToText, streamAssistantMessage } from "../../../lib/providers/llm";
 import type { ProviderId } from "../../../lib/settings";
+import { trajectoryTerminalInfo } from "../../../lib/trajectory/assistantOutcome";
 import {
-  buildPartialAssistantMessage,
-  type ConversationRuntimeEntry,
-} from "../runtime/chatPageRuntime";
+  NOOP_TRAJECTORY_RECORDER,
+  type TrajectoryRecorder,
+} from "../../../lib/trajectory/recorder";
+import { buildPartialAssistantMessage } from "../runtime/chatPageRuntime";
 
 export type RuntimeModel = {
   api: AssistantMessage["api"];
@@ -59,10 +67,27 @@ export type PersistConversationParams = {
   titlePromise: Promise<string | null> | null;
 };
 
+/** Normalize provider usage without inventing zero-valued fields. */
+function toTrajectoryUsage(value: unknown): TrajectoryUsage | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  const pick = (key: string) => (typeof raw[key] === "number" ? (raw[key] as number) : undefined);
+  const usage: TrajectoryUsage = {
+    ...(pick("totalTokens") === undefined ? {} : { totalTokens: pick("totalTokens") }),
+    ...(pick("input") === undefined ? {} : { input: pick("input") }),
+    ...(pick("output") === undefined ? {} : { output: pick("output") }),
+    ...(pick("cacheRead") === undefined ? {} : { cacheRead: pick("cacheRead") }),
+    ...(pick("cacheWrite") === undefined ? {} : { cacheWrite: pick("cacheWrite") }),
+    ...(pick("reasoning") === undefined ? {} : { reasoning: pick("reasoning") }),
+  };
+  return Object.keys(usage).length === 0 ? undefined : usage;
+}
+
 export type RunTextConversationTurnParams = {
   providerId: ProviderId;
   model: string;
   runtime: ProviderRuntimeConfig;
+  failover?: AgentRunnerFailoverParams;
   runtimeModel: RuntimeModel;
   selectedModel: {
     customProviderId: string;
@@ -71,6 +96,7 @@ export type RunTextConversationTurnParams = {
   sessionId: string;
   conversationId: string;
   conversationCwd?: string;
+  historyCwd?: string;
   fallbackTitle: string;
   createdAt: number;
   titlePromise: Promise<string | null> | null;
@@ -106,6 +132,16 @@ export type RunTextConversationTurnParams = {
   memoryExtractionModel?: MemoryExtractionModelConfig;
   onMemoryExtractionModelFailure?: (model: MemoryExtractionModelConfig) => void;
   memoryExtractionStatusText?: MemoryExtractionStatusText;
+  trajectory?: TrajectoryRecorder;
+  trajectoryTurn?: number;
+  trajectoryMessageIndex?: number;
+  trajectoryMessageId?: string;
+  readTrajectorySlots?: () => {
+    base?: string;
+    agent?: string;
+    skills?: string;
+    memory?: string;
+  };
 };
 
 export async function runTextConversationTurn(params: RunTextConversationTurnParams) {
@@ -113,11 +149,13 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
     providerId,
     model,
     runtime,
+    failover,
     runtimeModel,
     selectedModel,
     sessionId,
     conversationId,
     conversationCwd,
+    historyCwd = conversationCwd,
     fallbackTitle,
     createdAt,
     titlePromise,
@@ -145,6 +183,19 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
     memoryExtractionStatusText,
   } = params;
 
+  const trajectory = params.trajectory ?? NOOP_TRAJECTORY_RECORDER;
+  if (params.trajectoryTurn !== undefined) {
+    trajectory.beginTurn({
+      turn: params.trajectoryTurn,
+      ...(params.trajectoryMessageIndex === undefined
+        ? {}
+        : { messageIndex: params.trajectoryMessageIndex }),
+      ...(params.trajectoryMessageId === undefined
+        ? {}
+        : { messageId: params.trajectoryMessageId }),
+    });
+  }
+
   // Reset per-turn dedup state so <already-written-this-turn> reflects only
   // this turn. In-flight extraction from the previous turn keeps running.
   memoryExtraction.noteTurnBoundary(conversationId);
@@ -163,6 +214,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
       api: assistant.api,
       stopReason: assistant.stopReason,
       usage: assistant.usage,
+      contextUsageTokens,
     });
     batchLiveRoundsUpdate(
       (prev) =>
@@ -175,6 +227,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
             stopReason: String(assistant.stopReason ?? ""),
             usage: assistant.usage,
             usageTotalTokens: assistant.usage?.totalTokens,
+            contextUsageTokens,
           },
         })),
       transcriptStore,
@@ -228,6 +281,34 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
     );
   }
 
+  function recordTextRequestStart(context: Context, systemSuffix: string) {
+    const toolCatalog = serializeToolCatalog(context.tools);
+    const segmentedHeader = {
+      ...(params.readTrajectorySlots?.() ?? {}),
+      toolsSuffix: systemSuffix,
+      ...(toolCatalog === undefined ? {} : { toolCatalog }),
+    };
+    const actualSystemPrompt =
+      typeof context.systemPrompt === "string" ? context.systemPrompt : undefined;
+    const reconstructed = composeTrajectorySystemPrompt(segmentedHeader);
+    const headerInput =
+      actualSystemPrompt !== undefined && reconstructed !== actualSystemPrompt
+        ? {
+            runtime: actualSystemPrompt,
+            ...(toolCatalog === undefined ? {} : { toolCatalog }),
+          }
+        : segmentedHeader;
+    if (headerInput !== segmentedHeader) {
+      console.warn(
+        "[trajectory] text-mode segmented system prompt drifted from provider context; recording exact fallback",
+      );
+    }
+    const headerId = trajectory.captureHeader(headerInput);
+    if (startedTrajectorySteps.has(textRound)) return;
+    startedTrajectorySteps.add(textRound);
+    trajectory.stepStart(textRound, headerId);
+  }
+
   await compaction.maybeCompactPreSend({
     budgetContext: buildPreparedContext(getNextConversationState(), undefined, {
       includeUploadedFilesMetadata: true,
@@ -252,6 +333,8 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
     let protectionCheckChars = 0;
     let compactionRequested = false;
     let streamAttempt = 0;
+    let failoverAttempt = 0;
+    let failoverStatusVisible = false;
     const nativeWebSearchEnabled = runtime.nativeWebSearchEnabled !== false;
     const nativeWebSearchStatus = resolveProviderNativeWebSearchStatus({
       providerId,
@@ -274,11 +357,41 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
           providerId,
           model,
           runtime,
+          failover: failover
+            ? {
+                config: failover.config,
+                primary: failover.primary,
+                fallbacks: failover.fallbacks,
+                onSwitched: ({ target, errorMessage }) => {
+                  failover.onSwitched?.({ target, round: textRound, errorMessage });
+                },
+                onFailover: ({ fromLabel, toLabel, errorMessage }) => {
+                  failoverAttempt += 1;
+                  trajectory.noteRetry(textRound, {
+                    attempt: failoverAttempt,
+                    maxRetries: failover.fallbacks.length,
+                    ...(errorMessage ? { error: errorMessage } : {}),
+                  });
+                  failoverStatusVisible = true;
+                  updateConversationEventToolStatus(
+                    `第 ${textRound} 轮：${fromLabel} 不可用，正在切换到 ${toLabel}...`,
+                  );
+                },
+              }
+            : undefined,
           context: contextWithSkills,
           workdir: conversationCwd,
           sessionId,
           nativeWebSearch: nativeWebSearchEnabled,
+          onRequestStart: ({ context, systemSuffix }) => {
+            recordTextRequestStart(context, systemSuffix);
+          },
           onTextDelta: (delta) => {
+            trajectory.firstToken(textRound);
+            if (failoverStatusVisible) {
+              failoverStatusVisible = false;
+              updateConversationEventToolStatus(null);
+            }
             nativeWebSearchStatusController.noteVisibleActivity();
             conversationEvents.queueToken(delta, { round: textRound });
             if (textModeUsesLiveRounds) {
@@ -304,6 +417,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
             scope.controller.abort();
           },
           onHostedSearch: (hostedSearch) => {
+            trajectory.firstToken(textRound);
             if (hostedSearch.status === "searching") {
               nativeWebSearchStatusController.schedule();
             } else {
@@ -323,6 +437,12 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
           onRetryRecovered: () => {
             updateConversationEventToolStatus(null);
           },
+        });
+        trajectory.firstToken(textRound);
+        const trajectoryUsage = toTrajectoryUsage(finalAssistant.usage);
+        trajectory.stepEnd(textRound, {
+          ...trajectoryTerminalInfo(finalAssistant),
+          ...(trajectoryUsage === undefined ? {} : { usage: trajectoryUsage }),
         });
         nativeWebSearchStatusController.finish();
       } catch (streamErr) {
@@ -371,6 +491,11 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
 
         if (streamAttempt < 1) {
           streamAttempt += 1;
+          trajectory.noteRetry(textRound, {
+            attempt: streamAttempt,
+            maxRetries: 1,
+            error: streamErr instanceof Error ? streamErr.message : String(streamErr),
+          });
           streamedAssistantText = "";
           streamedAssistantTokenUnits = 0;
           protectionCheckChars = 0;
@@ -404,6 +529,8 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
   }));
   hookLifecycle.ensureMessageEnded();
   hookLifecycle.endAgent();
+  trajectory.endTurn(trajectoryTerminalInfo(finalAssistant));
+  await trajectory.flush();
   void persistConversationWithHistorySync({
     conversationId,
     sessionId,
@@ -436,8 +563,11 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
       sessionId,
       conversationId,
       workdir: conversationCwd,
+      // 抽取子模型看到的必须是用户真正说的话:memory 增量块只服务主模型的缓存,
+      // 混进来会把索引行当成用户发言,既撑破短消息门控又诱发重复写入。
       messages: buildPreparedContext(finalState).messages,
       statusText: memoryExtractionStatusText,
+      signal: cancellation.userStop.signal,
       debugLogger: conversationDebugLogger,
     });
   }

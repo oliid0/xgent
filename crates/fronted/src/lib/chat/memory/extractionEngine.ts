@@ -13,19 +13,20 @@ import type {
   ToolResultMessage,
   UserMessage,
 } from "@earendil-works/pi-ai";
-import type { StreamDebugLogger } from "../../debug/agentDebug";
 import {
   type MemoryMeta,
   memoryApplyBatch,
   memoryList,
   memoryRecentRejections,
   memoryTodayLocalDate,
-} from "../../memory/api";
+} from "@xagent/ui/lib/memory/api";
 import {
   EXTRACTION_CANDIDATE_LIMIT,
   EXTRACTION_REJECTION_DAYS,
   EXTRACTION_TIMEOUT_MS,
-} from "../../memory/config";
+} from "@xagent/ui/lib/memory/config";
+import type { MemoryReviewerMode, ValidatedPlanItem } from "@xagent/ui/lib/memory/schema";
+import type { StreamDebugLogger } from "../../debug/agentDebug";
 import {
   buildConversationWindowBlock,
   deriveWorkspaceMutations,
@@ -50,32 +51,16 @@ import {
   type ExtractionCandidateEntry,
   type ExtractionRejectionEntry,
 } from "../../memory/prompts/extraction";
-import type { MemoryReviewerMode, ValidatedPlanItem } from "../../memory/schema";
-import type {
-  CodexRequestFormat,
-  ProviderId,
-  ProviderModelConfig,
-  ReasoningLevel,
-  SelectedModel,
-} from "../../settings";
+import type { ProviderRuntimeConfig } from "../../providers/runtime/types";
+import type { ProviderId, SelectedModel } from "../../settings";
 import { createMemoryTools } from "../../tools/memoryTools";
 import { isAbortLikeError } from "../page/chatPageHelpers";
 import { runAssistantWithTools } from "../runner/agentRunner";
 
-export type MemoryExtractionRuntimeConfig = {
-  baseUrl: string;
-  apiKey: string;
-  requestFormat?: CodexRequestFormat;
-  reasoning?: ReasoningLevel;
-  promptCachingEnabled?: boolean;
-  nativeWebSearchEnabled?: boolean;
-  modelConfig?: ProviderModelConfig;
-};
-
 export type MemoryExtractionModelConfig = {
   providerId: ProviderId;
   model: string;
-  runtime: MemoryExtractionRuntimeConfig;
+  runtime: ProviderRuntimeConfig;
   selectedModel?: SelectedModel;
 };
 
@@ -408,7 +393,11 @@ async function runExtractionRound(params: {
     runtime: params.model.runtime,
     context,
     workdir: params.workdir,
-    sessionId: `${params.sessionId}:memory:${params.conversationId}:${Date.now()}`,
+    // 稳定 sessionId:codex 路径上它就是 prompt_cache_key(缓存分片路由)。同一
+    // 会话的多次抽取共享 system prompt / 工具定义 / 对话前缀,带时间戳会每次换
+    // 分片、全量 miss;去掉后后续抽取直接吃前一次的前缀。诊断侧的 prefixShape
+    // LRU 也不再被一次性键挤占(prompt-cache-stability.md 残留风险 #2)。
+    sessionId: `${params.sessionId}:memory:${params.conversationId}`,
     tools,
     executeToolCall,
     onTurnStart: (round) => {
@@ -444,12 +433,18 @@ export async function runMemoryExtraction(
 ): Promise<MemoryExtractionResult> {
   const workdir = params.workdir?.trim() ?? "";
   const statusText = params.statusText ?? defaultStatusText;
+  if (params.signal?.aborted) {
+    return { ok: false, aborted: true, ...EMPTY_RESULT };
+  }
 
   const [localDate, candidates, rejections] = await Promise.all([
     resolveLocalDate(),
     loadCandidates(workdir),
     loadRejections(workdir),
   ]);
+  if (params.signal?.aborted) {
+    return { ok: false, aborted: true, ...EMPTY_RESULT };
+  }
 
   // Confirmation deferral: the controller claimed this run only because the
   // short reply may answer a memory confirmation. With candidates loaded we
@@ -470,19 +465,23 @@ export async function runMemoryExtraction(
 
   const workspaceMutations = deriveWorkspaceMutations(params.messages, workdir || undefined);
   const summaryBlock = buildConversationSummaryBlock(params.conversationSummary);
+  // 块序按「稳定 → 易变」排:指令 prompt(约 4KB,会话内静态)打头,对话窗口
+  // (每轮必变)垫底。前缀缓存是字节级匹配,最易变的块排前面会让同会话的多次
+  // 抽取在第一行就分叉 —— sessionId 已稳定(见 runExtractionRound),块序对了
+  // 才真能吃到前一次抽取的前缀。指令里的方位措辞(above/below)与此序同步。
   const hiddenPromptText = [
-    buildConversationWindowBlock(params.messages),
-    ...(summaryBlock ? [summaryBlock] : []),
-    buildWorkspaceMutationsBlock(workspaceMutations),
-    buildExistingCandidatesBlock(candidates),
-    buildRecentRejectionsBlock(rejections),
-    buildAlreadyWrittenBlock(params.alreadyWrittenSlugs),
-    "",
     buildExtractionInstructionPrompt({
       localDate,
       workdir: workdir || undefined,
       reviewerMode: params.reviewerMode,
     }),
+    "",
+    ...(summaryBlock ? [summaryBlock] : []),
+    buildRecentRejectionsBlock(rejections),
+    buildExistingCandidatesBlock(candidates),
+    buildAlreadyWrittenBlock(params.alreadyWrittenSlugs),
+    buildWorkspaceMutationsBlock(workspaceMutations),
+    buildConversationWindowBlock(params.messages),
   ].join("\n\n");
   const hiddenPrompt: UserMessage = {
     role: "user",
@@ -596,6 +595,9 @@ export async function runMemoryExtraction(
     const writtenSlugs: string[] = [];
 
     if (accepted.length > 0) {
+      if (params.signal?.aborted) {
+        throw new Error("Cancelled");
+      }
       const batch = planToApplyBatchArgs(accepted);
       const model = params.primary.model;
       const response = await memoryApplyBatch({

@@ -183,6 +183,121 @@ fn normalize_archived_workspace_project_paths(raw: Option<&Value>) -> Value {
     Value::Array(out)
 }
 
+fn normalize_workspace_resource_ids(raw: Option<&Value>) -> Value {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    if let Some(Value::Array(items)) = raw {
+        for item in items {
+            let Some(id) = item.as_str().map(str::trim).filter(|id| !id.is_empty()) else {
+                continue;
+            };
+            if seen.insert(id.to_string()) {
+                out.push(Value::String(id.to_string()));
+            }
+            if out.len() >= 256 {
+                break;
+            }
+        }
+    }
+    Value::Array(out)
+}
+
+const WORKSPACE_RESOURCE_TOMBSTONE_TTL_MS: u64 = 90 * 24 * 60 * 60 * 1000;
+const MAX_WORKSPACE_RESOURCE_SETTINGS: usize = 256;
+
+fn normalize_workspace_resource_settings(raw: Option<&Value>) -> Value {
+    let Some(Value::Object(items)) = raw else {
+        return Value::Object(Map::new());
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0);
+    let mut normalized_by_path = Map::new();
+    for (raw_path_key, raw_entry) in items {
+        let path_key = normalize_project_path_key(raw_path_key);
+        if path_key.is_empty() {
+            continue;
+        }
+        let Some(entry) = raw_entry.as_object() else {
+            continue;
+        };
+        let mode = match entry.get("mode").and_then(Value::as_str) {
+            Some("custom") => "custom",
+            Some("off") => "off",
+            _ => "inherit",
+        };
+        let state_version = entry
+            .get("stateVersion")
+            .and_then(Value::as_u64)
+            .filter(|value| *value > 0)
+            .unwrap_or(1);
+        let writer_id = entry
+            .get("writerId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or_default()
+            .chars()
+            .take(64)
+            .collect::<String>();
+        let updated_at = entry
+            .get("updatedAt")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        if mode == "inherit"
+            && updated_at > 0
+            && now.saturating_sub(updated_at) > WORKSPACE_RESOURCE_TOMBSTONE_TTL_MS
+        {
+            continue;
+        }
+        normalized_by_path.insert(
+            path_key,
+            json!({
+                "mode": mode,
+                "skillNames": if mode == "custom" {
+                    normalize_workspace_resource_ids(entry.get("skillNames"))
+                } else {
+                    Value::Array(Vec::new())
+                },
+                "mcpServerIds": if mode == "custom" {
+                    normalize_workspace_resource_ids(entry.get("mcpServerIds"))
+                } else {
+                    Value::Array(Vec::new())
+                },
+                "stateVersion": state_version,
+                "writerId": writer_id,
+                "updatedAt": updated_at,
+            }),
+        );
+    }
+    let mut normalized_entries = normalized_by_path.into_iter().collect::<Vec<_>>();
+    normalized_entries.sort_by(|(path_a, entry_a), (path_b, entry_b)| {
+        let active_a = entry_a["mode"] != "inherit";
+        let active_b = entry_b["mode"] != "inherit";
+        active_b
+            .cmp(&active_a)
+            .then_with(|| {
+                entry_b["updatedAt"]
+                    .as_u64()
+                    .unwrap_or(0)
+                    .cmp(&entry_a["updatedAt"].as_u64().unwrap_or(0))
+            })
+            .then_with(|| {
+                entry_b["stateVersion"]
+                    .as_u64()
+                    .unwrap_or(0)
+                    .cmp(&entry_a["stateVersion"].as_u64().unwrap_or(0))
+            })
+            .then_with(|| path_a.chars().cmp(path_b.chars()))
+    });
+    normalized_entries.truncate(MAX_WORKSPACE_RESOURCE_SETTINGS);
+    let mut out = Map::new();
+    for (path_key, entry) in normalized_entries {
+        out.insert(path_key, entry);
+    }
+    Value::Object(out)
+}
+
 fn normalize_system_proxy_value(raw: Option<&Value>) -> Value {
     let obj = match raw {
         Some(Value::Object(map)) => map.clone(),
@@ -359,11 +474,78 @@ fn system_value_with_defaults(raw: Option<Value>, default_workdir: &str) -> Valu
         ),
     );
     system.insert(
+        SYSTEM_WORKSPACE_RESOURCE_SETTINGS_KEY.to_string(),
+        normalize_workspace_resource_settings(system.get(SYSTEM_WORKSPACE_RESOURCE_SETTINGS_KEY)),
+    );
+    system.insert(
         SYSTEM_SYSTEM_PROXY_KEY.to_string(),
         normalize_system_proxy_value(system.get(SYSTEM_SYSTEM_PROXY_KEY)),
     );
+    system.insert(
+        SYSTEM_COMMAND_SAFETY_MODE_KEY.to_string(),
+        normalize_command_safety_mode_value(system.get(SYSTEM_COMMAND_SAFETY_MODE_KEY)),
+    );
 
     Value::Object(system)
+}
+
+/// 命令安全模式的合法取值,与前端 COMMAND_SAFETY_MODES 一致。
+const COMMAND_SAFETY_MODES: [&str; 4] = ["ask", "auto", "sandbox", "sandboxOffline"];
+/// 键缺失(全新配置/旧快照)时的默认值。
+const COMMAND_SAFETY_MODE_DEFAULT: &str = "auto";
+/// 存在但无法识别时收敛到的最严格值(逐次人工放行)。
+const COMMAND_SAFETY_MODE_FAIL_CLOSED: &str = "ask";
+
+/// "ask" | "auto" | "sandbox" | "sandboxOffline"。
+///
+/// - 键缺失 / null / 空串:沿用默认 "auto"(全新配置与旧快照的正常形态)。
+/// - **存在但无法识别:收敛到最严格的 "ask"**(P2#6)。该设置全部意义在于约束,而
+///   `save_system` 会先删除全部 system key 再按白名单重插,故此处的默认值不只是读取
+///   期兜底,而是会被破坏性地持久化。未来新增的模式值、回退到旧版本、手改配置的
+///   笔误若静默降级成最宽松的非 ask 值,等于悄悄放宽用户的约束选择;与 sandbox.rs
+///   自述的 fail-closed 原则一致,一律向严格侧收敛并留下告警。
+///
+/// 与前端 normalizeCommandSafetyMode 保持同一套语义。
+fn normalize_command_safety_mode_value(raw: Option<&Value>) -> Value {
+    let Some(value) = raw.filter(|value| !value.is_null()) else {
+        return Value::String(COMMAND_SAFETY_MODE_DEFAULT.to_string());
+    };
+    let Some(text) = value.as_str().map(str::trim) else {
+        // 非字符串(类型损坏)同样是"存在但无法识别"。
+        eprintln!(
+            "[settings] non-string commandSafetyMode {value}; failing closed to \
+\"{COMMAND_SAFETY_MODE_FAIL_CLOSED}\""
+        );
+        return Value::String(COMMAND_SAFETY_MODE_FAIL_CLOSED.to_string());
+    };
+    if text.is_empty() {
+        return Value::String(COMMAND_SAFETY_MODE_DEFAULT.to_string());
+    }
+    if COMMAND_SAFETY_MODES.contains(&text) {
+        return Value::String(text.to_string());
+    }
+    eprintln!(
+        "[settings] unrecognized commandSafetyMode {value}; failing closed to \
+\"{COMMAND_SAFETY_MODE_FAIL_CLOSED}\""
+    );
+    Value::String(COMMAND_SAFETY_MODE_FAIL_CLOSED.to_string())
+}
+
+/// 沙箱下限的唯一权威来源(P2#3):后端自行回查持久化的 commandSafetyMode,不采信
+/// 调用方(渲染进程 / 网关 / Cron 调度器)声明的布尔。与 `load_runtime_ssh_host`
+/// 同一范式——服务端重新解析持久化配置,而不是信任请求参数。
+///
+/// 读取失败时返回 Err:调用方据此 fail-closed(报错),绝不静默降级成无沙箱执行。
+pub(crate) fn load_runtime_command_safety_mode() -> Result<String, String> {
+    let conn = open_db()?;
+    let system = load_system(&conn)?;
+    let raw = system
+        .as_ref()
+        .and_then(|value| value.get(SYSTEM_COMMAND_SAFETY_MODE_KEY));
+    match normalize_command_safety_mode_value(raw) {
+        Value::String(mode) => Ok(mode),
+        _ => Ok(COMMAND_SAFETY_MODE_FAIL_CLOSED.to_string()),
+    }
 }
 
 fn load_system_with_defaults(conn: &Connection, default_workdir: &str) -> Result<Value, String> {
@@ -405,6 +587,7 @@ fn save_system_with_default_workdir(
         SYSTEM_SELECTED_TOOLS_KEY,
         SYSTEM_TOOL_POLICIES_KEY,
         SYSTEM_WORKSPACE_PROJECTS_KEY,
+        SYSTEM_WORKSPACE_PROJECT_GROUPS_KEY,
         SYSTEM_ACTIVE_WORKSPACE_PROJECT_ID_KEY,
         SYSTEM_HIDDEN_WORKSPACE_PROJECT_PATHS_KEY,
         SYSTEM_MISSING_WORKSPACE_PROJECT_PATHS_KEY,
@@ -426,6 +609,7 @@ fn save_system_with_default_workdir(
 
     tx.commit()
         .map_err(|e| format!("提交 {SYSTEM_SETTINGS_TABLE} 事务失败：{e}"))?;
+    crate::services::webdav_auto_sync::mark_dirty();
     Ok(())
 }
 

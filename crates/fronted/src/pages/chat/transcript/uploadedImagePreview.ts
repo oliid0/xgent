@@ -14,6 +14,18 @@ function getUploadedImagePreviewCacheKey(workspaceRoot: string, absolutePath: st
   return `${workspaceRoot}\n${absolutePath}`;
 }
 
+export function invalidateUploadedImagePreviewCache(
+  workspaceRoot: string,
+  file: { absolutePath?: string },
+) {
+  const absolutePath = file.absolutePath?.trim();
+  const root = workspaceRoot.trim();
+  if (!root || !absolutePath) return;
+  const cacheKey = getUploadedImagePreviewCacheKey(root, absolutePath);
+  uploadedImagePreviewCache.delete(cacheKey);
+  uploadedImagePreviewRequests.delete(cacheKey);
+}
+
 function readUploadedImagePreviewCache(cacheKey: string) {
   const cached = uploadedImagePreviewCache.get(cacheKey);
   if (cached === undefined) return undefined;

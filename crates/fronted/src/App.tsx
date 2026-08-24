@@ -11,6 +11,7 @@ import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { CronPromptRunner } from "./components/cron/CronPromptRunner";
 import { useNativeInputContextMenu } from "./components/input-context-menu/NativeInputContextMenu";
 import { MemoryOrganizerHost } from "./components/memory/useMemoryOrganizer";
+import { useConfirmDialog } from "./components/ui/confirm-dialog";
 import { WindowsTitleBar } from "./components/WindowsTitleBar";
 import { LocaleContext, t as translate } from "./i18n";
 import { useAppUpdateController } from "./lib/appUpdates";
@@ -29,12 +30,14 @@ import {
   resolveWorkspaceProjects,
   subscribeToSystemThemePreference,
 } from "./lib/settings";
+import { getSettingsErrorMessage, SettingsStorageError } from "./lib/settings/errors";
 import {
   loadPersistedSettingsWithDefaults,
   persistSettings,
   type SettingsSaveState,
 } from "./lib/settings/storage";
 import { SoulProvider } from "./lib/soul";
+import { applyStoredGlobalShortcuts } from "./lib/shortcuts/globalShortcuts";
 import { applyFontFamilies } from "./lib/system/fontFamily";
 import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -45,12 +48,6 @@ function getDefaultContext(): Context {
   return {
     messages: [],
   };
-}
-
-function asErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message.trim()) return error.message.trim();
-  const text = String(error ?? "").trim();
-  return text || fallback;
 }
 
 function AppChrome(props: { children: ReactNode; nativeMobile?: boolean }) {
@@ -118,6 +115,7 @@ export default function App() {
   });
   const [context, setContext] = useState<Context>(() => getDefaultContext());
   const [overlay, setOverlay] = useState<"closed" | "entering" | "open" | "leaving">("closed");
+  const { confirm: requestRestartConfirm, dialog: restartConfirmDialog } = useConfirmDialog();
 
   const saveSequenceRef = useRef(0);
   const saveChainRef = useRef<Promise<unknown>>(Promise.resolve());
@@ -147,6 +145,13 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (browserRuntime || !platformResolved || nativeMobile) return;
+    void applyStoredGlobalShortcuts().catch((error) => {
+      console.warn("Failed to restore global shortcuts", error);
+    });
+  }, [browserRuntime, nativeMobile, platformResolved]);
 
   useEffect(() => {
     if (!nativeMobile) return;
@@ -301,7 +306,12 @@ export default function App() {
           setSettingsState(fallback);
           setSettingsSaveState({
             status: "error",
-            message: asErrorMessage(error, "加载设置失败，已回退到默认配置。"),
+            message: getSettingsErrorMessage(
+              error,
+              translate("app.settingsLoadFailed", fallback.locale),
+              fallback.locale,
+              translate,
+            ),
           });
         }
       } finally {
@@ -335,7 +345,7 @@ export default function App() {
             setSettingsState(merged);
           }
           if (persistResult.conflict) {
-            throw new Error(persistResult.conflict);
+            throw new SettingsStorageError(persistResult.conflict);
           }
         })
         .then(() => {
@@ -347,7 +357,7 @@ export default function App() {
           if (saveSequenceRef.current === saveSequence) {
             setSettingsSaveState({
               status: "error",
-              message: asErrorMessage(error, fallback),
+              message: getSettingsErrorMessage(error, fallback, next.locale, translate),
             });
           }
         });
@@ -366,7 +376,7 @@ export default function App() {
       );
       settingsRef.current = next;
       setSettingsState(next);
-      queueSettingsSave(prev, next, "保存设置失败。");
+      queueSettingsSave(prev, next, translate("app.settingsSaveFailed", next.locale));
     },
     [queueSettingsSave],
   );
@@ -408,7 +418,12 @@ export default function App() {
       void reloadPersistedSettings().catch((error) => {
         setSettingsSaveState({
           status: "error",
-          message: asErrorMessage(error, "重新加载设置失败，当前显示的是旧配置。"),
+          message: getSettingsErrorMessage(
+            error,
+            translate("app.settingsReloadFailed", settingsRef.current.locale),
+            settingsRef.current.locale,
+            translate,
+          ),
         });
       });
     },
@@ -444,11 +459,65 @@ export default function App() {
     [settings.locale],
   );
 
+  const runningConversationCountRef = useRef(0);
+  const handleRunningConversationCountChange = useCallback((count: number) => {
+    runningConversationCountRef.current = count;
+  }, []);
+  const beforeAppRestart = useCallback(async () => {
+    const count = runningConversationCountRef.current;
+    if (count === 0) return true;
+    return requestRestartConfirm({
+      title: translate("appUpdate.runningTasksTitle", settings.locale),
+      description: translate("appUpdate.runningTasksDescription", settings.locale).replace(
+        "{count}",
+        String(count),
+      ),
+      cancelLabel: translate("appUpdate.restartLater", settings.locale),
+      confirmLabel: translate("appUpdate.restartAnyway", settings.locale),
+      closeLabel: translate("appUpdate.restartLater", settings.locale),
+      tone: "warning",
+    });
+  }, [requestRestartConfirm, settings.locale]);
+
   const appUpdate = useAppUpdateController({
     enabled: settingsReady && desktopBridgeEnabled,
     includePrereleases: settings.updates.includePrereleases,
     messages: appUpdateMessages,
+    beforeRestart: beforeAppRestart,
   });
+
+  useEffect(() => {
+    if (!desktopBridgeEnabled || nativeMobile) return;
+    let disposed = false;
+    let unlistenAction: (() => void) | undefined;
+    void listen<{ action?: string; value?: string }>("app:action", (event) => {
+      if (disposed) return;
+      switch (event.payload?.action) {
+        case "set-theme": {
+          const theme = event.payload.value;
+          if (theme === "light" || theme === "dark" || theme === "system") {
+            setSettings((previous) => ({ ...previous, theme }));
+          }
+          break;
+        }
+        case "open-settings":
+          openSettings("system");
+          break;
+        case "check-updates":
+          void appUpdate.runCheck().catch(() => undefined);
+          break;
+        default:
+          break;
+      }
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else unlistenAction = unlisten;
+    });
+    return () => {
+      disposed = true;
+      unlistenAction?.();
+    };
+  }, [appUpdate.runCheck, desktopBridgeEnabled, nativeMobile, openSettings, setSettings]);
 
   useEffect(() => {
     if (!settingsReady || (!desktopBridgeEnabled && !lanPcCommandHostReady && !nativeMobile))
@@ -493,6 +562,7 @@ export default function App() {
               desktopBridgeEnabled={desktopBridgeEnabled}
               lanPcCommandHostReady={lanPcCommandHostReady}
               nativeMobile={nativeMobile}
+              onRunningConversationCountChange={handleRunningConversationCountChange}
             />
           </AppErrorBoundary>
           {visible && (
@@ -533,6 +603,7 @@ export default function App() {
               </div>
             </div>
           )}
+          {restartConfirmDialog}
         </AppChrome>
       </SoulProvider>
     </LocaleContext.Provider>

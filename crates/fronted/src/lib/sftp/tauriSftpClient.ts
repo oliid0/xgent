@@ -4,6 +4,7 @@ import type {
   SftpClient,
   SftpEntry,
   SftpListResponse,
+  SftpReadTextResponse,
   SftpStatResponse,
   SftpTransfer,
   SftpTransferEvent,
@@ -45,6 +46,12 @@ type RawSftpTransferResponse = {
 type RawSftpTransferEvent = {
   kind?: string;
   transfer?: RawSftpTransfer | null;
+};
+
+type RawSftpReadTextResponse = Partial<SftpReadTextResponse> & {
+  bytes_read?: number;
+  size_bytes?: number;
+  entry?: RawSftpEntry | null;
 };
 
 function normalizeEntry(entry: RawSftpEntry): SftpEntry {
@@ -109,6 +116,18 @@ function normalizeTransferEvent(event: RawSftpTransferEvent): SftpTransferEvent 
   return {
     kind: event.kind ?? "",
     transfer: normalizeTransfer(event.transfer),
+  };
+}
+
+function normalizeReadText(response: RawSftpReadTextResponse): SftpReadTextResponse {
+  return {
+    path: response.path ?? "",
+    content: response.content ?? "",
+    offset: Number(response.offset ?? 0),
+    bytesRead: Number(response.bytesRead ?? response.bytes_read ?? 0),
+    sizeBytes: Number(response.sizeBytes ?? response.size_bytes ?? 0),
+    truncated: response.truncated === true,
+    entry: response.entry ? normalizeEntry(response.entry) : null,
   };
 }
 
@@ -189,6 +208,31 @@ export const tauriSftpClient: SftpClient = {
       session_id: params.sessionId,
       transfer_id: params.transferId,
     });
+  },
+  async readText(params) {
+    return normalizeReadText(
+      await invoke<RawSftpReadTextResponse>("sftp_read_text", {
+        session_id: params.sessionId,
+        project_path_key: params.projectPathKey,
+        path: params.path,
+        max_bytes: params.maxBytes,
+        strict_utf8: params.strictUtf8 ?? false,
+      }),
+    );
+  },
+  async writeText(params) {
+    return normalizeAction(
+      await invoke<RawSftpActionResponse>("sftp_write_text", {
+        session_id: params.sessionId,
+        project_path_key: params.projectPathKey,
+        path: params.path,
+        content: params.content,
+        overwrite: true,
+        create_parent_dirs: false,
+        expected_mtime: params.expectedMtime,
+        expected_size_bytes: params.expectedSizeBytes,
+      }),
+    );
   },
   subscribeTransfers(listener) {
     let active = true;

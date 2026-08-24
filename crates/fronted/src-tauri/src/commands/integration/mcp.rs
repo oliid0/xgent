@@ -16,6 +16,7 @@ use crate::runtime::platform::{
     expand_tilde_path, maybe_augment_macos_path, resolve_program_path_with_current_dir,
 };
 use crate::runtime::process::{configure_child_process_group, kill_child_process_tree_best_effort};
+use crate::runtime::shell_runner::ShellRunRegistry;
 
 const DEFAULT_TIMEOUT_MS: u64 = 60_000;
 const LEGACY_SSE_ENDPOINT_WAIT_MS: u64 = 3_000;
@@ -930,7 +931,7 @@ impl SseTransport {
 
         // Wait for endpoint event a little while (if the stream is slow to emit).
         let wait_ms = timeout.as_millis() as u64;
-        let wait_ms = wait_ms.min(LEGACY_SSE_ENDPOINT_WAIT_MS).max(1);
+        let wait_ms = wait_ms.clamp(1, LEGACY_SSE_ENDPOINT_WAIT_MS);
         let deadline = Instant::now()
             .checked_add(Duration::from_millis(wait_ms))
             .unwrap_or_else(Instant::now);
@@ -1758,6 +1759,7 @@ pub async fn mcp_list_tools(
 #[tauri::command(rename_all = "snake_case")]
 pub async fn mcp_call_tool(
     state: tauri::State<'_, Arc<McpRuntimeManager>>,
+    run_registry: tauri::State<'_, Arc<ShellRunRegistry>>,
     server_id: String,
     tool_name: String,
     arguments: Value,
@@ -2086,5 +2088,79 @@ mod tests {
             .expect("join contender")
             .expect("contender ensure eventually succeeds");
         holder.join().expect("join holder");
+    }
+
+    #[test]
+    fn detects_windows_batch_programs_by_extension() {
+        assert!(is_windows_batch_program(Path::new(
+            r"C:\Program Files\nodejs\npx.cmd"
+        )));
+        assert!(is_windows_batch_program(Path::new(r"C:\tools\run.BAT")));
+        assert!(!is_windows_batch_program(Path::new(
+            r"C:\Program Files\nodejs\node.exe"
+        )));
+        assert!(!is_windows_batch_program(Path::new("npx")));
+    }
+
+    #[test]
+    fn windows_cmd_quote_arg_doubles_embedded_quotes() {
+        // cmd.exe 不认 `\"` 转义，翻倍才能保持引号配对。
+        assert_eq!(windows_cmd_quote_arg("-y"), r#""-y""#);
+        assert_eq!(windows_cmd_quote_arg(r#"a"b"#), r#""a""b""#);
+        assert_eq!(windows_cmd_quote_arg("with space"), r#""with space""#);
+    }
+
+    #[test]
+    fn windows_cmd_quote_arg_doubles_backslashes_before_quotes() {
+        // 内嵌引号前的反斜杠须补齐至 2n，重解析后还原为 n 个反斜杠 + 字面引号。
+        assert_eq!(windows_cmd_quote_arg(r#"a\"b"#), r#""a\\""b""#);
+        // 尾部反斜杠若不翻倍会把闭合引号转义掉，与后一个参数粘连。
+        assert_eq!(windows_cmd_quote_arg(r"C:\data\"), r#""C:\data\\""#);
+        // 非贴引号的反斜杠保持原样（路径分隔符不受影响）。
+        assert_eq!(windows_cmd_quote_arg(r"C:\a\b"), r#""C:\a\b""#);
+        assert_eq!(windows_cmd_quote_arg(""), r#""""#);
+    }
+
+    #[test]
+    fn windows_cmd_quote_arg_neutralizes_percent_expansion() {
+        // `%%cd:~,` no-op 打断 %VAR% 配对，cmd 展开后子进程仍收到原文。
+        assert_eq!(windows_cmd_quote_arg("%PATH%"), r#""%%cd:~,%PATH%%cd:~,%""#);
+        assert_eq!(windows_cmd_quote_arg("100%"), r#""100%%cd:~,%""#);
+        assert_eq!(windows_cmd_quote_arg("a\rb"), "\"a%%cd:~,\rb\"");
+    }
+
+    #[test]
+    fn windows_cmd_c_argument_wraps_whole_line_for_slash_s() {
+        // `/S` 语义：cmd 剥掉首尾引号后必须还原出可执行的完整命令行。
+        let program = Path::new(r"C:\Program Files\nodejs\npx.cmd");
+        let args = vec!["-y".to_string(), "@playwright/mcp".to_string()];
+        assert_eq!(
+            windows_cmd_c_argument(program, &args),
+            r#"""C:\Program Files\nodejs\npx.cmd" "-y" "@playwright/mcp"""#
+        );
+    }
+
+    #[test]
+    fn windows_cmd_c_argument_without_args_still_quotes_program() {
+        let program = Path::new(r"C:\tools\npx.cmd");
+        assert_eq!(
+            windows_cmd_c_argument(program, &[]),
+            r#"""C:\tools\npx.cmd"""#
+        );
+    }
+
+    #[test]
+    fn windows_cmd_c_argument_survives_trailing_backslash_arg() {
+        // filesystem 类 MCP server 常见传法：目录参数带尾部反斜杠。
+        let program = Path::new(r"C:\Program Files\nodejs\npx.cmd");
+        let args = vec![
+            "-y".to_string(),
+            "@modelcontextprotocol/server-filesystem".to_string(),
+            r"C:\Users\me\docs\".to_string(),
+        ];
+        assert_eq!(
+            windows_cmd_c_argument(program, &args),
+            r#"""C:\Program Files\nodejs\npx.cmd" "-y" "@modelcontextprotocol/server-filesystem" "C:\Users\me\docs\\"""#
+        );
     }
 }

@@ -256,7 +256,7 @@ export function createSubagentConversationStore(params: {
         worktreeRoot: input.worktreeRoot,
         branchName: input.branchName,
         contextSchemaVersion: SUBAGENT_CONTEXT_SCHEMA_VERSION,
-        activeSegmentIndex: input.state.activeSegmentIndex,
+        activeSegmentIndex: input.state.meta.activeSegmentIndex,
         totalSegmentCount: input.state.meta.totalSegmentCount,
         totalMessageCount: input.state.meta.totalMessageCount,
         roundCount: input.roundCount,
@@ -293,8 +293,8 @@ export function createSubagentConversationStore(params: {
         }
         if (!segments) return null;
         cacheHydrated(agentId, runSummary.id, segments);
-      } else {
-        cached!.updatedAt = Date.now();
+      } else if (cached) {
+        cached.updatedAt = Date.now();
       }
       return normalizeConversationState({
         meta: { systemPrompt, tools },

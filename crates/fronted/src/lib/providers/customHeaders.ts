@@ -55,6 +55,8 @@ const CUSTOM_HEADER_KEY_PRESETS: Record<CustomProvider["type"], readonly string[
   claude_code: ANTHROPIC_CUSTOM_HEADER_KEY_PRESETS,
   codex: CODEX_CUSTOM_HEADER_KEY_PRESETS,
   gemini: COMMON_CUSTOM_HEADER_KEY_PRESETS,
+  xai: CODEX_CUSTOM_HEADER_KEY_PRESETS,
+  deepseek: COMMON_CUSTOM_HEADER_KEY_PRESETS,
 };
 
 export function getCustomHeaderKeyPresets(providerId: CustomProvider["type"]): readonly string[] {

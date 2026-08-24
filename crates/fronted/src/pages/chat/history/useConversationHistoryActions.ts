@@ -1,15 +1,20 @@
+import type { Message } from "@earendil-works/pi-ai";
 import { type Dispatch, type MutableRefObject, type SetStateAction, useRef } from "react";
 import {
   type ConversationViewState,
   createConversationStateFromContext,
-  mergeHydratedConversationState,
-  normalizeConversationState,
+  createTranscriptProjection,
+  type HistoryMessageRef,
+  prependTranscriptProjection,
 } from "../../../lib/chat/conversation/conversationState";
 import {
-  getChatHistory,
-  getChatHistoryActiveSegment,
+  buildChatHistoryRevision,
+  buildConversationStateFromWindow,
+  CHAT_HISTORY_WINDOW_MESSAGES,
+  getChatHistoryWindow,
   persistConversationState,
   renameChatHistory,
+  replaceChatHistoryFromMessage,
 } from "../../../lib/chat/history/chatHistory";
 import {
   createConversationIdentity,
@@ -31,7 +36,7 @@ type TitleJobRefValue = {
   promise: Promise<string | null>;
 } | null;
 
-type PersistConversationParams = {
+export type PersistConversationParams = {
   conversationId: string;
   sessionId: string;
   providerId: string;
@@ -44,6 +49,10 @@ type PersistConversationParams = {
   titlePromise: Promise<string | null> | null;
   titleLookahead?: boolean;
 };
+
+export type PersistConversationAction = (
+  params: PersistConversationParams,
+) => Promise<boolean>;
 
 type IdleSchedulerWindow = Window & {
   requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
@@ -150,9 +159,10 @@ export function useConversationHistoryActions(params: UseConversationHistoryActi
   } = params;
 
   // The sequence claimed by the latest openInitial. hydrateFull validates
-  // against this (not the live counter) so any bump in between — a new
-  // conversation, another open — turns the idle hydration into a no-op.
+  // against this (not the live counter) so any bump in between 閳?a new
+  // conversation, another open 閳?turns the idle hydration into a no-op.
   const openLoadSequenceRef = useRef(0);
+  const earlierPageLoadsRef = useRef(new Map<string, Promise<void>>());
 
   function pruneIdleConversationCaches(extraKeepIds: Iterable<string> = []) {
     pruneIdleConversationRuntimeCaches({
@@ -210,36 +220,9 @@ export function useConversationHistoryActions(params: UseConversationHistoryActi
     });
   }
 
-  async function activateFullRecord(id: string, loadSequence: number) {
-    const record = await getChatHistory(id);
-    if (conversationLoadSequenceRef.current !== loadSequence) {
-      return;
-    }
-    // Reuse the phase-1 warm items by identity when the active segment is
-    // unchanged on disk: hydration then only prepends older history and the
-    // already-painted rows never re-render. The persisted-state baseline
-    // stays the disk record so differential persistence keeps its truth.
-    const warmState = conversationRuntimeCacheRef.current.get(id)?.state;
-    const hydratedState = mergeHydratedConversationState(warmState, record.state);
-    const nextEntry = createConversationRuntimeEntry({
-      state: hydratedState,
-      sessionId: record.sessionId ?? record.id,
-      createdAt: record.createdAt,
-      workdir: record.cwd,
-      selectedModel: resolveConversationSelectedModel(record.selectedModelJson),
-    });
-    activateConversation({
-      conversationId: record.id,
-      entry: nextEntry,
-      persistedState: record.state,
-      clearError: true,
-    });
-  }
-
-  // Phase 1 of the two-phase open: activate from the runtime cache
-  // synchronously ("cache-hit", already complete) or fetch and paint the
-  // active segment ("painted", phase 2 pending). Throws on failure after the
-  // one-shot full-record fallback also fails.
+  // Open a bounded tail window. Earlier history is fetched only when the
+  // transcript approaches the top, so a very large conversation never needs
+  // one unbounded JSON read or render pass.
   async function openInitial(id: string): Promise<"cache-hit" | "painted"> {
     const loadSequence = conversationLoadSequenceRef.current + 1;
     conversationLoadSequenceRef.current = loadSequence;
@@ -276,76 +259,93 @@ export function useConversationHistoryActions(params: UseConversationHistoryActi
     }
 
     try {
-      const activeRecord = await getChatHistoryActiveSegment(id);
+      const record = await getChatHistoryWindow({
+        id,
+        maxMessages: CHAT_HISTORY_WINDOW_MESSAGES,
+        includeActiveSegment: true,
+      });
       if (conversationLoadSequenceRef.current !== loadSequence) {
         return "painted";
       }
-
-      const warmState = normalizeConversationState({
-        meta: {
-          systemPrompt: activeRecord.meta.systemPrompt,
-          tools: activeRecord.meta.tools,
-        },
-        segments: [activeRecord.activeSegment],
-      });
-      const warmEntry = createConversationRuntimeEntry({
-        state: warmState,
-        sessionId: activeRecord.sessionId ?? activeRecord.id,
-        createdAt: activeRecord.createdAt,
-        workdir: activeRecord.cwd,
-        selectedModel: resolveConversationSelectedModel(activeRecord.selectedModelJson),
+      const state = buildConversationStateFromWindow(record);
+      const entry = createConversationRuntimeEntry({
+        state,
+        sessionId: record.conversation.sessionId ?? record.conversation.id,
+        createdAt: record.conversation.createdAt,
+        workdir: record.conversation.cwd,
+        selectedModel: resolveConversationSelectedModel(record.conversation.selectedModelJson),
       });
       activateConversation({
-        conversationId: activeRecord.id,
-        entry: warmEntry,
+        conversationId: record.conversation.id,
+        entry,
+        persistedState: state,
         clearError: true,
       });
       return "painted";
     } catch (err) {
-      // Keep the old fallback semantics: when the active-segment fetch fails,
-      // try the full record once before surfacing the failure.
-      try {
-        await activateFullRecord(id, loadSequence);
-        if (conversationLoadSequenceRef.current === loadSequence) {
-          setHydratingConversationId((current) => (current === id ? null : current));
-        }
-        // Fully hydrated already — the controller skips phase 2.
-        return "cache-hit";
-      } catch {
-        if (conversationLoadSequenceRef.current === loadSequence) {
-          const msg = err instanceof Error ? err.message : String(err);
-          setHydrationFailedConversationId(id);
-          setErrorMessage(msg || t("chat.history.openFailed"));
-          setHydratingConversationId((current) => (current === id ? null : current));
-        }
-        throw err;
+      if (conversationLoadSequenceRef.current === loadSequence) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setHydrationFailedConversationId(id);
+        setErrorMessage(msg || t("chat.history.openFailed"));
+        setHydratingConversationId((current) => (current === id ? null : current));
       }
+      throw err;
     }
   }
 
-  // Phase 2: quiet full hydration. Valid only for the sequence opened by the
-  // preceding openInitial — any other bump (new conversation, another open)
-  // turns this into a no-op.
+  // The existing open controller retains a phase-2 callback, but the full
+  // hydration it previously triggered is intentionally replaced by paging.
   async function hydrateFull(id: string): Promise<void> {
     const loadSequence = openLoadSequenceRef.current;
-    if (conversationLoadSequenceRef.current !== loadSequence) {
-      return;
+    if (conversationLoadSequenceRef.current === loadSequence) {
+      setHydratingConversationId((current) => (current === id ? null : current));
     }
-    try {
-      await activateFullRecord(id, loadSequence);
-    } catch (err) {
-      if (conversationLoadSequenceRef.current !== loadSequence) {
-        return;
+  }
+
+  function loadEarlier(conversationId: string) {
+    const id = conversationId.trim();
+    if (!id) return Promise.resolve();
+    const existing = earlierPageLoadsRef.current.get(id);
+    if (existing) return existing;
+
+    const task = (async () => {
+      const entry = conversationRuntimeCacheRef.current.get(id);
+      const transcript = entry?.state.transcript;
+      if (!entry || !transcript?.hasMoreBefore || !transcript.revision) return;
+      const page = await getChatHistoryWindow({
+        id,
+        maxMessages: CHAT_HISTORY_WINDOW_MESSAGES,
+        beforeOffset: transcript.oldestMessageOffset,
+        expectedRevision: transcript.revision,
+        includeActiveSegment: false,
+      });
+      if (page.oldestOffset >= transcript.oldestMessageOffset) {
+        throw new Error("鍘嗗彶鍒嗛〉娓告爣鏈悜鍓嶆帹杩?);
       }
-      const msg = err instanceof Error ? err.message : String(err);
-      setHydrationFailedConversationId(id);
-      setErrorMessage(msg || t("chat.history.openFullFailed"));
-      throw err;
-    } finally {
-      if (conversationLoadSequenceRef.current === loadSequence) {
-        setHydratingConversationId((current) => (current === id ? null : current));
-      }
-    }
+      const projection = createTranscriptProjection({
+        segments: page.segments,
+        activeSegmentIndex: page.meta.activeSegmentIndex,
+        oldestMessageOffset: page.oldestOffset,
+        hasMoreBefore: page.hasMoreBefore,
+        revision: page.revision,
+      });
+      updateConversationRuntimeEntry(id, (current) => {
+        if (
+          current.state.transcript.oldestMessageOffset !== transcript.oldestMessageOffset ||
+          current.state.transcript.revision !== transcript.revision
+        ) {
+          return current;
+        }
+        return {
+          ...current,
+          state: prependTranscriptProjection(current.state, projection),
+        };
+      });
+    })().finally(() => {
+      earlierPageLoadsRef.current.delete(id);
+    });
+    earlierPageLoadsRef.current.set(id, task);
+    return task;
   }
 
   // Post-deletion cleanup: the store already removed the row (and ran the
@@ -425,9 +425,24 @@ export function useConversationHistoryActions(params: UseConversationHistoryActi
         commitPersistedState: (persisted) =>
           persistedConversationStateRef.current.set(conversationId, persisted),
       });
+      const stampedState: ConversationViewState = {
+        ...state,
+        transcript: {
+          ...state.transcript,
+          revision: buildChatHistoryRevision({
+            conversationId,
+            updatedAt: summary.updatedAt,
+            activeSegmentIndex: state.activeSegmentIndex,
+            totalSegmentCount: state.meta.totalSegmentCount,
+            totalMessageCount: state.meta.totalMessageCount,
+          }),
+        },
+      };
+      persistedConversationStateRef.current.set(conversationId, stampedState);
       markLocalHistorySnapshotSynced(conversationId, summary.updatedAt);
       updateConversationRuntimeEntry(conversationId, (prev) => ({
         ...prev,
+        state: stampedState,
         errorMessage: null,
       }));
       sidebarStore.upsertLocal({ ...summary, isPending: undefined });
@@ -482,11 +497,52 @@ export function useConversationHistoryActions(params: UseConversationHistoryActi
     return true;
   }
 
+  async function replaceConversationAtMessage(
+    conversationId: string,
+    messageRef: HistoryMessageRef,
+    replacementMessage: Message,
+  ) {
+    const id = conversationId.trim();
+    const current = conversationRuntimeCacheRef.current.get(id);
+    if (!id || !current) {
+      throw new Error("Cannot replace a message in an unloaded conversation");
+    }
+    const expectedRevision = current.state.transcript.revision;
+    if (!expectedRevision) {
+      throw new Error("The conversation is missing its revision; reopen it before editing");
+    }
+
+    const replaced = await replaceChatHistoryFromMessage({
+      id,
+      baseMessageRef: messageRef,
+      replacementMessage,
+      expectedRevision,
+    });
+    const state = buildConversationStateFromWindow(replaced);
+    const entry = {
+      ...current,
+      state,
+      errorMessage: null,
+    };
+    setConversationRuntimeCacheEntry(conversationRuntimeCacheRef.current, id, entry);
+    persistedConversationStateRef.current.set(id, state);
+    if (currentConversationIdRef.current === id) {
+      setErrorMessage(null);
+      syncVisibleConversationRuntime(id, entry);
+    }
+    markLocalHistorySnapshotSynced(id, replaced.updatedAt);
+    sidebarStore.upsertLocal({ ...replaced.conversation, isPending: undefined });
+    pruneIdleConversationCaches([id]);
+    return state;
+  }
+
   return {
     startNewConversation,
     openInitial,
     hydrateFull,
+    loadEarlier,
     cleanupDeletedConversation,
+    replaceConversationAtMessage,
     persistConversation,
   };
 }

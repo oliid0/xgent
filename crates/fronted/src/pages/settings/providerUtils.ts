@@ -22,13 +22,13 @@ export { isBrowserRuntime };
 function normalizeModelBaseUrl(type: ProviderId, baseUrl: string) {
   let normalizedUrl = normalizeBaseUrl(baseUrl);
 
-  if (type !== "codex" && type !== "gemini") {
+  if (type !== "codex" && type !== "xai" && type !== "deepseek" && type !== "gemini") {
     return normalizedUrl;
   }
 
   const lower = normalizedUrl.toLowerCase();
 
-  if (type === "codex") {
+  if (type === "codex" || type === "xai" || type === "deepseek") {
     for (const suffix of CODEX_MODELS_SUFFIXES) {
       if (lower.endsWith(suffix)) {
         normalizedUrl = normalizedUrl.slice(0, -suffix.length);
@@ -89,6 +89,8 @@ type ProviderModelsAuthOptions = {
   authMode?: ProviderAuthMode;
   oauthAccountId?: string;
   customHeaders?: CustomProvider["customHeaders"];
+  isFullUrl?: boolean;
+  modelsUrl?: string;
 };
 
 function buildDefaultModelsHeaders(
@@ -334,12 +336,14 @@ export function buildProviderModelsFetchKey(
   authMode: ProviderAuthMode = "api-key",
   customHeaders?: CustomProvider["customHeaders"],
   oauthAccountId?: string,
+  isFullUrl = false,
+  modelsUrl?: string,
 ): string {
   const headerKey = (customHeaders ?? [])
     .map((header) => `${header.key.trim().toLowerCase()}:${header.value}`)
     .sort()
     .join("|");
-  return `${baseUrl.trim()}||${apiKey.trim()}||${useSystemProxy ? "proxy" : "direct"}||${authMode}||${oauthAccountId?.trim() ?? ""}||${headerKey}`;
+  return `${baseUrl.trim()}||${apiKey.trim()}||${useSystemProxy ? "proxy" : "direct"}||${authMode}||${oauthAccountId?.trim() ?? ""}||${isFullUrl ? "full" : "base"}||${modelsUrl?.trim() ?? ""}||${headerKey}`;
 }
 
 export async function fetchModelsFromApi(
@@ -349,17 +353,26 @@ export async function fetchModelsFromApi(
   options?: ProviderModelsAuthOptions & { useSystemProxy?: boolean },
 ): Promise<ProviderModelConfig[]> {
   const normalizedUrl = normalizeModelBaseUrl(type, baseUrl);
+  const exactModelsUrl = options?.modelsUrl?.trim();
   const normalizedApiKey = apiKey.trim();
   const attempts = buildProviderModelsAttempts(type, normalizedUrl, normalizedApiKey, options);
   const failures: ProviderModelsFailure[] = [];
   let emptyResult: ProviderModelConfig[] | null = null;
 
   for (const attempt of attempts) {
-    const proxyRequest = await prepareProxyRequest(type, normalizedUrl, attempt.headers, {
-      useSystemProxy: options?.useSystemProxy === true,
-      oauthAccountId: options?.authMode === "oauth-managed" ? options.oauthAccountId : undefined,
-    });
-    const modelsUrl = buildProviderModelsUrl(type, proxyRequest.baseUrl, attempt.kind);
+    const proxyRequest = await prepareProxyRequest(
+      type,
+      exactModelsUrl || normalizedUrl,
+      attempt.headers,
+      {
+        useSystemProxy: options?.useSystemProxy === true,
+        oauthAccountId:
+          options?.authMode === "oauth-managed" ? options.oauthAccountId : undefined,
+      },
+    );
+    const modelsUrl = exactModelsUrl
+      ? proxyRequest.baseUrl
+      : buildProviderModelsUrl(type, proxyRequest.baseUrl, attempt.kind);
 
     let response: Response;
     try {

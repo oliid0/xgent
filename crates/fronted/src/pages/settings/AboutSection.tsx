@@ -13,7 +13,11 @@ import {
 import { Markdown } from "../../components/Markdown";
 import { Button } from "../../components/ui/button";
 import { useLocale } from "../../i18n";
-import type { AppUpdateCheckResult, AppUpdateController } from "../../lib/appUpdates";
+import {
+  type AppUpdateCheckResult,
+  type AppUpdateController,
+  shouldShowRestartRequiredNotice,
+} from "../../lib/appUpdates";
 import { updateUpdateSettings } from "../../lib/settings";
 import { formatReleaseDate } from "./aboutDate";
 import { AgentActivationSwitch } from "./shared";
@@ -86,9 +90,11 @@ export function AboutSection(props: AboutSectionProps) {
   const installing = checkState.status === "installing";
   const installed = checkState.status === "installed";
   const restarting = checkState.status === "restarting";
+  const restartRequiredNotice = shouldShowRestartRequiredNotice(checkState, appUpdate.notice);
   const canInstall = appUpdate.canInstall;
-  const statusTitle =
-    checkState.status === "error"
+  const statusTitle = restartRequiredNotice
+    ? t("settings.aboutRestartBeforeCheck")
+    : checkState.status === "error"
       ? t("settings.aboutUpdateError")
       : checking
         ? t("settings.aboutChecking")
@@ -105,8 +111,9 @@ export function AboutSection(props: AboutSectionProps) {
                   : latestResult?.configured
                     ? t("settings.aboutUpToDate")
                     : t("settings.aboutUpdaterNotConfigured");
-  const statusDescription =
-    checkState.status === "error"
+  const statusDescription = restartRequiredNotice
+    ? t("settings.aboutRestartBeforeCheckDesc")
+    : checkState.status === "error"
       ? appUpdate.message || t("settings.aboutUpdateError")
       : checking
         ? t("settings.aboutCheckingDesc")
@@ -193,7 +200,7 @@ export function AboutSection(props: AboutSectionProps) {
           <div className="settings-about-status-card rounded-xl border border-border/60 bg-background/70 p-4">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                {checkState.status === "error" ? (
+                {checkState.status === "error" || restartRequiredNotice ? (
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
                 ) : restarting ? (
                   <Loader2 className="h-4 w-4 animate-spin text-primary" />

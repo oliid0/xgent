@@ -19,6 +19,7 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       "@xagent/runtime": fileURLToPath(new URL("./src/runtime/index.ts", import.meta.url)),
+      "@xagent/ui": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   define: {

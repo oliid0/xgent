@@ -9,6 +9,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import {
   MentionComposer,
@@ -20,6 +21,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
+  FileText,
   Globe,
   GlobeOff,
   Lightbulb,
@@ -62,7 +64,12 @@ import {
   type ChatRuntimeControls,
   DEFAULT_CHAT_RUNTIME_CONTROLS,
   type ReasoningLevel,
+  type SttSettings,
 } from "../../../lib/settings";
+import {
+  startDesktopSttCapture,
+  type DesktopSttCapture,
+} from "../../../lib/stt/desktopAudioCapture";
 import { cn } from "../../../lib/shared/utils";
 import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
 
@@ -105,6 +112,79 @@ function RuntimeControlTooltip(props: { label: string; children: ReactNode }) {
   );
 }
 
+export type ContextUsageTokensSource = {
+  subscribe: (listener: () => void) => () => void;
+  getContextUsageTokens: () => number | undefined;
+};
+
+function formatCompactTokens(value: number) {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 100_000 ? 0 : 1)}K`;
+  return String(value);
+}
+
+function ContextUsageIndicator(props: {
+  source: ContextUsageTokensSource;
+  contextWindow?: number;
+  onManualCompact?: () => void;
+  manualCompactionDisabled?: boolean;
+}) {
+  const { t } = useLocale();
+  const tokens = useSyncExternalStore(
+    props.source.subscribe,
+    props.source.getContextUsageTokens,
+    props.source.getContextUsageTokens,
+  );
+  const contextWindow =
+    typeof props.contextWindow === "number" && Number.isFinite(props.contextWindow)
+      ? Math.max(0, Math.floor(props.contextWindow))
+      : 0;
+  if (tokens === undefined || tokens <= 0 || contextWindow <= 0) return null;
+
+  const ratio = Math.min(1, Math.max(0, tokens / contextWindow));
+  const percent = Math.round(ratio * 100);
+  const color = ratio >= 0.9 ? "#ef4444" : ratio >= 0.7 ? "#f59e0b" : "#10b981";
+  const usageLabel = `${t("chat.contextUsage")}: ${formatCompactTokens(tokens)} / ${formatCompactTokens(contextWindow)} tokens (${percent}%)`;
+  const label = props.onManualCompact
+    ? `${usageLabel} · ${t("chat.manualCompact")}`
+    : usageLabel;
+
+  const indicator = (
+    <>
+      <span className="absolute inset-[3px] rounded-full bg-background/95" />
+      <span className="relative text-[9px] font-semibold tabular-nums text-foreground">
+        {percent}
+      </span>
+    </>
+  );
+
+  return (
+    <RuntimeControlTooltip label={label}>
+      {props.onManualCompact ? (
+        <button
+          type="button"
+          disabled={props.manualCompactionDisabled}
+          onClick={props.onManualCompact}
+          aria-label={label}
+          className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ background: `conic-gradient(${color} ${percent}%, hsl(var(--muted)) 0)` }}
+        >
+          {indicator}
+        </button>
+      ) : (
+        <span
+          role="status"
+          aria-label={usageLabel}
+          className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+          style={{ background: `conic-gradient(${color} ${percent}%, hsl(var(--muted)) 0)` }}
+        >
+          {indicator}
+        </span>
+      )}
+    </RuntimeControlTooltip>
+  );
+}
+
 export type ChatQueueTurnPreview = {
   id: string;
   previewText: string;
@@ -135,6 +215,7 @@ function prefersReducedMotion() {
 }
 
 export const ChatComposerBar = memo(function ChatComposerBar(props: {
+  conversationId: string;
   composerRef: MutableRefObject<MentionComposerHandle | null>;
   isSending: boolean;
   isUploadingFiles: boolean;
@@ -146,10 +227,14 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   chatRuntimeControls: ChatRuntimeControls;
   reasoningOptions: ReasoningLevel[];
   thinkingAlwaysOn: boolean;
+  contextUsageTokensSource?: ContextUsageTokensSource;
+  contextWindow?: number;
   gitClient?: GitClient | null;
   gitWriteEnabled?: boolean;
   gitDisabledMessage?: string;
   workspaceActivityClient?: WorkspaceActivityClient | null;
+  onManualCompact?: () => void;
+  manualCompactionDisabled?: boolean;
   onSend: () => void;
   onStop: () => void;
   onComposerBusyChange: (isBusy: boolean) => void;
@@ -169,6 +254,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   mobileExperience?: boolean;
 }) {
   const {
+    conversationId,
     composerRef,
     isSending,
     isUploadingFiles,
@@ -180,10 +266,15 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     chatRuntimeControls,
     reasoningOptions,
     thinkingAlwaysOn,
+    contextUsageTokensSource,
+    contextWindow,
+    sttSettings,
     gitClient,
     gitWriteEnabled = true,
     gitDisabledMessage,
     workspaceActivityClient,
+    onManualCompact,
+    manualCompactionDisabled,
     onSend,
     onStop,
     onComposerBusyChange,
@@ -227,6 +318,8 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const [voiceInputAvailable, setVoiceInputAvailable] = useState(false);
   const [voiceInputActive, setVoiceInputActive] = useState(false);
   const [voiceInputError, setVoiceInputError] = useState<string | null>(null);
+  const [voiceInputPartial, setVoiceInputPartial] = useState<string | null>(null);
+  const desktopSttCaptureRef = useRef<DesktopSttCapture | null>(null);
   const uploadDisabled = isInputDisabled || isUploadingFiles || !isAgentMode || !workdir;
   const controlsDisabled = isInputDisabled;
   const hasSendableDraft = !composerIsEmpty || pendingUploadedFiles.length > 0;
@@ -252,9 +345,15 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     ? t("chat.runtime.thinkingUnavailable")
     : t("chat.runtime.thinkingTooltip");
   const webSearchTooltip = t("chat.runtime.webSearchTooltip");
+  const planModeTooltip = chatRuntimeControls.planModeEnabled
+    ? t("chat.planMode.on")
+    : t("chat.planMode.off");
 
   useEffect(() => {
-    if (!isNativeMobileRuntime()) return;
+    if (!isNativeMobileRuntime()) {
+      setVoiceInputAvailable(sttSettings?.enabled === true);
+      return;
+    }
     let active = true;
     void mobileAssistantStatus()
       .then((status) => {
@@ -266,13 +365,57 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     return () => {
       active = false;
     };
-  }, []);
+  }, [sttSettings?.enabled]);
+
+  useEffect(
+    () => () => {
+      void desktopSttCaptureRef.current?.cancel();
+      desktopSttCaptureRef.current = null;
+    },
+    [],
+  );
 
   const startVoiceInput = useCallback(async () => {
-    if (voiceInputActive || isInputDisabled) return;
+    if (isInputDisabled) return;
+    if (!isNativeMobileRuntime() && voiceInputActive) {
+      const capture = desktopSttCaptureRef.current;
+      desktopSttCaptureRef.current = null;
+      setVoiceInputPartial(null);
+      try {
+        await capture?.stop();
+      } catch (error) {
+        setVoiceInputError(error instanceof Error ? error.message : String(error));
+        setVoiceInputActive(false);
+      }
+      return;
+    }
+    if (voiceInputActive) return;
     setVoiceInputError(null);
+    setVoiceInputPartial(null);
     setVoiceInputActive(true);
     try {
+      if (!isNativeMobileRuntime()) {
+        if (!sttSettings?.enabled) throw new Error(t("chat.composer.voiceNotConfigured"));
+        const insertFinalText = (text: string) => {
+          const composer = composerRef.current;
+          const prefix = composer?.hasContent() ? " " : "";
+          composer?.insertText(`${prefix}${text}`);
+          composer?.focus();
+          setVoiceInputPartial(null);
+        };
+        desktopSttCaptureRef.current = await startDesktopSttCapture({
+          provider: sttSettings.provider,
+          onPartial: (text) => setVoiceInputPartial(text.trim() || null),
+          onFinal: insertFinalText,
+          onError: (message) => setVoiceInputError(message),
+          onClosed: () => {
+            desktopSttCaptureRef.current = null;
+            setVoiceInputActive(false);
+            setVoiceInputPartial(null);
+          },
+        });
+        return;
+      }
       let permissions = await checkMobileAssistantPermissions();
       if (permissions.microphone !== "granted") {
         permissions = await requestMobileAssistantPermission("microphone");
@@ -290,10 +433,11 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
       }
     } catch (error) {
       setVoiceInputError(error instanceof Error ? error.message : String(error));
-    } finally {
       setVoiceInputActive(false);
+    } finally {
+      if (isNativeMobileRuntime()) setVoiceInputActive(false);
     }
-  }, [composerRef, isInputDisabled, t, voiceInputActive]);
+  }, [composerRef, isInputDisabled, sttSettings, t, voiceInputActive]);
   const toggleQueueTooltip = queueCollapsed ? t("chat.queue.expand") : t("chat.queue.collapse");
   const toggleComposerExpandTooltip = isComposerExpanded
     ? t("chat.composer.collapse")
@@ -555,6 +699,8 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   return (
     <div
       ref={rootRef}
+      data-file-upload-drop-zone=""
+      data-file-upload-conversation-id={conversationId}
       className={cn(
         "chat-composer-layer pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-4",
         // 展开态从头部下沿一路铺到底部，把整个聊天区让给输入框。
@@ -862,7 +1008,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
               {voiceInputAvailable ? (
                 <RuntimeControlTooltip
                   label={
-                    voiceInputError ??
+                    voiceInputError ?? voiceInputPartial ??
                     (voiceInputActive
                       ? t("chat.composer.voiceListening")
                       : t("chat.composer.voiceInput"))
@@ -870,7 +1016,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 >
                   <button
                     type="button"
-                    disabled={isInputDisabled || voiceInputActive}
+                    disabled={isInputDisabled || (isNativeMobileRuntime() && voiceInputActive)}
                     onClick={() => void startVoiceInput()}
                     aria-label={
                       voiceInputActive
@@ -926,6 +1072,31 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                   )}
                 </button>
               </RuntimeControlTooltip>
+
+              {isAgentMode ? (
+                <RuntimeControlTooltip label={planModeTooltip}>
+                  <button
+                    type="button"
+                    disabled={controlsDisabled}
+                    onClick={() =>
+                      onChatRuntimeControlsChange({
+                        planModeEnabled: !chatRuntimeControls.planModeEnabled,
+                      })
+                    }
+                    aria-label={planModeTooltip}
+                    aria-pressed={chatRuntimeControls.planModeEnabled}
+                    className={cn(
+                      "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
+                      "disabled:pointer-events-none disabled:opacity-40",
+                      chatRuntimeControls.planModeEnabled
+                        ? "bg-violet-500/10 text-violet-600 hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200"
+                        : "text-muted-foreground hover:text-foreground dark:hover:text-white",
+                    )}
+                  >
+                    <FileText className="h-4 w-4" />
+                  </button>
+                </RuntimeControlTooltip>
+              ) : null}
 
               <RuntimeControlTooltip label={thinkingTooltip}>
                 <button
@@ -1023,6 +1194,14 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
             </div>
 
             <div className="flex shrink-0 items-center gap-1">
+              {contextUsageTokensSource ? (
+                <ContextUsageIndicator
+                  source={contextUsageTokensSource}
+                  contextWindow={contextWindow}
+                  onManualCompact={onManualCompact}
+                  manualCompactionDisabled={manualCompactionDisabled}
+                />
+              ) : null}
               <Button
                 disabled={isSending ? false : sendDisabled}
                 onClick={() => {

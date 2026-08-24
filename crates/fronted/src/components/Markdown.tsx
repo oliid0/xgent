@@ -25,6 +25,7 @@ import {
   type StreamdownTranslations,
 } from "streamdown";
 import { useLocale } from "../i18n";
+import { parseChatFileLink, type ChatFileLink } from "../lib/chat/chatFileLinks";
 import {
   getCollapsedCodeBlockPreview,
   resolveCodeBlockRenderPolicy,
@@ -56,6 +57,8 @@ type MarkdownProps = {
   // against the page origin before they reach custom components. Sanitize
   // still runs, so scriptable protocols (javascript: etc.) never get through.
   preserveRelativeUrls?: boolean;
+  workdir?: string;
+  onOpenFileLink?: (link: ChatFileLink) => void;
 };
 
 const streamdownPlugins = { code, math, mermaid, cjk };
@@ -434,6 +437,8 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
     readOnly = false,
     componentOverrides,
     preserveRelativeUrls = false,
+    workdir,
+    onOpenFileLink,
   } = props;
   const streaming = renderMode === "streaming";
   const normalizedContent = useMemo(
@@ -441,9 +446,33 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
     [content, showCaret, streaming],
   );
   const baseComponents = readOnly ? markdownReadOnlyComponents : markdownComponents;
+  const chatLinkComponents = useMemo<Components | undefined>(() => {
+    if (!workdir?.trim() || !onOpenFileLink || readOnly) return undefined;
+    return {
+      a: function ChatFileAnchor(anchorProps: MarkdownAnchorFallbackProps) {
+        const { href, onClick, node: _node, ...rest } = anchorProps;
+        const fileLink = parseChatFileLink(href);
+        return (
+          <a
+            {...rest}
+            href={href}
+            onClick={(event) => {
+              if (!fileLink) {
+                onClick?.(event);
+                return;
+              }
+              event.preventDefault();
+              event.stopPropagation();
+              onOpenFileLink(fileLink);
+            }}
+          />
+        );
+      },
+    };
+  }, [onOpenFileLink, readOnly, workdir]);
   const components = useMemo(
-    () => (componentOverrides ? { ...baseComponents, ...componentOverrides } : baseComponents),
-    [baseComponents, componentOverrides],
+    () => ({ ...baseComponents, ...componentOverrides, ...chatLinkComponents }),
+    [baseComponents, chatLinkComponents, componentOverrides],
   );
 
   return (
@@ -462,7 +491,9 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
         )}
         plugins={streamdownPlugins}
         remarkPlugins={remarkPlugins}
-        {...(preserveRelativeUrls ? { rehypePlugins: relativeUrlRehypePlugins } : {})}
+        {...(preserveRelativeUrls || chatLinkComponents
+          ? { rehypePlugins: relativeUrlRehypePlugins }
+          : {})}
         components={components}
         mode={streaming ? "streaming" : "static"}
         dir="auto"

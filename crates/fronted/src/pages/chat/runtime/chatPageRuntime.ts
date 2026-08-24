@@ -85,6 +85,35 @@ export function setConversationRuntimeCacheEntry(
   cache.set(key, entry);
 }
 
+export function syncMovedConversationRuntimeWorkdir(params: {
+  conversationId: string;
+  cwd: string;
+  runtimeCache: ReadonlyMap<string, ConversationRuntimeEntry>;
+  isConversationRunning: (conversationId: string) => boolean;
+  updateConversationRuntimeEntry: (
+    conversationId: string,
+    updater: (previous: ConversationRuntimeEntry) => ConversationRuntimeEntry,
+  ) => unknown;
+}) {
+  const conversationId = params.conversationId.trim();
+  const cwd = params.cwd.trim();
+  const runtimeEntry = params.runtimeCache.get(conversationId);
+  if (
+    !conversationId ||
+    !cwd ||
+    !runtimeEntry ||
+    runtimeEntry.isSending ||
+    params.isConversationRunning(conversationId)
+  ) {
+    return false;
+  }
+  params.updateConversationRuntimeEntry(conversationId, (previous) => ({
+    ...previous,
+    workdir: cwd,
+  }));
+  return true;
+}
+
 export function pruneIdleConversationRuntimeCaches(params: {
   runtimeCache: Map<string, ConversationRuntimeEntry>;
   persistedStateCache: Map<string, ConversationViewState>;

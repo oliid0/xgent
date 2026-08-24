@@ -15,6 +15,8 @@ pub mod workspace_commands;
 
 pub use app_commands::app;
 #[cfg(desktop)]
+pub use app_commands::tray;
+#[cfg(desktop)]
 pub use app_commands::custom_tools;
 pub use app_commands::system;
 #[cfg(desktop)]
@@ -39,6 +41,8 @@ pub use integration_commands::local_access;
 pub use integration_commands::mcp;
 pub use integration_commands::memory;
 pub use integration_commands::provider_oauth;
+#[cfg(desktop)]
+pub use integration_commands::provider_usage;
 
 #[cfg(desktop)]
 pub use runtime_commands::process;
@@ -50,6 +54,12 @@ pub use runtime_commands::terminal;
 
 pub use workspace_commands::fs;
 #[cfg(desktop)]
+pub use workspace_commands::chat_file_links;
+#[cfg(desktop)]
+pub use workspace_commands::checkpoint;
+#[cfg(desktop)]
 pub use workspace_commands::git;
+#[cfg(desktop)]
+pub use workspace_commands::root_grants;
 #[cfg(desktop)]
 pub use workspace_commands::subagent_worktree;

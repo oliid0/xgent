@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { SUPPORTED_LOCALES, useLocale } from "../../i18n";
+import { inferRuntimePlatform } from "../../lib/runtimePlatform";
 import {
   CLOSE_WINDOW_BEHAVIOR_OPTIONS,
   type ExecutionMode,
@@ -50,6 +51,7 @@ import {
 } from "../../lib/system/fontFamily";
 import { tauriTerminalClient } from "../../lib/terminal/tauriTerminalClient";
 import type { TerminalShellOption } from "../../lib/terminal/types";
+import { useTrayPrefs, writeTrayPrefs } from "../../lib/tray/trayPrefs";
 import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
@@ -63,6 +65,8 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
   const { settings, setSettings, compact = false } = props;
   const { t } = useLocale();
   const browser = isBrowserRuntime();
+  const trayPrefs = useTrayPrefs();
+  const isMacPlatform = useMemo(() => inferRuntimePlatform() === "macos", []);
   const [terminalShellOptions, setTerminalShellOptions] = useState<TerminalShellOption[]>([]);
   const terminalShellSelectValue =
     settings.system.terminalShell === "auto" ||
@@ -562,6 +566,39 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
             </Select>
           </SettingsRow>
         </SettingsRowGroup>
+
+        {!browser ? (
+          <SettingsRowGroup title={t("settings.trayTitle")}>
+            <SettingsRow
+              label={t("settings.trayShowTitles")}
+              description={t("settings.trayShowTitlesDesc")}
+            >
+              <AgentActivationSwitch
+                checked={trayPrefs.showConversationTitles}
+                title={t("settings.trayShowTitles")}
+                onToggle={() =>
+                  writeTrayPrefs({
+                    showConversationTitles: !trayPrefs.showConversationTitles,
+                  })
+                }
+              />
+            </SettingsRow>
+            {isMacPlatform ? (
+              <SettingsRow
+                label={t("settings.trayRunningBadge")}
+                description={t("settings.trayRunningBadgeDesc")}
+              >
+                <AgentActivationSwitch
+                  checked={trayPrefs.showRunningBadge}
+                  title={t("settings.trayRunningBadge")}
+                  onToggle={() =>
+                    writeTrayPrefs({ showRunningBadge: !trayPrefs.showRunningBadge })
+                  }
+                />
+              </SettingsRow>
+            ) : null}
+          </SettingsRowGroup>
+        ) : null}
       </div>
     );
   }

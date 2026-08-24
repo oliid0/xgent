@@ -1,5 +1,12 @@
 export { providerSupportsNativeWebSearch } from "./nativeWebSearch";
-export { attachAnthropicAutomaticCaching } from "./runtime/anthropicCache";
+export {
+  attachAnthropicAutomaticCaching,
+  describeAnthropicCacheShape,
+} from "./runtime/anthropicCache";
+export {
+  describeCodexCacheShape,
+  resolvePromptCacheHintMode,
+} from "./runtime/codexPromptCache";
 export { attachCodexResponsesStorage } from "./runtime/codexStorage";
 export { normalizeErrorMessage } from "./runtime/errors";
 export {
@@ -10,11 +17,7 @@ export {
   normalizeGeminiThoughtSignatures,
 } from "./runtime/geminiToolPayload";
 export { assistantMessageToText, createStreamingTextReconciler } from "./runtime/messageUtils";
-export {
-  createModelFromConfig,
-  getAvailableThinkingLevelsForModel,
-  isThinkingAlwaysOnForModel,
-} from "./runtime/modelFactory";
+export { createModelFromConfig } from "./runtime/modelFactory";
 export { parseModelValue, toModelValue } from "./runtime/modelValue";
 export { attachProviderNativeWebSearch } from "./runtime/nativeSearchPayload";
 export {
@@ -24,16 +27,24 @@ export {
   finalizeProviderStreamOptions,
   type ProviderPayloadMiddleware,
 } from "./runtime/payloadPipeline";
+export { describeProviderCacheShape } from "./runtime/providerCacheShape";
+export { createProviderRuntimeConfig } from "./runtime/providerRuntimeConfig";
 export {
-  buildDualAuthHeaders,
+  buildAnthropicAuthHeaders,
   buildGeminiAuthHeaders,
+  buildOpenAIAuthHeaders,
   buildProviderRequestHeaders,
   buildProviderRequestMetadata,
   isValidCustomHeaderKey,
-  mergeCustomHeaders,
+  prepareProviderRequest,
   resolveProviderCacheRetention,
   toSimpleStreamReasoning,
 } from "./runtime/requestOptions";
 export { streamSimpleByApi } from "./runtime/streamByApi";
 export { completeAssistantMessage, streamAssistantMessage } from "./runtime/textOnlyRuntime";
-export type { ModelOption, ProviderRuntimeConfig, StreamOptionsEx } from "./runtime/types";
+export type {
+  ModelOption,
+  ProviderRuntimeConfig,
+  StreamOptionsEx,
+  ToolChoice,
+} from "./runtime/types";

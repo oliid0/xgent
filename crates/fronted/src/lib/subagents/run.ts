@@ -1,5 +1,5 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-
+import type { SubagentReportDetails } from "@xagent/ui/lib/subagents/protocol";
 import { CompactionController } from "../chat/compaction/controller";
 import {
   appendMessagesToConversation,
@@ -9,14 +9,10 @@ import {
 } from "../chat/conversation/conversationState";
 import { createTurnCancellationFromSignal } from "../chat/conversation/turnCancellation";
 import { runAssistantWithTools } from "../chat/runner/agentRunner";
+import type { ProviderRuntimeConfig } from "../providers/runtime/types";
 import type { RuntimePlatform } from "../runtimePlatform";
-import type {
-  CodexRequestFormat,
-  CustomProvider,
-  ProviderId,
-  ProviderModelConfig,
-  ReasoningLevel,
-} from "../settings";
+import type { ProviderId } from "../settings";
+import type { AdditionalProjectRoot } from "../tools/additionalProjectRoots";
 import { renderMessageBusSnapshot } from "./bus";
 import { toolErrorResult } from "./errors";
 import type { SubagentWorktreeIpc } from "./ipc/worktree";
@@ -27,7 +23,6 @@ import {
   buildSubagentContinuationMessage,
   buildSubagentSystemPrompt,
 } from "./prompts";
-import type { SubagentReportDetails } from "./protocol";
 import { createSubagentIdentity } from "./roster";
 import type { SubagentScheduler } from "./scheduler";
 import type { SubagentConversationStore } from "./store";
@@ -49,27 +44,15 @@ import {
   truncateText,
 } from "./utils";
 
-export type SubagentProviderRuntime = {
-  baseUrl: string;
-  apiKey: string;
-  customHeaders?: CustomProvider["customHeaders"];
-  requestFormat?: CodexRequestFormat;
-  reasoning?: ReasoningLevel;
-  promptCachingEnabled?: boolean;
-  promptCacheRetention?: "short" | "long";
-  nativeWebSearchEnabled?: boolean;
-  useSystemProxy?: boolean;
-  modelConfig?: ProviderModelConfig;
-};
-
 type ChildToolExecutor = (toolCall: ToolCall, signal?: AbortSignal) => Promise<ToolResultMessage>;
 
 export type SubagentRunEnvironment = {
   providerId: ProviderId;
   model: string;
-  runtime: SubagentProviderRuntime;
+  runtime: ProviderRuntimeConfig;
   runtimePlatform?: RuntimePlatform;
   workdir: string;
+  additionalRoots?: readonly AdditionalProjectRoot[];
   sessionId?: string;
   messageBusEnabled: boolean;
   store: SubagentConversationStore;
@@ -84,6 +67,8 @@ export type SubagentRunEnvironment = {
     execute: ChildToolExecutor,
   ) => { tools: Tool[]; execute: ChildToolExecutor };
   enqueueWorktreeApply: <T>(run: () => Promise<T>) => Promise<T>;
+  /** 父对话检查点上下文;传给 worktree.apply 让后端在改写父工作区前捕获前像。 */
+  checkpoint?: { conversationId: string; turnId: string };
   onStatus?: (status: string | null) => void;
 };
 
@@ -306,7 +291,7 @@ export async function executeSubagentRun(
         messages,
         currentAgentId: spec.id,
         currentAgentName: identity.name,
-      });
+      }).text;
     } catch (error) {
       console.warn("Failed to load subagent message bus snapshot", error);
       return "";
@@ -330,6 +315,7 @@ export async function executeSubagentRun(
 
   const settleWorktree = async (terminal: "completed" | "failed" | "cancelled") => {
     if (!worktree) return;
+    const worktreeRoot = worktree.worktreeRoot;
     env.onStatus?.(`Inspecting worktree changes for ${identity.name}…`);
     await fetchWorktreeStatus();
 
@@ -348,7 +334,8 @@ export async function executeSubagentRun(
           const applyResult = await env.enqueueWorktreeApply(() =>
             env.worktree.apply({
               parentWorkdir: env.workdir,
-              worktreeRoot: worktree!.worktreeRoot,
+              worktreeRoot,
+              ...(env.checkpoint ? { checkpoint: env.checkpoint } : {}),
             }),
           );
           applyStatus = applyResult.applied ? "applied" : "skipped";
@@ -509,6 +496,7 @@ export async function executeSubagentRun(
           },
           persist: async (state) => {
             schedulePersist("running", state);
+            return undefined;
           },
         },
         buildPreparedContext: (state) => buildRequestContext(state),
@@ -586,6 +574,7 @@ export async function executeSubagentRun(
       runtimePlatform: env.runtimePlatform,
       context: buildRequestContext(baseState),
       workdir: childWorkdir,
+      additionalRoots: env.additionalRoots,
       sessionId: subagentSessionId,
       nativeWebSearch: env.runtime.nativeWebSearchEnabled !== false,
       tools: childTools,

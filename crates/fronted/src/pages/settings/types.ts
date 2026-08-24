@@ -7,6 +7,8 @@ export type SetSettingsFn = (updater: (prev: AppSettings) => AppSettings) => voi
 export type SectionId =
   | "system"
   | "providers"
+  | "failover"
+  | "projectRoots"
   | "soul"
   | "memory"
   | "skills"
@@ -15,6 +17,11 @@ export type SectionId =
   | "cron"
   | "ssh"
   | "access"
+  | "shortcuts"
+  | "backup"
+  | "toolPermissions"
+  | "voice"
+  | "usage"
   | "mobileAssistant"
   | "mobileExecution"
   | "about";

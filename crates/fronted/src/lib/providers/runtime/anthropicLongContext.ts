@@ -1,11 +1,11 @@
-import type { Context, Model } from "@earendil-works/pi-ai";
+import type { Api, Context, Model } from "@earendil-works/pi-ai";
+import { isAnthropicOAuthApiKey } from "@xagent/ui/lib/providers/customHeaders";
 import type { ProviderId } from "../../settings";
 import {
   ANTHROPIC_STANDARD_CONTEXT_WINDOW,
   getAnthropicCompat,
   shouldSendAnthropicLongContextHeader,
 } from "../anthropicModels";
-import { isAnthropicOAuthApiKey } from "../customHeaders";
 import type { StreamOptionsEx } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -44,7 +44,7 @@ export function attachAnthropicLongContextBeta(
   params: {
     providerId: ProviderId;
     baseUrl: string;
-    model?: Model<"anthropic-messages">;
+    model?: Model<Api>;
     context?: Context;
   },
 ): StreamOptionsEx {
@@ -59,7 +59,10 @@ export function attachAnthropicLongContextBeta(
   for (const key of Object.keys(headers)) {
     if (key.toLowerCase() === "anthropic-beta") delete headers[key];
   }
-  headers["anthropic-beta"] = buildAnthropicBetaHeaderValue(model, params.context);
+  headers["anthropic-beta"] = buildAnthropicBetaHeaderValue(
+    model as Model<"anthropic-messages">,
+    params.context,
+  );
 
   return {
     ...options,

@@ -98,6 +98,47 @@ pub struct ChatHistoryActiveSegmentRecord {
     pub pinned_at: Option<i64>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatHistoryMessageRef {
+    pub segment_index: i64,
+    pub message_index: i64,
+    pub segment_id: String,
+    pub message_id: String,
+    pub role: String,
+    pub content_hash: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatHistorySegmentWindowRecord {
+    pub segment_index: i64,
+    pub segment_id: String,
+    pub summary_json: Option<String>,
+    pub messages_json: String,
+    pub start_message_index: i64,
+    pub message_count: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatHistoryWindowRecord {
+    pub conversation: ChatHistorySummary,
+    pub segments: Vec<ChatHistorySegmentWindowRecord>,
+    pub active_segment: Option<ChatHistorySegmentRecord>,
+    pub context_meta_json: String,
+    pub active_segment_index: i64,
+    pub total_segment_count: i64,
+    pub total_message_count: i64,
+    pub returned_message_count: i64,
+    pub oldest_offset: i64,
+    pub has_more_before: bool,
+    pub revision: String,
+    pub updated_at: i64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatHistorySegmentInput {
@@ -153,6 +194,14 @@ pub struct ChatHistoryConversationInput {
 #[serde(rename_all = "camelCase")]
 pub struct ChatHistorySegmentMutationInput {
     pub conversation: ChatHistoryConversationInput,
+    pub segment: ChatHistorySegmentInput,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatHistoryAppendSegmentInput {
+    pub conversation: ChatHistoryConversationInput,
+    pub previous_segment: ChatHistorySegmentInput,
     pub segment: ChatHistorySegmentInput,
 }
 

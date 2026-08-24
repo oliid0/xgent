@@ -83,6 +83,8 @@ export function useChatPageRuntimeStore(params: UseChatPageRuntimeStoreParams) {
   const persistedConversationStateRef = useRef(new Map<string, ConversationViewState>());
   const runningConversationIdsRef = useRef(new Set<string>());
   const conversationAbortControllersRef = useRef(new Map<string, AbortController>());
+  const conversationStopRequestsRef = useRef(new Set<string>());
+  const conversationStopRequestVersionsRef = useRef(new Map<string, number>());
 
   const buildRuntimeEntryFromVisibleState = useCallback(
     (): ConversationRuntimeEntry =>
@@ -184,6 +186,9 @@ export function useChatPageRuntimeStore(params: UseChatPageRuntimeStoreParams) {
       if (!key) return;
       if (controller) {
         conversationAbortControllersRef.current.set(key, controller);
+        if (conversationStopRequestsRef.current.has(key)) {
+          controller.abort();
+        }
         return;
       }
       conversationAbortControllersRef.current.delete(key);
@@ -193,6 +198,26 @@ export function useChatPageRuntimeStore(params: UseChatPageRuntimeStoreParams) {
 
   const getConversationAbortController = useCallback((conversationId: string) => {
     return conversationAbortControllersRef.current.get(conversationId.trim()) ?? null;
+  }, []);
+
+  const requestConversationStop = useCallback((conversationId: string) => {
+    const key = conversationId.trim();
+    if (!key) return false;
+    const alreadyRequested = conversationStopRequestsRef.current.has(key);
+    conversationStopRequestVersionsRef.current.set(
+      key,
+      (conversationStopRequestVersionsRef.current.get(key) ?? 0) + 1,
+    );
+    conversationStopRequestsRef.current.add(key);
+    return alreadyRequested;
+  }, []);
+
+  const isConversationStopRequested = useCallback((conversationId: string) => {
+    return conversationStopRequestsRef.current.has(conversationId.trim());
+  }, []);
+
+  const consumeConversationStop = useCallback((conversationId: string) => {
+    return conversationStopRequestsRef.current.delete(conversationId.trim());
   }, []);
 
   const setConversationSendingState = useCallback(
@@ -258,6 +283,8 @@ export function useChatPageRuntimeStore(params: UseChatPageRuntimeStoreParams) {
         controller.abort();
       }
       conversationAbortControllersRef.current.clear();
+      conversationStopRequestsRef.current.clear();
+      conversationStopRequestVersionsRef.current.clear();
     },
     [],
   );
@@ -274,6 +301,9 @@ export function useChatPageRuntimeStore(params: UseChatPageRuntimeStoreParams) {
     isConversationRunning,
     setConversationAbortController,
     getConversationAbortController,
+    requestConversationStop,
+    isConversationStopRequested,
+    consumeConversationStop,
     setConversationSendingState,
   };
 }

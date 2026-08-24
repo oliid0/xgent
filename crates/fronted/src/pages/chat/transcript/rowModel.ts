@@ -1,3 +1,14 @@
+import {
+  type GroupedRoundBlock,
+  groupRoundBlocks,
+} from "../components/assistant-bubble/assistantBubbleUtils";
+import { isTaskToolBlock } from "../../../lib/chat/taskProgress";
+import {
+  CHECKPOINT_ROW_ESTIMATE_PX,
+  estimateAssistantRowHeight,
+  estimateUserRowHeight,
+  measureEstimateText,
+} from "../../../lib/transcript-virtual/rowEstimates";
 import type {
   RenderSummaryCard,
   RenderTimelineItem,
@@ -5,23 +16,17 @@ import type {
 } from "../../../lib/chat/conversation/conversationState";
 import type { LiveTranscriptState } from "../../../lib/chat/conversation/liveTranscriptStore";
 import { getRoundText, type LiveRound, type UiRound } from "../../../lib/chat/messages/uiMessages";
-import {
-  CHECKPOINT_ROW_ESTIMATE_PX,
-  estimateAssistantRowHeight,
-  estimateUserRowHeight,
-  measureEstimateText,
-} from "../../../lib/transcript-virtual/rowEstimates";
 
-// The transcript's single row list: committed history rows plus (while a run
-// is active) one live assistant tail row, all rendered by one virtualizer in
-// one container. Folding a finished reply into history is a pure data
-// transition — the row key, the round keys and the block ids all carry over,
-// so React reconciles the settled reply in place and nothing remounts.
+const TRANSCRIPT_ROW_GAP_PX = 24;
+const ASSISTANT_UNIT_GAP_PX = 8;
 
 export type SummaryRow = {
   kind: "summary";
   key: string;
   estimate: number;
+  renderCost: number;
+  gapAfter: number;
+  anchorUserKey: string | null;
   item: RenderSummaryCard;
 };
 
@@ -29,69 +34,88 @@ export type UserRow = {
   kind: "user";
   key: string;
   estimate: number;
+  renderCost: number;
+  gapAfter: number;
+  anchorUserKey: string;
   item: RenderUserMessage;
 };
 
-export type AssistantRow = {
-  kind: "assistant";
-  key: string;
-  estimate: number;
-  // Live rows stream from the live store; settled rows come from history.
-  live: boolean;
-  // Stream-born rows keep Streamdown's streaming mode forever (mirrors the
-  // WebUI invariant): the mode of a row never flips, so the streaming→static
-  // re-parse cannot happen.
-  renderMode: "streaming" | "static";
-  rounds: (UiRound | LiveRound)[];
-  timestamp?: number;
-  compacted: boolean;
-  replyText: string;
-  // Retry re-sends the nearest preceding user prompt through the edit-resend
-  // truncation pipeline; resolved at build time so rows stay self-contained.
-  retryTarget: RenderUserMessage | null;
+export type AssistantBlockRenderUnit = {
+  kind: "block";
+  block: GroupedRoundBlock;
+  roundMeta?: UiRound["meta"];
+  runningToolCallIds: string[];
+  thinkingOpen: boolean;
+  isLatestThinking: boolean;
+  isRoundTail: boolean;
+  hasRunningToolCall: boolean;
 };
 
-export type TranscriptRow = SummaryRow | UserRow | AssistantRow;
+export type AssistantPlaceholderRenderUnit = {
+  kind: "placeholder";
+  showFallbackStatus: boolean;
+};
+
+export type AssistantFooterRenderUnit = {
+  kind: "footer";
+  timestamp?: number;
+  replyText: string;
+  retryTarget: RenderUserMessage | null;
+  rounds: (UiRound | LiveRound)[];
+  hasChangedFilesCandidate: boolean;
+};
+
+export type AssistantStatusRenderUnit = {
+  kind: "status";
+};
+
+export type AssistantRenderUnit =
+  | AssistantBlockRenderUnit
+  | AssistantPlaceholderRenderUnit
+  | AssistantStatusRenderUnit
+  | AssistantFooterRenderUnit;
+
+export type AssistantUnitRow = {
+  kind: "assistant-unit";
+  key: string;
+  replyKey: string;
+  estimate: number;
+  renderCost: number;
+  gapAfter: number;
+  anchorUserKey: string | null;
+  live: boolean;
+  mutable: boolean;
+  renderMode: "streaming" | "static";
+  compacted: boolean;
+  showAvatar: boolean;
+  unit: AssistantRenderUnit;
+};
+
+export type AssistantActivityRow = {
+  kind: "assistant-activity";
+  key: string;
+  replyKey: string;
+  estimate: number;
+  renderCost: number;
+  gapAfter: number;
+  anchorUserKey: string | null;
+  live: boolean;
+  units: AssistantUnitRow[];
+};
+
+export type TranscriptRow = SummaryRow | UserRow | AssistantUnitRow | AssistantActivityRow;
 
 export type TranscriptRowsSnapshot = {
   rows: TranscriptRow[];
-  // Index of the first live row; -1 when idle. Rows at or after this index
-  // are force-mounted by the virtualizer's live range extractor.
+  // Exactly one stable activity row is force-mounted for the active reply.
+  // Its completed and mutable child units reconcile inside that outer row.
   liveStartIndex: number;
 };
 
 export type LiveTailInput = LiveTranscriptState & {
   isSending: boolean;
+  // 鎵嬪姩鍘嬬缉绌洪棽鎬侊細live store 鍙疆 running銆佷笉缃?isSending锛屼絾浠嶈鏄剧ず銆屾鍦?  // 鍘嬬缉銆嶇姸鎬佽銆傝鏍囪鍙苟鍏?live tail 鍙鎬?gate锛屼笉鏀瑰彉鍏朵粬 isSending 璇箟銆?  isCompactionRunning?: boolean;
 };
-
-function computeAssistantEstimate(rounds: (UiRound | LiveRound)[]): number {
-  let proseChars = 0;
-  let codeLines = 0;
-  let codeFences = 0;
-  let toolCount = 0;
-  let thinkingCount = 0;
-  for (const round of rounds) {
-    for (const block of round.blocks) {
-      if (block.kind === "text") {
-        const measured = measureEstimateText(block.text);
-        proseChars += measured.proseChars;
-        codeLines += measured.codeLines;
-        codeFences += measured.codeFences;
-      } else if (block.kind === "thinking") {
-        thinkingCount += 1;
-      } else {
-        toolCount += 1;
-      }
-    }
-  }
-  return estimateAssistantRowHeight({
-    proseChars,
-    codeLines,
-    codeFences,
-    toolCount,
-    thinkingCount,
-  });
-}
 
 function buildReplyText(rounds: (UiRound | LiveRound)[]): string {
   return rounds
@@ -99,11 +123,320 @@ function buildReplyText(rounds: (UiRound | LiveRound)[]): string {
     .filter((text) => text.length > 0)
     .join("\n\n");
 }
+function isVisibleGroupedBlock(block: GroupedRoundBlock) {
+  if (block.kind === "text" || block.kind === "thinking") {
+    return block.text.trim().length > 0;
+  }
+  return !isTaskToolBlock(block);
+}
+
+function hasRunningToolCall(blocks: GroupedRoundBlock[], runningToolCallIds: string[]) {
+  if (runningToolCallIds.length === 0) return false;
+  const runningIds = new Set(runningToolCallIds);
+  return blocks.some((block) => {
+    if (block.kind === "tool") {
+      return Boolean(block.item.toolCall.id && runningIds.has(block.item.toolCall.id));
+    }
+    if (block.kind === "toolGroup") {
+      return block.items.some((item) =>
+        Boolean(item.toolCall.id && runningIds.has(item.toolCall.id)),
+      );
+    }
+    return false;
+  });
+}
+
+function hasChangedFilesCandidate(rounds: (UiRound | LiveRound)[]) {
+  return rounds.some((round) =>
+    round.blocks.some(
+      (block) =>
+        block.kind === "tool" &&
+        (block.item.toolCall.name === "Write" ||
+          block.item.toolCall.name === "Edit" ||
+          block.item.toolCall.name === "Delete") &&
+        Boolean(block.item.toolResult && !block.item.toolResult.isError),
+    ),
+  );
+}
+
+function measureBlockUnit(block: GroupedRoundBlock, hasUsage: boolean) {
+  let estimate: number;
+  let renderCost: number;
+  if (block.kind === "text") {
+    const measured = measureEstimateText(block.text);
+    estimate =
+      estimateAssistantRowHeight({
+        proseChars: measured.proseChars,
+        codeLines: measured.codeLines,
+        codeFences: measured.codeFences,
+        toolCount: 0,
+        thinkingCount: 0,
+      }) - 48;
+    renderCost = Math.min(
+      16,
+      Math.max(
+        1,
+        1 +
+          Math.ceil(measured.proseChars / 6_000) +
+          Math.ceil(measured.codeLines / 120) +
+          measured.codeFences,
+      ),
+    );
+  } else if (block.kind === "thinking") {
+    estimate = 42;
+    renderCost = 1;
+  } else if (block.kind === "toolGroup") {
+    estimate = 64 + Math.min(48, block.items.length * 4);
+    renderCost = Math.min(6, 1 + Math.ceil(block.items.length / 4));
+  } else if (block.kind === "hostedSearch" || block.kind === "hostedSearchGroup") {
+    estimate = 96;
+    renderCost =
+      block.kind === "hostedSearchGroup" ? Math.min(6, 1 + Math.ceil(block.items.length / 3)) : 2;
+  } else {
+    estimate = 72;
+    renderCost = 2;
+  }
+  return {
+    estimate: Math.max(36, estimate) + (hasUsage ? 112 : 0),
+    renderCost,
+  };
+}
+
+function sameStringArray(previous: string[], next: string[]) {
+  return (
+    previous === next ||
+    (previous.length === next.length && previous.every((value, index) => value === next[index]))
+  );
+}
+
+function sameGroupedBlock(previous: GroupedRoundBlock, next: GroupedRoundBlock) {
+  if (previous.kind !== next.kind || previous.key !== next.key) return false;
+  if (previous.kind === "text" || previous.kind === "thinking") {
+    return next.kind === previous.kind && previous.text === next.text;
+  }
+  if (previous.kind === "tool") {
+    return next.kind === "tool" && previous.item === next.item;
+  }
+  if (previous.kind === "hostedSearch") {
+    return next.kind === "hostedSearch" && previous.item === next.item;
+  }
+  if (previous.kind === "toolGroup") {
+    return (
+      next.kind === "toolGroup" &&
+      previous.items.length === next.items.length &&
+      previous.items.every((item, index) => item === next.items[index])
+    );
+  }
+  return (
+    next.kind === "hostedSearchGroup" &&
+    previous.items.length === next.items.length &&
+    previous.items.every((item, index) => item === next.items[index])
+  );
+}
+
+function canReuseLiveUnit(previous: AssistantUnitRow, next: AssistantUnitRow) {
+  if (previous.mutable || next.mutable) return false;
+  if (
+    previous.key !== next.key ||
+    previous.replyKey !== next.replyKey ||
+    previous.estimate !== next.estimate ||
+    previous.renderCost !== next.renderCost ||
+    previous.gapAfter !== next.gapAfter ||
+    previous.anchorUserKey !== next.anchorUserKey ||
+    previous.live !== next.live ||
+    previous.renderMode !== next.renderMode ||
+    previous.compacted !== next.compacted ||
+    previous.showAvatar !== next.showAvatar ||
+    previous.unit.kind !== "block" ||
+    next.unit.kind !== "block"
+  ) {
+    return false;
+  }
+  return (
+    sameGroupedBlock(previous.unit.block, next.unit.block) &&
+    previous.unit.roundMeta === next.unit.roundMeta &&
+    sameStringArray(previous.unit.runningToolCallIds, next.unit.runningToolCallIds) &&
+    previous.unit.thinkingOpen === next.unit.thinkingOpen &&
+    previous.unit.isLatestThinking === next.unit.isLatestThinking &&
+    previous.unit.isRoundTail === next.unit.isRoundTail &&
+    previous.unit.hasRunningToolCall === next.unit.hasRunningToolCall
+  );
+}
+
+function buildAssistantActivityRow(
+  replyKey: string,
+  units: AssistantUnitRow[],
+): AssistantActivityRow {
+  const lastIndex = units.length - 1;
+  return {
+    kind: "assistant-activity",
+    key: `${replyKey}:activity`,
+    replyKey,
+    estimate: units.reduce(
+      (total, unit, index) => total + unit.estimate + (index < lastIndex ? unit.gapAfter : 0),
+      0,
+    ),
+    renderCost: Math.min(
+      32,
+      Math.max(
+        1,
+        units.reduce((total, unit) => total + unit.renderCost, 0),
+      ),
+    ),
+    gapAfter: units.at(-1)?.gapAfter ?? TRANSCRIPT_ROW_GAP_PX,
+    anchorUserKey: units[0]?.anchorUserKey ?? null,
+    live: units.some((unit) => unit.live),
+    units,
+  };
+}
+
+type BuildAssistantUnitsInput = {
+  replyKey: string;
+  live: boolean;
+  renderMode: "streaming" | "static";
+  rounds: (UiRound | LiveRound)[];
+  timestamp?: number;
+  compacted: boolean;
+  replyText: string;
+  retryTarget: RenderUserMessage | null;
+  anchorUserKey: string | null;
+  liveUnitCache?: Map<string, AssistantUnitRow>;
+};
+
+function buildAssistantUnits(input: BuildAssistantUnitsInput): AssistantUnitRow[] {
+  const {
+    replyKey,
+    live,
+    renderMode,
+    rounds,
+    timestamp,
+    compacted,
+    replyText,
+    retryTarget,
+    anchorUserKey,
+    liveUnitCache,
+  } = input;
+  const rows: AssistantUnitRow[] = [];
+
+  rounds.forEach((round) => {
+    const groupedBlocks = groupRoundBlocks(round.blocks).filter(isVisibleGroupedBlock);
+    const runningToolCallIds = "runningToolCallIds" in round ? round.runningToolCallIds : [];
+    const roundHasRunningToolCall = hasRunningToolCall(groupedBlocks, runningToolCallIds);
+    let latestThinkingKey: string | null = null;
+    for (let blockIndex = groupedBlocks.length - 1; blockIndex >= 0; blockIndex -= 1) {
+      const block = groupedBlocks[blockIndex];
+      if (block?.kind === "thinking") {
+        latestThinkingKey = block.key;
+        break;
+      }
+    }
+
+    groupedBlocks.forEach((block, blockIndex) => {
+      const isRoundTail = blockIndex === groupedBlocks.length - 1;
+      const measurement = measureBlockUnit(block, Boolean(isRoundTail && round.meta?.usage));
+      rows.push({
+        kind: "assistant-unit",
+        key: `${replyKey}:round:${round.key}:block:${block.key}`,
+        replyKey,
+        estimate: measurement.estimate,
+        renderCost: measurement.renderCost,
+        gapAfter: ASSISTANT_UNIT_GAP_PX,
+        anchorUserKey,
+        live,
+        mutable: false,
+        renderMode,
+        compacted,
+        showAvatar: rows.length === 0,
+        unit: {
+          kind: "block",
+          block,
+          roundMeta: round.meta,
+          runningToolCallIds,
+          thinkingOpen: "thinkingOpen" in round ? round.thinkingOpen : false,
+          isLatestThinking: block.kind === "thinking" && block.key === latestThinkingKey,
+          isRoundTail,
+          hasRunningToolCall: roundHasRunningToolCall,
+        },
+      });
+    });
+  });
+
+  if (live) {
+    const contentTailIndex = rows.length - 1;
+    const contentTail = rows[contentTailIndex];
+    if (contentTail) {
+      rows[contentTailIndex] = {
+        ...contentTail,
+        gapAfter: ASSISTANT_UNIT_GAP_PX,
+        mutable: true,
+      };
+    }
+    rows.push({
+      kind: "assistant-unit",
+      key: `${replyKey}:footer`,
+      replyKey,
+      estimate: rows.length === 0 ? 64 : 32,
+      renderCost: 1,
+      gapAfter: TRANSCRIPT_ROW_GAP_PX,
+      anchorUserKey,
+      live: true,
+      mutable: true,
+      renderMode,
+      compacted,
+      showAvatar: rows.length === 0,
+      unit: { kind: "status" },
+    });
+  } else {
+    const changedFilesCandidate = hasChangedFilesCandidate(rounds);
+    const contentTailIndex = rows.length - 1;
+    const contentTail = rows[contentTailIndex];
+    if (contentTail) {
+      rows[contentTailIndex] = {
+        ...contentTail,
+        gapAfter: changedFilesCandidate ? ASSISTANT_UNIT_GAP_PX : 0,
+      };
+    }
+    rows.push({
+      kind: "assistant-unit",
+      key: `${replyKey}:footer`,
+      replyKey,
+      estimate: changedFilesCandidate ? 272 : 32,
+      renderCost: changedFilesCandidate ? 2 : 1,
+      gapAfter: TRANSCRIPT_ROW_GAP_PX,
+      anchorUserKey,
+      live: false,
+      mutable: false,
+      renderMode,
+      compacted,
+      showAvatar: rows.length === 0 && rounds.length > 0,
+      unit: {
+        kind: "footer",
+        timestamp,
+        replyText,
+        retryTarget,
+        rounds,
+        hasChangedFilesCandidate: changedFilesCandidate,
+      },
+    });
+  }
+
+  if (!liveUnitCache) return rows;
+
+  const nextKeys = new Set<string>();
+  const reconciled = rows.map((row) => {
+    nextKeys.add(row.key);
+    const previous = liveUnitCache.get(row.key);
+    const next = previous && canReuseLiveUnit(previous, row) ? previous : row;
+    liveUnitCache.set(row.key, next);
+    return next;
+  });
+  for (const key of liveUnitCache.keys()) {
+    if (!nextKeys.has(key)) liveUnitCache.delete(key);
+  }
+  return reconciled;
+}
 
 export type TranscriptRowModelOptions = {
-  // Fired once per build that discovers new row keys (always fired for the
-  // first build, even when empty, so the entrance registry can stamp the
-  // initial rows as never-animating).
   onRowsBorn?: (keys: readonly string[], isInitialBuild: boolean) => void;
 };
 
@@ -113,25 +446,28 @@ export type TranscriptRowModel = {
 };
 
 export function createTranscriptRowModel(options?: TranscriptRowModelOptions): TranscriptRowModel {
-  // Settled rows cache by item identity: a streaming commit leaves history
-  // item objects untouched, so per-frame builds reuse every settled row and
-  // memoized row components bail on identity.
-  let rowCache = new WeakMap<RenderTimelineItem, TranscriptRow>();
-  // The composed history-row array, reused while the historyItems array
-  // identity is unchanged — live-store emits then skip the per-item walk
-  // entirely instead of paying O(history) per frame.
+  let rowCache = new WeakMap<
+    RenderTimelineItem,
+    {
+      anchorUserKey: string | null;
+      retryTarget: RenderUserMessage | null;
+      rows: TranscriptRow[];
+    }
+  >();
   let historyRowsCache: { items: RenderTimelineItem[]; rows: TranscriptRow[] } | null = null;
-  // Committed keys of stream-born replies → their live row key. Keying the
-  // committed row with the live key is what makes settle remount-free.
   let streamOrigins = new Map<string, string>();
-  // Every key ever produced, for O(new) birth reporting.
   let knownKeys = new Set<string>();
   let hasBuilt = false;
   let turnSeq = 0;
-  // The active live turn, or a settled turn still waiting for its committed
-  // twin to land in history (desktop persistence can lag the run's end).
-  let activeTurn: { rowKey: string; historyLenAtStart: number } | null = null;
-  let pendingSettle: { rowKey: string; historyLenAtStart: number } | null = null;
+  let activeTurn: {
+    replyKey: string;
+    historyLenAtStart: number;
+    liveUnitCache: Map<string, AssistantUnitRow>;
+    lastLiveUnits: AssistantUnitRow[];
+    settlingUnits: AssistantUnitRow[] | null;
+  } | null = null;
+  let pendingSettle: { replyKey: string; historyLenAtStart: number } | null = null;
+  let deferredSettles: { replyKey: string; historyLenAtStart: number }[] = [];
   let draftRoundCache: { text: string; round: LiveRound } | null = null;
 
   const reset = () => {
@@ -143,13 +479,12 @@ export function createTranscriptRowModel(options?: TranscriptRowModelOptions): T
     turnSeq = 0;
     activeTurn = null;
     pendingSettle = null;
+    deferredSettles = [];
     draftRoundCache = null;
   };
 
   const draftRound = (text: string): LiveRound => {
     if (draftRoundCache?.text !== text) {
-      // Mirrors what buildUiMessages will derive for a single-text reply
-      // (round r1, block text-1), so the settled twin reconciles in place.
       draftRoundCache = {
         text,
         round: {
@@ -166,15 +501,12 @@ export function createTranscriptRowModel(options?: TranscriptRowModelOptions): T
 
   const adoptSettledTwin = (
     historyItems: RenderTimelineItem[],
-    turn: { rowKey: string; historyLenAtStart: number },
+    turn: { replyKey: string; historyLenAtStart: number },
   ) => {
     for (let index = historyItems.length - 1; index >= turn.historyLenAtStart; index -= 1) {
       const item = historyItems[index];
-      if (item?.kind === "assistant") {
-        streamOrigins.set(item.key, turn.rowKey);
-        // The twin can land while the run is still sending; drop any
-        // un-aliased row built for it so the next build re-keys it onto the
-        // live row instead of remounting.
+      if (item?.kind === "assistant" && !streamOrigins.has(item.key)) {
+        streamOrigins.set(item.key, turn.replyKey);
         if (rowCache.has(item)) {
           rowCache.delete(item);
           historyRowsCache = null;
@@ -185,30 +517,45 @@ export function createTranscriptRowModel(options?: TranscriptRowModelOptions): T
     return false;
   };
 
-  const buildHistoryRow = (
+  const buildHistoryRows = (
     item: RenderTimelineItem,
     retryTarget: RenderUserMessage | null,
-  ): TranscriptRow => {
+  ): TranscriptRow[] => {
+    const anchorUserKey = item.kind === "user" ? item.key : (retryTarget?.key ?? null);
     const cached = rowCache.get(item);
-    if (cached) {
-      return cached;
+    if (cached && cached.anchorUserKey === anchorUserKey && cached.retryTarget === retryTarget) {
+      return cached.rows;
     }
-    let row: TranscriptRow;
+
+    let rows: TranscriptRow[];
     if (item.kind === "summary") {
-      row = { kind: "summary", key: item.key, estimate: CHECKPOINT_ROW_ESTIMATE_PX, item };
+      rows = [
+        {
+          kind: "summary",
+          key: item.key,
+          estimate: CHECKPOINT_ROW_ESTIMATE_PX,
+          renderCost: 1,
+          gapAfter: TRANSCRIPT_ROW_GAP_PX,
+          anchorUserKey,
+          item,
+        },
+      ];
     } else if (item.kind === "user") {
-      row = {
-        kind: "user",
-        key: item.key,
-        estimate: estimateUserRowHeight(item.text.length, item.attachments.length),
-        item,
-      };
+      rows = [
+        {
+          kind: "user",
+          key: item.key,
+          estimate: estimateUserRowHeight(item.text.length, item.attachments.length),
+          renderCost: Math.min(4, 1 + item.attachments.length),
+          gapAfter: TRANSCRIPT_ROW_GAP_PX,
+          anchorUserKey: item.key,
+          item,
+        },
+      ];
     } else {
       const originKey = streamOrigins.get(item.key);
-      row = {
-        kind: "assistant",
-        key: originKey ?? item.key,
-        estimate: computeAssistantEstimate(item.rounds),
+      const assistantUnits = buildAssistantUnits({
+        replyKey: originKey ?? item.key,
         live: false,
         renderMode: originKey ? "streaming" : "static",
         rounds: item.rounds,
@@ -216,37 +563,65 @@ export function createTranscriptRowModel(options?: TranscriptRowModelOptions): T
         compacted: item.isFromCompactedSegment,
         replyText: buildReplyText(item.rounds),
         retryTarget,
-      };
+        anchorUserKey,
+      });
+      rows = originKey ? [buildAssistantActivityRow(originKey, assistantUnits)] : assistantUnits;
     }
-    rowCache.set(item, row);
-    return row;
+    rowCache.set(item, { anchorUserKey, retryTarget, rows });
+    return rows;
   };
 
   const build = (
     historyItems: RenderTimelineItem[],
     live: LiveTailInput,
   ): TranscriptRowsSnapshot => {
-    const liveTailVisible = live.isSending && !live.isSettled;
+    const liveTailVisible =
+      (live.isSending || live.isCompactionRunning === true) && !live.isSettled;
     const isInitialBuild = !hasBuilt;
     hasBuilt = true;
 
-    if (liveTailVisible && !activeTurn) {
-      // A settled turn still waiting for its twin is superseded by the new
-      // turn — the next assistant item would belong to the new run.
+    if (liveTailVisible && pendingSettle && activeTurn) {
+      if (!adoptSettledTwin(historyItems, pendingSettle)) {
+        deferredSettles.push(pendingSettle);
+      }
       pendingSettle = null;
       activeTurn = {
-        rowKey: `live-turn-${++turnSeq}`,
+        replyKey: `live-turn-${++turnSeq}`,
         historyLenAtStart: historyItems.length,
+        liveUnitCache: new Map(),
+        lastLiveUnits: [],
+        settlingUnits: null,
+      };
+    } else if (liveTailVisible && !activeTurn) {
+      pendingSettle = null;
+      activeTurn = {
+        replyKey: `live-turn-${++turnSeq}`,
+        historyLenAtStart: historyItems.length,
+        liveUnitCache: new Map(),
+        lastLiveUnits: [],
+        settlingUnits: null,
       };
     } else if (!liveTailVisible && activeTurn) {
-      if (!adoptSettledTwin(historyItems, activeTurn)) {
-        pendingSettle = activeTurn;
+      // 钀藉畾浜ゆ帴锛氫涪寮?activeTurn 鐨勫垽鎹槸銆屽巻鍙茶嚜 historyLenAtStart 璧锋湁娌℃湁
+      // 鏂板鐨勩€佸皻鏈璁ら鐨?assistant 瀛敓椤广€嶁€斺€攁doptSettledTwin 鐨勮繑鍥炲€兼鏄?      // 杩欎釜鍒ゆ嵁锛堣棰嗘垚鍔?鈬?绐楀彛鍐呮湁鍙鍏诲鐢熼」锛夈€備笉鑳芥敼鐢ㄣ€宭ive 鍗曞厓閲屾湁娌℃湁
+      // 鍙 block銆嶏細瀛樺湪闆跺彲瑙?block 鍗存湁鐪熷疄瀛敓琛岀殑 turn鈥斺€旇鍙栨秷鐨?run 浼?      // 鎸佷箙鍖栦腑姝㈡彁绀?assistant 椤癸紱浠呰緭鍑?Task 宸ュ叿鐨?run 鍏跺潡琚?      // isVisibleGroupedBlock 鍏ㄩ儴杩囨护銆傝繖绫?turn 鑻ヨ璇垽涓㈠純锛屽鐢熻姘镐笉琚鍏?      // 鈫?浠ュ叏鏂?key 閲嶆寕杞斤紙杩濆弽闆?remount锛夛紝persist 婊炲悗鏃舵洿浼氭紡杩涗笅涓€涓?run 鐨?      // historyLenAtStart 绐楀彛琚敊浣嶈棰嗐€?      const adopted = adoptSettledTwin(historyItems, activeTurn);
+      if (adopted) {
+        activeTurn = null;
+      } else if (activeTurn.lastLiveUnits.some((row) => row.unit.kind === "block")) {
+        // 浜у嚭杩囧唴瀹?鉄?鐪熷疄鍥炲蹇呭皢鎸佷箙鍖栵細瀛敓琛屽皻鏈惤搴擄紙persist 婊炲悗锛夋椂
+        // 鐧昏 pendingSettle锛屽緟鍏惰惤搴撳悗鎸夊悓涓€ replyKey 璁ら锛堥浂 remount锛夈€?        pendingSettle = {
+          replyKey: activeTurn.replyKey,
+          historyLenAtStart: activeTurn.historyLenAtStart,
+        };
+      } else {
+        // 鏃㈡病浜у嚭鍐呭銆佸巻鍙蹭篃娌℃湁鍙鍏诲鐢熼」锛堢┖闂叉墜鍔ㄥ帇缂╄惤瀹氭垚妫€鏌ョ偣鍗＄墖銆?        // 鎴栦骇鍑哄墠鍗宠鍙栨秷鐨?run锛夆啋 鐩存帴娓呮帀锛岄伩鍏嶅簳閮ㄧ暀涓嬪喕缁撶殑 settling 鐘舵€佽銆?        activeTurn = null;
       }
-      activeTurn = null;
     } else if (!liveTailVisible && pendingSettle) {
-      if (adoptSettledTwin(historyItems, pendingSettle)) {
-        pendingSettle = null;
-      }
+      if (adoptSettledTwin(historyItems, pendingSettle)) pendingSettle = null;
+    }
+
+    if (deferredSettles.length > 0) {
+      deferredSettles = deferredSettles.filter((turn) => !adoptSettledTwin(historyItems, turn));
     }
 
     const bornKeys: string[] = [];
@@ -264,41 +639,54 @@ export function createTranscriptRowModel(options?: TranscriptRowModelOptions): T
       historyRows = [];
       let retryTarget: RenderUserMessage | null = null;
       for (const item of historyItems) {
-        const row = buildHistoryRow(item, item.kind === "assistant" ? retryTarget : null);
-        historyRows.push(row);
-        trackBirth(row.key);
-        if (item.kind === "user") {
-          retryTarget = item;
-        }
+        const itemRows = buildHistoryRows(item, retryTarget);
+        historyRows.push(...itemRows);
+        for (const row of itemRows) trackBirth(row.key);
+        if (item.kind === "user") retryTarget = item;
       }
       historyRowsCache = { items: historyItems, rows: historyRows };
     }
 
     let rows = historyRows;
     let liveStartIndex = -1;
-    if (liveTailVisible && activeTurn) {
-      const rounds: (UiRound | LiveRound)[] =
-        live.liveRounds.length > 0
-          ? live.liveRounds
-          : live.draftAssistantText
-            ? [draftRound(live.draftAssistantText)]
-            : [];
-      liveStartIndex = historyRows.length;
-      trackBirth(activeTurn.rowKey);
-      rows = [
-        ...historyRows,
-        {
-          kind: "assistant",
-          key: activeTurn.rowKey,
-          estimate: rounds.length > 0 ? computeAssistantEstimate(rounds) : 80,
+    if ((liveTailVisible || pendingSettle) && activeTurn) {
+      let liveUnits = activeTurn.lastLiveUnits;
+      if (liveTailVisible) {
+        const rounds: (UiRound | LiveRound)[] =
+          live.liveRounds.length > 0
+            ? live.liveRounds
+            : live.draftAssistantText
+              ? [draftRound(live.draftAssistantText)]
+              : [];
+        liveUnits = buildAssistantUnits({
+          replyKey: activeTurn.replyKey,
           live: true,
           renderMode: "streaming",
           rounds,
           compacted: false,
           replyText: "",
           retryTarget: null,
-        },
-      ];
+          anchorUserKey: historyRows.at(-1)?.anchorUserKey ?? null,
+          liveUnitCache: activeTurn.liveUnitCache,
+        });
+        activeTurn.lastLiveUnits = liveUnits;
+        activeTurn.settlingUnits = null;
+      } else {
+        if (!activeTurn.settlingUnits) {
+          activeTurn.settlingUnits = activeTurn.lastLiveUnits
+            .filter((row) => row.unit.kind !== "status")
+            .map((row) => ({
+              ...row,
+              live: false,
+              mutable: false,
+            }));
+        }
+        liveUnits = activeTurn.settlingUnits;
+      }
+      const liveActivity = buildAssistantActivityRow(activeTurn.replyKey, liveUnits);
+      rows = [...historyRows, liveActivity];
+      liveStartIndex = rows.length - 1;
+      trackBirth(liveActivity.key);
     }
 
     if (bornKeys.length > 0 || isInitialBuild) {

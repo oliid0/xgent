@@ -50,22 +50,53 @@ export function buildProviderRequestHeaders(
     };
   }
   if (providerId === "codex") {
+    // 标准 Chat Completions 是无状态协议，只需 Authorization——
+    // session_id/conversation_id 是 Responses（Codex CLI）链路专属头，
+    // 不得泄漏进 completions 格式的请求。
+    if (requestFormat === "openai-completions") return authHeaders;
     const requestSessionId = normalizeSessionId(sessionId) ?? createUuid();
     return {
       ...authHeaders,
-      "User-Agent": CODEX_DEFAULT_USER_AGENT,
       [CODEX_SESSION_ID_HEADER]: requestSessionId,
       [CODEX_CONVERSATION_ID_HEADER]: requestSessionId,
     };
   }
+  // 其它 OpenAI 兼容端：仅 Bearer。
   return authHeaders;
 }
 
-export function mergeCustomHeaders(
-  base: Record<string, string>,
-  customHeaders?: CustomProvider["customHeaders"],
-): Record<string, string> {
-  return mergeCustomHeadersBase(base, customHeaders);
+/**
+ * 供应商上游请求的唯一装配入口：内置头 → 合并用户自定义头 → 过本地反代。
+ * 聊天 / 文本 / 摘要三条链路都走这里，杜绝各自重复装配时漏掉 customHeaders。
+ */
+export async function prepareProviderRequest(
+  providerId: ProviderId,
+  runtime: ProviderRuntimeConfig,
+  options?: { sessionId?: string },
+): Promise<PreparedProxyRequest> {
+  const upstreamBaseUrl =
+    providerId === "deepseek"
+      ? runtime.isFullUrl
+        ? normalizeDeepSeekResponsesEndpoint(runtime.baseUrl)
+        : normalizeDeepSeekResponsesBaseUrl(runtime.baseUrl)
+      : runtime.baseUrl;
+  return prepareProxyRequest(
+    providerId,
+    upstreamBaseUrl.trim(),
+    mergeCustomHeaders(
+      buildProviderRequestHeaders(
+        providerId,
+        runtime.apiKey,
+        options?.sessionId,
+        runtime.requestFormat,
+      ),
+      runtime.customHeaders,
+    ),
+    {
+      useSystemProxy: runtime.useSystemProxy === true,
+      isFullUrl: runtime.isFullUrl === true,
+    },
+  );
 }
 
 export function toSimpleStreamReasoning(
@@ -80,9 +111,10 @@ export function resolveProviderCacheRetention(
   requestOverride?: CacheRetention,
   providerPreference?: CacheRetention,
 ): CacheRetention | undefined {
-  // OpenAI 侧的"缓存"体现为稳定的 prompt_cache_key 路由提示；开关关闭时
-  // 显式返回 none，阻止 pi-ai 按 sessionId 默认下发。
+  // Codex 的 wire 策略由 promptCacheHintMode 处理；这里保留 short 让供应商级
+  // none 仍可被单模型覆盖。请求级 none 则始终优先，供标题/压缩等辅助请求禁用。
   if (providerId !== "claude_code" && providerId !== "codex") return undefined;
+  if (providerId === "codex") return requestOverride ?? "short";
   if (promptCachingEnabled === false) return "none";
   // 请求级 override 优先（压缩/标题等辅助请求强制 none）。
   if (requestOverride) return requestOverride;

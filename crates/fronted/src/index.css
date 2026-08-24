@@ -311,6 +311,7 @@
     height: 100%;
     -webkit-user-select: none;
     user-select: none;
+    overscroll-behavior: none;
   }
 
   #root {
@@ -3579,6 +3580,10 @@
 }
 
 @media (hover: none), (pointer: coarse) {
+  .settings-hover-actions {
+    opacity: 1;
+  }
+
   .hub-skill-card:hover,
   .mcp-server-card:hover {
     transform: none;

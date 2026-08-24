@@ -8,10 +8,20 @@ import {
   type PendingUploadedFile,
 } from "../../../lib/chat/messages/uploadedFiles";
 import { cn } from "../../../lib/shared/utils";
+import {
+  copyImagePreviewSource,
+  copyUploadedImagePreview,
+  openUploadedImageInSystemViewer,
+  prepareUploadedImagePreviewCopy,
+  saveImagePreviewSource,
+  supportsDirectUploadedImageCopy,
+  supportsSystemImageOpen,
+} from "../../../lib/system/imagePreview";
 import { useUploadedImagePreview } from "./uploadedImagePreview";
 
 function UserImageAttachmentCard({
   file,
+  workspaceRoot,
   imageSrc,
   isLoading,
   compact,
@@ -21,6 +31,7 @@ function UserImageAttachmentCard({
   closePreviewLabel,
 }: {
   file: PendingUploadedFile;
+  workspaceRoot?: string;
   imageSrc: string | null;
   isLoading: boolean;
   compact: boolean;
@@ -32,17 +43,34 @@ function UserImageAttachmentCard({
   const [previewOpen, setPreviewOpen] = useState(false);
   const labeledPreview = `${previewLabel}: ${file.fileName}`;
   const previewSlides = useMemo<ImagePreviewSlide[]>(
-    () =>
-      imageSrc
-        ? [
-            {
-              src: imageSrc,
-              alt: file.fileName,
-              title: file.fileName,
-            },
-          ]
-        : [],
-    [file.fileName, imageSrc],
+    () => {
+      if (!imageSrc) return [];
+      const nativeRequest =
+        workspaceRoot?.trim() && file.absolutePath?.trim()
+          ? { workdir: workspaceRoot, absolutePath: file.absolutePath }
+          : null;
+      return [
+        {
+          src: imageSrc,
+          alt: file.fileName,
+          title: file.fileName,
+          onPrepare:
+            nativeRequest && supportsDirectUploadedImageCopy
+              ? () => prepareUploadedImagePreviewCopy(nativeRequest)
+              : undefined,
+          onCopy:
+            nativeRequest && supportsDirectUploadedImageCopy
+              ? () => copyUploadedImagePreview(nativeRequest)
+              : () => copyImagePreviewSource(imageSrc),
+          onSave: () => saveImagePreviewSource(imageSrc, file.fileName),
+          onOpen:
+            nativeRequest && supportsSystemImageOpen
+              ? () => openUploadedImageInSystemViewer(nativeRequest)
+              : undefined,
+        },
+      ];
+    },
+    [file.absolutePath, file.fileName, imageSrc, workspaceRoot],
   );
   return (
     <div
@@ -197,6 +225,7 @@ function UserAttachmentCard({
     return (
       <UserImageAttachmentCard
         file={file}
+        workspaceRoot={workspaceRoot}
         imageSrc={imageSrc}
         isLoading={isLoading}
         compact={compactImageLayout}

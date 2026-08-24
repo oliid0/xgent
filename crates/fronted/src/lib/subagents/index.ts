@@ -1,18 +1,20 @@
-export { createSubagentTools, type SubagentRuntimeConfig } from "./agentTool";
-export { renderMessageBusSnapshot } from "./bus";
-export { isSubagentCardToolCall } from "./card";
-export type { SubagentStoreIpc } from "./ipc/store";
-export type { SubagentWorktreeIpc } from "./ipc/worktree";
 export type {
   SubagentBatchDetails,
   SubagentCardArguments,
   SubagentCardDetails,
   SubagentMessageDetails,
   SubagentReportDetails,
-} from "./protocol";
-export { buildSubagentCardToolCallId, isSubagentCardArguments } from "./protocol";
-export { buildRosterReminder } from "./roster";
-export type { SubagentProviderRuntime } from "./run";
+} from "@xagent/ui/lib/subagents/protocol";
+export {
+  buildSubagentCardToolCallId,
+  isSubagentCardArguments,
+} from "@xagent/ui/lib/subagents/protocol";
+export { createSubagentTools, type SubagentRuntimeConfig } from "./agentTool";
+export { renderMessageBusDelta, renderMessageBusSnapshot } from "./bus";
+export { isSubagentCardToolCall } from "./card";
+export type { SubagentStoreIpc } from "./ipc/store";
+export type { SubagentWorktreeIpc } from "./ipc/worktree";
+export { buildRosterIdentitySection, buildRosterRunStatusSection } from "./roster";
 export {
   createSubagentScheduler,
   DEFAULT_SUBAGENT_MAX_PARALLEL_RUNS,

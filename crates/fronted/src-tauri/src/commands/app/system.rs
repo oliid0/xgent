@@ -3,11 +3,16 @@ use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+#[cfg(desktop)]
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs;
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 #[cfg(desktop)]
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
+#[cfg(desktop)]
+use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::runtime::platform::expand_tilde_path;
@@ -23,7 +28,30 @@ pub use crate::services::skills::{
 };
 
 const UPLOADED_IMAGE_PREVIEW_MAX_BYTES: usize = 5 * 1024 * 1024; // 5MB
+#[cfg(desktop)]
+const IMAGE_PREVIEW_DATA_MAX_BYTES: usize = 25 * 1024 * 1024;
+#[cfg(desktop)]
+const IMAGE_PREVIEW_SAVE_TARGET_TTL: Duration = Duration::from_secs(5 * 60);
 const UPLOADED_NATIVE_ATTACHMENT_MAX_BYTES: u64 = 25 * 1024 * 1024; // 25MB
+const UPLOADED_TEXT_TRANSCODE_MAX_BYTES: u64 = 64 * 1024 * 1024; // 64MB
+
+#[cfg(desktop)]
+#[derive(Debug)]
+struct PendingImagePreviewSaveTarget {
+    target: PathBuf,
+    created_at: SystemTime,
+}
+
+#[cfg(desktop)]
+static PENDING_IMAGE_PREVIEW_SAVE_TARGETS: OnceLock<
+    Mutex<HashMap<String, PendingImagePreviewSaveTarget>>,
+> = OnceLock::new();
+
+#[cfg(desktop)]
+fn pending_image_preview_save_targets(
+) -> &'static Mutex<HashMap<String, PendingImagePreviewSaveTarget>> {
+    PENDING_IMAGE_PREVIEW_SAVE_TARGETS.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 #[tauri::command]
 pub fn system_home_dir() -> Result<String, String> {
@@ -90,6 +118,13 @@ pub struct SystemUploadedNativeAttachmentResponse {
 #[serde(rename_all = "camelCase")]
 pub struct SystemCreateProjectFolderResponse {
     pub path: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemClassifiedDroppedPaths {
+    pub files: Vec<String>,
+    pub dirs: Vec<String>,
 }
 
 fn app_storage_dir() -> Result<PathBuf, String> {
@@ -301,52 +336,123 @@ fn probe_file_prefix(path: &Path, max_bytes: usize) -> Result<Vec<u8>, String> {
     Ok(buffer)
 }
 
-fn is_probably_utf8_text_file(path: &Path) -> Result<bool, String> {
-    let buffer = probe_file_prefix(path, 32 * 1024)?;
-    if buffer.is_empty() {
-        return Ok(true);
-    }
-    if buffer.contains(&0) {
-        return Ok(false);
-    }
-    let bytes = buffer
-        .strip_prefix(&[0xEF, 0xBB, 0xBF])
-        .unwrap_or(buffer.as_slice());
-    Ok(std::str::from_utf8(bytes).is_ok())
+const UPLOAD_TEXT_PROBE_BYTES: usize = 32 * 1024;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UploadTextClass {
+    Utf8,
+    NeedsTranscode,
+    Binary,
 }
 
-fn is_probably_utf8_text_bytes(bytes: &[u8]) -> bool {
+fn classify_upload_text_bytes(bytes: &[u8], prefix_truncated: bool) -> UploadTextClass {
     if bytes.is_empty() {
-        return true;
+        return UploadTextClass::Utf8;
+    }
+    if bytes.starts_with(&[0xFF, 0xFE]) || bytes.starts_with(&[0xFE, 0xFF]) {
+        return UploadTextClass::NeedsTranscode;
     }
     if bytes.contains(&0) {
-        return false;
+        return UploadTextClass::Binary;
     }
-    let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
-    std::str::from_utf8(bytes).is_ok()
+    let stripped = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
+    match std::str::from_utf8(stripped) {
+        Ok(_) => return UploadTextClass::Utf8,
+        Err(error)
+            if prefix_truncated
+                && error.error_len().is_none()
+                && stripped.len() - error.valid_up_to() < 4 =>
+        {
+            return UploadTextClass::Utf8;
+        }
+        Err(_) => {}
+    }
+
+    let suspicious = stripped
+        .iter()
+        .filter(|byte| matches!(**byte, 0x01..=0x08 | 0x0B | 0x0E..=0x1A | 0x1C..=0x1F | 0x7F))
+        .count();
+    if suspicious * 32 > stripped.len() {
+        UploadTextClass::Binary
+    } else {
+        UploadTextClass::NeedsTranscode
+    }
 }
 
-fn detect_upload_file_kind(path: &Path) -> Result<&'static str, String> {
+fn classify_upload_text_file(path: &Path) -> Result<UploadTextClass, String> {
+    let buffer = probe_file_prefix(path, UPLOAD_TEXT_PROBE_BYTES)?;
+    Ok(classify_upload_text_bytes(
+        &buffer,
+        buffer.len() == UPLOAD_TEXT_PROBE_BYTES,
+    ))
+}
+
+fn transcode_upload_text_to_utf8(bytes: &[u8]) -> Vec<u8> {
+    if bytes.is_empty() || std::str::from_utf8(bytes).is_ok() {
+        return bytes.to_vec();
+    }
+    if bytes.starts_with(&[0xFF, 0xFE]) {
+        let (text, _, _) = encoding_rs::UTF_16LE.decode(bytes);
+        return text.into_owned().into_bytes();
+    }
+    if bytes.starts_with(&[0xFE, 0xFF]) {
+        let (text, _, _) = encoding_rs::UTF_16BE.decode(bytes);
+        return text.into_owned().into_bytes();
+    }
+    let mut detector = chardetng::EncodingDetector::new();
+    detector.feed(bytes, true);
+    let encoding = detector.guess(None, true);
+    let (text, _, _) = encoding.decode(bytes);
+    text.into_owned().into_bytes()
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DetectedUploadKind {
+    kind: &'static str,
+    needs_utf8_transcode: bool,
+}
+
+impl DetectedUploadKind {
+    fn plain(kind: &'static str) -> Self {
+        Self {
+            kind,
+            needs_utf8_transcode: false,
+        }
+    }
+
+    fn from_text_class(class: UploadTextClass) -> Option<Self> {
+        match class {
+            UploadTextClass::Utf8 => Some(Self::plain("text")),
+            UploadTextClass::NeedsTranscode => Some(Self {
+                kind: "text",
+                needs_utf8_transcode: true,
+            }),
+            UploadTextClass::Binary => None,
+        }
+    }
+}
+
+fn detect_upload_file_kind(path: &Path) -> Result<DetectedUploadKind, String> {
     if let Some(kind) = infer_image_upload_kind(path) {
-        return Ok(kind);
+        return Ok(DetectedUploadKind::plain(kind));
     }
     if is_pdf_upload(path) {
-        return Ok("pdf");
+        return Ok(DetectedUploadKind::plain("pdf"));
     }
     if is_notebook_upload(path) {
-        return Ok("notebook");
+        return Ok(DetectedUploadKind::plain("notebook"));
     }
     if is_word_upload(path) {
-        return Ok("word");
+        return Ok(DetectedUploadKind::plain("word"));
     }
     if is_spreadsheet_upload(path) {
-        return Ok("spreadsheet");
+        return Ok(DetectedUploadKind::plain("spreadsheet"));
     }
     if is_archive_upload(path) {
-        return Ok("archive");
+        return Ok(DetectedUploadKind::plain("archive"));
     }
-    if is_probably_utf8_text_file(path)? {
-        return Ok("text");
+    if let Some(detected) = DetectedUploadKind::from_text_class(classify_upload_text_file(path)?) {
+        return Ok(detected);
     }
     Err(format!(
         "{} 不是当前 Read 支持解析的文本/图片/PDF/notebook/Word/Excel/压缩包文件",
@@ -358,7 +464,7 @@ fn detect_uploaded_bytes_kind(
     file_name: &str,
     mime_type: Option<&str>,
     bytes: &[u8],
-) -> Result<&'static str, String> {
+) -> Result<DetectedUploadKind, String> {
     let path = Path::new(file_name);
     let normalized_mime = mime_type
         .map(str::trim)
@@ -370,28 +476,30 @@ fn detect_uploaded_bytes_kind(
         .map(|value| value.starts_with("image/"))
         .unwrap_or(false)
     {
-        return Ok("image");
+        return Ok(DetectedUploadKind::plain("image"));
     }
     if let Some(kind) = infer_image_upload_kind(path) {
-        return Ok(kind);
+        return Ok(DetectedUploadKind::plain(kind));
     }
     if normalized_mime.as_deref() == Some("application/pdf") || is_pdf_upload(path) {
-        return Ok("pdf");
+        return Ok(DetectedUploadKind::plain("pdf"));
     }
     if is_notebook_upload(path) {
-        return Ok("notebook");
+        return Ok(DetectedUploadKind::plain("notebook"));
     }
     if is_word_upload(path) || is_word_upload_mime(mime_type) {
-        return Ok("word");
+        return Ok(DetectedUploadKind::plain("word"));
     }
     if is_spreadsheet_upload(path) || is_spreadsheet_upload_mime(mime_type) {
-        return Ok("spreadsheet");
+        return Ok(DetectedUploadKind::plain("spreadsheet"));
     }
     if is_archive_upload(path) || is_archive_upload_mime(mime_type) {
-        return Ok("archive");
+        return Ok(DetectedUploadKind::plain("archive"));
     }
-    if is_probably_utf8_text_bytes(bytes) {
-        return Ok("text");
+    if let Some(detected) =
+        DetectedUploadKind::from_text_class(classify_upload_text_bytes(bytes, false))
+    {
+        return Ok(detected);
     }
 
     Err(format!(
@@ -402,17 +510,17 @@ fn detect_uploaded_bytes_kind(
 fn sanitize_uploaded_file_name(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for ch in input.chars() {
-        if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') {
-            out.push(ch);
-        } else {
+        if ch.is_control() || matches!(ch, '/' | '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*') {
             out.push('_');
+        } else {
+            out.push(ch);
         }
     }
-    let trimmed = out.trim_matches('_').trim_matches('.').to_string();
+    let trimmed = out.trim_matches(|ch: char| ch == '.' || ch.is_whitespace());
     let candidate = if trimmed.is_empty() {
         "file".to_string()
     } else {
-        trimmed
+        trimmed.to_string()
     };
     avoid_windows_reserved_file_name(candidate)
 }
@@ -723,8 +831,8 @@ fn import_readable_file_paths_into_workdir(
             continue;
         }
 
-        let kind = match detect_upload_file_kind(&source) {
-            Ok(kind) => kind,
+        let detected = match detect_upload_file_kind(&source) {
+            Ok(detected) => detected,
             Err(message) => {
                 skipped.push(message);
                 continue;
@@ -732,6 +840,7 @@ fn import_readable_file_paths_into_workdir(
         };
 
         let canonical_source = fs::canonicalize(&source).unwrap_or_else(|_| source.clone());
+        let mut entry_size = metadata.len();
         let destination = if canonical_source.starts_with(workdir) {
             canonical_source
         } else {
@@ -749,21 +858,36 @@ fn import_readable_file_paths_into_workdir(
                 .unwrap_or("file");
             let sanitized_name = sanitize_uploaded_file_name(source_name);
             let target = unique_path_for_copy(import_root.join(sanitized_name));
-            fs::copy(&source, &target).map_err(|e| {
-                format!(
-                    "复制文件到工作区失败 {} -> {}: {e}",
-                    source.display(),
-                    target.display()
-                )
-            })?;
+            if detected.needs_utf8_transcode && metadata.len() <= UPLOADED_TEXT_TRANSCODE_MAX_BYTES
+            {
+                let bytes = fs::read(&source)
+                    .map_err(|e| format!("读取文件失败 {}: {e}", source.display()))?;
+                let utf8 = transcode_upload_text_to_utf8(&bytes);
+                entry_size = utf8.len() as u64;
+                fs::write(&target, &utf8).map_err(|e| {
+                    format!(
+                        "转码并写入文件失败 {} -> {}: {e}",
+                        source.display(),
+                        target.display()
+                    )
+                })?;
+            } else {
+                fs::copy(&source, &target).map_err(|e| {
+                    format!(
+                        "复制文件到工作区失败 {} -> {}: {e}",
+                        source.display(),
+                        target.display()
+                    )
+                })?;
+            }
             target
         };
 
         files.push(build_readable_file_entry(
             workdir,
             &destination,
-            kind,
-            metadata.len(),
+            detected.kind,
+            entry_size,
         )?);
     }
 
@@ -800,7 +924,7 @@ pub(crate) fn system_import_uploaded_readable_files_sync(
             continue;
         }
 
-        let kind = match detect_uploaded_bytes_kind(
+        let detected = match detect_uploaded_bytes_kind(
             source_name,
             upload.mime_type.as_deref(),
             &upload.content,
@@ -823,14 +947,21 @@ pub(crate) fn system_import_uploaded_readable_files_sync(
 
         let sanitized_name = sanitize_uploaded_file_name(source_name);
         let target = unique_path_for_copy(import_root.join(sanitized_name));
-        fs::write(&target, &upload.content)
+        let content = if detected.needs_utf8_transcode
+            && upload.content.len() as u64 <= UPLOADED_TEXT_TRANSCODE_MAX_BYTES
+        {
+            transcode_upload_text_to_utf8(&upload.content)
+        } else {
+            upload.content
+        };
+        fs::write(&target, &content)
             .map_err(|e| format!("写入上传文件失败 {}: {e}", target.display()))?;
 
         files.push(build_readable_file_entry(
             &workdir,
             &target,
-            kind,
-            upload.content.len() as u64,
+            detected.kind,
+            content.len() as u64,
         )?);
     }
 
@@ -879,6 +1010,106 @@ fn system_import_uploaded_readable_files_from_base64_sync(
     Ok(response)
 }
 
+#[cfg(desktop)]
+fn resolve_uploaded_image_target(
+    workdir: &str,
+    absolute_path: &str,
+) -> Result<(PathBuf, &'static str), String> {
+    let workdir = canonicalize_upload_workdir(workdir)?;
+    let target = canonicalize_uploaded_file_path(absolute_path)?;
+    if !target.starts_with(&workdir) {
+        return Err(format!(
+            "Image path is outside the current workspace: {}",
+            target.display()
+        ));
+    }
+    let mime_type = infer_image_upload_mime(&target)
+        .ok_or_else(|| format!("{} is not a supported image file", target.display()))?;
+    Ok((target, mime_type))
+}
+
+#[cfg(desktop)]
+fn decode_image_preview_base64(data_base64: &str) -> Result<Vec<u8>, String> {
+    let encoded = data_base64.trim();
+    if encoded.is_empty() {
+        return Err("Image preview data is empty".to_string());
+    }
+    if encoded.len() > IMAGE_PREVIEW_DATA_MAX_BYTES.saturating_mul(4) / 3 + 4 {
+        return Err("Image preview data is too large".to_string());
+    }
+    let bytes = BASE64_STANDARD
+        .decode(encoded)
+        .map_err(|error| format!("Invalid image preview data: {error}"))?;
+    if bytes.len() > IMAGE_PREVIEW_DATA_MAX_BYTES {
+        return Err("Image preview data is too large".to_string());
+    }
+    Ok(bytes)
+}
+
+#[cfg(desktop)]
+fn remember_image_preview_save_target(target: PathBuf) -> Result<String, String> {
+    let save_token = uuid::Uuid::new_v4().to_string();
+    let mut targets = pending_image_preview_save_targets()
+        .lock()
+        .map_err(|_| "Unable to lock image preview save targets".to_string())?;
+    let now = SystemTime::now();
+    targets.retain(|_, pending| {
+        now.duration_since(pending.created_at)
+            .map(|age| age <= IMAGE_PREVIEW_SAVE_TARGET_TTL)
+            .unwrap_or(true)
+    });
+    targets.insert(
+        save_token.clone(),
+        PendingImagePreviewSaveTarget {
+            target,
+            created_at: now,
+        },
+    );
+    Ok(save_token)
+}
+
+#[cfg(desktop)]
+fn take_image_preview_save_target(save_token: &str) -> Result<PathBuf, String> {
+    let mut targets = pending_image_preview_save_targets()
+        .lock()
+        .map_err(|_| "Unable to lock image preview save targets".to_string())?;
+    let pending = targets
+        .remove(save_token)
+        .ok_or_else(|| "Image preview save target is unavailable or has expired".to_string())?;
+    if pending
+        .created_at
+        .elapsed()
+        .map(|age| age > IMAGE_PREVIEW_SAVE_TARGET_TTL)
+        .unwrap_or(false)
+    {
+        return Err("Image preview save target has expired".to_string());
+    }
+    Ok(pending.target)
+}
+
+#[cfg(desktop)]
+pub(crate) fn system_prepare_preview_file_save_sync(
+    file_name: String,
+) -> Result<Option<String>, String> {
+    let safe_file_name = sanitize_uploaded_file_name(&file_name);
+    let target = FileDialog::new().set_file_name(&safe_file_name).save_file();
+    target.map(remember_image_preview_save_target).transpose()
+}
+
+#[cfg(desktop)]
+pub(crate) fn system_write_preview_file_sync(
+    save_token: String,
+    data_base64: String,
+    _mime_type: String,
+) -> Result<(), String> {
+    // Consume the user-selected capability before decoding frontend data so it
+    // cannot be replayed by a later request.
+    let target = take_image_preview_save_target(&save_token)?;
+    let bytes = decode_image_preview_base64(&data_base64)?;
+    fs::write(&target, bytes)
+        .map_err(|error| format!("Unable to save image preview {}: {error}", target.display()))
+}
+
 pub(crate) fn system_read_uploaded_image_preview_sync(
     workdir: String,
     absolute_path: String,
@@ -902,6 +1133,15 @@ pub(crate) fn system_read_uploaded_image_preview_sync(
         mime_type: mime_type.to_string(),
         data: BASE64_STANDARD.encode(bytes),
     })
+}
+
+#[cfg(desktop)]
+pub(crate) fn system_open_uploaded_image_sync(
+    workdir: String,
+    absolute_path: String,
+) -> Result<(), String> {
+    let (target, _) = resolve_uploaded_image_target(&workdir, &absolute_path)?;
+    crate::commands::fs::spawn_workspace_open_command(&target, "open")
 }
 
 pub(crate) fn system_read_uploaded_native_attachment_sync(
@@ -1001,7 +1241,7 @@ fn is_windows_reserved_project_name(name: &str) -> bool {
                 .is_ok_and(|value| (1..=9).contains(&value)))
 }
 
-fn validate_project_folder_name(name: &str) -> Result<&str, String> {
+pub(crate) fn validate_project_folder_name(name: &str) -> Result<&str, String> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
         return Err("项目名不能为空".to_string());
@@ -1044,6 +1284,56 @@ fn project_folder_display_path(path: &Path) -> String {
 
 fn canonicalize_project_folder(path: &Path) -> String {
     project_folder_display_path(&fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()))
+}
+
+fn system_classify_dropped_paths_sync(
+    paths: Vec<String>,
+) -> Result<SystemClassifiedDroppedPaths, String> {
+    if paths.is_empty() {
+        return Err("未检测到拖入的内容".to_string());
+    }
+    let mut files = Vec::new();
+    let mut dirs = Vec::new();
+    let mut seen = HashSet::new();
+    for raw_path in paths {
+        let raw_path = raw_path.trim();
+        if raw_path.is_empty() {
+            return Err("拖入路径不能为空".to_string());
+        }
+        let path = expand_tilde_path(raw_path);
+        if !path.is_absolute() {
+            return Err(format!("拖入路径必须是绝对路径：{raw_path}"));
+        }
+        let metadata = fs::metadata(&path)
+            .map_err(|error| format!("拖入路径不存在或无法访问（{raw_path}）：{error}"))?;
+        if metadata.is_dir() {
+            let canonical = fs::canonicalize(&path)
+                .map_err(|error| format!("无法解析拖入的目录（{raw_path}）：{error}"))?;
+            let display_path = project_folder_display_path(&canonical);
+            if seen.insert(display_path.clone()) {
+                dirs.push(display_path);
+            }
+        } else if metadata.is_file() && seen.insert(raw_path.to_string()) {
+            files.push(raw_path.to_string());
+        }
+    }
+    Ok(SystemClassifiedDroppedPaths { files, dirs })
+}
+
+fn system_resolve_dropped_workspace_folders_sync(
+    paths: Vec<String>,
+) -> Result<Vec<String>, String> {
+    let classified = system_classify_dropped_paths_sync(paths)?;
+    if !classified.files.is_empty() {
+        return Err(format!(
+            "工作空间区域只支持拖入文件夹：{}",
+            classified.files[0]
+        ));
+    }
+    if classified.dirs.is_empty() {
+        return Err("未检测到拖入的文件夹".to_string());
+    }
+    Ok(classified.dirs)
 }
 
 pub(crate) fn system_create_project_folder_sync(
@@ -1152,6 +1442,26 @@ pub async fn system_pick_file(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+pub async fn system_resolve_dropped_workspace_folders(
+    paths: Vec<String>,
+) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        system_resolve_dropped_workspace_folders_sync(paths)
+    })
+    .await
+    .map_err(|error| format!("system_resolve_dropped_workspace_folders join failed: {error}"))?
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn system_classify_dropped_paths(
+    paths: Vec<String>,
+) -> Result<SystemClassifiedDroppedPaths, String> {
+    tauri::async_runtime::spawn_blocking(move || system_classify_dropped_paths_sync(paths))
+        .await
+        .map_err(|error| format!("system_classify_dropped_paths join failed: {error}"))?
+}
+
+#[tauri::command(rename_all = "snake_case")]
 pub async fn system_create_project_folder(
     parent: String,
     name: String,
@@ -1232,6 +1542,41 @@ pub async fn system_read_uploaded_image_preview(
     .map_err(|e| format!("system_read_uploaded_image_preview join failed: {e}"))?
 }
 
+#[cfg(desktop)]
+#[tauri::command(rename_all = "snake_case")]
+pub async fn system_open_uploaded_image(
+    workdir: String,
+    absolute_path: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        system_open_uploaded_image_sync(workdir, absolute_path)
+    })
+    .await
+    .map_err(|e| format!("system_open_uploaded_image join failed: {e}"))?
+}
+
+#[cfg(desktop)]
+#[tauri::command(rename_all = "snake_case")]
+pub async fn system_prepare_preview_file_save(file_name: String) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || system_prepare_preview_file_save_sync(file_name))
+        .await
+        .map_err(|e| format!("system_prepare_preview_file_save join failed: {e}"))?
+}
+
+#[cfg(desktop)]
+#[tauri::command(rename_all = "snake_case")]
+pub async fn system_write_preview_file(
+    save_token: String,
+    data_base64: String,
+    mime_type: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        system_write_preview_file_sync(save_token, data_base64, mime_type)
+    })
+    .await
+    .map_err(|e| format!("system_write_preview_file join failed: {e}"))?
+}
+
 #[tauri::command(rename_all = "snake_case")]
 pub async fn system_read_uploaded_native_attachment(
     workdir: String,
@@ -1300,6 +1645,60 @@ pub async fn system_append_debug_jsonl(
     })
     .await
     .map_err(|e| format!("system_append_debug_jsonl join 失败：{e}"))?
+}
+
+#[cfg(desktop)]
+fn system_clipboard_read_text_sync() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    let candidates: &[(&str, &[&str])] = &[(
+        "powershell.exe",
+        &[
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); $value = Get-Clipboard -Raw; if ($null -ne $value) { [Console]::Out.Write($value) }",
+        ],
+    )];
+    #[cfg(target_os = "macos")]
+    let candidates: &[(&str, &[&str])] = &[("pbpaste", &[])];
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let candidates: &[(&str, &[&str])] = &[
+        ("wl-paste", &["--no-newline", "--type", "text"]),
+        ("xclip", &["-selection", "clipboard", "-out"]),
+        ("xsel", &["--clipboard", "--output"]),
+    ];
+
+    let mut last_error = "no native clipboard reader is available".to_string();
+    for (program, args) in candidates {
+        match std::process::Command::new(program).args(*args).output() {
+            Ok(output) if output.status.success() => {
+                return String::from_utf8(output.stdout)
+                    .map_err(|error| format!("clipboard text is not valid UTF-8: {error}"));
+            }
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                last_error = if stderr.is_empty() {
+                    format!("{program} exited with {}", output.status)
+                } else {
+                    format!("{program} failed: {stderr}")
+                };
+            }
+            Err(error) => last_error = format!("failed to start {program}: {error}"),
+        }
+    }
+    Err(last_error)
+}
+
+/// Reads clipboard text outside the webview so custom paste actions do not
+/// trigger WKWebView's extra DOM paste-permission bubble. This command is
+/// intentionally desktop-only; mobile keeps its existing Clipboard API path.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn system_clipboard_read_text() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(system_clipboard_read_text_sync)
+        .await
+        .map_err(|error| format!("system_clipboard_read_text join failed: {error}"))?
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -1648,7 +2047,8 @@ mod tests {
                 Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
                 b"not validated here",
             )
-            .expect("docx should be accepted"),
+            .expect("docx should be accepted")
+            .kind,
             "word"
         );
         assert_eq!(
@@ -1657,17 +2057,20 @@ mod tests {
                 Some("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
                 b"not validated here",
             )
-            .expect("xlsx should be accepted"),
+            .expect("xlsx should be accepted")
+            .kind,
             "spreadsheet"
         );
         assert_eq!(
             detect_uploaded_bytes_kind("bundle.tar.gz", Some("application/gzip"), b"gzip")
-                .expect("tar.gz should be accepted"),
+                .expect("tar.gz should be accepted")
+                .kind,
             "archive"
         );
         assert_eq!(
             detect_uploaded_bytes_kind("assets.7z", Some("application/x-7z-compressed"), b"7z")
-                .expect("7z should be accepted"),
+                .expect("7z should be accepted")
+                .kind,
             "archive"
         );
     }

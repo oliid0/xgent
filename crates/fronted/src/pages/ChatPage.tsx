@@ -49,7 +49,7 @@ import { WorkspaceNavigationRail } from "../components/workspace-tools/Workspace
 import { WorkspaceSidePanel } from "../components/workspace-tools/WorkspaceSidePanel";
 import { useLocale } from "../i18n";
 import type { AppUpdateController } from "../lib/appUpdates";
-import { getAutomationState } from "../lib/automation";
+import { getAutomationState, useAutomation } from "../lib/automation";
 import { createHookRunScope } from "../lib/automation/hookRunner";
 import { browserSessionController } from "../lib/browser/browserSessionController";
 import type { CompactionStatus } from "../lib/chat/compaction/types";
@@ -60,10 +60,13 @@ import {
 import {
   appendMessagesToConversation,
   buildRequestContext,
+  clearTaskListState,
   type ConversationViewState,
   createConversationStateFromContext,
+  getActiveSegment,
   type HistoryMessageRef,
   type RenderTimelineItem,
+  setTaskListState,
 } from "../lib/chat/conversation/conversationState";
 import type { LiveTranscriptStore } from "../lib/chat/conversation/liveTranscriptStore";
 import {
@@ -103,6 +106,7 @@ import {
 } from "../lib/chat/page/chatPageHelpers";
 import type { ScrollFollowHandle } from "../lib/chat-scroll/useScrollFollow";
 import { createStreamDebugLogger } from "../lib/debug/agentDebug";
+import type { AgentRunnerFailoverParams } from "../lib/chat/runner/agentRunner";
 import { tauriGitClient } from "../lib/git/tauriGitClient";
 import { memoryDeleteProject } from "../lib/memory/api";
 import { buildMemoryOverviewSection } from "../lib/memory/prompts/injection";
@@ -125,6 +129,7 @@ import {
   type ChatRuntimeControls,
   DEFAULT_WORKSPACE_PROJECT_ID,
   type ExecutionMode,
+  filterMcpSettingsForWorkspace,
   findProviderModelConfig,
   getChatRuntimeReasoningLevelsForProvider,
   getSshProjectHostIds,
@@ -137,8 +142,10 @@ import {
   normalizeSelectedModelForProviders,
   openWorkspaceToolsSingletonTab,
   parseSelectedModelJson,
+  removeWorkspaceResourceReferences,
   removeWorkspaceToolsProjectState,
   resolveEffectiveTheme,
+  resolveWorkspaceResources,
   resolveWorkspaceProjects,
   type SelectedModel,
   type SystemToolId,
@@ -154,12 +161,15 @@ import {
   updateWorkspaceToolsProjectState,
   type WorkspaceFileTreeStatePatch,
   type WorkspaceProject,
+  type WorkspaceProjectGroup,
   type WorkspaceToolsProjectState,
   workspaceProjectPathKey,
 } from "../lib/settings";
 import { tauriSftpClient } from "../lib/sftp/tauriSftpClient";
 import { createUuid } from "../lib/shared/id";
 import { cn } from "../lib/shared/utils";
+import { buildTrayMenuModel, syncTrayMenu } from "../lib/tray/trayMenu";
+import { useTrayPrefs } from "../lib/tray/trayPrefs";
 import { createGuiSidebarBackend } from "../lib/sidebar/guiSidebarBackend";
 import {
   type ConversationOpenState,
@@ -176,16 +186,27 @@ import {
   resolveExplicitSkillMentions,
 } from "../lib/skills";
 import { buildSoulSystemPrompt, useSoul } from "../lib/soul";
-import { createSubagentStoreManager } from "../lib/subagents";
+import {
+  collectRetainedSubagentParentToolCallIds,
+  createSubagentStoreManager,
+  pruneSubagentRunsForConversation,
+} from "../lib/subagents";
 import {
   applyTerminalEventToSessions,
   sortTerminalSessions,
   terminalSessionBelongsToProject,
 } from "../lib/terminal/sessionStore";
 import { tauriTerminalClient } from "../lib/terminal/tauriTerminalClient";
+import { tauriSshLocalForwardClient } from "../lib/terminal/tauriSshLocalForwardClient";
 import type { TerminalSession, TerminalShellOption } from "../lib/terminal/types";
 import { invokeFs } from "../lib/tools/fsBackend";
 import type { SkillAccessPolicy } from "../lib/tools/skillAccessPolicy";
+import {
+  answerPlanDecision,
+  getPendingPlanForConversation,
+  isPlanApprovalMessage,
+  registerPlanDecisionHandlers,
+} from "../lib/tools/planModeTools";
 import { disposeTodoToolState } from "../lib/tools/todoTools";
 import {
   answerToolApproval,
@@ -195,6 +216,9 @@ import {
   subscribeToolApprovals,
 } from "../lib/tools/toolApproval";
 import { tauriWorkspaceActivityClient } from "../lib/workspace-activity/tauriWorkspaceActivityClient";
+import { CurrentTaskProgress } from "./chat/components/CurrentTaskProgress";
+import { DesktopCheckpointRewindProvider } from "./chat/components/DesktopCheckpointRewindProvider";
+import { WorkspaceCloneTaskOverlay } from "./chat/components/WorkspaceCloneTaskOverlay";
 import {
   fallbackWorkspaceProjectName,
   findWorkspaceProject,
@@ -226,6 +250,32 @@ import {
   useLiveTranscriptController,
   usePendingUploads,
 } from "./chat";
+import { useContextUsageTokensSource } from "./chat/hooks/useContextUsageTokensSource";
+import { useChatFileLinkNavigation } from "./chat/hooks/useChatFileLinkNavigation";
+import { syncMovedConversationRuntimeWorkdir } from "./chat/runtime/chatPageRuntime";
+import {
+  isNativeDropInsideUploadZone,
+  nativeDropPositionScaleFactor,
+} from "./chat/hooks/nativeFileDropRouting";
+import { useManualCompaction } from "./chat/runtime/useManualCompaction";
+import { buildModelFailoverPlan } from "./chat/runtime/providerRuntimeConfig";
+import type { AdditionalProjectRoot } from "../lib/tools/additionalProjectRoots";
+import {
+  acquireTrajectoryRecorder,
+  releaseTrajectoryRecorder,
+  resolveTrajectoryTurnNumber,
+  trajectorySlotCapture,
+  updateTrajectoryRecorderSegment,
+} from "../lib/trajectory/recorderRegistry";
+import {
+  clearLocalTrajectory,
+  invalidateDesktopTrajectory,
+} from "../lib/trajectory/liveTrajectory";
+import {
+  applyWorkspaceRootGrants,
+  buildDroppedWorkspaceRootDrafts,
+  listWorkspaceRootGrants,
+} from "../lib/workspaceRootGrants";
 import { BrowserPanel } from "./chat/browser/BrowserPanel";
 import {
   buildConversationRuntimeSnapshotEntries,
@@ -303,6 +353,7 @@ type ChatPageProps = {
   desktopBridgeEnabled: boolean;
   lanPcCommandHostReady: boolean;
   nativeMobile: boolean;
+  onRunningConversationCountChange?: (count: number) => void;
 };
 
 type MobileWorkspaceDestination =
@@ -557,6 +608,7 @@ function buildProviderRuntimeConfig(
     authMode: provider.authMode,
     oauthAccountId: provider.oauthAccountId,
     customHeaders: provider.customHeaders,
+    isFullUrl: provider.isFullUrl,
     requestFormat: provider.requestFormat,
     reasoning: reasoningSupported
       ? controls.thinkingEnabled
@@ -564,6 +616,7 @@ function buildProviderRuntimeConfig(
         : "off"
       : undefined,
     promptCachingEnabled: provider.promptCachingEnabled,
+    promptCacheHintMode: provider.promptCacheHintMode,
     promptCacheRetention: provider.promptCacheRetention,
     nativeWebSearchEnabled: controls.nativeWebSearchEnabled,
     useSystemProxy: provider.useSystemProxy,
@@ -620,12 +673,13 @@ export function ChatPage(props: ChatPageProps) {
     desktopBridgeEnabled,
     lanPcCommandHostReady,
     nativeMobile,
+    onRunningConversationCountChange,
   } = props;
   const desktopCommandHostAvailable = desktopBridgeEnabled || lanPcCommandHostReady;
   // Monaco reads NLS globals while the lazy editor module imports monaco-editor.
   setPreferredMonacoNlsLocale(settings.locale);
   const effectiveTheme = resolveEffectiveTheme(settings.theme);
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const initialConversationRef = useRef(createConversationIdentity());
   const initialConversationStateRef = useRef(createConversationStateFromContext(context));
 
@@ -661,6 +715,10 @@ export function ChatPage(props: ChatPageProps) {
   const [runningConversationIds, setRunningConversationIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  useEffect(() => {
+    onRunningConversationCountChange?.(runningConversationIds.size);
+    return () => onRunningConversationCountChange?.(0);
+  }, [onRunningConversationCountChange, runningConversationIds.size]);
   const [conversationOpenState, setConversationOpenState] = useState<ConversationOpenState>({
     conversationId: "",
     phase: "idle",
@@ -671,15 +729,20 @@ export function ChatPage(props: ChatPageProps) {
 
   const isAgentMode = isAgentExecutionMode(settings.system.executionMode);
   const isAgentDevExecutionMode = isAgentDevMode(settings.system.executionMode);
-  const skillsConfigured = settings.skills.enabled;
+  const workdir = settings.system.workdir.trim();
+  const configuredWorkspaceResources = useMemo(
+    () => resolveWorkspaceResources(settings, workdir),
+    [settings, workdir],
+  );
+  const skillsConfigured = configuredWorkspaceResources.skillsEnabled;
   const skillsEnabled = skillsConfigured && isAgentMode;
   const { document: soulDocument } = useSoul();
   const soulPrompt = useMemo(() => buildSoulSystemPrompt(soulDocument), [soulDocument]);
   const selectedSkillNames = useMemo(
-    () => (skillsEnabled ? mergeAlwaysEnabledSkillNames(settings.skills.selected) : []),
-    [skillsEnabled, settings.skills.selected],
+    () =>
+      skillsEnabled ? mergeAlwaysEnabledSkillNames(configuredWorkspaceResources.skillNames) : [],
+    [configuredWorkspaceResources.skillNames, skillsEnabled],
   );
-  const workdir = settings.system.workdir.trim();
   // The sidebar store owns all sidebar domain state (conversation list,
   // workdirs, running set); ChatPage only issues imperative calls and keeps a
   // few narrow selector subscriptions.
@@ -695,6 +758,7 @@ export function ChatPage(props: ChatPageProps) {
     () => mergeWorkspaceProjectsWithHistory(settings.system, sidebarWorkdirs),
     [sidebarWorkdirs, settings.system],
   );
+  const workspaceProjectGroups = settings.system.workspaceProjectGroups;
   const [activeWorkspaceProjectId, setActiveWorkspaceProjectId] = useState<string>(
     () => settings.system.activeWorkspaceProjectId?.trim() || DEFAULT_WORKSPACE_PROJECT_ID,
   );
@@ -1027,28 +1091,14 @@ export function ChatPage(props: ChatPageProps) {
     [checkWorkspaceProjectDirectory, setErrorMessage, t],
   );
 
-  const handleOpenCreateWorkspaceProject = useCallback(async () => {
-    if (nativeMobile) {
+  const handleOpenCreateWorkspaceProject = useCallback(() => {
+    if (nativeMobile || desktopBridgeEnabled) {
       setMobileWorkspaceCreateOpen(true);
       return;
     }
-    if (!desktopBridgeEnabled) return;
-    try {
-      const picked = await invoke<string | null>("system_pick_folder", {
-        initial_workdir: activeWorkspaceProjectPath || workdir,
-      });
-      const path = picked?.trim();
-      if (!path) return;
-      activateWorkspaceProject(createWorkspaceProjectFromPath(path, "managed"));
-    } catch (error) {
-      setErrorMessage(asErrorMessage(error, "选择项目目录失败"));
-    }
   }, [
-    activateWorkspaceProject,
-    activeWorkspaceProjectPath,
     desktopBridgeEnabled,
     nativeMobile,
-    workdir,
   ]);
 
   const commitWorkspaceProjectRename = useCallback(
@@ -1270,6 +1320,7 @@ export function ChatPage(props: ChatPageProps) {
     async () => "painted",
   );
   const hydrateFullActionRef = useRef<(id: string) => Promise<void>>(async () => undefined);
+  const loadEarlierHistoryActionRef = useRef<(id: string) => Promise<void>>(async () => undefined);
   const cleanupDeletedConversationActionRef = useRef<(id: string) => void>(() => undefined);
   // Two-phase conversation open: paint the active segment fast, hydrate the
   // full transcript at idle. The overlay appears only after 150ms of
@@ -1286,6 +1337,80 @@ export function ChatPage(props: ChatPageProps) {
   );
   const sendActionRef = useRef<SendChatAction>(async () => false);
   const stopSendingActionRef = useRef<() => void>(() => undefined);
+  const pendingPlanContinuationsRef = useRef(new Map<string, string>());
+  const pendingPlanFeedbackRef = useRef(new Map<string, string>());
+  const planDecisionSendsInFlightRef = useRef(new Set<string>());
+  const [planContinuationVersion, setPlanContinuationVersion] = useState(0);
+  useEffect(() => {
+    registerPlanDecisionHandlers({
+      onApprove: ({ conversationId }) => {
+        setSettings((prev) => ({
+          ...prev,
+          chatRuntimeControls: {
+            ...prev.chatRuntimeControls,
+            planModeEnabled: false,
+          },
+        }));
+        pendingPlanContinuationsRef.current.set(
+          conversationId,
+          t("chat.planMode.executePrompt"),
+        );
+        setPlanContinuationVersion((version) => version + 1);
+      },
+      onReject: ({ conversationId, feedback }) => {
+        pendingPlanFeedbackRef.current.set(conversationId, feedback);
+        setPlanContinuationVersion((version) => version + 1);
+      },
+    });
+    return () => registerPlanDecisionHandlers(null);
+  }, [setSettings, t]);
+
+  useEffect(() => {
+    const flush = (
+      store: Map<string, string>,
+      buildOverrides: (conversationId: string, text: string) => Parameters<SendChatAction>[0],
+    ) => {
+      for (const [conversationId, text] of store) {
+        if (runningConversationIds.has(conversationId)) continue;
+        if (planDecisionSendsInFlightRef.current.has(conversationId)) continue;
+        planDecisionSendsInFlightRef.current.add(conversationId);
+        store.delete(conversationId);
+        void sendActionRef
+          .current(buildOverrides(conversationId, text))
+          .then((accepted) => {
+            if (!accepted && !store.has(conversationId)) {
+              store.set(conversationId, text);
+              window.setTimeout(
+                () => setPlanContinuationVersion((version) => version + 1),
+                750,
+              );
+            }
+          })
+          .catch((error) => {
+            console.warn("plan decision continuation failed", error);
+            if (!store.has(conversationId)) store.set(conversationId, text);
+          })
+          .finally(() => {
+            planDecisionSendsInFlightRef.current.delete(conversationId);
+          });
+      }
+    };
+    flush(pendingPlanFeedbackRef.current, (conversationId, feedback) => ({
+      conversationIdOverride: conversationId,
+      textOverride: feedback,
+      preserveComposerOnStart: true,
+    }));
+    if (settings.chatRuntimeControls.planModeEnabled) return;
+    flush(pendingPlanContinuationsRef.current, (conversationId, prompt) => ({
+      conversationIdOverride: conversationId,
+      textOverride: prompt,
+      preserveComposerOnStart: true,
+      runtimeControlsOverride: {
+        ...settings.chatRuntimeControls,
+        planModeEnabled: false,
+      },
+    }));
+  }, [planContinuationVersion, runningConversationIds, settings.chatRuntimeControls]);
   const hydratingConversationIdRef = useRef<string | null>(hydratingConversationId);
   const hydrationFailedConversationIdRef = useRef<string | null>(hydrationFailedConversationId);
   const setHydratingConversationId = useCallback((next: SetStateAction<string | null>) => {
@@ -1317,6 +1442,13 @@ export function ChatPage(props: ChatPageProps) {
   } = useLiveTranscriptController({
     currentConversationId,
   });
+  const contextUsageTokensSource = useContextUsageTokensSource({
+    isRunning: isSending || compactionStatus.phase === "running",
+    conversationId: currentConversationId,
+    transcriptItems: historyRenderItems,
+    liveTranscriptStore,
+    getCompactionController,
+  });
   const { queueConversationEventForRequest } = useConversationEventPublisher(desktopBridgeEnabled);
   const {
     currentConversationIdRef,
@@ -1324,10 +1456,14 @@ export function ChatPage(props: ChatPageProps) {
     persistedConversationStateRef,
     buildRuntimeEntryFromVisibleState,
     syncVisibleConversationRuntime,
+    ensureConversationRuntimeEntry,
     updateConversationRuntimeEntry,
     isConversationRunning,
     setConversationAbortController,
     getConversationAbortController,
+    requestConversationStop,
+    isConversationStopRequested,
+    consumeConversationStop,
     setConversationSendingState,
   } = useChatPageRuntimeStore({
     initialConversation: initialConversationRef.current,
@@ -1916,6 +2052,20 @@ export function ChatPage(props: ChatPageProps) {
     setNotifyItems((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
+  const notifyChatFileLinkError = useCallback(
+    (message: string) => addNotify("error", message),
+    [addNotify],
+  );
+  const handleOpenChatFileLink = useChatFileLinkNavigation({
+    conversationId: currentConversationId,
+    conversationWorkdir: displayedConversationWorkdir,
+    terminalProjectPathKey,
+    notifyError: notifyChatFileLinkError,
+    onRevealInFileTree: handleChangedFileReveal,
+    openWorkspaceEditorFile,
+    openWorkspaceFilePreview,
+  });
+
   const {
     isUploadingFiles,
     pendingUploadedFiles,
@@ -2217,6 +2367,7 @@ export function ChatPage(props: ChatPageProps) {
   function stopConversation(conversationId: string) {
     const targetConversationId = conversationId.trim();
     if (!targetConversationId) return false;
+    requestConversationStop(targetConversationId);
     const controller = getConversationAbortController(targetConversationId);
     if (!controller) return false;
     const transcriptStore = getConversationLiveTranscriptStore(targetConversationId);
@@ -2229,9 +2380,7 @@ export function ChatPage(props: ChatPageProps) {
   function stopSending() {
     const conversationId = currentConversationIdRef.current.trim();
     if (!conversationId) return;
-    if (!stopConversation(conversationId)) {
-      requestQueuedChatTurnProcessing(conversationId);
-    }
+    stopConversation(conversationId);
   }
 
   function clearCurrentComposerDraftForQueuedTurn(conversationId: string) {
@@ -2307,6 +2456,7 @@ export function ChatPage(props: ChatPageProps) {
     if (!targetConversationId) return;
     if (queuedChatProcessingConversationIdsRef.current.has(targetConversationId)) return;
     if (isConversationRunning(targetConversationId)) return;
+    if (isConversationStopRequested(targetConversationId)) return;
     if (isQueuedChatTurnEditBlockingProcessing(targetConversationId)) return;
     if (!queuedChatTurnsRef.current.some((item) => item.conversationId === targetConversationId)) {
       return;
@@ -2384,8 +2534,10 @@ export function ChatPage(props: ChatPageProps) {
     setQueuedChatTurnsState((current) => promoteQueuedChatTurn(current, queuedTurn.id));
     if (isConversationRunning(queuedTurn.conversationId)) {
       stopConversation(queuedTurn.conversationId);
+      consumeConversationStop(queuedTurn.conversationId);
       return;
     }
+    consumeConversationStop(queuedTurn.conversationId);
     requestQueuedChatTurnProcessing(queuedTurn.conversationId);
   }
 
@@ -2448,7 +2600,9 @@ export function ChatPage(props: ChatPageProps) {
     startNewConversation,
     openInitial: openConversationInitial,
     hydrateFull: hydrateConversationFull,
+    loadEarlier: loadEarlierConversationHistory,
     cleanupDeletedConversation,
+    replaceConversationAtMessage,
     persistConversation,
   } = useConversationHistoryActions({
     conversationState,
@@ -2483,7 +2637,13 @@ export function ChatPage(props: ChatPageProps) {
   startNewConversationActionRef.current = startNewConversation;
   openInitialActionRef.current = openConversationInitial;
   hydrateFullActionRef.current = hydrateConversationFull;
+  loadEarlierHistoryActionRef.current = loadEarlierConversationHistory;
   cleanupDeletedConversationActionRef.current = cleanupDeletedConversation;
+
+  const handleLoadEarlierHistory = useCallback(
+    () => loadEarlierHistoryActionRef.current(currentConversationIdRef.current),
+    [currentConversationIdRef],
+  );
 
   const removeWorkspaceProjectFromSettings = useCallback(
     (project: WorkspaceProject) => {
@@ -2526,6 +2686,17 @@ export function ChatPage(props: ChatPageProps) {
               ...prev.system,
               workspaceProjects: prev.system.workspaceProjects.filter(
                 (item) => item.id !== project.id && workspaceProjectPathKey(item.path) !== pathKey,
+              ),
+              workspaceProjectGroups: prev.system.workspaceProjectGroups.map((group) => ({
+                ...group,
+                projectPaths: group.projectPaths.filter(
+                  (item) => workspaceProjectPathKey(item) !== pathKey,
+                ),
+              })),
+              workspaceResourceSettings: Object.fromEntries(
+                Object.entries(prev.system.workspaceResourceSettings).filter(
+                  ([itemPath]) => workspaceProjectPathKey(itemPath) !== pathKey,
+                ),
               ),
               hiddenWorkspaceProjectPaths: nextHidden,
               missingWorkspaceProjectPaths: prev.system.missingWorkspaceProjectPaths.filter(
@@ -2748,6 +2919,96 @@ export function ChatPage(props: ChatPageProps) {
     [setSettings],
   );
 
+  const handleCreateWorkspaceGroup = useCallback(
+    (nameInput: string) => {
+      const name = nameInput.trim().slice(0, 80);
+      if (!name) return;
+      const now = Date.now();
+      const group: WorkspaceProjectGroup = {
+        id: createUuid(),
+        name,
+        projectPaths: [],
+        collapsed: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setSettings((previous) =>
+        updateSystem(previous, {
+          workspaceProjectGroups: [...previous.system.workspaceProjectGroups, group],
+        }),
+      );
+    },
+    [setSettings],
+  );
+
+  const handleRenameWorkspaceGroup = useCallback(
+    (groupId: string, nameInput: string) => {
+      const name = nameInput.trim().slice(0, 80);
+      if (!name) return;
+      setSettings((previous) =>
+        updateSystem(previous, {
+          workspaceProjectGroups: previous.system.workspaceProjectGroups.map((group) =>
+            group.id === groupId ? { ...group, name, updatedAt: Date.now() } : group,
+          ),
+        }),
+      );
+    },
+    [setSettings],
+  );
+
+  const handleDeleteWorkspaceGroup = useCallback(
+    (groupId: string) => {
+      setSettings((previous) =>
+        updateSystem(previous, {
+          workspaceProjectGroups: previous.system.workspaceProjectGroups.filter(
+            (group) => group.id !== groupId,
+          ),
+        }),
+      );
+    },
+    [setSettings],
+  );
+
+  const handleMoveWorkspaceProjectToGroup = useCallback(
+    (projectPath: string, groupId: string | null) => {
+      const pathKey = workspaceProjectPathKey(projectPath);
+      if (!pathKey) return;
+      setSettings((previous) =>
+        updateSystem(previous, {
+          workspaceProjectGroups: previous.system.workspaceProjectGroups.map((group) => {
+            const projectPaths = group.projectPaths.filter(
+              (path) => workspaceProjectPathKey(path) !== pathKey,
+            );
+            if (group.id === groupId) projectPaths.push(pathKey);
+            if (
+              projectPaths.length === group.projectPaths.length &&
+              projectPaths.every((path, index) => path === group.projectPaths[index])
+            ) {
+              return group;
+            }
+            return { ...group, projectPaths, updatedAt: Date.now() };
+          }),
+        }),
+      );
+    },
+    [setSettings],
+  );
+
+  const handleToggleWorkspaceGroupCollapsed = useCallback(
+    (groupId: string) => {
+      setSettings((previous) =>
+        updateSystem(previous, {
+          workspaceProjectGroups: previous.system.workspaceProjectGroups.map((group) =>
+            group.id === groupId
+              ? { ...group, collapsed: !group.collapsed, updatedAt: Date.now() }
+              : group,
+          ),
+        }),
+      );
+    },
+    [setSettings],
+  );
+
   useEffect(() => {
     const nextWorkdir = activeWorkspaceProjectPath.trim();
     if (!isAgentMode || !nextWorkdir) {
@@ -2824,6 +3085,69 @@ export function ChatPage(props: ChatPageProps) {
   ) {
     return await persistConversation(params);
   }
+
+  const ensureConversationReadyForManualCompaction = useCallback(
+    async (conversationId: string) => {
+      await hydrateConversationFull(conversationId);
+      ensureConversationRuntimeEntry(conversationId);
+      return conversationId;
+    },
+    [ensureConversationRuntimeEntry, hydrateConversationFull],
+  );
+
+  const resolveManualCompactionPromptInputs = useCallback(
+    async (input: { isCurrentConversation: boolean; workdir?: string }) => {
+      if (!input.isCurrentConversation) {
+        return { soulPrompt: "", skillsPrompt: "", memoryPrompt: "" };
+      }
+      const skillsPrompt =
+        skillsEnabled && enabledComposerSkills.length > 0
+          ? buildSkillsSystemPrompt({
+              rootDir: skillsRootDir,
+              selected: enabledComposerSkills,
+              explicit: [],
+            })
+          : "";
+      let memoryPrompt = "";
+      try {
+        memoryPrompt = await buildMemoryOverviewSection(input.workdir?.trim() || "");
+      } catch (error) {
+        console.warn("Failed to build memory overview for manual compaction", error);
+      }
+      return { soulPrompt, skillsPrompt, memoryPrompt };
+    },
+    [enabledComposerSkills, skillsEnabled, skillsRootDir, soulPrompt],
+  );
+
+  const runManualCompaction = useManualCompaction({
+    settings,
+    t,
+    currentConversationIdRef,
+    isConversationRunning,
+    setConversationRunningState: setConversationSendingState,
+    setConversationAbortController,
+    buildRuntimeEntryFromVisibleState,
+    conversationRuntimeCacheRef,
+    ensureConversationReady: ensureConversationReadyForManualCompaction,
+    getCompactionController,
+    getConversationLiveTranscriptStore,
+    updateConversationRuntimeEntry,
+    resetLiveTranscript,
+    updateToolStatus,
+    persistConversation: persistConversationWithHistorySync,
+    setErrorMessage,
+    resolveManualCompactionPromptInputs,
+  });
+
+  const handleManualCompaction = useCallback(() => {
+    void runManualCompaction().then((result) => {
+      if (result.status === "compacted") {
+        addNotify("success", t("chat.manualCompactComplete"));
+      } else if (result.message) {
+        addNotify(result.status === "failed" ? "error" : "warning", result.message);
+      }
+    });
+  }, [addNotify, runManualCompaction, t]);
 
   function clearConversationRuntimeSnapshotTimer(conversationId: string) {
     const targetConversationId = conversationId.trim();
@@ -3169,12 +3493,36 @@ export function ChatPage(props: ChatPageProps) {
     const effectiveSelectedSystemToolIds =
       overrides?.selectedSystemToolIdsOverride ?? settings.system.selectedSystemTools;
     const effectiveProjectPathKey = workspaceProjectPathKey(effectiveWorkdir);
+    const effectiveProject = workspaceProjects.find(
+      (project) => workspaceProjectPathKey(project.path) === effectiveProjectPathKey,
+    );
+    let additionalRoots: AdditionalProjectRoot[] = [];
+    if (effectiveIsAgentMode && effectiveProject && desktopBridgeEnabled) {
+      try {
+        additionalRoots = (await listWorkspaceRootGrants(effectiveProject))
+          .filter((grant) => grant.state === "active")
+          .map((grant) => ({
+            id: grant.id,
+            alias: grant.alias,
+            path: grant.canonicalPath,
+            access: grant.access,
+          }));
+      } catch (error) {
+        console.warn("Failed to load workspace root grants", error);
+      }
+    }
     const effectiveAssociatedSshHostIds = getSshProjectHostIds(
       settings.ssh,
       effectiveProjectPathKey,
     );
     const effectiveIsAgentDevExecutionMode = isAgentDevMode(effectiveExecutionMode);
-    const effectiveSkillsEnabled = settings.skills.enabled && effectiveIsAgentMode;
+    const workspaceResources = resolveWorkspaceResources(settings, effectiveWorkdir);
+    const effectiveSkillsEnabled = workspaceResources.skillsEnabled && effectiveIsAgentMode;
+    const effectiveSelectedSkillNames = effectiveSkillsEnabled
+      ? workspaceResources.skillNames
+      : [];
+    const getEffectiveMcpSettings = () =>
+      filterMcpSettingsForWorkspace(getMcpSettings(), workspaceResources);
     const conversationRunId = createConversationRunId(conversationId);
     const conversationEvents = createConversationEventController({
       conversationId,
@@ -3257,6 +3605,26 @@ export function ChatPage(props: ChatPageProps) {
     );
     const runtimeControls = overrides?.runtimeControlsOverride ?? settings.chatRuntimeControls;
     const providerConfig = buildProviderRuntimeConfig(provider, model, runtimeControls);
+    const failoverPlan = buildModelFailoverPlan(
+      settings,
+      effectiveSelectedModel,
+      runtimeControls,
+    );
+    const failoverParams: AgentRunnerFailoverParams | undefined = failoverPlan
+      ? {
+          config: failoverPlan.config,
+          primary: failoverPlan.primary,
+          fallbacks: failoverPlan.fallbacks,
+          onSwitched: ({ target }) => {
+            const nextSelectedModel = target?.selectedModel ?? failoverPlan.primary.selectedModel;
+            updateConversationRuntimeEntry(conversationId, (previous) =>
+              selectedModelsMatch(previous.selectedModel, nextSelectedModel)
+                ? previous
+                : { ...previous, selectedModel: nextSelectedModel },
+            );
+          },
+        }
+      : undefined;
     const memorySummaryModelSelection = resolveMemorySummaryModelSelection(settings);
     const memoryExtractionModel = memorySummaryModelSelection
       ? {
@@ -3437,6 +3805,7 @@ export function ChatPage(props: ChatPageProps) {
         conversationId,
         titleSourceText,
         content,
+        locale,
         sidebarStore,
         titleJobRef,
         conversationEvents,
@@ -3462,6 +3831,73 @@ export function ChatPage(props: ChatPageProps) {
     let nextConversationState = appendMessagesToConversation(baseConversationState, [
       pendingUserMessage,
     ]);
+    let initialUserTurnPersisted = false;
+    if (overrides?.editResendBaseMessageRef) {
+      try {
+        clearLocalTrajectory(conversationId);
+        await releaseTrajectoryRecorder(conversationId);
+        nextConversationState = clearTaskListState(
+          await replaceConversationAtMessage(
+            conversationId,
+            overrides.editResendBaseMessageRef,
+            pendingUserMessage,
+          ),
+        );
+        initialUserTurnPersisted = true;
+        invalidateDesktopTrajectory(conversationId);
+        const keepParentToolCallIds =
+          collectRetainedSubagentParentToolCallIds(nextConversationState);
+        subagentStoresRef.current.invalidate(conversationId);
+        await pruneSubagentRunsForConversation({
+          parentConversationId: conversationId,
+          keepParentToolCallIds,
+        }).catch((error) => {
+          console.warn("edit-resend subagent cleanup failed", error);
+        });
+      } catch (error) {
+        const message = asErrorMessage(
+          error,
+          "Replacing the edited message failed; the original history was kept",
+        );
+        setConversationErrorState(message);
+        conversationEvents.emitError(message, conversationId);
+        conversationEvents.close();
+        return false;
+      }
+    }
+    const trajectoryTurn = desktopBridgeEnabled
+      ? await resolveTrajectoryTurnNumber({
+          conversationId,
+          currentUserPersisted: initialUserTurnPersisted,
+          fallbackTurn: nextConversationState.meta.totalMessageCount,
+        })
+      : undefined;
+    const trajectoryRecording = desktopBridgeEnabled
+      ? acquireTrajectoryRecorder(
+          conversationId,
+          getActiveSegment(nextConversationState)?.segmentIndex ??
+            nextConversationState.meta.activeSegmentIndex,
+        )
+      : null;
+    if (trajectoryRecording) {
+      compaction.setObserver({
+        onStart: ({ trigger }) => {
+          trajectoryRecording.recorder.compactionStart({ standalone: trigger === "manual" });
+        },
+        onEnd: ({ trigger, status, tokensBefore, tokensAfter, newSegmentIndex, error }) => {
+          trajectoryRecording.recorder.compactionEnd({
+            status,
+            standalone: trigger === "manual",
+            ...(tokensBefore === undefined ? {} : { tokensBefore }),
+            ...(tokensAfter === undefined ? {} : { tokensAfter }),
+            ...(error === undefined ? {} : { error }),
+          });
+          if (status === "complete" && newSegmentIndex !== undefined) {
+            updateTrajectoryRecorderSegment(conversationId, newSegmentIndex);
+          }
+        },
+      });
+    }
     let conversationRunStarted = false;
     let runtimeSnapshotStarted = false;
     function startRuntimeSnapshot() {
@@ -3556,19 +3992,21 @@ export function ChatPage(props: ChatPageProps) {
     // Persist the user turn immediately so all local-access clients can surface
     // the conversation before the assistant round finishes. Live state is
     // distributed independently through runtime snapshots.
-    const initialPersist = persistConversationWithHistorySync({
-      conversationId,
-      sessionId,
-      providerId,
-      model,
-      selectedModel,
-      cwd: conversationCwd,
-      state: nextConversationState,
-      fallbackTitle,
-      createdAt,
-      titlePromise,
-      titleLookahead: true,
-    });
+    const initialPersist = initialUserTurnPersisted
+      ? Promise.resolve(true)
+      : persistConversationWithHistorySync({
+          conversationId,
+          sessionId,
+          providerId,
+          model,
+          selectedModel,
+          cwd: conversationCwd,
+          state: nextConversationState,
+          fallbackTitle,
+          createdAt,
+          titlePromise,
+          titleLookahead: true,
+        });
     if (overrides?.afterInitialHistoryPersist) {
       const persisted = await initialPersist;
       if (!persisted) {
@@ -3639,6 +4077,7 @@ export function ChatPage(props: ChatPageProps) {
         soulPrompt,
         skillsPrompt,
         memoryPrompt,
+        captureSlots: trajectorySlotCapture(conversationId),
         includeAbortedMessages: options?.includeAbortedMessages,
         includeUploadedFilesMetadata: options?.includeUploadedFilesMetadata,
       });
@@ -3657,6 +4096,7 @@ export function ChatPage(props: ChatPageProps) {
         soulPrompt,
         skillsPrompt,
         memoryPrompt,
+        captureSlots: trajectorySlotCapture(conversationId),
         includeAbortedMessages: options?.includeAbortedMessages,
         includeUploadedFilesMetadata: options?.includeUploadedFilesMetadata,
       });
@@ -3671,9 +4111,11 @@ export function ChatPage(props: ChatPageProps) {
         authMode: providerConfig.authMode,
         oauthAccountId: providerConfig.oauthAccountId,
         customHeaders: providerConfig.customHeaders,
+        isFullUrl: providerConfig.isFullUrl,
         requestFormat: providerConfig.requestFormat,
         reasoning: providerConfig.reasoning,
         promptCachingEnabled: providerConfig.promptCachingEnabled,
+        promptCacheHintMode: providerConfig.promptCacheHintMode,
         nativeWebSearchEnabled: providerConfig.nativeWebSearchEnabled,
         useSystemProxy: providerConfig.useSystemProxy,
         modelConfig: providerConfig.modelConfig,
@@ -3738,20 +4180,20 @@ export function ChatPage(props: ChatPageProps) {
     });
 
     // Optionally append skills metadata to system prompt (progressive disclosure).
-    if (effectiveSkillsEnabled && selectedSkillNames.length > 0) {
+    if (effectiveSkillsEnabled && effectiveSelectedSkillNames.length > 0) {
       // In case the user sends quickly after startup (availableSkills not loaded yet),
       // do a best-effort refresh before failing.
       let skillsList = availableSkills;
       let rootDir = skillsRootDir;
       let byName = new Map(skillsList.map((s) => [s.name, s]));
-      let missing = selectedSkillNames.filter((n) => !byName.has(n));
+      let missing = effectiveSelectedSkillNames.filter((n) => !byName.has(n));
       if (missing.length > 0) {
         const fresh = await refreshSkills();
         if (fresh) {
           skillsList = fresh.skills;
           rootDir = fresh.rootDir;
           byName = new Map(skillsList.map((s) => [s.name, s]));
-          missing = selectedSkillNames.filter((n) => !byName.has(n));
+          missing = effectiveSelectedSkillNames.filter((n) => !byName.has(n));
         }
       }
 
@@ -3765,7 +4207,7 @@ export function ChatPage(props: ChatPageProps) {
         return true;
       }
 
-      const selectedSkills = selectedSkillNames.map((n) => byName.get(n)!).filter(Boolean);
+      const selectedSkills = effectiveSelectedSkillNames.map((n) => byName.get(n)!).filter(Boolean);
       const allowBuiltinSkillManagement = selectedSkills.some(
         (skill) => skill.name === "skills-creator" || skill.name === "skills-installer",
       );
@@ -3914,6 +4356,27 @@ export function ChatPage(props: ChatPageProps) {
       }));
     }
 
+    const taskStateStore = {
+      runId: conversationRunId,
+      getState: () => nextConversationState.meta.taskList,
+      commitState: async (taskList: NonNullable<ConversationViewState["meta"]["taskList"]>) => {
+        const state = setTaskListState(nextConversationState, taskList);
+        applyConversationState(state);
+        await persistConversationWithHistorySync({
+          conversationId,
+          sessionId,
+          providerId,
+          model,
+          selectedModel,
+          cwd: conversationCwd,
+          state,
+          fallbackTitle,
+          createdAt,
+          titlePromise,
+        });
+      },
+    };
+
     function rebaseConversationStateDuringRun(nextState: ConversationViewState) {
       // Once a compaction/prune result is committed into visible history, the
       // corresponding live transcript becomes stale and must be cleared.
@@ -3935,35 +4398,61 @@ export function ChatPage(props: ChatPageProps) {
               authMode: providerConfig.authMode,
               oauthAccountId: providerConfig.oauthAccountId,
               customHeaders: providerConfig.customHeaders,
+              isFullUrl: providerConfig.isFullUrl,
               requestFormat: providerConfig.requestFormat,
               reasoning: providerConfig.reasoning,
               promptCachingEnabled: providerConfig.promptCachingEnabled,
+              promptCacheHintMode: providerConfig.promptCacheHintMode,
               nativeWebSearchEnabled: providerConfig.nativeWebSearchEnabled,
               useSystemProxy: providerConfig.useSystemProxy,
               modelConfig: providerConfig.modelConfig,
             },
+            failover: failoverParams,
             runtimeModel,
             selectedModel,
             memoryExtractionModel,
             onMemoryExtractionModelFailure: handleMemoryExtractionModelFailure,
             memoryExtractionStatusText,
             effectiveWorkdir,
+            additionalRoots,
             effectiveSkillsEnabled,
             showSilentMemoryExtraction: effectiveIsAgentDevExecutionMode,
             skillsRootDir: skillsRootDirForTools,
             skillAccessPolicy: skillAccessPolicyForTools,
             onManagedSkillsChanged: (change) => {
-              enableManagedSkills(change.names);
+              if (change.action !== "delete") {
+                enableManagedSkills(change.names);
+                return;
+              }
+              setSettings((prev) =>
+                removeWorkspaceResourceReferences(
+                  updateSkills(prev, {
+                    selected: prev.skills.selected.filter(
+                      (name) => !change.names.includes(name),
+                    ),
+                  }),
+                  { skillNames: change.names },
+                ),
+              );
             },
             agentTemplates: settings.agents,
             selectedSystemToolIds: effectiveSelectedSystemToolIds,
             cloudExecution: settings.access,
             nativeMobileRuntime: !desktopBridgeEnabled,
             lanPcCommandHostReady,
-            getMcpSettings,
+            getMcpSettings: getEffectiveMcpSettings,
             getToolPolicies,
+            commandSafetyMode: settings.system.commandSafetyMode,
+            planModeEnabled: runtimeControls.planModeEnabled,
             applyMcpOps: (ops) => {
-              setSettings((prev) => applyMcpOpsToAppSettings(prev, ops));
+              const removedIds = ops
+                .filter((op) => op.kind === "remove")
+                .map((op) => op.serverId);
+              setSettings((prev) =>
+                removeWorkspaceResourceReferences(applyMcpOpsToAppSettings(prev, ops), {
+                  mcpServerIds: removedIds,
+                }),
+              );
             },
             sshHosts: settings.ssh.hosts,
             associatedSshHostIds: effectiveAssociatedSshHostIds,
@@ -3973,7 +4462,9 @@ export function ChatPage(props: ChatPageProps) {
               }
             },
             sessionId,
+            taskStateStore,
             conversationId,
+            checkpointTurnId: conversationRunId,
             conversationCwd,
             fallbackTitle,
             createdAt,
@@ -4001,6 +4492,14 @@ export function ChatPage(props: ChatPageProps) {
             commitVisibleAbortedConversation,
             updateConversationRuntimeEntry,
             persistConversationWithHistorySync,
+            trajectory: trajectoryRecording?.recorder,
+            trajectoryTurn,
+            trajectoryMessageIndex: Math.max(
+              0,
+              nextConversationState.meta.totalMessageCount - 1,
+            ),
+            trajectoryMessageId: pendingUserMessage.id,
+            readTrajectorySlots: trajectoryRecording?.readSlots,
           },
         });
       } else {
@@ -4015,13 +4514,16 @@ export function ChatPage(props: ChatPageProps) {
               authMode: providerConfig.authMode,
               oauthAccountId: providerConfig.oauthAccountId,
               customHeaders: providerConfig.customHeaders,
+              isFullUrl: providerConfig.isFullUrl,
               requestFormat: providerConfig.requestFormat,
               reasoning: providerConfig.reasoning,
               promptCachingEnabled: providerConfig.promptCachingEnabled,
+              promptCacheHintMode: providerConfig.promptCacheHintMode,
               nativeWebSearchEnabled: providerConfig.nativeWebSearchEnabled,
               useSystemProxy: providerConfig.useSystemProxy,
               modelConfig: providerConfig.modelConfig,
             },
+            failover: failoverParams,
             runtimeModel,
             selectedModel,
             memoryExtractionModel,
@@ -4052,6 +4554,14 @@ export function ChatPage(props: ChatPageProps) {
             commitVisibleAbortedConversation,
             updateConversationRuntimeEntry,
             persistConversationWithHistorySync,
+            trajectory: trajectoryRecording?.recorder,
+            trajectoryTurn,
+            trajectoryMessageIndex: Math.max(
+              0,
+              nextConversationState.meta.totalMessageCount - 1,
+            ),
+            trajectoryMessageId: pendingUserMessage.id,
+            readTrajectorySlots: trajectoryRecording?.readSlots,
           },
         });
       }
@@ -4222,6 +4732,27 @@ export function ChatPage(props: ChatPageProps) {
     handleNewConversation();
   }, [handleNewConversation]);
 
+  useEffect(() => {
+    if (nativeMobile) return;
+    let disposed = false;
+    let unlistenAction: (() => void) | undefined;
+    void listen<{ action?: string }>("app:action", (event) => {
+      if (!disposed && event.payload?.action === "new-chat") {
+        handleDesktopNewConversation();
+      }
+    }).then((unlisten) => {
+      if (disposed) {
+        unlisten();
+      } else {
+        unlistenAction = unlisten;
+      }
+    });
+    return () => {
+      disposed = true;
+      unlistenAction?.();
+    };
+  }, [handleDesktopNewConversation, nativeMobile]);
+
   const handleSelectConversation = useCallback(
     (id: string) => {
       const targetConversationId = id.trim();
@@ -4238,14 +4769,169 @@ export function ChatPage(props: ChatPageProps) {
     [compactViewport, openController],
   );
 
+  const automationState = useAutomation();
+  const trayPrefs = useTrayPrefs();
+
+  useEffect(() => {
+    if (nativeMobile) return;
+    let disposed = false;
+    let unlistenAction: (() => void) | undefined;
+    let unlistenFeedback: (() => void) | undefined;
+
+    const stopConversationRun = (conversationId: string) => {
+      const stopped = stopConversation(conversationId);
+      if (!stopped && !runningConversationIds.has(conversationId)) {
+        consumeConversationStop(conversationId);
+      }
+    };
+
+    void listen<{ action?: string; id?: string }>("app:action", (event) => {
+      if (disposed) return;
+      switch (event.payload?.action) {
+        case "open-conversation": {
+          const conversationId = event.payload.id?.trim();
+          if (!conversationId) break;
+          setActiveView("chat");
+          setDesktopNavigationTarget("conversations");
+          handleSelectConversation(conversationId);
+          break;
+        }
+        case "view-all-conversations":
+          setActiveView("chat");
+          setDesktopNavigationTarget("conversations");
+          setSidebarOpen(true);
+          break;
+        case "switch-workspace": {
+          const projectId = event.payload.id?.trim();
+          const project = workspaceProjects.find((entry) => entry.id === projectId);
+          if (!project) break;
+          setActiveView("chat");
+          void handleSelectWorkspaceProject(project);
+          break;
+        }
+        case "stop-run": {
+          const conversationId = event.payload.id?.trim();
+          if (conversationId) stopConversationRun(conversationId);
+          break;
+        }
+        case "stop-all-runs":
+          for (const conversationId of runningConversationIds) {
+            stopConversationRun(conversationId);
+          }
+          break;
+        default:
+          break;
+      }
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else unlistenAction = unlisten;
+    });
+
+    void listen<{
+      action?: string;
+      id?: string;
+      ok?: boolean;
+      error?: string;
+      value?: string;
+    }>("app:action-feedback", (event) => {
+      if (disposed || event.payload.action !== "toggle-cron-task") return;
+      const taskId = event.payload.id?.trim() || "";
+      const task = getAutomationState().cron.tasks.find((entry) => entry.id === taskId);
+      const name = task?.name.trim() || taskId;
+      if (event.payload.ok) {
+        const key = event.payload.value === "enabled" ? "tray.cronEnabled" : "tray.cronDisabled";
+        addNotify("success", t(key).replace("{name}", name));
+      } else {
+        addNotify(
+          "error",
+          t("tray.cronToggleFailed")
+            .replace("{name}", name)
+            .replace("{error}", event.payload.error || ""),
+        );
+      }
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else unlistenFeedback = unlisten;
+    });
+
+    return () => {
+      disposed = true;
+      unlistenAction?.();
+      unlistenFeedback?.();
+    };
+  }, [
+    addNotify,
+    handleSelectConversation,
+    handleSelectWorkspaceProject,
+    nativeMobile,
+    runningConversationIds,
+    t,
+    workspaceProjects,
+  ]);
+
+  useEffect(() => {
+    if (nativeMobile) return;
+    const timer = window.setTimeout(() => {
+      void syncTrayMenu(
+        buildTrayMenuModel({
+          locale,
+          theme: settings.theme,
+          conversations: historyItems,
+          runningConversationIds,
+          workspaceProjects,
+          activeWorkspaceProjectId: activeWorkspaceProject?.id,
+          archivedWorkspaceProjectPaths: settings.system.archivedWorkspaceProjectPaths,
+          cronTasks: automationState.cron.tasks,
+          prefs: trayPrefs,
+        }),
+      );
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [
+    activeWorkspaceProject?.id,
+    automationState.cron.tasks,
+    historyItems,
+    locale,
+    nativeMobile,
+    runningConversationIds,
+    settings.system.archivedWorkspaceProjectPaths,
+    settings.theme,
+    trayPrefs,
+    workspaceProjects,
+  ]);
+
   // Called by the sidebar container after the store confirmed a deletion so
   // local runtime caches and the visible conversation stay consistent.
   const handleConversationDeleted = useCallback((id: string) => {
     cleanupDeletedConversationActionRef.current(id);
   }, []);
 
+  const handleConversationCwdChanged = useCallback(
+    (conversationId: string, cwd: string) => {
+      syncMovedConversationRuntimeWorkdir({
+        conversationId,
+        cwd,
+        runtimeCache: conversationRuntimeCacheRef.current,
+        isConversationRunning,
+        updateConversationRuntimeEntry,
+      });
+    },
+    [conversationRuntimeCacheRef, isConversationRunning, updateConversationRuntimeEntry],
+  );
+
   const handleSend = useCallback(() => {
     const conversationId = currentConversationIdRef.current.trim();
+    const composerText = composerRef.current?.getDraft().text.trim() ?? "";
+    const pendingPlan = getPendingPlanForConversation(conversationId);
+    if (
+      settings.chatRuntimeControls.planModeEnabled &&
+      pendingPlan &&
+      isPlanApprovalMessage(composerText)
+    ) {
+      const outcome = answerPlanDecision(pendingPlan.toolCallId, "approve", { conversationId });
+      if (outcome.ok) composerRef.current?.clear();
+      return;
+    }
     const runtimeEntry = conversationRuntimeCacheRef.current.get(conversationId);
     if (queuedChatTurnEditSlotRef.current?.conversationId === conversationId) {
       if (enqueueCurrentComposerTurn("edit")) {
@@ -4257,8 +4943,9 @@ export function ChatPage(props: ChatPageProps) {
       enqueueCurrentComposerTurn("end");
       return;
     }
+    if (conversationId) consumeConversationStop(conversationId);
     void sendActionRef.current();
-  }, [enqueueCurrentComposerTurn, isConversationRunning]);
+  }, [enqueueCurrentComposerTurn, isConversationRunning, settings.chatRuntimeControls.planModeEnabled]);
 
   const handleStopSending = useCallback(() => {
     stopSendingActionRef.current();
@@ -4443,23 +5130,96 @@ export function ChatPage(props: ChatPageProps) {
     : t("chat.upload.dropDisabledHint");
   const fileDropLimitHint = t("chat.upload.dropLimit").replace("{max}", String(MAX_UPLOAD_FILES));
 
+  const importDroppedPaths = useCallback(
+    async (paths: string[]) => {
+      try {
+        const classified = await invoke<{ files: string[]; dirs: string[] }>(
+          "system_classify_dropped_paths",
+          { paths },
+        );
+        if (classified.dirs.length > 0) {
+          if (!activeWorkspaceProject?.path.trim()) {
+            addNotify("warning", t("chat.workspaceMountDropNoProject"));
+          } else {
+            const existingGrants = await listWorkspaceRootGrants(activeWorkspaceProject);
+            const result = buildDroppedWorkspaceRootDrafts({
+              projectPath: activeWorkspaceProject.path,
+              existingGrants,
+              folderPaths: classified.dirs,
+            });
+            if (result.addedPaths.length > 0) {
+              await applyWorkspaceRootGrants(activeWorkspaceProject, result.drafts);
+              addNotify(
+                "success",
+                t("chat.workspaceMountDropSuccess").replace(
+                  "{count}",
+                  String(result.addedPaths.length),
+                ),
+              );
+            }
+            if (result.skippedInsideWorkspace.length > 0) {
+              addNotify(
+                "warning",
+                t("chat.workspaceMountDropSkippedInside").replace(
+                  "{count}",
+                  String(result.skippedInsideWorkspace.length),
+                ),
+              );
+            }
+            if (result.skippedOverlapping.length > 0) {
+              addNotify(
+                "warning",
+                t("chat.workspaceMountDropSkippedOverlap").replace(
+                  "{count}",
+                  String(result.skippedOverlapping.length),
+                ),
+              );
+            }
+          }
+        }
+        if (classified.files.length === 0) return;
+        if (!canDropUpload) {
+          setErrorMessage(fileDropTitle);
+          return;
+        }
+        await importReadableFilePaths(classified.files);
+      } catch (error) {
+        setErrorMessage(asErrorMessage(error, t("chat.workspaceMountDropFailed")));
+      }
+    },
+    [
+      activeWorkspaceProject,
+      addNotify,
+      canDropUpload,
+      fileDropTitle,
+      importReadableFilePaths,
+      t,
+    ],
+  );
+
   useEffect(() => {
     let cancelled = false;
     let unlisten: (() => void) | null = null;
 
     listenFileDrop((event) => {
       if (event.type === "enter" || event.type === "over") {
-        setIsFileDropActive(true);
+        const scaleFactor = nativeDropPositionScaleFactor(
+          window.navigator.userAgent,
+          window.devicePixelRatio,
+        );
+        setIsFileDropActive(isNativeDropInsideUploadZone(event.position, { scaleFactor }));
         return;
       }
 
       if (event.type === "drop") {
         setIsFileDropActive(false);
-        if (!canDropUpload) {
-          setErrorMessage(fileDropTitle);
-          return;
+        const scaleFactor = nativeDropPositionScaleFactor(
+          window.navigator.userAgent,
+          window.devicePixelRatio,
+        );
+        if (isNativeDropInsideUploadZone(event.position, { scaleFactor })) {
+          void importDroppedPaths(event.paths);
         }
-        void importReadableFilePaths(event.paths);
         return;
       }
 
@@ -4482,20 +5242,15 @@ export function ChatPage(props: ChatPageProps) {
         unlisten();
       }
     };
-  }, [canDropUpload, fileDropTitle, importReadableFilePaths]);
+  }, [importDroppedPaths]);
 
   const { handleResendFromEdit } = useEditResend({
-    conversationState,
     isSending,
     isConversationHydrating,
     isConversationHydrationFailed,
     currentConversationIdRef,
     composerRef,
-    setPendingUploadsForConversation,
-    updateConversationRuntimeEntry,
-    invalidateSubagentsForConversation: (conversationId) => {
-      subagentStoresRef.current.invalidate(conversationId);
-    },
+    onError: (error) => setErrorMessage(asErrorMessage(error, t("chat.editFailed"))),
     sendActionRef,
   });
 
@@ -4573,6 +5328,7 @@ export function ChatPage(props: ChatPageProps) {
           activeView={activeView}
           showProjects={isAgentMode}
           projects={workspaceProjects}
+          workspaceProjectGroups={workspaceProjectGroups}
           activeProjectId={activeWorkspaceProject?.id}
           missingProjectPathKeys={missingWorkspaceProjectPathKeys}
           projectRenamingId={projectRenamingId}
@@ -4584,6 +5340,11 @@ export function ChatPage(props: ChatPageProps) {
           onCreateProject={
             desktopBridgeEnabled || nativeMobile ? handleOpenCreateWorkspaceProject : undefined
           }
+          onCreateWorkspaceGroup={handleCreateWorkspaceGroup}
+          onRenameWorkspaceGroup={handleRenameWorkspaceGroup}
+          onDeleteWorkspaceGroup={handleDeleteWorkspaceGroup}
+          onMoveProjectToGroup={handleMoveWorkspaceProjectToGroup}
+          onToggleWorkspaceGroupCollapsed={handleToggleWorkspaceGroupCollapsed}
           onSelectProject={handleSelectWorkspaceProject}
           onNewConversationForProject={handleNewConversationForProject}
           onBrowseProjectInFileTree={
@@ -4613,6 +5374,7 @@ export function ChatPage(props: ChatPageProps) {
             handleSelectConversation(id);
           }}
           onConversationDeleted={handleConversationDeleted}
+          onConversationCwdChanged={handleConversationCwdChanged}
           onCloseSidebar={handleCloseSidebar}
           onOpenSettings={() => {
             if (mobileExperience) setSidebarOpen(false);
@@ -4817,14 +5579,44 @@ export function ChatPage(props: ChatPageProps) {
                 <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
               </div>
 
-              <ChangedFilesActionsProvider value={changedFilesActions}>
-                <ChatTranscript
+              <DesktopCheckpointRewindProvider
+                conversationId={currentConversationId}
+                workspaceRoot={currentConversationWorkspaceRoot}
+                project={
+                  workspaceProjects.find(
+                    (project) =>
+                      currentConversationWorkspaceRoot &&
+                      workspaceProjectPathKey(project.path) ===
+                        workspaceProjectPathKey(currentConversationWorkspaceRoot),
+                  ) ?? null
+                }
+                disabled={
+                  !desktopCommandHostAvailable ||
+                  !isAgentMode ||
+                  isSending ||
+                  isConversationRunning(currentConversationId)
+                }
+                onRewound={(info) => {
+                  const changed = info.result.restoredFiles + info.result.deletedFiles;
+                  const failed = info.result.conflicts.length + info.result.failed.length;
+                  addNotify(
+                    failed > 0 ? "warning" : "success",
+                    t("chat.checkpointRewind.done")
+                      .replace("{changed}", String(changed))
+                      .replace("{failed}", String(failed)),
+                  );
+                }}
+              >
+                <ChangedFilesActionsProvider value={changedFilesActions}>
+                  <ChatTranscript
                   conversationId={currentConversationId}
                   workspaceRoot={currentConversationWorkspaceRoot}
                   gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
                   followRef={scrollFollowRef}
                   hasModels={hasModels}
                   historyItems={historyRenderItems}
+                  hasMoreHistory={conversationState.transcript.hasMoreBefore}
+                  onLoadEarlierHistory={handleLoadEarlierHistory}
                   isHistorySwitching={conversationOpenState.showOverlay}
                   isSending={isSending}
                   isAgentMode={isAgentMode}
@@ -4833,6 +5625,7 @@ export function ChatPage(props: ChatPageProps) {
                   liveTranscriptStore={liveTranscriptStore}
                   isCompactionRunning={isCompactionRunning}
                   bottomReservePx={composerOverlayHeight}
+                  onOpenFileLink={desktopCommandHostAvailable ? handleOpenChatFileLink : undefined}
                   onResendFromEdit={handleResendFromEdit}
                   onBranchConversation={
                     // 水合中/水合失败时 handler 只会静默 return——直接不传，
@@ -4845,8 +5638,9 @@ export function ChatPage(props: ChatPageProps) {
                   onOpenSettings={onOpenSettings}
                   onSuggestionSelect={handleEmptyStateSuggestion}
                   suggestionsDisabled={isSuggestionTyping}
-                />
-              </ChangedFilesActionsProvider>
+                  />
+                </ChangedFilesActionsProvider>
+              </DesktopCheckpointRewindProvider>
 
               {mobileExperience ? (
                 <MobileToolActivity
@@ -4859,6 +5653,18 @@ export function ChatPage(props: ChatPageProps) {
                   bottomOffsetPx={composerOverlayHeight}
                 />
               ) : null}
+
+              <CurrentTaskProgress
+                historyItems={historyRenderItems}
+                liveTranscriptStore={liveTranscriptStore}
+                isConversationRunning={
+                  isSending ||
+                  (currentConversationId
+                    ? isConversationRunning(currentConversationId)
+                    : false)
+                }
+                persistedState={conversationState.meta.taskList}
+              />
 
               {pendingToolApprovals.length > 0 ? (
                 <ToolApprovalBar
@@ -4881,6 +5687,7 @@ export function ChatPage(props: ChatPageProps) {
               ) : null}
 
               <ChatComposerBar
+                conversationId={currentConversationId}
                 composerRef={composerRef}
                 isSending={isSending}
                 isUploadingFiles={isUploadingFiles}
@@ -4892,6 +5699,11 @@ export function ChatPage(props: ChatPageProps) {
                 chatRuntimeControls={chatRuntimeControlsForCurrentProvider}
                 reasoningOptions={chatRuntimeReasoningOptions}
                 thinkingAlwaysOn={chatRuntimeThinkingAlwaysOn}
+                contextUsageTokensSource={contextUsageTokensSource}
+                contextWindow={currentModelContextWindow}
+                sttSettings={desktopCommandHostAvailable ? settings.stt : undefined}
+                onManualCompact={handleManualCompaction}
+                manualCompactionDisabled={isSending || compactionStatus.phase === "running"}
                 gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
                 workspaceActivityClient={
                   desktopCommandHostAvailable ? tauriWorkspaceActivityClient : null
@@ -5048,15 +5860,24 @@ export function ChatPage(props: ChatPageProps) {
             onClose={() => setMobileWorkspaceDestination(null)}
           />
         ) : null}
-        {nativeMobile ? (
+        {nativeMobile || desktopBridgeEnabled ? (
           <MobileWorkspaceCreateDialog
             open={mobileWorkspaceCreateOpen}
             parent={parentWorkspacePath(getDefaultWorkspaceProjectPath(settings.system))}
+            cloneAvailable={desktopBridgeEnabled}
             onCreated={(path, kind) => {
               setMobileWorkspaceCreateOpen(false);
               activateWorkspaceProject(createWorkspaceProjectFromPath(path, kind));
             }}
+            onCloneStarted={() => setMobileWorkspaceCreateOpen(false)}
             onClose={() => setMobileWorkspaceCreateOpen(false)}
+          />
+        ) : null}
+        {desktopBridgeEnabled ? (
+          <WorkspaceCloneTaskOverlay
+            onOpenWorkspace={(path) => {
+              activateWorkspaceProject(createWorkspaceProjectFromPath(path, "managed"));
+            }}
           />
         ) : null}
         {workspaceEditorMounted ? (
@@ -5126,6 +5947,7 @@ export function ChatPage(props: ChatPageProps) {
               sessions={terminalSessions}
               client={tauriTerminalClient}
               sftpClient={tauriSftpClient}
+              localForwardClient={tauriSshLocalForwardClient}
               theme={effectiveTheme}
               isOpen={workspaceSshTerminalOpen}
               onHide={() => setWorkspaceSshTerminalOpen(false)}

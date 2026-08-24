@@ -7,6 +7,7 @@ import {
   mergePendingUploadedFiles,
   type PendingUploadedFile,
 } from "../../../lib/chat/messages/uploadedFiles";
+import { invalidateUploadedImagePreviewCache } from "../transcript/uploadedImagePreview";
 
 type SystemPickReadableFilesResponse = {
   files: PendingUploadedFile[];
@@ -226,6 +227,9 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
         return;
       }
       if (result.files.length > 0) {
+        for (const file of result.files) {
+          invalidateUploadedImagePreviewCache(targetWorkdir, file);
+        }
         const previous = getPendingUploadsForConversation(targetConversationId);
         const merged = mergePendingUploadedFiles(previous, result.files);
         if (merged.length > MAX_UPLOAD_FILES) {

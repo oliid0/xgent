@@ -1,13 +1,21 @@
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
-import type { ReactNode } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
 
 import { Markdown } from "../../../../components/Markdown";
+import { useLocale } from "../../../../i18n";
 import {
   previewText,
   type ToolTraceItem,
   toolResultMessageToText,
 } from "../../../../lib/chat/messages/uiMessages";
 import { cn } from "../../../../lib/shared/utils";
+import {
+  answerPlanDecision,
+  getPlanDecisionVersion,
+  isPlanApprovalToolCall,
+  isPlanDecisionPending,
+  subscribePlanDecisions,
+} from "../../../../lib/tools/planModeTools";
 import type {
   SubagentBatchDetails,
   SubagentCardDetails,
@@ -218,10 +226,44 @@ export function ToolResultDisplay({
   item: ToolTraceItem;
   result: ToolResultMessage;
 }) {
+  const { t } = useLocale();
+  useSyncExternalStore(subscribePlanDecisions, getPlanDecisionVersion, getPlanDecisionVersion);
   const kind = getBuiltinResultKind(result);
   const text = extractResultText(result);
   const images = getToolResultImages(result);
   const shellDetails = isShellResultDetails(result.details) ? result.details : null;
+  const rawDetails =
+    result.details && typeof result.details === "object"
+      ? (result.details as Record<string, unknown>)
+      : null;
+
+  if (rawDetails?.kind === "exit_plan_mode" && typeof rawDetails.plan === "string") {
+    const pending = isPlanDecisionPending(result.toolCallId);
+    const approved = isPlanApprovalToolCall(result.toolCallId);
+    return (
+      <div className="space-y-3 rounded-xl border border-violet-500/20 bg-violet-500/[0.04] p-3.5">
+        <Markdown content={rawDetails.plan} />
+        <div className="flex items-center justify-end gap-2 border-t border-violet-500/15 pt-3">
+          <span className="mr-auto text-xs text-muted-foreground">
+            {approved
+              ? t("chat.planMode.approved")
+              : pending
+                ? t("chat.planMode.pending")
+                : t("chat.planMode.updated")}
+          </span>
+          {pending ? (
+            <button
+              type="button"
+              onClick={() => answerPlanDecision(result.toolCallId, "approve")}
+              className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-violet-500"
+            >
+              {t("chat.planMode.approve")}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   if (item.toolCall.name === "Bash") {
     if (!shellDetails) return null;

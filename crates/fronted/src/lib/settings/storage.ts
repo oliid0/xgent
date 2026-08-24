@@ -11,9 +11,11 @@ import {
   normalizeCloseWindowBehavior,
   normalizeFontFamily,
   normalizeFontScaleSettings,
+  normalizeModelFailoverSettings,
   normalizeSelectedModel,
   normalizeSettings,
   normalizeSkillsSettings,
+  normalizeSttSettings,
   normalizeTheme,
   normalizeUpdateSettings,
   normalizeWorkspaceToolsSettings,
@@ -33,6 +35,8 @@ type PersistedSettingsResponse = {
   agents?: unknown | null;
   ssh?: unknown | null;
   access?: unknown | null;
+  stt?: unknown | null;
+  modelFailover?: unknown | null;
   memory?: unknown | null;
   defaultWorkdir?: unknown | null;
 };
@@ -56,12 +60,12 @@ export type SettingsSaveState =
 
 type SshPatchApplyResponse = {
   ssh?: unknown;
-  conflict?: string | null;
+  conflict?: "settings_changed" | null;
 };
 
 export type PersistSettingsResult = {
   ssh?: AppSettings["ssh"];
-  conflict?: string;
+  conflict?: "ssh_settings_changed";
 };
 
 function readLocalUiSettings(): {
@@ -215,6 +219,11 @@ export async function loadPersistedSettingsWithDefaults(): Promise<PersistedSett
     agents: (persisted?.agents ?? defaults.agents) as AppSettings["agents"],
     ssh: (persisted?.ssh ?? defaults.ssh) as AppSettings["ssh"],
     access: (persisted?.access ?? defaults.access) as AppSettings["access"],
+    stt: normalizeSttSettings(persisted?.stt ?? defaults.stt),
+    modelFailover: normalizeModelFailoverSettings(
+      persisted?.modelFailover ?? defaults.modelFailover,
+      (persisted?.providers ?? defaults.customProviders) as AppSettings["customProviders"],
+    ),
     memory: (persisted?.memory ?? defaults.memory) as AppSettings["memory"],
     skills: localUi.skills,
     chatRuntimeControls: localUi.chatRuntimeControls,
@@ -292,7 +301,7 @@ export async function persistSettings(
           result.ssh = normalizeSettings({ ssh: response.ssh as AppSettings["ssh"] }).ssh;
         }
         if (response?.conflict) {
-          result.conflict = response.conflict;
+          result.conflict = "ssh_settings_changed";
         }
       }),
     );
@@ -302,6 +311,22 @@ export async function persistSettings(
     tasks.push(
       invoke("settings_save_access", {
         payload: next.access,
+      } as any),
+    );
+  }
+
+  if (hasChanged(prev.stt, next.stt)) {
+    tasks.push(
+      invoke("settings_save_stt", {
+        payload: { ...next.stt, allowIncomplete: true },
+      } as any),
+    );
+  }
+
+  if (hasChanged(prev.modelFailover, next.modelFailover)) {
+    tasks.push(
+      invoke("settings_save_model_failover", {
+        payload: next.modelFailover,
       } as any),
     );
   }

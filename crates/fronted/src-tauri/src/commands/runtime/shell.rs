@@ -16,7 +16,11 @@ use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use std::path::{Path, PathBuf};
 
 #[cfg(desktop)]
-use crate::runtime::shell_runner::{run_shell_script, ShellRunRegistry};
+use crate::runtime::sandbox::{resolve_effective_options, SandboxOptions};
+#[cfg(desktop)]
+use crate::runtime::shell_runner::{run_shell_script_with_envs, ShellRunRegistry};
+#[cfg(desktop)]
+use crate::runtime::shell_session::{ShellSessionManager, ShellSessionResponse};
 use crate::runtime::shell_types::ShellRunResponse;
 #[cfg(mobile)]
 use crate::services::lan_pc_client::LanPcClient;
@@ -371,6 +375,8 @@ pub async fn shell_run(
     max_timeout_ms: Option<u64>,
     provider_id: Option<String>,
     run_id: Option<String>,
+    sandbox: bool,
+    sandbox_allow_network: bool,
 ) -> Result<ShellRunResponse, String> {
     run_mobile_shell(
         app,
@@ -429,6 +435,8 @@ pub async fn mobile_ssh_exec(
     .await
 }
 
+/// Cancels any run registered in the shared `ShellRunRegistry` — shell
+/// commands, MCP tool calls, and SSH exec all park their cancel tokens there.
 #[tauri::command(rename_all = "snake_case")]
 #[cfg(desktop)]
 pub async fn shell_run(
@@ -441,15 +449,23 @@ pub async fn shell_run(
     max_timeout_ms: Option<u64>,
     provider_id: Option<String>,
     run_id: Option<String>,
+    sandbox: Option<bool>,
+    sandbox_allow_network: Option<bool>,
 ) -> Result<ShellRunResponse, String> {
     let _ = app;
+    let sandbox_options = resolve_effective_options(sandbox.unwrap_or(false).then_some(
+        SandboxOptions {
+            allow_network: sandbox_allow_network.unwrap_or(false),
+        },
+    ))?;
     let normalized_run_id = run_id
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty());
     let cancel_token = normalized_run_id.as_deref().map(|id| registry.register(id));
+    let registered_token = cancel_token.clone();
 
     let join_result = tauri::async_runtime::spawn_blocking(move || {
-        run_shell_script(
+        run_shell_script_with_envs(
             workdir,
             command,
             cwd,
@@ -457,12 +473,14 @@ pub async fn shell_run(
             max_timeout_ms,
             provider_id,
             cancel_token,
+            &[],
+            sandbox_options,
         )
     })
     .await;
 
-    if let Some(run_id) = normalized_run_id {
-        registry.unregister(&run_id);
+    if let (Some(run_id), Some(token)) = (normalized_run_id.as_deref(), registered_token.as_ref()) {
+        registry.unregister(run_id, token);
     }
 
     join_result.map_err(|e| format!("shell_run join failed: {e}"))?
@@ -522,4 +540,79 @@ pub fn shell_cancel(
     ShellCancelResponse {
         cancelled: registry.cancel(run_id.trim()),
     }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+#[cfg(desktop)]
+pub fn runtime_cancel(
+    registry: State<'_, Arc<ShellRunRegistry>>,
+    run_id: String,
+) -> ShellCancelResponse {
+    ShellCancelResponse {
+        cancelled: registry.cancel(run_id.trim()),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+#[tauri::command(rename_all = "snake_case")]
+#[cfg(desktop)]
+pub async fn shell_session_start(
+    manager: State<'_, Arc<ShellSessionManager>>,
+    session_id: String,
+    workdir: String,
+    command: String,
+    cwd: Option<String>,
+    yield_time_ms: Option<u64>,
+    timeout_ms: Option<u64>,
+    max_timeout_ms: Option<u64>,
+    sandbox: Option<bool>,
+    sandbox_allow_network: Option<bool>,
+) -> Result<ShellSessionResponse, String> {
+    let manager = Arc::clone(manager.inner());
+    let sandbox_options = resolve_effective_options(sandbox.unwrap_or(false).then_some(
+        SandboxOptions {
+            allow_network: sandbox_allow_network.unwrap_or(false),
+        },
+    ))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        manager.start(
+            session_id,
+            workdir,
+            command,
+            cwd,
+            yield_time_ms,
+            timeout_ms,
+            max_timeout_ms,
+            sandbox_options,
+        )
+    })
+    .await
+    .map_err(|error| format!("shell_session_start join failed: {error}"))?
+}
+
+#[tauri::command(rename_all = "snake_case")]
+#[cfg(desktop)]
+pub async fn shell_session_wait(
+    manager: State<'_, Arc<ShellSessionManager>>,
+    session_id: String,
+    cursor: Option<u64>,
+    yield_time_ms: Option<u64>,
+) -> Result<ShellSessionResponse, String> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.wait(&session_id, cursor, yield_time_ms))
+        .await
+        .map_err(|error| format!("shell_session_wait join failed: {error}"))?
+}
+
+#[tauri::command(rename_all = "snake_case")]
+#[cfg(desktop)]
+pub async fn shell_session_stop(
+    manager: State<'_, Arc<ShellSessionManager>>,
+    session_id: String,
+    cursor: Option<u64>,
+) -> Result<ShellSessionResponse, String> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.stop(&session_id, cursor))
+        .await
+        .map_err(|error| format!("shell_session_stop join failed: {error}"))?
 }

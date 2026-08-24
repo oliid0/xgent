@@ -11,6 +11,9 @@ use wait_timeout::ChildExt;
 
 use crate::runtime::process::{configure_child_process_group, kill_child_process_tree_best_effort};
 
+mod enhancements;
+pub use enhancements::*;
+
 const GIT_DIFF_MAX_BYTES: usize = 512 * 1024;
 const GIT_UNTRACKED_FILE_MAX_BYTES: u64 = 128 * 1024;
 const GIT_COMMAND_TIMEOUT_SECS: u64 = 60;
@@ -95,6 +98,7 @@ pub struct GitBranch {
 pub struct GitBranchesResponse {
     pub state: GitRepositoryState,
     pub branches: Vec<GitBranch>,
+    pub worktrees: Vec<GitWorktreeInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -624,7 +628,14 @@ pub(crate) fn git_status_sync(workdir: String) -> Result<GitRepositoryState, Str
     };
     let output = git_output(
         &repo_root,
-        &["status", "--porcelain=v2", "--branch", "--show-stash", "-z"],
+        &[
+            "status",
+            "--porcelain=v2",
+            "--branch",
+            "--show-stash",
+            "--untracked-files=all",
+            "-z",
+        ],
     )?;
     if !output.status.success() {
         return Ok(GitRepositoryState {
@@ -684,6 +695,7 @@ pub(crate) fn git_branches_sync(workdir: String) -> Result<GitBranchesResponse, 
         return Ok(GitBranchesResponse {
             state,
             branches: Vec::new(),
+            worktrees: Vec::new(),
         });
     }
     let output = git_success(
@@ -748,7 +760,12 @@ pub(crate) fn git_branches_sync(workdir: String) -> Result<GitBranchesResponse, 
             .cmp(&right.kind)
             .then_with(|| left.full_name.cmp(&right.full_name))
     });
-    Ok(GitBranchesResponse { state, branches })
+    let worktrees = git_worktrees_sync(&state.repo_root)?;
+    Ok(GitBranchesResponse {
+        state,
+        branches,
+        worktrees,
+    })
 }
 
 fn ensure_ready_state(workdir: &str) -> Result<GitRepositoryState, String> {
@@ -909,6 +926,13 @@ fn validate_git_remote_url(value: &str) -> Result<String, String> {
     }
     if value.chars().any(|ch| matches!(ch, '\0' | '\n' | '\r')) {
         return Err("远端仓库地址不能包含换行或空字符。".to_string());
+    }
+    let helper_scheme_len = value
+        .chars()
+        .take_while(|&ch| ch.is_ascii_alphanumeric() || matches!(ch, '+' | '-' | '.'))
+        .count();
+    if value[helper_scheme_len..].starts_with("::") {
+        return Err("不支持 remote helper 形式的远程地址（如 ext::）。".to_string());
     }
     Ok(value.to_string())
 }
@@ -2080,6 +2104,14 @@ pub(crate) fn git_diff_sync(
     ];
     if mode == "working_tree" {
         args.push("HEAD".to_string());
+    } else if mode == "staged" {
+        args.push("--cached".to_string());
+        base_ref = if ref_exists(&state.repo_root, "HEAD") {
+            "HEAD".to_string()
+        } else {
+            "ROOT".to_string()
+        };
+        head_ref = "INDEX".to_string();
     } else {
         base_ref = resolve_review_base(&state);
         if base_ref.is_empty() {
@@ -2418,11 +2450,9 @@ pub(crate) fn git_delete_branch_sync(
         return Err("不能删除当前检出的分支。".to_string());
     }
     let delete_flag = if force == Some(true) { "-D" } else { "-d" };
-    operation_response(
-        &workdir,
-        git_success(&state.repo_root, &["branch", delete_flag, branch.as_str()]),
-        "分支已删除。",
-    )
+    let result = git_success(&state.repo_root, &["worktree", "prune", "--expire", "now"])
+        .and_then(|_| git_success(&state.repo_root, &["branch", delete_flag, branch.as_str()]));
+    operation_response(&workdir, result, "分支已删除。")
 }
 
 pub(crate) fn git_rename_branch_sync(

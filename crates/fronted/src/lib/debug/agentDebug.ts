@@ -2,12 +2,14 @@ import type { Context } from "@earendil-works/pi-ai";
 import { invoke } from "@xagent/runtime";
 
 import type { CodexRequestFormat, ExecutionMode, ProviderId, ReasoningLevel } from "../settings";
+import type { PrefixCacheDiagnostics } from "./prefixCacheShape";
 
 type DebugLineType = "request" | "result" | "error";
 
 type RuntimeDebugInput = {
   baseUrl: string;
   apiKey: string;
+  customHeaders?: { key: string; value: string }[];
   requestFormat?: CodexRequestFormat;
   reasoning?: ReasoningLevel;
   promptCachingEnabled?: boolean;
@@ -85,7 +87,10 @@ function sanitizeDebugValue(value: unknown, seen = new WeakSet<object>()): unkno
   if (valueType === "number" || valueType === "boolean") return value;
   if (valueType === "bigint") return value.toString();
   if (valueType === "undefined") return "[undefined]";
-  if (valueType === "function") return `[Function ${(value as Function).name || "anonymous"}]`;
+  if (valueType === "function") {
+    const functionName = (value as { name?: string }).name;
+    return `[Function ${functionName || "anonymous"}]`;
+  }
   if (value instanceof Date) return value.toISOString();
   if (value instanceof Error) {
     return {
@@ -193,6 +198,9 @@ export function buildRuntimeDebugInfo(runtime: RuntimeDebugInput) {
     nativeWebSearchEnabled: runtime.nativeWebSearchEnabled,
     useSystemProxy: runtime.useSystemProxy,
     hasApiKey: runtime.apiKey.trim().length > 0,
+    // Keep values redacted while exposing enough shape to diagnose headers
+    // that were lost between settings and the provider request.
+    customHeaderKeys: (runtime.customHeaders ?? []).map((header) => header.key),
   };
 }
 
@@ -201,10 +209,12 @@ export function buildStreamRequestDebugPayload(params: {
   context: Context;
   options?: unknown;
   round?: number;
+  prefixCache?: PrefixCacheDiagnostics;
 }) {
   return {
     round: params.round,
     runtime: buildRuntimeDebugInfo(params.runtime),
+    prefixCache: params.prefixCache,
     context: sanitizeDebugValue(params.context),
     options: sanitizeDebugValue(params.options ?? {}),
   };

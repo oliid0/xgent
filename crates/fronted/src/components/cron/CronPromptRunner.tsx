@@ -10,9 +10,11 @@ import { resolveRuntimePlatform } from "../../lib/runtimePlatform";
 import {
   type AppSettings,
   DEFAULT_CHAT_RUNTIME_CONTROLS,
+  filterMcpSettingsForWorkspace,
   findProviderModelConfig,
   isAgentDevMode,
   isAgentExecutionMode,
+  resolveWorkspaceResources,
   type ReasoningLevel,
 } from "../../lib/settings";
 import {
@@ -54,11 +56,12 @@ function buildCronSystemPrompt(taskName: string) {
   return lines.join("\n");
 }
 
-async function buildCronSkillsContext(settings: AppSettings) {
-  const selectedSkillNames = settings.skills.selected.filter(
+async function buildCronSkillsContext(settings: AppSettings, workdir: string) {
+  const resources = resolveWorkspaceResources(settings, workdir);
+  const selectedSkillNames = resources.skillNames.filter(
     (name) => !isAlwaysEnabledSkillName(name),
   );
-  if (!settings.skills.enabled || selectedSkillNames.length === 0) {
+  if (!resources.skillsEnabled || selectedSkillNames.length === 0) {
     return {
       enabled: false,
       prompt: "",
@@ -70,13 +73,21 @@ async function buildCronSkillsContext(settings: AppSettings) {
   const discovery = await discoverSkills({ force: true });
   const skillByName = new Map(discovery.skills.map((skill) => [skill.name, skill]));
   const missing = selectedSkillNames.filter((name) => !skillByName.has(name));
-  if (missing.length > 0) {
+  if (missing.length > 0 && resources.mode !== "custom") {
     throw new Error(`找不到以下 Skills：${missing.join(", ")}（请先重新扫描固定 Skills 目录）`);
   }
 
   const selectedSkills = selectedSkillNames
     .map((name) => skillByName.get(name))
     .filter((skill): skill is SkillSummary => Boolean(skill));
+  if (selectedSkills.length === 0) {
+    return {
+      enabled: false,
+      prompt: "",
+      rootDir: "",
+      accessPolicy: undefined as SkillAccessPolicy | undefined,
+    };
+  }
 
   return {
     enabled: true,
@@ -149,7 +160,8 @@ async function executeCronPromptRun(
     throw new Error(`Auto Prompt provider API key is empty: ${providerLabel}`);
   }
 
-  const skillsContext = await buildCronSkillsContext(settings);
+  const workspaceResources = resolveWorkspaceResources(settings, workdir);
+  const skillsContext = await buildCronSkillsContext(settings, workdir);
   const runtimePlatform = await resolveRuntimePlatform();
   const builtinRegistry = await buildBuiltinToolRegistry({
     workdir,
@@ -166,7 +178,7 @@ async function executeCronPromptRun(
     },
     selectedSystemToolIds: settings.system.selectedSystemTools,
     cloudExecution: settings.access,
-    getMcpSettings: () => settings.mcp,
+    getMcpSettings: () => filterMcpSettingsForWorkspace(settings.mcp, workspaceResources),
     mcpLoadFailureMode: "throw",
   });
 

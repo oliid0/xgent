@@ -95,6 +95,131 @@ pub(crate) async fn chat_history_get_tail(
     .map_err(|e| format!("chat_history_get_tail join 失败：{e}"))?
 }
 
+pub(crate) fn build_chat_history_window_record(
+    conn: &Connection,
+    record: &ChatHistoryRecord,
+    max_messages: i64,
+    before_offset: Option<i64>,
+    expected_revision: Option<&str>,
+    include_active_segment: bool,
+) -> Result<ChatHistoryWindowRecord, String> {
+    let chat_id = record.id.trim();
+    if chat_id.is_empty() {
+        return Err("history conversation id must not be empty".to_string());
+    }
+    if max_messages <= 0 {
+        return Err("history window maxMessages must be greater than zero".to_string());
+    }
+
+    let revision = build_history_revision(
+        &record.id,
+        record.updated_at,
+        record.active_segment_index,
+        record.total_segment_count,
+        record.total_message_count,
+    );
+    validate_expected_history_revision(expected_revision, &revision)?;
+
+    let end_offset = before_offset
+        .unwrap_or(record.total_message_count)
+        .clamp(0, record.total_message_count);
+    let requested_oldest_offset = end_offset.saturating_sub(max_messages).max(0);
+    let (segments, first_segment_offset) =
+        load_message_window_segments(conn, &record.id, requested_oldest_offset, end_offset)?;
+    if end_offset > requested_oldest_offset && segments.is_empty() {
+        return Err("history window did not resolve to stored segments".to_string());
+    }
+    let relative_end_offset = end_offset.saturating_sub(first_segment_offset);
+    let window =
+        build_history_message_window(&segments, max_messages, Some(relative_end_offset), true)?;
+    let oldest_offset = first_segment_offset.saturating_add(window.oldest_offset);
+    if oldest_offset > requested_oldest_offset
+        || first_segment_offset.saturating_add(window.end_offset) != end_offset
+        || window.returned_message_count != end_offset.saturating_sub(oldest_offset)
+    {
+        return Err("history window offsets are inconsistent".to_string());
+    }
+
+    let segment_windows = serialize_history_segment_windows(&window)?;
+    let conversation = get_summary_by_id(conn, &record.id)?;
+    let active_segment = if include_active_segment {
+        Some(load_segment_by_index(
+            conn,
+            &record.id,
+            record.active_segment_index,
+        )?)
+    } else {
+        None
+    };
+
+    Ok(ChatHistoryWindowRecord {
+        conversation,
+        segments: segment_windows,
+        active_segment,
+        context_meta_json: record.context_meta_json.clone(),
+        active_segment_index: record.active_segment_index,
+        total_segment_count: record.total_segment_count,
+        total_message_count: record.total_message_count,
+        returned_message_count: window.returned_message_count,
+        oldest_offset,
+        has_more_before: oldest_offset > 0,
+        revision,
+        updated_at: record.updated_at,
+    })
+}
+
+pub(crate) fn chat_history_get_window_sync(
+    conn: &mut Connection,
+    id: &str,
+    max_messages: i64,
+    before_offset: Option<i64>,
+    expected_revision: Option<&str>,
+    include_active_segment: bool,
+) -> Result<ChatHistoryWindowRecord, String> {
+    let chat_id = id.trim();
+    if chat_id.is_empty() {
+        return Err("history conversation id must not be empty".to_string());
+    }
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("failed to begin history-window read: {e}"))?;
+    let record = get_record_by_id(&tx, chat_id)?;
+    let result = build_chat_history_window_record(
+        &tx,
+        &record,
+        max_messages,
+        before_offset,
+        expected_revision,
+        include_active_segment,
+    )?;
+    tx.commit()
+        .map_err(|e| format!("failed to commit history-window read: {e}"))?;
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn chat_history_get_window(
+    id: String,
+    max_messages: i64,
+    before_offset: Option<i64>,
+    expected_revision: Option<String>,
+    include_active_segment: bool,
+) -> Result<ChatHistoryWindowRecord, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut conn = open_db()?;
+        chat_history_get_window_sync(
+            &mut conn,
+            &id,
+            max_messages,
+            before_offset,
+            expected_revision.as_deref(),
+            include_active_segment,
+        )
+    })
+    .await
+    .map_err(|e| format!("chat_history_get_window join failed: {e}"))?
+}
+
 #[tauri::command]
 pub async fn chat_history_get_active_segment(
     id: String,
@@ -218,16 +343,21 @@ pub async fn chat_history_upsert_active_segment(
 }
 
 pub(crate) async fn chat_history_append_segment_inner(
-    input: ChatHistorySegmentMutationInput,
+    input: ChatHistoryAppendSegmentInput,
 ) -> Result<ChatHistorySummary, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        validate_segment_mutation_input(&input)?;
+        validate_append_segment_input(&input)?;
         let mut conn = open_db()?;
         let tx = conn
             .transaction()
             .map_err(|e| format!("开启 append segment 事务失败：{e}"))?;
 
         validate_append_segment_preconditions(&tx, &input)?;
+        upsert_single_segment(
+            &tx,
+            input.conversation.id.trim(),
+            &input.previous_segment,
+        )?;
         upsert_chat_history_header(&tx, &input.conversation)?;
         insert_single_segment(&tx, input.conversation.id.trim(), &input.segment)?;
         verify_chat_history_consistency(&tx, input.conversation.id.trim())?;
@@ -243,7 +373,7 @@ pub(crate) async fn chat_history_append_segment_inner(
 
 #[tauri::command]
 pub async fn chat_history_append_segment(
-    input: ChatHistorySegmentMutationInput,
+    input: ChatHistoryAppendSegmentInput,
 ) -> Result<ChatHistorySummary, String> {
     chat_history_append_segment_inner(input).await
 }
@@ -306,4 +436,24 @@ pub async fn chat_history_set_model(
     selected_model_json: String,
 ) -> Result<ChatHistorySummary, String> {
     chat_history_set_model_inner(id, selected_model_json).await
+}
+
+pub(crate) async fn chat_history_set_cwd_inner(
+    id: String,
+    cwd: String,
+) -> Result<ChatHistorySummary, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let conn = open_db()?;
+        set_chat_history_cwd_sync(&conn, &id, &cwd)
+    })
+    .await
+    .map_err(|e| format!("chat_history_set_cwd join failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn chat_history_set_cwd(
+    id: String,
+    cwd: String,
+) -> Result<ChatHistorySummary, String> {
+    chat_history_set_cwd_inner(id, cwd).await
 }

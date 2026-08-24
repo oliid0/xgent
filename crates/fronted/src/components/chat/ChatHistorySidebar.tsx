@@ -8,6 +8,7 @@ import type { AppUpdateController } from "../../lib/appUpdates";
 import {
   DEFAULT_WORKSPACE_PROJECT_ID,
   type WorkspaceProject,
+  type WorkspaceProjectGroup,
   workspaceProjectPathKey,
 } from "../../lib/settings";
 import { cn } from "../../lib/shared/utils";
@@ -40,6 +41,7 @@ import {
   Pin,
   PinOff,
   Plus,
+  Search,
   Settings,
   Sparkles,
   Terminal,
@@ -53,6 +55,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { Input } from "../ui/input";
@@ -75,6 +80,17 @@ type ChatHistorySidebarProps = {
   errorMessage: string | null;
   errorDetail?: string | null;
   onDismissError?: () => void;
+  searchQuery: string;
+  searchResults: readonly {
+    conversationId: string;
+    title: string;
+    cwd?: string;
+    snippet: string;
+    role?: string;
+    updatedAt: number;
+  }[];
+  searchStatus: "idle" | "loading" | "ready" | "error";
+  onSearchQueryChange: (query: string) => void;
   renamingId: string | null;
   renameDraft: string;
   isOpen: boolean;
@@ -83,6 +99,7 @@ type ChatHistorySidebarProps = {
   showProjects?: boolean;
   // Pre-sorted by the container (activity/running/pinned) — rendered as-is.
   projects?: WorkspaceProject[];
+  workspaceProjectGroups?: WorkspaceProjectGroup[];
   activeProjectId?: string;
   missingProjectPathKeys?: ReadonlySet<string>;
   runningProjectPathKeys?: ReadonlySet<string>;
@@ -93,6 +110,11 @@ type ChatHistorySidebarProps = {
   onProjectsCollapsedChange?: (collapsed: boolean) => void;
   onRecentCollapsedChange?: (collapsed: boolean) => void;
   onCreateProject?: () => void;
+  onCreateWorkspaceGroup?: (name: string) => void;
+  onRenameWorkspaceGroup?: (groupId: string, name: string) => void;
+  onDeleteWorkspaceGroup?: (groupId: string) => void;
+  onMoveProjectToGroup?: (projectPath: string, groupId: string | null) => void;
+  onToggleWorkspaceGroupCollapsed?: (groupId: string) => void;
   onSelectProject?: (project: WorkspaceProject) => void;
   onNewConversationForProject?: (project: WorkspaceProject) => void;
   onBrowseProjectInFileTree?: (project: WorkspaceProject) => void;
@@ -115,7 +137,13 @@ type ChatHistorySidebarProps = {
   onCommitRename: () => void;
   onCancelRename: () => void;
   onSetPinned: (id: string, isPinned: boolean) => void;
+  onMoveToWorkspace: (id: string, cwd: string) => void;
+  onMoveConversationsToWorkspace: (
+    ids: readonly string[],
+    cwd: string,
+  ) => Promise<readonly string[]>;
   onDeleteConversation: (id: string) => void;
+  onDeleteConversations: (ids: readonly string[]) => Promise<readonly string[]>;
   onLoadMore: () => void;
   onCloseSidebar: () => void;
   onOpenSettings: () => void;
@@ -241,6 +269,12 @@ const HistoryRow = memo(function HistoryRow(props: {
   onCommitRename: () => void;
   onCancelRename: () => void;
   onSetPinned: (id: string, isPinned: boolean) => void;
+  projects: readonly WorkspaceProject[];
+  onMoveToWorkspace: (id: string, cwd: string) => void;
+  selectionMode: boolean;
+  isSelected: boolean;
+  onToggleSelection: (id: string) => void;
+  onEnterSelection: (id: string) => void;
   onDeleteConversation: (id: string) => void;
   onSetPendingDelete: (id: string | null) => void;
   touchActions?: boolean;
@@ -260,6 +294,12 @@ const HistoryRow = memo(function HistoryRow(props: {
     onCommitRename,
     onCancelRename,
     onSetPinned,
+    projects,
+    onMoveToWorkspace,
+    selectionMode,
+    isSelected,
+    onToggleSelection,
+    onEnterSelection,
     onDeleteConversation,
     onSetPendingDelete,
     touchActions = false,
@@ -271,10 +311,21 @@ const HistoryRow = memo(function HistoryRow(props: {
   // not double-commit (symmetric with ProjectRow's guard).
   const skipNextBlurCommitRef = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const currentCwdKey = workspaceProjectPathKey(item.cwd ?? "");
+  const moveTargets = projects.filter(
+    (project) =>
+      workspaceProjectPathKey(project.path) &&
+      workspaceProjectPathKey(project.path) !== currentCwdKey,
+  );
 
   const handleSelect = useCallback(() => {
+    if (selectionMode) {
+      if (isRunning || isBusy) return;
+      onToggleSelection(item.id);
+      return;
+    }
     onSelectConversation(item.id);
-  }, [item.id, onSelectConversation]);
+  }, [isBusy, isRunning, item.id, onSelectConversation, onToggleSelection, selectionMode]);
 
   const handleStartRenaming = useCallback(() => {
     onStartRenaming(item);
@@ -341,7 +392,9 @@ const HistoryRow = memo(function HistoryRow(props: {
     <div
       className={cn(
         "chat-history-row group/item grid h-[30px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-lg pl-1 transition-colors",
-        isActive
+        isSelected
+          ? "bg-primary/10 text-foreground ring-1 ring-inset ring-primary/20"
+          : isActive
           ? "bg-foreground/[0.07] text-foreground hover:bg-foreground/[0.09]"
           : "text-foreground/85 hover:bg-foreground/[0.05] hover:text-foreground",
       )}
@@ -389,6 +442,19 @@ const HistoryRow = memo(function HistoryRow(props: {
           className="flex h-[30px] min-w-0 items-center rounded-md px-2 text-left outline-hidden transition-colors focus-visible:ring-2 focus-visible:ring-ring"
           title={item.title}
         >
+          {selectionMode ? (
+            <span
+              className={cn(
+                "mr-1.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                isSelected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background",
+              )}
+              aria-hidden="true"
+            >
+              {isSelected ? <Check className="h-3 w-3" /> : null}
+            </span>
+          ) : null}
           <span className="sidebar-project-name-fade min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5">
             {item.title}
           </span>
@@ -475,6 +541,42 @@ const HistoryRow = memo(function HistoryRow(props: {
                   {t("chat.conversationRename")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  disabled={item.isPending || isRunning || isBusy}
+                  onSelect={() => onEnterSelection(item.id)}
+                  className="gap-2"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  {t("chat.history.select")}
+                </DropdownMenuItem>
+                {moveTargets.length > 0 ? (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger
+                      disabled={item.isPending || isRunning || isBusy}
+                      className="gap-2"
+                    >
+                      <FolderTree className="h-3.5 w-3.5" />
+                      <span className="min-w-0 flex-1">{t("chat.conversationMove")}</span>
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent
+                      side={touchActions ? "left" : "right"}
+                      collisionPadding={12}
+                      className="min-w-[12rem] max-w-[min(20rem,80vw)]"
+                    >
+                      {moveTargets.map((project) => (
+                        <DropdownMenuItem
+                          key={project.id}
+                          onSelect={() => onMoveToWorkspace(item.id, project.path)}
+                          className="gap-2"
+                        >
+                          <FolderClosed className="h-3.5 w-3.5 shrink-0" />
+                          <span className="min-w-0 truncate">{project.name}</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                ) : null}
+                <DropdownMenuItem
                   disabled={isDeleteDisabled || isBusy}
                   onSelect={handleRequestDelete}
                   className="gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
@@ -508,6 +610,9 @@ const ProjectRow = memo(function ProjectRow(props: {
   onCancelProjectRename: () => void;
   onSetProjectPinned: (project: WorkspaceProject, isPinned: boolean) => void;
   onRemoveProject: (project: WorkspaceProject) => void;
+  workspaceProjectGroups: readonly WorkspaceProjectGroup[];
+  currentGroupId: string | null;
+  onMoveProjectToGroup?: (projectPath: string, groupId: string | null) => void;
   // Archived rows render disabled: no selection (so no new conversations),
   // no pin — but rename/remove/browse stay available from the menu.
   isArchived: boolean;
@@ -535,6 +640,9 @@ const ProjectRow = memo(function ProjectRow(props: {
     onCancelProjectRename,
     onSetProjectPinned,
     onRemoveProject,
+    workspaceProjectGroups,
+    currentGroupId,
+    onMoveProjectToGroup,
     isArchived,
     canArchive,
     onArchiveProject,
@@ -864,6 +972,48 @@ const ProjectRow = memo(function ProjectRow(props: {
                         </DropdownMenuItem>
                       </>
                     ) : null}
+                    {workspaceProjectGroups.length > 0 && onMoveProjectToGroup ? (
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger className="gap-2">
+                          <FolderTree className="h-3.5 w-3.5" />
+                          <span className="min-w-0 flex-1">{t("chat.workspaceMoveToGroup")}</span>
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent
+                          side={touchActions ? "left" : "right"}
+                          collisionPadding={12}
+                          className="min-w-[12rem] max-w-[min(20rem,80vw)]"
+                        >
+                          <DropdownMenuItem
+                            onSelect={() => onMoveProjectToGroup(project.path, null)}
+                            className="gap-2"
+                          >
+                            <Check
+                              className={cn(
+                                "h-3.5 w-3.5",
+                                currentGroupId === null ? "opacity-100" : "opacity-0",
+                              )}
+                            />
+                            <span>{t("chat.workspaceUngrouped")}</span>
+                          </DropdownMenuItem>
+                          {workspaceProjectGroups.map((group) => (
+                            <DropdownMenuItem
+                              key={group.id}
+                              onSelect={() => onMoveProjectToGroup(project.path, group.id)}
+                              className="gap-2"
+                            >
+                              <Check
+                                className={cn(
+                                  "h-3.5 w-3.5",
+                                  currentGroupId === group.id ? "opacity-100" : "opacity-0",
+                                )}
+                              />
+                              <span className="min-w-0 truncate">{group.name}</span>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    ) : null}
                     {!isArchived && canArchive ? (
                       <DropdownMenuItem onSelect={handleArchive} className="gap-2">
                         <Archive className="h-3.5 w-3.5" />
@@ -996,6 +1146,10 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     errorMessage,
     errorDetail,
     onDismissError,
+    searchQuery,
+    searchResults,
+    searchStatus,
+    onSearchQueryChange,
     renamingId,
     renameDraft,
     isOpen,
@@ -1003,6 +1157,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     activeView = "chat",
     showProjects = false,
     projects = [],
+    workspaceProjectGroups = [],
     activeProjectId,
     missingProjectPathKeys = EMPTY_PROJECT_PATH_KEYS,
     runningProjectPathKeys = EMPTY_PROJECT_PATH_KEYS,
@@ -1013,6 +1168,11 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     onProjectsCollapsedChange,
     onRecentCollapsedChange,
     onCreateProject,
+    onCreateWorkspaceGroup,
+    onRenameWorkspaceGroup,
+    onDeleteWorkspaceGroup,
+    onMoveProjectToGroup,
+    onToggleWorkspaceGroupCollapsed,
     onSelectProject,
     onBrowseProjectInFileTree,
     onBrowseProjectInSystemFileManager,
@@ -1032,7 +1192,10 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     onCommitRename,
     onCancelRename,
     onSetPinned,
+    onMoveToWorkspace,
+    onMoveConversationsToWorkspace,
     onDeleteConversation,
+    onDeleteConversations,
     onLoadMore,
     onCloseSidebar,
     onOpenSettings,
@@ -1051,8 +1214,17 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   const soulDocument = soul.document;
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [selectedConversationIds, setSelectedConversationIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
+  const [batchMutationRunning, setBatchMutationRunning] = useState(false);
   const [pendingProjectRemoveId, setPendingProjectRemoveId] = useState<string | null>(null);
   const [showAllProjects, setShowAllProjects] = useState(false);
+  const [historySearchOpen, setHistorySearchOpen] = useState(false);
+  const [creatingWorkspaceGroup, setCreatingWorkspaceGroup] = useState(false);
+  const [workspaceGroupDraft, setWorkspaceGroupDraft] = useState("");
+  const [renamingWorkspaceGroupId, setRenamingWorkspaceGroupId] = useState<string | null>(null);
   const [soulLauncherOpen, setSoulLauncherOpen] = useState(false);
   const soulLongPressTimerRef = useRef<number | null>(null);
   const soulLongPressStartRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
@@ -1099,7 +1271,69 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   const handleCommitRename = useStableEvent(onCommitRename);
   const handleCancelRename = useStableEvent(onCancelRename);
   const handleSetPinned = useStableEvent(onSetPinned);
+  const handleMoveToWorkspace = useStableEvent(onMoveToWorkspace);
   const handleDeleteConversation = useStableEvent(onDeleteConversation);
+  const toggleConversationSelection = useStableEvent((conversationId: string) => {
+    setBatchDeleteConfirm(false);
+    setSelectedConversationIds((current) => {
+      const next = new Set(current);
+      if (next.has(conversationId)) next.delete(conversationId);
+      else next.add(conversationId);
+      return next;
+    });
+  });
+  const enterConversationSelection = useStableEvent((conversationId: string) => {
+    setBatchDeleteConfirm(false);
+    setHistorySearchOpen(false);
+    onSearchQueryChange("");
+    onRecentCollapsedChange?.(false);
+    setSelectedConversationIds(new Set([conversationId]));
+  });
+  const leaveConversationSelection = useStableEvent(() => {
+    setBatchDeleteConfirm(false);
+    setSelectedConversationIds(new Set());
+  });
+  const selectionMode = selectedConversationIds.size > 0;
+
+  useEffect(() => {
+    if (selectedConversationIds.size === 0 || batchMutationRunning) return;
+    const visibleIds = new Set(items.map((item) => item.id));
+    const retained = new Set(
+      Array.from(selectedConversationIds).filter((conversationId) =>
+        visibleIds.has(conversationId),
+      ),
+    );
+    if (retained.size !== selectedConversationIds.size) {
+      setSelectedConversationIds(retained);
+      setBatchDeleteConfirm(false);
+    }
+  }, [batchMutationRunning, items, selectedConversationIds]);
+  const selectedConversationIdList = useMemo(
+    () => Array.from(selectedConversationIds),
+    [selectedConversationIds],
+  );
+  const runBatchMove = useStableEvent((cwd: string) => {
+    if (selectedConversationIdList.length === 0 || batchMutationRunning) return;
+    setBatchMutationRunning(true);
+    setBatchDeleteConfirm(false);
+    void onMoveConversationsToWorkspace(selectedConversationIdList, cwd)
+      .then((failedIds) => setSelectedConversationIds(new Set(failedIds)))
+      .finally(() => setBatchMutationRunning(false));
+  });
+  const runBatchDelete = useStableEvent(() => {
+    if (selectedConversationIdList.length === 0 || batchMutationRunning) return;
+    if (!batchDeleteConfirm) {
+      setBatchDeleteConfirm(true);
+      return;
+    }
+    setBatchMutationRunning(true);
+    void onDeleteConversations(selectedConversationIdList)
+      .then((failedIds) => {
+        setSelectedConversationIds(new Set(failedIds));
+        setBatchDeleteConfirm(false);
+      })
+      .finally(() => setBatchMutationRunning(false));
+  });
   const handleSelectProject = useStableEvent((project: WorkspaceProject) => {
     onSelectProject?.(project);
   });
@@ -1133,6 +1367,11 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   const handleUnarchiveProject = useStableEvent((project: WorkspaceProject) => {
     onUnarchiveProject?.(project);
   });
+  const handleMoveProjectToGroup = useStableEvent(
+    (projectPath: string, groupId: string | null) => {
+      onMoveProjectToGroup?.(projectPath, groupId);
+    },
+  );
   // Archived rows are split into their own collapsed group at the list end;
   // the render cap only applies to the active rows.
   const activeProjects = useMemo(
@@ -1141,6 +1380,23 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
         (project) => !archivedProjectPathKeys.has(workspaceProjectPathKey(project.path)),
       ),
     [archivedProjectPathKeys, projects],
+  );
+  const activeProjectGroupIds = useMemo(() => {
+    const assignments = new Map<string, string>();
+    for (const group of workspaceProjectGroups) {
+      for (const path of group.projectPaths) {
+        const key = workspaceProjectPathKey(path);
+        if (key && !assignments.has(key)) assignments.set(key, group.id);
+      }
+    }
+    return assignments;
+  }, [workspaceProjectGroups]);
+  const ungroupedActiveProjects = useMemo(
+    () =>
+      activeProjects.filter(
+        (project) => !activeProjectGroupIds.has(workspaceProjectPathKey(project.path)),
+      ),
+    [activeProjectGroupIds, activeProjects],
   );
   const archivedProjects = useMemo(
     () =>
@@ -1152,13 +1408,16 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   // Projects arrive pre-sorted from the container; the view only caps the
   // rendered count until the user expands the list.
   const renderedProjects = useMemo(
-    () => (showAllProjects ? activeProjects : activeProjects.slice(0, PROJECT_LIST_COLLAPSED_MAX)),
-    [activeProjects, showAllProjects],
+    () =>
+      showAllProjects
+        ? ungroupedActiveProjects
+        : ungroupedActiveProjects.slice(0, PROJECT_LIST_COLLAPSED_MAX),
+    [showAllProjects, ungroupedActiveProjects],
   );
   // Archiving must always leave at least one active workspace behind.
   const canArchiveProjects = Boolean(onArchiveProject) && activeProjects.length > 1;
   const [archivedGroupOpen, setArchivedGroupOpen] = useState(false);
-  const hiddenProjectCount = activeProjects.length - renderedProjects.length;
+  const hiddenProjectCount = ungroupedActiveProjects.length - renderedProjects.length;
   const sidebarSectionLayout = useMemo(() => {
     const {
       containerHeight,
@@ -1456,6 +1715,44 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     [canResizeProjectSections],
   );
 
+  const renderActiveProjectRow = (project: WorkspaceProject) => {
+    const pathKey = workspaceProjectPathKey(project.path);
+    return (
+      <ProjectRow
+        key={project.id}
+        project={project}
+        isActive={activeProjectId === project.id}
+        isMissing={missingProjectPathKeys.has(pathKey)}
+        isRunning={runningProjectPathKeys.has(pathKey)}
+        isRenaming={projectRenamingId === project.id}
+        isPendingRemove={pendingProjectRemoveId === project.id}
+        renameDraft={projectRenameDraft}
+        onSelectProject={handleSelectProject}
+        onBrowseProjectInFileTree={
+          onBrowseProjectInFileTree ? handleBrowseProjectInFileTree : undefined
+        }
+        onBrowseProjectInSystemFileManager={
+          onBrowseProjectInSystemFileManager ? handleBrowseProjectInSystemFileManager : undefined
+        }
+        onStartRenamingProject={handleStartRenamingProject}
+        onProjectRenameDraftChange={handleProjectRenameDraftChange}
+        onCommitProjectRename={handleCommitProjectRename}
+        onCancelProjectRename={handleCancelProjectRename}
+        onSetProjectPinned={handleSetProjectPinned}
+        onRemoveProject={handleRemoveProject}
+        workspaceProjectGroups={workspaceProjectGroups}
+        currentGroupId={activeProjectGroupIds.get(pathKey) ?? null}
+        onMoveProjectToGroup={onMoveProjectToGroup ? handleMoveProjectToGroup : undefined}
+        isArchived={false}
+        canArchive={canArchiveProjects}
+        onArchiveProject={handleArchiveProject}
+        onUnarchiveProject={handleUnarchiveProject}
+        onSetPendingRemove={setPendingProjectRemoveId}
+        touchActions={mobileExperience}
+      />
+    );
+  };
+
   const renderHistoryRow = useCallback(
     (item: SidebarConversation) => (
       <HistoryRow
@@ -1474,6 +1771,12 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
         onCommitRename={handleCommitRename}
         onCancelRename={handleCancelRename}
         onSetPinned={handleSetPinned}
+        projects={activeProjects}
+        onMoveToWorkspace={handleMoveToWorkspace}
+        selectionMode={selectionMode}
+        isSelected={selectedConversationIds.has(item.id)}
+        onToggleSelection={toggleConversationSelection}
+        onEnterSelection={enterConversationSelection}
         onDeleteConversation={handleDeleteConversation}
         onSetPendingDelete={setPendingDeleteId}
         touchActions={mobileExperience}
@@ -1488,11 +1791,17 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
       handleRenameDraftChange,
       handleSelectConversation,
       handleSetPinned,
+      handleMoveToWorkspace,
       handleStartRenaming,
+      enterConversationSelection,
       pendingDeleteId,
       renameDraft,
       renamingId,
       runningConversationIds,
+      selectedConversationIds,
+      selectionMode,
+      activeProjects,
+      toggleConversationSelection,
       mobileExperience,
     ],
   );
@@ -1663,21 +1972,41 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     style={{ transform: `rotate(${projectsCollapsed ? 0 : 90}deg)` }}
                   />
                 </button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    PROJECT_ICON_BUTTON_CLASS,
-                    "pointer-events-auto opacity-100 transition-opacity hover:!bg-transparent md:pointer-events-none md:opacity-0 md:group-hover/workspace-header:pointer-events-auto md:group-hover/workspace-header:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100",
-                  )}
-                  title={t("chat.workspaceCreate")}
-                  aria-label={t("chat.workspaceCreate")}
-                  onClick={() => onCreateProject?.()}
-                  disabled={!onCreateProject}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
+                <div className="flex items-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      PROJECT_ICON_BUTTON_CLASS,
+                      "pointer-events-auto opacity-100 transition-opacity hover:!bg-transparent md:pointer-events-none md:opacity-0 md:group-hover/workspace-header:pointer-events-auto md:group-hover/workspace-header:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100",
+                    )}
+                    title={t("chat.workspaceGroupCreate")}
+                    aria-label={t("chat.workspaceGroupCreate")}
+                    onClick={() => {
+                      setCreatingWorkspaceGroup(true);
+                      setWorkspaceGroupDraft("");
+                    }}
+                    disabled={!onCreateWorkspaceGroup}
+                  >
+                    <FolderTree className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      PROJECT_ICON_BUTTON_CLASS,
+                      "pointer-events-auto opacity-100 transition-opacity hover:!bg-transparent md:pointer-events-none md:opacity-0 md:group-hover/workspace-header:pointer-events-auto md:group-hover/workspace-header:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100",
+                    )}
+                    title={t("chat.workspaceCreate")}
+                    aria-label={t("chat.workspaceCreate")}
+                    onClick={() => onCreateProject?.()}
+                    disabled={!onCreateProject}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
               <div
                 aria-hidden={projectsCollapsed}
@@ -1688,42 +2017,173 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                 )}
               >
                 <div ref={projectsBodyRef} className="space-y-0.5 px-2 pb-0.5">
-                  {renderedProjects.map((project) => {
-                    const pathKey = workspaceProjectPathKey(project.path);
-                    return (
-                      <ProjectRow
-                        key={project.id}
-                        project={project}
-                        isActive={activeProjectId === project.id}
-                        isMissing={missingProjectPathKeys.has(pathKey)}
-                        isRunning={runningProjectPathKeys.has(pathKey)}
-                        isRenaming={projectRenamingId === project.id}
-                        isPendingRemove={pendingProjectRemoveId === project.id}
-                        renameDraft={projectRenameDraft}
-                        onSelectProject={handleSelectProject}
-                        onBrowseProjectInFileTree={
-                          onBrowseProjectInFileTree ? handleBrowseProjectInFileTree : undefined
-                        }
-                        onBrowseProjectInSystemFileManager={
-                          onBrowseProjectInSystemFileManager
-                            ? handleBrowseProjectInSystemFileManager
-                            : undefined
-                        }
-                        onStartRenamingProject={handleStartRenamingProject}
-                        onProjectRenameDraftChange={handleProjectRenameDraftChange}
-                        onCommitProjectRename={handleCommitProjectRename}
-                        onCancelProjectRename={handleCancelProjectRename}
-                        onSetProjectPinned={handleSetProjectPinned}
-                        onRemoveProject={handleRemoveProject}
-                        isArchived={false}
-                        canArchive={canArchiveProjects}
-                        onArchiveProject={handleArchiveProject}
-                        onUnarchiveProject={handleUnarchiveProject}
-                        onSetPendingRemove={setPendingProjectRemoveId}
-                        touchActions={mobileExperience}
+                  {creatingWorkspaceGroup ? (
+                    <div className="flex h-8 items-center gap-1 px-1">
+                      <Input
+                        autoFocus
+                        value={workspaceGroupDraft}
+                        placeholder={t("chat.workspaceGroupName")}
+                        onChange={(event) => setWorkspaceGroupDraft(event.currentTarget.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && workspaceGroupDraft.trim()) {
+                            onCreateWorkspaceGroup?.(workspaceGroupDraft);
+                            setCreatingWorkspaceGroup(false);
+                            setWorkspaceGroupDraft("");
+                          } else if (event.key === "Escape") {
+                            setCreatingWorkspaceGroup(false);
+                            setWorkspaceGroupDraft("");
+                          }
+                        }}
+                        className="h-7 min-w-0 flex-1 text-xs"
                       />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={!workspaceGroupDraft.trim()}
+                        onClick={() => {
+                          onCreateWorkspaceGroup?.(workspaceGroupDraft);
+                          setCreatingWorkspaceGroup(false);
+                          setWorkspaceGroupDraft("");
+                        }}
+                        className="h-7 w-7"
+                        aria-label={t("chat.workspaceGroupSave")}
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setCreatingWorkspaceGroup(false);
+                          setWorkspaceGroupDraft("");
+                        }}
+                        className="h-7 w-7"
+                        aria-label={t("chat.cancel")}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ) : null}
+                  {workspaceProjectGroups.map((group) => {
+                    const groupProjects = activeProjects.filter(
+                      (project) =>
+                        activeProjectGroupIds.get(workspaceProjectPathKey(project.path)) ===
+                        group.id,
+                    );
+                    const isRenamingGroup = renamingWorkspaceGroupId === group.id;
+                    return (
+                      <div key={group.id} className="pt-0.5">
+                        <div className="group/workspace-group flex h-7 items-center gap-1 rounded-md px-1">
+                          {isRenamingGroup ? (
+                            <div className="flex min-w-0 flex-1 items-center gap-1">
+                              <Input
+                                autoFocus
+                                value={workspaceGroupDraft}
+                                onChange={(event) =>
+                                  setWorkspaceGroupDraft(event.currentTarget.value)
+                                }
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" && workspaceGroupDraft.trim()) {
+                                    onRenameWorkspaceGroup?.(group.id, workspaceGroupDraft);
+                                    setRenamingWorkspaceGroupId(null);
+                                    setWorkspaceGroupDraft("");
+                                  } else if (event.key === "Escape") {
+                                    setRenamingWorkspaceGroupId(null);
+                                    setWorkspaceGroupDraft("");
+                                  }
+                                }}
+                                className="h-6 min-w-0 flex-1 text-xs"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                disabled={!workspaceGroupDraft.trim()}
+                                onClick={() => {
+                                  onRenameWorkspaceGroup?.(group.id, workspaceGroupDraft);
+                                  setRenamingWorkspaceGroupId(null);
+                                  setWorkspaceGroupDraft("");
+                                }}
+                                aria-label={t("chat.workspaceGroupSave")}
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onToggleWorkspaceGroupCollapsed?.(group.id)}
+                                className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 text-left text-[calc(11.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground hover:text-foreground"
+                              >
+                                <ChevronRight
+                                  className={cn(
+                                    "h-3 w-3 shrink-0 transition-transform duration-200",
+                                    !group.collapsed && "rotate-90",
+                                  )}
+                                />
+                                <span className="min-w-0 flex-1 truncate">{group.name}</span>
+                                <span className="shrink-0 text-[10px] text-muted-foreground/65">
+                                  {groupProjects.length}
+                                </span>
+                              </button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger
+                                  render={
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className={cn(
+                                        PROJECT_ICON_BUTTON_CLASS,
+                                        "opacity-100 md:opacity-0 md:group-hover/workspace-group:opacity-100",
+                                      )}
+                                      aria-label={t("chat.workspaceGroupMore")}
+                                    />
+                                  }
+                                >
+                                  <MoreHorizontal className="h-3.5 w-3.5" />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                  side="right"
+                                  align="start"
+                                  collisionPadding={12}
+                                >
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onSelect={() => {
+                                      setRenamingWorkspaceGroupId(group.id);
+                                      setWorkspaceGroupDraft(group.name);
+                                    }}
+                                  >
+                                    <Edit3 className="h-3.5 w-3.5" />
+                                    {t("chat.workspaceGroupRename")}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                    onSelect={() => onDeleteWorkspaceGroup?.(group.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    {t("chat.workspaceGroupDelete")}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </>
+                          )}
+                        </div>
+                        {!group.collapsed ? groupProjects.map(renderActiveProjectRow) : null}
+                      </div>
                     );
                   })}
+                  {workspaceProjectGroups.length > 0 && renderedProjects.length > 0 ? (
+                    <div className="px-2 pt-1 text-[calc(10.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground/70">
+                      {t("chat.workspaceUngrouped")}
+                    </div>
+                  ) : null}
+                  {renderedProjects.map(renderActiveProjectRow)}
                   {hiddenProjectCount > 0 || showAllProjects ? (
                     <button
                       type="button"
@@ -1734,7 +2194,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                         ? t("chat.workspaceShowLess")
                         : t("chat.workspaceShowAll").replace(
                             "{count}",
-                            String(activeProjects.length),
+                            String(ungroupedActiveProjects.length),
                           )}
                     </button>
                   ) : null}
@@ -1786,6 +2246,13 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                                 onCancelProjectRename={handleCancelProjectRename}
                                 onSetProjectPinned={handleSetProjectPinned}
                                 onRemoveProject={handleRemoveProject}
+                                workspaceProjectGroups={workspaceProjectGroups}
+                                currentGroupId={
+                                  activeProjectGroupIds.get(pathKey) ?? null
+                                }
+                                onMoveProjectToGroup={
+                                  onMoveProjectToGroup ? handleMoveProjectToGroup : undefined
+                                }
                                 isArchived
                                 canArchive={false}
                                 onArchiveProject={handleArchiveProject}
@@ -1847,7 +2314,111 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                 style={{ transform: `rotate(${recentCollapsed ? 0 : 90}deg)` }}
               />
             </button>
-            <div />
+            {selectionMode ? (
+              <div className="flex min-w-0 items-center gap-0.5">
+                <span className="mr-1 whitespace-nowrap text-[11px] text-muted-foreground">
+                  {t("chat.history.selectedCount").replace(
+                    "{count}",
+                    String(selectedConversationIds.size),
+                  )}
+                </span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className={PROJECT_ICON_BUTTON_CLASS}
+                        title={t("chat.history.moveSelected")}
+                        aria-label={t("chat.history.moveSelected")}
+                        disabled={batchMutationRunning || activeProjects.length === 0}
+                      />
+                    }
+                  >
+                    {batchMutationRunning ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <FolderTree className="h-3.5 w-3.5" />
+                    )}
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={4}
+                    collisionPadding={12}
+                    className="sidebar-context-menu min-w-[12rem] rounded-xl border-border/60 bg-background/95 backdrop-blur-xl"
+                  >
+                    {activeProjects.map((project) => (
+                      <DropdownMenuItem
+                        key={project.id}
+                        disabled={batchMutationRunning}
+                        onSelect={() => runBatchMove(project.path)}
+                        className="gap-2"
+                      >
+                        <FolderClosed className="h-3.5 w-3.5 shrink-0" />
+                        <span className="min-w-0 truncate">{project.name}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    PROJECT_ICON_BUTTON_CLASS,
+                    batchDeleteConfirm && "text-destructive hover:text-destructive",
+                  )}
+                  title={
+                    batchDeleteConfirm
+                      ? t("chat.history.confirmDeleteSelected")
+                      : t("chat.history.deleteSelected")
+                  }
+                  aria-label={
+                    batchDeleteConfirm
+                      ? t("chat.history.confirmDeleteSelected")
+                      : t("chat.history.deleteSelected")
+                  }
+                  onClick={runBatchDelete}
+                  disabled={batchMutationRunning}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={PROJECT_ICON_BUTTON_CLASS}
+                  title={t("chat.history.cancelSelection")}
+                  aria-label={t("chat.history.cancelSelection")}
+                  onClick={leaveConversationSelection}
+                  disabled={batchMutationRunning}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={PROJECT_ICON_BUTTON_CLASS}
+                title={t("chat.history.search")}
+                aria-label={t("chat.history.search")}
+                onClick={() => {
+                  setHistorySearchOpen((open) => {
+                    if (open) onSearchQueryChange("");
+                    return !open;
+                  });
+                }}
+              >
+                {searchStatus === "loading" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Search className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            )}
           </div>
 
           <div
@@ -1860,6 +2431,37 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                 : "translate-y-0 opacity-100",
             )}
           >
+            {historySearchOpen ? (
+              <div className="shrink-0 px-2 pb-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    autoFocus
+                    value={searchQuery}
+                    onChange={(event) => onSearchQueryChange(event.currentTarget.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        onSearchQueryChange("");
+                        setHistorySearchOpen(false);
+                      }
+                    }}
+                    placeholder={t("chat.history.searchPlaceholder")}
+                    aria-label={t("chat.history.search")}
+                    className="h-8 pl-8 pr-8 text-xs"
+                  />
+                  {searchQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => onSearchQueryChange("")}
+                      className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label={t("chat.history.searchClear")}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             {errorMessage ? (
               <div className="shrink-0 px-2 pb-2">
                 <SidebarStateCard
@@ -1881,7 +2483,45 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   error. The error banner above never replaces the rows. The
                   scope-keyed wrapper replays a soft enter transition when the
                   workspace scope changes. */}
-              {isListLoading && items.length === 0 ? (
+              {searchQuery.trim() ? (
+                <div className="space-y-1 pt-1">
+                  {searchStatus === "loading" ? (
+                    <div className="flex items-center gap-2 px-2 py-4 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      {t("chat.history.searching")}
+                    </div>
+                  ) : searchStatus === "error" ? (
+                    <p className="px-2 py-4 text-xs text-destructive">
+                      {t("chat.history.searchFailed")}
+                    </p>
+                  ) : searchStatus === "ready" && searchResults.length === 0 ? (
+                    <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                      {t("chat.history.searchEmpty")}
+                    </p>
+                  ) : (
+                    searchResults.map((result, index) => (
+                      <button
+                        key={`${result.conversationId}:${result.updatedAt}:${index}`}
+                        type="button"
+                        onClick={() => onSelectConversation(result.conversationId)}
+                        className="w-full rounded-lg px-2 py-2 text-left transition-colors hover:bg-foreground/[0.05] focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span className="block truncate text-xs font-medium text-foreground/90">
+                          {result.title || t("tray.untitledConversation")}
+                        </span>
+                        <span className="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-muted-foreground">
+                          {result.snippet.replaceAll("[", "").replaceAll("]", "")}
+                        </span>
+                        {result.cwd ? (
+                          <span className="mt-0.5 block truncate text-[10px] text-muted-foreground/65">
+                            {result.cwd}
+                          </span>
+                        ) : null}
+                      </button>
+                    ))
+                  )}
+                </div>
+              ) : isListLoading && items.length === 0 ? (
                 <HistoryListLoadingSkeleton />
               ) : (
                 <div key={scopeKey || "scope"} className="chat-history-scope-enter">
@@ -1924,7 +2564,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   )}
                 </div>
               )}
-              {items.length > 0 && (hasMore || isLoadingMore) ? (
+              {!searchQuery.trim() && items.length > 0 && (hasMore || isLoadingMore) ? (
                 <div className="px-2 pb-2 pt-1 text-center text-[calc(11px*var(--zone-font-scale,1))] leading-5 text-muted-foreground/70">
                   {isLoadingMore
                     ? t("sidebar.loadingMoreHistory")

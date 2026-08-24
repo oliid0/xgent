@@ -3,13 +3,18 @@ import { useLocale } from "../../i18n";
 import type { SftpClient } from "../../lib/sftp/types";
 import { cn } from "../../lib/shared/utils";
 import type {
+  SshLocalForwardClient,
+  SshLocalForwardRecord,
+  SshLocalForwardSnapshot,
+} from "../../lib/terminal/sshLocalForwardTypes";
+import type {
   SshTerminalTab,
   SshTerminalTabKind,
   SshTerminalTabsSnapshot,
   TerminalClient,
   TerminalSession,
 } from "../../lib/terminal/types";
-import { AlertTriangle, FolderTree, Terminal, X } from "../icons";
+import { AlertTriangle, FolderTree, Loader2, Terminal, Waypoints, X } from "../icons";
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
 import { XTermViewport } from "../project-tools/XTermViewport";
 import { WorkspaceSftpPanel } from "./WorkspaceSftpPanel";
@@ -26,6 +31,7 @@ type WorkspaceSshTerminalOverlayProps = {
   sessions: TerminalSession[];
   client: TerminalClient;
   sftpClient: SftpClient;
+  localForwardClient?: SshLocalForwardClient;
   theme: "light" | "dark";
   isOpen: boolean;
   onHide: () => void;
@@ -62,8 +68,17 @@ function tabIdFor(sessionId: string, kind: SshTerminalTabKind) {
 }
 
 export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayProps) {
-  const { openRequest, projectPathKey, sessions, client, sftpClient, theme, isOpen, onHide } =
-    props;
+  const {
+    openRequest,
+    projectPathKey,
+    sessions,
+    client,
+    sftpClient,
+    localForwardClient,
+    theme,
+    isOpen,
+    onHide,
+  } = props;
   const { t } = useLocale();
   const [isVisible, setIsVisible] = useState(isOpen);
   const [tabsSnapshot, setTabsSnapshot] = useState<SshTerminalTabsSnapshot>({
@@ -73,6 +88,15 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
   });
   const [activeTabId, setActiveTabId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [forwardPanelOpen, setForwardPanelOpen] = useState(false);
+  const [forwardSnapshot, setForwardSnapshot] = useState<SshLocalForwardSnapshot>({
+    forwards: [],
+    revision: 0,
+  });
+  const [forwardRemoteHost, setForwardRemoteHost] = useState("");
+  const [forwardRemotePort, setForwardRemotePort] = useState("");
+  const [forwardLocalPort, setForwardLocalPort] = useState("");
+  const [forwardBusy, setForwardBusy] = useState(false);
   const openRequestIdRef = useRef<number | null>(null);
   const hideTimerRef = useRef<number | null>(null);
 
@@ -212,6 +236,117 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
     [cancelPendingHide],
   );
 
+  useEffect(() => {
+    if (!localForwardClient || !isOpen || !projectPathKey) return;
+    let cancelled = false;
+    void localForwardClient
+      .list({ projectPathKey })
+      .then((snapshot) => {
+        if (!cancelled) setForwardSnapshot(snapshot);
+      })
+      .catch((reason) => {
+        if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason));
+      });
+    let unlisten: (() => void) | undefined;
+    void localForwardClient.subscribe((event) => {
+      if (cancelled || event.forward.projectPathKey !== projectPathKey) return;
+      setForwardSnapshot((previous) => {
+        const forwards = previous.forwards.filter((item) => item.id !== event.forward.id);
+        forwards.push(event.forward);
+        return { forwards, revision: Math.max(previous.revision, event.revision) };
+      });
+    }).then((dispose) => {
+      if (cancelled) dispose();
+      else unlisten = dispose;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [isOpen, localForwardClient, projectPathKey]);
+
+  const activeForwards = useMemo(
+    () =>
+      forwardSnapshot.forwards.filter(
+        (forward) => forward.status === "active" && sessionsById.has(forward.sessionId),
+      ),
+    [forwardSnapshot.forwards, sessionsById],
+  );
+
+  const startForward = useCallback(async () => {
+    if (!localForwardClient || !activeSession) return;
+    const remotePort = Number(forwardRemotePort);
+    const localPort = forwardLocalPort.trim() ? Number(forwardLocalPort) : 0;
+    if (!Number.isInteger(remotePort) || remotePort < 1 || remotePort > 65535) {
+      setError(t("workspaceSshTerminal.forwardInvalidRemotePort"));
+      return;
+    }
+    if (!Number.isInteger(localPort) || localPort < 0 || localPort > 65535) {
+      setError(t("workspaceSshTerminal.forwardInvalidLocalPort"));
+      return;
+    }
+    setForwardBusy(true);
+    setError(null);
+    try {
+      if (localPort > 0 && !(await localForwardClient.checkLocalPort(localPort))) {
+        throw new Error(t("workspaceSshTerminal.forwardPortBusy"));
+      }
+      const action = await localForwardClient.start({
+        sessionId: activeSession.id,
+        projectPathKey,
+        remoteHost: forwardRemoteHost.trim(),
+        remotePort,
+        localPort,
+      });
+      setForwardSnapshot((previous) => ({
+        forwards: [
+          ...previous.forwards.filter((item) => item.id !== action.forward.id),
+          action.forward,
+        ],
+        revision: Math.max(previous.revision, action.revision),
+      }));
+      setForwardRemotePort("");
+      setForwardLocalPort("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setForwardBusy(false);
+    }
+  }, [
+    activeSession,
+    forwardLocalPort,
+    forwardRemoteHost,
+    forwardRemotePort,
+    localForwardClient,
+    projectPathKey,
+    t,
+  ]);
+
+  const stopForward = useCallback(
+    async (forward: SshLocalForwardRecord) => {
+      if (!localForwardClient) return;
+      setForwardBusy(true);
+      setError(null);
+      try {
+        const action = await localForwardClient.stop({
+          forwardId: forward.id,
+          sessionId: forward.sessionId,
+        });
+        setForwardSnapshot((previous) => ({
+          forwards: previous.forwards.map((item) =>
+            item.id === action.forward.id ? action.forward : item,
+          ),
+          revision: Math.max(previous.revision, action.revision),
+        }));
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : String(reason));
+      } finally {
+        setForwardBusy(false);
+      }
+    },
+    [localForwardClient],
+  );
+
   return (
     <div
       className={cn(
@@ -232,6 +367,21 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
             {activeSession ? sessionEndpointLabel(activeSession) : t("workspaceSshTerminal.empty")}
           </div>
         </div>
+        <button
+          type="button"
+          disabled={!activeSession || !localForwardClient}
+          className={cn(
+            "flex h-8 items-center gap-1.5 rounded-lg border px-2 text-xs transition-colors",
+            forwardPanelOpen
+              ? "border-primary/30 bg-primary/10 text-primary"
+              : "border-transparent text-muted-foreground hover:border-border hover:bg-background hover:text-foreground",
+          )}
+          title={t("workspaceSshTerminal.localForward")}
+          onClick={() => setForwardPanelOpen((open) => !open)}
+        >
+          <Waypoints className="h-4 w-4" />
+          <span>{activeForwards.length}</span>
+        </button>
         <button
           type="button"
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -294,6 +444,75 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
         <div className="flex shrink-0 items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <div className="min-w-0 flex-1 truncate">{error}</div>
+        </div>
+      ) : null}
+
+      {forwardPanelOpen && localForwardClient ? (
+        <div className="shrink-0 border-b border-border bg-muted/20 p-3">
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_auto]">
+            <label className="space-y-1 text-[11px] text-muted-foreground">
+              <span>{t("workspaceSshTerminal.forwardRemoteHost")}</span>
+              <input
+                value={forwardRemoteHost}
+                onChange={(event) => setForwardRemoteHost(event.target.value)}
+                placeholder="127.0.0.1"
+                className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground"
+              />
+            </label>
+            <label className="space-y-1 text-[11px] text-muted-foreground">
+              <span>{t("workspaceSshTerminal.forwardRemotePort")}</span>
+              <input
+                value={forwardRemotePort}
+                onChange={(event) => setForwardRemotePort(event.target.value)}
+                inputMode="numeric"
+                className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground"
+              />
+            </label>
+            <label className="space-y-1 text-[11px] text-muted-foreground">
+              <span>{t("workspaceSshTerminal.forwardLocalPort")}</span>
+              <input
+                value={forwardLocalPort}
+                onChange={(event) => setForwardLocalPort(event.target.value)}
+                inputMode="numeric"
+                placeholder={t("workspaceSshTerminal.forwardAuto")}
+                className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={!activeSession || forwardBusy}
+              onClick={() => void startForward()}
+              className="mt-4 inline-flex h-8 items-center justify-center rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-50"
+            >
+              {forwardBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+              {t("workspaceSshTerminal.forwardStart")}
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            {t("workspaceSshTerminal.forwardHelp")}
+          </p>
+          {activeForwards.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {activeForwards.map((forward) => (
+                <div
+                  key={forward.id}
+                  className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-2 py-1.5 text-xs"
+                >
+                  <span className="font-mono">
+                    {forward.address || `${forward.localHost}:${forward.localPort}`} → {forward.remoteHost}:{forward.remotePort}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={forwardBusy}
+                    onClick={() => void stopForward(forward)}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    {t("workspaceSshTerminal.forwardStop")}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

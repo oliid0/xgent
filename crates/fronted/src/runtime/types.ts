@@ -7,8 +7,9 @@ export type RuntimeUnlisten = () => void;
 export type RuntimeInvokeArgs = Record<string, unknown>;
 
 export type RuntimeFileDropEvent =
-  | { type: "enter" | "over" | "leave" }
-  | { type: "drop"; paths: string[] };
+  | { type: "enter" | "over"; position: { x: number; y: number } }
+  | { type: "leave" }
+  | { type: "drop"; paths: string[]; position: { x: number; y: number } };
 
 export interface XAgentRuntime {
   invoke<T>(command: string, args?: RuntimeInvokeArgs): Promise<T>;

@@ -1,14 +1,58 @@
 import { invoke } from "@xagent/runtime";
 import {
   type GitClient,
+  type GitCloneTask,
+  type GitRemoteBranchesResponse,
   normalizeGitBranchesResponse,
+  normalizeGitCloneTask,
   normalizeGitCommitDetailsResponse,
   normalizeGitDiffResponse,
   normalizeGitLogResponse,
   normalizeGitOperationResponse,
+  normalizeGitRemoteBranchesResponse,
+  normalizeGitRemoveWorktreeResponse,
   normalizeGitRepositoryDiscovery,
   normalizeGitRepositoryState,
+  normalizeGitWorktreeResponse,
 } from "./types";
+
+export async function startGitClone(params: {
+  parent: string;
+  name: string;
+  remoteUrl: string;
+  branch?: string;
+}): Promise<GitCloneTask> {
+  return normalizeGitCloneTask(
+    await invoke("git_clone_repository_start", {
+      parent: params.parent,
+      name: params.name,
+      remote_url: params.remoteUrl,
+      branch: params.branch,
+    }),
+  );
+}
+
+export async function listGitCloneTasks(): Promise<GitCloneTask[]> {
+  const tasks = await invoke<unknown[]>("git_clone_repository_tasks");
+  return Array.isArray(tasks) ? tasks.map(normalizeGitCloneTask) : [];
+}
+
+export async function cancelGitClone(taskId: string): Promise<GitCloneTask> {
+  return normalizeGitCloneTask(await invoke("git_clone_repository_cancel", { task_id: taskId }));
+}
+
+export async function dismissGitClone(taskId: string): Promise<GitCloneTask[]> {
+  const tasks = await invoke<unknown[]>("git_clone_repository_dismiss", { task_id: taskId });
+  return Array.isArray(tasks) ? tasks.map(normalizeGitCloneTask) : [];
+}
+
+export async function listGitRemoteBranches(
+  remoteUrl: string,
+): Promise<GitRemoteBranchesResponse> {
+  return normalizeGitRemoteBranchesResponse(
+    await invoke("git_list_remote_branches", { remote_url: remoteUrl }),
+  );
+}
 
 export const tauriGitClient: GitClient = {
   async status(workdir) {
@@ -43,6 +87,29 @@ export const tauriGitClient: GitClient = {
   async createBranch(workdir, branch, startPoint) {
     return normalizeGitOperationResponse(
       await invoke("git_create_branch", { workdir, branch, start_point: startPoint }),
+      workdir,
+    );
+  },
+  async createWorktree(workdir, options) {
+    return normalizeGitWorktreeResponse(
+      await invoke("git_create_worktree", {
+        workdir,
+        branch: options.branch,
+        directory_name: options.directoryName,
+        parent_directory: options.parentDirectory,
+        start_point: options.startPoint,
+      }),
+      workdir,
+    );
+  },
+  async removeWorktree(workdir, worktreePath, options = {}) {
+    return normalizeGitRemoveWorktreeResponse(
+      await invoke("git_remove_worktree", {
+        workdir,
+        worktree_path: worktreePath,
+        force: options.force,
+        delete_branch: options.deleteBranch,
+      }),
       workdir,
     );
   },

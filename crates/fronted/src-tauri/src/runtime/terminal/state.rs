@@ -60,7 +60,7 @@ impl SshSessionRuntime {
         shutdown_tx: tokio::sync::mpsc::Sender<()>,
     ) -> usize {
         let connection_id = self.connection_id.fetch_add(1, Ordering::SeqCst) + 1;
-        *self.handle.lock().await = Some(handle);
+        *self.handle.lock().await = Some(Arc::new(handle));
         if let Ok(mut slot) = self.input_tx.lock() {
             *slot = Some(input_tx);
         }
@@ -81,6 +81,10 @@ impl SshSessionRuntime {
         if let Ok(mut slot) = self.shutdown_tx.lock() {
             *slot = None;
         }
+    }
+
+    pub(crate) async fn current_handle(&self) -> Option<Arc<client::Handle<LiveAgentSshClient>>> {
+        self.handle.lock().await.as_ref().map(Arc::clone)
     }
 
     pub(crate) fn input_sender(&self) -> Option<tokio::sync::mpsc::Sender<SshSessionInput>> {
@@ -146,7 +150,7 @@ pub(crate) enum PendingSshPrompt {
     },
     KeyboardInteractive {
         request: PendingSshConnectRequest,
-        host_config: RuntimeSshHostConfig,
+        host_config: Box<RuntimeSshHostConfig>,
         title: String,
         size: TerminalSize,
         handle: client::Handle<XAgentSshClient>,

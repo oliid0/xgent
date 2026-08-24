@@ -5,11 +5,14 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     path::PathBuf,
+    sync::{Mutex, OnceLock},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 #[cfg(desktop)]
 use std::{path::Path, sync::Arc};
+#[cfg(desktop)]
+use uuid::Uuid;
 
 use crate::runtime::project_path::project_path_key as normalize_project_path_key;
 #[cfg(desktop)]
@@ -26,24 +29,38 @@ const SSH_PROJECT_HOST_ASSOCIATIONS_TABLE: &str = "ssh_project_host_associations
 const SSH_KNOWN_HOSTS_TABLE: &str = "ssh_known_hosts";
 const ACCESS_SETTINGS_TABLE: &str = "access_settings";
 const MEMORY_SETTINGS_TABLE: &str = "memory_settings";
+const MODEL_FAILOVER_SETTINGS_TABLE: &str = "model_failover_settings";
+#[cfg(desktop)]
+const STT_SETTINGS_TABLE: &str = "stt_settings";
+#[cfg(desktop)]
+const BACKUP_SYNC_SETTINGS_TABLE: &str = "backup_sync_settings";
 
 const SYSTEM_EXECUTION_MODE_KEY: &str = "executionMode";
 const SYSTEM_WORKDIR_KEY: &str = "workdir";
 const SYSTEM_SELECTED_TOOLS_KEY: &str = "selectedSystemTools";
 const SYSTEM_TOOL_POLICIES_KEY: &str = "toolPolicies";
+const SYSTEM_COMMAND_SAFETY_MODE_KEY: &str = "commandSafetyMode";
 const SYSTEM_WORKSPACE_PROJECTS_KEY: &str = "workspaceProjects";
+const SYSTEM_WORKSPACE_PROJECT_GROUPS_KEY: &str = "workspaceProjectGroups";
 const SYSTEM_ACTIVE_WORKSPACE_PROJECT_ID_KEY: &str = "activeWorkspaceProjectId";
 const SYSTEM_HIDDEN_WORKSPACE_PROJECT_PATHS_KEY: &str = "hiddenWorkspaceProjectPaths";
 const SYSTEM_MISSING_WORKSPACE_PROJECT_PATHS_KEY: &str = "missingWorkspaceProjectPaths";
 const SYSTEM_ARCHIVED_WORKSPACE_PROJECT_PATHS_KEY: &str = "archivedWorkspaceProjectPaths";
+const SYSTEM_WORKSPACE_RESOURCE_SETTINGS_KEY: &str = "workspaceResourceSettings";
 const SYSTEM_TERMINAL_SHELL_KEY: &str = "terminalShell";
 const SYSTEM_SYSTEM_PROXY_KEY: &str = "systemProxy";
 const DEFAULT_WORKSPACE_PROJECT_ID: &str = "default-project";
 const DEFAULT_WORKSPACE_PROJECT_NAME: &str = "Default Project";
 pub(crate) const PROVIDER_API_KEY_UPDATES_FIELD: &str = "providerApiKeyUpdates";
+pub(crate) const PROVIDER_USAGE_QUERY_SECRET_UPDATES_FIELD: &str =
+    "providerUsageQuerySecretUpdates";
 pub(crate) const SYSTEM_PROXY_PASSWORD_UPDATE_FIELD: &str = "systemProxyPasswordUpdate";
 pub(crate) const SSH_SECRET_UPDATES_FIELD: &str = "sshSecretUpdates";
 pub(crate) const SSH_PATCH_FIELD: &str = "sshPatch";
+#[cfg(desktop)]
+pub(crate) const STT_SECRET_SYNC_FIELD: &str = "sttSecretSync";
+#[cfg(desktop)]
+pub(crate) const STT_SECRET_UPDATE_FIELD: &str = "sttSecretUpdate";
 const SSH_SYNC_CONFLICT_MESSAGE: &str = "SSH 设置已在另一端更新，已刷新为最新状态，请重新提交。";
 
 const PROVIDER_SETTINGS_SELECT_SQL: &str = "
@@ -161,7 +178,16 @@ include!("agents.rs");
 include!("system.rs");
 include!("mcp.rs");
 include!("memory_settings.rs");
+include!("model_failover.rs");
 include!("secret_redaction.rs");
+#[cfg(desktop)]
+include!("stt.rs");
+#[cfg(desktop)]
+include!("backup_snapshot.rs");
+#[cfg(desktop)]
+include!("backup_io.rs");
+#[cfg(desktop)]
+include!("webdav_sync.rs");
 #[cfg(desktop)]
 include!("local_access_snapshot.rs");
 include!("ssh/mod.rs");

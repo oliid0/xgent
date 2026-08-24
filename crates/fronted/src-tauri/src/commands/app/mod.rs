@@ -1,5 +1,7 @@
 #[cfg(desktop)]
 pub mod app;
+#[cfg(desktop)]
+pub mod tray;
 #[cfg(mobile)]
 #[path = "mobile_app.rs"]
 pub mod app;

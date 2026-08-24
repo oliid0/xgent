@@ -1,4 +1,4 @@
-import { Agent, type AgentTool } from "@earendil-works/pi-agent-core";
+import { Agent, type AgentContext, type AgentTool } from "@earendil-works/pi-agent-core";
 import type {
   AssistantMessage,
   Context,
@@ -8,8 +8,8 @@ import type {
   ToolResultMessage,
 } from "@earendil-works/pi-ai";
 import { buildStreamRequestDebugPayload, type StreamDebugLogger } from "../../debug/agentDebug";
-import { buildMemoryToolsSuffixSection } from "../../memory/prompts/injection";
-import { mergeCustomHeaders } from "../../providers/customHeaders";
+import { capturePrefixShape, comparePrefixShape } from "../../debug/prefixCacheShape";
+import { readPreviousPrefixShape, recordPrefixShape } from "../../debug/prefixShapeStore";
 import {
   createHostedSearchEventAggregator,
   createHostedSearchProbeId,
@@ -17,40 +17,46 @@ import {
   withHostedSearchProbeHeader,
 } from "../../providers/hostedSearchEvents";
 import {
-  buildProviderRequestHeaders,
   buildProviderRequestMetadata,
   createModelFromConfig,
   createStreamingTextReconciler,
+  describeProviderCacheShape,
   finalizeProviderStreamOptions,
   normalizeErrorMessage,
+  type ProviderRuntimeConfig,
+  prepareProviderRequest,
   resolveProviderCacheRetention,
   type StreamOptionsEx,
   streamSimpleByApi,
+  type ToolChoice,
   toSimpleStreamReasoning,
 } from "../../providers/llm";
 import {
+  buildProviderNativeWebFetchBridgeResult,
   buildProviderNativeWebSearchBridgeResult,
+  HIDDEN_PROVIDER_NATIVE_WEB_FETCH_TOOL_NAMES,
   HIDDEN_PROVIDER_NATIVE_WEB_SEARCH_TOOL_NAMES,
+  isProviderNativeWebFetchToolName,
   isProviderNativeWebSearchToolName,
 } from "../../providers/nativeWebSearch";
-import { prepareProxyRequest } from "../../providers/proxy";
-import type { RetryAttemptRecord } from "../../providers/runtime/streamRetry";
+import type { PreparedProxyRequest } from "../../providers/proxy";
 import {
-  inferRuntimePlatform,
-  normalizeRuntimePlatform,
-  type RuntimePlatform,
-  runtimePlatformLabel,
-} from "../../runtimePlatform";
-import type {
-  CodexRequestFormat,
-  CustomProvider,
-  ProviderAuthMode,
-  ProviderId,
-  ProviderModelConfig,
-  ReasoningLevel,
-} from "../../settings";
+  failoverBreakerKey,
+  type ModelFailoverRuntimeConfig,
+  type ProviderFailoverCandidate,
+  withProviderFailover,
+} from "../../providers/runtime/providerFailover";
+import type { RetryAttemptRecord } from "../../providers/runtime/streamRetry";
+import type { RuntimePlatform } from "../../runtimePlatform";
+import type { ProviderId, ReasoningLevel, SelectedModel } from "../../settings";
 import { createSubagentScheduler, type SubagentScheduler } from "../../subagents/scheduler";
 import { withPowerActivity } from "../../system/powerActivity";
+import type { AdditionalProjectRoot } from "../../tools/additionalProjectRoots";
+import {
+  attachPinnedTailBlocks,
+  type PinnedTailBlock,
+  resolveTailBlockAnchorId,
+} from "../context/contextTailBlock";
 import { sanitizeContextForModelRequest } from "../context/requestContextSanitizer";
 import {
   appendHostedSearchBlocksToAssistant,
@@ -63,9 +69,17 @@ import {
   createDeferredProviderNativeWebSearchStatus,
   resolveProviderNativeWebSearchStatus,
 } from "../search/providerNativeSearchStatus";
-import { comparableToolCall } from "./flattenedToolCallText";
-import { recoverAssistantSeedToolCalls } from "./seedToolCalls";
+import {
+  comparableToolCall,
+  recoverAssistantSeedToolCalls,
+  stripSeedToolCallMarkup,
+} from "./seedToolCalls";
 import { wrapStreamWithToolCallArgumentGuard } from "./toolCallArgumentGuard";
+import { buildToolsSuffix as buildToolExecutionPrompt } from "./toolExecutionPrompt";
+
+function throwIfRunnerCancelled(signal?: AbortSignal) {
+  if (signal?.aborted) throw new Error("Cancelled");
+}
 
 function createLinkedAbortSignal(signals: Array<AbortSignal | undefined>): {
   signal?: AbortSignal;
@@ -134,7 +148,17 @@ export function buildToolsSuffix(
   workdir: string,
   availableToolNames?: readonly string[],
   runtimePlatformInput?: RuntimePlatform,
+  additionalRoots?: readonly AdditionalProjectRoot[],
 ) {
+  return buildToolExecutionPrompt(
+    workdir,
+    availableToolNames,
+    runtimePlatformInput,
+    additionalRoots,
+  );
+  /* Legacy inline prompt retained temporarily for an easy semantic comparison
+     with the extracted prompt module. It is excluded from compilation. */
+  /*
   const runtimePlatform = normalizeRuntimePlatform(runtimePlatformInput) ?? inferRuntimePlatform();
   const platformLabel = runtimePlatformLabel(runtimePlatform);
   const allowAll = availableToolNames === undefined;
@@ -408,6 +432,7 @@ export function buildToolsSuffix(
   );
 
   return sections.join("\n\n");
+  */
 }
 
 function toolNameLookupKey(name: string) {
@@ -618,6 +643,12 @@ function toMessageToolResult(message: Message, toolCall: ToolCall): ToolResultMe
 type TurnContextOverride = {
   context: Context;
   emittedMessages: Message[];
+  /**
+   * 只随出站请求投递的尾部文本（bus 增量、roster 运行状态等易变内容）。
+   * 不写入 agent.state.messages：写进去会经 emittedMessages 泄漏到持久化、
+   * UI 与记忆抽取。runner 逐次累积并在每次出站请求上重挂。
+   */
+  wireTailText?: string;
 } | null;
 
 type ToolExecutionEventContext = {
@@ -648,26 +679,36 @@ function findLastAssistantMessage(messages: Message[]): AssistantMessage | null 
   );
 }
 
+export type AgentRunnerFailoverTarget = {
+  selectedModel: SelectedModel;
+  providerId: ProviderId;
+  model: string;
+  label: string;
+  runtime: ProviderRuntimeConfig;
+};
+
+export type AgentRunnerFailoverSwitchEvent = {
+  target: AgentRunnerFailoverTarget | null;
+  round: number;
+  errorMessage: string;
+};
+
+export type AgentRunnerFailoverParams = {
+  config: ModelFailoverRuntimeConfig;
+  primary: { selectedModel?: SelectedModel; label: string };
+  fallbacks: AgentRunnerFailoverTarget[];
+  onSwitched?: (event: AgentRunnerFailoverSwitchEvent) => void;
+};
+
 export async function runAssistantWithTools(params: {
   providerId: ProviderId;
   model: string;
-  runtime: {
-    baseUrl: string;
-    apiKey: string;
-    authMode?: ProviderAuthMode;
-    oauthAccountId?: string;
-    customHeaders?: CustomProvider["customHeaders"];
-    requestFormat?: CodexRequestFormat;
-    reasoning?: ReasoningLevel;
-    promptCachingEnabled?: boolean;
-    promptCacheRetention?: "short" | "long";
-    nativeWebSearchEnabled?: boolean;
-    useSystemProxy?: boolean;
-    modelConfig?: ProviderModelConfig;
-  };
+  runtime: ProviderRuntimeConfig;
+  failover?: AgentRunnerFailoverParams;
   runtimePlatform?: RuntimePlatform;
   context: Context;
   workdir: string;
+  additionalRoots?: readonly AdditionalProjectRoot[];
   sessionId?: string;
   nativeWebSearch?: boolean;
   tools: Context["tools"];
@@ -676,10 +717,6 @@ export async function runAssistantWithTools(params: {
     signal?: AbortSignal,
     context?: ToolExecutionEventContext,
   ) => Promise<Message>;
-  resolveToolGate?: (
-    toolCall: ToolCall,
-    signal?: AbortSignal,
-  ) => Promise<{ allow: true } | { allow: false; reason: string }>;
   onTurnStart?: (round: number) => void;
   onTextDelta: (delta: string, round: number) => void;
   onThinkingDelta?: (delta: string, round: number) => void;
@@ -699,13 +736,53 @@ export async function runAssistantWithTools(params: {
   }) => Promise<{
     context: Context;
     emittedMessages: Message[];
+    wireTailText?: string;
   } | null>;
   onToolStatus?: (status: string | null) => void;
   onRetryAttempts?: (round: number, attempts: RetryAttemptRecord[]) => void;
+  onRequestStart?: (params: {
+    round: number;
+    context: Context;
+    toolsSuffix: string;
+  }) => void;
   signal?: AbortSignal;
   debugLogger?: StreamDebugLogger;
   subagentScheduler?: SubagentScheduler;
   allowEmptyWorkdir?: boolean;
+  /**
+   * 工具审批门:每次工具执行前(截断校验之后)对规范化后的调用调用一次。
+   * 返回 allow:false 时该调用被拦截,reason 作为 toolResult 交给模型(与截断
+   * 拒绝同渲染路径)。回调可 await(交互式审批),被 turn 中止时应 reject/拒绝。
+   * 与策略/元数据实现解耦:runner 只认这个结果,不感知 toolPolicies 细节。
+   */
+  resolveToolGate?: (
+    toolCall: ToolCall,
+    signal?: AbortSignal,
+  ) => Promise<{ allow: true } | { allow: false; reason: string }>;
+  /**
+   * 请求层工具可见性谓词(MCP 懒加载):返回 false 的工具不进发给模型的请求,
+   * 但保留在执行层(loop 快照)——已发生的调用照常校验与执行。每轮请求前重新
+   * 评估,ToolSearch 激活后下一轮立即可见。与隐藏的 provider 原生搜索桥同机制。
+   */
+  requestToolFilter?: (toolName: string) => boolean;
+  /**
+   * 工具级终止谓词:某批调用里任一调用命中即在该批执行完后结束本轮 run,不再
+   * 跑后续模型轮(pi-agent-core afterToolCall terminate,批内全部标记 terminate
+   * 才生效,故谓词按批铺展——同批的并行调用照常执行,结果保留在历史)。计划
+   * 提交用它跳过无意义的"收尾话"轮——批准事实由卡片展示,执行由续轮承接。
+   */
+  resolveToolTermination?: (toolCall: ToolCall) => boolean;
+  /**
+   * 每轮出站请求的 tool_choice 裁决钩子(编排层策略,runner 不感知具体模式)。
+   * 返回 undefined 走缺省(有工具则 "auto")。定向强制({type:"tool"})只应
+   * 由调用方在有界场景使用——无界强制会剥夺模型的文本收尾能力,导致失控循环。
+   */
+  resolveToolChoice?: (round: number) => ToolChoice | undefined;
+  /**
+   * 模型轮数上限(含):达到后当前工具批执行完即优雅终止本轮 run(不抛错,
+   * 结果保留在历史),由编排层决定后续(如 plan mode 的补提交/兜底)。缺省无上限。
+   */
+  maxRounds?: number;
 }) {
   const modelId = params.model.trim();
   if (!modelId) throw new Error("No model selected");
@@ -724,24 +801,9 @@ export async function runAssistantWithTools(params: {
   const subagentScheduler = params.subagentScheduler ?? createSubagentScheduler();
 
   return withPowerActivity("assistant-tools", `${params.providerId}:${modelId}`, async () => {
-    const proxyRequest = await prepareProxyRequest(
-      params.providerId,
-      params.runtime.baseUrl.trim(),
-      mergeCustomHeaders(
-        buildProviderRequestHeaders(
-          params.providerId,
-          params.runtime.apiKey,
-          params.sessionId,
-          params.runtime.authMode,
-        ),
-        params.runtime.customHeaders,
-      ),
-      {
-        useSystemProxy: params.runtime.useSystemProxy === true,
-        oauthAccountId:
-          params.runtime.authMode === "oauth-managed" ? params.runtime.oauthAccountId : undefined,
-      },
-    );
+    const proxyRequest = await prepareProviderRequest(params.providerId, params.runtime, {
+      sessionId: params.sessionId,
+    });
 
     const model = createModelFromConfig(
       params.providerId,
@@ -769,6 +831,108 @@ export async function runAssistantWithTools(params: {
       api: model.api,
     });
 
+    // ---- Provider auto-failover targets -----------------------------------
+    // Target 0 is the primary (params.providerId/model/runtime); the rest map
+    // to params.failover.fallbacks in queue order. Fallback proxy/model
+    // preparation is lazy so unused fallbacks never touch the hot path.
+    type PreparedFailoverTarget = {
+      index: number;
+      key: string;
+      label: string;
+      selectedModel?: SelectedModel;
+      providerId: ProviderId;
+      modelId: string;
+      runtime: ProviderRuntimeConfig;
+      proxyRequest: PreparedProxyRequest;
+      model: ReturnType<typeof createModelFromConfig>;
+    };
+
+    const failoverParams = params.failover;
+    const primaryTarget: PreparedFailoverTarget = {
+      index: 0,
+      key: failoverParams?.primary.selectedModel
+        ? failoverBreakerKey(
+            failoverParams.primary.selectedModel.customProviderId,
+            failoverParams.primary.selectedModel.model,
+          )
+        : failoverBreakerKey(params.providerId, modelId),
+      label: failoverParams?.primary.label ?? `${params.providerId} · ${modelId}`,
+      selectedModel: failoverParams?.primary.selectedModel,
+      providerId: params.providerId,
+      modelId,
+      runtime: params.runtime,
+      proxyRequest,
+      model,
+    };
+
+    const preparedFallbackTargets = new Map<number, Promise<PreparedFailoverTarget>>();
+    const prepareFallbackTarget = (index: number): Promise<PreparedFailoverTarget> => {
+      const existing = preparedFallbackTargets.get(index);
+      if (existing) return existing;
+      const fallback = failoverParams?.fallbacks[index - 1];
+      if (!fallback) {
+        return Promise.reject(new Error(`Unknown failover target index: ${index}`));
+      }
+      const prepared = (async () => {
+        const fallbackProxyRequest = await prepareProviderRequest(
+          fallback.providerId,
+          fallback.runtime,
+          { sessionId: params.sessionId },
+        );
+        return {
+          index,
+          key: failoverBreakerKey(
+            fallback.selectedModel.customProviderId,
+            fallback.selectedModel.model,
+          ),
+          label: fallback.label,
+          selectedModel: fallback.selectedModel,
+          providerId: fallback.providerId,
+          modelId: fallback.model,
+          runtime: fallback.runtime,
+          proxyRequest: fallbackProxyRequest,
+          model: createModelFromConfig(
+            fallback.providerId,
+            fallback.model,
+            fallbackProxyRequest.baseUrl,
+            fallback.runtime.requestFormat,
+            fallback.runtime.modelConfig,
+            fallback.runtime.baseUrl.trim(),
+          ),
+        } satisfies PreparedFailoverTarget;
+      })();
+      // A failed preparation must not be cached forever; allow later retries.
+      preparedFallbackTargets.set(
+        index,
+        prepared.catch((error) => {
+          preparedFallbackTargets.delete(index);
+          throw error;
+        }),
+      );
+      return preparedFallbackTargets.get(index) as Promise<PreparedFailoverTarget>;
+    };
+
+    /** Cheap, IO-free model identity for failover bookkeeping/synthesis. */
+    const fallbackTargetIdentity = (index: number) => {
+      const fallback = failoverParams?.fallbacks[index - 1];
+      if (!fallback) return { api: model.api, provider: model.provider, id: modelId };
+      const identity = createModelFromConfig(
+        fallback.providerId,
+        fallback.model,
+        fallback.runtime.baseUrl.trim(),
+        fallback.runtime.requestFormat,
+        fallback.runtime.modelConfig,
+        fallback.runtime.baseUrl.trim(),
+      );
+      return { api: identity.api, provider: identity.provider, id: identity.id };
+    };
+
+    // Sticky winner: rounds after a successful failover start on the target
+    // that actually answered, mirroring cc-switch's hot switch semantics.
+    let activeFailoverTargetIndex = 0;
+    let lastFailoverErrorMessage = "";
+    // ------------------------------------------------------------------------
+
     const toolResultErrorFlags = new Map<string, boolean>();
     const toolCallsById = new Map<string, ToolCall>();
     const incompleteToolCallArguments = new Map<string, string>();
@@ -790,6 +954,7 @@ export async function runAssistantWithTools(params: {
       toolCall: ToolCall,
       signal?: AbortSignal,
     ): Promise<{ content: ToolResultMessage["content"]; details: unknown }> => {
+      throwIfRunnerCancelled(signal ?? params.signal);
       const effectiveToolCall = normalizeToolCallNameForExecution(toolCall);
       if (effectiveToolCall !== toolCall) {
         toolCallsById.set(effectiveToolCall.id, effectiveToolCall);
@@ -804,6 +969,15 @@ export async function runAssistantWithTools(params: {
             sourcesIntro: "Hosted search sources already captured in this round:",
             fallbackText:
               "No local web_search executor is available. Continue from existing context, or request provider-native web search through the model/tool protocol instead of printing raw tool-call markup.",
+            extraInstructions: ["Do not repeat raw tool-call markup in the final answer."],
+          });
+        } else if (shouldSilenceProviderNativeWebFetchToolCall(effectiveToolCall)) {
+          toolResult = buildProviderNativeWebFetchBridgeResult({
+            toolCall: effectiveToolCall,
+            hostedSearchBlocks: hostedSearchBlocksByRound.get(currentRound) ?? [],
+            sourcesIntro: "Hosted search sources already captured in this round:",
+            fallbackText:
+              "No hosted search sources were captured in this round. Continue from existing context.",
             extraInstructions: ["Do not repeat raw tool-call markup in the final answer."],
           });
         } else {
@@ -854,6 +1028,7 @@ export async function runAssistantWithTools(params: {
       } finally {
         linkedSignal.cleanup();
       }
+      throwIfRunnerCancelled(linkedSignal.signal);
 
       toolResultErrorFlags.set(effectiveToolCall.id, Boolean(toolResult.isError));
       return {
@@ -905,26 +1080,93 @@ export async function runAssistantWithTools(params: {
         ? HIDDEN_PROVIDER_NATIVE_WEB_SEARCH_TOOL_NAMES.filter((name) => !localToolNames.has(name))
         : [],
     );
+    const hiddenProviderNativeWebFetchToolNames = new Set<string>(
+      nativeWebSearchStatus
+        ? HIDDEN_PROVIDER_NATIVE_WEB_FETCH_TOOL_NAMES.filter((name) => !localToolNames.has(name))
+        : [],
+    );
     const shouldSilenceProviderNativeWebSearchToolCall = (toolCall: ToolCall) =>
       Boolean(
         nativeWebSearchStatus &&
           !localToolNames.has(toolCall.name) &&
           isProviderNativeWebSearchToolName(toolCall.name),
       );
+    const shouldSilenceProviderNativeWebFetchToolCall = (toolCall: ToolCall) =>
+      Boolean(
+        nativeWebSearchStatus &&
+          !localToolNames.has(toolCall.name) &&
+          isProviderNativeWebFetchToolName(toolCall.name),
+      );
+    // Single gate for every tool-event suppression site: bridged web_search and
+    // web_fetch calls must never surface as tool rows/status lines in the UI.
+    const shouldSilenceProviderNativeToolCall = (toolCall: ToolCall) =>
+      shouldSilenceProviderNativeWebSearchToolCall(toolCall) ||
+      shouldSilenceProviderNativeWebFetchToolCall(toolCall);
     const filterRequestTools = (
       tools: Context["tools"] | undefined,
     ): Context["tools"] | undefined =>
-      tools?.filter((tool) => !hiddenProviderNativeWebSearchToolNames.has(tool.name));
+      tools?.filter(
+        (tool) =>
+          !hiddenProviderNativeWebSearchToolNames.has(tool.name) &&
+          !hiddenProviderNativeWebFetchToolNames.has(tool.name) &&
+          (params.requestToolFilter?.(tool.name) ?? true),
+      );
+
+    const assistantVisibleAnswerText = (assistant: AssistantMessage) =>
+      stripSeedToolCallMarkup(
+        assistant.content
+          .flatMap((block) => (block.type === "text" ? [block.text] : []))
+          .join("\n"),
+      ).trim();
+
+    // Relays that execute Anthropic server tools in-band can leak the original
+    // tool_use blocks with stop_reason end_turn *after* the model has already
+    // written its final answer (the server results streamed mid-generation, so
+    // the answer text follows them in the same message). Bridging those calls
+    // and letting pi-agent-core run another model turn makes Claude answer the
+    // same question again — duplicate output after every web search. Marking
+    // every bridged call of such a batch as terminate keeps the bridge results
+    // in history (the next request stays protocol-consistent) but ends the run
+    // on the answer the user already has. Guards: the model must have finished
+    // normally with visible answer text, and a leaked search call additionally
+    // needs completed in-round hosted-search sources — a model that is still
+    // waiting for results (raw-markup recovery, relays that execute nothing)
+    // keeps its follow-up turn.
+    const shouldTerminateBridgedProviderNativeToolCall = async (
+      assistant: AssistantMessage,
+      toolCall: ToolCall,
+    ) => {
+      if (!shouldSilenceProviderNativeToolCall(toolCall)) return false;
+      if (assistant.stopReason !== "stop") return false;
+      if (assistantVisibleAnswerText(assistant).length === 0) return false;
+      if (isProviderNativeWebSearchToolName(toolCall.name)) {
+        // Await the round's probe finalization (message_end already queued this
+        // exact promise) so the coverage decision reads the complete in-band
+        // search metadata instead of racing the response-clone parser.
+        const blocks = await finishHostedSearchRound(currentRound, "completed");
+        return blocks.some((block) => block.status === "completed" && block.sources.length > 0);
+      }
+      // web_fetch bridges never add new information; once the model has
+      // delivered its answer there is nothing for a follow-up turn to do.
+      return true;
+    };
     const toolsSuffix = buildToolsSuffix(
       params.workdir,
       llmTools.map((tool) => tool.name),
       params.runtimePlatform,
+      params.additionalRoots,
     );
     let currentSystemPrompt = params.context.systemPrompt;
-    let pendingTurnOverridePromise: Promise<TurnContextOverride> | null = null;
     let emittedBaselineIndex = params.context.messages.length;
     let latestAgentEndMessages: Message[] = [];
-    let agentTools: AgentTool<any>[] = [];
+    // 尾部投递内容的累积器：只进出站请求，永不进 agent.state.messages。
+    // 每个块连同它首次挂上的锚点 toolCallId 一起记住——锚点必须钉死，重新搜索
+    // 会让块随工具循环推进从旧消息搬到新消息，旧消息字节变回去、前缀就断了。
+    // 语义：带 wireTailText 的 override 追加（按到达顺序）；不带 wireTailText 的
+    // override 清空——不带的只有压缩/重冻结分支，此时快照已重算进 systemPrompt，
+    // 旧尾部内容已被快照覆盖，继续挂只会重复投递。
+    let accumulatedWireTailBlocks: PinnedTailBlock[] = [];
+    let agentTools: AgentTool[] = [];
     const pendingRecoveredSeedTurnRef: {
       current: {
         round: number;
@@ -1114,15 +1356,27 @@ export async function runAssistantWithTools(params: {
       }
     }
 
-    async function consumePendingTurnOverride(): Promise<TurnContextOverride> {
-      const pending = pendingTurnOverridePromise;
-      if (!pending) return null;
-      pendingTurnOverridePromise = null;
-      return pending;
-    }
-
-    function applyTurnContextOverride(override: Exclude<TurnContextOverride, null>) {
-      if (!agent) return;
+    function applyTurnContextOverride(
+      override: Exclude<TurnContextOverride, null>,
+    ): AgentContext | undefined {
+      if (!agent) return undefined;
+      if (override.wireTailText) {
+        // 锚点在这里解析一次就钉死：override.context.messages 是本轮出站请求
+        // 的消息列表，此刻的“最后一条安全工具结果”就是这个块该长期附着的位置。
+        // 解析不出锚点时丢弃本块——调用方在探锚阶段已确认过可挂，走到这里为空
+        // 只可能是压缩改写了消息列表，此时游标也不会推进，下一轮重投。
+        const anchorToolCallId = resolveTailBlockAnchorId(override.context.messages);
+        if (anchorToolCallId) {
+          accumulatedWireTailBlocks = [
+            ...accumulatedWireTailBlocks,
+            { anchorToolCallId, text: override.wireTailText },
+          ];
+        }
+      } else {
+        // 见 accumulatedWireTailBlocks 声明处的语义说明：压缩/重冻结分支不带
+        // wireTailText，旧尾部内容已并入重算后的快照，累积必须清空。
+        accumulatedWireTailBlocks = [];
+      }
       currentSystemPrompt = override.context.systemPrompt;
       agent.state.systemPrompt = buildSystemPrompt(currentSystemPrompt, toolsSuffix);
       agent.state.messages = override.context.messages.slice();
@@ -1132,9 +1386,14 @@ export async function runAssistantWithTools(params: {
         override.context.messages.length - override.emittedMessages.length,
       );
       latestAgentEndMessages = [];
+      return {
+        systemPrompt: agent.state.systemPrompt,
+        messages: agent.state.messages.slice(),
+        tools: agentTools,
+      };
     }
 
-    const visibleAgentTools: AgentTool<any>[] = llmTools.map((tool) => ({
+    const visibleAgentTools: AgentTool[] = llmTools.map((tool) => ({
       ...tool,
       label: tool.name,
       async execute(toolCallId, toolArgs, signal) {
@@ -1164,7 +1423,7 @@ export async function runAssistantWithTools(params: {
         return executeSingleToolCall(toolCall, signal);
       },
     }));
-    const hiddenProviderNativeWebSearchAgentTools: AgentTool<any>[] = [
+    const hiddenProviderNativeWebSearchAgentTools: AgentTool[] = [
       ...hiddenProviderNativeWebSearchToolNames,
     ].map((name) => ({
       name,
@@ -1189,126 +1448,315 @@ export async function runAssistantWithTools(params: {
         return executeSingleToolCall(toolCall, signal);
       },
     }));
-    agentTools = [...visibleAgentTools, ...hiddenProviderNativeWebSearchAgentTools];
+    // Registered so pi-agent-core resolves leaked provider-native web_fetch
+    // calls instead of erroring with "Tool web_fetch not found"; execution
+    // routes into the silent bridge above.
+    const hiddenProviderNativeWebFetchAgentTools: AgentTool[] = [
+      ...hiddenProviderNativeWebFetchToolNames,
+    ].map((name) => ({
+      name,
+      label: name,
+      description: "Internal provider-native web fetch bridge.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string" },
+        },
+        additionalProperties: true,
+      },
+      async execute(toolCallId, toolArgs, signal) {
+        const toolCall = toSyntheticToolCall({
+          id: toolCallId,
+          name,
+          arguments: (toolArgs ?? {}) as Record<string, unknown>,
+        });
+        toolCallsById.set(toolCall.id, toolCall);
+        return executeSingleToolCall(toolCall, signal);
+      },
+    }));
+    agentTools = [
+      ...visibleAgentTools,
+      ...hiddenProviderNativeWebSearchAgentTools,
+      ...hiddenProviderNativeWebFetchAgentTools,
+    ];
 
     let streamRound = 0;
-    const streamFn = (streamModel: typeof model, streamContext: Context, options?: any) => {
+    const streamFn = (
+      streamModel: typeof model,
+      streamContext: Context,
+      options?: StreamOptionsEx,
+    ) => {
       const round = ++streamRound;
       const retryAttemptsForRound: RetryAttemptRecord[] = [];
       params.onRetryAttempts?.(round, retryAttemptsForRound);
       const streamTools =
         streamContext.tools ?? (agent?.state.tools as Context["tools"] | undefined) ?? llmTools;
+      // 尾部投递内容只存在于出站请求：每次请求在此重挂到各自钉死的锚点（与记忆
+      // 增量的逐请求重建同口径），agent.state.messages 始终不含它。挂在 sanitize
+      // 之前、capturePrefixShape 之后读取 effectiveContext，归因看到的就是真实
+      // 出站字节。
+      const outboundMessages =
+        accumulatedWireTailBlocks.length > 0
+          ? attachPinnedTailBlocks(streamContext.messages.slice(), accumulatedWireTailBlocks)
+          : streamContext.messages.slice();
       const effectiveContext = sanitizeContextForModelRequest({
         ...streamContext,
-        systemPrompt:
-          typeof currentSystemPrompt === "string"
-            ? currentSystemPrompt
-            : streamContext.systemPrompt,
-        messages: streamContext.messages.slice(),
+        // Keep the runtime-only tool rules out of compaction and persistence,
+        // then reattach them at the provider boundary on every model round.
+        systemPrompt: buildSystemPrompt(currentSystemPrompt, toolsSuffix),
+        messages: outboundMessages,
         tools: filterRequestTools(streamTools),
       });
-      const fallbackReasoning =
-        params.providerId === "claude_code" || params.providerId === "gemini"
-          ? toSimpleStreamReasoning(params.runtime.reasoning)
-          : streamModel.api === "openai-responses" || streamModel.api === "openai-completions"
-            ? toSimpleStreamReasoning(params.runtime.reasoning)
-            : undefined;
-      const shouldProbeHostedSearch = Boolean(nativeWebSearchStatus);
-      const hostedSearchProbeId = shouldProbeHostedSearch
-        ? createHostedSearchProbeId(params.providerId)
-        : undefined;
-      let streamOptions: StreamOptionsEx = {
-        ...(options ?? {}),
-        apiKey: options?.apiKey ?? params.runtime.apiKey,
-        headers: withHostedSearchProbeHeader(
-          {
+      try {
+        params.onRequestStart?.({ round, context: effectiveContext, toolsSuffix });
+      } catch (error) {
+        // Request observers are diagnostics only and must never break generation.
+        console.warn("[agent-runner] request observer threw; request is unaffected", error);
+      }
+
+      // pi-agent-core passes the agent-state model; honor it for the primary
+      // target so external model swaps keep working through the failover path.
+      const primaryRoundTarget: PreparedFailoverTarget =
+        streamModel === model ? primaryTarget : { ...primaryTarget, model: streamModel };
+
+      // 哈希只在请求边界算一次:同一轮内的 failover / 重试复用同一份归因,
+      // 更不能进流式回调 —— 那会让开销随 token 数放大。
+      //
+      // 缓存参数按主目标口径入账:TTL 或断点策略变化会真实作废缓存,而 system 与
+      // tools 的字节可以一模一样,不单独记这一维就会在真出事时报 unchanged。
+      // 协议族分发在 providers 层的 describeProviderCacheShape 里收敛,这里只
+      // 负责把与注入侧同源的输入(含请求头,x-session-id 已有则以头值为准)递进去。
+      const roundCacheRetention =
+        options?.cacheRetention ??
+        resolveProviderCacheRetention(
+          primaryRoundTarget.providerId,
+          primaryRoundTarget.runtime.promptCachingEnabled,
+          undefined,
+          primaryRoundTarget.runtime.promptCacheRetention,
+        );
+      const roundSessionId = options?.sessionId ?? params.sessionId;
+      const prefixShape = capturePrefixShape({
+        systemPrompt: effectiveContext.systemPrompt,
+        tools: effectiveContext.tools,
+        cacheControl: describeProviderCacheShape({
+          providerId: primaryRoundTarget.providerId,
+          baseUrl: primaryRoundTarget.runtime.baseUrl,
+          promptCacheHintMode:
+            primaryRoundTarget.runtime.modelConfig?.promptCacheHintMode ??
+            primaryRoundTarget.runtime.promptCacheHintMode,
+          modelApi: primaryRoundTarget.model.api,
+          sessionId: roundSessionId,
+          cacheRetention: roundCacheRetention,
+          // 与下方 streamOptions 的 headers 合并口径一致:注入侧看到的就是这份。
+          headers: {
             ...(options?.headers ?? {}),
-            ...proxyRequest.headers,
+            ...primaryRoundTarget.proxyRequest.headers,
           },
-          hostedSearchProbeId,
-        ),
-        signal: options?.signal,
-        sessionId: options?.sessionId ?? params.sessionId,
-        cacheRetention:
-          options?.cacheRetention ??
-          resolveProviderCacheRetention(
-            params.providerId,
-            params.runtime.promptCachingEnabled,
-            undefined,
-            params.runtime.promptCacheRetention,
+        }),
+      });
+      const prefixCacheDiagnostics = comparePrefixShape(
+        readPreviousPrefixShape(roundSessionId),
+        prefixShape,
+      );
+      recordPrefixShape(roundSessionId, prefixShape);
+
+      const buildTargetRoundStream = (target: PreparedFailoverTarget) => {
+        const targetModel = target.model;
+        const fallbackReasoning =
+          target.providerId === "claude_code" ||
+          target.providerId === "gemini" ||
+          target.providerId === "deepseek" ||
+          targetModel.api === "openai-responses" ||
+          targetModel.api === "openai-completions"
+            ? toSimpleStreamReasoning(target.runtime.reasoning)
+            : undefined;
+        const targetNativeWebSearchStatus =
+          target.index === 0
+            ? nativeWebSearchStatus
+            : resolveProviderNativeWebSearchStatus({
+                providerId: target.providerId,
+                api: targetModel.api,
+                enabled: params.nativeWebSearch,
+                baseUrl: target.runtime.baseUrl,
+                modelId: target.modelId,
+              });
+        const shouldProbeHostedSearch = Boolean(targetNativeWebSearchStatus);
+        const hostedSearchProbeId = shouldProbeHostedSearch
+          ? createHostedSearchProbeId(target.providerId)
+          : undefined;
+        let streamOptions: StreamOptionsEx = {
+          ...(options ?? {}),
+          apiKey: options?.apiKey ?? target.runtime.apiKey,
+          headers: withHostedSearchProbeHeader(
+            {
+              ...(options?.headers ?? {}),
+              ...target.proxyRequest.headers,
+            },
+            hostedSearchProbeId,
           ),
-        metadata: buildProviderRequestMetadata(params.providerId, params.sessionId),
-        toolChoice: options?.toolChoice ?? (effectiveContext.tools?.length ? "auto" : undefined),
-        reasoning: normalizeStreamReasoning(options?.reasoning) ?? fallbackReasoning,
-        streamRetry: {
-          onRetry: (attempt, maxAttempts, errorMessage) => {
-            params.onToolStatus?.(
-              `第 ${round} 轮：连接已断开，正在重试 (${attempt}/${maxAttempts})...`,
-            );
-            retryAttemptsForRound.push({ attempt, maxAttempts, errorMessage });
-            params.onRetryAttempts?.(round, retryAttemptsForRound.slice());
+          signal: options?.signal,
+          sessionId: options?.sessionId ?? params.sessionId,
+          cacheRetention:
+            options?.cacheRetention ??
+            resolveProviderCacheRetention(
+              target.providerId,
+              target.runtime.promptCachingEnabled,
+              undefined,
+              target.runtime.promptCacheRetention,
+            ),
+          metadata: buildProviderRequestMetadata(target.providerId, params.sessionId),
+          toolChoice:
+            params.resolveToolChoice?.(round) ??
+            options?.toolChoice ??
+            (effectiveContext.tools?.length ? "auto" : undefined),
+          reasoning: normalizeStreamReasoning(options?.reasoning) ?? fallbackReasoning,
+          workdir: params.workdir,
+          streamRetry: {
+            onRetry: (attempt, maxAttempts, errorMessage) => {
+              params.onToolStatus?.(
+                `第 ${round} 轮：连接已断开，正在重试 (${attempt}/${maxAttempts})...`,
+              );
+              retryAttemptsForRound.push({ attempt, maxAttempts, errorMessage });
+              params.onRetryAttempts?.(round, retryAttemptsForRound.slice());
+            },
+            onRetryRecovered: () => {
+              params.onToolStatus?.(`第 ${round} 轮：模型生成中...`);
+            },
           },
-          onRetryRecovered: () => {
-            params.onToolStatus?.(`第 ${round} 轮：模型生成中...`);
+        };
+
+        streamOptions = finalizeProviderStreamOptions({
+          providerId: target.providerId,
+          baseUrl: target.runtime.baseUrl,
+          options: streamOptions,
+          context: effectiveContext,
+          model: targetModel,
+          workdir: params.workdir,
+          nativeWebSearch: params.nativeWebSearch,
+          promptCacheHintMode:
+            target.runtime.modelConfig?.promptCacheHintMode ?? target.runtime.promptCacheHintMode,
+          debugLogger: params.debugLogger,
+          extra: {
+            round,
+            sessionId: params.sessionId,
           },
-        },
+        });
+
+        // A discarded failover attempt for this round may have left a live
+        // probe/aggregator behind; finish it quietly and drop its blocks so
+        // the winning attempt starts from a clean slate.
+        const staleProbe = hostedSearchProbeByRound.get(round);
+        if (staleProbe) {
+          hostedSearchProbeByRound.delete(round);
+          hostedSearchBlocksByRound.delete(round);
+          hostedSearchOrderedBlocksByRound.delete(round);
+          void staleProbe
+            .finishProbe()
+            .then(() => staleProbe.disposeAggregator())
+            .catch(() => undefined);
+        }
+
+        const hostedSearchAggregator = createHostedSearchEventAggregator({
+          providerId: target.providerId,
+          onHostedSearch: (hostedSearch) => {
+            if (hostedSearch.status === "searching") {
+              nativeWebSearchStatusController.schedule();
+            } else {
+              nativeWebSearchStatusController.pause();
+            }
+            upsertHostedSearchBlockForRound(round, hostedSearch);
+            upsertHostedSearchOrderedBlockForRound(round, hostedSearch);
+            params.onHostedSearch?.(hostedSearch, round);
+          },
+        });
+        const hostedSearchProbe = startHostedSearchFetchProbe({
+          providerId: target.providerId,
+          sessionId: params.sessionId,
+          requestId: hostedSearchProbeId,
+          enabled: shouldProbeHostedSearch,
+          onRawEvent: hostedSearchAggregator.accept,
+        });
+        hostedSearchProbeByRound.set(round, {
+          finishProbe: hostedSearchProbe.finish,
+          completeAggregator: hostedSearchAggregator.complete,
+          failAggregator: hostedSearchAggregator.fail,
+          disposeAggregator: hostedSearchAggregator.dispose,
+        });
+
+        params.debugLogger?.logRequest(
+          buildStreamRequestDebugPayload({
+            runtime: target.runtime,
+            context: effectiveContext,
+            options: streamOptions,
+            round,
+            prefixCache: prefixCacheDiagnostics,
+          }),
+        );
+
+        return streamSimpleByApi(targetModel, effectiveContext, streamOptions);
       };
 
-      streamOptions = finalizeProviderStreamOptions({
-        providerId: params.providerId,
-        baseUrl: params.runtime.baseUrl,
-        options: streamOptions,
-        context: effectiveContext,
-        model: streamModel,
-        workdir: params.workdir,
-        nativeWebSearch: params.nativeWebSearch,
-        debugLogger: params.debugLogger,
-        extra: {
-          round,
-          sessionId: params.sessionId,
+      const wrapWithGuard = (stream: ReturnType<typeof streamSimpleByApi>) =>
+        wrapStreamWithToolCallArgumentGuard(stream, (toolCall, reason) => {
+          incompleteToolCallArguments.set(toolCall.id, reason);
+        });
+
+      if (!failoverParams || failoverParams.fallbacks.length === 0) {
+        return wrapWithGuard(buildTargetRoundStream(primaryRoundTarget));
+      }
+
+      // Candidate order: sticky active target first, then the rest in
+      // primary→queue order. Breaker-open targets are skipped inside
+      // withProviderFailover.
+      const totalTargets = failoverParams.fallbacks.length + 1;
+      const targetOrder = [
+        activeFailoverTargetIndex,
+        ...Array.from({ length: totalTargets }, (_, i) => i).filter(
+          (i) => i !== activeFailoverTargetIndex,
+        ),
+      ];
+      const candidates = targetOrder.map((targetIndex) => {
+        const fallback = targetIndex === 0 ? null : failoverParams.fallbacks[targetIndex - 1];
+        return {
+          key:
+            targetIndex === 0
+              ? primaryTarget.key
+              : failoverBreakerKey(
+                  fallback?.selectedModel.customProviderId ?? "",
+                  fallback?.selectedModel.model ?? "",
+                ),
+          label: targetIndex === 0 ? primaryTarget.label : (fallback?.label ?? ""),
+          model:
+            targetIndex === 0
+              ? { api: model.api, provider: model.provider, id: model.id }
+              : fallbackTargetIdentity(targetIndex),
+          start: async () => {
+            const target =
+              targetIndex === 0 ? primaryRoundTarget : await prepareFallbackTarget(targetIndex);
+            return buildTargetRoundStream(target);
+          },
+        } satisfies ProviderFailoverCandidate;
+      });
+
+      const failoverStream = withProviderFailover(candidates, {
+        config: failoverParams.config,
+        signal: options?.signal,
+        onFailover: ({ fromLabel, toLabel, errorMessage }) => {
+          lastFailoverErrorMessage = errorMessage;
+          params.onToolStatus?.(`第 ${round} 轮：${fromLabel} 不可用，正在切换到 ${toLabel}...`);
+        },
+        onCommitted: (candidateIndex) => {
+          const targetIndex = targetOrder[candidateIndex] ?? activeFailoverTargetIndex;
+          if (targetIndex === activeFailoverTargetIndex) return;
+          activeFailoverTargetIndex = targetIndex;
+          failoverParams.onSwitched?.({
+            target: targetIndex === 0 ? null : (failoverParams.fallbacks[targetIndex - 1] ?? null),
+            round,
+            errorMessage: lastFailoverErrorMessage,
+          });
         },
       });
-
-      const hostedSearchAggregator = createHostedSearchEventAggregator({
-        providerId: params.providerId,
-        onHostedSearch: (hostedSearch) => {
-          if (hostedSearch.status === "searching") {
-            nativeWebSearchStatusController.schedule();
-          } else {
-            nativeWebSearchStatusController.pause();
-          }
-          upsertHostedSearchBlockForRound(round, hostedSearch);
-          upsertHostedSearchOrderedBlockForRound(round, hostedSearch);
-          params.onHostedSearch?.(hostedSearch, round);
-        },
-      });
-      const hostedSearchProbe = startHostedSearchFetchProbe({
-        providerId: params.providerId,
-        sessionId: params.sessionId,
-        requestId: hostedSearchProbeId,
-        enabled: shouldProbeHostedSearch,
-        onRawEvent: hostedSearchAggregator.accept,
-      });
-      hostedSearchProbeByRound.set(round, {
-        finishProbe: hostedSearchProbe.finish,
-        completeAggregator: hostedSearchAggregator.complete,
-        failAggregator: hostedSearchAggregator.fail,
-        disposeAggregator: hostedSearchAggregator.dispose,
-      });
-
-      params.debugLogger?.logRequest(
-        buildStreamRequestDebugPayload({
-          runtime: params.runtime,
-          context: effectiveContext,
-          options: streamOptions,
-          round,
-        }),
-      );
-
-      const sourceStream = streamSimpleByApi(streamModel, effectiveContext, streamOptions);
-      return wrapStreamWithToolCallArgumentGuard(sourceStream, (toolCall, reason) => {
-        incompleteToolCallArguments.set(toolCall.id, reason);
-      });
+      return wrapWithGuard(failoverStream);
     };
 
     // A truncated call whose repaired arguments also fail schema validation
@@ -1316,7 +1764,7 @@ export async function runAssistantWithTools(params: {
     // model would see a schema error blaming its own call. Rewrite such tool
     // results into the truthful transport-error teaching before the next turn.
     const reconcileTruncatedToolResults = () => {
-      if (incompleteToolCallArguments.size === 0) return;
+      if (incompleteToolCallArguments.size === 0) return false;
       const messages = getAgentMessages(agent);
       let changed = false;
       const next = messages.map((message) => {
@@ -1336,6 +1784,7 @@ export async function runAssistantWithTools(params: {
       if (changed && agent) {
         agent.state.messages = next;
       }
+      return changed;
     };
 
     agent = new Agent({
@@ -1349,8 +1798,24 @@ export async function runAssistantWithTools(params: {
       sessionId: params.sessionId,
       streamFn,
       toolExecution: "sequential",
-      afterToolCall: async ({ toolCall }) => ({
+      afterToolCall: async ({ assistantMessage, toolCall }) => ({
         isError: toolResultErrorFlags.get(toolCall.id) ?? false,
+        // The batch only terminates when *every* call terminates. A terminating
+        // call (ExitPlanMode) can arrive batched with ordinary parallel calls,
+        // so the predicate must spread across the whole batch: every sibling
+        // still executes and keeps its result in history, then the run ends —
+        // otherwise one Read next to ExitPlanMode would silently void the
+        // "submitting ends this turn" guarantee and run a wrap-up round.
+        // maxRounds is the run-level circuit breaker: once the cap is reached
+        // the current batch finishes normally, then the run ends gracefully.
+        terminate:
+          (params.maxRounds !== undefined && currentRound >= params.maxRounds) ||
+          (params.resolveToolTermination
+            ? getAssistantToolCalls(assistantMessage).some((call) =>
+                params.resolveToolTermination?.(call),
+              )
+            : false) ||
+          (await shouldTerminateBridgedProviderNativeToolCall(assistantMessage, toolCall)),
       }),
       beforeToolCall: async ({ assistantMessage, toolCall }) => {
         const effectiveToolCall = normalizeToolCallNameForExecution(toolCall);
@@ -1407,13 +1872,55 @@ export async function runAssistantWithTools(params: {
         }
         return undefined;
       },
-      transformContext: async (_messages, _signal) => {
-        const override = await consumePendingTurnOverride();
-        if (override) {
-          applyTurnContextOverride(override);
+      // 0.84 起 pi-agent-core 用 prepareNextTurnWithContext 取代了原先靠
+      // transformContext 顺带做的 turn 间改写。二者的关键差异:transformContext
+      // 拿不到 loop 的 context,只能读回 agent.state.messages;而 loop 的
+      // currentContext.messages 是 createContextSnapshot() 切出的**另一个数组**,
+      // agent.state 上的改写不会自动回流。所以这里必须显式把改写后的消息作为
+      // context 返回,否则 message_end 里对 assistant 的规范化(工具名归一、
+      // hostedSearch 块回填、seed 工具调用去重)和截断结果重写全部只活在
+      // agent.state,下一轮请求仍按旧快照发出。
+      prepareNextTurnWithContext: async ({ message, toolResults, context }, signal) => {
+        const reconciled = reconcileTruncatedToolResults();
+        // agent.state 是 message_end 规范化后的权威副本;只要它与 loop 快照长度
+        // 一致,就以它为准(内容可能已被就地替换,长度相同不代表内容相同)。
+        const stateMessages = getAgentMessages(agent);
+        const currentContext: AgentContext =
+          agent && stateMessages.length === context.messages.length
+            ? { ...context, messages: stateMessages.slice() }
+            : reconciled
+              ? { ...context, messages: agent ? stateMessages.slice() : context.messages }
+              : context;
+        const contextChanged = currentContext !== context;
+        if (
+          !params.onBeforeNextTurn ||
+          message.stopReason !== "toolUse" ||
+          toolResults.length === 0
+        ) {
+          return contextChanged ? { context: currentContext } : undefined;
         }
-        reconcileTruncatedToolResults();
-        return getAgentMessages(agent).slice();
+
+        const runtimeMessages = currentContext.messages as Message[];
+        const override = await params.onBeforeNextTurn({
+          round: currentRound,
+          assistant: message,
+          toolResults,
+          runtimeContext: {
+            systemPrompt: currentSystemPrompt,
+            messages: runtimeMessages.slice(),
+            tools: llmTools,
+          },
+          emittedMessages:
+            emittedBaselineIndex <= 0
+              ? runtimeMessages.slice()
+              : runtimeMessages.slice(emittedBaselineIndex),
+          signal: signal ?? params.signal,
+        });
+        if (!override) {
+          return contextChanged ? { context: currentContext } : undefined;
+        }
+        const nextContext = applyTurnContextOverride(override);
+        return nextContext ? { context: nextContext } : undefined;
       },
     });
 
@@ -1462,7 +1969,7 @@ export async function runAssistantWithTools(params: {
                 streamEvent.partial.content[streamEvent.contentIndex] = effectiveToolCall;
               }
               toolCallsById.set(effectiveToolCall.id, effectiveToolCall);
-              if (!shouldSilenceProviderNativeWebSearchToolCall(effectiveToolCall)) {
+              if (!shouldSilenceProviderNativeToolCall(effectiveToolCall)) {
                 params.onToolCall?.(effectiveToolCall, currentRound);
               }
             }
@@ -1475,7 +1982,7 @@ export async function runAssistantWithTools(params: {
                 streamEvent.partial.content[streamEvent.contentIndex] = effectiveToolCall;
               }
               toolCallsById.set(effectiveToolCall.id, effectiveToolCall);
-              if (!shouldSilenceProviderNativeWebSearchToolCall(effectiveToolCall)) {
+              if (!shouldSilenceProviderNativeToolCall(effectiveToolCall)) {
                 params.onToolCallDelta?.(effectiveToolCall, currentRound);
               }
             }
@@ -1483,7 +1990,7 @@ export async function runAssistantWithTools(params: {
             nativeWebSearchStatusController.pause();
             const effectiveToolCall = normalizeToolCallNameForExecution(streamEvent.toolCall);
             toolCallsById.set(effectiveToolCall.id, effectiveToolCall);
-            if (!shouldSilenceProviderNativeWebSearchToolCall(effectiveToolCall)) {
+            if (!shouldSilenceProviderNativeToolCall(effectiveToolCall)) {
               params.onToolCall?.(effectiveToolCall, currentRound);
             }
           }
@@ -1560,7 +2067,7 @@ export async function runAssistantWithTools(params: {
               assistant: assistantMessage,
             });
             const toolCallCount = getAssistantToolCalls(assistantMessage).filter(
-              (toolCall) => !shouldSilenceProviderNativeWebSearchToolCall(toolCall),
+              (toolCall) => !shouldSilenceProviderNativeToolCall(toolCall),
             ).length;
             if (toolCallCount > 0) {
               nativeWebSearchStatusController.pause();
@@ -1574,40 +2081,11 @@ export async function runAssistantWithTools(params: {
                 id: event.message.toolCallId,
                 name: event.message.toolName,
               });
-            if (!shouldSilenceProviderNativeWebSearchToolCall(toolCall)) {
+            if (!shouldSilenceProviderNativeToolCall(toolCall)) {
               params.onToolResult?.(toolCall, event.message, currentRound);
             }
           }
           break;
-        case "turn_end": {
-          const toolResults = event.toolResults.filter(
-            (message): message is ToolResultMessage => message.role === "toolResult",
-          );
-          if (
-            params.onBeforeNextTurn &&
-            event.message.role === "assistant" &&
-            event.message.stopReason === "toolUse" &&
-            toolResults.length > 0
-          ) {
-            const runtimeMessages = getAgentMessages(agent);
-            const runtimeSnapshot: Context = {
-              systemPrompt: currentSystemPrompt,
-              messages: runtimeMessages.slice(),
-              tools: llmTools,
-            };
-            const emittedSnapshot = getMessagesSinceBaseline(agent, emittedBaselineIndex);
-            const assistant = event.message;
-            pendingTurnOverridePromise = params.onBeforeNextTurn({
-              round: currentRound,
-              assistant,
-              toolResults,
-              runtimeContext: runtimeSnapshot,
-              emittedMessages: emittedSnapshot,
-              signal: params.signal,
-            });
-          }
-          break;
-        }
         case "tool_execution_start": {
           nativeWebSearchStatusController.pause();
           const toolCall =
@@ -1618,7 +2096,7 @@ export async function runAssistantWithTools(params: {
               arguments: event.args ?? {},
             });
           toolCallsById.set(toolCall.id, toolCall);
-          if (shouldSilenceProviderNativeWebSearchToolCall(toolCall)) {
+          if (shouldSilenceProviderNativeToolCall(toolCall)) {
             break;
           }
           const parallelBatch = getParallelToolBatch(
@@ -1662,12 +2140,9 @@ export async function runAssistantWithTools(params: {
     try {
       let recoveredSeedTurnCount = 0;
       while (true) {
+        throwIfRunnerCancelled(params.signal);
         await agent.continue();
-
-        const override = await consumePendingTurnOverride();
-        if (override) {
-          applyTurnContextOverride(override);
-        }
+        throwIfRunnerCancelled(params.signal);
 
         const recoveredSeedTurn = pendingRecoveredSeedTurnRef.current;
         pendingRecoveredSeedTurnRef.current = null;
@@ -1684,7 +2159,7 @@ export async function runAssistantWithTools(params: {
         }
 
         const visibleRecoveredSeedToolCalls = recoveredSeedToolCalls.filter(
-          (toolCall) => !shouldSilenceProviderNativeWebSearchToolCall(toolCall),
+          (toolCall) => !shouldSilenceProviderNativeToolCall(toolCall),
         );
         if (visibleRecoveredSeedToolCalls.length > 0) {
           params.onToolStatus?.(
@@ -1694,8 +2169,9 @@ export async function runAssistantWithTools(params: {
 
         const syntheticToolResults: ToolResultMessage[] = [];
         for (const toolCall of recoveredSeedToolCalls) {
+          throwIfRunnerCancelled(params.signal);
           toolCallsById.set(toolCall.id, toolCall);
-          const shouldSilenceToolCall = shouldSilenceProviderNativeWebSearchToolCall(toolCall);
+          const shouldSilenceToolCall = shouldSilenceProviderNativeToolCall(toolCall);
           if (!shouldSilenceToolCall) {
             params.onToolCall?.(toolCall, recoveredSeedRound);
             params.onToolStatus?.(`正在执行：${summarizeToolCall(toolCall)}`);
@@ -1703,6 +2179,7 @@ export async function runAssistantWithTools(params: {
           }
 
           const result = await executeSingleToolCall(toolCall, params.signal);
+          throwIfRunnerCancelled(params.signal);
           const toolResult = {
             role: "toolResult",
             toolCallId: toolCall.id,
@@ -1724,7 +2201,8 @@ export async function runAssistantWithTools(params: {
         }
 
         if (params.onBeforeNextTurn) {
-          pendingTurnOverridePromise = params.onBeforeNextTurn({
+          throwIfRunnerCancelled(params.signal);
+          const override = await params.onBeforeNextTurn({
             round: recoveredSeedRound,
             assistant: recoveredSeedAssistant,
             toolResults: syntheticToolResults,
@@ -1736,10 +2214,16 @@ export async function runAssistantWithTools(params: {
             emittedMessages: getMessagesSinceBaseline(agent, emittedBaselineIndex),
             signal: params.signal,
           });
+          throwIfRunnerCancelled(params.signal);
+          if (override) {
+            applyTurnContextOverride(override);
+          }
         }
       }
 
+      throwIfRunnerCancelled(params.signal);
       await waitForHostedSearchFinalizations();
+      throwIfRunnerCancelled(params.signal);
 
       const messages = getAgentMessages(agent).slice();
       const assistant =

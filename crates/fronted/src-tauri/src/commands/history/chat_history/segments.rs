@@ -105,9 +105,22 @@ fn validate_segment_mutation_input(input: &ChatHistorySegmentMutationInput) -> R
     Ok(())
 }
 
+fn validate_append_segment_input(input: &ChatHistoryAppendSegmentInput) -> Result<(), String> {
+    validate_conversation_input(&input.conversation)?;
+    validate_segment_input(&input.previous_segment)?;
+    validate_segment_input(&input.segment)?;
+    if input.segment.segment_index != input.conversation.active_segment_index {
+        return Err("segmentIndex 必须等于 activeSegmentIndex".to_string());
+    }
+    if input.previous_segment.segment_index + 1 != input.segment.segment_index {
+        return Err("previousSegment 与 segment 必须连续".to_string());
+    }
+    Ok(())
+}
+
 fn validate_append_segment_preconditions(
     conn: &Connection,
-    input: &ChatHistorySegmentMutationInput,
+    input: &ChatHistoryAppendSegmentInput,
 ) -> Result<(), String> {
     let conversation_id = input.conversation.id.trim();
     let existing_header = conn
@@ -137,6 +150,12 @@ fn validate_append_segment_preconditions(
 
     if active_segment_index != total_segment_count - 1 {
         return Err("append segment 前置校验失败：现有 activeSegmentIndex 非最后一段".to_string());
+    }
+    if input.previous_segment.segment_index != active_segment_index {
+        return Err(format!(
+            "append segment 待封存分段错误：期望 segmentIndex={}，实际为 {}",
+            active_segment_index, input.previous_segment.segment_index
+        ));
     }
     if input.segment.segment_index != total_segment_count {
         return Err(format!(
@@ -175,6 +194,23 @@ fn validate_append_segment_preconditions(
             "append segment 不允许覆盖已有分段：segmentIndex={}",
             input.segment.segment_index
         ));
+    }
+
+    let stored_previous_segment_id = conn
+        .query_row(
+            "
+            SELECT segment_id
+            FROM chatHistorySegment
+            WHERE conversation_id = ?1 AND segment_index = ?2
+            ",
+            params![conversation_id, active_segment_index],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|e| format!("读取待封存历史分段失败：{e}"))?
+        .ok_or_else(|| "append segment 缺少待封存的现有活跃分段".to_string())?;
+    if stored_previous_segment_id != input.previous_segment.segment_id {
+        return Err("append segment 待封存分段身份不一致".to_string());
     }
 
     Ok(())
@@ -258,6 +294,89 @@ fn load_tail_segments(
     }
     segments.reverse();
     Ok(segments)
+}
+
+fn load_message_window_segments(
+    conn: &Connection,
+    conversation_id: &str,
+    start_offset: i64,
+    end_offset: i64,
+) -> Result<(Vec<ChatHistorySegmentRecord>, i64), String> {
+    if end_offset <= start_offset {
+        return Ok((Vec::new(), start_offset.max(0)));
+    }
+
+    let mut metadata_stmt = conn
+        .prepare(
+            "
+            SELECT segment_index, message_count
+            FROM chatHistorySegment
+            WHERE conversation_id = ?1
+            ORDER BY segment_index ASC
+            ",
+        )
+        .map_err(|e| format!("准备历史窗口分段元数据查询失败：{e}"))?;
+    let metadata_rows = metadata_stmt
+        .query_map(params![conversation_id], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+        })
+        .map_err(|e| format!("查询历史窗口分段元数据失败：{e}"))?;
+
+    let mut first_segment_index = None;
+    let mut last_segment_index = None;
+    let mut first_segment_offset = 0_i64;
+    let mut segment_start_offset = 0_i64;
+    for row in metadata_rows {
+        let (segment_index, message_count) =
+            row.map_err(|e| format!("读取历史窗口分段元数据失败：{e}"))?;
+        let segment_end_offset = segment_start_offset.saturating_add(message_count.max(0));
+        if segment_end_offset > start_offset && segment_start_offset < end_offset {
+            if first_segment_index.is_none() {
+                first_segment_index = Some(segment_index);
+                first_segment_offset = segment_start_offset;
+            }
+            last_segment_index = Some(segment_index);
+        }
+        segment_start_offset = segment_end_offset;
+    }
+    drop(metadata_stmt);
+
+    let (Some(first_segment_index), Some(last_segment_index)) =
+        (first_segment_index, last_segment_index)
+    else {
+        return Ok((Vec::new(), start_offset.max(0)));
+    };
+    let mut stmt = conn
+        .prepare(
+            "
+            SELECT
+                segment_index,
+                segment_id,
+                summary_json,
+                messages_json,
+                message_count,
+                start_message_id,
+                end_message_id,
+                created_at,
+                updated_at
+            FROM chatHistorySegment
+            WHERE conversation_id = ?1
+              AND segment_index BETWEEN ?2 AND ?3
+            ORDER BY segment_index ASC
+            ",
+        )
+        .map_err(|e| format!("准备历史窗口分段查询失败：{e}"))?;
+    let rows = stmt
+        .query_map(
+            params![conversation_id, first_segment_index, last_segment_index],
+            row_to_segment,
+        )
+        .map_err(|e| format!("查询历史窗口分段失败：{e}"))?;
+    let mut segments = Vec::new();
+    for row in rows {
+        segments.push(row.map_err(|e| format!("读取历史窗口分段失败：{e}"))?);
+    }
+    Ok((segments, first_segment_offset))
 }
 
 fn load_segment_by_index(
@@ -443,6 +562,39 @@ fn set_chat_history_pinned_sync(
 
     get_summary_by_id(conn, chat_id)
 }
+
+fn set_chat_history_cwd_sync(
+    conn: &Connection,
+    id: &str,
+    cwd: &str,
+) -> Result<ChatHistorySummary, String> {
+    let chat_id = id.trim();
+    if chat_id.is_empty() {
+        return Err("历史对话 id 不能为空".to_string());
+    }
+
+    let target = cwd.trim();
+    if target.is_empty() {
+        return Err("目标工作空间不能为空".to_string());
+    }
+
+    let affected = conn
+        .execute(
+            "
+            UPDATE chatHistory
+            SET cwd = ?1
+            WHERE id = ?2
+            ",
+            params![target, chat_id],
+        )
+        .map_err(|e| format!("更新历史对话工作空间失败：{e}"))?;
+
+    if affected == 0 {
+        return Err("未找到对应的历史对话".to_string());
+    }
+
+    get_summary_by_id(conn, chat_id)
+}
 fn rename_chat_history_sync(
     conn: &Connection,
     id: &str,
@@ -461,10 +613,10 @@ fn rename_chat_history_sync(
         .execute(
             "
             UPDATE chatHistory
-            SET title = ?1, updated_at = ?2
-            WHERE id = ?3
+            SET title = ?1
+            WHERE id = ?2
             ",
-            params![next_title, now_ms(), chat_id],
+            params![next_title, chat_id],
         )
         .map_err(|e| format!("更新历史对话标题失败：{e}"))?;
 

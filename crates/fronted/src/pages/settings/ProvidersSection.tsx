@@ -112,6 +112,8 @@ type CcsProviderImportItem = {
   providerType: ProviderId;
   name: string;
   baseUrl: string;
+  isFullUrl: boolean;
+  modelsUrl?: string;
   apiKey: string;
   requestFormat: CodexRequestFormat;
   models?: string[];
@@ -123,11 +125,13 @@ type CcsProvidersResponse = {
   providers: CcsProviderImportItem[];
 };
 
-const PROVIDER_TABS: ProviderId[] = ["claude_code", "codex", "gemini"];
+const PROVIDER_TABS: ProviderId[] = ["claude_code", "codex", "gemini", "xai", "deepseek"];
 const PROVIDER_LABELS: Record<ProviderId, string> = {
   claude_code: "Anthropic",
   codex: "OpenAI",
   gemini: "Gemini",
+  xai: "Grok",
+  deepseek: "DeepSeek",
 };
 
 function getProviderLabel(type: ProviderId) {
@@ -137,6 +141,8 @@ function getProviderLabel(type: ProviderId) {
 function ProviderBrandIcon({ type }: { type: ProviderId }) {
   if (type === "claude_code") return <ClaudeIcon height="1em" />;
   if (type === "gemini") return <GeminiIcon height="1em" />;
+  if (type === "xai") return <Zap className="h-[1em] w-[1em]" />;
+  if (type === "deepseek") return <Waypoints className="h-[1em] w-[1em]" />;
   return <OpenaiChatgptIcon height="1em" className="fill-current dark:text-white" />;
 }
 
@@ -236,6 +242,8 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
     (initialApiKey.trim() === "" || isLocalAccessSecretSentinel(initialApiKey));
   const [name, setName] = useState(initialData?.name ?? "");
   const [baseUrl, setBaseUrl] = useState(initialData?.baseUrl ?? "");
+  const [isFullUrl, setIsFullUrl] = useState(initialData?.isFullUrl ?? false);
+  const [modelsUrl, setModelsUrl] = useState(initialData?.modelsUrl ?? "");
   const [apiKey, setApiKey] = useState(
     initialUsesRedactedApiKey ? REDACTED_API_KEY_DISPLAY : initialApiKey,
   );
@@ -265,7 +273,8 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
   );
   const [useSystemProxy, setUseSystemProxy] = useState(initialData?.useSystemProxy ?? false);
   const [promptCachingEnabled, setPromptCachingEnabled] = useState(
-    initialData?.promptCachingEnabled ?? providerType !== "gemini",
+    initialData?.promptCachingEnabled ??
+      (providerType !== "gemini" && providerType !== "xai" && providerType !== "deepseek"),
   );
   const [promptCacheRetention, setPromptCacheRetention] = useState<"short" | "long">(
     initialData?.promptCacheRetention === "long" ? "long" : "short",
@@ -311,6 +320,8 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
           oauthAccountId: authMode === "oauth-managed" ? managedOAuthAccountId : undefined,
           customHeaders,
           useSystemProxy,
+          isFullUrl,
+          modelsUrl,
         });
         setModels((prev) => mergeFetchedModels(list, prev));
       } catch (err) {
@@ -319,7 +330,16 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
         setFetchingModels(false);
       }
     },
-    [authMode, customHeaders, managedOAuthAccountId, providerType, supportsOAuth, useSystemProxy],
+    [
+      authMode,
+      customHeaders,
+      isFullUrl,
+      managedOAuthAccountId,
+      modelsUrl,
+      providerType,
+      supportsOAuth,
+      useSystemProxy,
+    ],
   );
 
   useEffect(() => {
@@ -333,6 +353,8 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
       supportsOAuth ? authMode : "api-key",
       customHeaders,
       authMode === "oauth-managed" ? managedOAuthAccountId : undefined,
+      isFullUrl,
+      modelsUrl,
     );
     if (!trimUrl || !trimCredential) return;
     if (key === prevFetchKey.current) return;
@@ -353,7 +375,9 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
     customHeaders,
     doFetch,
     managedOAuthAccountId,
+    isFullUrl,
     modelFetchCredential,
+    modelsUrl,
     supportsOAuth,
     useSystemProxy,
   ]);
@@ -574,6 +598,8 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
       name: name.trim(),
       type: providerType,
       baseUrl: baseUrl.trim(),
+      isFullUrl,
+      modelsUrl: providerType === "gemini" ? undefined : modelsUrl.trim() || undefined,
       apiKey: nextApiKey,
       apiKeyConfigured:
         (authMode === "oauth-managed" && managedOAuthAccountId.trim().length > 0) ||
@@ -591,12 +617,20 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
           : customHeaders,
       models,
       activeModels: Array.from(activeModels),
-      requestFormat: providerType === "codex" ? requestFormat : undefined,
+      requestFormat:
+        providerType === "xai"
+          ? "openai-responses"
+          : providerType === "codex"
+            ? requestFormat
+            : undefined,
       reasoning:
         providerType === "gemini" && initialData?.reasoning === "xhigh"
           ? "high"
           : (initialData?.reasoning ?? "off"),
-      promptCachingEnabled: providerType === "gemini" ? false : promptCachingEnabled,
+      promptCachingEnabled:
+        providerType === "gemini" || providerType === "xai" || providerType === "deepseek"
+          ? false
+          : promptCachingEnabled,
       promptCacheRetention:
         providerType === "claude_code" && promptCachingEnabled && promptCacheRetention === "long"
           ? "long"
@@ -844,6 +878,33 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                           )}
                         </Button>
                       </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-3 grid gap-3 rounded-xl border bg-muted/20 p-3 sm:grid-cols-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium">{t("settings.providerFullUrl")}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {t("settings.providerFullUrlDesc")}
+                      </div>
+                    </div>
+                    <DialogSwitch
+                      checked={isFullUrl}
+                      onCheckedChange={setIsFullUrl}
+                      ariaLabel={t("settings.providerFullUrl")}
+                    />
+                  </div>
+                  {providerType !== "gemini" ? (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="modal-models-url">{t("settings.providerModelsUrl")}</Label>
+                      <Input
+                        id="modal-models-url"
+                        value={modelsUrl}
+                        onChange={(event) => setModelsUrl(event.currentTarget.value)}
+                        placeholder="https://example.com/v1/models"
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -1187,7 +1248,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                   />
                 </div>
 
-                {providerType !== "gemini" ? (
+                {providerType === "claude_code" || providerType === "codex" ? (
                   <div
                     className={cn(
                       "mt-3 rounded-xl border bg-card px-4 py-3 transition-colors",
@@ -1665,18 +1726,25 @@ function providerFromCcs(item: CcsProviderImportItem, existingIds: Set<string>):
     name: `${item.name.replace(/[（(]ccswitch[）)]/i, "").trim()}（ccswitch）`,
     type: providerType,
     baseUrl: item.baseUrl,
+    isFullUrl: item.isFullUrl,
+    ...(item.providerType !== "gemini" && item.modelsUrl?.trim()
+      ? { modelsUrl: item.modelsUrl.trim() }
+      : {}),
     apiKey: item.apiKey,
     apiKeyConfigured: item.apiKey.trim().length > 0,
     models,
     activeModels: models.map((model) => model.id),
     requestFormat:
-      providerType === "codex"
+      providerType === "xai"
+        ? "openai-responses"
+        : providerType === "codex"
         ? item.requestFormat === "openai-completions"
           ? "openai-completions"
           : "openai-responses"
         : undefined,
     reasoning: "off",
-    promptCachingEnabled: providerType !== "gemini",
+    promptCachingEnabled:
+      providerType !== "gemini" && providerType !== "xai" && providerType !== "deepseek",
     nativeWebSearchEnabled: true,
     useSystemProxy: false,
   };
@@ -1731,18 +1799,25 @@ function providerFromCherry(
     name: existing?.name ?? cherryProviderName(item, allItems),
     type: providerType,
     baseUrl: item.baseUrl,
+    isFullUrl: existing?.isFullUrl ?? false,
+    ...(existing?.modelsUrl ? { modelsUrl: existing.modelsUrl } : {}),
     apiKey,
     apiKeyConfigured: apiKey.trim().length > 0,
     models,
     activeModels: existing?.activeModels ?? [],
     requestFormat:
-      providerType === "codex"
+      providerType === "xai"
+        ? "openai-responses"
+        : providerType === "codex"
         ? item.requestFormat === "openai-completions"
           ? "openai-completions"
           : "openai-responses"
         : undefined,
     reasoning: existing?.reasoning ?? "off",
-    promptCachingEnabled: existing?.promptCachingEnabled ?? providerType !== "gemini",
+    promptCachingEnabled:
+      providerType === "deepseek" || providerType === "xai" || providerType === "gemini"
+        ? false
+        : (existing?.promptCachingEnabled ?? true),
     nativeWebSearchEnabled: existing?.nativeWebSearchEnabled ?? true,
     useSystemProxy: existing?.useSystemProxy ?? false,
   };
@@ -2502,6 +2577,8 @@ export function ProvidersSection(
         try {
           const models = await fetchModelsFromApi(item.providerType, item.baseUrl, item.apiKey, {
             useSystemProxy: true,
+            isFullUrl: item.isFullUrl,
+            modelsUrl: item.modelsUrl,
           });
           return { identity, models, fetched: true };
         } catch {
@@ -2619,6 +2696,10 @@ export function ProvidersSection(
               item.providerType,
               item.baseUrl,
               cherryEffectiveApiKey(item, existingById.get(identity)),
+              {
+                isFullUrl: existingById.get(identity)?.isFullUrl,
+                modelsUrl: existingById.get(identity)?.modelsUrl,
+              },
             );
             const models = fetchedModels.filter((model) => isLikelyCherryChatModel(model.id));
             return { identity, models, fetched: true, failed: false };
@@ -2743,8 +2824,8 @@ export function ProvidersSection(
 
   return (
     <>
-      <div className="providers-tabbar-row mb-4 flex shrink-0 items-center justify-between gap-3">
-        <div className="providers-tabbar inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground">
+      <div className="providers-tabbar-row mb-4 flex min-w-0 shrink-0 items-center justify-between gap-3">
+        <div className="providers-tabbar inline-flex h-9 min-w-0 max-w-full items-center overflow-x-auto rounded-lg bg-muted p-1 text-muted-foreground">
           {PROVIDER_TABS.map((tab) => (
             <button
               key={tab}

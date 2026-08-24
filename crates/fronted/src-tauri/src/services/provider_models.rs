@@ -27,6 +27,8 @@ pub async fn fetch_provider_models(
     base_url: &str,
     api_key: &str,
     use_system_proxy: bool,
+    models_url: Option<&str>,
+    is_full_url: bool,
 ) -> Result<String, String> {
     // 与本地反代的 x-xagent-use-system-proxy 语义一致：勾选时代理配置异常
     // fail fast，绝不静默降级；未勾选一律直连（忽略环境代理）。
@@ -38,7 +40,14 @@ pub async fn fetch_provider_models(
     };
     with_provider_models_timeout(
         PROVIDER_MODELS_REQUEST_TIMEOUT,
-        fetch_provider_models_with_client(&client, provider_type, base_url, api_key),
+        fetch_provider_models_with_client(
+            &client,
+            provider_type,
+            base_url,
+            api_key,
+            models_url,
+            is_full_url,
+        ),
     )
     .await
 }
@@ -60,8 +69,16 @@ async fn fetch_provider_models_with_client(
     provider_type: &str,
     base_url: &str,
     api_key: &str,
+    models_url: Option<&str>,
+    is_full_url: bool,
 ) -> Result<String, String> {
-    let attempts = build_provider_models_attempts(provider_type, base_url, api_key)?;
+    let attempts = build_provider_models_attempts_with_override(
+        provider_type,
+        base_url,
+        api_key,
+        models_url,
+        is_full_url,
+    )?;
     let mut failures = Vec::new();
     let mut empty_result = None;
 
@@ -150,24 +167,27 @@ async fn read_limited_response(response: reqwest::Response) -> Result<Vec<u8>, S
     Ok(body)
 }
 
-fn normalize_provider_base_url(provider_type: &str, raw: &str) -> Result<Url, String> {
-    if !matches!(provider_type, "claude_code" | "codex" | "gemini") {
-        return Err("不支持的供应商类型".to_string());
-    }
-    let mut url = Url::parse(raw.trim()).map_err(|_| "Base URL 必须是绝对 URL".to_string())?;
+fn parse_http_url(raw: &str, label: &str) -> Result<Url, String> {
+    let url = Url::parse(raw.trim()).map_err(|_| format!("{label} 必须是绝对 URL"))?;
     if !matches!(url.scheme(), "http" | "https")
         || !url.has_host()
         || !url.username().is_empty()
         || url.password().is_some()
     {
-        return Err("Base URL 必须是有效的 HTTP(S) 绝对 URL".to_string());
+        return Err(format!("{label} 必须是有效的 HTTP(S) 绝对 URL"));
     }
+    Ok(url)
+}
+
+fn normalize_provider_base_url(provider_type: &str, raw: &str) -> Result<Url, String> {
+    validate_provider_type(provider_type)?;
+    let mut url = parse_http_url(raw, "Base URL")?;
     if url.query().is_some() || url.fragment().is_some() {
         return Err("Base URL 不能包含查询参数或片段".to_string());
     }
 
     let mut path = url.path().trim_end_matches('/').to_string();
-    if provider_type == "codex" {
+    if matches!(provider_type, "codex" | "xai" | "deepseek") {
         let lower = path.to_ascii_lowercase();
         if let Some(suffix) = CODEX_MODELS_SUFFIXES
             .iter()
@@ -194,31 +214,50 @@ fn normalize_provider_base_url(provider_type: &str, raw: &str) -> Result<Url, St
     Ok(url)
 }
 
+fn validate_provider_type(provider_type: &str) -> Result<(), String> {
+    if matches!(
+        provider_type,
+        "claude_code" | "codex" | "gemini" | "xai" | "deepseek"
+    ) {
+        Ok(())
+    } else {
+        Err("不支持的供应商类型".to_string())
+    }
+}
+
+fn normalize_provider_models_url(raw: &str) -> Result<Url, String> {
+    let url = parse_http_url(raw, "模型列表 URL")?;
+    if url.fragment().is_some() {
+        return Err("模型列表 URL 不能包含片段".to_string());
+    }
+    Ok(url)
+}
+
 fn build_provider_models_url(provider_type: &str, base_url: &Url, official: bool) -> Url {
     let mut url = base_url.clone();
-    let path = url.path().trim_end_matches('/');
-    let next_path = if provider_type == "gemini" {
-        if path.to_ascii_lowercase().ends_with("/models") {
-            path.to_string()
-        } else if is_gemini_version_path(path) {
-            format!("{path}/models")
-        } else {
-            format!("{path}/{}/models", if official { "v1beta" } else { "v1" })
-        }
-    } else if path.ends_with("/v1") {
-        format!("{path}/models")
+    let mut api_root = url.path().trim_end_matches('/').to_string();
+    if api_root.to_ascii_lowercase().ends_with("/models") {
+        api_root.truncate(api_root.len() - "/models".len());
+    }
+    if is_api_version_path(&api_root) {
+        api_root.truncate(api_root.rfind('/').unwrap_or(0));
+    }
+    let version_path = if official && provider_type == "gemini" {
+        "v1beta"
     } else {
-        format!("{path}/v1/models")
+        "v1"
     };
+    let next_path = format!("{api_root}/{version_path}/models");
     url.set_path(&next_path);
     url
 }
 
-fn is_gemini_version_path(path: &str) -> bool {
-    let Some(segment) = path.trim_end_matches('/').rsplit('/').next() else {
-        return false;
-    };
-    let lower = segment.to_ascii_lowercase();
+fn is_api_version_path(path: &str) -> bool {
+    let lower = path
+        .rsplit('/')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
     let Some(version) = lower.strip_prefix('v') else {
         return false;
     };
@@ -226,53 +265,97 @@ fn is_gemini_version_path(path: &str) -> bool {
     !digits.is_empty() && digits.chars().all(|character| character.is_ascii_digit())
 }
 
+#[cfg(test)]
 fn build_provider_models_attempts(
     provider_type: &str,
     base_url: &str,
     api_key: &str,
 ) -> Result<Vec<ProviderModelsAttempt>, String> {
-    let base_url = normalize_provider_base_url(provider_type, base_url)?;
-    let candidates = [false, true].map(|official| ProviderModelsAttempt {
-        url: build_provider_models_url(provider_type, &base_url, official),
+    build_provider_models_attempts_with_override(provider_type, base_url, api_key, None, false)
+}
+
+fn build_provider_models_attempts_with_override(
+    provider_type: &str,
+    base_url: &str,
+    api_key: &str,
+    models_url: Option<&str>,
+    is_full_url: bool,
+) -> Result<Vec<ProviderModelsAttempt>, String> {
+    validate_provider_type(provider_type)?;
+    let explicit_url = if provider_type == "gemini" {
+        None
+    } else {
+        models_url
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(normalize_provider_models_url)
+            .transpose()?
+    };
+    let base_url = match explicit_url.as_ref() {
+        Some(url) => url.clone(),
+        None if is_full_url => normalize_provider_full_url(base_url)?,
+        None => normalize_provider_base_url(provider_type, base_url)?,
+    };
+    let [default_attempt, official_attempt] = [false, true].map(|official| ProviderModelsAttempt {
+        url: explicit_url
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| build_provider_models_url(provider_type, &base_url, official)),
         headers: build_provider_models_headers(provider_type, api_key, official),
     });
-    let mut attempts = Vec::new();
-    for candidate in candidates {
-        if attempts.iter().any(|existing: &ProviderModelsAttempt| {
-            existing.url == candidate.url && existing.headers == candidate.headers
-        }) {
-            continue;
-        }
-        attempts.push(candidate);
+    // codex/xai/deepseek 的官方形式与统一首次尝试完全一致，重复请求同一端点没有意义，收敛为一次。
+    let mut attempts = vec![default_attempt];
+    if official_attempt.url != attempts[0].url || official_attempt.headers != attempts[0].headers {
+        attempts.push(official_attempt);
     }
     Ok(attempts)
 }
 
+// 完整端点模式：从聊天端点推导 models API 根。与前端
+// deriveModelsBaseUrlFromFullUrl 逻辑一致（优先截到 /v1/，否则去掉末段）。
+fn normalize_provider_full_url(raw: &str) -> Result<Url, String> {
+    let mut url = parse_http_url(raw, "Base URL")?;
+    url.set_query(None);
+    url.set_fragment(None);
+    let path = url.path().trim_end_matches('/').to_string();
+    let lower = path.to_ascii_lowercase();
+    let derived_path = if let Some(version_index) = lower.find("/v1/") {
+        path[..version_index + "/v1".len()].to_string()
+    } else if let Some(separator_index) = path.rfind('/') {
+        if separator_index > 0 {
+            path[..separator_index].to_string()
+        } else {
+            "/".to_string()
+        }
+    } else {
+        "/".to_string()
+    };
+    url.set_path(&derived_path);
+    Ok(url)
+}
+
+// 首次尝试统一 /v1/models + authorization Bearer；失败后回退到各家官方形式
+// （gemini v1beta + x-goog-api-key、claude_code x-api-key）。每次请求仍只带单一鉴权头。
 fn build_provider_models_headers(
     provider_type: &str,
     api_key: &str,
     official: bool,
 ) -> Vec<(&'static str, String)> {
     let mut headers = vec![("content-type", "application/json".to_string())];
+    if !official {
+        headers.push(("authorization", format!("Bearer {api_key}")));
+        return headers;
+    }
     match provider_type {
         "gemini" => {
             headers.push(("x-goog-api-key", api_key.to_string()));
-            if !official {
-                headers.push(("authorization", format!("Bearer {api_key}")));
-            }
         }
         "claude_code" => {
             headers.push(("x-api-key", api_key.to_string()));
             headers.push(("anthropic-version", ANTHROPIC_API_VERSION.to_string()));
-            if !official {
-                headers.push(("authorization", format!("Bearer {api_key}")));
-            }
         }
         _ => {
             headers.push(("authorization", format!("Bearer {api_key}")));
-            if !official {
-                headers.push(("x-api-key", api_key.to_string()));
-            }
         }
     }
     headers
@@ -341,22 +424,62 @@ mod tests {
             "key",
         )
         .expect("gemini attempts");
+        assert_eq!(gemini.len(), 2);
         assert_eq!(
             gemini[0].url.as_str(),
-            "https://relay.example.com/v1beta/models"
+            "https://relay.example.com/v1/models"
         );
         assert_eq!(
             gemini[1].url.as_str(),
             "https://relay.example.com/v1beta/models"
         );
 
+        // claude_code URL 不随 official 变化，但官方鉴权头不同，保留重试。
+        let claude =
+            build_provider_models_attempts("claude_code", "https://relay.example.com", "key")
+                .expect("claude attempts");
+        assert_eq!(claude.len(), 2);
+        assert_eq!(claude[0].url, claude[1].url);
+
+        // codex/xai/deepseek 官方形式与统一首次尝试完全一致，收敛为一次请求。
         let codex = build_provider_models_attempts(
             "codex",
             "https://relay.example.com/v1/responses",
             "key",
         )
         .expect("codex attempts");
+        assert_eq!(codex.len(), 1);
         assert_eq!(codex[0].url.as_str(), "https://relay.example.com/v1/models");
+
+        let deepseek = build_provider_models_attempts(
+            "deepseek",
+            "https://api.deepseek.com/v1/chat/completions",
+            "key",
+        )
+        .expect("deepseek attempts");
+        assert_eq!(deepseek.len(), 1);
+        assert_eq!(
+            deepseek[0].url.as_str(),
+            "https://api.deepseek.com/v1/models"
+        );
+    }
+
+    #[test]
+    fn provider_model_full_url_derives_nested_models_endpoint() {
+        let attempts = build_provider_models_attempts_with_override(
+            "codex",
+            "https://relay.example.com/custom/v1/chat/completions?region=cn",
+            "key",
+            None,
+            true,
+        )
+        .expect("full URL attempts");
+
+        assert_eq!(attempts.len(), 1);
+        assert_eq!(
+            attempts[0].url.as_str(),
+            "https://relay.example.com/custom/v1/models"
+        );
     }
 
     #[test]
@@ -374,8 +497,46 @@ mod tests {
     }
 
     #[test]
+    fn provider_models_url_override_is_exact_and_allows_query_auth() {
+        let attempts = build_provider_models_attempts_with_override(
+            "claude_code",
+            "https://unused.example.com/v1beta",
+            "key",
+            Some("https://models.example.com/catalog?api-version=2026-01"),
+            false,
+        )
+        .expect("models URL override attempts");
+
+        assert_eq!(attempts.len(), 2);
+        assert!(attempts.iter().all(|attempt| {
+            attempt.url.as_str() == "https://models.example.com/catalog?api-version=2026-01"
+        }));
+        assert!(build_provider_models_attempts_with_override(
+            "codex",
+            "",
+            "key",
+            Some("https://user:pass@example.com/models"),
+            false,
+        )
+        .is_err());
+
+        let gemini = build_provider_models_attempts_with_override(
+            "gemini",
+            "https://generativelanguage.googleapis.com/v1beta",
+            "key",
+            Some("https://ignored.example.com/custom/models"),
+            false,
+        )
+        .expect("gemini keeps automatic model discovery");
+        assert_eq!(
+            gemini[0].url.as_str(),
+            "https://generativelanguage.googleapis.com/v1/models"
+        );
+    }
+
+    #[test]
     fn provider_model_headers_exclude_inference_identity() {
-        for provider_type in ["claude_code", "codex", "gemini"] {
+        for provider_type in ["claude_code", "codex", "gemini", "xai", "deepseek"] {
             for official in [false, true] {
                 let headers = build_provider_models_headers(provider_type, "key", official);
                 let names = headers
@@ -394,6 +555,32 @@ mod tests {
                 ] {
                     assert!(!names.iter().any(|name| name == forbidden));
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn provider_model_headers_use_authorization_then_official_auth() {
+        for (provider_type, official_expected) in [
+            ("claude_code", "x-api-key"),
+            ("codex", "authorization"),
+            ("gemini", "x-goog-api-key"),
+            ("xai", "authorization"),
+            ("deepseek", "authorization"),
+        ] {
+            for (official, expected) in [(false, "authorization"), (true, official_expected)] {
+                let headers = build_provider_models_headers(provider_type, "key", official);
+                let auth_names = headers
+                    .iter()
+                    .map(|(name, _)| name.to_ascii_lowercase())
+                    .filter(|name| {
+                        matches!(
+                            name.as_str(),
+                            "authorization" | "x-api-key" | "x-goog-api-key"
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(auth_names, vec![expected.to_string()], "{provider_type}");
             }
         }
     }
@@ -438,6 +625,8 @@ mod tests {
             "codex",
             "http://provider.invalid",
             "test-key",
+            None,
+            false,
         )
         .await
         .expect("fetch provider models");

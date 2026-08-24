@@ -3,12 +3,29 @@ import { memo, useMemo } from "react";
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
 import { CloudArtifactsCard } from "../../../components/chat/CloudArtifactsCard";
 import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
+import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import { collectChangedFiles } from "../../../lib/chat/messages/changedFiles";
 import { collectCloudArtifacts } from "../../../lib/chat/messages/cloudArtifacts";
 import type { UiRound } from "../../../lib/chat/messages/uiMessages";
+import {
+  normalizeLiveToolStatus,
+  VIBING_STATUS,
+} from "../../../lib/chat/page/chatPageHelpers";
+import { cn } from "../../../lib/shared/utils";
+import type { AssistantUnitRow } from "../transcript/rowModel";
 
 import { AssistantAvatar } from "./assistant-bubble/AssistantAvatar";
-import { RoundContent } from "./assistant-bubble/RoundContent";
+import {
+  RetryDetailsBlock,
+  RoundBlockContent,
+  RoundContent,
+} from "./assistant-bubble/RoundContent";
+import {
+  AssistantStatus,
+  CompactingText,
+  VibingText,
+} from "./assistant-bubble/StatusText";
+import { UsagePanel } from "./assistant-bubble/UsagePanel";
 
 export { AssistantAvatar } from "./assistant-bubble/AssistantAvatar";
 export { RetryDetailsBlock } from "./assistant-bubble/RoundContent";
@@ -31,6 +48,8 @@ export const AssistantBubble = memo(function AssistantBubble(props: {
   toolStatus?: string | null;
   toolStatusVariant?: "default" | "compaction";
   retryAttempts?: RetryAttemptRecord[];
+  workdir?: string;
+  onOpenFileLink?: (link: ChatFileLink) => void;
 }) {
   const {
     rounds,
@@ -41,6 +60,8 @@ export const AssistantBubble = memo(function AssistantBubble(props: {
     toolStatus,
     toolStatusVariant,
     retryAttempts,
+    workdir,
+    onOpenFileLink,
   } = props;
   const latestTodoItem = useMemo(() => {
     for (let roundIndex = rounds.length - 1; roundIndex >= 0; roundIndex -= 1) {
@@ -84,10 +105,86 @@ export const AssistantBubble = memo(function AssistantBubble(props: {
             runningToolCallIds={round.runningToolCallIds ?? EMPTY_RUNNING_TOOL_CALL_IDS}
             thinkingOpen={round.thinkingOpen}
             latestTodoItem={latestTodoItem}
+            workdir={workdir}
+            onOpenFileLink={onOpenFileLink}
           />
         ))}
         {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
         {cloudArtifacts.length > 0 ? <CloudArtifactsCard artifacts={cloudArtifacts} /> : null}
+      </div>
+    </div>
+  );
+});
+
+export const AssistantBubbleUnit = memo(function AssistantBubbleUnit(props: {
+  row: AssistantUnitRow;
+  showUsage?: boolean;
+  usageContextWindow?: number;
+  isAgentMode: boolean;
+  isCompactionRunning: boolean;
+  toolStatus: string | null;
+  retryAttempts?: RetryAttemptRecord[];
+  workdir?: string;
+  onOpenFileLink?: (link: ChatFileLink) => void;
+}) {
+  const {
+    row,
+    showUsage,
+    usageContextWindow,
+    isAgentMode,
+    isCompactionRunning,
+    toolStatus,
+    retryAttempts,
+    workdir,
+    onOpenFileLink,
+  } = props;
+  const { unit } = row;
+  if (unit.kind === "footer") return null;
+
+  const normalizedStatus = normalizeLiveToolStatus(toolStatus);
+  const status =
+    unit.kind === "status" && row.live ? (
+      isCompactionRunning ? (
+        <CompactingText className="w-full" />
+      ) : normalizedStatus === VIBING_STATUS || !normalizedStatus ? (
+        <VibingText className="w-full" />
+      ) : (
+        <AssistantStatus className="w-full">{normalizedStatus}</AssistantStatus>
+      )
+    ) : null;
+
+  return (
+    <div className="flex w-full max-w-full items-start gap-3">
+      {row.showAvatar ? (
+        <AssistantAvatar />
+      ) : (
+        <div aria-hidden="true" className="h-7 w-7 shrink-0" />
+      )}
+      <div
+        className={cn(
+          "min-w-0 flex-1 space-y-2",
+          unit.kind === "status" && isAgentMode ? "pt-1" : row.showAvatar ? "pt-0.5" : "",
+        )}
+      >
+        {status ? <div className="min-w-0 max-w-full overflow-hidden py-1.5">{status}</div> : null}
+        {row.mutable && retryAttempts?.length ? (
+          <RetryDetailsBlock attempts={retryAttempts} />
+        ) : null}
+        {unit.kind === "block" ? (
+          <RoundBlockContent
+            block={unit.block}
+            isLive={row.live}
+            renderMode={row.renderMode}
+            runningToolCallIds={unit.runningToolCallIds}
+            thinkingOpen={unit.thinkingOpen}
+            isLatestThinking={unit.isLatestThinking}
+            workdir={workdir}
+            onOpenFileLink={onOpenFileLink}
+          />
+        ) : null}
+        {unit.kind === "block" && unit.isRoundTail && showUsage ? (
+          <UsagePanel usage={unit.roundMeta?.usage} contextWindow={usageContextWindow} />
+        ) : null}
       </div>
     </div>
   );

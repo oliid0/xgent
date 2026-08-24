@@ -1,11 +1,10 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 
 use crate::runtime::shell_runner::{
-    run_shell_script_with_envs, ShellCancelToken, ShellRunResponse,
+    run_shell_script_with_envs, ShellCancelFlag, ShellCancelToken, ShellRunResponse,
 };
 use crate::runtime::task_runner::{
     build_http_client, resolve_workdir, run_single_http_request, HttpRequestInput,
@@ -41,7 +40,7 @@ impl HookScopeRegistry {
         if state.cancelled.contains(scope_id) {
             return Err("Hook scope has been cancelled.".to_string());
         }
-        let token: ShellCancelToken = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let token: ShellCancelToken = Arc::new(ShellCancelFlag::default());
         state
             .active_tokens
             .entry(scope_id.to_string())
@@ -83,7 +82,7 @@ impl HookScopeRegistry {
         }
         if let Some(tokens) = state.active_tokens.remove(scope_id) {
             for token in tokens {
-                token.store(true, Ordering::SeqCst);
+                token.cancel();
             }
         }
         Ok(())
@@ -167,6 +166,8 @@ pub(crate) fn run_hook_script_sync(
         None,
         token.clone(),
         &context,
+        // Hook 脚本是用户显式配置的自动化,不属于模型驱动面,不套沙箱。
+        None,
     );
 
     if let (Some(scope), Some(token)) = (&scope_id, &token) {

@@ -58,6 +58,32 @@ export type BuiltinToolBundle<TExtra extends object = object> = TExtra & {
   metadataByName: Map<string, BuiltinToolMetadata>;
 };
 
+export type TaskStatus = "pending" | "in_progress" | "completed";
+
+export type TaskItem = {
+  id: string;
+  subject: string;
+  description: string;
+  activeForm: string;
+  status: TaskStatus;
+};
+
+export type TaskListState = {
+  runId: string;
+  revision: number;
+  nextTaskId: number;
+  tasks: TaskItem[];
+};
+
+export type TaskListResultDetails = {
+  kind: "task_list";
+  action: "created" | "updated" | "listed";
+  runId: string;
+  revision: number;
+  tasks: TaskItem[];
+  taskId?: string;
+};
+
 export function createBuiltinMetadataMap(
   entries: Array<
     [

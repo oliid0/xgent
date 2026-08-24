@@ -19,12 +19,26 @@ import {
   isDeepSeekCodexTarget,
   resolveDeepSeekOpenAICompletionsOverrides,
 } from "../deepSeekProviderAdapter";
+import {
+  DEEPSEEK_RESPONSES_API,
+  isOfficialDeepSeekBaseUrl,
+  normalizeDeepSeekResponsesBaseUrl,
+} from "../deepSeekNative";
+import { isXaiProviderTarget } from "./xaiResponsesPayload";
 
 const CODEX_RESPONSES_SUFFIX = "/responses";
 const CODEX_RESPONSE_SUFFIX = "/response";
 const CODEX_CHAT_COMPLETIONS_SUFFIX = "/chat/completions";
 
 type CodexApi = "openai-responses" | "openai-completions";
+
+const XAI_THINKING_LEVEL_MAP = { minimal: "low", max: "high" } as const;
+const DEEPSEEK_THINKING_LEVEL_MAP = {
+  off: "none",
+  minimal: "low",
+  medium: "high",
+  xhigh: "high",
+} as const;
 
 function resolveKnownModel(
   provider: "openai" | "anthropic" | "google",
@@ -310,15 +324,46 @@ export function createModelFromConfig(
   const zeroCost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   const customModelCost = configuredCost ?? zeroCost;
 
-  if (providerId === "codex") {
+  if (providerId === "deepseek") {
+    return {
+      id: modelId,
+      name: modelId,
+      api: DEEPSEEK_RESPONSES_API,
+      provider: "deepseek",
+      baseUrl: normalizeDeepSeekResponsesBaseUrl(baseUrl, {
+        officialHost: isOfficialDeepSeekBaseUrl(upstreamBaseUrl?.trim() || baseUrl),
+      }),
+      reasoning: true,
+      thinkingLevelMap: DEEPSEEK_THINKING_LEVEL_MAP,
+      input: ["text"],
+      cost: customModelCost,
+      contextWindow,
+      maxTokens,
+      compat: {
+        supportsDeveloperRole: true,
+        supportsLongCacheRetention: false,
+        supportsStrictMode: false,
+      },
+    } as Model<any>;
+  }
+
+  if (providerId === "codex" || providerId === "xai") {
     const { baseUrl: normalizedBaseUrl, preferredApi } = normalizeCodexBaseUrl(baseUrl);
+    const isXaiTarget = isXaiProviderTarget({
+      providerId,
+      baseUrl: upstreamBaseUrl?.trim() || baseUrl,
+    });
     const isDeepSeekCodex = isDeepSeekCodexTarget({
       providerId,
       baseUrl: normalizedBaseUrl,
       upstreamBaseUrl,
       modelId,
     });
-    const api = isDeepSeekCodex ? "openai-completions" : inferCodexApi(requestFormat, preferredApi);
+    const api = isXaiTarget
+      ? "openai-responses"
+      : isDeepSeekCodex
+        ? "openai-completions"
+        : inferCodexApi(requestFormat, preferredApi);
     const responsesCompat =
       api === "openai-responses"
         ? resolveCodexOpenAIResponsesCompat({
@@ -334,6 +379,7 @@ export function createModelFromConfig(
           contextWindow,
           maxTokens,
           ...(configuredCost ? { cost: configuredCost } : {}),
+          ...(isXaiTarget ? { reasoning: true, thinkingLevelMap: XAI_THINKING_LEVEL_MAP } : {}),
           ...(responsesCompat
             ? {
                 compat: {
@@ -366,6 +412,7 @@ export function createModelFromConfig(
       cost: customModelCost,
       contextWindow,
       maxTokens,
+      ...(isXaiTarget ? { thinkingLevelMap: XAI_THINKING_LEVEL_MAP } : {}),
     };
     if (api === "openai-responses" && responsesCompat) {
       custom.compat = responsesCompat;

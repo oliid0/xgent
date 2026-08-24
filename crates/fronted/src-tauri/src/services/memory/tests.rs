@@ -967,7 +967,7 @@ mod tests {
             })
             .expect("read daily");
         assert_eq!(read.headline, "2026-05-13");
-        assert_eq!(read.meta.archived, false);
+        assert!(!read.meta.archived);
         assert!(read.body.contains("10:00"));
         assert!(read.body.contains("11:00"));
         let sources = read
@@ -2618,4 +2618,3 @@ mod tests {
         assert!(read.body.contains("User prefers vim."));
     }
 }
-

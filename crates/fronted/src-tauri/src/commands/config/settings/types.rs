@@ -7,7 +7,10 @@ pub struct SettingsLoadResponse {
     pub agents: Option<Value>,
     pub ssh: Option<Value>,
     pub access: Option<Value>,
+    #[cfg(desktop)]
+    pub stt: Option<Value>,
     pub memory: Option<Value>,
+    pub model_failover: Option<Value>,
     pub default_workdir: String,
 }
 

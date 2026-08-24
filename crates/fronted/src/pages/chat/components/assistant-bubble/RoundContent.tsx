@@ -4,9 +4,10 @@ import { ChevronRight, Lightbulb, RefreshCw } from "../../../../components/icons
 import { Markdown } from "../../../../components/Markdown";
 import { useLocale } from "../../../../i18n";
 import type { RetryAttemptRecord } from "../../../../lib/chat/conversation/liveTranscriptStore";
+import type { ChatFileLink } from "../../../../lib/chat/chatFileLinks";
 import type { ToolTraceItem, UiRound } from "../../../../lib/chat/messages/uiMessages";
 import { normalizeLiveToolStatus, VIBING_STATUS } from "../../../../lib/chat/page/chatPageHelpers";
-import { groupRoundBlocks } from "./assistantBubbleUtils";
+import { type GroupedRoundBlock, groupRoundBlocks } from "./assistantBubbleUtils";
 import { HostedSearchGroupView } from "./HostedSearchGroupView";
 import { LazyCollapse } from "./LazyCollapse";
 import { AssistantStatus, CompactingText, VibingText } from "./StatusText";
@@ -127,6 +128,81 @@ export const RetryDetailsBlock = memo(function RetryDetailsBlock({
   );
 });
 
+/** Renders one grouped assistant block. The transcript virtualizer uses this
+ * finer unit so very large replies no longer mount every Markdown/tool block
+ * merely because one part of the reply is visible. */
+export const RoundBlockContent = memo(function RoundBlockContent(props: {
+  block: GroupedRoundBlock;
+  isLive: boolean;
+  renderMode: "streaming" | "static";
+  runningToolCallIds: string[];
+  thinkingOpen: boolean;
+  isLatestThinking: boolean;
+  workdir?: string;
+  onOpenFileLink?: (link: ChatFileLink) => void;
+}) {
+  const {
+    block,
+    isLive,
+    renderMode,
+    runningToolCallIds,
+    thinkingOpen,
+    isLatestThinking,
+    workdir,
+    onOpenFileLink,
+  } = props;
+
+  if (block.kind === "thinking") {
+    return (
+      <ThinkingBlock
+        text={block.text}
+        open={isLive && thinkingOpen && isLatestThinking}
+        isRunning={isLive && thinkingOpen && isLatestThinking}
+        renderMode={renderMode}
+      />
+    );
+  }
+  if (block.kind === "tool") {
+    const displayImagePayload = getNativeDisplayImagePayload(block.item);
+    if (displayImagePayload) return <NativeDisplayImageBlock payload={displayImagePayload} />;
+    if (block.item.toolCall.name === "Image" && !block.item.toolResult?.isError) return null;
+    return (
+      <MemoToolCallItem
+        item={block.item}
+        isRunning={Boolean(
+          isLive && block.item.toolCall.id && runningToolCallIds.includes(block.item.toolCall.id),
+        )}
+      />
+    );
+  }
+  if (block.kind === "toolGroup") {
+    return (
+      <ToolTraceGroup
+        items={block.items}
+        runningToolCallIds={isLive ? runningToolCallIds : []}
+      />
+    );
+  }
+  if (block.kind === "hostedSearch" || block.kind === "hostedSearchGroup") {
+    return (
+      <HostedSearchGroupView
+        items={block.kind === "hostedSearch" ? [block.item] : block.items}
+      />
+    );
+  }
+  if (!block.text.trim()) return null;
+  return (
+    <Markdown
+      content={block.text}
+      className="font-openai-chat"
+      renderMode={renderMode}
+      showCaret={isLive}
+      workdir={workdir}
+      onOpenFileLink={onOpenFileLink}
+    />
+  );
+});
+
 export const RoundContent = memo(function RoundContent(props: {
   round: UiRound;
   showUsage?: boolean;
@@ -142,6 +218,8 @@ export const RoundContent = memo(function RoundContent(props: {
   runningToolCallIds?: string[];
   thinkingOpen?: boolean;
   latestTodoItem?: ToolTraceItem | null;
+  workdir?: string;
+  onOpenFileLink?: (link: ChatFileLink) => void;
 }) {
   const {
     round,
@@ -156,6 +234,8 @@ export const RoundContent = memo(function RoundContent(props: {
     runningToolCallIds,
     thinkingOpen,
     latestTodoItem,
+    workdir,
+    onOpenFileLink,
   } = props;
   const groupedBlocks = useMemo(() => groupRoundBlocks(round.blocks), [round.blocks]);
   const visibleGroupedBlocks = useMemo(
@@ -295,6 +375,8 @@ export const RoundContent = memo(function RoundContent(props: {
             className="font-openai-chat"
             renderMode={renderMode ?? (isLive ? "streaming" : "static")}
             showCaret={Boolean(isLive && isActive)}
+            workdir={workdir}
+            onOpenFileLink={onOpenFileLink}
           />
         );
       })}

@@ -84,10 +84,18 @@ export const tauriRuntime: XAgentRuntime = {
   listenFileDrop(handler: (event: RuntimeFileDropEvent) => void): Promise<RuntimeUnlisten> {
     return getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type === "drop") {
-        handler({ type: "drop", paths: event.payload.paths });
+        handler({
+          type: "drop",
+          paths: event.payload.paths,
+          position: event.payload.position,
+        });
         return;
       }
-      handler({ type: event.payload.type });
+      if (event.payload.type === "enter" || event.payload.type === "over") {
+        handler({ type: event.payload.type, position: event.payload.position });
+        return;
+      }
+      handler({ type: "leave" });
     });
   },
 };

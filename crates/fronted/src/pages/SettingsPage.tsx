@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
+  Archive,
   BookOpen,
   Brain,
   Cable,
@@ -10,11 +11,15 @@ import {
   Cpu,
   Info,
   Key,
+  Keyboard,
+  FolderTree,
   Mic,
   Search,
   Settings2,
+  Shield,
   Sparkles,
   Terminal,
+  Waypoints,
   X,
   Zap,
 } from "../components/icons";
@@ -22,18 +27,25 @@ import {
 import { useLocale } from "../i18n";
 import { useCompactViewport } from "../lib/responsive/compactViewport";
 import { AboutSection } from "./settings/AboutSection";
+import { BackupSyncSection } from "./settings/BackupSyncSection";
 import { AccessSection } from "./settings/AccessSection";
 import { CronSection } from "./settings/CronSection";
 import { HooksSection } from "./settings/HooksSection";
+import { GlobalShortcutsSection } from "./settings/GlobalShortcutsSection";
 import { McpSettingsSection } from "./settings/McpSettingsSection";
 import { MobileAssistantSection } from "./settings/MobileAssistantSection";
 import { MobileExecutionSection } from "./settings/MobileExecutionSection";
 import { MemoryPanel } from "./settings/memory/MemoryPanel";
 import { ProvidersSection } from "./settings/ProvidersSection";
+import { ModelFailoverSection } from "./settings/ModelFailoverSection";
+import { ProviderUsageSection } from "./settings/ProviderUsageSection";
+import { ProjectRootsSection } from "./settings/ProjectRootsSection";
 import { SkillsSettingsForm } from "./settings/SkillsSettingsForm";
 import { SoulSection } from "./settings/SoulSection";
 import { SshSettingsSection } from "./settings/SshSettingsSection";
 import { SystemSettingsForm } from "./settings/SystemSettingsForm";
+import { SttSettingsSection } from "./settings/SttSettingsSection";
+import { ToolPermissionsSection } from "./settings/ToolPermissionsSection";
 import type { SectionId, SettingsPageProps } from "./settings/types";
 
 function getSaveIndicator(state: SettingsPageProps["saveState"], t: (key: string) => string) {
@@ -98,6 +110,7 @@ type NavGroup = {
     accentClass: string;
     descriptionKey: string;
     mobileOnly?: boolean;
+    desktopOnly?: boolean;
   }>;
 };
 
@@ -116,6 +129,54 @@ const NAV_GROUPS: NavGroup[] = [
         icon: <Cpu className="h-3.5 w-3.5" />,
         accentClass: "bg-blue-500",
         descriptionKey: "settings.mobile.providersDescription",
+      },
+      {
+        id: "failover",
+        icon: <Waypoints className="h-3.5 w-3.5" />,
+        accentClass: "bg-orange-500",
+        descriptionKey: "settings.failover.desc",
+      },
+      {
+        id: "shortcuts",
+        icon: <Keyboard className="h-3.5 w-3.5" />,
+        accentClass: "bg-fuchsia-500",
+        descriptionKey: "settings.globalShortcutsDesc",
+        desktopOnly: true,
+      },
+      {
+        id: "backup",
+        icon: <Archive className="h-3.5 w-3.5" />,
+        accentClass: "bg-teal-600",
+        descriptionKey: "settings.backupSyncDesc",
+        desktopOnly: true,
+      },
+      {
+        id: "toolPermissions",
+        icon: <Shield className="h-3.5 w-3.5" />,
+        accentClass: "bg-indigo-500",
+        descriptionKey: "settings.toolPermissionsDesc",
+        desktopOnly: true,
+      },
+      {
+        id: "projectRoots",
+        icon: <FolderTree className="h-3.5 w-3.5" />,
+        accentClass: "bg-cyan-600",
+        descriptionKey: "settings.projectRoots.desc",
+        desktopOnly: true,
+      },
+      {
+        id: "voice",
+        icon: <Mic className="h-3.5 w-3.5" />,
+        accentClass: "bg-rose-500",
+        descriptionKey: "settings.stt.desc",
+        desktopOnly: true,
+      },
+      {
+        id: "usage",
+        icon: <Cloud className="h-3.5 w-3.5" />,
+        accentClass: "bg-emerald-500",
+        descriptionKey: "settings.usage.desc",
+        desktopOnly: true,
       },
     ],
   },
@@ -233,6 +294,8 @@ export function SettingsPage(props: SettingsPageProps) {
   const sectionLabels: Record<SectionId, string> = {
     system: t("settings.navSystem"),
     providers: t("settings.navProviders"),
+    failover: t("settings.navFailover"),
+    projectRoots: t("settings.navProjectRoots"),
     soul: t("settings.navSoul"),
     memory: t("settings.navMemory"),
     skills: t("settings.navSkills"),
@@ -241,6 +304,11 @@ export function SettingsPage(props: SettingsPageProps) {
     cron: t("settings.navCron"),
     ssh: t("settings.navSsh"),
     access: t("settings.navAccess"),
+    shortcuts: t("settings.navShortcuts"),
+    backup: t("settings.navBackup"),
+    toolPermissions: t("settings.navToolPermissions"),
+    voice: t("settings.navVoice"),
+    usage: t("settings.navUsage"),
     mobileAssistant: t("settings.navMobileAssistant"),
     mobileExecution: t("settings.navMobileExecution"),
     about: t("settings.navAbout"),
@@ -252,7 +320,12 @@ export function SettingsPage(props: SettingsPageProps) {
       NAV_GROUPS.map((group) => ({
         label: t(group.labelKey),
         items: group.items
-          .filter((item) => !hiddenSectionSet.has(item.id) && (!item.mobileOnly || nativeMobile))
+          .filter(
+            (item) =>
+              !hiddenSectionSet.has(item.id) &&
+              (!item.mobileOnly || nativeMobile) &&
+              (!item.desktopOnly || !nativeMobile),
+          )
           .map((item) => ({
             ...item,
             label: sectionLabels[item.id],
@@ -302,6 +375,8 @@ export function SettingsPage(props: SettingsPageProps) {
             thirdPartyImportEnabled={!nativeMobile}
           />
         );
+      case "failover":
+        return <ModelFailoverSection settings={settings} setSettings={setSettings} />;
       case "soul":
         return <SoulSection createRequestId={soulCreateRequestId} />;
       case "system":
@@ -349,6 +424,18 @@ export function SettingsPage(props: SettingsPageProps) {
         return <CronSection settings={settings} setSettings={setSettings} />;
       case "ssh":
         return <SshSettingsSection settings={settings} setSettings={setSettings} />;
+      case "shortcuts":
+        return <GlobalShortcutsSection />;
+      case "backup":
+        return <BackupSyncSection settings={settings} setSettings={setSettings} />;
+      case "toolPermissions":
+        return <ToolPermissionsSection settings={settings} setSettings={setSettings} />;
+      case "projectRoots":
+        return <ProjectRootsSection settings={settings} setSettings={setSettings} />;
+      case "voice":
+        return <SttSettingsSection settings={settings} setSettings={setSettings} />;
+      case "usage":
+        return <ProviderUsageSection settings={settings} setSettings={setSettings} />;
       case "about":
         return <AboutSection settings={settings} setSettings={setSettings} appUpdate={appUpdate} />;
       default: {

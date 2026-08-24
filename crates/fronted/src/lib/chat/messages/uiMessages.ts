@@ -5,15 +5,6 @@ import type {
   ToolResultMessage,
   Usage,
 } from "@earendil-works/pi-ai";
-import { assistantMessageToText } from "../../providers/llm";
-import { isProviderNativeWebSearchToolName } from "../../providers/nativeWebSearch";
-import { isSubagentCardToolCall } from "../../subagents/card";
-import {
-  buildSubagentCardToolCallId,
-  type SubagentBatchDetails,
-  type SubagentCardDetails,
-} from "../../subagents/protocol";
-import { GLOBAL_BASH_MAX_TIMEOUT_MS, MIN_BASH_TIMEOUT_MS } from "../../tools/bashTimeoutPolicy";
 import {
   enrichHostedSearchContentWithText,
   type HostedSearchBlock,
@@ -21,13 +12,18 @@ import {
   normalizeHostedSearchBlock,
   resolveHostedSearchTextBoundary,
   splitTextAroundHostedSearch,
-} from "./hostedSearch";
-import { fileToolFieldChars, LIVE_TOOL_PREVIEW_META_KEY } from "./toolPreview";
+} from "@xagent/ui/lib/chat/hostedSearch";
 import {
   getUserMessageAttachments,
-  getUserMessageDisplayText,
   type PendingUploadedFile,
-} from "./uploadedFiles";
+} from "@xagent/ui/lib/chat/uploadedFiles";
+import {
+  buildSubagentCardToolCallId,
+  type SubagentBatchDetails,
+  type SubagentCardDetails,
+} from "@xagent/ui/lib/subagents/protocol";
+import { isSubagentCardToolCall } from "../../subagents/card";
+import { readMessageContextUsage } from "../compaction/contextUsageMetadata";
 
 export type ToolTraceItem = {
   toolCall: ToolCall;
@@ -69,6 +65,8 @@ export type UiRound = {
     stopReason?: string;
     usage?: Usage;
     usageTotalTokens?: number;
+    contextUsageTokens?: number;
+    contextRelevant?: boolean;
   };
 };
 
@@ -649,34 +647,6 @@ function isParentAgentToolCall(toolCall: ToolCall) {
   return toolCall.name === "Agent" && !isSubagentCardToolCall(toolCall);
 }
 
-function isDsmlRecoveredToolCallId(toolCallId: string | undefined) {
-  return toolCallId?.startsWith("dsml-tool-call-") ?? false;
-}
-
-function isRecoveredProviderNativeWebSearchResult(toolResult: ToolResultMessage | undefined) {
-  const details = toolResult?.details as Record<string, unknown> | undefined;
-  return details?.recoveredProviderNativeWebSearch === true;
-}
-
-export function shouldDisplayToolTraceItem(
-  item: ToolTraceItem,
-  options?: { hasHostedSearch?: boolean },
-) {
-  if (!isProviderNativeWebSearchToolName(item.toolCall.name)) {
-    return true;
-  }
-  if (options?.hasHostedSearch) {
-    return false;
-  }
-  if (isDsmlRecoveredToolCallId(item.toolCall.id)) {
-    return false;
-  }
-  if (isRecoveredProviderNativeWebSearchResult(item.toolResult)) {
-    return false;
-  }
-  return true;
-}
-
 function shouldDisplayToolBlock(
   toolCall: ToolCall,
   toolResult: ToolResultMessage | undefined,
@@ -687,72 +657,6 @@ function shouldDisplayToolBlock(
     hasHostedSearch:
       options?.contentHasHostedSearch || blocks.some((block) => block.kind === "hostedSearch"),
   });
-}
-
-const SUBAGENT_PLACEHOLDER_MAX_AGENTS = 8;
-
-function asPlainObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function optionalText(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function clampInteger(value: unknown, fallback: number, min: number, max: number) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return Math.max(min, Math.min(max, Math.floor(value)));
-}
-
-/**
- * Live placeholder cards while the parent Agent call's arguments stream.
- * The streaming JSON parser yields partial `agents` arrays; an element only
- * renders once its `id` and `prompt` fields have started streaming. Indexes
- * follow the raw array so placeholder ids match the authoritative cards
- * emitted when execution starts.
- */
-export function buildSubagentPlaceholderToolCalls(parentToolCall: ToolCall): ToolCall[] {
-  if (!isParentAgentToolCall(parentToolCall)) return [];
-  const args = asPlainObject(parentToolCall.arguments);
-  const rawAgents = Array.isArray(args.agents) ? args.agents : [];
-  if (rawAgents.length === 0 || rawAgents.length > SUBAGENT_PLACEHOLDER_MAX_AGENTS) return [];
-  const concurrency = Math.min(
-    rawAgents.length,
-    clampInteger(
-      args.concurrency,
-      SUBAGENT_PLACEHOLDER_MAX_AGENTS,
-      1,
-      SUBAGENT_PLACEHOLDER_MAX_AGENTS,
-    ),
-  );
-
-  const placeholders: ToolCall[] = [];
-  rawAgents.forEach((rawAgent, index) => {
-    const record = asPlainObject(rawAgent);
-    const id = optionalText(record.id);
-    const prompt = optionalText(record.prompt);
-    if (!id || !prompt) return;
-    placeholders.push({
-      type: "toolCall",
-      id: buildSubagentCardToolCallId(parentToolCall.id, index + 1),
-      name: "Agent",
-      arguments: {
-        subagent_card: true,
-        parent_tool_call_id: parentToolCall.id,
-        index: index + 1,
-        total: rawAgents.length,
-        concurrency,
-        id,
-        name: optionalText(record.name),
-        role: optionalText(record.role),
-        mode: record.mode === "worktree" || record.mode === "readonly" ? record.mode : undefined,
-        prompt,
-      },
-    });
-  });
-  return placeholders;
 }
 
 function isSubagentBatchResult(
@@ -894,64 +798,6 @@ function upsertToolBlock(
   return [...blocks, nextBlock];
 }
 
-export function getRoundText(round: Pick<UiRound, "blocks">) {
-  let text = "";
-  for (const block of round.blocks) {
-    if (block.kind === "text") text += block.text;
-  }
-  return text;
-}
-
-export function getRoundThinkingText(round: Pick<UiRound, "blocks">) {
-  let text = "";
-  for (const block of round.blocks) {
-    if (block.kind === "thinking") text += block.text;
-  }
-  return text;
-}
-
-export function getRoundToolTrace(round: Pick<UiRound, "blocks">): ToolTraceItem[] {
-  const hasHostedSearch = round.blocks.some((block) => block.kind === "hostedSearch");
-  return round.blocks.flatMap((block) =>
-    block.kind === "tool" && shouldDisplayToolTraceItem(block.item, { hasHostedSearch })
-      ? [block.item]
-      : [],
-  );
-}
-
-export function getRoundHostedSearches(round: Pick<UiRound, "blocks">): HostedSearchBlock[] {
-  return round.blocks.flatMap((block) => (block.kind === "hostedSearch" ? [block.item] : []));
-}
-
-export function hasRoundContent(round: Pick<UiRound, "blocks">) {
-  return (
-    getRoundText(round).trim().length > 0 ||
-    getRoundThinkingText(round).trim().length > 0 ||
-    getRoundToolTrace(round).length > 0 ||
-    getRoundHostedSearches(round).length > 0
-  );
-}
-
-export function appendTextDeltaToRound<TRound extends Pick<UiRound, "blocks">>(
-  round: TRound,
-  delta: string,
-): TRound {
-  return {
-    ...round,
-    blocks: rebalanceHostedSearchTextBoundaries(appendTextLikeBlock(round.blocks, "text", delta)),
-  };
-}
-
-export function appendThinkingDeltaToRound<TRound extends Pick<UiRound, "blocks">>(
-  round: TRound,
-  delta: string,
-): TRound {
-  return {
-    ...round,
-    blocks: appendTextLikeBlock(round.blocks, "thinking", delta),
-  };
-}
-
 export function upsertToolCallToRound<TRound extends Pick<UiRound, "blocks">>(
   round: TRound,
   toolCall: ToolCall,
@@ -960,40 +806,6 @@ export function upsertToolCallToRound<TRound extends Pick<UiRound, "blocks">>(
     ...round,
     blocks: upsertToolBlock(round.blocks, toolCall),
   };
-}
-
-export function markToolCallRunningInRound<
-  TRound extends Pick<UiRound, "blocks"> & { runningToolCallIds: string[] },
->(round: TRound, toolCall: ToolCall): TRound {
-  const visibleToolCalls = buildSubagentPlaceholderToolCalls(toolCall);
-  const runningCandidateIds =
-    visibleToolCalls.length > 0
-      ? visibleToolCalls.map((item) => item.id)
-      : toolCall.id
-        ? [toolCall.id]
-        : [];
-  if (runningCandidateIds.length === 0) return round;
-
-  const visibleToolCallIds = new Set(
-    getRoundToolTrace(round)
-      .map((item) => item.toolCall.id)
-      .filter((id): id is string => Boolean(id)),
-  );
-  let runningToolCallIds = round.runningToolCallIds;
-  for (const id of runningCandidateIds) {
-    if (!visibleToolCallIds.has(id) || runningToolCallIds.includes(id)) continue;
-    if (runningToolCallIds === round.runningToolCallIds) {
-      runningToolCallIds = runningToolCallIds.slice();
-    }
-    runningToolCallIds.push(id);
-  }
-
-  return runningToolCallIds === round.runningToolCallIds
-    ? round
-    : {
-        ...round,
-        runningToolCallIds,
-      };
 }
 
 export function attachToolResultToRound<TRound extends Pick<UiRound, "blocks">>(
@@ -1084,33 +896,6 @@ export function upsertHostedSearchToRound<TRound extends Pick<UiRound, "blocks">
   };
 }
 
-export function updateLiveRound(
-  prev: LiveRound[],
-  round: number,
-  updater: (target: LiveRound) => LiveRound,
-) {
-  if (prev.length === 0) return prev;
-
-  const lastIdx = prev.length - 1;
-  if (prev[lastIdx].round === round) {
-    const next = prev.slice();
-    next[lastIdx] = updater(prev[lastIdx]);
-    return next;
-  }
-
-  const idx = prev.findIndex((item) => item.round === round);
-  if (idx < 0) return prev;
-
-  const next = prev.slice();
-  next[idx] = updater(prev[idx]);
-  return next;
-}
-
-export function collapseThinking(target: LiveRound) {
-  if (!target.thinkingOpen || !getRoundThinkingText(target).trim()) return target;
-  return { ...target, thinkingOpen: false };
-}
-
 function buildUiRoundBlocks(
   assistant: AssistantMessage,
   toolResultById: Map<string, ToolResultMessage>,
@@ -1179,6 +964,7 @@ export function buildUiMessages(messages: Message[], indexOffset = 0): UiMessage
       if (messages[i].role === "assistant") {
         roundNum += 1;
         const assistant = messages[i] as AssistantMessage;
+        const contextUsage = readMessageContextUsage(assistant);
         lastAssistantTimestamp = assistant.timestamp ?? lastAssistantTimestamp;
 
         const toolResults: ToolResultMessage[] = [];
@@ -1210,6 +996,7 @@ export function buildUiMessages(messages: Message[], indexOffset = 0): UiMessage
             stopReason: String(assistant.stopReason ?? ""),
             usage: assistant.usage as Usage | undefined,
             usageTotalTokens: assistant.usage?.totalTokens,
+            contextUsageTokens: contextUsage?.totalTokens,
           },
         });
       } else {
@@ -1222,6 +1009,7 @@ export function buildUiMessages(messages: Message[], indexOffset = 0): UiMessage
       out.push({
         key: `assistant-${indexOffset + groupStartIndex}-${indexOffset + i}-${lastAssistantTimestamp}`,
         role: "assistant",
+        messageIndex: indexOffset + groupStartIndex,
         text: lastText,
         rounds,
         timestamp: lastAssistantTimestamp > 0 ? lastAssistantTimestamp : undefined,

@@ -19,11 +19,23 @@ import { normalizeApiKey, normalizeBaseUrl, normalizeModels } from "./normalize"
 export { normalizeFontFamily } from "../system/fontFamily";
 export type { SystemToolId } from "../tools/systemToolOptions";
 
-export type ProviderId = "codex" | "claude_code" | "gemini";
+export type ProviderId = "codex" | "claude_code" | "gemini" | "xai" | "deepseek";
 export type ProviderAuthMode = "api-key" | "oauth-managed" | "oauth-token";
 
 export type ExecutionMode = "text" | "tools" | "agent-dev";
 export type ToolPolicy = "allow" | "ask" | "deny";
+export type CommandSafetyMode = "auto" | "ask" | "sandbox" | "sandboxOffline";
+
+export type ModelFailoverProviderSettings = {
+  enabled: boolean;
+  /** Custom-provider ids in fallback priority order. */
+  queue: string[];
+  maxSwitches: number;
+  failureThreshold: number;
+  cooldownSeconds: number;
+};
+
+export type ModelFailoverSettings = Record<ProviderId, ModelFailoverProviderSettings>;
 
 export type CodexRequestFormat = "openai-completions" | "openai-responses";
 
@@ -170,11 +182,14 @@ export type SystemProxyConfig = {
 
 export type SystemSettings = {
   executionMode: ExecutionMode;
+  commandSafetyMode: CommandSafetyMode;
   workdir: string;
   selectedSystemTools: SystemToolId[];
   /** Per-tool, tool-group and MCP-server execution policies. */
   toolPolicies?: Record<string, ToolPolicy>;
   workspaceProjects: WorkspaceProject[];
+  workspaceProjectGroups: WorkspaceProjectGroup[];
+  workspaceResourceSettings: Record<string, WorkspaceResourceSetting>;
   activeWorkspaceProjectId?: string;
   hiddenWorkspaceProjectPaths: string[];
   missingWorkspaceProjectPaths: string[];
@@ -199,6 +214,34 @@ export type WorkspaceProject = {
   pinnedAt?: number | null;
 };
 
+export type WorkspaceProjectGroup = {
+  id: string;
+  name: string;
+  projectPaths: string[];
+  sourceProjectPath?: string;
+  collapsed: boolean;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type WorkspaceResourceMode = "inherit" | "custom";
+
+export type WorkspaceResourceSetting = {
+  mode: WorkspaceResourceMode;
+  skillNames: string[];
+  mcpServerIds: string[];
+  stateVersion: number;
+  writerId: string;
+  updatedAt: number;
+};
+
+export type ResolvedWorkspaceResources = {
+  mode: WorkspaceResourceMode;
+  skillsEnabled: boolean;
+  skillNames: string[];
+  mcpServerIds: string[];
+};
+
 export type SelectedModel = {
   customProviderId: string;
   model: string;
@@ -220,20 +263,26 @@ export type ProviderModelConfig = {
   maxOutputToken: number;
   /** 用户自填单价：目录外模型（中转/改名）没有官方定价时用于成本展示。 */
   cost?: ProviderModelCost;
+  promptCacheHintMode?: PromptCacheHintMode;
 };
+
+export type PromptCacheHintMode = "auto" | "openai-key" | "openrouter-session" | "none";
 
 export type ChatRuntimeControls = {
   thinkingEnabled: boolean;
   nativeWebSearchEnabled: boolean;
   reasoning: ReasoningLevel;
   reasoningByProvider: Partial<Record<ChatRuntimeReasoningProviderKey, ReasoningLevel>>;
+  planModeEnabled: boolean;
 };
 
 export type ChatRuntimeReasoningProviderKey =
   | "claude_code"
   | "codex_openai_responses"
   | "codex_openai_completions"
-  | "gemini";
+  | "gemini"
+  | "xai"
+  | "deepseek";
 
 export type AgentPromptTemplate = {
   id: string;
@@ -278,11 +327,54 @@ export type SshSettings = {
   projectHostAssociations: Record<string, string[]>;
 };
 
+export type UsageQueryMode = "coding-plan" | "balance" | "general" | "newapi" | "custom";
+
+export type UsageQueryConfig = {
+  enabled: boolean;
+  mode: UsageQueryMode;
+  script: string;
+  baseUrl: string;
+  apiKey: string;
+  accessToken: string;
+  userId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  codingPlanProvider: string;
+  teamOrganizationId: string;
+  teamProjectId: string;
+  apiKeyConfigured?: boolean;
+  accessTokenConfigured?: boolean;
+  secretAccessKeyConfigured?: boolean;
+  timeoutSecs?: number;
+};
+
+export function getDefaultUsageQueryConfig(): UsageQueryConfig {
+  return {
+    enabled: false,
+    mode: "balance",
+    script: "",
+    baseUrl: "",
+    apiKey: "",
+    accessToken: "",
+    userId: "",
+    accessKeyId: "",
+    secretAccessKey: "",
+    codingPlanProvider: "",
+    teamOrganizationId: "",
+    teamProjectId: "",
+    timeoutSecs: 10,
+  };
+}
+
 export type CustomProvider = {
   id: string;
   name: string;
   type: ProviderId;
   baseUrl: string;
+  /** Treat baseUrl as the complete inference endpoint instead of an SDK base URL. */
+  isFullUrl: boolean;
+  /** Optional exact endpoint used only for model discovery. */
+  modelsUrl?: string;
   apiKey: string;
   apiKeyConfigured?: boolean;
   authMode?: ProviderAuthMode;
@@ -294,10 +386,12 @@ export type CustomProvider = {
   requestFormat?: CodexRequestFormat;
   reasoning: ReasoningLevel;
   promptCachingEnabled: boolean;
+  promptCacheHintMode?: PromptCacheHintMode;
   /** 仅 Anthropic：ephemeral 缓存保留档位；long 在官方 API 上映射为 1h TTL。 */
   promptCacheRetention?: "short" | "long";
   nativeWebSearchEnabled: boolean;
   useSystemProxy: boolean;
+  usageQuery?: UsageQueryConfig;
 };
 
 export type EffectiveTheme = "light" | "dark";
@@ -335,6 +429,43 @@ export type AccessSettings = {
   iosAShellEnabled: boolean;
 };
 
+export const STT_PROVIDER_IDS = [
+  "aliyun_dashscope",
+  "tencent_cloud",
+  "volcengine_v2",
+  "volcengine_seed_v3",
+  "baidu_cloud",
+] as const;
+
+export type SttProviderId = (typeof STT_PROVIDER_IDS)[number];
+
+export type SttProviderSettings = {
+  id: SttProviderId;
+  configured?: boolean;
+  websocketUrl: string;
+  model: string;
+  apiKey: string;
+  appId: string;
+  secretId: string;
+  secretKey: string;
+  engineModelType: string;
+  cluster: string;
+  accessToken: string;
+  resourceId: string;
+  baiduAppId: string;
+  baiduApiKey: string;
+  devPid: string;
+  clearSecrets?: boolean;
+};
+
+export type SttSettings = {
+  enabled: boolean;
+  provider: SttProviderId;
+  providers: Record<SttProviderId, SttProviderSettings>;
+  /** Accepted by the persistence command for editable, not-yet-complete drafts. */
+  allowIncomplete?: boolean;
+};
+
 export type AppSettings = {
   system: SystemSettings;
   customProviders: CustomProvider[];
@@ -342,6 +473,8 @@ export type AppSettings = {
   agents: AgentPromptTemplate[];
   ssh: SshSettings;
   access: AccessSettings;
+  stt: SttSettings;
+  modelFailover: ModelFailoverSettings;
   memory: MemorySettings;
   customSettings: CustomSettings;
   updates: UpdateSettings;
@@ -369,17 +502,82 @@ const DEFAULT_CODEX_CONTEXT_WINDOW = 258_000;
 const DEFAULT_CODEX_MAX_OUTPUT_TOKEN = 142_000;
 const DEFAULT_GEMINI_CONTEXT_WINDOW = 1_048_576;
 const DEFAULT_GEMINI_MAX_OUTPUT_TOKEN = 65_536;
+const DEFAULT_XAI_CONTEXT_WINDOW = 2_000_000;
+const DEFAULT_XAI_MAX_OUTPUT_TOKEN = 131_072;
+const DEFAULT_DEEPSEEK_CONTEXT_WINDOW = 128_000;
+const DEFAULT_DEEPSEEK_MAX_OUTPUT_TOKEN = 8_192;
 export const DEFAULT_CHAT_RUNTIME_CONTROLS: ChatRuntimeControls = {
   thinkingEnabled: true,
   nativeWebSearchEnabled: true,
+  planModeEnabled: false,
   reasoning: "high",
   reasoningByProvider: {
     claude_code: "high",
     codex_openai_responses: "high",
     codex_openai_completions: "high",
     gemini: "high",
+    xai: "high",
+    deepseek: "high",
   },
 };
+
+const DEFAULT_MODEL_FAILOVER_PROVIDER_SETTINGS: ModelFailoverProviderSettings = {
+  enabled: false,
+  queue: [],
+  maxSwitches: 3,
+  failureThreshold: 4,
+  cooldownSeconds: 60,
+};
+
+function normalizeIntegerSetting(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  fallback: number,
+) {
+  const number = Number(value);
+  return Number.isFinite(number)
+    ? Math.min(maximum, Math.max(minimum, Math.trunc(number)))
+    : fallback;
+}
+
+export function normalizeModelFailoverSettings(
+  input: unknown,
+  providers: readonly CustomProvider[],
+): ModelFailoverSettings {
+  const source = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const normalizeProvider = (providerId: ProviderId): ModelFailoverProviderSettings => {
+    const raw = (
+      source[providerId] && typeof source[providerId] === "object"
+        ? source[providerId]
+        : {}
+    ) as Record<string, unknown>;
+    const eligibleIds = new Set(
+      providers.filter((provider) => provider.type === providerId).map((provider) => provider.id),
+    );
+    const queue = Array.from(
+      new Set(
+        (Array.isArray(raw.queue) ? raw.queue : [])
+          .map((value) => (typeof value === "string" ? value.trim() : ""))
+          .filter((value) => value && eligibleIds.has(value)),
+      ),
+    );
+    return {
+      enabled: raw.enabled === true,
+      queue,
+      maxSwitches: normalizeIntegerSetting(raw.maxSwitches, 1, 10, 3),
+      failureThreshold: normalizeIntegerSetting(raw.failureThreshold, 1, 10, 4),
+      cooldownSeconds: normalizeIntegerSetting(raw.cooldownSeconds, 5, 3600, 60),
+    };
+  };
+  return {
+    codex: normalizeProvider("codex"),
+    claude_code: normalizeProvider("claude_code"),
+    gemini: normalizeProvider("gemini"),
+    xai: normalizeProvider("xai"),
+    deepseek: normalizeProvider("deepseek"),
+  };
+}
 
 export const DEFAULT_WORKSPACE_PROJECT_ID = "default-project";
 export const DEFAULT_WORKSPACE_PROJECT_NAME = "Default Project";
@@ -429,6 +627,7 @@ export function getBuiltinCustomProviders(): CustomProvider[] {
       name: "Anthropic",
       type: "claude_code",
       baseUrl: "https://api.anthropic.com/v1",
+      isFullUrl: false,
       apiKey: "",
       customHeaders: [],
       models: [],
@@ -443,6 +642,7 @@ export function getBuiltinCustomProviders(): CustomProvider[] {
       name: "OpenAI",
       type: "codex",
       baseUrl: "https://api.openai.com/v1",
+      isFullUrl: false,
       apiKey: "",
       customHeaders: [],
       models: [],
@@ -458,6 +658,38 @@ export function getBuiltinCustomProviders(): CustomProvider[] {
       name: "Gemini",
       type: "gemini",
       baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      isFullUrl: false,
+      apiKey: "",
+      customHeaders: [],
+      models: [],
+      activeModels: [],
+      reasoning: "off",
+      promptCachingEnabled: false,
+      nativeWebSearchEnabled: true,
+      useSystemProxy: false,
+    },
+    {
+      id: "builtin-xai",
+      name: "Grok",
+      type: "xai",
+      baseUrl: "https://api.x.ai/v1",
+      isFullUrl: false,
+      apiKey: "",
+      customHeaders: [],
+      models: [],
+      activeModels: [],
+      requestFormat: "openai-responses",
+      reasoning: "off",
+      promptCachingEnabled: false,
+      nativeWebSearchEnabled: true,
+      useSystemProxy: false,
+    },
+    {
+      id: "builtin-deepseek",
+      name: "DeepSeek",
+      type: "deepseek",
+      baseUrl: "https://api.deepseek.com",
+      isFullUrl: false,
       apiKey: "",
       customHeaders: [],
       models: [],
@@ -642,6 +874,77 @@ function normalizeWorkspaceProjects(input: unknown): WorkspaceProject[] {
   return out;
 }
 
+function normalizeWorkspaceProjectGroups(input: unknown): WorkspaceProjectGroup[] {
+  if (!Array.isArray(input)) return [];
+  const groups: WorkspaceProjectGroup[] = [];
+  const seenIds = new Set<string>();
+  for (const value of input) {
+    const obj = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+    const id = typeof obj.id === "string" ? obj.id.trim() : "";
+    const name = typeof obj.name === "string" ? obj.name.trim() : "";
+    if (!id || !name || seenIds.has(id)) continue;
+    const projectPaths = Array.from(
+      new Set(normalizeStringArray(obj.projectPaths).map(workspaceProjectPathKey).filter(Boolean)),
+    ).slice(0, 200);
+    const sourceProjectPath = workspaceProjectPathKey(obj.sourceProjectPath);
+    const createdAt =
+      typeof obj.createdAt === "number" && Number.isFinite(obj.createdAt) && obj.createdAt > 0
+        ? obj.createdAt
+        : Date.now();
+    const updatedAt =
+      typeof obj.updatedAt === "number" && Number.isFinite(obj.updatedAt) && obj.updatedAt > 0
+        ? obj.updatedAt
+        : createdAt;
+    seenIds.add(id);
+    groups.push({
+      id,
+      name: name.slice(0, 80),
+      projectPaths,
+      ...(sourceProjectPath ? { sourceProjectPath } : {}),
+      collapsed: obj.collapsed === true,
+      createdAt,
+      updatedAt,
+    });
+    if (groups.length >= 100) break;
+  }
+  return groups;
+}
+
+function normalizeWorkspaceResourceSettings(
+  input: unknown,
+): Record<string, WorkspaceResourceSetting> {
+  const raw = (
+    input && typeof input === "object" && !Array.isArray(input) ? input : {}
+  ) as Record<string, unknown>;
+  const settings: Record<string, WorkspaceResourceSetting> = {};
+  const canonicalKeys = new Set<string>();
+  for (const [rawPath, value] of Object.entries(raw)) {
+    const obj = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+    const mode: WorkspaceResourceMode = obj.mode === "custom" ? "custom" : "inherit";
+    const skillNames = Array.from(new Set(normalizeStringArray(obj.skillNames))).slice(0, 256);
+    const mcpServerIds = Array.from(new Set(normalizeStringArray(obj.mcpServerIds))).slice(0, 256);
+    const stateVersion =
+      typeof obj.stateVersion === "number" && Number.isSafeInteger(obj.stateVersion)
+        ? Math.max(0, obj.stateVersion)
+        : 0;
+    const writerId = typeof obj.writerId === "string" ? obj.writerId.trim().slice(0, 128) : "";
+    const updatedAt =
+      typeof obj.updatedAt === "number" && Number.isFinite(obj.updatedAt) && obj.updatedAt > 0
+        ? obj.updatedAt
+        : 0;
+    assignNormalizedProjectKeyValue(settings, canonicalKeys, rawPath, {
+      mode,
+      skillNames: mode === "custom" ? skillNames : [],
+      mcpServerIds: mode === "custom" ? mcpServerIds : [],
+      stateVersion,
+      writerId,
+      updatedAt,
+    });
+    if (Object.keys(settings).length >= 200) break;
+  }
+  return settings;
+}
+
 export function normalizeHiddenWorkspaceProjectPaths(input: unknown): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -804,6 +1107,8 @@ const CHAT_RUNTIME_REASONING_PROVIDER_KEYS: ChatRuntimeReasoningProviderKey[] = 
   "codex_openai_responses",
   "codex_openai_completions",
   "gemini",
+  "xai",
+  "deepseek",
 ];
 
 export function getChatRuntimeReasoningProviderKey(params: {
@@ -816,6 +1121,8 @@ export function getChatRuntimeReasoningProviderKey(params: {
   if (params.providerId === "gemini") {
     return "gemini";
   }
+  if (params.providerId === "xai") return "xai";
+  if (params.providerId === "deepseek") return "deepseek";
   if (params.providerId === "codex" && params.requestFormat === "openai-completions") {
     return "codex_openai_completions";
   }
@@ -855,6 +1162,7 @@ export function normalizeChatRuntimeControls(input: unknown): ChatRuntimeControl
   return {
     thinkingEnabled: obj.thinkingEnabled !== false,
     nativeWebSearchEnabled: obj.nativeWebSearchEnabled !== false,
+    planModeEnabled: obj.planModeEnabled === true,
     reasoning,
     reasoningByProvider: normalizeChatRuntimeReasoningByProvider(
       obj.reasoningByProvider,
@@ -1050,7 +1358,9 @@ export function normalizeAccessSettings(input: unknown): AccessSettings {
 }
 
 function toKnownProvider(providerId: ProviderId): KnownProvider {
-  if (providerId === "codex") return "openai";
+  if (providerId === "codex" || providerId === "xai" || providerId === "deepseek") {
+    return "openai";
+  }
   if (providerId === "gemini") return "google";
   return "anthropic";
 }
@@ -1093,6 +1403,20 @@ export function getProviderModelDefaults(
     return {
       contextWindow: DEFAULT_GEMINI_CONTEXT_WINDOW,
       maxOutputToken: DEFAULT_GEMINI_MAX_OUTPUT_TOKEN,
+    };
+  }
+
+  if (providerId === "xai") {
+    return {
+      contextWindow: DEFAULT_XAI_CONTEXT_WINDOW,
+      maxOutputToken: DEFAULT_XAI_MAX_OUTPUT_TOKEN,
+    };
+  }
+
+  if (providerId === "deepseek") {
+    return {
+      contextWindow: DEFAULT_DEEPSEEK_CONTEXT_WINDOW,
+      maxOutputToken: DEFAULT_DEEPSEEK_MAX_OUTPUT_TOKEN,
     };
   }
 
@@ -1232,6 +1556,8 @@ function normalizeProviderId(input: unknown): ProviderId {
   switch (input) {
     case "codex":
     case "gemini":
+    case "xai":
+    case "deepseek":
       return input;
     default:
       return "claude_code";
@@ -1260,7 +1586,12 @@ export function normalizeCustomProvider(input: unknown): CustomProvider {
   const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const type = normalizeProviderId(obj.type);
   const codexRouting =
-    type === "codex" ? normalizeCodexRouting(obj.baseUrl, obj.requestFormat) : undefined;
+    type === "codex" || type === "xai"
+      ? normalizeCodexRouting(
+          obj.baseUrl,
+          type === "xai" ? "openai-responses" : obj.requestFormat,
+        )
+      : undefined;
   const models = normalizeProviderModelConfigs(obj.models, type);
   const validModelIds = new Set(models.map((model) => model.id));
   const apiKey = normalizeApiKey(typeof obj.apiKey === "string" ? obj.apiKey : "");
@@ -1273,6 +1604,11 @@ export function normalizeCustomProvider(input: unknown): CustomProvider {
     baseUrl: codexRouting
       ? codexRouting.baseUrl
       : normalizeBaseUrl(typeof obj.baseUrl === "string" ? obj.baseUrl : ""),
+    isFullUrl: obj.isFullUrl === true,
+    modelsUrl:
+      typeof obj.modelsUrl === "string" && obj.modelsUrl.trim()
+        ? obj.modelsUrl.trim()
+        : undefined,
     apiKey,
     apiKeyConfigured: apiKey.length > 0 || obj.apiKeyConfigured === true,
     authMode:
@@ -1291,16 +1627,59 @@ export function normalizeCustomProvider(input: unknown): CustomProvider {
     activeModels: normalizeModels(normalizeStringArray(obj.activeModels)).filter((modelId) =>
       validModelIds.has(modelId),
     ),
-    requestFormat: codexRouting?.requestFormat,
+    requestFormat: type === "xai" ? "openai-responses" : codexRouting?.requestFormat,
     reasoning: normalizeReasoningLevel(obj.reasoning),
     // Anthropic/OpenAI 默认开启提示词缓存（OpenAI 侧体现为稳定的
     // prompt_cache_key 路由提示）；Gemini 的隐式缓存由服务端自动处理。
-    promptCachingEnabled: type === "gemini" ? false : obj.promptCachingEnabled !== false,
+    promptCachingEnabled:
+      type === "gemini" || type === "xai" || type === "deepseek"
+        ? false
+        : obj.promptCachingEnabled !== false,
+    promptCacheHintMode:
+      obj.promptCacheHintMode === "openai-key" ||
+      obj.promptCacheHintMode === "openrouter-session" ||
+      obj.promptCacheHintMode === "none"
+        ? obj.promptCacheHintMode
+        : "auto",
     ...(type === "claude_code" && obj.promptCacheRetention === "long"
       ? { promptCacheRetention: "long" as const }
       : {}),
     nativeWebSearchEnabled: obj.nativeWebSearchEnabled !== false,
     useSystemProxy: obj.useSystemProxy === true,
+    usageQuery: normalizeUsageQueryConfig(obj.usageQuery),
+  };
+}
+
+export function normalizeUsageQueryConfig(input: unknown): UsageQueryConfig {
+  const defaults = getDefaultUsageQueryConfig();
+  const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const mode =
+    obj.mode === "coding-plan" ||
+    obj.mode === "general" ||
+    obj.mode === "newapi" ||
+    obj.mode === "custom"
+      ? obj.mode
+      : "balance";
+  const text = (field: string) => (typeof obj[field] === "string" ? obj[field].trim() : "");
+  const timeout = Number(obj.timeoutSecs);
+  return {
+    ...defaults,
+    enabled: obj.enabled === true,
+    mode,
+    script: typeof obj.script === "string" ? obj.script : "",
+    baseUrl: text("baseUrl"),
+    apiKey: text("apiKey"),
+    accessToken: text("accessToken"),
+    userId: text("userId"),
+    accessKeyId: text("accessKeyId"),
+    secretAccessKey: text("secretAccessKey"),
+    codingPlanProvider: text("codingPlanProvider"),
+    teamOrganizationId: text("teamOrganizationId"),
+    teamProjectId: text("teamProjectId"),
+    apiKeyConfigured: obj.apiKeyConfigured === true,
+    accessTokenConfigured: obj.accessTokenConfigured === true,
+    secretAccessKeyConfigured: obj.secretAccessKeyConfigured === true,
+    timeoutSecs: Number.isFinite(timeout) ? Math.min(30, Math.max(2, timeout)) : 10,
   };
 }
 
@@ -1494,10 +1873,18 @@ export function normalizeSystemSettings(input: unknown): SystemSettings {
   const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   return {
     executionMode: normalizeExecutionMode(obj.executionMode),
+    commandSafetyMode:
+      obj.commandSafetyMode === "ask" ||
+      obj.commandSafetyMode === "sandbox" ||
+      obj.commandSafetyMode === "sandboxOffline"
+        ? obj.commandSafetyMode
+        : "auto",
     workdir: normalizeWorkdir(obj.workdir),
     selectedSystemTools: normalizeSystemToolSelection(obj.selectedSystemTools),
     toolPolicies: normalizeToolPolicies(obj.toolPolicies),
     workspaceProjects: normalizeWorkspaceProjects(obj.workspaceProjects),
+    workspaceProjectGroups: normalizeWorkspaceProjectGroups(obj.workspaceProjectGroups),
+    workspaceResourceSettings: normalizeWorkspaceResourceSettings(obj.workspaceResourceSettings),
     activeWorkspaceProjectId:
       typeof obj.activeWorkspaceProjectId === "string" && obj.activeWorkspaceProjectId.trim()
         ? obj.activeWorkspaceProjectId.trim()
@@ -2072,15 +2459,91 @@ export function normalizeUpdateSettings(input: unknown): UpdateSettings {
   };
 }
 
+function defaultSttProvider(id: SttProviderId): SttProviderSettings {
+  const endpoints: Partial<Record<SttProviderId, string>> = {
+    aliyun_dashscope: "wss://dashscope.aliyuncs.com/api-ws/v1/inference/",
+    volcengine_v2: "wss://openspeech.bytedance.com/api/v2/asr",
+    volcengine_seed_v3: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async",
+    baidu_cloud: "wss://vop.baidu.com/realtime_asr",
+  };
+  return {
+    id,
+    websocketUrl: endpoints[id] ?? "",
+    model: id === "aliyun_dashscope" ? "paraformer-realtime-v2" : "",
+    apiKey: "",
+    appId: "",
+    secretId: "",
+    secretKey: "",
+    engineModelType: id === "tencent_cloud" ? "16k_zh" : "",
+    cluster: "",
+    accessToken: "",
+    resourceId: "",
+    baiduAppId: "",
+    baiduApiKey: "",
+    devPid: id === "baidu_cloud" ? "1537" : "",
+  };
+}
+
+export function normalizeSttSettings(input: unknown): SttSettings {
+  const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const rawProviders =
+    obj.providers && typeof obj.providers === "object"
+      ? (obj.providers as Record<string, unknown>)
+      : {};
+  const providers = Object.fromEntries(
+    STT_PROVIDER_IDS.map((id) => {
+      const defaults = defaultSttProvider(id);
+      const raw =
+        rawProviders[id] && typeof rawProviders[id] === "object"
+          ? (rawProviders[id] as Record<string, unknown>)
+          : {};
+      const text = (field: keyof SttProviderSettings) =>
+        typeof raw[field] === "string"
+          ? (raw[field] as string).trim()
+          : typeof defaults[field] === "string"
+            ? (defaults[field] as string)
+            : "";
+      return [
+        id,
+        {
+          ...defaults,
+          websocketUrl: text("websocketUrl"),
+          model: text("model"),
+          apiKey: text("apiKey"),
+          appId: text("appId"),
+          secretId: text("secretId"),
+          secretKey: text("secretKey"),
+          engineModelType: text("engineModelType"),
+          cluster: text("cluster"),
+          accessToken: text("accessToken"),
+          resourceId: text("resourceId"),
+          baiduAppId: text("baiduAppId"),
+          baiduApiKey: text("baiduApiKey"),
+          devPid: text("devPid"),
+          configured: raw.configured === true,
+          ...(raw.clearSecrets === true ? { clearSecrets: true } : {}),
+        },
+      ];
+    }),
+  ) as Record<SttProviderId, SttProviderSettings>;
+  const provider = STT_PROVIDER_IDS.includes(obj.provider as SttProviderId)
+    ? (obj.provider as SttProviderId)
+    : "aliyun_dashscope";
+  return { enabled: obj.enabled === true, provider, providers };
+}
+
 export function getDefaultSettings(): AppSettings {
   const customProviders = getBuiltinCustomProviders();
   return {
     system: {
       executionMode: "tools",
+      commandSafetyMode: "auto",
       workdir: "",
       selectedSystemTools: [],
       toolPolicies: undefined,
       workspaceProjects: [],
+      workspaceProjectGroups: [],
+      workspaceResourceSettings: {},
       activeWorkspaceProjectId: undefined,
       hiddenWorkspaceProjectPaths: [],
       missingWorkspaceProjectPaths: [],
@@ -2099,6 +2562,8 @@ export function getDefaultSettings(): AppSettings {
       projectHostAssociations: {},
     },
     access: normalizeAccessSettings({}),
+    stt: normalizeSttSettings({}),
+    modelFailover: normalizeModelFailoverSettings({}, customProviders),
     memory: normalizeMemorySettings({}, customProviders),
     customSettings: normalizeCustomSettings({}, customProviders),
     updates: normalizeUpdateSettings({}),
@@ -2132,6 +2597,11 @@ export function normalizeSettings(input?: Partial<AppSettings> | null): AppSetti
     agents: normalizeAgentPromptTemplates(obj.agents ?? defaults.agents),
     ssh: normalizeSshSettings(obj.ssh ?? defaults.ssh),
     access: normalizeAccessSettings(obj.access ?? defaults.access),
+    stt: normalizeSttSettings(obj.stt ?? defaults.stt),
+    modelFailover: normalizeModelFailoverSettings(
+      obj.modelFailover ?? defaults.modelFailover,
+      customProviders,
+    ),
     memory: normalizeMemorySettings(obj.memory ?? defaults.memory, customProviders),
     customSettings: normalizeCustomSettings(
       obj.customSettings ?? defaults.customSettings,
@@ -2157,6 +2627,110 @@ export function updateSystem(prev: AppSettings, patch: Partial<SystemSettings>):
       ...patch,
     },
   });
+}
+
+export function resolveWorkspaceResources(
+  settings: AppSettings,
+  workdir: string,
+): ResolvedWorkspaceResources {
+  const pathKey = workspaceProjectPathKey(workdir);
+  const configured = pathKey ? settings.system.workspaceResourceSettings[pathKey] : undefined;
+  if (configured?.mode === "custom") {
+    const enabledMcpIds = new Set(
+      settings.mcp.servers.filter((server) => server.enabled).map((server) => server.id),
+    );
+    const skillNames = mergeAlwaysEnabledSkillNames(configured.skillNames);
+    return {
+      mode: "custom",
+      skillsEnabled: skillNames.length > 0,
+      skillNames,
+      mcpServerIds: configured.mcpServerIds.filter((id) => enabledMcpIds.has(id)),
+    };
+  }
+  return {
+    mode: "inherit",
+    skillsEnabled: settings.skills.enabled,
+    skillNames: mergeAlwaysEnabledSkillNames(settings.skills.selected),
+    mcpServerIds: settings.mcp.servers
+      .filter((server) => server.enabled)
+      .map((server) => server.id),
+  };
+}
+
+export function filterMcpSettingsForWorkspace(
+  mcp: McpSettings,
+  resources: ResolvedWorkspaceResources,
+): McpSettings {
+  if (resources.mode !== "custom") return mcp;
+  const allowed = new Set(resources.mcpServerIds);
+  return normalizeMcpSettings({
+    servers: mcp.servers.map((server) => ({
+      ...server,
+      enabled: server.enabled && allowed.has(server.id),
+    })),
+    selected: mcp.selected.filter((id) => allowed.has(id)),
+  });
+}
+
+export function updateWorkspaceResourceSettings(
+  prev: AppSettings,
+  projectPath: string,
+  draft: Pick<WorkspaceResourceSetting, "mode" | "skillNames" | "mcpServerIds">,
+): AppSettings {
+  const pathKey = workspaceProjectPathKey(projectPath);
+  if (!pathKey) return prev;
+  const current = prev.system.workspaceResourceSettings[pathKey];
+  const mode: WorkspaceResourceMode = draft.mode === "custom" ? "custom" : "inherit";
+  const next: WorkspaceResourceSetting = {
+    mode,
+    skillNames:
+      mode === "custom" ? Array.from(new Set(draft.skillNames.map((name) => name.trim()).filter(Boolean))) : [],
+    mcpServerIds:
+      mode === "custom" ? Array.from(new Set(draft.mcpServerIds.map((id) => id.trim()).filter(Boolean))) : [],
+    stateVersion: (current?.stateVersion ?? 0) + 1,
+    writerId: current?.writerId || createUuid(),
+    updatedAt: Date.now(),
+  };
+  return updateSystem(prev, {
+    workspaceResourceSettings: {
+      ...prev.system.workspaceResourceSettings,
+      [pathKey]: next,
+    },
+  });
+}
+
+export function removeWorkspaceResourceReferences(
+  prev: AppSettings,
+  removed: { skillNames?: readonly string[]; mcpServerIds?: readonly string[] },
+): AppSettings {
+  const removedSkills = new Set(removed.skillNames ?? []);
+  const removedMcpServers = new Set(removed.mcpServerIds ?? []);
+  if (removedSkills.size === 0 && removedMcpServers.size === 0) return prev;
+  let changed = false;
+  const workspaceResourceSettings = Object.fromEntries(
+    Object.entries(prev.system.workspaceResourceSettings).map(([pathKey, setting]) => {
+      const skillNames = setting.skillNames.filter((name) => !removedSkills.has(name));
+      const mcpServerIds = setting.mcpServerIds.filter((id) => !removedMcpServers.has(id));
+      if (
+        skillNames.length === setting.skillNames.length &&
+        mcpServerIds.length === setting.mcpServerIds.length
+      ) {
+        return [pathKey, setting];
+      }
+      changed = true;
+      return [
+        pathKey,
+        {
+          ...setting,
+          skillNames,
+          mcpServerIds,
+          stateVersion: setting.stateVersion + 1,
+          updatedAt: Date.now(),
+        },
+      ];
+    }),
+  );
+  return changed ? updateSystem(prev, { workspaceResourceSettings }) : prev;
 }
 
 export function updateMcp(prev: AppSettings, patch: Partial<McpSettings>): AppSettings {

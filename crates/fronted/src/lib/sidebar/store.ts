@@ -77,6 +77,7 @@ export type SidebarStore = {
   refreshWorkdirs(reason: SidebarWorkdirsRefreshReason): Promise<void>;
   rename(id: string, title: string): Promise<boolean>;
   setPinned(id: string, isPinned: boolean): Promise<boolean>;
+  setCwd(id: string, cwd: string): Promise<boolean>;
   remove(id: string): Promise<boolean>;
   clearMutationError(id: string): void;
   upsertLocal(conversation: SidebarConversation): void;
@@ -767,6 +768,22 @@ export function createSidebarStore(
         }),
         execute: () => backend.setConversationPinned(id, isPinned),
       }),
+
+    setCwd: (id, cwd) => {
+      const target = cwd.trim();
+      if (!target) return Promise.resolve(false);
+      return runMutation({
+        id,
+        kind: "move",
+        failureCode: "moveFailed",
+        blockedCode: "moveBlockedRunning",
+        optimistic: (current) => ({ ...current, cwd: target }),
+        execute: () => backend.setConversationCwd(id, target),
+      }).then((moved) => {
+        if (moved) void refreshWorkdirs("new-workdir");
+        return moved;
+      });
+    },
 
     remove: async (id) => {
       const removed = await runMutation({

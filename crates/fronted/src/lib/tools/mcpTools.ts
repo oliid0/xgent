@@ -164,7 +164,7 @@ export async function createMcpTools(params: {
   try {
     toolInfos = await invoke<McpToolInfo[]>("mcp_list_tools", {
       servers: enabledServers,
-    } as any);
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (params.loadFailureMode === "throw") {

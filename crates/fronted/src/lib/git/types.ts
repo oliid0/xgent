@@ -45,6 +45,60 @@ export type GitBranch = {
 export type GitBranchesResponse = {
   state: GitRepositoryState;
   branches: GitBranch[];
+  worktrees: GitWorktreeInfo[];
+};
+
+export type GitWorktreeInfo = {
+  path: string;
+  branch: string;
+  mainWorktreePath: string;
+  isCurrent: boolean;
+};
+
+export type GitWorktreeCreateOptions = {
+  branch: string;
+  directoryName: string;
+  parentDirectory?: string;
+  startPoint?: string;
+};
+
+export type GitWorktreeRemoveOptions = {
+  force?: boolean;
+  deleteBranch?: boolean;
+};
+
+export type GitWorktreeResponse = GitOperationResponse & {
+  worktreePath: string;
+  branch: string;
+  directoryName: string;
+  mainWorktreePath: string;
+};
+
+export type GitRemoveWorktreeResponse = GitOperationResponse & {
+  worktreePath: string;
+  mainWorktreePath: string;
+  branch: string;
+  worktreeRemoved: boolean;
+  branchDeleteRequested: boolean;
+  branchDeleted: boolean;
+};
+
+export type GitRemoteBranchesResponse = {
+  defaultBranch: string;
+  branches: string[];
+};
+
+export type GitCloneTask = {
+  id: string;
+  repositoryName: string;
+  targetPath: string;
+  branch: string;
+  status: "running" | "cancelling" | "completed" | "failed" | "cancelled" | string;
+  phase: string;
+  progress?: number | null;
+  detail: string;
+  error: string;
+  startedAt: number;
 };
 
 export type GitDiffResponse = {
@@ -166,7 +220,20 @@ export type GitClient = {
   init(workdir: string, options?: GitInitOptions): Promise<GitOperationResponse>;
   switchBranch(workdir: string, branch: string, kind?: string): Promise<GitOperationResponse>;
   createBranch(workdir: string, branch: string, startPoint?: string): Promise<GitOperationResponse>;
-  diff(workdir: string, mode: "branch" | "working_tree", path?: string): Promise<GitDiffResponse>;
+  createWorktree(
+    workdir: string,
+    options: GitWorktreeCreateOptions,
+  ): Promise<GitWorktreeResponse>;
+  removeWorktree(
+    workdir: string,
+    worktreePath: string,
+    options?: GitWorktreeRemoveOptions,
+  ): Promise<GitRemoveWorktreeResponse>;
+  diff(
+    workdir: string,
+    mode: "branch" | "working_tree" | "staged",
+    path?: string,
+  ): Promise<GitDiffResponse>;
   log(workdir: string, options?: GitLogOptions): Promise<GitLogResponse>;
   commitDetails(workdir: string, commit: string): Promise<GitCommitDetailsResponse>;
   compareCommitWithRemote(workdir: string, commit: string): Promise<GitDiffResponse>;
@@ -303,6 +370,76 @@ export function normalizeGitBranchesResponse(input: unknown, workdir = ""): GitB
   return {
     state: normalizeGitRepositoryState(source.state, workdir),
     branches: Array.isArray(source.branches) ? source.branches.map(normalizeGitBranch) : [],
+    worktrees: Array.isArray(source.worktrees)
+      ? source.worktrees.map(normalizeGitWorktreeInfo)
+      : [],
+  };
+}
+
+export function normalizeGitWorktreeInfo(input: unknown): GitWorktreeInfo {
+  const source = asObject(input);
+  return {
+    path: asString(source.path),
+    branch: asString(source.branch),
+    mainWorktreePath: asString(source.mainWorktreePath ?? source.main_worktree_path),
+    isCurrent: asBoolean(source.isCurrent ?? source.is_current),
+  };
+}
+
+export function normalizeGitWorktreeResponse(
+  input: unknown,
+  workdir = "",
+): GitWorktreeResponse {
+  const source = asObject(input);
+  return {
+    ...normalizeGitOperationResponse(source, workdir),
+    worktreePath: asString(source.worktreePath ?? source.worktree_path),
+    branch: asString(source.branch),
+    directoryName: asString(source.directoryName ?? source.directory_name),
+    mainWorktreePath: asString(source.mainWorktreePath ?? source.main_worktree_path),
+  };
+}
+
+export function normalizeGitRemoveWorktreeResponse(
+  input: unknown,
+  workdir = "",
+): GitRemoveWorktreeResponse {
+  const source = asObject(input);
+  return {
+    ...normalizeGitOperationResponse(source, workdir),
+    worktreePath: asString(source.worktreePath ?? source.worktree_path),
+    mainWorktreePath: asString(source.mainWorktreePath ?? source.main_worktree_path),
+    branch: asString(source.branch),
+    worktreeRemoved: asBoolean(source.worktreeRemoved ?? source.worktree_removed),
+    branchDeleteRequested: asBoolean(
+      source.branchDeleteRequested ?? source.branch_delete_requested,
+    ),
+    branchDeleted: asBoolean(source.branchDeleted ?? source.branch_deleted),
+  };
+}
+
+export function normalizeGitRemoteBranchesResponse(input: unknown): GitRemoteBranchesResponse {
+  const source = asObject(input);
+  return {
+    defaultBranch: asString(source.defaultBranch ?? source.default_branch),
+    branches: stringArray(source.branches),
+  };
+}
+
+export function normalizeGitCloneTask(input: unknown): GitCloneTask {
+  const source = asObject(input);
+  const progress = source.progress;
+  return {
+    id: asString(source.id),
+    repositoryName: asString(source.repositoryName ?? source.repository_name),
+    targetPath: asString(source.targetPath ?? source.target_path),
+    branch: asString(source.branch),
+    status: asString(source.status),
+    phase: asString(source.phase),
+    progress: typeof progress === "number" && Number.isFinite(progress) ? progress : null,
+    detail: asString(source.detail),
+    error: asString(source.error),
+    startedAt: asNumber(source.startedAt ?? source.started_at),
   };
 }
 

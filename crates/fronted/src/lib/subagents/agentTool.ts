@@ -207,6 +207,7 @@ export function createSubagentTools(params: {
   metadataByName: Map<string, BuiltinToolMetadata>;
   createSubagentToolRegistry?: (workdir: string) => Promise<SubagentToolRegistry>;
   worktreeIpc?: SubagentWorktreeIpc;
+  forceReadonly?: boolean;
 }): BuiltinToolBundle {
   const store = params.store;
   const templates = params.templates;
@@ -288,7 +289,11 @@ export function createSubagentTools(params: {
     const identities = new Map(
       store.listIdentities().map((identity) => [identity.agentId, identity]),
     );
-    const parsed = parseSubagentBatch(toolCall.arguments, { identities, templates });
+    const parsed = parseSubagentBatch(toolCall.arguments, {
+      identities,
+      templates,
+      forceReadonly: params.forceReadonly,
+    });
     if (!parsed.ok) {
       return rejectBatch(parsed.issues);
     }

@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { invoke } from "@xagent/runtime";
 import App from "./App";
 import { LocalAccessPairingGate } from "./components/local-access/LocalAccessPairingGate";
 import "./index.css";
@@ -34,3 +35,14 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     </LocalAccessPairingGate>
   </React.StrictMode>,
 );
+
+if (!isBrowserRuntime()) {
+  const platform = inferRuntimePlatform();
+  if (platform === "windows" || platform === "macos" || platform === "linux") {
+    requestAnimationFrame(() => {
+      void invoke("app_frontend_ready").catch((error) => {
+        console.warn("Failed to reveal the frontend-ready window", error);
+      });
+    });
+  }
+}

@@ -69,6 +69,9 @@ export type WorkspaceCodeEditorOpenRequest = {
   projectPathKey: string;
   workdir: string;
   path: string;
+  line?: number;
+  endLine?: number;
+  column?: number;
 };
 
 type ReadEditableTextResponse = {
@@ -303,6 +306,7 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
   const editorModelKeyRef = useRef("");
   const activeKeyRef = useRef("");
   const openRequestIdRef = useRef<number | null>(null);
+  const revealedLocationRequestIdRef = useRef<number | null>(null);
   const closeRequestIdRef = useRef<number | null>(null);
   const openAnimationFrameRef = useRef<number | null>(null);
   const closeAnimationTimeoutRef = useRef<number | null>(null);
@@ -799,6 +803,35 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
     }
     editorModelKeyRef.current = activeTab.key;
   }, [activeTab]);
+
+  useEffect(() => {
+    if (
+      !openRequest?.line ||
+      revealedLocationRequestIdRef.current === openRequest.id ||
+      !activeTab ||
+      activeTab.key !== editorTabKey(openRequest.projectPathKey, openRequest.path)
+    ) {
+      return;
+    }
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    if (!editor || !model) return;
+    const startLineNumber = Math.min(Math.max(1, openRequest.line), model.getLineCount());
+    const endLineNumber = Math.min(
+      Math.max(startLineNumber, openRequest.endLine ?? startLineNumber),
+      model.getLineCount(),
+    );
+    const startColumn = Math.min(
+      Math.max(1, openRequest.column ?? 1),
+      model.getLineMaxColumn(startLineNumber),
+    );
+    const endColumn = model.getLineMaxColumn(endLineNumber);
+    const range = new monaco.Range(startLineNumber, startColumn, endLineNumber, endColumn);
+    editor.setSelection(range);
+    editor.revealRangeInCenter(range, monaco.editor.ScrollType.Smooth);
+    editor.focus();
+    revealedLocationRequestIdRef.current = openRequest.id;
+  }, [activeTab, openRequest]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

@@ -7,6 +7,13 @@ import { useLocale } from "../../../../i18n";
 import type { ToolTraceItem } from "../../../../lib/chat/messages/uiMessages";
 import { prepareImageProxyUrl } from "../../../../lib/providers/proxy";
 import { cn } from "../../../../lib/shared/utils";
+import {
+  copyImagePreviewData,
+  copyImagePreviewSource,
+  imagePreviewFileName,
+  saveImagePreviewData,
+  saveImagePreviewSource,
+} from "../../../../lib/system/imagePreview";
 import type {
   DisplayImageItemDetails,
   DisplayImageResultDetails,
@@ -280,14 +287,24 @@ export function ToolResultImagePreview(props: {
   const estimatedBytes = sizeBytes ?? estimateBase64Bytes(image.data);
   const imageDetail = `${alt} · ${formatToolResultBytes(estimatedBytes)}`;
   const slides = useMemo<ImagePreviewSlide[]>(
-    () => [
-      {
-        src,
-        alt,
-        title: alt,
-      },
-    ],
-    [alt, src],
+    () => {
+      const fileName = imagePreviewFileName(alt, image.mimeType, "generated-image");
+      const previewData = {
+        dataBase64: image.data,
+        fileName,
+        mimeType: image.mimeType,
+      };
+      return [
+        {
+          src,
+          alt,
+          title: alt,
+          onCopy: () => copyImagePreviewData(previewData),
+          onSave: () => saveImagePreviewData(previewData),
+        },
+      ];
+    },
+    [alt, image.data, image.mimeType, src],
   );
 
   useEffect(() => {
@@ -484,11 +501,17 @@ export function NativeDisplayImageBlock(props: {
   const imageSources = useNativeDisplayImageSources(payload.entries);
   const slides = useMemo<ImagePreviewSlide[]>(
     () =>
-      payload.entries.map((_entry, index) => ({
-        src: imageSources[index]?.src ?? "",
-        alt: formatDisplayImageLabel(t, payload.entries.length, index),
-        title: formatDisplayImageLabel(t, payload.entries.length, index),
-      })),
+      payload.entries.map((_entry, index) => {
+        const src = imageSources[index]?.src ?? "";
+        const title = formatDisplayImageLabel(t, payload.entries.length, index);
+        return {
+          src,
+          alt: title,
+          title,
+          onCopy: src ? () => copyImagePreviewSource(src) : undefined,
+          onSave: src ? () => saveImagePreviewSource(src, title) : undefined,
+        };
+      }),
     [imageSources, payload.entries, t],
   );
 
