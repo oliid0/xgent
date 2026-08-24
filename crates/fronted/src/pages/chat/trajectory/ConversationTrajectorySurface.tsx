@@ -108,7 +108,9 @@ function eventDetails(event: TrajectoryEvent): string[] {
     const before = numberField(event, "before");
     const after = numberField(event, "after");
     details.push(
-      before === undefined && after === undefined ? undefined : `${before ?? "?"} \u2192 ${after ?? "?"}`,
+      before === undefined && after === undefined
+        ? undefined
+        : `${before ?? "?"} \u2192 ${after ?? "?"}`,
       textField(event, "err"),
     );
   }
@@ -241,7 +243,9 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 px-3 py-2.5 sm:px-5">
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold text-foreground">{t("chat.trajectory.title")}</h2>
+          <h2 className="truncate text-sm font-semibold text-foreground">
+            {t("chat.trajectory.title")}
+          </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {t("chat.trajectory.summary")
               .replace("{events}", String(events.length))

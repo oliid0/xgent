@@ -1360,7 +1360,8 @@ export function truncateConversationFromMessage(
 ): ConversationViewState {
   const targetArrayIndex = state.segments.findIndex(
     (segment) =>
-      segment.segmentId === messageRef.segmentId && segment.segmentIndex === messageRef.segmentIndex,
+      segment.segmentId === messageRef.segmentId &&
+      segment.segmentIndex === messageRef.segmentIndex,
   );
   const targetSegment = state.segments[targetArrayIndex];
   const targetMessage = targetSegment?.messages[messageRef.messageIndex];

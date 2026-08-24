@@ -288,7 +288,6 @@ import { MobileSshPanel } from "./chat/mobile/MobileSshPanel";
 import { type MobileShellPanelMode, MobileTerminalPanel } from "./chat/mobile/MobileTerminalPanel";
 import { MobileToolActivity } from "./chat/mobile/MobileToolActivity";
 import { MobileWorkspaceCreateDialog } from "./chat/mobile/MobileWorkspaceCreateDialog";
-import { ConversationTrajectorySurface } from "./chat/trajectory/ConversationTrajectorySurface";
 import {
   appendQueuedChatTurn,
   buildQueuedChatTurnPreview,
@@ -310,6 +309,7 @@ import { syncMovedConversationRuntimeWorkdir } from "./chat/runtime/chatPageRunt
 import { buildModelFailoverPlan } from "./chat/runtime/providerRuntimeConfig";
 import { useManualCompaction } from "./chat/runtime/useManualCompaction";
 import { ChatSidebarContainer } from "./chat/sidebar/ChatSidebarContainer";
+import { ConversationTrajectorySurface } from "./chat/trajectory/ConversationTrajectorySurface";
 import { McpHubPage } from "./mcp-hub/McpHubPage";
 import type { SectionId, SettingsOpenOptions } from "./settings/types";
 import { SkillsHubPage } from "./skills-hub/SkillsHubPage";
@@ -5624,68 +5624,68 @@ export function ChatPage(props: ChatPageProps) {
                 <ConversationTrajectorySurface conversationId={currentConversationId} />
               ) : (
                 <DesktopCheckpointRewindProvider
-                conversationId={currentConversationId}
-                workspaceRoot={currentConversationWorkspaceRoot}
-                project={
-                  workspaceProjects.find(
-                    (project) =>
-                      currentConversationWorkspaceRoot &&
-                      workspaceProjectPathKey(project.path) ===
-                        workspaceProjectPathKey(currentConversationWorkspaceRoot),
-                  ) ?? null
-                }
-                disabled={
-                  !desktopCommandHostAvailable ||
-                  !isAgentMode ||
-                  isSending ||
-                  isConversationRunning(currentConversationId)
-                }
-                onRewound={(info) => {
-                  const changed = info.result.restoredFiles + info.result.deletedFiles;
-                  const failed = info.result.conflicts.length + info.result.failed.length;
-                  addNotify(
-                    failed > 0 ? "warning" : "success",
-                    t("chat.checkpointRewind.done")
-                      .replace("{changed}", String(changed))
-                      .replace("{failed}", String(failed)),
-                  );
-                }}
-              >
-                <ChangedFilesActionsProvider value={changedFilesActions}>
-                  <ChatTranscript
-                    conversationId={currentConversationId}
-                    workspaceRoot={currentConversationWorkspaceRoot}
-                    gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
-                    followRef={scrollFollowRef}
-                    hasModels={hasModels}
-                    historyItems={historyRenderItems}
-                    hasMoreHistory={conversationState.transcript.hasMoreBefore}
-                    onLoadEarlierHistory={handleLoadEarlierHistory}
-                    isHistorySwitching={conversationOpenState.showOverlay}
-                    isSending={isSending}
-                    isAgentMode={isAgentMode}
-                    showUsage={isAgentDevExecutionMode}
-                    usageContextWindow={currentModelContextWindow}
-                    liveTranscriptStore={liveTranscriptStore}
-                    isCompactionRunning={isCompactionRunning}
-                    bottomReservePx={composerOverlayHeight}
-                    onOpenFileLink={
-                      desktopCommandHostAvailable ? handleOpenChatFileLink : undefined
-                    }
-                    onResendFromEdit={handleResendFromEdit}
-                    onBranchConversation={
-                      // 水合中/水合失败时 handler 只会静默 return——直接不传，
-                      // 让 AssistantRow 的 disabled 分支给出可见的禁用态。
-                      isConversationHydrating || isConversationHydrationFailed
-                        ? undefined
-                        : handleBranchConversation
-                    }
-                    branchPendingMessageId={branchPendingMessageId}
-                    onOpenSettings={onOpenSettings}
-                    onSuggestionSelect={handleEmptyStateSuggestion}
-                    suggestionsDisabled={isSuggestionTyping}
-                  />
-                </ChangedFilesActionsProvider>
+                  conversationId={currentConversationId}
+                  workspaceRoot={currentConversationWorkspaceRoot}
+                  project={
+                    workspaceProjects.find(
+                      (project) =>
+                        currentConversationWorkspaceRoot &&
+                        workspaceProjectPathKey(project.path) ===
+                          workspaceProjectPathKey(currentConversationWorkspaceRoot),
+                    ) ?? null
+                  }
+                  disabled={
+                    !desktopCommandHostAvailable ||
+                    !isAgentMode ||
+                    isSending ||
+                    isConversationRunning(currentConversationId)
+                  }
+                  onRewound={(info) => {
+                    const changed = info.result.restoredFiles + info.result.deletedFiles;
+                    const failed = info.result.conflicts.length + info.result.failed.length;
+                    addNotify(
+                      failed > 0 ? "warning" : "success",
+                      t("chat.checkpointRewind.done")
+                        .replace("{changed}", String(changed))
+                        .replace("{failed}", String(failed)),
+                    );
+                  }}
+                >
+                  <ChangedFilesActionsProvider value={changedFilesActions}>
+                    <ChatTranscript
+                      conversationId={currentConversationId}
+                      workspaceRoot={currentConversationWorkspaceRoot}
+                      gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
+                      followRef={scrollFollowRef}
+                      hasModels={hasModels}
+                      historyItems={historyRenderItems}
+                      hasMoreHistory={conversationState.transcript.hasMoreBefore}
+                      onLoadEarlierHistory={handleLoadEarlierHistory}
+                      isHistorySwitching={conversationOpenState.showOverlay}
+                      isSending={isSending}
+                      isAgentMode={isAgentMode}
+                      showUsage={isAgentDevExecutionMode}
+                      usageContextWindow={currentModelContextWindow}
+                      liveTranscriptStore={liveTranscriptStore}
+                      isCompactionRunning={isCompactionRunning}
+                      bottomReservePx={composerOverlayHeight}
+                      onOpenFileLink={
+                        desktopCommandHostAvailable ? handleOpenChatFileLink : undefined
+                      }
+                      onResendFromEdit={handleResendFromEdit}
+                      onBranchConversation={
+                        // 水合中/水合失败时 handler 只会静默 return——直接不传，
+                        // 让 AssistantRow 的 disabled 分支给出可见的禁用态。
+                        isConversationHydrating || isConversationHydrationFailed
+                          ? undefined
+                          : handleBranchConversation
+                      }
+                      branchPendingMessageId={branchPendingMessageId}
+                      onOpenSettings={onOpenSettings}
+                      onSuggestionSelect={handleEmptyStateSuggestion}
+                      suggestionsDisabled={isSuggestionTyping}
+                    />
+                  </ChangedFilesActionsProvider>
                 </DesktopCheckpointRewindProvider>
               )}
 
@@ -5735,43 +5735,43 @@ export function ChatPage(props: ChatPageProps) {
 
               {chatSurface === "conversation" ? (
                 <ChatComposerBar
-                conversationId={currentConversationId}
-                composerRef={composerRef}
-                isSending={isSending}
-                isUploadingFiles={isUploadingFiles}
-                isInputDisabled={isComposerInputDisabled}
-                inputPlaceholder={composerPlaceholder}
-                workdir={displayedConversationWorkdir}
-                enabledSkills={enabledComposerSkills}
-                isAgentMode={isAgentMode}
-                chatRuntimeControls={chatRuntimeControlsForCurrentProvider}
-                reasoningOptions={chatRuntimeReasoningOptions}
-                thinkingAlwaysOn={chatRuntimeThinkingAlwaysOn}
-                contextUsageTokensSource={contextUsageTokensSource}
-                contextWindow={currentModelContextWindow}
-                sttSettings={desktopCommandHostAvailable ? settings.stt : undefined}
-                onManualCompact={handleManualCompaction}
-                manualCompactionDisabled={isSending || compactionStatus.phase === "running"}
-                gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
-                workspaceActivityClient={
-                  desktopCommandHostAvailable ? tauriWorkspaceActivityClient : null
-                }
-                onSend={handleSend}
-                onStop={handleStopSending}
-                onComposerBusyChange={handleComposerBusyChange}
-                onChatRuntimeControlsChange={handleChatRuntimeControlsChange}
-                onPickReadableFiles={pickReadableFiles}
-                onPasteFiles={importReadableFiles}
-                loadHistoryPrompts={loadComposerHistoryPrompts}
-                pendingUploadedFiles={pendingUploadedFiles}
-                onRemovePendingUpload={removePendingUpload}
-                queuedTurns={queuedChatTurnsForCurrentConversation}
-                onRunQueuedTurnNow={runQueuedTurnNow}
-                onMoveQueuedTurnUp={moveQueuedTurnUp}
-                onEditQueuedTurn={editQueuedTurn}
-                onRemoveQueuedTurn={removeQueuedTurn}
-                onHeightChange={setComposerOverlayHeight}
-                mobileExperience={mobileExperience}
+                  conversationId={currentConversationId}
+                  composerRef={composerRef}
+                  isSending={isSending}
+                  isUploadingFiles={isUploadingFiles}
+                  isInputDisabled={isComposerInputDisabled}
+                  inputPlaceholder={composerPlaceholder}
+                  workdir={displayedConversationWorkdir}
+                  enabledSkills={enabledComposerSkills}
+                  isAgentMode={isAgentMode}
+                  chatRuntimeControls={chatRuntimeControlsForCurrentProvider}
+                  reasoningOptions={chatRuntimeReasoningOptions}
+                  thinkingAlwaysOn={chatRuntimeThinkingAlwaysOn}
+                  contextUsageTokensSource={contextUsageTokensSource}
+                  contextWindow={currentModelContextWindow}
+                  sttSettings={desktopCommandHostAvailable ? settings.stt : undefined}
+                  onManualCompact={handleManualCompaction}
+                  manualCompactionDisabled={isSending || compactionStatus.phase === "running"}
+                  gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
+                  workspaceActivityClient={
+                    desktopCommandHostAvailable ? tauriWorkspaceActivityClient : null
+                  }
+                  onSend={handleSend}
+                  onStop={handleStopSending}
+                  onComposerBusyChange={handleComposerBusyChange}
+                  onChatRuntimeControlsChange={handleChatRuntimeControlsChange}
+                  onPickReadableFiles={pickReadableFiles}
+                  onPasteFiles={importReadableFiles}
+                  loadHistoryPrompts={loadComposerHistoryPrompts}
+                  pendingUploadedFiles={pendingUploadedFiles}
+                  onRemovePendingUpload={removePendingUpload}
+                  queuedTurns={queuedChatTurnsForCurrentConversation}
+                  onRunQueuedTurnNow={runQueuedTurnNow}
+                  onMoveQueuedTurnUp={moveQueuedTurnUp}
+                  onEditQueuedTurn={editQueuedTurn}
+                  onRemoveQueuedTurn={removeQueuedTurn}
+                  onHeightChange={setComposerOverlayHeight}
+                  mobileExperience={mobileExperience}
                 />
               ) : null}
               {chatSurface === "conversation" && isFileDropActive ? (

@@ -14,13 +14,16 @@ export const translations: Record<Locale, Record<string, string>> = {
     "chat.trajectory.open": "\u6253\u5f00\u53ef\u89c6\u5316\u8f68\u8ff9",
     "chat.trajectory.backToChat": "\u8fd4\u56de\u4f1a\u8bdd",
     "chat.trajectory.title": "\u4f1a\u8bdd\u8fd0\u884c\u8f68\u8ff9",
-    "chat.trajectory.summary": "{events} \u4e2a\u4e8b\u4ef6 \u00b7 {segments} \u4e2a\u4f1a\u8bdd\u5206\u6bb5",
+    "chat.trajectory.summary":
+      "{events} \u4e2a\u4e8b\u4ef6 \u00b7 {segments} \u4e2a\u4f1a\u8bdd\u5206\u6bb5",
     "chat.trajectory.refresh": "\u5237\u65b0\u8f68\u8ff9",
     "chat.trajectory.loading": "\u6b63\u5728\u8bfb\u53d6\u8f68\u8ff9\u2026",
     "chat.trajectory.loadFailed": "\u8f68\u8ff9\u8bfb\u53d6\u5931\u8d25",
     "chat.trajectory.empty": "\u8fd8\u6ca1\u6709\u8f68\u8ff9\u8bb0\u5f55",
-    "chat.trajectory.emptyHint": "\u53d1\u9001\u4e00\u6761\u6d88\u606f\u540e\uff0c\u6a21\u578b\u8bf7\u6c42\u3001\u5de5\u5177\u6267\u884c\u3001\u91cd\u8bd5\u548c\u4e0a\u4e0b\u6587\u538b\u7f29\u4f1a\u5728\u8fd9\u91cc\u5b9e\u65f6\u663e\u793a\u3002",
-    "chat.trajectory.truncated": "\u8be5\u4f1a\u8bdd\u7684\u90e8\u5206\u8f68\u8ff9\u8d85\u51fa\u5b58\u50a8\u4e0a\u9650\uff0c\u5f53\u524d\u663e\u793a\u7684\u8bb0\u5f55\u53ef\u80fd\u4e0d\u5b8c\u6574\u3002",
+    "chat.trajectory.emptyHint":
+      "\u53d1\u9001\u4e00\u6761\u6d88\u606f\u540e\uff0c\u6a21\u578b\u8bf7\u6c42\u3001\u5de5\u5177\u6267\u884c\u3001\u91cd\u8bd5\u548c\u4e0a\u4e0b\u6587\u538b\u7f29\u4f1a\u5728\u8fd9\u91cc\u5b9e\u65f6\u663e\u793a\u3002",
+    "chat.trajectory.truncated":
+      "\u8be5\u4f1a\u8bdd\u7684\u90e8\u5206\u8f68\u8ff9\u8d85\u51fa\u5b58\u50a8\u4e0a\u9650\uff0c\u5f53\u524d\u663e\u793a\u7684\u8bb0\u5f55\u53ef\u80fd\u4e0d\u5b8c\u6574\u3002",
     "chat.trajectory.turn": "\u7b2c {turn} \u8f6e",
     "chat.trajectory.standalone": "\u4f1a\u8bdd\u7ef4\u62a4",
     "chat.trajectory.details": "\u539f\u59cb\u8be6\u60c5",
@@ -2508,8 +2511,10 @@ export const translations: Record<Locale, Record<string, string>> = {
     "chat.trajectory.loading": "Loading trajectory\u2026",
     "chat.trajectory.loadFailed": "Could not load trajectory",
     "chat.trajectory.empty": "No trajectory events yet",
-    "chat.trajectory.emptyHint": "Send a message to see model requests, tool execution, retries, and context compaction here in real time.",
-    "chat.trajectory.truncated": "Some trajectory data exceeded the storage limit, so this timeline may be incomplete.",
+    "chat.trajectory.emptyHint":
+      "Send a message to see model requests, tool execution, retries, and context compaction here in real time.",
+    "chat.trajectory.truncated":
+      "Some trajectory data exceeded the storage limit, so this timeline may be incomplete.",
     "chat.trajectory.turn": "Turn {turn}",
     "chat.trajectory.standalone": "Conversation maintenance",
     "chat.trajectory.details": "Raw details",
