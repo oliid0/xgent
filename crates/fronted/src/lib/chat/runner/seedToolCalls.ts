@@ -1,6 +1,10 @@
 import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { createUuid } from "@xagent/ui/lib/shared/id";
-import { isOnlyDsmlOrphanCloseTags } from "./deepSeekDsml";
+import {
+  hasDsmlToolCallMarkup,
+  isOnlyDsmlOrphanCloseTags,
+  recoverDsmlToolCallsFromText,
+} from "./deepSeekDsml";
 import { hasFlattenedToolRequestText, recoverFlattenedToolRequests } from "./flattenedToolCallText";
 
 const SEED_TOOL_CALL_DISPLAY_PATTERN = /<seed:tool_call>[\s\S]*?(?:<\/seed:tool_call>|$)/gi;
@@ -152,6 +156,17 @@ function recoverToolCallsFromBlockText(
       }
       return "";
     });
+  }
+
+  // A few OpenAI-compatible DeepSeek endpoints flatten the DSML protocol
+  // block into ordinary assistant text. The markup itself is an unambiguous
+  // protocol signature, so recover it even when the endpoint reports a
+  // generic provider/model name. Otherwise the call is rendered to the user
+  // but never reaches the executor or the provider-side web-search bridge.
+  if (hasDsmlToolCallMarkup(cleanedText)) {
+    const dsml = recoverDsmlToolCallsFromText(cleanedText);
+    cleanedText = dsml.cleanedText;
+    toolCalls.push(...dsml.toolCalls);
   }
 
   if (options?.recoverFlattenedText && hasFlattenedToolRequestText(cleanedText)) {

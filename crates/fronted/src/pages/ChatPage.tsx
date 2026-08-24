@@ -25,7 +25,7 @@ import type {
 } from "../components/chat/MentionComposer";
 import { type NotifyItem, NotifyToast } from "../components/chat/NotifyToast";
 import { ToolApprovalBar } from "../components/chat/ToolApprovalBar";
-import { Ban, Globe, Terminal, Upload } from "../components/icons";
+import { Activity, Ban, Globe, MessageSquare, Terminal, Upload } from "../components/icons";
 import { MacOsTitleBarSpacer, MacOsTitleBarToggle } from "../components/MacOsTitleBarSpacer";
 import type {
   GitCommitContextPayload,
@@ -288,6 +288,7 @@ import { MobileSshPanel } from "./chat/mobile/MobileSshPanel";
 import { type MobileShellPanelMode, MobileTerminalPanel } from "./chat/mobile/MobileTerminalPanel";
 import { MobileToolActivity } from "./chat/mobile/MobileToolActivity";
 import { MobileWorkspaceCreateDialog } from "./chat/mobile/MobileWorkspaceCreateDialog";
+import { ConversationTrajectorySurface } from "./chat/trajectory/ConversationTrajectorySurface";
 import {
   appendQueuedChatTurn,
   buildQueuedChatTurnPreview,
@@ -813,6 +814,7 @@ export function ChatPage(props: ChatPageProps) {
     previousCompactViewportRef.current = compactViewport;
   }, [compactViewport]);
   const [activeView, setActiveView] = useState<"chat" | "skills-hub" | "mcp-hub">("chat");
+  const [chatSurface, setChatSurface] = useState<"conversation" | "trajectory">("conversation");
   const [desktopNavigationTarget, setDesktopNavigationTarget] =
     useState<WorkspaceNavigationTarget>("conversations");
   const [workspaceToolsOpen, setWorkspaceToolsOpen] = useState(false);
@@ -5520,24 +5522,88 @@ export function ChatPage(props: ChatPageProps) {
                   onToggleTheme={onToggleTheme}
                   onOpenSidebar={handleOpenSidebar}
                   mobileExperience={mobileExperience}
+                  preThemeActions={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        setChatSurface((surface) =>
+                          surface === "trajectory" ? "conversation" : "trajectory",
+                        )
+                      }
+                      title={
+                        chatSurface === "trajectory"
+                          ? t("chat.trajectory.backToChat")
+                          : t("chat.trajectory.open")
+                      }
+                      aria-label={
+                        chatSurface === "trajectory"
+                          ? t("chat.trajectory.backToChat")
+                          : t("chat.trajectory.open")
+                      }
+                      aria-pressed={chatSurface === "trajectory"}
+                      className={cn(
+                        "h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground",
+                        chatSurface === "trajectory" && "bg-accent text-foreground",
+                      )}
+                    >
+                      {chatSurface === "trajectory" ? (
+                        <MessageSquare className="h-4 w-4" />
+                      ) : (
+                        <Activity className="h-4 w-4" />
+                      )}
+                    </Button>
+                  }
                   trailingActions={
                     mobileExperience ? (
-                      <MobileQuickActions
-                        onOpenTerminal={() => handleOpenWorkspaceTool("terminal")}
-                        onOpenRootfs={() => {
-                          setSidebarOpen(false);
-                          setMobileWorkspaceDestination(null);
-                          onOpenSettings(nativeMobile ? "mobileExecution" : "system");
-                        }}
-                        onOpenBrowser={handleOpenBrowser}
-                        onOpenBrowserSettings={() => {
-                          setSidebarOpen(false);
-                          setMobileWorkspaceDestination({ kind: "browser-settings" });
-                        }}
-                        onOpenGitReview={() => handleOpenWorkspaceTool("gitReview")}
-                        onOpenSsh={() => handleOpenWorkspaceTool("sshConnection")}
-                        onOpenBackgroundTasks={() => handleOpenWorkspaceTool("backgroundTasks")}
-                      />
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            setChatSurface((surface) =>
+                              surface === "trajectory" ? "conversation" : "trajectory",
+                            )
+                          }
+                          title={
+                            chatSurface === "trajectory"
+                              ? t("chat.trajectory.backToChat")
+                              : t("chat.trajectory.open")
+                          }
+                          aria-label={
+                            chatSurface === "trajectory"
+                              ? t("chat.trajectory.backToChat")
+                              : t("chat.trajectory.open")
+                          }
+                          aria-pressed={chatSurface === "trajectory"}
+                          className={cn(
+                            "h-10 w-10 rounded-xl text-muted-foreground hover:text-foreground",
+                            chatSurface === "trajectory" && "bg-accent text-foreground",
+                          )}
+                        >
+                          {chatSurface === "trajectory" ? (
+                            <MessageSquare className="h-4 w-4" />
+                          ) : (
+                            <Activity className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <MobileQuickActions
+                          onOpenTerminal={() => handleOpenWorkspaceTool("terminal")}
+                          onOpenRootfs={() => {
+                            setSidebarOpen(false);
+                            setMobileWorkspaceDestination(null);
+                            onOpenSettings(nativeMobile ? "mobileExecution" : "system");
+                          }}
+                          onOpenBrowser={handleOpenBrowser}
+                          onOpenBrowserSettings={() => {
+                            setSidebarOpen(false);
+                            setMobileWorkspaceDestination({ kind: "browser-settings" });
+                          }}
+                          onOpenGitReview={() => handleOpenWorkspaceTool("gitReview")}
+                          onOpenSsh={() => handleOpenWorkspaceTool("sshConnection")}
+                          onOpenBackgroundTasks={() => handleOpenWorkspaceTool("backgroundTasks")}
+                        />
+                      </>
                     ) : (
                       <Button
                         variant="ghost"
@@ -5554,7 +5620,10 @@ export function ChatPage(props: ChatPageProps) {
                 <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
               </div>
 
-              <DesktopCheckpointRewindProvider
+              {chatSurface === "trajectory" ? (
+                <ConversationTrajectorySurface conversationId={currentConversationId} />
+              ) : (
+                <DesktopCheckpointRewindProvider
                 conversationId={currentConversationId}
                 workspaceRoot={currentConversationWorkspaceRoot}
                 project={
@@ -5617,9 +5686,10 @@ export function ChatPage(props: ChatPageProps) {
                     suggestionsDisabled={isSuggestionTyping}
                   />
                 </ChangedFilesActionsProvider>
-              </DesktopCheckpointRewindProvider>
+                </DesktopCheckpointRewindProvider>
+              )}
 
-              {mobileExperience ? (
+              {mobileExperience && chatSurface === "conversation" ? (
                 <MobileToolActivity
                   store={liveTranscriptStore}
                   open={mobileActivityOpen}
@@ -5631,17 +5701,19 @@ export function ChatPage(props: ChatPageProps) {
                 />
               ) : null}
 
-              <CurrentTaskProgress
-                historyItems={historyRenderItems}
-                liveTranscriptStore={liveTranscriptStore}
-                isConversationRunning={
-                  isSending ||
-                  (currentConversationId ? isConversationRunning(currentConversationId) : false)
-                }
-                persistedState={conversationState.meta.taskList}
-              />
+              {chatSurface === "conversation" ? (
+                <CurrentTaskProgress
+                  historyItems={historyRenderItems}
+                  liveTranscriptStore={liveTranscriptStore}
+                  isConversationRunning={
+                    isSending ||
+                    (currentConversationId ? isConversationRunning(currentConversationId) : false)
+                  }
+                  persistedState={conversationState.meta.taskList}
+                />
+              ) : null}
 
-              {pendingToolApprovals.length > 0 ? (
+              {chatSurface === "conversation" && pendingToolApprovals.length > 0 ? (
                 <ToolApprovalBar
                   pending={pendingToolApprovals}
                   onDecide={(toolCallId, decision) =>
@@ -5661,7 +5733,8 @@ export function ChatPage(props: ChatPageProps) {
                 />
               ) : null}
 
-              <ChatComposerBar
+              {chatSurface === "conversation" ? (
+                <ChatComposerBar
                 conversationId={currentConversationId}
                 composerRef={composerRef}
                 isSending={isSending}
@@ -5699,8 +5772,9 @@ export function ChatPage(props: ChatPageProps) {
                 onRemoveQueuedTurn={removeQueuedTurn}
                 onHeightChange={setComposerOverlayHeight}
                 mobileExperience={mobileExperience}
-              />
-              {isFileDropActive ? (
+                />
+              ) : null}
+              {chatSurface === "conversation" && isFileDropActive ? (
                 <div
                   className="file-drop-overlay pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-4 sm:p-6 bg-white/30 backdrop-blur-md dark:bg-black/30"
                   aria-hidden="true"

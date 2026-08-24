@@ -210,6 +210,7 @@ test("agent turn preserves suppressed parent Agent trace for cancellation persis
     compaction: {
       async maybeCompactPreSend() {},
       beginRequest: noOp,
+      observeContextMessages: noOp,
       shouldProtectMidStream: () => false,
       async compactDuringRun() {
         return { context: null, shouldDisableProtection: false };

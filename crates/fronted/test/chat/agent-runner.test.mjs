@@ -916,7 +916,11 @@ test("runAssistantWithTools applies turn context overrides without duplicating c
   const result = await runAssistantWithTools(params);
 
   assert.equal(observedStreamContexts.length, 2);
-  assert.equal(observedStreamContexts[1].systemPrompt, "Compacted system prompt");
+  assert.match(observedStreamContexts[1].systemPrompt, /^Compacted system prompt(?:\n|$)/);
+  assert.equal(
+    observedStreamContexts[1].systemPrompt.match(/# Tool-Execution Mode/g)?.length,
+    1,
+  );
   assert.deepEqual(
     observedStreamContexts[1].messages.map((message) => message.content),
     ["Resume from checkpoint"],

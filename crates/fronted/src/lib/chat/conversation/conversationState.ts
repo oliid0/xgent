@@ -779,6 +779,46 @@ export function prependTranscriptProjection(
   };
 }
 
+/**
+ * Reconcile a fast, active-segment-only history paint with a later complete
+ * state. When the active segment is byte-for-byte unchanged, retain the warm
+ * render item objects so virtualized rows keep their measurements and local
+ * UI state. Any shape or content change falls back to the authoritative
+ * hydrated state.
+ */
+export function mergeHydratedConversationState(
+  warm: ConversationViewState | null,
+  hydrated: ConversationViewState,
+): ConversationViewState {
+  if (!warm || warm.segments.length !== hydrated.segments.length) return hydrated;
+
+  const warmActive = getActiveSegment(warm);
+  const hydratedActive = getActiveSegment(hydrated);
+  if (
+    !warmActive ||
+    !hydratedActive ||
+    warmActive.segmentId !== hydratedActive.segmentId ||
+    warmActive.segmentIndex !== hydratedActive.segmentIndex ||
+    JSON.stringify(warmActive) !== JSON.stringify(hydratedActive)
+  ) {
+    return hydrated;
+  }
+
+  const warmItems = new Map(warm.transcript.items.map((item) => [item.key, item] as const));
+  const items = hydrated.transcript.items.map((item) => {
+    const candidate = warmItems.get(item.key);
+    return candidate && JSON.stringify(candidate) === JSON.stringify(item) ? candidate : item;
+  });
+
+  return {
+    ...hydrated,
+    transcript: {
+      ...hydrated.transcript,
+      items,
+    },
+  };
+}
+
 function markTimelineItemCompacted(item: RenderTimelineItem): RenderTimelineItem {
   if (item.kind === "summary" || item.isFromCompactedSegment) {
     return item;
@@ -1306,6 +1346,55 @@ export function replaceActiveSegmentMessages(
       revision: null,
     },
   };
+}
+
+/**
+ * Produce the local state that precedes an edit/resend target. The durable
+ * branch operation remains authoritative, but keeping this pure operation
+ * available lets optimistic and offline callers rebuild the exact request and
+ * transcript state without carrying later compacted segments along.
+ */
+export function truncateConversationFromMessage(
+  state: ConversationViewState,
+  messageRef: HistoryMessageRef,
+): ConversationViewState {
+  const targetArrayIndex = state.segments.findIndex(
+    (segment) =>
+      segment.segmentId === messageRef.segmentId && segment.segmentIndex === messageRef.segmentIndex,
+  );
+  const targetSegment = state.segments[targetArrayIndex];
+  const targetMessage = targetSegment?.messages[messageRef.messageIndex];
+  if (
+    targetArrayIndex < 0 ||
+    !targetSegment ||
+    !targetMessage ||
+    readMessageStringId(targetMessage) !== messageRef.messageId ||
+    targetMessage.role !== messageRef.role ||
+    getHistoryMessageContentHash(targetMessage) !== messageRef.contentHash
+  ) {
+    return state;
+  }
+
+  const segments = state.segments.slice(0, targetArrayIndex + 1).map((segment, index) =>
+    index === targetArrayIndex
+      ? {
+          ...segment,
+          messages: segment.messages.slice(0, messageRef.messageIndex),
+        }
+      : segment,
+  );
+  const totalMessageCount = segments.reduce((sum, segment) => sum + segment.messages.length, 0);
+
+  return normalizeConversationState({
+    meta: {
+      systemPrompt: state.meta.systemPrompt,
+      tools: state.meta.tools,
+      taskList: state.meta.taskList,
+      totalSegmentCount: targetSegment.segmentIndex + 1,
+      totalMessageCount,
+    },
+    segments,
+  });
 }
 
 export function setTaskListState(

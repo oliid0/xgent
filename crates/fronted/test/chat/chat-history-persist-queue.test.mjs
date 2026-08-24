@@ -34,11 +34,20 @@ function loadChatHistory(invoke) {
 }
 
 function segment(index, overrides = {}) {
+  const messageCount = Number.isInteger(overrides.messageCount) ? overrides.messageCount : 0;
+  const messages =
+    overrides.messages ??
+    Array.from({ length: messageCount }, (_, messageIndex) => ({
+      role: "user",
+      id: `seg-${index}-message-${messageIndex}`,
+      content: `message-${messageIndex}`,
+      timestamp: 100 + index + messageIndex,
+    }));
   return {
     segmentIndex: index,
     segmentId: `seg-${index}`,
-    messages: [],
-    messageCount: 0,
+    messages,
+    messageCount,
     createdAt: 100 + index,
     updatedAt: 100 + index,
     ...overrides,
