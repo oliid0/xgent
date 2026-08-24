@@ -67,9 +67,7 @@ export const ANTHROPIC_WEB_SEARCH_TOOL_TYPES = {
  * that contract; guessing from a model name makes custom endpoints fail with a
  * hard 400.
  */
-export function supportsAnthropicDynamicFilteringWebSearch(model: {
-  compat?: unknown;
-}): boolean {
+export function supportsAnthropicDynamicFilteringWebSearch(model: { compat?: unknown }): boolean {
   const compat = model.compat;
   return Boolean(
     compat &&

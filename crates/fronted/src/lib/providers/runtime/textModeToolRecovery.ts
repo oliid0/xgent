@@ -1,9 +1,4 @@
-import type {
-  AssistantMessage,
-  Context,
-  ToolCall,
-  ToolResultMessage,
-} from "@earendil-works/pi-ai";
+import type { AssistantMessage, Context, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { HostedSearchBlock } from "@xagent/ui/lib/chat/hostedSearch";
 import {
   buildProviderNativeWebFetchBridgeResult,

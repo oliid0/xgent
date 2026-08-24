@@ -12,13 +12,13 @@ import {
   type OpenAIResponsesOptions,
   stream as streamOpenAIResponses,
 } from "@earendil-works/pi-ai/api/openai-responses";
+import { wrapDeepSeekDsmlToolCallStream } from "../deepSeekDsmlToolCallStream";
 import { DEEPSEEK_RESPONSES_API, streamDeepSeekResponses } from "../deepSeekNative";
 import {
   attachDeepSeekProviderPayloadAdapter,
   isDeepSeekAnthropicTarget,
   normalizeDeepSeekAnthropicContext,
 } from "../deepSeekProviderAdapter";
-import { wrapDeepSeekDsmlToolCallStream } from "../deepSeekDsmlToolCallStream";
 import { resolveMaxTokens } from "./common";
 import {
   recoverOpenAICompletionsMissingFinishReason,
@@ -153,9 +153,7 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
           const compatible = effectiveOptions.recoverMissingFinishReason
             ? recoverOpenAICompletionsMissingFinishReason(source)
             : source;
-          return rejectEmptyOpenAICompletionsResponse(
-            compatible,
-          );
+          return rejectEmptyOpenAICompletionsResponse(compatible);
         },
         { signal: effectiveOptions.signal, ...effectiveOptions.streamRetry },
       );

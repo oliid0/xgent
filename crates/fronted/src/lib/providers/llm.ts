@@ -1,5 +1,5 @@
-export { providerSupportsNativeWebSearch } from "./nativeWebSearch";
 export { mergeCustomHeaders } from "./customHeaders";
+export { providerSupportsNativeWebSearch } from "./nativeWebSearch";
 export {
   attachAnthropicAutomaticCaching,
   describeAnthropicCacheShape,
