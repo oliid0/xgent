@@ -29,9 +29,7 @@ const sessionAllowByConversation = new Map<string, Set<string>>();
 const listeners = new Set<() => void>();
 const listenersByConversation = new Map<string, Set<() => void>>();
 const pendingSnapshotsByConversation = new Map<string, PendingToolApprovalSummary[]>();
-const EMPTY_PENDING_APPROVALS: PendingToolApprovalSummary[] = Object.freeze(
-  [],
-) as PendingToolApprovalSummary[];
+const EMPTY_PENDING_APPROVALS: PendingToolApprovalSummary[] = [];
 let version = 0;
 
 function emitChange(conversationId: string) {
