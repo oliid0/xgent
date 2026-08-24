@@ -125,7 +125,11 @@ export function imagePreviewFileName(
 ) {
   const safe = (preferredName ?? "")
     .trim()
-    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_")
+    .split("")
+    .map((character) =>
+      character.charCodeAt(0) <= 31 || '\\/:*?"<>|'.includes(character) ? "_" : character,
+    )
+    .join("")
     .replace(/[. ]+$/g, "")
     .slice(0, 160);
   const fallback = `${fallbackStem}.${extensionForMime(mimeType)}`;

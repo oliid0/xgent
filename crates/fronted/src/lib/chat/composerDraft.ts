@@ -64,6 +64,8 @@ export function buildTextFromComposerDraft(
           const file = pastedFileById?.get(segment.paste.id);
           return file ? `[${segment.paste.label}: ${file.relativePath}]` : segment.paste.text;
         }
+        default:
+          return "";
       }
     })
     .join("")
