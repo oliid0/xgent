@@ -296,6 +296,13 @@ export function createTsModuleLoader(options = {}) {
     const mock = resolveMock(specifier, parentDir);
     if (mock !== undefined) return mock;
 
+    if (specifier === "@xagent/ui") {
+      return loadModule(path.join(rootDir, "src"), rootDir);
+    }
+    if (specifier.startsWith("@xagent/ui/")) {
+      return loadModule(path.join(rootDir, "src", specifier.slice("@xagent/ui/".length)), rootDir);
+    }
+
     if (specifier === "@earendil-works/pi-agent-core") {
       const packageJson = requireFromRoot.resolve("@earendil-works/pi-agent-core/package.json");
       return loadModule(path.join(path.dirname(packageJson), "dist/agent.js"));
