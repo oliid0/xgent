@@ -4,10 +4,7 @@ import { Card } from "@astryxdesign/core/Card";
 import { Icon } from "@astryxdesign/core/Icon";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from "@astryxdesign/core/SegmentedControl";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
@@ -167,7 +164,10 @@ export function AskUserQuestionCard({
             isDisabled={!canInteract}
             onChange={(value) => {
               if (value === "custom") {
-                choose({ kind: "custom", value: selected?.kind === "custom" ? selected.value : "" });
+                choose({
+                  kind: "custom",
+                  value: selected?.kind === "custom" ? selected.value : "",
+                });
                 return;
               }
               choose({ kind: "option", value: value.slice("option:".length) });
@@ -202,7 +202,10 @@ export function AskUserQuestionCard({
               placeholder={t("chat.askUser.otherPlaceholder")}
               width="100%"
               onChange={(value) =>
-                choose({ kind: "custom", value: value.slice(0, ASK_USER_QUESTION_CUSTOM_MAX_LENGTH) })
+                choose({
+                  kind: "custom",
+                  value: value.slice(0, ASK_USER_QUESTION_CUSTOM_MAX_LENGTH),
+                })
               }
               onKeyDown={(event) => {
                 if (event.key === "Enter" && allAnswered) void submit();

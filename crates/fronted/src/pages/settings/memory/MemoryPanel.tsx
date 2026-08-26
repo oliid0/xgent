@@ -5,9 +5,17 @@
 // Shared by every frontend runtime. Platform differences belong in the
 // runtime boundary, never in this panel.
 
-import { useEffect, useMemo, useState } from "react";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Selector } from "@astryxdesign/core/Selector";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Textarea as AstryxTextarea } from "@xagent/ui/components/ui/textarea";
+import {
+  Heading as AstryxHeading,
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
+import { useEffect, useMemo, useState } from "react";
 import { useLocale } from "../../../i18n";
 import type { MemoryMeta } from "../../../lib/memory/api";
 import { MEMORY_TYPES, type MemoryType } from "../../../lib/memory/schema";
@@ -50,11 +58,6 @@ import {
   Trash2,
 } from "./platform";
 import { type MemoryCreateDraft, useMemoryPanelData } from "./useMemoryPanelData";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Textarea as AstryxTextarea } from "@xagent/ui/components/ui/textarea";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 const EMPTY_CREATE_DRAFT: MemoryCreateDraft = {
   slug: "",

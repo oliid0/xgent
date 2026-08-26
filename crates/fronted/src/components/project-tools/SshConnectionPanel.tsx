@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Button as XdsButton } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { FormLayout } from "@astryxdesign/core/FormLayout";
@@ -18,14 +17,15 @@ import {
   VStack,
 } from "@astryxdesign/core/Layout";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
-import { Selector } from "@astryxdesign/core/Selector";
-import { SelectableCard } from "@astryxdesign/core/SelectableCard";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { SelectableCard } from "@astryxdesign/core/SelectableCard";
+import { Selector } from "@astryxdesign/core/Selector";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import type { SshHostConfig } from "../../lib/settings";
 import { workspaceProjectPathKey } from "../../lib/settings";
@@ -740,8 +740,7 @@ export function SshConnectionPanel(props: SshConnectionPanelProps) {
                     value={createTitle}
                     onChange={setCreateTitle}
                     placeholder={
-                      selectedCreateHost?.name ||
-                      t("projectTools.sshConnectionTabTitlePlaceholder")
+                      selectedCreateHost?.name || t("projectTools.sshConnectionTabTitlePlaceholder")
                     }
                     width="100%"
                     size="lg"
@@ -856,10 +855,7 @@ export function SshConnectionPanel(props: SshConnectionPanelProps) {
                 value="project"
                 label={t("projectTools.sshConnectionScopeProject")}
               />
-              <SegmentedControlItem
-                value="all"
-                label={t("projectTools.sshConnectionScopeAll")}
-              />
+              <SegmentedControlItem value="all" label={t("projectTools.sshConnectionScopeAll")} />
             </SegmentedControl>
           </VStack>
         </LayoutHeader>
@@ -1051,9 +1047,7 @@ export function SshConnectionPanel(props: SshConnectionPanelProps) {
                         </MetadataListItem>
                       ) : null}
                       {prompt.fingerprintSha256 ? (
-                        <MetadataListItem
-                          label={t("projectTools.sshConnectionFingerprint")}
-                        >
+                        <MetadataListItem label={t("projectTools.sshConnectionFingerprint")}>
                           <Text type="code" wordBreak="break-all">
                             {prompt.fingerprintSha256}
                           </Text>

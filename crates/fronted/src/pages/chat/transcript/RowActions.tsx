@@ -42,7 +42,9 @@ export function AssistantRowFooter(props: AssistantRowFooterProps) {
   const retryTitle = retryMessageRef ? t("chat.retry") : "旧历史缺少稳定消息标识，无法重试";
   const branchPending = branchPendingMessageId != null;
   const isRowBranchPending =
-    branchPending && Boolean(retryMessageRef) && branchPendingMessageId === retryMessageRef?.messageId;
+    branchPending &&
+    Boolean(retryMessageRef) &&
+    branchPendingMessageId === retryMessageRef?.messageId;
 
   return (
     <HStack gap={1.5} vAlign="center" className="mt-1 pl-10">

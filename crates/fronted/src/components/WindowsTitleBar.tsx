@@ -1,9 +1,16 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem } from "@astryxdesign/core/Layout";
 import { Text } from "@astryxdesign/core/Text";
-import { type CSSProperties, type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import {
+  type CSSProperties,
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import iconSimpleUrl from "../../src-tauri/icons/icon-simple.png";
 import { useLocale } from "../i18n";
@@ -180,21 +187,24 @@ export function WindowsTitleBar() {
       width="100%"
       height="var(--xagent-windows-titlebar-height)"
       vAlign="center"
-      style={{
-        position: "relative",
-        zIndex: "var(--xagent-z-window-chrome)",
-        flexShrink: 0,
-        userSelect: "none",
-        color: "var(--color-text-primary)",
-        opacity: isFocused ? 1 : "var(--xagent-window-chrome-opacity-inactive)",
-        backgroundColor: "var(--xagent-window-chrome-background)",
-        borderBlockEnd: "var(--border-width) solid var(--color-border)",
-        boxShadow: "var(--shadow-low)",
-        backdropFilter: "blur(var(--xagent-window-chrome-blur)) saturate(var(--xagent-window-chrome-saturation))",
-        transitionProperty: "opacity, background-color",
-        transitionDuration: "var(--duration-fast)",
-        transitionTimingFunction: "var(--ease-standard)",
-      } as CSSProperties}
+      style={
+        {
+          position: "relative",
+          zIndex: "var(--xagent-z-window-chrome)",
+          flexShrink: 0,
+          userSelect: "none",
+          color: "var(--color-text-primary)",
+          opacity: isFocused ? 1 : "var(--xagent-window-chrome-opacity-inactive)",
+          backgroundColor: "var(--xagent-window-chrome-background)",
+          borderBlockEnd: "var(--border-width) solid var(--color-border)",
+          boxShadow: "var(--shadow-low)",
+          backdropFilter:
+            "blur(var(--xagent-window-chrome-blur)) saturate(var(--xagent-window-chrome-saturation))",
+          transitionProperty: "opacity, background-color",
+          transitionDuration: "var(--duration-fast)",
+          transitionTimingFunction: "var(--ease-standard)",
+        } as CSSProperties
+      }
     >
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Native titlebar dragging and double-click maximize are pointer gestures; the adjacent controls remain keyboard accessible. */}
       <StackItem size="fill">
@@ -224,12 +234,7 @@ export function WindowsTitleBar() {
         </HStack>
       </StackItem>
 
-      <HStack
-        height="100%"
-        vAlign="stretch"
-        role="toolbar"
-        aria-label={t("window.controls")}
-      >
+      <HStack height="100%" vAlign="stretch" role="toolbar" aria-label={t("window.controls")}>
         <IconButton
           label={t("window.minimize")}
           tooltip={t("window.minimize")}
@@ -245,9 +250,7 @@ export function WindowsTitleBar() {
         <IconButton
           label={maximizeLabel}
           tooltip={maximizeLabel}
-          icon={
-            <Icon icon={isMaximized ? Minimize2 : Maximize2} size="sm" color="inherit" />
-          }
+          icon={<Icon icon={isMaximized ? Minimize2 : Maximize2} size="sm" color="inherit" />}
           size="sm"
           variant="ghost"
           onClick={toggleMaximize}

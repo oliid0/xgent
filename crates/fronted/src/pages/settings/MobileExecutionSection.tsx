@@ -1,4 +1,3 @@
-import { invoke, isBrowserRuntime } from "@xagent/runtime";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
@@ -13,6 +12,7 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
+import { invoke, isBrowserRuntime } from "@xagent/runtime";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FolderOpen, RefreshCw, Terminal, Trash2, X } from "../../components/icons";
 import { useLocale } from "../../i18n";
@@ -246,11 +246,7 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
         </HStack>
 
         {!isNativeMobile ? (
-          <Banner
-            status="info"
-            title={t("settings.mobileNativeOnly")}
-            collapsible={false}
-          />
+          <Banner status="info" title={t("settings.mobileNativeOnly")} collapsible={false} />
         ) : (
           <VStack gap={4}>
             <MetadataList>

@@ -1,3 +1,11 @@
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import {
+  Heading as AstryxHeading,
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -10,7 +18,6 @@ import {
   Search,
   Sparkles,
 } from "../../components/icons";
-
 import { Button } from "../../components/ui/button";
 import { useLocale } from "../../i18n";
 import { updateSkills } from "../../lib/settings";
@@ -23,11 +30,6 @@ import {
   type SkillSummary,
 } from "../../lib/skills";
 import type { SettingsSectionProps } from "./types";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 export function SkillsSettingsForm(props: SettingsSectionProps) {
   const { settings, setSettings } = props;

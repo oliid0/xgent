@@ -1,11 +1,12 @@
-import { openUrl } from "@xagent/runtime";
 import { HoverCard } from "@astryxdesign/core/HoverCard";
+import { openUrl } from "@xagent/runtime";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { getFileTypeIcon } from "../../../components/chat/fileTypeIcons";
 import { mentionChipClassName } from "../../../components/chat/mentionChipStyles";
 import { SkillIcon } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
-
 import {
   type CodeMentionReference,
   codeMentionDisplayName,
@@ -26,8 +27,6 @@ import {
   type PendingUploadedFile,
   parsePastedTextDisplayReferences,
 } from "./uploadedFiles";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 const COMMON_SKILL_MENTION_ENV_VARS = new Set([
   "PATH",

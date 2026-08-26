@@ -1,7 +1,7 @@
 import { Heading as AstryxHeading, type HeadingLevel } from "@astryxdesign/core/Heading";
 import { Stack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
-import { forwardRef, type ElementType, type HTMLAttributes } from "react";
+import { type ElementType, forwardRef, type HTMLAttributes } from "react";
 import { cn } from "../../lib/shared/utils";
 
 export type ViewProps = Omit<HTMLAttributes<HTMLElement>, "color"> & {

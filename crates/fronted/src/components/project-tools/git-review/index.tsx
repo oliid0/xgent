@@ -114,12 +114,7 @@ export const GitReviewPanel = memo(function GitReviewPanel(props: GitReviewPanel
   );
 
   return (
-    <VStack
-      ref={panelRef}
-      height="100%"
-      minHeight={0}
-      style={{ position: "relative" }}
-    >
+    <VStack ref={panelRef} height="100%" minHeight={0} style={{ position: "relative" }}>
       <GitRemoteSetupModal
         open={data.remoteSetupOpen}
         action={data.remoteSetupAction}

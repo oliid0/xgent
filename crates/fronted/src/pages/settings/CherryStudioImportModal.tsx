@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Text } from "@astryxdesign/core/Text";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { useMemo, useState } from "react";
 import {
   Check,
   ClaudeIcon,
@@ -13,13 +15,11 @@ import {
   RefreshCw,
   Settings,
 } from "../../components/icons";
+import { AdaptiveDialog } from "../../components/ui/adaptive-dialog";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import type { CodexRequestFormat, ProviderId } from "../../lib/settings";
 import { cn } from "../../lib/shared/utils";
-import { AdaptiveDialog } from "../../components/ui/adaptive-dialog";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 export type CherryProviderImportItem = {
   sourceId: string;

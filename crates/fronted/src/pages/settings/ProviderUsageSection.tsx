@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -14,6 +13,7 @@ import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
+import { useState } from "react";
 import { RefreshCw, Wallet } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
@@ -44,12 +44,7 @@ function UsageResultView({ result }: { result: ProviderUsageResult | null }) {
   return (
     <Grid columns={{ minWidth: 220, max: 2, repeat: "fit" }} gap={2} width="100%">
       {result.data.map((item, index) => (
-        <Card
-          key={`${item.planName ?? "usage"}-${index}`}
-          padding={3}
-          variant="muted"
-          width="100%"
-        >
+        <Card key={`${item.planName ?? "usage"}-${index}`} padding={3} variant="muted" width="100%">
           <VStack gap={2}>
             <Heading level={4}>{item.planName || item.extra || "Usage"}</Heading>
             <MetadataList>
@@ -153,7 +148,9 @@ export function ProviderUsageSection({ settings, setSettings }: SettingsSectionP
             <HStack gap={3} vAlign="center" padding={4}>
               <StackItem size="fill">
                 <VStack gap={1}>
-                  <Heading level={3} maxLines={1}>{provider.name}</Heading>
+                  <Heading level={3} maxLines={1}>
+                    {provider.name}
+                  </Heading>
                   <Text type="supporting" color="secondary" maxLines={1}>
                     {provider.baseUrl || provider.type} · {t(`settings.usage.mode.${config.mode}`)}
                   </Text>
@@ -193,9 +190,7 @@ export function ProviderUsageSection({ settings, setSettings }: SettingsSectionP
                       min={2}
                       max={30}
                       value={config.timeoutSecs ?? 10}
-                      onChange={(value) =>
-                        patchProvider(provider.id, { timeoutSecs: value ?? 10 })
-                      }
+                      onChange={(value) => patchProvider(provider.id, { timeoutSecs: value ?? 10 })}
                       width="100%"
                       isWheelEnabled={false}
                     />

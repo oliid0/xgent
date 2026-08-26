@@ -14,11 +14,10 @@ export function OdometerNumber({ value, className }: { value: number; className?
   const safe = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
   const text = String(safe);
   return (
-    <HStack
-      as="span"
-      className={cn("inline-flex tabular-nums leading-none", className)}
-    >
-      <Text type="inherit" className="sr-only">{text}</Text>
+    <HStack as="span" className={cn("inline-flex tabular-nums leading-none", className)}>
+      <Text type="inherit" className="sr-only">
+        {text}
+      </Text>
       <HStack as="span" aria-hidden="true" className="inline-flex">
         {Array.from(text).map((char, index) => {
           const digit = char.charCodeAt(0) - 48;

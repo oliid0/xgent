@@ -1,6 +1,14 @@
-import { invoke } from "@xagent/runtime";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Selector } from "@astryxdesign/core/Selector";
+import { invoke } from "@xagent/runtime";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
+import {
+  Heading as AstryxHeading,
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { useEffect, useMemo, useState } from "react";
 import { FolderTree, Loader2, Trash2 } from "../../components/icons";
 import { Button } from "../../components/ui/button";
@@ -21,11 +29,6 @@ import {
   type WorkspaceRootGrantState,
 } from "../../lib/workspaceRootGrants";
 import type { SettingsSectionProps } from "./types";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
-import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 
 type EditableRoot = WorkspaceRootGrantDraft & {
   localId: string;

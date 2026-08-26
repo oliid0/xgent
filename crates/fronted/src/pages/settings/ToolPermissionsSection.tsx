@@ -52,9 +52,7 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
             <Shield />
             <StackItem size="fill">
               <VStack gap={1}>
-                <Heading level={2}>
-                  {t("settings.toolPermissionsTitle")}
-                </Heading>
+                <Heading level={2}>{t("settings.toolPermissionsTitle")}</Heading>
                 <Text type="supporting" color="secondary">
                   {t("settings.toolPermissionsDesc")}
                 </Text>
@@ -87,9 +85,7 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
       <Section padding={4} width="100%">
         <VStack gap={3}>
           <VStack gap={1}>
-            <Heading level={3}>
-              {t("settings.commandSafety.title")}
-            </Heading>
+            <Heading level={3}>{t("settings.commandSafety.title")}</Heading>
             <Text type="supporting" color="secondary">
               {t("settings.commandSafety.desc")}
             </Text>
@@ -133,9 +129,7 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
               padding={3}
               className="settings-tool-permissions-category-header"
             >
-              <Heading level={3}>
-                {t(category.labelKey)}
-              </Heading>
+              <Heading level={3}>{t(category.labelKey)}</Heading>
               <ButtonGroup label={t("settings.toolPermissionsApplyCategory")} size="sm">
                 {POLICY_OPTIONS.map((policy) => (
                   <Button

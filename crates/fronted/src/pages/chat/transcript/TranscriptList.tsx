@@ -1,8 +1,9 @@
-import { type Range, useVirtualizer } from "@tanstack/react-virtual";
 import { Card } from "@astryxdesign/core/Card";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import { type Range, useVirtualizer } from "@tanstack/react-virtual";
+import { View as AstryxView } from "@xagent/ui/components/ui/view";
 import {
   type MutableRefObject,
   memo,
@@ -15,7 +16,6 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-
 import { CheckCircle2 } from "../../../components/icons";
 import { Markdown } from "../../../components/Markdown";
 import { useLocale } from "../../../i18n";
@@ -42,7 +42,6 @@ import { AssistantRenderUnit } from "./AssistantRenderUnit";
 import { extractRenderUnitRange } from "./renderUnitRangeExtractor";
 import { createTranscriptRowModel } from "./rowModel";
 import { UserMessageRow } from "./UserMessageRow";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
 
 // Measured row heights survive conversation switches: saved on unmount,
 // restored (width-gated) on the next open so the switch lays out with exact

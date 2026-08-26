@@ -1,5 +1,6 @@
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useMemo, useState } from "react";
-
 import { ImagePreview, type ImagePreviewSlide } from "../../../components/chat/ImagePreview";
 import { File, FileText, X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
@@ -18,8 +19,6 @@ import {
   supportsSystemImageOpen,
 } from "../../../lib/system/imagePreview";
 import { useUploadedImagePreview } from "./uploadedImagePreview";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 function UserImageAttachmentCard({
   file,

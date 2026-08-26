@@ -2,11 +2,7 @@ import { ChatToolCalls } from "@astryxdesign/core/Chat";
 import { memo, useMemo, useState } from "react";
 
 import type { ToolTraceItem } from "../../../../lib/chat/messages/uiMessages";
-import {
-  areToolTraceItemsEqual,
-  createAstryxToolCall,
-  ToolCallDetail,
-} from "./ToolCallItem";
+import { areToolTraceItemsEqual, createAstryxToolCall, ToolCallDetail } from "./ToolCallItem";
 
 function ToolTraceGroupInner(props: { items: ToolTraceItem[]; runningToolCallIds?: string[] }) {
   const { items, runningToolCallIds = [] } = props;
@@ -25,13 +21,7 @@ function ToolTraceGroupInner(props: { items: ToolTraceItem[]; runningToolCallIds
     [items, runningIds],
   );
 
-  return (
-    <ChatToolCalls
-      calls={calls}
-      isExpanded={isExpanded}
-      onExpandedChange={setIsExpanded}
-    />
-  );
+  return <ChatToolCalls calls={calls} isExpanded={isExpanded} onExpandedChange={setIsExpanded} />;
 }
 
 function areRunningIdsEqual(previous?: string[], next?: string[]) {

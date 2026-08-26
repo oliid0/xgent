@@ -1,5 +1,6 @@
 import "@xterm/xterm/css/xterm.css";
 
+import { View as AstryxView } from "@xagent/ui/components/ui/view";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { type CSSProperties, useEffect, useRef } from "react";
@@ -13,7 +14,6 @@ import type {
   TerminalStreamHandle,
   TerminalStreamInputState,
 } from "../../lib/terminal/types";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
 
 type XTermViewportProps = {
   client: TerminalClient;

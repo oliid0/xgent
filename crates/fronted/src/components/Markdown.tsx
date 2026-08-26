@@ -1,8 +1,11 @@
+import { Link } from "@astryxdesign/core/Link";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
 import { openUrl } from "@xagent/runtime";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import {
   type ComponentProps,
   cloneElement,
@@ -13,7 +16,6 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Link } from "@astryxdesign/core/Link";
 import remarkBreaks from "remark-breaks";
 import {
   type Components,
@@ -35,8 +37,6 @@ import { cn } from "../lib/shared/utils";
 import { Check, ChevronDown, ChevronUp, Copy, ExternalLink } from "./icons";
 import { AdaptiveDialog } from "./ui/adaptive-dialog";
 import { Button } from "./ui/button";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 type MarkdownProps = {
   content: string;
@@ -517,6 +517,7 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
     </AstryxView>
   );
 });
+
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";

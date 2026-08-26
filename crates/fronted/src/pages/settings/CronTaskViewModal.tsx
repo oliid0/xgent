@@ -1,3 +1,10 @@
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import {
+  Heading as AstryxHeading,
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -16,7 +23,6 @@ import {
   X,
   XCircle,
 } from "../../components/icons";
-
 import { useLocale } from "../../i18n";
 import {
   type CronRunRecord,
@@ -34,10 +40,6 @@ import {
 import { useCompactViewport } from "../../lib/responsive/compactViewport";
 import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmActionPopover } from "./shared";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 type CronTaskViewModalProps = {
   taskId: string;

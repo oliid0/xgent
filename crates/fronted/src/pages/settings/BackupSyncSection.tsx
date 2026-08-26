@@ -1,4 +1,9 @@
 import { listen } from "@xagent/runtime";
+import {
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
@@ -56,8 +61,6 @@ import {
   type SyncForm,
 } from "./backupSyncForm";
 import type { SettingsSectionProps } from "./types";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 type Status = { kind: "ok" | "error"; text: string } | null;
 

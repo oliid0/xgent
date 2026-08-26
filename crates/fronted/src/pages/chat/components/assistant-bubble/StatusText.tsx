@@ -16,13 +16,7 @@ export function CompactingText() {
 
 export function AssistantStatus({ children }: { children: ReactNode }) {
   return (
-    <HStack
-      as="span"
-      gap={2}
-      vAlign="center"
-      width="100%"
-      role="status"
-    >
+    <HStack as="span" gap={2} vAlign="center" width="100%" role="status">
       <Spinner size="sm" aria-hidden="true" />
       <Text type="supporting" color="secondary">
         {children}

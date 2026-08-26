@@ -16,11 +16,7 @@ type MobileBackgroundTasksPanelProps = {
 export function MobileBackgroundTasksPanel(props: MobileBackgroundTasksPanelProps) {
   const { t } = useLocale();
   return (
-    <MobileFullscreenPanel
-      open={props.open}
-      keepMounted
-      label={t("sidebar.backgroundTasks")}
-    >
+    <MobileFullscreenPanel open={props.open} keepMounted label={t("sidebar.backgroundTasks")}>
       <MobilePanelHeader
         title={t("sidebar.backgroundTasks")}
         backLabel={t("settings.close")}

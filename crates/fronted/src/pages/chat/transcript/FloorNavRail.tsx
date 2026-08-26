@@ -1,3 +1,5 @@
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { View as AstryxView } from "@xagent/ui/components/ui/view";
 import {
   useCallback,
   useEffect,
@@ -7,7 +9,6 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-
 import { Pin } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import {
@@ -21,8 +22,6 @@ import {
   sampleFloorEntries,
 } from "../../../lib/chat-floor-nav/floorModel";
 import { cn } from "../../../lib/shared/utils";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 /** 收起态短横线数量上限的绝对边界（实际数量随可用高度自适应）。 */
 const MIN_COLLAPSED_MARKERS = 8;

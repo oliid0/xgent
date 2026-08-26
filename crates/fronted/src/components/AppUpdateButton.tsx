@@ -50,7 +50,13 @@ export function AppUpdateButton({
         type="button"
         label={title}
         tooltip={title}
-        icon={installed ? <RefreshCw className={iconClassName} /> : <Download className={iconClassName} />}
+        icon={
+          installed ? (
+            <RefreshCw className={iconClassName} />
+          ) : (
+            <Download className={iconClassName} />
+          )
+        }
         variant="primary"
         size="sm"
         isLoading={busy}
@@ -65,7 +71,9 @@ export function AppUpdateButton({
     <Button
       type="button"
       label={actionLabel}
-      icon={installed ? <RefreshCw className={iconClassName} /> : <Download className={iconClassName} />}
+      icon={
+        installed ? <RefreshCw className={iconClassName} /> : <Download className={iconClassName} />
+      }
       variant="primary"
       size="sm"
       tooltip={title}

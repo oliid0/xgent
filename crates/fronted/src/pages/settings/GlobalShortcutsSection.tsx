@@ -1,3 +1,9 @@
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import {
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import {
   type ReactNode,
   useCallback,
@@ -25,9 +31,6 @@ import {
   writeGlobalShortcutBindings,
 } from "../../lib/shortcuts/globalShortcuts";
 import { AgentActivationSwitch } from "./shared";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 /* ============================== 键盘布局数据 ============================== */
 

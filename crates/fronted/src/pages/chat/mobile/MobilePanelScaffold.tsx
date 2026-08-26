@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Heading, Text } from "@astryxdesign/core/Text";
+import type { ReactNode } from "react";
 import { ArrowLeft } from "../../../components/icons";
 import { cn } from "../../../lib/shared/utils";
 

@@ -60,7 +60,10 @@ function ModelSelectorContent(props: {
   const [modelSearch, setModelSearch] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const normalizedSearch = modelSearch.trim().toLowerCase();
-  const groups = useMemo(() => groupModelOptionsByProvider(props.modelOptions), [props.modelOptions]);
+  const groups = useMemo(
+    () => groupModelOptionsByProvider(props.modelOptions),
+    [props.modelOptions],
+  );
   const selectedGroupId = props.modelOptions.find(
     (option) => option.value === props.selectedValue,
   )?.providerId;
@@ -230,9 +233,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
         paddingBlock: mobileExperience ? "var(--spacing-2)" : "var(--spacing-2-5)",
         paddingInlineEnd: "var(--spacing-4)",
         paddingInlineStart:
-          !sidebarOpen && macOsTauri
-            ? "var(--xagent-macos-titlebar-inset)"
-            : "var(--spacing-4)",
+          !sidebarOpen && macOsTauri ? "var(--xagent-macos-titlebar-inset)" : "var(--spacing-4)",
       }}
     >
       <HStack gap={1.5} vAlign="center" style={{ minWidth: 0 }}>

@@ -111,11 +111,7 @@ export function HostedSearchGroupView({ items }: { items: HostedSearchBlock[] })
           {status === "searching" ? (
             <AssistantStatus>{statusLabel}</AssistantStatus>
           ) : (
-            <Token
-              label={statusLabel}
-              size="sm"
-              color={status === "failed" ? "red" : "green"}
-            />
+            <Token label={statusLabel} size="sm" color={status === "failed" ? "red" : "green"} />
           )}
         </HStack>
       }

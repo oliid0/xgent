@@ -157,7 +157,11 @@ export function CodexOAuthAccounts({ value, onChange, browserRuntime }: Props) {
           <Spinner label={t("settings.loading")} />
         </Center>
       ) : status.accounts.length > 0 ? (
-        <List density="balanced" hasDividers aria-label={t("settings.providerOAuthSelectedAccount")}>
+        <List
+          density="balanced"
+          hasDividers
+          aria-label={t("settings.providerOAuthSelectedAccount")}
+        >
           {status.accounts.map((account) => {
             const selected = value === account.id;
             const label = account.email || t("settings.providerOAuthOpenAIAccount");
@@ -171,9 +175,7 @@ export function CodexOAuthAccounts({ value, onChange, browserRuntime }: Props) {
                     variant={selected ? "success" : "neutral"}
                     label={selected ? t("settings.providerOAuthSelectedAccount") : label}
                     icon={
-                      selected ? (
-                        <Icon icon={CheckCircle2} size="xsm" color="inherit" />
-                      ) : undefined
+                      selected ? <Icon icon={CheckCircle2} size="xsm" color="inherit" /> : undefined
                     }
                   />
                 }

@@ -1,13 +1,13 @@
-import type { Context } from "@earendil-works/pi-ai";
 import { Center } from "@astryxdesign/core/Center";
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
 import { Dialog } from "@astryxdesign/core/Dialog";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { StackItem, VStack } from "@astryxdesign/core/Stack";
 import { ToastViewport } from "@astryxdesign/core/Toast";
-import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Theme } from "@astryxdesign/core/theme";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
+import type { Context } from "@earendil-works/pi-ai";
 import {
   configureLanPcCommandHost,
   invoke,

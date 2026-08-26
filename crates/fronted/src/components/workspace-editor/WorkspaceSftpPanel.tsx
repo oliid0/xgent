@@ -1,4 +1,3 @@
-import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button as XdsButton } from "@astryxdesign/core/Button";
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
 import { HStack } from "@astryxdesign/core/Layout";
@@ -6,6 +5,10 @@ import { Popover } from "@astryxdesign/core/Popover";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { useToast } from "@astryxdesign/core/Toast";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import type { SftpClient, SftpEntry, SftpSide, SftpTransfer } from "../../lib/sftp/types";
 import { cn } from "../../lib/shared/utils";
@@ -25,11 +28,8 @@ import {
   Trash2,
   Upload,
 } from "../icons";
-import { useConfirmDialog } from "../ui/confirm-dialog";
 import { AdaptiveDialog } from "../ui/adaptive-dialog";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import { useConfirmDialog } from "../ui/confirm-dialog";
 
 type WorkspaceSftpPanelProps = {
   session: TerminalSession;

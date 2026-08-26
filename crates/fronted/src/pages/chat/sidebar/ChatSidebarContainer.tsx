@@ -3,6 +3,7 @@
 // ChatPage), the conversation-rename UI state, the delete flow, and the
 // error-code → i18n mapping for every frontend target.
 
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ChatHistorySidebar } from "../../../components/chat/ChatHistorySidebar";
 import type { WorkspaceToolTarget } from "../../../components/project-tools/workspaceToolsModel";
@@ -25,7 +26,6 @@ import type { SidebarSnapshot, SidebarStore } from "../../../lib/sidebar/store";
 import type { SidebarConversation } from "../../../lib/sidebar/types";
 import { useSidebarSelector } from "../../../lib/sidebar/useSidebarSelector";
 import { sortWorkspaceProjectsByActivity } from "../../../lib/workspaceProjects";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 type ChatSidebarContainerProps = {
   store: SidebarStore;

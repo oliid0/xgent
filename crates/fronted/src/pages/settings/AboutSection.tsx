@@ -1,4 +1,9 @@
 import { openUrl } from "@xagent/runtime";
+import {
+  Heading as AstryxHeading,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import iconSimpleUrl from "../../../src-tauri/icons/icon-simple.png";
 import {
   AlertTriangle,
@@ -22,9 +27,6 @@ import { updateUpdateSettings } from "../../lib/settings";
 import { formatReleaseDate } from "./aboutDate";
 import { AgentActivationSwitch } from "./shared";
 import type { SettingsSectionProps } from "./types";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 type AboutSectionProps = SettingsSectionProps & {
   appUpdate: AppUpdateController;

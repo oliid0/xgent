@@ -1,8 +1,8 @@
 import { Selector } from "@astryxdesign/core/Selector";
 import {
   Children,
-  isValidElement,
   type CSSProperties,
+  isValidElement,
   type ReactElement,
   type ReactNode,
 } from "react";

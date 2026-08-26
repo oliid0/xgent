@@ -4,9 +4,11 @@
 // Shared by every frontend runtime; only relative or @xagent/runtime imports
 // are allowed here.
 
+import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { openUrl } from "@xagent/runtime";
-import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import {
   type UIEvent as ReactUIEvent,
   type RefObject,
@@ -65,8 +67,6 @@ import {
 import { GitBranchFromCommitModal } from "./Toolbar";
 import type { GitReviewData } from "./useGitReviewData";
 import { GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS, useOverlayScrollbar } from "./useOverlayScrollbar";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 const GRAPH_SWIMLANE_WIDTH = 11;
 const GRAPH_SVG_HEIGHT = 22;

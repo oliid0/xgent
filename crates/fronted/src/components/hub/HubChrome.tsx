@@ -128,12 +128,7 @@ export function HubHeader(props: {
             <VStack gap={0.5} hAlign={onClose ? "center" : "start"}>
               <Heading level={1}>{title}</Heading>
               {subtitle && !onClose ? (
-                <Text
-                  type="supporting"
-                  color="secondary"
-                  maxLines={1}
-                  hasTruncateTooltip="below"
-                >
+                <Text type="supporting" color="secondary" maxLines={1} hasTruncateTooltip="below">
                   {subtitle}
                 </Text>
               ) : null}
@@ -180,12 +175,7 @@ export function HubPanel(props: {
             : "default";
 
   return (
-    <Card
-      padding={4}
-      variant={variant}
-      elevation={active ? "low" : "none"}
-      className={className}
-    >
+    <Card padding={4} variant={variant} elevation={active ? "low" : "none"} className={className}>
       {children}
     </Card>
   );

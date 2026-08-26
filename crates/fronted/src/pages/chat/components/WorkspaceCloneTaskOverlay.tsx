@@ -54,14 +54,12 @@ export function WorkspaceCloneTaskOverlay(props: { onOpenWorkspace: (path: strin
           <Card key={task.id} width="100%" padding={3} elevation="high">
             <VStack gap={3}>
               <HStack gap={3} vAlign="start">
-                {running ? (
-                  <Spinner aria-label={task.repositoryName} size="sm" />
-                ) : (
-                  <FolderOpen />
-                )}
+                {running ? <Spinner aria-label={task.repositoryName} size="sm" /> : <FolderOpen />}
                 <StackItem size="fill">
                   <VStack gap={1}>
-                    <Heading level={4} maxLines={1}>{task.repositoryName}</Heading>
+                    <Heading level={4} maxLines={1}>
+                      {task.repositoryName}
+                    </Heading>
                     <Text type="supporting" color="secondary" maxLines={2}>
                       {task.error || task.detail}
                     </Text>
@@ -108,9 +106,7 @@ export function WorkspaceCloneTaskOverlay(props: { onOpenWorkspace: (path: strin
                     isDisabled={task.status === "cancelling"}
                     onClick={() =>
                       void cancelGitClone(task.id).then((next) =>
-                        setTasks((prev) =>
-                          prev.map((item) => (item.id === next.id ? next : item)),
-                        ),
+                        setTasks((prev) => prev.map((item) => (item.id === next.id ? next : item))),
                       )
                     }
                   />

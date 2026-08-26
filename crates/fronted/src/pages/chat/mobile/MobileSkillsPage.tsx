@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { ClickableCard } from "@astryxdesign/core/ClickableCard";
@@ -8,6 +7,7 @@ import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, MoreHorizontal, RefreshCw, SkillIcon } from "../../../components/icons";
 import { Markdown } from "../../../components/Markdown";
 import { useLocale } from "../../../i18n";
@@ -165,9 +165,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
                 {selected.description}
               </Text>
             ) : null}
-            {preview.loading ? (
-              <Spinner label={t("settings.skillsScanning")} size="md" />
-            ) : null}
+            {preview.loading ? <Spinner label={t("settings.skillsScanning")} size="md" /> : null}
             {preview.error ? (
               <Banner status="error" title={preview.error} collapsible={false} />
             ) : null}

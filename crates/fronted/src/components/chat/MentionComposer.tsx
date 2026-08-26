@@ -1,6 +1,8 @@
-import { openUrl } from "@xagent/runtime";
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
 import { Popover } from "@astryxdesign/core/Popover";
+import { openUrl } from "@xagent/runtime";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import {
   type ClipboardEvent,
   type FocusEvent,
@@ -45,8 +47,6 @@ import {
   type PromptHistoryStash,
   stepPromptHistory,
 } from "./promptHistory";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */

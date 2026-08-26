@@ -1,6 +1,5 @@
-import { invoke } from "@xagent/runtime";
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Button as AstryxNativeButton } from "@astryxdesign/core/Button";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
@@ -12,6 +11,13 @@ import { Switch } from "@astryxdesign/core/Switch";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
+import { invoke } from "@xagent/runtime";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import {
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ccswitchLogoUrl from "../../../src-tauri/icons/custom/ccswitch.png";
 import cherryStudioLogoUrl from "../../../src-tauri/icons/custom/cherrystudio.png";
@@ -38,7 +44,6 @@ import {
   X,
   Zap,
 } from "../../components/icons";
-
 import { Button } from "../../components/ui/button";
 import {
   DropdownMenu,
@@ -99,9 +104,6 @@ import {
 } from "./providerUtils";
 import { ConfirmDeletePopover } from "./shared";
 import type { SettingsSectionProps } from "./types";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 type ModalProps = {
   providerType: ProviderId;
@@ -219,13 +221,7 @@ function DialogSwitch(props: {
 }) {
   const { checked, onCheckedChange, ariaLabel } = props;
   return (
-    <Switch
-      label={ariaLabel}
-      isLabelHidden
-      size="sm"
-      value={checked}
-      onChange={onCheckedChange}
-    />
+    <Switch label={ariaLabel} isLabelHidden size="sm" value={checked} onChange={onCheckedChange} />
   );
 }
 function formatTokenCount(value: number): string {
@@ -3209,15 +3205,15 @@ export function ProvidersSection(
             overflow="scroll"
             role="tablist"
           >
-          {PROVIDER_TABS.map((tab) => (
-            <Tab
-              key={tab}
-              value={tab}
-              label={getProviderLabel(tab)}
-              icon={<ProviderBrandIcon type={tab} />}
-              panelId={`provider-panel-${tab}`}
-            />
-          ))}
+            {PROVIDER_TABS.map((tab) => (
+              <Tab
+                key={tab}
+                value={tab}
+                label={getProviderLabel(tab)}
+                icon={<ProviderBrandIcon type={tab} />}
+                panelId={`provider-panel-${tab}`}
+              />
+            ))}
           </TabList>
         }
         endContent={

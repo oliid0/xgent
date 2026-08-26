@@ -1,3 +1,5 @@
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import {
   type ComponentProps,
   createContext,
@@ -17,8 +19,6 @@ import {
   classifyWorkspaceMarkdownTarget,
   workspaceMarkdownHeadingSlug,
 } from "./workspaceMarkdownAssets";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 type WorkspaceMarkdownPreviewContextValue = {
   workdir: string;

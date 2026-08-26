@@ -1,8 +1,15 @@
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@astryxdesign/core/Link";
-
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import {
+  Heading as AstryxHeading,
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Check,
@@ -47,11 +54,6 @@ import {
 import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
 import { cn } from "../../lib/shared/utils";
 import { SettingsModalShell } from "../settings/SettingsModalShell";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 const STORE_PAGE_LIMIT = 18;
 

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Grid, GridSpan } from "@astryxdesign/core/Grid";
@@ -8,6 +7,7 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
+import { useState } from "react";
 import { Check, Mic } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
@@ -115,12 +115,10 @@ export function SttSettingsSection({ settings, setSettings }: SettingsSectionPro
           <Mic />
           <StackItem size="fill">
             <VStack gap={1}>
-            <Heading level={2}>
-              {t("settings.stt.title")}
-            </Heading>
-            <Text type="supporting" color="secondary">
-              {t("settings.stt.desc")}
-            </Text>
+              <Heading level={2}>{t("settings.stt.title")}</Heading>
+              <Text type="supporting" color="secondary">
+                {t("settings.stt.desc")}
+              </Text>
             </VStack>
           </StackItem>
           <Switch
@@ -152,40 +150,40 @@ export function SttSettingsSection({ settings, setSettings }: SettingsSectionPro
           />
 
           <Grid columns={{ minWidth: 240, max: 2, repeat: "fit" }} gap={3} width="100%">
-          {PROVIDER_FIELDS[providerId].map((field) => (
-            <GridSpan key={field.key} columns={field.key === "websocketUrl" ? "full" : 1}>
-              <TextInput
-                label={field.label}
-                type={field.secret ? "password" : "text"}
-                value={typeof provider[field.key] === "string" ? String(provider[field.key]) : ""}
-                placeholder={
-                  field.secret && provider.configured
-                    ? t("settings.stt.secretSaved")
-                    : field.placeholder
-                }
-                onChange={(value) => patchProvider({ [field.key]: value })}
-                width="100%"
-              />
-            </GridSpan>
-          ))}
+            {PROVIDER_FIELDS[providerId].map((field) => (
+              <GridSpan key={field.key} columns={field.key === "websocketUrl" ? "full" : 1}>
+                <TextInput
+                  label={field.label}
+                  type={field.secret ? "password" : "text"}
+                  value={typeof provider[field.key] === "string" ? String(provider[field.key]) : ""}
+                  placeholder={
+                    field.secret && provider.configured
+                      ? t("settings.stt.secretSaved")
+                      : field.placeholder
+                  }
+                  onChange={(value) => patchProvider({ [field.key]: value })}
+                  width="100%"
+                />
+              </GridSpan>
+            ))}
           </Grid>
 
           <HStack gap={3} vAlign="center" wrap="wrap">
-          <Button
-            type="button"
-            label={t("settings.stt.test")}
-            icon={<Check />}
-            isLoading={testing}
-            isDisabled={testing}
-            onClick={() => void testConnection()}
-          />
-          {testResult ? (
-            <Banner
-              status={testResult.ok ? "success" : "error"}
-              title={testResult.message}
-              collapsible={false}
+            <Button
+              type="button"
+              label={t("settings.stt.test")}
+              icon={<Check />}
+              isLoading={testing}
+              isDisabled={testing}
+              onClick={() => void testConnection()}
             />
-          ) : null}
+            {testResult ? (
+              <Banner
+                status={testResult.ok ? "success" : "error"}
+                title={testResult.message}
+                collapsible={false}
+              />
+            ) : null}
           </HStack>
         </VStack>
       </Section>

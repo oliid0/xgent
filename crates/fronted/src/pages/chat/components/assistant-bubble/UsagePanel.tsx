@@ -1,7 +1,7 @@
-import type { Usage } from "@earendil-works/pi-ai";
 import { VStack } from "@astryxdesign/core/Layout";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { ProgressBar } from "@astryxdesign/core/ProgressBar";
+import type { Usage } from "@earendil-works/pi-ai";
 
 import { useLocale } from "../../../../i18n";
 

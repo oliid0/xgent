@@ -1,3 +1,11 @@
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
+import {
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import type { SftpClient } from "../../lib/sftp/types";
@@ -18,11 +26,6 @@ import { AlertTriangle, FolderTree, Loader2, Terminal, Waypoints, X } from "../i
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
 import { XTermViewport } from "../project-tools/XTermViewport";
 import { WorkspaceSftpPanel } from "./WorkspaceSftpPanel";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 
 export type WorkspaceSshTerminalOpenRequest = {
   id: number;

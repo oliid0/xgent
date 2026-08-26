@@ -1,6 +1,7 @@
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import {
@@ -24,7 +25,6 @@ import {
   X,
 } from "../icons";
 import { Button } from "../ui/button";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
 
 type BackgroundTasksPanelProps = {
   // Visibility contract from the workspace side panel: gates the per-second uptime

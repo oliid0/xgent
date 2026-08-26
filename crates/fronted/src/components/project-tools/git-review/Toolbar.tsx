@@ -5,12 +5,14 @@
 // Shared by every frontend runtime; only relative or @xagent/runtime imports
 // are allowed here.
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Text } from "@astryxdesign/core/Text";
 import { useToast } from "@astryxdesign/core/Toast";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale } from "../../../i18n";
 import type { GitBranch as GitBranchInfo, GitWorktreeInfo } from "../../../lib/git/types";
 import { gitDiscoveredRepositoryLabel, selectedGitRepositoryLabel } from "../../../lib/git/types";
@@ -30,8 +32,8 @@ import {
   Trash2,
   Upload,
 } from "../../icons";
-import { Button } from "../../ui/button";
 import { AdaptiveDialog } from "../../ui/adaptive-dialog";
+import { Button } from "../../ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,8 +55,6 @@ import {
   remoteSetupSubmitKey,
 } from "./model";
 import type { GitReviewData } from "./useGitReviewData";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 const GIT_REVIEW_STACKED_PANE_BUTTON_CLASS =
   "inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";

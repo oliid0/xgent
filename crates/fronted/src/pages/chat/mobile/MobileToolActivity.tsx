@@ -1,4 +1,3 @@
-import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { ChatToolCalls } from "@astryxdesign/core/Chat";
@@ -7,6 +6,7 @@ import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Text } from "@astryxdesign/core/Text";
+import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import { useMemo, useSyncExternalStore } from "react";
 import { ChevronRight, Globe, Terminal, Wrench } from "../../../components/icons";
 import { AdaptiveDialog } from "../../../components/ui/adaptive-dialog";
@@ -195,11 +195,7 @@ export function MobileToolActivity({
             label={capsuleTitle}
             tooltip={capsuleDetail || capsuleTitle}
             icon={
-              <ActivityIcon
-                name={capsuleItem?.toolCall.name ?? ""}
-                running
-                label={capsuleTitle}
-              />
+              <ActivityIcon name={capsuleItem?.toolCall.name ?? ""} running label={capsuleTitle} />
             }
             endContent={<ChevronRight size={14} />}
             variant="secondary"

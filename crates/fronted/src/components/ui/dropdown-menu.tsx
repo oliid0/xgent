@@ -9,12 +9,12 @@ import {
 import { Text } from "@astryxdesign/core/Text";
 import {
   Children,
-  isValidElement,
   type CSSProperties,
   type ElementType,
+  isValidElement,
+  type MouseEventHandler,
   type ReactElement,
   type ReactNode,
-  type MouseEventHandler,
 } from "react";
 
 type LegacyRootProps = {

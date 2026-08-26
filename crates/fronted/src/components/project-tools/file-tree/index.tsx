@@ -28,16 +28,7 @@ import {
 import { useLocale } from "../../../i18n";
 import type { WorkspaceFileTreeStatePatch } from "../../../lib/settings";
 import { getFileTypeIcon } from "../../chat/fileTypeIcons";
-import {
-  Check,
-  Edit3,
-  FolderClosed,
-  FolderOpen,
-  Plus,
-  RefreshCw,
-  Trash2,
-  X,
-} from "../../icons";
+import { Check, Edit3, FolderClosed, FolderOpen, Plus, RefreshCw, Trash2, X } from "../../icons";
 import { useConfirmDialog } from "../../ui/confirm-dialog";
 import { isWorkspaceImagePath } from "../../workspace-editor/workspaceImagePreview";
 import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
@@ -489,7 +480,16 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
 
     const root = buildItem(ROOT_PATH);
     return root ? [root] : [];
-  }, [expandedSet, handleOpenFile, nodes, selectPath, selectedPath, t, toggleDirectory, touchActions]);
+  }, [
+    expandedSet,
+    handleOpenFile,
+    nodes,
+    selectPath,
+    selectedPath,
+    t,
+    toggleDirectory,
+    touchActions,
+  ]);
 
   if (!initialized) {
     return (
@@ -549,42 +549,42 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
       {touchActions ? (
         <Section variant="transparent" padding={1.5} dividers={["bottom"]}>
           <Grid columns={4} gap={1} width="100%">
-          <Button
-            label={t("projectTools.fileTree.newFile")}
-            variant="ghost"
-            size="sm"
-            width="100%"
-            icon={<Plus />}
-            isDisabled={!canMutate || busyAction}
-            onClick={() => startAction("file", selectedPath)}
-          />
-          <Button
-            label={t("projectTools.fileTree.newFolder")}
-            variant="ghost"
-            size="sm"
-            width="100%"
-            icon={<FolderClosed />}
-            isDisabled={!canMutate || busyAction}
-            onClick={() => startAction("folder", selectedPath)}
-          />
-          <Button
-            label={t("projectTools.fileTree.rename")}
-            variant="ghost"
-            size="sm"
-            width="100%"
-            icon={<Edit3 />}
-            isDisabled={!canMutate || !selectedPath || busyAction}
-            onClick={() => startAction("rename", selectedPath)}
-          />
-          <Button
-            label={t("projectTools.fileTree.delete")}
-            variant="destructive"
-            size="sm"
-            width="100%"
-            icon={<Trash2 />}
-            isDisabled={!canMutate || !selectedPath || busyAction}
-            onClick={() => void deletePath(selectedPath)}
-          />
+            <Button
+              label={t("projectTools.fileTree.newFile")}
+              variant="ghost"
+              size="sm"
+              width="100%"
+              icon={<Plus />}
+              isDisabled={!canMutate || busyAction}
+              onClick={() => startAction("file", selectedPath)}
+            />
+            <Button
+              label={t("projectTools.fileTree.newFolder")}
+              variant="ghost"
+              size="sm"
+              width="100%"
+              icon={<FolderClosed />}
+              isDisabled={!canMutate || busyAction}
+              onClick={() => startAction("folder", selectedPath)}
+            />
+            <Button
+              label={t("projectTools.fileTree.rename")}
+              variant="ghost"
+              size="sm"
+              width="100%"
+              icon={<Edit3 />}
+              isDisabled={!canMutate || !selectedPath || busyAction}
+              onClick={() => startAction("rename", selectedPath)}
+            />
+            <Button
+              label={t("projectTools.fileTree.delete")}
+              variant="destructive"
+              size="sm"
+              width="100%"
+              icon={<Trash2 />}
+              isDisabled={!canMutate || !selectedPath || busyAction}
+              onClick={() => void deletePath(selectedPath)}
+            />
           </Grid>
         </Section>
       ) : null}
@@ -592,46 +592,46 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
       {pendingAction ? (
         <Section variant="muted" padding={2} dividers={["bottom"]}>
           <HStack gap={2} vAlign="center">
-          <StackItem size="fill">
-          <TextInput
-            label={actionPlaceholder}
-            isLabelHidden
-            hasAutoFocus
-            value={draftName}
-            onChange={setDraftName}
-            onEnter={() => void finishAction()}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
+            <StackItem size="fill">
+              <TextInput
+                label={actionPlaceholder}
+                isLabelHidden
+                hasAutoFocus
+                value={draftName}
+                onChange={setDraftName}
+                onEnter={() => void finishAction()}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setPendingAction(null);
+                    setPendingTargetPath(null);
+                    setActionError(null);
+                  }
+                }}
+                placeholder={actionPlaceholder}
+                size="sm"
+                width="100%"
+              />
+            </StackItem>
+            <IconButton
+              label={t("settings.save")}
+              variant="ghost"
+              size="sm"
+              icon={<Check />}
+              isLoading={busyAction}
+              isDisabled={busyAction}
+              onClick={() => void finishAction()}
+            />
+            <IconButton
+              label={t("settings.cancel")}
+              variant="ghost"
+              size="sm"
+              icon={<X />}
+              onClick={() => {
                 setPendingAction(null);
                 setPendingTargetPath(null);
-                setActionError(null);
-              }
-            }}
-            placeholder={actionPlaceholder}
-            size="sm"
-            width="100%"
-          />
-          </StackItem>
-          <IconButton
-            label={t("settings.save")}
-            variant="ghost"
-            size="sm"
-            icon={<Check />}
-            isLoading={busyAction}
-            isDisabled={busyAction}
-            onClick={() => void finishAction()}
-          />
-          <IconButton
-            label={t("settings.cancel")}
-            variant="ghost"
-            size="sm"
-            icon={<X />}
-            onClick={() => {
-              setPendingAction(null);
-              setPendingTargetPath(null);
-            }}
-          />
+              }}
+            />
           </HStack>
         </Section>
       ) : null}

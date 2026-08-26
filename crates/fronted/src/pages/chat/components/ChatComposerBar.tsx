@@ -1,5 +1,7 @@
 import { ChatComposer } from "@astryxdesign/core/Chat";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import {
   memo,
   type ReactNode,
@@ -73,8 +75,6 @@ import {
   startDesktopSttCapture,
 } from "../../../lib/stt/desktopAudioCapture";
 import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 const REASONING_I18N_KEYS: Record<ReasoningLevel, string> = {
   off: "settings.reasoning.off",

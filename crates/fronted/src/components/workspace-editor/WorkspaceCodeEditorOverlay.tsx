@@ -1,5 +1,7 @@
-import * as monaco from "monaco-editor";
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import * as monaco from "monaco-editor";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import CssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
 import HtmlWorker from "monaco-editor/esm/vs/language/html/html.worker?worker";
@@ -42,8 +44,6 @@ import {
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
 import { AdaptiveDialog } from "../ui/adaptive-dialog";
 import { isWorkspacePreviewPath } from "./workspaceImagePreview";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 type MonacoEnvironmentGlobal = typeof globalThis & {
   MonacoEnvironment?: {

@@ -104,9 +104,7 @@ export function WorkspaceNavigationRail(props: WorkspaceNavigationRailProps) {
         label: preset.metadata.name || "XGent",
         icon: <Icon icon={Sparkles} size="sm" color="inherit" />,
         endContent:
-          preset.id === soul.activeId ? (
-            <Icon icon={Check} size="sm" color="success" />
-          ) : undefined,
+          preset.id === soul.activeId ? <Icon icon={Check} size="sm" color="success" /> : undefined,
         onClick: () => {
           void soul.select(preset.id).catch(() => undefined);
         },

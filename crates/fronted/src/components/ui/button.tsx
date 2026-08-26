@@ -3,10 +3,10 @@ import {
   type ButtonProps as AstryxButtonProps,
 } from "@astryxdesign/core/Button";
 import {
+  type ButtonHTMLAttributes,
   Children,
   forwardRef,
   isValidElement,
-  type ButtonHTMLAttributes,
   type ReactNode,
 } from "react";
 

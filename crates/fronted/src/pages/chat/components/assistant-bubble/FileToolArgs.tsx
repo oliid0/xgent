@@ -1,9 +1,9 @@
 import { Button } from "@astryxdesign/core/Button";
 import { Code } from "@astryxdesign/core/Code";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { VStack } from "@astryxdesign/core/Layout";
 import { Section } from "@astryxdesign/core/Section";
 import { Text } from "@astryxdesign/core/Text";
-import { VStack } from "@astryxdesign/core/Layout";
 
 import { useChangedFilesActions } from "../../../../components/chat/ChangedFilesCard";
 import { useLocale } from "../../../../i18n";

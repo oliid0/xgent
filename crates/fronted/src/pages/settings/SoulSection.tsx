@@ -1,3 +1,11 @@
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
+import {
+  Heading as AstryxHeading,
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Plus, RefreshCw, Save, Sparkles, Trash2, X } from "../../components/icons";
 import { Button } from "../../components/ui/button";
@@ -5,11 +13,6 @@ import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { useLocale } from "../../i18n";
 import { DEFAULT_SOUL_METADATA, type SoulDraft, useSoul, validateSoulDraft } from "../../lib/soul";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
-import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 
 type SoulSectionProps = {
   createRequestId?: number;

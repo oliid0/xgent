@@ -1,6 +1,6 @@
+import { Center } from "@astryxdesign/core/Center";
 import { ChatMessageList } from "@astryxdesign/core/Chat";
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
-import { Center } from "@astryxdesign/core/Center";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { VStack } from "@astryxdesign/core/Layout";
@@ -207,9 +207,7 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
             style={{ marginInline: "auto" }}
           >
             {showNoModelsState || showStartChatState ? (
-              <Center
-                style={{ minHeight: "var(--xagent-chat-empty-stage-min-height)" }}
-              >
+              <Center style={{ minHeight: "var(--xagent-chat-empty-stage-min-height)" }}>
                 {/* Keyed per conversation so the hero entrance replays when
                   switching between empty conversations, not just on mount. */}
                 <ChatEmptyState
@@ -266,9 +264,7 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
               </RowInteractionProvider>
             </ChatMessageList>
 
-            <VStack
-              style={{ height: transcriptBottomReservePx }}
-            />
+            <VStack style={{ height: transcriptBottomReservePx }} />
           </VStack>
         </VStack>
         {!showNoModelsState && !showStartChatState && !isTranscriptSettling ? (

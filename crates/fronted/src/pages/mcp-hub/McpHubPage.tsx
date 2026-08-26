@@ -1,3 +1,4 @@
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useState } from "react";
 import {
   HubBackdrop,
@@ -13,7 +14,6 @@ import { cn } from "../../lib/shared/utils";
 import { McpImportView } from "./McpImportView";
 import { McpRegistryBrowser } from "./McpRegistryBrowser";
 import { McpServerEditModal, McpServersForm } from "./McpServersForm";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
 
 type McpHubPageProps = {
   settings: AppSettings;

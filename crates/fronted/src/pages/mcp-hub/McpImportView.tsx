@@ -1,3 +1,9 @@
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import {
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HubPanel, HubSegmentedButton, HubSegmentedControl } from "../../components/hub/HubChrome";
 import {
@@ -21,9 +27,6 @@ import {
   scanExternalMcpServers,
   scanMcpConfigContent,
 } from "../../lib/skills";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 const EXTERNAL_MCP_TOOL_LABELS: Record<string, string> = {
   "claude-code": "Claude Code",

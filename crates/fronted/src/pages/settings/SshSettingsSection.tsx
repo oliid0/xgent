@@ -1,6 +1,13 @@
-import { invoke, isBrowserRuntime } from "@xagent/runtime";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { invoke, isBrowserRuntime } from "@xagent/runtime";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import {
+  Heading as AstryxHeading,
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import {
   Check,
@@ -19,7 +26,6 @@ import {
   Trash2,
   Upload,
 } from "../../components/icons";
-
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -40,10 +46,6 @@ import {
 } from "../../lib/ssh/scan";
 import { ConfirmActionPopover, ConfirmDeletePopover, PromptTag } from "./shared";
 import type { SettingsSectionProps } from "./types";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 type SshViewMode = "list" | "grid";
 type SshHostDraft = Omit<SshHostConfig, "id">;

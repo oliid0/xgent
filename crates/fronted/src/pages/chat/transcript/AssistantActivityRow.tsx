@@ -1,5 +1,5 @@
-import { memo } from "react";
 import { VStack } from "@astryxdesign/core/Layout";
+import { memo } from "react";
 import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { HistoryMessageRef } from "../../../lib/chat/conversation/conversationState";
 import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
@@ -44,11 +44,7 @@ export const AssistantActivityRow = memo(function AssistantActivityRow(props: {
       className="min-w-0 w-full max-w-full"
     >
       {row.units.map((unit, index) => (
-        <VStack
-          key={unit.key}
-          data-activity-key={unit.key}
-          className="min-w-0 max-w-full"
-        >
+        <VStack key={unit.key} data-activity-key={unit.key} className="min-w-0 max-w-full">
           <AssistantRenderUnit
             row={unit}
             showUsage={showUsage}
@@ -63,11 +59,7 @@ export const AssistantActivityRow = memo(function AssistantActivityRow(props: {
             onBranchConversation={onBranchConversation}
           />
           {unit.gapAfter > 0 && index < row.units.length - 1 ? (
-            <VStack
-              aria-hidden="true"
-              className="shrink-0"
-              style={{ height: unit.gapAfter }}
-            />
+            <VStack aria-hidden="true" className="shrink-0" style={{ height: unit.gapAfter }} />
           ) : null}
         </VStack>
       ))}

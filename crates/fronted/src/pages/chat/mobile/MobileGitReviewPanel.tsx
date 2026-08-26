@@ -1,8 +1,7 @@
-import { invoke } from "@xagent/runtime";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
-import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Center } from "@astryxdesign/core/Center";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
@@ -12,6 +11,7 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
+import { invoke } from "@xagent/runtime";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -539,72 +539,72 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
           </HStack>
           <StackItem size="fill" isScrollable>
             <VStack padding={3} className="min-h-full overscroll-contain">
-            {!snapshot && busy ? (
-              <Center height="100%">
-                <HStack gap={2} vAlign="center">
-                  <Spinner aria-label={t("chat.mobileTerminal.running")} size="sm" />
-                  <Text type="supporting" color="secondary">
-                    {t("chat.mobileTerminal.running")}
-                  </Text>
-                </HStack>
-              </Center>
-            ) : notRepository ? (
-              <EmptyState
-                icon={<GitBranch />}
-                title={t("git.branchSelector.initRepositoryTitle")}
-                description={t("git.branchSelector.initRepositoryDescription")}
-                actions={
-                  <Button
-                    label={t("git.branchSelector.initRepository")}
-                    variant="primary"
-                    isDisabled={Boolean(busy)}
-                    onClick={() => void initializeRepository()}
-                  />
-                }
-              />
-            ) : snapshot?.changes.length === 0 ? (
-              <EmptyState
-                icon={<FileText />}
-                title={t("projectTools.gitReview.noLocalChanges")}
-                isCompact
-              />
-            ) : (
-              <List density="balanced" hasDividers>
-                {snapshot?.changes.map((change) => (
-                  <ListItem
-                    key={`${change.indexStatus}${change.worktreeStatus}:${change.path}`}
-                    label={change.path}
-                    startContent={
-                      <Token
-                        label={changeBadge(change)}
-                        color={change.untracked ? "green" : "orange"}
-                        size="sm"
-                      />
-                    }
-                    description={
-                      <HStack gap={1} wrap="wrap">
-                        {change.staged ? (
-                          <Token
-                            label={t("projectTools.gitReview.labelStaged")}
-                            color="green"
-                            size="sm"
-                          />
-                        ) : null}
-                        {change.working ? (
-                          <Token
-                            label={t("projectTools.gitReview.labelUnstaged")}
-                            color="orange"
-                            size="sm"
-                          />
-                        ) : null}
-                      </HStack>
-                    }
-                    isDisabled={Boolean(busy)}
-                    onClick={() => void openChange(change)}
-                  />
-                ))}
-              </List>
-            )}
+              {!snapshot && busy ? (
+                <Center height="100%">
+                  <HStack gap={2} vAlign="center">
+                    <Spinner aria-label={t("chat.mobileTerminal.running")} size="sm" />
+                    <Text type="supporting" color="secondary">
+                      {t("chat.mobileTerminal.running")}
+                    </Text>
+                  </HStack>
+                </Center>
+              ) : notRepository ? (
+                <EmptyState
+                  icon={<GitBranch />}
+                  title={t("git.branchSelector.initRepositoryTitle")}
+                  description={t("git.branchSelector.initRepositoryDescription")}
+                  actions={
+                    <Button
+                      label={t("git.branchSelector.initRepository")}
+                      variant="primary"
+                      isDisabled={Boolean(busy)}
+                      onClick={() => void initializeRepository()}
+                    />
+                  }
+                />
+              ) : snapshot?.changes.length === 0 ? (
+                <EmptyState
+                  icon={<FileText />}
+                  title={t("projectTools.gitReview.noLocalChanges")}
+                  isCompact
+                />
+              ) : (
+                <List density="balanced" hasDividers>
+                  {snapshot?.changes.map((change) => (
+                    <ListItem
+                      key={`${change.indexStatus}${change.worktreeStatus}:${change.path}`}
+                      label={change.path}
+                      startContent={
+                        <Token
+                          label={changeBadge(change)}
+                          color={change.untracked ? "green" : "orange"}
+                          size="sm"
+                        />
+                      }
+                      description={
+                        <HStack gap={1} wrap="wrap">
+                          {change.staged ? (
+                            <Token
+                              label={t("projectTools.gitReview.labelStaged")}
+                              color="green"
+                              size="sm"
+                            />
+                          ) : null}
+                          {change.working ? (
+                            <Token
+                              label={t("projectTools.gitReview.labelUnstaged")}
+                              color="orange"
+                              size="sm"
+                            />
+                          ) : null}
+                        </HStack>
+                      }
+                      isDisabled={Boolean(busy)}
+                      onClick={() => void openChange(change)}
+                    />
+                  ))}
+                </List>
+              )}
             </VStack>
           </StackItem>
           <HStack
@@ -647,33 +647,33 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
             padding={3}
             className="min-h-full overscroll-contain pb-[calc(var(--spacing-3)+env(safe-area-inset-bottom,0px))]"
           >
-          {busy && history.length === 0 ? (
-            <Center height="100%">
-              <HStack gap={2} vAlign="center">
-                <Spinner aria-label={t("chat.mobileTerminal.running")} size="sm" />
-                <Text type="supporting" color="secondary">
-                  {t("chat.mobileTerminal.running")}
-                </Text>
-              </HStack>
-            </Center>
-          ) : history.length === 0 ? (
-            <EmptyState
-              icon={<History />}
-              title={t("projectTools.gitReview.noCommitHistory")}
-              isCompact
-            />
-          ) : (
-            <List density="balanced" hasDividers>
-              {history.map((entry) => (
-                <ListItem
-                  key={entry.sha}
-                  label={entry.subject}
-                  description={`${entry.shortSha} · ${entry.author} · ${entry.date}`}
-                  startContent={<GitCommitHorizontal />}
-                  isDisabled={Boolean(busy)}
-                  onClick={() => void openCommit(entry)}
-                />
-              ))}
+            {busy && history.length === 0 ? (
+              <Center height="100%">
+                <HStack gap={2} vAlign="center">
+                  <Spinner aria-label={t("chat.mobileTerminal.running")} size="sm" />
+                  <Text type="supporting" color="secondary">
+                    {t("chat.mobileTerminal.running")}
+                  </Text>
+                </HStack>
+              </Center>
+            ) : history.length === 0 ? (
+              <EmptyState
+                icon={<History />}
+                title={t("projectTools.gitReview.noCommitHistory")}
+                isCompact
+              />
+            ) : (
+              <List density="balanced" hasDividers>
+                {history.map((entry) => (
+                  <ListItem
+                    key={entry.sha}
+                    label={entry.subject}
+                    description={`${entry.shortSha} · ${entry.author} · ${entry.date}`}
+                    startContent={<GitCommitHorizontal />}
+                    isDisabled={Boolean(busy)}
+                    onClick={() => void openCommit(entry)}
+                  />
+                ))}
               </List>
             )}
           </VStack>

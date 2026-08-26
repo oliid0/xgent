@@ -1,6 +1,7 @@
 import type { ImageContent, ToolResultMessage } from "@earendil-works/pi-ai";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useEffect, useMemo, useState } from "react";
-
 import { ImagePreview, type ImagePreviewSlide } from "../../../../components/chat/ImagePreview";
 import { ImageOff, Loader2 } from "../../../../components/icons";
 import { useLocale } from "../../../../i18n";
@@ -19,8 +20,6 @@ import type {
   DisplayImageResultDetails,
 } from "../../../../lib/tools/builtinTypes";
 import { getBuiltinResultKind } from "./assistantBubbleUtils";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 export function getToolResultImages(result?: ToolResultMessage) {
   if (!result) return [];

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import { StackItem, VStack } from "@astryxdesign/core/Layout";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { useEffect, useState } from "react";
 import { useLocale } from "../../i18n";
 import type { AppSettings } from "../../lib/settings";
 import { CronSection } from "../../pages/settings/CronSection";
@@ -54,12 +54,7 @@ export function BackgroundServicesPanel(props: BackgroundServicesPanelProps) {
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
-              <SegmentedControlItem
-                key={tab.id}
-                value={tab.id}
-                label={tab.label}
-                icon={<Icon />}
-              />
+              <SegmentedControlItem key={tab.id} value={tab.id} label={tab.label} icon={<Icon />} />
             );
           })}
         </SegmentedControl>

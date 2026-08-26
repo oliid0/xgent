@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -8,6 +7,7 @@ import { List, ListItem } from "@astryxdesign/core/List";
 import { Section } from "@astryxdesign/core/Section";
 import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
+import { useEffect, useMemo, useState } from "react";
 import { useLocale } from "../../i18n";
 import type {
   PendingToolApprovalSummary,

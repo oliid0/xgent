@@ -14,48 +14,48 @@
     --xagent-content-width-sm: 24rem;
     --xagent-content-width-md: 48rem;
     --xagent-chat-measure: 50em;
-  --xagent-approval-summary-max-height: 6rem;
-  --xagent-tool-preview-max-height: 14rem;
-  --xagent-image-preview-stage-min-height: 16rem;
-  --xagent-image-preview-max-height: calc(100dvh - 9rem);
-  --xagent-image-preview-slider-max-width: 20rem;
-  --xagent-workspace-image-stage-min-height: 12rem;
-  --xagent-z-workspace-overlay: 50;
-  --xagent-z-workspace-navigation: 30;
-  --xagent-oauth-list-min-height: 8rem;
-  --xagent-chat-empty-stage-min-height: calc(100dvh - 13.75rem);
-  --xagent-z-chat-floating-action: 10;
-  --xagent-artifacts-list-max-height: 9.375rem;
-  --xagent-changed-files-list-max-height: 13.125rem;
-  --xagent-assistant-avatar-size: 1.75rem;
-  --xagent-opacity-compacted: 0.7;
-  --xagent-macos-titlebar-spacer-height: 2.375rem;
-  --xagent-macos-titlebar-leading-inset: 5.5rem;
-  --xagent-windows-titlebar-height: 2rem;
-  --xagent-window-app-icon-size: 0.9375rem;
-  --xagent-window-control-width: 2.375rem;
-  --xagent-window-close-control-width: 2.625rem;
-  --xagent-window-chrome-opacity-inactive: 0.55;
-  --xagent-window-chrome-background: color-mix(
-    in srgb,
-    var(--color-background-surface) 82%,
-    transparent
-  );
-  --xagent-window-chrome-blur: 1.25rem;
-  --xagent-window-chrome-saturation: 1.35;
-  --xagent-z-titlebar-actions: 49;
-  --xagent-z-window-chrome: 50;
-  --xagent-z-hub-header: 10;
-  --xagent-hub-content-max-width: 82.5rem;
-  --xagent-hub-header-control-size: 2.75rem;
-  --xagent-hub-header-icon-size: 2.5rem;
-  --xagent-hub-sidebar-reserve: 2.75rem;
-  --xagent-hub-header-blur: 1.25rem;
-  --xagent-hub-header-background: color-mix(
-    in srgb,
-    var(--color-background-surface) 82%,
-    transparent
-  );
+    --xagent-approval-summary-max-height: 6rem;
+    --xagent-tool-preview-max-height: 14rem;
+    --xagent-image-preview-stage-min-height: 16rem;
+    --xagent-image-preview-max-height: calc(100dvh - 9rem);
+    --xagent-image-preview-slider-max-width: 20rem;
+    --xagent-workspace-image-stage-min-height: 12rem;
+    --xagent-z-workspace-overlay: 50;
+    --xagent-z-workspace-navigation: 30;
+    --xagent-oauth-list-min-height: 8rem;
+    --xagent-chat-empty-stage-min-height: calc(100dvh - 13.75rem);
+    --xagent-z-chat-floating-action: 10;
+    --xagent-artifacts-list-max-height: 9.375rem;
+    --xagent-changed-files-list-max-height: 13.125rem;
+    --xagent-assistant-avatar-size: 1.75rem;
+    --xagent-opacity-compacted: 0.7;
+    --xagent-macos-titlebar-spacer-height: 2.375rem;
+    --xagent-macos-titlebar-leading-inset: 5.5rem;
+    --xagent-windows-titlebar-height: 2rem;
+    --xagent-window-app-icon-size: 0.9375rem;
+    --xagent-window-control-width: 2.375rem;
+    --xagent-window-close-control-width: 2.625rem;
+    --xagent-window-chrome-opacity-inactive: 0.55;
+    --xagent-window-chrome-background: color-mix(
+      in srgb,
+      var(--color-background-surface) 82%,
+      transparent
+    );
+    --xagent-window-chrome-blur: 1.25rem;
+    --xagent-window-chrome-saturation: 1.35;
+    --xagent-z-titlebar-actions: 49;
+    --xagent-z-window-chrome: 50;
+    --xagent-z-hub-header: 10;
+    --xagent-hub-content-max-width: 82.5rem;
+    --xagent-hub-header-control-size: 2.75rem;
+    --xagent-hub-header-icon-size: 2.5rem;
+    --xagent-hub-sidebar-reserve: 2.75rem;
+    --xagent-hub-header-blur: 1.25rem;
+    --xagent-hub-header-background: color-mix(
+      in srgb,
+      var(--color-background-surface) 82%,
+      transparent
+    );
     --xagent-task-overlay-width: 23.75rem;
     --xagent-z-task-overlay: 95;
     --xagent-content-width-lg: 45rem;

@@ -9,6 +9,7 @@ import { DiffFile } from "@git-diff-view/file";
 import { DiffModeEnum, DiffView } from "@git-diff-view/react";
 import "@git-diff-view/react/styles/diff-view.css";
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import {
   memo,
   type MouseEvent as ReactMouseEvent,
@@ -41,7 +42,6 @@ import {
   syncGitReviewAutoscrollScrollbar,
   useOverlayScrollbar,
 } from "./useOverlayScrollbar";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
 
 const RAW_DIFF_PREVIEW_CHAR_LIMIT = 60 * 1024;
 

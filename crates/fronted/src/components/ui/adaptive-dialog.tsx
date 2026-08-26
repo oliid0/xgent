@@ -1,7 +1,7 @@
 import { BottomSheet } from "@astryxdesign/core/BottomSheet";
 import { Dialog, DialogHeader, type DialogPurpose } from "@astryxdesign/core/Dialog";
-import { Layout, LayoutContent, LayoutFooter, VStack } from "@astryxdesign/core/Layout";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { Layout, LayoutContent, LayoutFooter, VStack } from "@astryxdesign/core/Layout";
 import type { ReactNode } from "react";
 
 const TOUCH_ORIENTED_LG_QUERY = "(max-width: 1024px) and (pointer: coarse) and (hover: none)";

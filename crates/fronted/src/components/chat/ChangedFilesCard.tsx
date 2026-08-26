@@ -72,11 +72,7 @@ const ChangedFileRow = memo(function ChangedFileRow({ file }: { file: ChangedFil
         </Text>
       }
       startContent={
-        <Icon
-          icon={FileTypeIcon}
-          size="sm"
-          color={file.deleted ? "disabled" : "secondary"}
-        />
+        <Icon icon={FileTypeIcon} size="sm" color={file.deleted ? "disabled" : "secondary"} />
       }
       endContent={
         <HStack gap={1} vAlign="center">

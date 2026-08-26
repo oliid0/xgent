@@ -6,12 +6,14 @@
 // Shared by every frontend runtime. Platform differences belong in the
 // runtime boundary, never in this modal.
 
-import { useEffect, useState } from "react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { useEffect, useState } from "react";
 import {
   formatMemoryError,
   type MemoryOrganizeRunStatus,
@@ -52,8 +54,6 @@ import {
 } from "./panelModel";
 import { BrushCleaning, Button, Check, DrawerSelect, RefreshCw } from "./platform";
 import { useOrganizeRunHistory } from "./useMemoryPanelData";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 export function OrganizerHistoryModal(props: {
   t: (key: string) => string;

@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Section } from "@astryxdesign/core/Section";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
+import type { ReactNode } from "react";
 
 export {
   ConfirmActionPopover,
@@ -52,14 +52,14 @@ export function SettingsRow(props: {
     >
       <StackItem size="fill">
         <VStack gap={0.5}>
-        <Text type="body" weight="medium">
-          {props.label}
-        </Text>
-        {props.description ? (
-          <Text type="supporting" color="secondary">
-            {props.description}
+          <Text type="body" weight="medium">
+            {props.label}
           </Text>
-        ) : null}
+          {props.description ? (
+            <Text type="supporting" color="secondary">
+              {props.description}
+            </Text>
+          ) : null}
         </VStack>
       </StackItem>
       <HStack hAlign="end" vAlign="center" className="settings-row-control shrink-0">

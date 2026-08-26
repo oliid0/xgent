@@ -3,6 +3,12 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import {
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import iconSimpleUrl from "../../../src-tauri/icons/icon-simple.png";
 import { useLocale } from "../../i18n";
@@ -63,9 +69,6 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { Input } from "../ui/input";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 type ChatHistorySidebarProps = {
   items: readonly SidebarConversation[];

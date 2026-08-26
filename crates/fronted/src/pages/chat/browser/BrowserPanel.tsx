@@ -1,4 +1,8 @@
 import { isTauriRuntime } from "@xagent/runtime";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import {
   type FormEvent,
   useCallback,
@@ -17,10 +21,6 @@ import {
   normalizeBrowserAddress,
 } from "../../../lib/browser/browserSessionController";
 import { cn } from "../../../lib/shared/utils";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
-import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 
 function hostname(url: string) {
   try {

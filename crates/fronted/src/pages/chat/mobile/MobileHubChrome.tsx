@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
 import { Center } from "@astryxdesign/core/Center";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
+import type { ReactNode } from "react";
 import { PanelLeft, Search } from "../../../components/icons";
 
 type MobileHubHeaderProps = {

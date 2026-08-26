@@ -1,3 +1,5 @@
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Paragraph as AstryxParagraph, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { ChevronDown, Globe, Trash2 } from "../../components/icons";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -17,9 +19,6 @@ import {
   type HttpRequestSpec,
 } from "../../lib/automation";
 import { createUuid } from "../../lib/shared/id";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 export type HttpRequestDraft = {
   id: string;

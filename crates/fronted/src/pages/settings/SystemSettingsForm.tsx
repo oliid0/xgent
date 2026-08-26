@@ -1,4 +1,10 @@
 import { isBrowserRuntime } from "@xagent/runtime";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import {
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -54,9 +60,6 @@ import type { TerminalShellOption } from "../../lib/terminal/types";
 import { useTrayPrefs, writeTrayPrefs } from "../../lib/tray/trayPrefs";
 import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 const FONT_SCALE_OPTIONS = [0.9, 1, 1.1, 1.2] as const;
 

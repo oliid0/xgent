@@ -1,6 +1,6 @@
+import { Card } from "@astryxdesign/core/Card";
 import { generateDiffFile } from "@git-diff-view/file";
 import { DiffModeEnum, DiffView } from "@git-diff-view/react";
-import { Card } from "@astryxdesign/core/Card";
 import { useMemo, useSyncExternalStore } from "react";
 import "@git-diff-view/react/styles/diff-view.css";
 

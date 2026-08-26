@@ -1,4 +1,12 @@
 import { isBrowserRuntime } from "@xagent/runtime";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import {
+  Heading as AstryxHeading,
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { type FormEvent, memo, useEffect, useMemo, useState } from "react";
 import { ToolPolicyToggle } from "../../components/hub/ToolPolicyToggle";
 import {
@@ -37,11 +45,6 @@ import {
 import { cn } from "../../lib/shared/utils";
 import { toolGroupPolicyKey, toolServerPolicyKey } from "../../lib/tools/toolPolicy";
 import { SettingsModalShell } from "../settings/SettingsModalShell";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 type SetMcpSettingsFn = (updater: (prev: AppSettings) => AppSettings) => void;
 

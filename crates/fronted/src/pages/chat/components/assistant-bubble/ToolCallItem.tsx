@@ -1,10 +1,13 @@
-import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import { Banner } from "@astryxdesign/core/Banner";
-import { ChatToolCalls, type ChatToolCallItem as AstryxToolCallItem } from "@astryxdesign/core/Chat";
+import {
+  type ChatToolCallItem as AstryxToolCallItem,
+  ChatToolCalls,
+} from "@astryxdesign/core/Chat";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import { memo, type ReactNode, useCallback } from "react";
 
 import { AskUserQuestionCard } from "../../../../components/chat/AskUserQuestionCard";

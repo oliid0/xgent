@@ -1,6 +1,11 @@
-import type { Context, Message, UserMessage } from "@earendil-works/pi-ai";
 import { ResizeHandle, useResizable } from "@astryxdesign/core/Resizable";
+import type { Context, Message, UserMessage } from "@earendil-works/pi-ai";
 import { invoke, listen, listenFileDrop, revealItemInDir } from "@xagent/runtime";
+import {
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import {
   type CSSProperties,
   lazy,
@@ -314,8 +319,6 @@ import { ConversationTrajectorySurface } from "./chat/trajectory/ConversationTra
 import { McpHubPage } from "./mcp-hub/McpHubPage";
 import type { SectionId, SettingsOpenOptions } from "./settings/types";
 import { SkillsHubPage } from "./skills-hub/SkillsHubPage";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 const WorkspaceCodeEditorOverlay = lazy(async () => {
   await preparePreferredMonacoNlsLocale();
@@ -5449,9 +5452,7 @@ export function ChatPage(props: ChatPageProps) {
           onOpenWorkspaceTool={handleOpenWorkspaceTool}
         />
 
-        {!mobileExperience &&
-        sidebarOpen &&
-        desktopNavigationTarget === "conversations" ? (
+        {!mobileExperience && sidebarOpen && desktopNavigationTarget === "conversations" ? (
           <ResizeHandle
             direction="horizontal"
             hasDivider

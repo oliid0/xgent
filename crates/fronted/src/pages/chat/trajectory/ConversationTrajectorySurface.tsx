@@ -7,8 +7,8 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { Layout, LayoutContent, LayoutHeader } from "@astryxdesign/core/Layout";
 import { Section } from "@astryxdesign/core/Section";
 import { Spinner } from "@astryxdesign/core/Spinner";
-import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { invoke } from "@xagent/runtime";
@@ -44,7 +44,9 @@ function numberField(event: TrajectoryEvent, key: string) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-function statusVariant(event: TrajectoryEvent): "success" | "warning" | "error" | "accent" | "neutral" {
+function statusVariant(
+  event: TrajectoryEvent,
+): "success" | "warning" | "error" | "accent" | "neutral" {
   if (event.err || event.st === "error") return "error";
   if (event.st === "aborted") return "warning";
   if (event.st === "complete" || event.k === "tool_end" || event.k === "turn_end") {
@@ -100,7 +102,9 @@ function eventDetails(event: TrajectoryEvent): string[] {
     const before = numberField(event, "before");
     const after = numberField(event, "after");
     details.push(
-      before === undefined && after === undefined ? undefined : `${before ?? "?"} → ${after ?? "?"}`,
+      before === undefined && after === undefined
+        ? undefined
+        : `${before ?? "?"} → ${after ?? "?"}`,
       textField(event, "err"),
     );
   }

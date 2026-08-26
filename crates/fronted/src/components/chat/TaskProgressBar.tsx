@@ -20,31 +20,27 @@ export function TaskProgressBar(props: {
   const label = active?.activeForm || active?.subject || t("chat.tasks.ready");
 
   return (
-    <VStack
-      className="mx-auto w-full max-w-4xl px-3 pb-2 sm:px-5"
-    >
+    <VStack className="mx-auto w-full max-w-4xl px-3 pb-2 sm:px-5">
       <Card width="100%" padding={3} elevation="low">
         <VStack gap={2}>
-        <HStack gap={2} vAlign="center">
-          {active && isConversationRunning ? (
-            <Spinner aria-label={label} size="sm" />
-          ) : (
-            <Check />
-          )}
-          <StackItem size="fill">
-            <Text type="label" maxLines={1}>{label}</Text>
-          </StackItem>
-          <Text type="supporting" color="secondary" hasTabularNumbers>
-            {completed}/{snapshot.tasks.length}
-          </Text>
-        </HStack>
-        <ProgressBar
-          label={t("chat.tasks.progress")}
-          value={completed}
-          max={snapshot.tasks.length}
-          isLabelHidden
-          variant={completed === snapshot.tasks.length ? "success" : "accent"}
-        />
+          <HStack gap={2} vAlign="center">
+            {active && isConversationRunning ? <Spinner aria-label={label} size="sm" /> : <Check />}
+            <StackItem size="fill">
+              <Text type="label" maxLines={1}>
+                {label}
+              </Text>
+            </StackItem>
+            <Text type="supporting" color="secondary" hasTabularNumbers>
+              {completed}/{snapshot.tasks.length}
+            </Text>
+          </HStack>
+          <ProgressBar
+            label={t("chat.tasks.progress")}
+            value={completed}
+            max={snapshot.tasks.length}
+            isLabelHidden
+            variant={completed === snapshot.tasks.length ? "success" : "accent"}
+          />
         </VStack>
       </Card>
     </VStack>

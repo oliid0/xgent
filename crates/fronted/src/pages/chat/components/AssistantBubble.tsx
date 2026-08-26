@@ -168,11 +168,7 @@ export const AssistantBubbleUnit = memo(function AssistantBubbleUnit(props: {
         paddingBlockStart={unit.kind === "status" && isAgentMode ? 1 : row.showAvatar ? 0.5 : 0}
       >
         {status ? (
-          <VStack
-            width="100%"
-            paddingBlock={1.5}
-            style={{ overflow: "hidden" }}
-          >
+          <VStack width="100%" paddingBlock={1.5} style={{ overflow: "hidden" }}>
             {status}
           </VStack>
         ) : null}

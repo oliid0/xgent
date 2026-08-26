@@ -4,9 +4,11 @@
 // Shared by every frontend runtime; only relative or @xagent/runtime imports
 // are allowed here.
 
-import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
 import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../../i18n";
 import type { GitStatusEntry } from "../../../lib/git/types";
 import { cn } from "../../../lib/shared/utils";
@@ -46,8 +48,6 @@ import {
 import { GitDiscardConfirmModal } from "./Toolbar";
 import type { GitReviewData } from "./useGitReviewData";
 import { GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS, useOverlayScrollbar } from "./useOverlayScrollbar";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 const INITIAL_CHANGE_ENTRY_RENDER_COUNT = 160;
 const CHANGE_ENTRY_RENDER_BATCH_SIZE = 160;

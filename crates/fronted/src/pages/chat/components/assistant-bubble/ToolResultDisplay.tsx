@@ -1,6 +1,7 @@
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { type ReactNode, useSyncExternalStore } from "react";
-
 import { Markdown } from "../../../../components/Markdown";
 import { useLocale } from "../../../../i18n";
 import {
@@ -51,8 +52,6 @@ import {
 import { EditDiffView } from "./EditDiffView";
 import { TodoListView } from "./TodoListView";
 import { getToolResultImages, ToolResultImagePreview } from "./ToolImages";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 export function ToolSection(props: { label?: string; trailing?: ReactNode; children: ReactNode }) {
   const { label, trailing, children } = props;

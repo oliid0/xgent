@@ -182,9 +182,7 @@ export function ModelFailoverSection({ settings, setSettings }: SettingsSectionP
                                     size="sm"
                                     variant="ghost"
                                     isDisabled={index === 0}
-                                    onClick={() =>
-                                      moveQueueProvider(providerType, provider.id, -1)
-                                    }
+                                    onClick={() => moveQueueProvider(providerType, provider.id, -1)}
                                   />
                                   <IconButton
                                     label={moveDownLabel}
@@ -193,17 +191,13 @@ export function ModelFailoverSection({ settings, setSettings }: SettingsSectionP
                                     size="sm"
                                     variant="ghost"
                                     isDisabled={index === queueProviders.length - 1}
-                                    onClick={() =>
-                                      moveQueueProvider(providerType, provider.id, 1)
-                                    }
+                                    onClick={() => moveQueueProvider(providerType, provider.id, 1)}
                                   />
                                   <Button
                                     label={t("settings.failover.remove")}
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() =>
-                                      toggleQueueProvider(providerType, provider.id)
-                                    }
+                                    onClick={() => toggleQueueProvider(providerType, provider.id)}
                                   />
                                 </HStack>
                               }

@@ -46,9 +46,7 @@ export function LazyCollapse(props: {
         {mounted ? (
           // Dropping the class on collapse resets the CSS animation, so
           // every re-expand replays the entrance.
-          <VStack className={open ? "lazy-collapse-reveal" : "invisible"}>
-            {children()}
-          </VStack>
+          <VStack className={open ? "lazy-collapse-reveal" : "invisible"}>{children()}</VStack>
         ) : null}
       </VStack>
     </Grid>

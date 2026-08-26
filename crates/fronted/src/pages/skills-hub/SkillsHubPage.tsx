@@ -1,3 +1,10 @@
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Link } from "@astryxdesign/core/Link";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Skeleton } from "@astryxdesign/core/Skeleton";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import {
   type KeyboardEvent,
   useCallback,
@@ -7,10 +14,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
-import { Link } from "@astryxdesign/core/Link";
-import { Selector } from "@astryxdesign/core/Selector";
-import { Skeleton } from "@astryxdesign/core/Skeleton";
 import {
   GlassPanel,
   HubBackdrop,
@@ -100,9 +103,6 @@ import {
   isInstalledSkillSort,
   sortInstalledSkillItems,
 } from "../../lib/skills/installedSort";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
 
 type SkillsHubView = "installed" | "store" | "import";
 
@@ -5200,7 +5200,10 @@ function installPhaseLabel(job: SkillInstallJobSnapshot | undefined, t: (key: st
       return t("settings.skillsStorePhasePreparing");
   }
 }
+
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
+import {
+  Heading as AstryxHeading,
+  Paragraph as AstryxParagraph,
+} from "@xagent/ui/components/ui/view";

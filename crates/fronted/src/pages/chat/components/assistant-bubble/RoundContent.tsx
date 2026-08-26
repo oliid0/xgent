@@ -1,9 +1,9 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { HStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Text } from "@astryxdesign/core/Text";
+import { View as AstryxView } from "@xagent/ui/components/ui/view";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Lightbulb, RefreshCw } from "../../../../components/icons";
 import { Markdown } from "../../../../components/Markdown";
 import { useLocale } from "../../../../i18n";
@@ -18,7 +18,6 @@ import { MemoToolCallItem } from "./ToolCallItem";
 import { getNativeDisplayImagePayload, NativeDisplayImageBlock } from "./ToolImages";
 import { ToolTraceGroup } from "./ToolTraceGroup";
 import { UsagePanel } from "./UsagePanel";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
 
 const ThinkingBlock = memo(function ThinkingBlock({
   text,
@@ -47,9 +46,9 @@ const ThinkingBlock = memo(function ThinkingBlock({
     <Collapsible
       isOpen={isOpen}
       onOpenChange={(nextOpen) => {
-          userInteractedRef.current = true;
-          setIsOpen(nextOpen);
-        }}
+        userInteractedRef.current = true;
+        setIsOpen(nextOpen);
+      }}
       trigger={
         isRunning ? (
           <AssistantStatus>{t("chat.thinking")}</AssistantStatus>

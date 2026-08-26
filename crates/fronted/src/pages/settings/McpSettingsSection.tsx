@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Heading, Text } from "@astryxdesign/core/Text";
+import { useState } from "react";
 import { Cable, Plus } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { type McpServerConfig, updateMcp } from "../../lib/settings";
@@ -33,9 +33,7 @@ export function McpSettingsSection(props: SettingsSectionProps & { allowStdio: b
         <HStack gap={3} vAlign="center">
           <Cable />
           <VStack gap={0}>
-            <Heading level={2}>
-              MCP
-            </Heading>
+            <Heading level={2}>MCP</Heading>
             <Text type="supporting" color="secondary">
               {t("mcpHub.subtitle")}
             </Text>

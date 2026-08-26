@@ -371,4 +371,5 @@ export function useNativeInputContextMenu(options: { enabled?: boolean } = {}) {
     },
   };
 }
+
 import type { ContextMenuOption } from "@astryxdesign/core/ContextMenu";

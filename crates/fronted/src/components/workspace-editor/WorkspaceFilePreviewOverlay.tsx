@@ -1,3 +1,5 @@
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { renderAsync } from "docx-preview";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { read, utils } from "xlsx";
@@ -25,8 +27,6 @@ import {
   isWorkspaceEditablePreviewPath,
   type WorkspacePreviewKind,
 } from "./workspaceImagePreview";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 export type WorkspaceFilePreviewOpenRequest = {
   id: number;

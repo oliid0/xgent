@@ -1,4 +1,3 @@
-import { invoke } from "@xagent/runtime";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Code, CodeBlock } from "@astryxdesign/core/CodeBlock";
@@ -9,16 +8,9 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
+import { invoke } from "@xagent/runtime";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  GitBranch,
-  Key,
-  Send,
-  Square,
-  Terminal,
-  Trash2,
-  X,
-} from "../../../components/icons";
+import { GitBranch, Key, Send, Square, Terminal, Trash2, X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import type { SshHostConfig } from "../../../lib/settings";
 import { MobileFullscreenPanel } from "./MobilePanelScaffold";
@@ -368,96 +360,96 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           padding={3}
           className="h-full overflow-y-auto overscroll-contain"
         >
-        {entries.length === 0 ? (
-          <EmptyState
-            icon={<PanelIcon />}
-            title={
-              mode === "git"
-                ? t("chat.mobileGit.ready")
-                : mode === "ssh"
-                  ? t("chat.mobileSsh.ready")
-                  : t("chat.mobileTerminal.ready")
-            }
-            description={
-              mode === "git"
-                ? t("chat.mobileGit.hint")
-                : mode === "ssh"
-                  ? t("chat.mobileSsh.hint")
-                  : t("chat.mobileTerminal.workspaceHint")
-            }
-            isCompact
-          />
-        ) : (
-          <VStack gap={4}>
-            {entries.map((entry) => {
-              const response = entry.response;
-              const exitCode = response?.exitCode ?? response?.exit_code;
-              return (
-                <Card key={entry.id} padding={3} width="100%">
-                  <VStack gap={3}>
-                    <Text type="body" weight="medium">
-                      <Code>{`$ ${entry.command}`}</Code>
-                    </Text>
-                    {entry.id === activeRunId ? (
-                      <HStack gap={2} vAlign="center">
-                        <Spinner aria-label={t("chat.mobileTerminal.running")} size="sm" />
-                        <Text type="supporting" color="secondary">
-                          {t("chat.mobileTerminal.running")}
-                        </Text>
-                      </HStack>
-                    ) : null}
-                    {response?.stdout ? (
-                      <CodeBlock
-                        code={response.stdout}
-                        language="plaintext"
-                        title="stdout"
-                        size="sm"
-                        width="100%"
-                        maxHeight="var(--xagent-terminal-output-max-height)"
-                        isWrapped
-                        container="section"
-                      />
-                    ) : null}
-                    {response?.stderr ? (
-                      <CodeBlock
-                        code={response.stderr}
-                        language="plaintext"
-                        title="stderr"
-                        size="sm"
-                        width="100%"
-                        maxHeight="var(--xagent-terminal-output-max-height)"
-                        isWrapped
-                        container="section"
-                      />
-                    ) : null}
-                    {entry.error ? (
-                      <CodeBlock
-                        code={entry.error}
-                        language="plaintext"
-                        title="error"
-                        size="sm"
-                        width="100%"
-                        maxHeight="var(--xagent-terminal-output-max-height)"
-                        isWrapped
-                        container="section"
-                      />
-                    ) : null}
-                    {exitCode !== undefined ? (
-                      <Token
-                        label={t("chat.mobileTerminal.exitCode").replace(
-                          "{code}",
-                          String(exitCode),
-                        )}
-                        color={exitCode === 0 ? "green" : "red"}
-                        size="sm"
-                      />
-                    ) : null}
-                  </VStack>
-                </Card>
-              );
-            })}
-          </VStack>
-        )}
+          {entries.length === 0 ? (
+            <EmptyState
+              icon={<PanelIcon />}
+              title={
+                mode === "git"
+                  ? t("chat.mobileGit.ready")
+                  : mode === "ssh"
+                    ? t("chat.mobileSsh.ready")
+                    : t("chat.mobileTerminal.ready")
+              }
+              description={
+                mode === "git"
+                  ? t("chat.mobileGit.hint")
+                  : mode === "ssh"
+                    ? t("chat.mobileSsh.hint")
+                    : t("chat.mobileTerminal.workspaceHint")
+              }
+              isCompact
+            />
+          ) : (
+            <VStack gap={4}>
+              {entries.map((entry) => {
+                const response = entry.response;
+                const exitCode = response?.exitCode ?? response?.exit_code;
+                return (
+                  <Card key={entry.id} padding={3} width="100%">
+                    <VStack gap={3}>
+                      <Text type="body" weight="medium">
+                        <Code>{`$ ${entry.command}`}</Code>
+                      </Text>
+                      {entry.id === activeRunId ? (
+                        <HStack gap={2} vAlign="center">
+                          <Spinner aria-label={t("chat.mobileTerminal.running")} size="sm" />
+                          <Text type="supporting" color="secondary">
+                            {t("chat.mobileTerminal.running")}
+                          </Text>
+                        </HStack>
+                      ) : null}
+                      {response?.stdout ? (
+                        <CodeBlock
+                          code={response.stdout}
+                          language="plaintext"
+                          title="stdout"
+                          size="sm"
+                          width="100%"
+                          maxHeight="var(--xagent-terminal-output-max-height)"
+                          isWrapped
+                          container="section"
+                        />
+                      ) : null}
+                      {response?.stderr ? (
+                        <CodeBlock
+                          code={response.stderr}
+                          language="plaintext"
+                          title="stderr"
+                          size="sm"
+                          width="100%"
+                          maxHeight="var(--xagent-terminal-output-max-height)"
+                          isWrapped
+                          container="section"
+                        />
+                      ) : null}
+                      {entry.error ? (
+                        <CodeBlock
+                          code={entry.error}
+                          language="plaintext"
+                          title="error"
+                          size="sm"
+                          width="100%"
+                          maxHeight="var(--xagent-terminal-output-max-height)"
+                          isWrapped
+                          container="section"
+                        />
+                      ) : null}
+                      {exitCode !== undefined ? (
+                        <Token
+                          label={t("chat.mobileTerminal.exitCode").replace(
+                            "{code}",
+                            String(exitCode),
+                          )}
+                          color={exitCode === 0 ? "green" : "red"}
+                          size="sm"
+                        />
+                      ) : null}
+                    </VStack>
+                  </Card>
+                );
+              })}
+            </VStack>
+          )}
         </VStack>
       </StackItem>
 

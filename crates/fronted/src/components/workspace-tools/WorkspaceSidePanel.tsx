@@ -1,4 +1,9 @@
 import { openUrl } from "@xagent/runtime";
+import {
+  Heading as AstryxHeading,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import type { GitClient } from "../../lib/git/types";
@@ -36,9 +41,6 @@ import {
 import { XTermViewport } from "../project-tools/XTermViewport";
 import { Button } from "../ui/button";
 import { BackgroundServicesPanel } from "./BackgroundServicesPanel";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 type WorkspaceSidePanelProps = {
   width: number;

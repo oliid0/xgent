@@ -1,7 +1,7 @@
-import { invoke } from "@xagent/runtime";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack } from "@astryxdesign/core/Layout";
+import { invoke } from "@xagent/runtime";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { useLocale } from "../i18n";
@@ -132,36 +132,34 @@ export function MacOsTitleBarToggle({
     <HStack
       gap={0.5}
       vAlign="center"
-      style={{
-        position: "fixed",
-        zIndex: "var(--xagent-z-titlebar-actions)",
-        top: toggleTop,
-        left: toggleLeft,
-        height: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
-        transitionProperty: "left",
-        transitionDuration: "var(--duration-medium)",
-        transitionTimingFunction: "var(--ease-standard)",
-        WebkitAppRegion: "no-drag",
-      } as CSSProperties}
+      style={
+        {
+          position: "fixed",
+          zIndex: "var(--xagent-z-titlebar-actions)",
+          top: toggleTop,
+          left: toggleLeft,
+          height: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
+          transitionProperty: "left",
+          transitionDuration: "var(--duration-medium)",
+          transitionTimingFunction: "var(--ease-standard)",
+          WebkitAppRegion: "no-drag",
+        } as CSSProperties
+      }
     >
       <IconButton
         label={t(sidebarOpen ? "tooltip.closeSidebar" : "tooltip.openSidebar")}
         tooltip={t(sidebarOpen ? "tooltip.closeSidebar" : "tooltip.openSidebar")}
-        icon={
-          <Icon
-            icon={sidebarOpen ? PanelLeftClose : PanelLeft}
-            size="sm"
-            color="inherit"
-          />
-        }
+        icon={<Icon icon={sidebarOpen ? PanelLeftClose : PanelLeft} size="sm" color="inherit" />}
         size="sm"
         variant="ghost"
         onClick={onToggle}
-        style={{
-          height: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
-          width: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
-          WebkitAppRegion: "no-drag",
-        } as CSSProperties}
+        style={
+          {
+            height: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
+            width: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
+            WebkitAppRegion: "no-drag",
+          } as CSSProperties
+        }
       />
       {!sidebarOpen && onOpenSettings && (
         <IconButton
@@ -171,11 +169,13 @@ export function MacOsTitleBarToggle({
           size="sm"
           variant="ghost"
           onClick={onOpenSettings}
-          style={{
-            height: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
-            width: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
-            WebkitAppRegion: "no-drag",
-          } as CSSProperties}
+          style={
+            {
+              height: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
+              width: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
+              WebkitAppRegion: "no-drag",
+            } as CSSProperties
+          }
         />
       )}
       {!sidebarOpen && onOpenSettings && appUpdate ? (

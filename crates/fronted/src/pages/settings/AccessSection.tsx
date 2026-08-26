@@ -1,4 +1,12 @@
 import { invoke, isBrowserRuntime, listen } from "@xagent/runtime";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
+import {
+  Heading as AstryxHeading,
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -26,11 +34,6 @@ import {
 import type { AppSettings } from "../../lib/settings";
 import { AgentActivationSwitch } from "./shared";
 import type { SettingsSectionProps } from "./types";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
-import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 
 type LocalAccessStatus = {
   enabled: boolean;

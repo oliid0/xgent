@@ -1,6 +1,6 @@
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { forwardRef, type ChangeEvent, type InputHTMLAttributes } from "react";
+import { type ChangeEvent, forwardRef, type InputHTMLAttributes } from "react";
 
 export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;

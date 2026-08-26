@@ -6,6 +6,10 @@
 
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   formatMemoryError,
@@ -48,10 +52,6 @@ import {
   toModelValue,
   X,
 } from "./platform";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
-import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 
 const MEMORY_ORGANIZER_TIME_DEBOUNCE_MS = 400;
 

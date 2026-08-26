@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
@@ -7,6 +6,7 @@ import { Section } from "@astryxdesign/core/Section";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
   Clock3,
@@ -144,12 +144,10 @@ export function MobileAssistantSection() {
           <Shield />
           <StackItem size="fill">
             <VStack gap={1}>
-            <Heading level={3}>
-              {t("settings.mobileAssistant.permissions")}
-            </Heading>
-            <Text type="supporting" color="secondary">
-              {t("settings.mobileAssistant.permissionsDescription")}
-            </Text>
+              <Heading level={3}>{t("settings.mobileAssistant.permissions")}</Heading>
+              <Text type="supporting" color="secondary">
+                {t("settings.mobileAssistant.permissionsDescription")}
+              </Text>
             </VStack>
           </StackItem>
           <IconButton
@@ -190,9 +188,7 @@ export function MobileAssistantSection() {
 
       <Section padding={0} width="100%">
         <VStack gap={2} paddingInline={4} paddingBlockStart={4}>
-          <Heading level={3}>
-            {t("settings.mobileAssistant.platformServices")}
-          </Heading>
+          <Heading level={3}>{t("settings.mobileAssistant.platformServices")}</Heading>
         </VStack>
         <List density="balanced" hasDividers>
           {[
@@ -239,9 +235,7 @@ export function MobileAssistantSection() {
           {status.detail}
         </Text>
       ) : null}
-      {error ? (
-        <Banner status="error" title={error} collapsible={false} />
-      ) : null}
+      {error ? <Banner status="error" title={error} collapsible={false} /> : null}
     </VStack>
   );
 }

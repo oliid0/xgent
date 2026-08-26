@@ -1,3 +1,10 @@
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import {
+  Heading as AstryxHeading,
+  Inline as AstryxInline,
+  Paragraph as AstryxParagraph,
+  View as AstryxView,
+} from "@xagent/ui/components/ui/view";
 import { useState } from "react";
 import {
   AlertTriangle,
@@ -12,7 +19,6 @@ import {
   Terminal,
   X,
 } from "../../components/icons";
-
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -44,10 +50,6 @@ import {
 } from "./httpRequestEditor";
 import { ModelPicker, type ModelPickerOption } from "./modelPicker";
 import { SettingsModalShell } from "./SettingsModalShell";
-import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
-import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 export type CronPromptModelOption = ModelPickerOption;
 
