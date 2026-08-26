@@ -109,8 +109,6 @@ const ChangedFileRow = memo(function ChangedFileRow({ file }: { file: ChangedFil
         </HStack>
       }
       onClick={canOpen ? () => actions?.onOpenFile?.(file.path) : undefined}
-      title={file.path}
-      aria-label={canOpen ? openLabel : file.path}
     />
   );
 });

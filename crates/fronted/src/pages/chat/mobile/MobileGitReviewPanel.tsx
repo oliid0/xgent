@@ -542,7 +542,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
             {!snapshot && busy ? (
               <Center height="100%">
                 <HStack gap={2} vAlign="center">
-                  <Spinner accessibleLabel={t("chat.mobileTerminal.running")} size="sm" />
+                  <Spinner aria-label={t("chat.mobileTerminal.running")} size="sm" />
                   <Text type="supporting" color="secondary">
                     {t("chat.mobileTerminal.running")}
                   </Text>
@@ -650,7 +650,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
           {busy && history.length === 0 ? (
             <Center height="100%">
               <HStack gap={2} vAlign="center">
-                <Spinner accessibleLabel={t("chat.mobileTerminal.running")} size="sm" />
+                <Spinner aria-label={t("chat.mobileTerminal.running")} size="sm" />
                 <Text type="supporting" color="secondary">
                   {t("chat.mobileTerminal.running")}
                 </Text>

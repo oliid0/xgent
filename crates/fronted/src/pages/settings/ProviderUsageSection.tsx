@@ -160,7 +160,7 @@ export function ProviderUsageSection({ settings, setSettings }: SettingsSectionP
                 </VStack>
               </StackItem>
               {liveState.loading ? (
-                <Spinner accessibleLabel={t("settings.usage.refresh")} size="sm" />
+                <Spinner aria-label={t("settings.usage.refresh")} size="sm" />
               ) : null}
               <Switch
                 value={config.enabled}

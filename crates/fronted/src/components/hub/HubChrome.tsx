@@ -24,7 +24,9 @@ export function HubBackdrop(props: { tone?: HubTone }) {
         pointerEvents: "none",
         backgroundColor: "var(--color-background-body)",
       }}
-    />
+    >
+      {null}
+    </Center>
   );
 }
 

@@ -356,7 +356,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
                         </Text>
                         {entry.id === activeRunId ? (
                           <HStack gap={2} vAlign="center">
-                            <Spinner accessibleLabel={t("chat.mobileTerminal.running")} size="sm" />
+                            <Spinner aria-label={t("chat.mobileTerminal.running")} size="sm" />
                             <Text type="supporting" color="secondary">
                               {t("chat.mobileTerminal.running")}
                             </Text>

@@ -92,7 +92,7 @@ export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
     return (
       <Center minHeight="100vh" width="100%">
         <VStack gap={3} hAlign="center">
-          <Spinner accessibleLabel="正在验证设备" />
+          <Spinner aria-label="正在验证设备" />
           <Text type="body" color="secondary">
             正在验证设备…
           </Text>
@@ -116,8 +116,7 @@ export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
             <TextInput
               label="设备名称"
               value={deviceName}
-              maxLength={64}
-              onChange={setDeviceName}
+              onChange={(value) => setDeviceName(value.slice(0, 64))}
               width="100%"
               isRequired
             />
@@ -126,8 +125,7 @@ export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
               value={code}
               inputMode="numeric"
               autoComplete="one-time-code"
-              maxLength={6}
-              onChange={(value) => setCode(value.replace(/\D/g, ""))}
+              onChange={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))}
               width="100%"
               isRequired
             />

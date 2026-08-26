@@ -52,7 +52,7 @@ function ArtifactRow({ artifact }: { artifact: CloudArtifactAttachment }) {
       }
       description={
         error ? (
-          <Text type="supporting" color="error" wordBreak="break-word">
+          <Text type="supporting" color="primary" wordBreak="break-word">
             {error}
           </Text>
         ) : (
@@ -71,8 +71,6 @@ function ArtifactRow({ artifact }: { artifact: CloudArtifactAttachment }) {
       }
       onClick={() => void reveal()}
       isDisabled={opening}
-      title={artifact.localPath}
-      aria-label={revealLabel}
     />
   );
 }

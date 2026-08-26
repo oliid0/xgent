@@ -55,7 +55,7 @@ export function WorkspaceCloneTaskOverlay(props: { onOpenWorkspace: (path: strin
             <VStack gap={3}>
               <HStack gap={3} vAlign="start">
                 {running ? (
-                  <Spinner accessibleLabel={task.repositoryName} size="sm" />
+                  <Spinner aria-label={task.repositoryName} size="sm" />
                 ) : (
                   <FolderOpen />
                 )}

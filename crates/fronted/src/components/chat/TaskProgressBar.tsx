@@ -27,7 +27,7 @@ export function TaskProgressBar(props: {
         <VStack gap={2}>
         <HStack gap={2} vAlign="center">
           {active && isConversationRunning ? (
-            <Spinner accessibleLabel={label} size="sm" />
+            <Spinner aria-label={label} size="sm" />
           ) : (
             <Check />
           )}

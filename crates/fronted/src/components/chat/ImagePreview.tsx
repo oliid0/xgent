@@ -133,7 +133,7 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
   const positionLabel = `${clampedIndex + 1} / ${slides.length}`;
 
   const actionButtons = (
-    <ButtonGroup size="sm">
+    <ButtonGroup label={t("chat.image.preview")} size="sm">
       {activeSlide?.onCopy ? (
         <Button
           label={t("chat.image.copy")}
@@ -260,9 +260,7 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
                 valueDisplay="text"
                 width="min(40vw, var(--xagent-image-preview-slider-max-width))"
                 formatValue={(value) => `${Math.round(value * 100)}%`}
-                onChange={(value) => {
-                  if (typeof value === "number") setZoom(value);
-                }}
+                onChange={(value: number) => setZoom(value)}
               />
               <Text type="supporting" color="secondary" hasTabularNumbers>
                 {positionLabel}

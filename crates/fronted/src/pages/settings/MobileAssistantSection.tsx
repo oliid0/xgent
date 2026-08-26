@@ -174,7 +174,7 @@ export function MobileAssistantSection() {
                 description={t(permission.descriptionKey)}
                 startContent={
                   busy === permission.id ? (
-                    <Spinner accessibleLabel={t(permission.labelKey)} size="sm" />
+                    <Spinner aria-label={t(permission.labelKey)} size="sm" />
                   ) : (
                     <Icon />
                   )

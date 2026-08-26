@@ -196,13 +196,14 @@ export function AskUserQuestionCard({
 
           {selected?.kind === "custom" && canInteract ? (
             <TextInput
-              autoFocus
+              hasAutoFocus
               label={t("chat.askUser.other")}
               value={selected.value}
-              maxLength={ASK_USER_QUESTION_CUSTOM_MAX_LENGTH}
               placeholder={t("chat.askUser.otherPlaceholder")}
               width="100%"
-              onChange={(value) => choose({ kind: "custom", value })}
+              onChange={(value) =>
+                choose({ kind: "custom", value: value.slice(0, ASK_USER_QUESTION_CUSTOM_MAX_LENGTH) })
+              }
               onKeyDown={(event) => {
                 if (event.key === "Enter" && allAnswered) void submit();
               }}
