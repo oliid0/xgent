@@ -50,7 +50,6 @@ const ChangedFileRow = memo(function ChangedFileRow({ file }: { file: ChangedFil
   const { dir, base } = splitPath(file.path);
   const canOpen = Boolean(actions?.onOpenFile) && !file.deleted;
   const FileTypeIcon = getFileTypeIcon(file.path, "file");
-  const openLabel = `${t("chat.changedFiles.open")}: ${file.path}`;
   const revealLabel = `${t("chat.changedFiles.reveal")}: ${file.path}`;
   const diffLabel = `${t("chat.changedFiles.diff")}: ${file.path}`;
 

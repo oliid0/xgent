@@ -153,7 +153,7 @@ export function WorkspaceImagePreviewOverlay(props: WorkspaceImagePreviewOverlay
     >
       <MacOsTitleBarSpacer />
       <Layout
-        height="100%"
+        height="fill"
         header={
           <LayoutHeader hasDivider padding={3}>
             <HStack gap={2} vAlign="center">

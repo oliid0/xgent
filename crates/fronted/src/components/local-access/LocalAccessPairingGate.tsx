@@ -123,8 +123,6 @@ export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
             <TextInput
               label="配对码"
               value={code}
-              inputMode="numeric"
-              autoComplete="one-time-code"
               onChange={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))}
               width="100%"
               isRequired

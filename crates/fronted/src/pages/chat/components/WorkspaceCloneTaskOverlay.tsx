@@ -68,7 +68,7 @@ export function WorkspaceCloneTaskOverlay(props: { onOpenWorkspace: (path: strin
                     <StatusDot
                       label={task.status}
                       variant={task.error ? "error" : completed ? "success" : "accent"}
-                      pulse={running}
+                      isPulsing={running}
                     />
                   </VStack>
                 </StackItem>
