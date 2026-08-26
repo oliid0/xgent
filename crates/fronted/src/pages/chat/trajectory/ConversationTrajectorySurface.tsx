@@ -39,7 +39,6 @@ function textField(event: TrajectoryEvent, key: string) {
   const value = event[key];
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
-
 function numberField(event: TrajectoryEvent, key: string) {
   const value = event[key];
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
@@ -303,4 +302,3 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
     />
   );
 }
-
