@@ -1,4 +1,5 @@
 import { ChatComposer } from "@astryxdesign/core/Chat";
+import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
@@ -1068,130 +1069,77 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                   </RuntimeControlTooltip>
 
                   {voiceInputAvailable ? (
-                    <RuntimeControlTooltip
+                    <ToggleButton
                       label={
+                        voiceInputActive
+                          ? t("chat.composer.voiceListening")
+                          : t("chat.composer.voiceInput")
+                      }
+                      tooltip={
                         voiceInputError ??
                         voiceInputPartial ??
                         (voiceInputActive
                           ? t("chat.composer.voiceListening")
                           : t("chat.composer.voiceInput"))
                       }
-                    >
-                      <AstryxButton
-                        type="button"
-                        disabled={isInputDisabled || (isNativeMobileRuntime() && voiceInputActive)}
-                        onClick={() => void startVoiceInput()}
-                        aria-label={
-                          voiceInputActive
-                            ? t("chat.composer.voiceListening")
-                            : t("chat.composer.voiceInput")
-                        }
-                        aria-pressed={voiceInputActive}
-                        className={cn(
-                          "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
-                          "disabled:pointer-events-none disabled:opacity-55",
-                          voiceInputActive
-                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-300"
-                            : voiceInputError
-                              ? "text-amber-600 dark:text-amber-300"
-                              : "text-muted-foreground hover:text-foreground dark:hover:text-white",
-                        )}
-                      >
-                        {voiceInputActive ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Mic className="h-4 w-4" />
-                        )}
-                      </AstryxButton>
-                    </RuntimeControlTooltip>
+                      isIconOnly
+                      size="sm"
+                      isPressed={voiceInputActive}
+                      isDisabled={isInputDisabled || (isNativeMobileRuntime() && voiceInputActive)}
+                      icon={<Mic className="h-4 w-4" />}
+                      pressedIcon={<Loader2 className="h-4 w-4 animate-spin" />}
+                      onPressedChange={() => void startVoiceInput()}
+                    />
                   ) : null}
 
-                  <RuntimeControlTooltip label={webSearchTooltip}>
-                    <AstryxButton
-                      type="button"
-                      disabled={controlsDisabled}
-                      onClick={() =>
-                        onChatRuntimeControlsChange({
-                          nativeWebSearchEnabled: !chatRuntimeControls.nativeWebSearchEnabled,
-                        })
-                      }
-                      aria-label={
-                        chatRuntimeControls.nativeWebSearchEnabled
-                          ? t("chat.runtime.webSearchOn")
-                          : t("chat.runtime.webSearchOff")
-                      }
-                      className={cn(
-                        "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
-                        "disabled:pointer-events-none disabled:opacity-40",
-                        chatRuntimeControls.nativeWebSearchEnabled
-                          ? "text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200"
-                          : "text-muted-foreground hover:text-foreground dark:hover:text-white",
-                      )}
-                    >
-                      {chatRuntimeControls.nativeWebSearchEnabled ? (
-                        <Globe className="h-4 w-4" />
-                      ) : (
-                        <GlobeOff className="h-4 w-4" />
-                      )}
-                    </AstryxButton>
-                  </RuntimeControlTooltip>
+                  <ToggleButton
+                    label={webSearchTooltip}
+                    tooltip={webSearchTooltip}
+                    isIconOnly
+                    size="sm"
+                    isPressed={chatRuntimeControls.nativeWebSearchEnabled}
+                    isDisabled={controlsDisabled}
+                    icon={<GlobeOff className="h-4 w-4" />}
+                    pressedIcon={<Globe className="h-4 w-4" />}
+                    onPressedChange={(isPressed) =>
+                      onChatRuntimeControlsChange({ nativeWebSearchEnabled: isPressed })
+                    }
+                  />
 
                   {isAgentMode ? (
-                    <RuntimeControlTooltip label={planModeTooltip}>
-                      <AstryxButton
-                        type="button"
-                        disabled={controlsDisabled}
-                        onClick={() =>
-                          onChatRuntimeControlsChange({
-                            planModeEnabled: !chatRuntimeControls.planModeEnabled,
-                          })
-                        }
-                        aria-label={planModeTooltip}
-                        aria-pressed={chatRuntimeControls.planModeEnabled}
-                        className={cn(
-                          "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
-                          "disabled:pointer-events-none disabled:opacity-40",
-                          chatRuntimeControls.planModeEnabled
-                            ? "bg-violet-500/10 text-violet-600 hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200"
-                            : "text-muted-foreground hover:text-foreground dark:hover:text-white",
-                        )}
-                      >
-                        <FileText className="h-4 w-4" />
-                      </AstryxButton>
-                    </RuntimeControlTooltip>
+                    <ToggleButton
+                      label={planModeTooltip}
+                      tooltip={planModeTooltip}
+                      isIconOnly
+                      size="sm"
+                      isPressed={chatRuntimeControls.planModeEnabled}
+                      isDisabled={controlsDisabled}
+                      icon={<FileText className="h-4 w-4" />}
+                      onPressedChange={(isPressed) =>
+                        onChatRuntimeControlsChange({ planModeEnabled: isPressed })
+                      }
+                    />
                   ) : null}
 
-                  <RuntimeControlTooltip label={thinkingTooltip}>
-                    <AstryxButton
-                      type="button"
-                      disabled={controlsDisabled || !thinkingSupported || thinkingAlwaysOn}
-                      onClick={() =>
-                        onChatRuntimeControlsChange({
-                          thinkingEnabled: !chatRuntimeControls.thinkingEnabled,
-                        })
-                      }
-                      aria-label={
-                        !thinkingSupported
-                          ? t("chat.runtime.thinkingUnavailable")
-                          : chatRuntimeControls.thinkingEnabled
-                            ? t("chat.runtime.thinkingOn")
-                            : t("chat.runtime.thinkingOff")
-                      }
-                      className={cn(
-                        "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
-                        "disabled:pointer-events-none disabled:opacity-40",
-                        chatRuntimeControls.thinkingEnabled && thinkingSupported
-                          ? "text-amber-600 hover:text-amber-700 dark:text-amber-300 dark:hover:text-amber-200"
-                          : "text-muted-foreground hover:text-foreground dark:hover:text-white",
-                      )}
-                    >
-                      {chatRuntimeControls.thinkingEnabled && thinkingSupported ? (
-                        <Lightbulb className="h-4 w-4" />
-                      ) : (
-                        <LightbulbOff className="h-4 w-4" />
-                      )}
-                    </AstryxButton>
-                  </RuntimeControlTooltip>
+                  <ToggleButton
+                    label={
+                      !thinkingSupported
+                        ? t("chat.runtime.thinkingUnavailable")
+                        : chatRuntimeControls.thinkingEnabled
+                          ? t("chat.runtime.thinkingOn")
+                          : t("chat.runtime.thinkingOff")
+                    }
+                    tooltip={thinkingTooltip}
+                    isIconOnly
+                    size="sm"
+                    isPressed={chatRuntimeControls.thinkingEnabled && thinkingSupported}
+                    isDisabled={controlsDisabled || !thinkingSupported || thinkingAlwaysOn}
+                    icon={<LightbulbOff className="h-4 w-4" />}
+                    pressedIcon={<Lightbulb className="h-4 w-4" />}
+                    onPressedChange={(isPressed) =>
+                      onChatRuntimeControlsChange({ thinkingEnabled: isPressed })
+                    }
+                  />
 
                   {reasoningOptions.length > 0 ? (
                     <AstryxView

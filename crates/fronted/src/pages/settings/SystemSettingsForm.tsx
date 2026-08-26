@@ -1,13 +1,18 @@
+import { Button as CoreButton } from "@astryxdesign/core/Button";
+import { Center } from "@astryxdesign/core/Center";
+import { Icon } from "@astryxdesign/core/Icon";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { SelectableCard } from "@astryxdesign/core/SelectableCard";
+import { Text } from "@astryxdesign/core/Text";
+import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { isBrowserRuntime } from "@xagent/runtime";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import {
   Inline as AstryxInline,
   Paragraph as AstryxParagraph,
   View as AstryxView,
 } from "@xagent/ui/components/ui/view";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
-  CheckCircle2,
   ChevronDown,
   Cpu,
   Globe,
@@ -67,6 +72,59 @@ type SystemSettingsFormProps = SettingsSectionProps & {
   compact?: boolean;
 };
 
+function SettingsChoiceCard(props: {
+  label: string;
+  description?: string;
+  icon: ReactNode;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <SelectableCard
+      label={props.label}
+      isSelected={props.isSelected}
+      onChange={(isSelected) => {
+        if (isSelected) props.onSelect();
+      }}
+      padding={3}
+      variant="muted"
+      width="100%"
+      height="100%"
+      className="settings-native-choice-card"
+    >
+      <HStack width="100%" gap={3} vAlign="start">
+        <Center
+          width="var(--size-element-md)"
+          height="var(--size-element-md)"
+          style={{
+            flexShrink: 0,
+            borderRadius: "var(--radius-element)",
+            color: props.isSelected ? "var(--color-text-accent)" : "var(--color-icon-secondary)",
+            backgroundColor: props.isSelected
+              ? "var(--color-accent-muted)"
+              : "var(--color-background-muted)",
+          }}
+        >
+          {props.icon}
+        </Center>
+        <StackItem size="fill">
+          <VStack gap={0.5}>
+            <Text type="label" weight="semibold" wordBreak="break-word">
+              {props.label}
+            </Text>
+            {props.description ? (
+              <Text type="supporting" color="secondary" wordBreak="break-word">
+                {props.description}
+              </Text>
+            ) : null}
+          </VStack>
+        </StackItem>
+        {props.isSelected ? <Icon icon="check" size="sm" color="accent" /> : null}
+      </HStack>
+    </SelectableCard>
+  );
+}
+
 export function SystemSettingsForm(props: SystemSettingsFormProps) {
   const { settings, setSettings, compact = false } = props;
   const { t } = useLocale();
@@ -81,8 +139,6 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
       : "auto";
 
   const executionMode = settings.system.executionMode;
-  const isClassicAgentMode = executionMode === "tools";
-  const isAgentDevMode = executionMode === "agent-dev";
   const appearanceIcon =
     settings.theme === "system" ? (
       <MonitorSmartphone className="h-4 w-4 text-muted-foreground" />
@@ -535,17 +591,16 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
                   />
                   {systemProxy.passwordConfigured &&
                   !(proxyPasswordDraft ?? systemProxy.password).trim() ? (
-                    <AstryxButton
-                      type="button"
-                      className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                      disabled={browser}
+                    <CoreButton
+                      label={t("settings.systemProxyPasswordClear")}
+                      variant="ghost"
+                      size="sm"
+                      isDisabled={browser}
                       onClick={() => {
                         setProxyPasswordDraft(null);
                         patchSystemProxy({ password: "", passwordConfigured: false });
                       }}
-                    >
-                      {t("settings.systemProxyPasswordClear")}
-                    </AstryxButton>
+                    />
                   ) : null}
                 </AstryxView>
               </SettingsRow>
@@ -641,130 +696,44 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
           direction="horizontal"
           className="settings-execution-grid grid grid-cols-1 gap-3 md:grid-cols-3"
         >
-          <AstryxButton
-            type="button"
-            onClick={() =>
-              setSettings((prev) => updateSystem(prev, { executionMode: "text" as ExecutionMode }))
-            }
-            className={`settings-execution-choice group relative flex flex-col items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-              executionMode === "text"
-                ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
-                : "border-transparent bg-muted/40 hover:border-border hover:bg-muted/60"
-            }`}
-          >
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${
-                executionMode === "text"
-                  ? "bg-primary/10 text-primary"
-                  : "bg-muted text-muted-foreground group-hover:bg-accent"
-              }`}
-            >
-              <MessageSquare className="h-5 w-5" />
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal">
-              <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
-                {t("settings.chatMode")}
-              </AstryxView>
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-              >
-                {t("settings.chatModeDesc")}
-              </AstryxView>
-            </AstryxView>
-            {executionMode === "text" ? (
-              <AstryxView layout="block" direction="horizontal" className="absolute right-3 top-3">
-                <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-              </AstryxView>
-            ) : null}
-          </AstryxButton>
-
-          <AstryxButton
-            type="button"
-            onClick={() =>
-              setSettings((prev) => updateSystem(prev, { executionMode: "tools" as ExecutionMode }))
-            }
-            className={`settings-execution-choice group relative flex flex-col items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-              isClassicAgentMode
-                ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
-                : "border-transparent bg-muted/40 hover:border-border hover:bg-muted/60"
-            }`}
-          >
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${
-                isClassicAgentMode
-                  ? "bg-primary/10 text-primary"
-                  : "bg-muted text-muted-foreground group-hover:bg-accent"
-              }`}
-            >
-              <Wrench className="h-5 w-5" />
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal">
-              <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
-                {t("settings.agentMode")}
-              </AstryxView>
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-              >
-                {t("settings.agentModeDesc")}
-              </AstryxView>
-            </AstryxView>
-            {isClassicAgentMode ? (
-              <AstryxView layout="block" direction="horizontal" className="absolute right-3 top-3">
-                <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-              </AstryxView>
-            ) : null}
-          </AstryxButton>
-
-          <AstryxButton
-            type="button"
-            onClick={() =>
-              setSettings((prev) =>
-                updateSystem(prev, { executionMode: "agent-dev" as ExecutionMode }),
-              )
-            }
-            className={`settings-execution-choice group relative flex flex-col items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-              isAgentDevMode
-                ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
-                : "border-transparent bg-muted/40 hover:border-border hover:bg-muted/60"
-            }`}
-          >
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${
-                isAgentDevMode
-                  ? "bg-primary/10 text-primary"
-                  : "bg-muted text-muted-foreground group-hover:bg-accent"
-              }`}
-            >
-              <Cpu className="h-5 w-5" />
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal">
-              <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
-                {t("settings.agentDevMode")}
-              </AstryxView>
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-              >
-                {t("settings.agentDevModeDesc")}
-              </AstryxView>
-            </AstryxView>
-            {isAgentDevMode ? (
-              <AstryxView layout="block" direction="horizontal" className="absolute right-3 top-3">
-                <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-              </AstryxView>
-            ) : null}
-          </AstryxButton>
+          {(
+            [
+              {
+                value: "text",
+                label: t("settings.chatMode"),
+                description: t("settings.chatModeDesc"),
+                icon: <MessageSquare />,
+              },
+              {
+                value: "tools",
+                label: t("settings.agentMode"),
+                description: t("settings.agentModeDesc"),
+                icon: <Wrench />,
+              },
+              {
+                value: "agent-dev",
+                label: t("settings.agentDevMode"),
+                description: t("settings.agentDevModeDesc"),
+                icon: <Cpu />,
+              },
+            ] satisfies Array<{
+              value: ExecutionMode;
+              label: string;
+              description: string;
+              icon: ReactNode;
+            }>
+          ).map((option) => (
+            <SettingsChoiceCard
+              key={option.value}
+              label={option.label}
+              description={option.description}
+              icon={option.icon}
+              isSelected={executionMode === option.value}
+              onSelect={() =>
+                setSettings((prev) => updateSystem(prev, { executionMode: option.value }))
+              }
+            />
+          ))}
         </AstryxView>
       </AstryxView>
 
@@ -853,46 +822,13 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
             {THEME_OPTIONS.map((theme) => {
               const selected = settings.theme === theme;
               return (
-                <AstryxButton
+                <SettingsChoiceCard
                   key={theme}
-                  type="button"
-                  onClick={() => setSettings((prev) => ({ ...prev, theme }))}
-                  className={`settings-choice-card group relative flex h-full items-start gap-3 rounded-xl border px-3.5 py-3.5 text-left transition-all ${
-                    selected
-                      ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
-                      : "border-border/60 bg-background/80 hover:border-border hover:bg-muted/35"
-                  }`}
-                >
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                      selected
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted text-muted-foreground group-hover:bg-accent/80"
-                    }`}
-                  >
-                    {renderThemeIcon(theme)}
-                  </AstryxView>
-                  <AstryxView layout="block" direction="horizontal" className="min-w-0 pr-6">
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="text-sm font-semibold"
-                    >
-                      {getThemeLabel(theme)}
-                    </AstryxView>
-                  </AstryxView>
-                  {selected ? (
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="absolute right-3 top-3"
-                    >
-                      <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-                    </AstryxView>
-                  ) : null}
-                </AstryxButton>
+                  label={getThemeLabel(theme)}
+                  icon={renderThemeIcon(theme)}
+                  isSelected={selected}
+                  onSelect={() => setSettings((prev) => ({ ...prev, theme }))}
+                />
               );
             })}
           </AstryxView>
@@ -929,45 +865,14 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
                     ? t("settings.english")
                     : locale;
               return (
-                <AstryxButton
+                <SettingsChoiceCard
                   key={locale}
-                  type="button"
-                  onClick={() => setSettings((prev) => ({ ...prev, locale }))}
-                  className={`settings-choice-card group relative flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-all ${
-                    selected
-                      ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
-                      : "border-border/60 bg-background/80 hover:border-border hover:bg-muted/35"
-                  }`}
-                >
-                  <AstryxInline className="text-base leading-none">
-                    {locale === "zh-CN" ? "🇨🇳" : "🇺🇸"}
-                  </AstryxInline>
-                  <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1 pr-5">
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="truncate text-sm font-semibold"
-                    >
-                      {localeLabel}
-                    </AstryxView>
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="mt-0.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground"
-                    >
-                      {locale}
-                    </AstryxView>
-                  </AstryxView>
-                  {selected ? (
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="absolute right-3 top-1/2 -translate-y-1/2"
-                    >
-                      <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-                    </AstryxView>
-                  ) : null}
-                </AstryxButton>
+                  label={localeLabel}
+                  description={locale}
+                  icon={locale === "zh-CN" ? "🇨🇳" : "🇺🇸"}
+                  isSelected={selected}
+                  onSelect={() => setSettings((prev) => ({ ...prev, locale }))}
+                />
               );
             })}
           </AstryxView>
@@ -983,31 +888,34 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
           direction="horizontal"
           className="flex items-center justify-between gap-2"
         >
-          <AstryxButton
-            type="button"
-            disabled={!compact}
-            onClick={() => setProxyDetailsOpen((open) => !open)}
-            className="settings-proxy-disclosure flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-medium text-foreground disabled:cursor-default"
-            aria-expanded={!compact || proxyDetailsOpen}
-          >
-            <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <AstryxInline className="min-w-0 flex-1">
-              <AstryxInline className="block">{t("settings.systemProxy")}</AstryxInline>
-              {compact && systemProxy.host ? (
-                <AstryxInline className="mt-0.5 block truncate font-mono text-[11px] font-normal text-muted-foreground">
-                  {systemProxy.type}://{systemProxy.host}
-                  {systemProxy.port > 0 ? `:${systemProxy.port}` : ""}
-                </AstryxInline>
-              ) : null}
-            </AstryxInline>
+          <StackItem size="fill">
             {compact ? (
-              <ChevronDown
-                className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
-                  proxyDetailsOpen ? "rotate-180" : ""
-                }`}
-              />
-            ) : null}
-          </AstryxButton>
+              <VStack gap={0.5}>
+                <CoreButton
+                  label={t("settings.systemProxy")}
+                  icon={<Icon icon={Globe} size="sm" color="secondary" />}
+                  endContent={<Icon icon={ChevronDown} size="sm" color="secondary" />}
+                  variant="ghost"
+                  width="100%"
+                  aria-expanded={proxyDetailsOpen}
+                  onClick={() => setProxyDetailsOpen((open) => !open)}
+                />
+                {systemProxy.host ? (
+                  <Text type="code" color="secondary" maxLines={1}>
+                    {systemProxy.type}://{systemProxy.host}
+                    {systemProxy.port > 0 ? `:${systemProxy.port}` : ""}
+                  </Text>
+                ) : null}
+              </VStack>
+            ) : (
+              <HStack gap={2} vAlign="center">
+                <Icon icon={Globe} size="sm" color="secondary" />
+                <Text type="label" weight="medium">
+                  {t("settings.systemProxy")}
+                </Text>
+              </HStack>
+            )}
+          </StackItem>
           <AgentActivationSwitch
             checked={systemProxy.enabled}
             title={t("settings.systemProxyEnable")}
@@ -1149,17 +1057,16 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
                     className="flex items-center gap-2 text-[11px] text-muted-foreground"
                   >
                     <AstryxInline>{t("settings.systemProxyPasswordConfigured")}</AstryxInline>
-                    <AstryxButton
-                      type="button"
-                      className="underline-offset-2 hover:text-foreground hover:underline"
-                      disabled={browser}
+                    <CoreButton
+                      label={t("settings.systemProxyPasswordClear")}
+                      variant="ghost"
+                      size="sm"
+                      isDisabled={browser}
                       onClick={() => {
                         setProxyPasswordDraft(null);
                         patchSystemProxy({ password: "", passwordConfigured: false });
                       }}
-                    >
-                      {t("settings.systemProxyPasswordClear")}
-                    </AstryxButton>
+                    />
                   </AstryxView>
                 ) : null}
               </AstryxView>
@@ -1187,66 +1094,25 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
               const selected = settings.closeWindowBehavior === behavior;
               const isMinimize = behavior === "minimize";
               return (
-                <AstryxButton
+                <SettingsChoiceCard
                   key={behavior}
-                  type="button"
-                  onClick={() =>
+                  label={
+                    isMinimize ? t("settings.closeWindowMinimize") : t("settings.closeWindowExit")
+                  }
+                  description={
+                    isMinimize
+                      ? t("settings.closeWindowMinimizeDesc")
+                      : t("settings.closeWindowExitDesc")
+                  }
+                  icon={isMinimize ? <Minimize2 /> : <LogOut />}
+                  isSelected={selected}
+                  onSelect={() =>
                     setSettings((prev) => ({
                       ...prev,
                       closeWindowBehavior: behavior,
                     }))
                   }
-                  className={`group relative flex h-full items-start gap-3 rounded-xl border px-3.5 py-3.5 text-left transition-all ${
-                    selected
-                      ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
-                      : "border-border/60 bg-background/80 hover:border-border hover:bg-muted/35"
-                  }`}
-                >
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                      selected
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted text-muted-foreground group-hover:bg-accent/80"
-                    }`}
-                  >
-                    {isMinimize ? (
-                      <Minimize2 className="h-4.5 w-4.5" />
-                    ) : (
-                      <LogOut className="h-4.5 w-4.5" />
-                    )}
-                  </AstryxView>
-                  <AstryxView layout="block" direction="horizontal" className="min-w-0 pr-6">
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="text-sm font-semibold"
-                    >
-                      {isMinimize
-                        ? t("settings.closeWindowMinimize")
-                        : t("settings.closeWindowExit")}
-                    </AstryxView>
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-                    >
-                      {isMinimize
-                        ? t("settings.closeWindowMinimizeDesc")
-                        : t("settings.closeWindowExitDesc")}
-                    </AstryxView>
-                  </AstryxView>
-                  {selected ? (
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="absolute right-3 top-3"
-                    >
-                      <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-                    </AstryxView>
-                  ) : null}
-                </AstryxButton>
+                />
               );
             })}
           </AstryxView>
@@ -1385,18 +1251,17 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
                 {FONT_SCALE_OPTIONS.map((value) => {
                   const selected = fontScale[zone.key] === value;
                   return (
-                    <AstryxButton
+                    <ToggleButton
                       key={value}
-                      type="button"
-                      onClick={() => setZoneFontScale(zone.key, value)}
-                      className={`rounded-md px-2.5 py-1 text-xs transition-all ${
-                        selected
-                          ? "bg-background font-semibold text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
+                      label={getFontScaleLabel(value)}
+                      isPressed={selected}
+                      size="sm"
+                      onPressedChange={(isPressed) => {
+                        if (isPressed) setZoneFontScale(zone.key, value);
+                      }}
                     >
                       {getFontScaleLabel(value)}
-                    </AstryxButton>
+                    </ToggleButton>
                   );
                 })}
               </AstryxView>

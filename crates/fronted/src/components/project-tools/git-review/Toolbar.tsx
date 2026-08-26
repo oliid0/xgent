@@ -10,7 +10,7 @@ import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Text } from "@astryxdesign/core/Text";
 import { useToast } from "@astryxdesign/core/Toast";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { ToggleButton, ToggleButtonGroup } from "@astryxdesign/core/ToggleButton";
 import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale } from "../../../i18n";
@@ -55,9 +55,6 @@ import {
   remoteSetupSubmitKey,
 } from "./model";
 import type { GitReviewData } from "./useGitReviewData";
-
-const GIT_REVIEW_STACKED_PANE_BUTTON_CLASS =
-  "inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 export function GitRemoteSetupModal(props: {
   open: boolean;
@@ -802,36 +799,28 @@ function GitReviewScopeDial(props: {
     },
   ];
   return (
-    <AstryxView layout="block" direction="horizontal" className="relative h-7 w-[52px] shrink-0">
+    <ToggleButtonGroup
+      label={`${repositoryLabel} / ${branchLabel}`}
+      type="single"
+      value={value}
+      onChange={(nextValue) => {
+        if (nextValue === "repository" || nextValue === "branch") onChange(nextValue);
+      }}
+      size="sm"
+    >
       {items.map((item) => {
-        const isActive = item.key === value;
         return (
-          <AstryxButton
+          <ToggleButton
             key={item.key}
-            type="button"
-            aria-pressed={isActive}
-            aria-label={item.label}
-            title={item.label}
-            onClick={() => {
-              if (!isActive) onChange(item.key);
-            }}
-            className={cn(
-              "group absolute top-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center outline-hidden transition-[left] duration-200 ease-out motion-reduce:transition-none",
-              isActive ? "left-3 z-10" : "left-10",
-            )}
-          >
-            <item.Icon
-              className={cn(
-                "h-[18px] w-[18px] transition-all duration-200 ease-out motion-reduce:transition-none",
-                isActive
-                  ? cn("scale-100", item.activeTone)
-                  : "scale-[0.7] text-muted-foreground/50 group-hover:text-muted-foreground group-focus-visible:text-muted-foreground",
-              )}
-            />
-          </AstryxButton>
+            value={item.key}
+            label={item.label}
+            tooltip={item.label}
+            icon={<item.Icon className={cn("h-4 w-4", item.activeTone)} />}
+            isIconOnly
+          />
         );
       })}
-    </AstryxView>
+    </ToggleButtonGroup>
   );
 }
 
@@ -1133,70 +1122,63 @@ export function GitReviewToolbar(props: {
         </AstryxView>
       ) : null}
       <AstryxView layout="flex" direction="horizontal" className="mt-3 flex items-center gap-2">
-        <AstryxView
-          layout="inline-flex"
-          direction="horizontal"
-          className="inline-flex shrink-0 rounded-md border border-border bg-muted/25 p-0.5 text-xs"
+        <ToggleButtonGroup
+          label={`${t("projectTools.gitReview.localChangesView")} / ${t("projectTools.gitReview.commitHistoryView")}`}
+          type="single"
+          value={reviewMode}
+          onChange={(nextValue) => {
+            if (nextValue === "changes" || nextValue === "history") setReviewMode(nextValue);
+          }}
+          size="sm"
         >
-          <AstryxButton
-            type="button"
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground",
-              reviewMode === "changes" && "bg-background text-foreground shadow-sm",
-            )}
-            onClick={() => setReviewMode("changes")}
+          <ToggleButton
+            value="changes"
+            label={t("projectTools.gitReview.localChangesView")}
+            icon={<GitBranch className="h-3.5 w-3.5" />}
           >
-            <GitBranch className="h-3.5 w-3.5" />
             {t("projectTools.gitReview.localChangesView")}
-          </AstryxButton>
-          <AstryxButton
-            type="button"
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground",
-              reviewMode === "history" && "bg-background text-foreground shadow-sm",
-            )}
-            onClick={() => setReviewMode("history")}
+          </ToggleButton>
+          <ToggleButton
+            value="history"
+            label={t("projectTools.gitReview.commitHistoryView")}
+            icon={<History className="h-3.5 w-3.5" />}
           >
-            <History className="h-3.5 w-3.5" />
             {t("projectTools.gitReview.commitHistoryView")}
-          </AstryxButton>
-        </AstryxView>
+          </ToggleButton>
+        </ToggleButtonGroup>
         {!useSplitReviewLayout ? (
-          <AstryxView
-            layout="inline-flex"
-            direction="horizontal"
-            className="ml-auto inline-flex shrink-0 rounded-md border border-border bg-muted/25 p-0.5"
-          >
-            <AstryxButton
-              type="button"
-              aria-label={t("projectTools.gitReview.listPane")}
-              aria-pressed={stackedPane === "list"}
-              title={t("projectTools.gitReview.listPane")}
-              className={cn(
-                GIT_REVIEW_STACKED_PANE_BUTTON_CLASS,
-                stackedPane === "list" && "bg-background text-foreground shadow-sm",
-              )}
-              onClick={() => onStackedPaneChange("list", "back")}
+          <AstryxView layout="flex" direction="horizontal" className="ml-auto shrink-0">
+            <ToggleButtonGroup
+              label={`${t("projectTools.gitReview.listPane")} / ${t("projectTools.gitReview.detailPane")}`}
+              type="single"
+              value={stackedPane}
+              onChange={(nextValue) => {
+                if (nextValue === "list") onStackedPaneChange("list", "back");
+                if (nextValue === "detail") onStackedPaneChange("detail", "forward");
+              }}
+              size="sm"
             >
-              {reviewMode === "changes" ? (
-                <GitBranch className="h-3.5 w-3.5" />
-              ) : (
-                <History className="h-3.5 w-3.5" />
-              )}
-            </AstryxButton>
-            <AstryxButton
-              type="button"
-              aria-label={t("projectTools.gitReview.detailPane")}
-              aria-pressed={stackedPane === "detail"}
-              title={t("projectTools.gitReview.detailPane")}
-              className={cn(
-                GIT_REVIEW_STACKED_PANE_BUTTON_CLASS,
-                stackedPane === "detail" && "bg-background text-foreground shadow-sm",
-              )}
-              onClick={() => onStackedPaneChange("detail", "forward")}
-            >
-              <Eye className="h-3.5 w-3.5" />
-            </AstryxButton>
+              <ToggleButton
+                value="list"
+                label={t("projectTools.gitReview.listPane")}
+                tooltip={t("projectTools.gitReview.listPane")}
+                icon={
+                  reviewMode === "changes" ? (
+                    <GitBranch className="h-3.5 w-3.5" />
+                  ) : (
+                    <History className="h-3.5 w-3.5" />
+                  )
+                }
+                isIconOnly
+              />
+              <ToggleButton
+                value="detail"
+                label={t("projectTools.gitReview.detailPane")}
+                tooltip={t("projectTools.gitReview.detailPane")}
+                icon={<Eye className="h-3.5 w-3.5" />}
+                isIconOnly
+              />
+            </ToggleButtonGroup>
           </AstryxView>
         ) : null}
       </AstryxView>

@@ -1,4 +1,5 @@
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
 import {
   Heading as AstryxHeading,
   Inline as AstryxInline,
@@ -224,54 +225,35 @@ export function HooksSection(_props: SettingsSectionProps) {
         </AstryxView>
       ) : null}
 
-      <AstryxView
-        layout="grid"
-        direction="horizontal"
-        className="settings-hooks-event-selector grid min-w-0 grid-cols-4 gap-1.5 rounded-2xl border border-border/60 bg-card p-2"
+      <TabList
+        value={activeEvent}
+        onChange={(value) => setActiveEvent(value as HookEvent)}
         role="tablist"
-        aria-label={t("settings.hooksLifecycle")}
+        overflow="scroll"
+        size="sm"
+        hasDivider
       >
         {orderedEvents.map(({ event, phase }) => {
-          const selected = activeEvent === event;
           const eventHookCount = hooks.filter((hook) => hook.event === event).length;
           return (
-            <AstryxButton
+            <Tab
               key={event}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => setActiveEvent(event)}
-              className={`settings-hooks-event-option flex min-h-14 min-w-0 items-center gap-2 rounded-xl px-2.5 text-left transition-[color,background-color,box-shadow] duration-150 ${
-                selected
-                  ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
-                  : "text-muted-foreground hover:bg-muted/35 hover:text-foreground"
-              }`}
-            >
-              <AstryxInline
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${phase.bgColor} ${phase.color}`}
-              >
-                {phase.icon}
-              </AstryxInline>
-              <AstryxInline className="min-w-0 flex-1">
-                <AstryxInline className="block truncate text-xs font-medium">
-                  {getHookEventLabel(t, event)}
-                </AstryxInline>
-                <AstryxInline className="mt-0.5 block truncate text-[10px] text-muted-foreground/75">
-                  {phase.label}
-                </AstryxInline>
-              </AstryxInline>
-              {eventHookCount > 0 ? (
-                <AstryxInline className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">
-                  {eventHookCount}
-                </AstryxInline>
-              ) : null}
-            </AstryxButton>
+              value={event}
+              label={`${getHookEventLabel(t, event)} · ${phase.label}`}
+              panelId="settings-hooks-event-panel"
+              icon={phase.icon}
+              endContent={
+                eventHookCount > 0 ? <Badge label={eventHookCount} variant="neutral" /> : undefined
+              }
+            />
           );
         })}
-      </AstryxView>
+      </TabList>
 
       <AstryxView
         as="section"
+        id="settings-hooks-event-panel"
+        role="tabpanel"
         className="settings-hooks-detail min-w-0 overflow-hidden rounded-2xl border border-border/60 bg-card"
       >
         <AstryxView

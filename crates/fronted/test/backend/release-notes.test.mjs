@@ -50,7 +50,7 @@ function runNotesScriptAsync(args, env = {}, options = {}) {
 }
 
 function runGit(args, cwd) {
-  const result = spawnSync("git", args, {
+  const result = spawnSync("git", ["-c", "commit.gpgsign=false", ...args], {
     cwd,
     encoding: "utf8",
   });

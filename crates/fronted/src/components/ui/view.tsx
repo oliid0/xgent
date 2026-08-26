@@ -1,7 +1,8 @@
+import { Grid } from "@astryxdesign/core/Grid";
 import { Heading as AstryxHeading, type HeadingLevel } from "@astryxdesign/core/Heading";
 import { Stack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
-import { type ElementType, forwardRef, type HTMLAttributes } from "react";
+import { type ElementType, forwardRef, type HTMLAttributes, type Ref } from "react";
 import { cn } from "../../lib/shared/utils";
 
 export type ViewProps = Omit<HTMLAttributes<HTMLElement>, "color"> & {
@@ -10,36 +11,46 @@ export type ViewProps = Omit<HTMLAttributes<HTMLElement>, "color"> & {
   direction?: "horizontal" | "vertical";
 };
 
-/**
- * Neutral Astryx layout primitive for regions without a more specific product
- * component. Display is explicit so migration preserves block/flex/grid
- * geometry while Stack supplies the design-system layout boundary.
- */
 export const View = forwardRef<HTMLElement, ViewProps>(function View(
   { as = "div", layout, direction, style, className, children, ...props },
   ref,
 ) {
   const classTokens = className?.split(/\s+/) ?? [];
-  const resolvedLayout =
-    layout ??
-    (classTokens.includes("inline-grid")
-      ? "inline-grid"
-      : classTokens.includes("inline-flex")
-        ? "inline-flex"
-        : classTokens.includes("grid")
-          ? "grid"
-          : classTokens.includes("flex")
-            ? "flex"
-            : "block");
+  const resolvedLayout = classTokens.includes("inline-grid")
+    ? "inline-grid"
+    : classTokens.includes("inline-flex")
+      ? "inline-flex"
+      : classTokens.includes("grid")
+        ? "grid"
+        : classTokens.includes("flex")
+          ? "flex"
+          : (layout ?? "block");
   const resolvedDirection =
-    direction ?? (classTokens.includes("flex-col") ? "vertical" : "horizontal");
+    direction ??
+    (classTokens.includes("flex-col") || resolvedLayout === "block" ? "vertical" : "horizontal");
+
+  if (resolvedLayout === "grid" || resolvedLayout === "inline-grid") {
+    return (
+      <Grid
+        {...props}
+        ref={ref as Ref<HTMLDivElement>}
+        data-view-layout={resolvedLayout}
+        className={cn("astryx-view", `astryx-view-${resolvedLayout}`, className)}
+        style={style}
+      >
+        {children}
+      </Grid>
+    );
+  }
+
   return (
     <Stack
       {...props}
       ref={ref}
       as={as}
       direction={resolvedDirection}
-      className={cn(resolvedLayout, className)}
+      data-view-layout={resolvedLayout}
+      className={cn("astryx-view", `astryx-view-${resolvedLayout}`, className)}
       style={style}
     >
       {children}

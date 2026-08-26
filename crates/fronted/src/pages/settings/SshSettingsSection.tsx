@@ -1,5 +1,6 @@
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { ToggleButton, ToggleButtonGroup } from "@astryxdesign/core/ToggleButton";
 import { invoke, isBrowserRuntime } from "@xagent/runtime";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import {
@@ -151,7 +152,9 @@ function SshHostModal(props: {
   );
   const [proxyUsername, setProxyUsername] = useState(initialData?.proxy.username ?? "");
   const [proxyPassword, setProxyPassword] = useState(initialData?.proxy.password ?? "");
-  const isCompact = useMediaQuery("(max-width: 640px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
   const isEditing = Boolean(initialData);
   const isPasswordAuth = authType === "password";
   const isPrivateKeyAuth = authType === "privateKey";
@@ -704,7 +707,9 @@ function SshImportModal(props: {
   const [result, setResult] = useState<SshScanResult | null>(null);
   const [error, setError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
-  const isCompact = useMediaQuery("(max-width: 640px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -1133,37 +1138,31 @@ function SshViewModeToggle(props: { value: SshViewMode; onChange: (value: SshVie
   ];
 
   return (
-    <fieldset className="settings-ssh-view-toggle relative isolate grid min-w-0 grid-cols-2 rounded-lg border border-border/60 bg-muted/30 p-0.5 shadow-inner shadow-black/5">
-      <legend className="sr-only">{groupLabel}</legend>
-      <AstryxView
-        as="span"
-        layout="grid"
-        direction="horizontal"
-        aria-hidden="true"
-        className={`pointer-events-none absolute bottom-0.5 left-0.5 top-0.5 w-[calc(50%-0.125rem)] rounded-md bg-emerald-500/10 shadow-sm shadow-emerald-500/10 ring-1 ring-emerald-500/30 transition-transform duration-200 ease-out motion-reduce:transition-none ${
-          value === "grid" ? "translate-x-full" : "translate-x-0"
-        }`}
-      />
-      {options.map((option) => {
-        const Icon = option.icon;
-        const active = value === option.value;
-        return (
-          <AstryxButton
-            key={option.value}
-            type="button"
-            className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-md transition-colors duration-200 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background motion-reduce:transition-none ${
-              active ? "text-emerald-500" : "text-muted-foreground"
-            }`}
-            title={option.label}
-            aria-label={option.label}
-            aria-pressed={active}
-            onClick={() => onChange(option.value)}
-          >
-            <Icon className="h-3.5 w-3.5" />
-          </AstryxButton>
-        );
-      })}
-    </fieldset>
+    <AstryxView layout="block" direction="horizontal" className="settings-ssh-view-toggle">
+      <ToggleButtonGroup
+        label={groupLabel}
+        type="single"
+        value={value}
+        onChange={(nextValue) => {
+          if (nextValue === "list" || nextValue === "grid") onChange(nextValue);
+        }}
+        size="sm"
+      >
+        {options.map((option) => {
+          const Icon = option.icon;
+          return (
+            <ToggleButton
+              key={option.value}
+              value={option.value}
+              label={option.label}
+              tooltip={option.label}
+              icon={<Icon className="h-3.5 w-3.5" />}
+              isIconOnly
+            />
+          );
+        })}
+      </ToggleButtonGroup>
+    </AstryxView>
   );
 }
 

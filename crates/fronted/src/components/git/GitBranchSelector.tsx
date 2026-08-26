@@ -142,7 +142,9 @@ function GitInitModal(props: {
   const branchId = useId();
   const userNameId = useId();
   const userEmailId = useId();
-  const isCompact = useMediaQuery("(max-width: 640px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
 
   if (!open) return null;
 
@@ -338,7 +340,9 @@ function BranchActionsModal(props: {
   const { t } = useLocale();
   const titleId = useId();
   const inputId = useId();
-  const isCompact = useMediaQuery("(max-width: 640px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
 
   if (!action) return null;
 

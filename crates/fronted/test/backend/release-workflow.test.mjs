@@ -9,7 +9,7 @@ const repoRoot = path.resolve(frontendRoot, "../..");
 const workflow = readFileSync(
   path.join(repoRoot, ".github/workflows/desktop-release.yml"),
   "utf8",
-);
+).replace(/\r\n?/g, "\n");
 
 function jobSource(name, nextName) {
   const start = workflow.indexOf(`  ${name}:\n`);

@@ -144,7 +144,7 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
           closeLabel={t("chat.cancel")}
         />
 
-        <StackItem size="fill">
+        <StackItem size="fill" className="mobile-panel-safe-content">
           <FileTreePanel active touchActions />
         </StackItem>
       </MobileFullscreenPanel>

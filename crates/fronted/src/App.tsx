@@ -74,12 +74,12 @@ function AppChrome(props: { children: ReactNode; nativeMobile?: boolean }) {
         height="100%"
         width="100%"
         gap={0}
-        className="app-safe-area relative overflow-hidden bg-body"
+        className="app-safe-area app-chrome"
         onContextMenu={onRootContextMenu}
         onMouseDownCapture={onRootMouseDownCapture}
       >
         <WindowsTitleBar />
-        <StackItem size="fill" className="relative overflow-hidden bg-body">
+        <StackItem size="fill" className="app-chrome-content">
           {props.children}
         </StackItem>
       </VStack>
@@ -296,13 +296,13 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    if (!settingsReady || !desktopBridgeEnabled) return;
+    if (!settingsReady || !desktopBridgeEnabled || browserRuntime) return;
     void invoke("app_set_close_window_behavior", {
       behavior: settings.closeWindowBehavior,
     }).catch(() => {
       // Ignore non-Tauri and older desktop shells.
     });
-  }, [desktopBridgeEnabled, settingsReady, settings.closeWindowBehavior]);
+  }, [browserRuntime, desktopBridgeEnabled, settingsReady, settings.closeWindowBehavior]);
 
   useEffect(() => {
     let cancelled = false;
@@ -489,14 +489,14 @@ export default function App() {
   }, [requestRestartConfirm, settings.locale]);
 
   const appUpdate = useAppUpdateController({
-    enabled: settingsReady && desktopBridgeEnabled,
+    enabled: settingsReady && desktopBridgeEnabled && !browserRuntime,
     includePrereleases: settings.updates.includePrereleases,
     messages: appUpdateMessages,
     beforeRestart: beforeAppRestart,
   });
 
   useEffect(() => {
-    if (!desktopBridgeEnabled || nativeMobile) return;
+    if (!desktopBridgeEnabled || nativeMobile || browserRuntime) return;
     let disposed = false;
     let unlistenAction: (() => void) | undefined;
     void listen<{ action?: string; value?: string }>("app:action", (event) => {
@@ -526,7 +526,14 @@ export default function App() {
       disposed = true;
       unlistenAction?.();
     };
-  }, [appUpdate.runCheck, desktopBridgeEnabled, nativeMobile, openSettings, setSettings]);
+  }, [
+    appUpdate.runCheck,
+    browserRuntime,
+    desktopBridgeEnabled,
+    nativeMobile,
+    openSettings,
+    setSettings,
+  ]);
 
   useEffect(() => {
     if (!settingsReady || (!desktopBridgeEnabled && !lanPcCommandHostReady && !nativeMobile))
@@ -584,8 +591,8 @@ export default function App() {
                 }}
                 purpose="info"
                 variant={compactSettingsDialog ? "fullscreen" : "standard"}
-                width={900}
-                maxHeight={compactSettingsDialog ? "100dvh" : "85dvh"}
+                width="var(--xagent-dialog-width-xl)"
+                maxHeight={compactSettingsDialog ? "100dvh" : "var(--xagent-dialog-height-xl)"}
                 padding={0}
                 aria-label={translate("settings.title", settings.locale)}
               >

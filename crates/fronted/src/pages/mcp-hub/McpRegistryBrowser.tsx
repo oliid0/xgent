@@ -1,3 +1,5 @@
+import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
+import { ClickableCard } from "@astryxdesign/core/ClickableCard";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Link } from "@astryxdesign/core/Link";
@@ -809,26 +811,15 @@ function RegistryCard(props: {
   const headerPadding = hasVersionSelector ? (link ? "pr-36" : "pr-28") : link ? "pr-8" : undefined;
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: The card contains nested controls and cannot be a native button.
-    <AstryxView
-      layout="flex"
-      direction="vertical"
-      role="button"
-      tabIndex={0}
-      aria-label={card.displayName}
+    <ClickableCard
+      label={card.displayName}
       onClick={() => onPreview(card)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onPreview(card);
-        }
-      }}
-      className={cn(
-        "skill-card-enter group relative flex h-full min-h-[228px] cursor-pointer flex-col rounded-2xl border p-3.5 text-left backdrop-blur-xl transition-all focus:outline-none focus:ring-2 focus:ring-foreground/10",
-        done
-          ? "border-border/55 bg-background/80 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_4px_18px_-12px_rgba(15,23,42,0.18)] dark:border-white/[0.10] dark:bg-white/[0.07] dark:shadow-[0_1px_0_rgba(255,255,255,0.07)_inset,0_4px_18px_-12px_rgba(0,0,0,0.55)]"
-          : "border-border/40 bg-background/55 hover:-translate-y-0.5 hover:border-border/55 hover:bg-background/70 hover:shadow-[0_4px_16px_-10px_rgba(15,23,42,0.18)] dark:border-white/[0.05] dark:bg-white/[0.03] dark:hover:border-white/[0.10] dark:hover:bg-white/[0.06] dark:hover:shadow-[0_4px_16px_-10px_rgba(0,0,0,0.55)]",
-      )}
+      padding={3}
+      width="100%"
+      height="100%"
+      variant={done ? "default" : "muted"}
+      elevation={done ? "low" : "none"}
+      className="skill-card-enter group relative min-h-[228px]"
     >
       {link || hasVersionSelector ? (
         <AstryxView
@@ -840,16 +831,17 @@ function RegistryCard(props: {
           onPointerDown={(event) => event.stopPropagation()}
         >
           {link ? (
-            <a
+            <AstryxCoreButton
               href={link}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/70 ring-1 ring-transparent transition-all hover:bg-foreground/[0.06] hover:text-foreground hover:ring-border/45"
-              title={t("mcpHub.storeOpenExternal")}
-              aria-label={t("mcpHub.storeOpenExternal")}
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
+              label={t("mcpHub.storeOpenExternal")}
+              tooltip={t("mcpHub.storeOpenExternal")}
+              icon={<ExternalLink className="h-3.5 w-3.5" />}
+              isIconOnly
+              variant="ghost"
+              size="sm"
+            />
           ) : null}
           {hasVersionSelector ? (
             <Select value={card.id} onValueChange={setSelectedCardId}>
@@ -1023,7 +1015,7 @@ function RegistryCard(props: {
           {done ? t("mcpHub.storeInstalled") : t(installLabelKey(card))}
         </Button>
       </AstryxView>
-    </AstryxView>
+    </ClickableCard>
   );
 }
 
@@ -1057,7 +1049,9 @@ function McpRegistryPreviewDrawer(props: {
         ? t(installActionKey)
         : t("mcpHub.storeAddDraft");
 
-  const isCompact = useMediaQuery("(max-width: 640px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
 
   return (
     <Dialog
@@ -1070,8 +1064,9 @@ function McpRegistryPreviewDrawer(props: {
       variant={isCompact ? "fullscreen" : "standard"}
       width={isCompact ? "100dvw" : "min(var(--xagent-drawer-width), 40dvw)"}
       padding={0}
-      className="ml-auto mr-0"
       style={{
+        marginInlineStart: "auto",
+        marginInlineEnd: 0,
         blockSize: "var(--xagent-viewport-height)",
         maxBlockSize: "var(--xagent-viewport-height)",
         ...(isCompact

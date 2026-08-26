@@ -16,7 +16,6 @@ use crate::runtime::platform::{
     expand_tilde_path, maybe_augment_macos_path, resolve_program_path_with_current_dir,
 };
 use crate::runtime::process::{configure_child_process_group, kill_child_process_tree_best_effort};
-use crate::runtime::shell_runner::ShellRunRegistry;
 
 const DEFAULT_TIMEOUT_MS: u64 = 60_000;
 const LEGACY_SSE_ENDPOINT_WAIT_MS: u64 = 3_000;
@@ -1759,7 +1758,6 @@ pub async fn mcp_list_tools(
 #[tauri::command(rename_all = "snake_case")]
 pub async fn mcp_call_tool(
     state: tauri::State<'_, Arc<McpRuntimeManager>>,
-    run_registry: tauri::State<'_, Arc<ShellRunRegistry>>,
     server_id: String,
     tool_name: String,
     arguments: Value,

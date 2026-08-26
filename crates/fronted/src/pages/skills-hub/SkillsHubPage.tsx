@@ -1,26 +1,21 @@
+import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { ClickableCard } from "@astryxdesign/core/ClickableCard";
+import { Icon } from "@astryxdesign/core/Icon";
+import { HStack } from "@astryxdesign/core/Layout";
 import { Link } from "@astryxdesign/core/Link";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
 import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
-import {
-  type KeyboardEvent,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  GlassPanel,
-  HubBackdrop,
-  HubHeader,
-  HubSegmentedButton,
-  HubSegmentedControl,
-} from "../../components/hub/HubChrome";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { GlassPanel, HubBackdrop, HubHeader } from "../../components/hub/HubChrome";
 import {
   Activity,
   AlertTriangle,
@@ -400,22 +395,6 @@ function stripInstalledSkillPreviewMetadata(content: string, skill: SkillSummary
     return stripJsonSkillMetadata(content);
   }
   return content;
-}
-
-function ScanActivityDots() {
-  return (
-    <AstryxView
-      as="span"
-      layout="inline-flex"
-      direction="horizontal"
-      className="ml-0.5 inline-flex gap-[2px]"
-      aria-hidden="true"
-    >
-      <AstryxInline className="skills-scan-dot h-1 w-1 rounded-full bg-foreground/55" />
-      <AstryxInline className="skills-scan-dot h-1 w-1 rounded-full bg-foreground/55" />
-      <AstryxInline className="skills-scan-dot h-1 w-1 rounded-full bg-foreground/55" />
-    </AstryxView>
-  );
 }
 
 function FrostSpinner() {
@@ -1833,12 +1812,6 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     setPreviewInstalledSkill(skill);
   }
 
-  function handleInstalledSkillCardKeyDown(event: KeyboardEvent<HTMLElement>, skill: SkillSummary) {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    openInstalledSkillPreview(skill);
-  }
-
   function setSkillsEnabled(enabled: boolean) {
     setSettings((prev) => updateSkills(prev, { enabled }));
   }
@@ -1889,250 +1862,111 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
             direction="vertical"
             className="hub-content-stage mx-auto flex h-full min-h-0 w-full max-w-[1320px] flex-col gap-4"
           >
-            {/* Status pill row */}
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className={cn(
-                "hub-status-panel hub-panel-enter relative overflow-hidden rounded-xl border bg-card",
-                skillsEnabled ? "border-border shadow-sm" : "border-border",
-              )}
-            >
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                className="flex items-center gap-3 px-4 py-3.5 sm:gap-x-5 sm:px-5"
-              >
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex min-w-0 flex-1 items-center gap-3 sm:gap-3.5"
-                >
-                  <AstryxView
-                    layout="flex"
-                    direction="horizontal"
-                    className={cn(
-                      "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors",
-                      skillsEnabled
-                        ? "border-border bg-muted text-foreground"
-                        : "border-border bg-muted text-muted-foreground",
-                    )}
-                  >
-                    <Plug className="h-5 w-5" />
-                    {skillsEnabled ? (
-                      <AstryxInline className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-background" />
-                    ) : null}
-                  </AstryxView>
-                  <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-                    <AstryxView
-                      layout="flex"
-                      direction="horizontal"
-                      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
-                    >
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="text-[13.5px] font-semibold tracking-tight text-foreground"
-                      >
-                        {skillsEnabled
-                          ? t("settings.skillsHubEnabled")
-                          : t("settings.skillsHubDisabled")}
-                      </AstryxView>
-                      {selectableSkills.length > 0 && (
-                        <AstryxView
-                          as="span"
-                          layout="inline-flex"
-                          direction="horizontal"
-                          className={cn(
-                            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium tabular-nums ring-1",
-                            selectedCount > 0
-                              ? "bg-foreground/[0.06] text-foreground/85 ring-1 ring-border/50"
-                              : "bg-muted text-muted-foreground ring-border",
-                          )}
-                        >
-                          <AstryxInline className="font-semibold">{selectedCount}</AstryxInline>
-                          <AstryxInline className="opacity-50">/</AstryxInline>
-                          <AstryxInline className="opacity-80">
-                            {selectableSkills.length}
-                          </AstryxInline>
-                          <AstryxInline className="ml-0.5 opacity-70">
-                            {t("settings.skillsHubSelectedShort")}
-                          </AstryxInline>
-                        </AstryxView>
-                      )}
-                    </AstryxView>
-                    {skillsStatusHint ? (
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="mt-0.5 truncate text-[11.5px] text-muted-foreground"
-                      >
-                        {skillsStatusHint}
-                      </AstryxView>
-                    ) : null}
-                  </AstryxView>
-                </AstryxView>
-
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex shrink-0 items-center gap-2"
-                >
-                  <AstryxButton
-                    type="button"
-                    role="switch"
-                    aria-checked={skillsEnabled}
-                    disabled={lockedByChatMode}
-                    onClick={() => setSkillsEnabled(!skillsEnabled)}
-                    className={cn(
-                      "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full ring-1 transition-all",
-                      "disabled:cursor-not-allowed disabled:opacity-50",
-                      skillsEnabled
-                        ? "bg-emerald-600 ring-emerald-600 dark:bg-emerald-500 dark:ring-emerald-500"
-                        : "bg-muted-foreground/25 ring-border/40",
-                    )}
-                    title={
+            <Banner
+              status={lockedByChatMode ? "warning" : skillsEnabled ? "success" : "info"}
+              title={
+                skillsEnabled ? t("settings.skillsHubEnabled") : t("settings.skillsHubDisabled")
+              }
+              description={
+                skillsStatusHint ??
+                `${selectedCount} / ${selectableSkills.length} ${t("settings.skillsHubSelectedShort")}`
+              }
+              collapsible={false}
+              endContent={
+                <HStack gap={2} vAlign="center">
+                  <Switch
+                    label={
                       skillsEnabled
                         ? t("settings.skillsHubToggleDisable")
                         : t("settings.skillsHubToggleEnable")
                     }
-                  >
-                    <AstryxInline
-                      className={cn(
-                        "pointer-events-none inline-block h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform",
-                        skillsEnabled ? "translate-x-[1.4rem]" : "translate-x-[0.15rem]",
-                      )}
-                    />
-                  </AstryxButton>
-
-                  <Button
-                    variant="outline"
+                    isLabelHidden
+                    value={skillsEnabled}
+                    isDisabled={lockedByChatMode}
+                    onChange={setSkillsEnabled}
                     size="sm"
-                    className={cn(
-                      "h-8 shrink-0 gap-1.5 rounded-lg border-border bg-background px-3",
-                      loading && "text-foreground",
-                    )}
+                  />
+                  <AstryxCoreButton
+                    label={loading ? t("settings.skillsScanning") : t("settings.skillsScan")}
+                    icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+                    variant="secondary"
+                    size="md"
+                    isLoading={loading}
+                    isDisabled={loading || lockedByChatMode}
                     onClick={() => void refresh()}
-                    disabled={loading || lockedByChatMode}
-                    title={loading ? t("settings.skillsScanning") : t("settings.skillsScan")}
-                  >
-                    <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-                    <AstryxInline className="hidden sm:inline-grid items-center">
-                      <AstryxView
-                        as="span"
-                        layout="inline-flex"
-                        direction="horizontal"
-                        className="invisible col-start-1 row-start-1 inline-flex items-center justify-center whitespace-nowrap"
-                        aria-hidden="true"
-                      >
-                        <AstryxInline>{t("settings.skillsScanning")}</AstryxInline>
-                        <ScanActivityDots />
-                      </AstryxView>
-                      <AstryxView
-                        as="span"
-                        layout="inline-flex"
-                        direction="horizontal"
-                        className="col-start-1 row-start-1 inline-flex items-center justify-center whitespace-nowrap"
-                      >
-                        <AstryxInline>
-                          {loading ? t("settings.skillsScanning") : t("settings.skillsScan")}
-                        </AstryxInline>
-                        {loading ? <ScanActivityDots /> : null}
-                      </AstryxView>
-                    </AstryxInline>
-                  </Button>
-                </AstryxView>
-              </AstryxView>
-            </AstryxView>
+                  />
+                </HStack>
+              }
+            />
 
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="hub-tab-row hub-panel-enter flex items-center justify-between gap-3 max-sm:flex-col max-sm:items-stretch max-sm:gap-2"
+            <HStack
+              width="100%"
+              gap={3}
+              vAlign="center"
+              hAlign="between"
+              wrap="wrap"
+              className="hub-tab-row hub-panel-enter skills-hub-toolbar"
             >
-              <HubSegmentedControl className="shrink-0 max-sm:max-w-full max-sm:overflow-x-auto max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden">
-                {[
-                  {
-                    value: "installed" as const,
-                    label: t("settings.skillsHubInstalledTab"),
-                    icon: Server,
-                    count: selectableSkills.length,
-                  },
-                  {
-                    value: "store" as const,
-                    label: t("settings.skillsHubStoreTab"),
-                    icon: Cloud,
-                    count: null,
-                  },
-                  {
-                    value: "import" as const,
-                    label: t("settings.skillsHubImportTab"),
-                    icon: Download,
-                    count: null,
-                  },
-                ].map((item) => {
-                  const Icon = item.icon;
-                  const active = view === item.value;
-                  return (
-                    <HubSegmentedButton
-                      key={item.value}
-                      active={active}
-                      onClick={() => setView(item.value)}
-                      className="px-4 max-sm:shrink-0"
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      <AstryxInline>{item.label}</AstryxInline>
-                      {item.count !== null && item.count > 0 ? (
-                        <AstryxView
-                          as="span"
-                          layout="inline-flex"
-                          direction="horizontal"
-                          className={cn(
-                            "ml-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums",
-                            active
-                              ? "bg-foreground/[0.08] text-foreground/85"
-                              : "bg-muted/70 text-muted-foreground",
-                          )}
-                        >
-                          {item.count}
-                        </AstryxView>
-                      ) : null}
-                    </HubSegmentedButton>
-                  );
-                })}
-              </HubSegmentedControl>
+              <TabList
+                value={view}
+                onChange={(value) => setView(value as SkillsHubView)}
+                role="tablist"
+                hasDivider
+                overflow="scroll"
+              >
+                <Tab
+                  value="installed"
+                  label={t("settings.skillsHubInstalledTab")}
+                  panelId="skills-panel-installed"
+                  icon={<Icon icon={Server} size="sm" color="inherit" />}
+                  endContent={
+                    selectableSkills.length > 0 ? (
+                      <Badge label={selectableSkills.length} />
+                    ) : undefined
+                  }
+                />
+                <Tab
+                  value="store"
+                  label={t("settings.skillsHubStoreTab")}
+                  panelId="skills-panel-store"
+                  icon={<Icon icon={Cloud} size="sm" color="inherit" />}
+                />
+                <Tab
+                  value="import"
+                  label={t("settings.skillsHubImportTab")}
+                  panelId="skills-panel-import"
+                  icon={<Icon icon={Download} size="sm" color="inherit" />}
+                />
+              </TabList>
 
               {!lockedByChatMode ? (
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex w-full min-w-0 items-center justify-end gap-2"
+                <HStack
+                  gap={2}
+                  vAlign="center"
+                  hAlign="end"
+                  wrap="wrap"
+                  className="skills-hub-actions"
                 >
                   {view !== "store" ? (
-                    <AstryxButton
-                      type="button"
-                      aria-pressed={bulkMode}
-                      onClick={() => {
+                    <ToggleButton
+                      label={t("settings.skillsBulkSelect")}
+                      isPressed={bulkMode}
+                      size="md"
+                      icon={<Icon icon={ListChecks} size="sm" color="inherit" />}
+                      onPressedChange={(_nextPressed, event) => {
+                        event.preventDefault();
                         if (bulkMode) exitBulkMode();
                         else enterBulkMode();
                       }}
-                      title={
+                      tooltip={
                         view === "installed"
                           ? t("settings.skillsBulkHint")
                           : t("settings.skillsBulkImportHint")
                       }
-                      className={cn(
-                        "inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3.5 text-[12.5px] font-medium transition-colors max-sm:px-2.5",
-                        bulkMode
-                          ? "border-primary/50 bg-primary/10 text-foreground ring-1 ring-primary/20"
-                          : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
-                      )}
+                      className="skills-hub-bulk"
                     >
-                      <ListChecks className="h-3.5 w-3.5" />
-                      <AstryxInline>
-                        {bulkMode ? t("settings.skillsBulkDone") : t("settings.skillsBulkSelect")}
-                      </AstryxInline>
-                    </AstryxButton>
+                      {bulkMode ? t("settings.skillsBulkDone") : t("settings.skillsBulkSelect")}
+                    </ToggleButton>
                   ) : null}
                   {view === "installed" ? (
                     <Selector
@@ -2149,47 +1983,55 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                         value: option.value,
                         label: t(option.labelKey),
                       }))}
-                      width="100%"
+                      width="var(--xagent-hub-sort-control-width)"
+                      className="skills-hub-sort"
                     />
                   ) : null}
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="relative w-full min-w-0 max-w-md max-sm:flex-1"
-                  >
-                    <Search className="absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <AstryxInput
-                      type="text"
-                      value={
-                        view === "installed" ? filter : view === "store" ? storeQuery : importQuery
-                      }
-                      onChange={(e) => {
-                        const value = e.currentTarget.value;
-                        if (view === "installed") {
-                          setFilter(value);
-                        } else if (view === "store") {
-                          setStoreQuery(value);
-                        } else {
-                          setImportQuery(value);
-                        }
-                      }}
-                      placeholder={
-                        view === "installed"
-                          ? t("settings.skillsSearch")
-                          : view === "store"
-                            ? t("settings.skillsStoreSearch")
-                            : t("settings.skillsImportSearchPlaceholder")
-                      }
-                      className="h-10 w-full rounded-xl border border-border/40 bg-background/95 pl-10 pr-3 text-[13px] outline-hidden transition-all placeholder:text-muted-foreground/60 focus:border-border/60 focus:bg-background focus:ring-2 focus:ring-foreground/10 dark:bg-popover/95"
-                    />
-                  </AstryxView>
-                </AstryxView>
+                  <TextInput
+                    label={
+                      view === "installed"
+                        ? t("settings.skillsSearch")
+                        : view === "store"
+                          ? t("settings.skillsStoreSearch")
+                          : t("settings.skillsImportSearchPlaceholder")
+                    }
+                    isLabelHidden
+                    value={
+                      view === "installed" ? filter : view === "store" ? storeQuery : importQuery
+                    }
+                    onChange={(value) => {
+                      if (view === "installed") setFilter(value);
+                      else if (view === "store") setStoreQuery(value);
+                      else setImportQuery(value);
+                    }}
+                    placeholder={
+                      view === "installed"
+                        ? t("settings.skillsSearch")
+                        : view === "store"
+                          ? t("settings.skillsStoreSearch")
+                          : t("settings.skillsImportSearchPlaceholder")
+                    }
+                    startIcon={Search}
+                    hasClear
+                    width="var(--xagent-hub-search-control-width)"
+                    className="skills-hub-search"
+                  />
+                </HStack>
               ) : null}
-            </AstryxView>
+            </HStack>
 
             <AstryxView
               layout="block"
               direction="horizontal"
+              id={`skills-panel-${view}`}
+              role="tabpanel"
+              aria-label={
+                view === "installed"
+                  ? t("settings.skillsHubInstalledTab")
+                  : view === "store"
+                    ? t("settings.skillsHubStoreTab")
+                    : t("settings.skillsHubImportTab")
+              }
               className="hub-view-stage min-h-0 flex-1 overflow-hidden"
             >
               {lockedByChatMode ? (
@@ -2508,36 +2350,16 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                                         >
                                           <AstryxInline className="h-2 w-2 rounded-full border border-current opacity-40" />
                                         </AstryxButton>
-                                        <AstryxButton
-                                          type="button"
-                                          role="switch"
-                                          aria-checked={checked}
-                                          aria-label={`${t("skills.select")}: ${skill.name}`}
-                                          title={
-                                            checked
-                                              ? t("settings.skillsHubToggleDisable")
-                                              : t("settings.skillsHubToggleEnable")
-                                          }
-                                          onClick={(event) => {
+                                        <Switch
+                                          label={`${t("skills.select")}: ${skill.name}`}
+                                          isLabelHidden
+                                          value={checked}
+                                          size="sm"
+                                          onChange={(next, event) => {
                                             event.stopPropagation();
-                                            toggleSkill(skill.name, !checked);
+                                            toggleSkill(skill.name, next);
                                           }}
-                                          className={cn(
-                                            "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full ring-1 transition-all",
-                                            checked
-                                              ? "bg-emerald-500 ring-emerald-400/45"
-                                              : "bg-muted-foreground/25 ring-border/40",
-                                          )}
-                                        >
-                                          <AstryxInline
-                                            className={cn(
-                                              "pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform",
-                                              checked
-                                                ? "translate-x-[1.05rem]"
-                                                : "translate-x-[0.15rem]",
-                                            )}
-                                          />
-                                        </AstryxButton>
+                                        />
                                       </AstryxView>
                                     )}
                                   </AstryxView>
@@ -2652,35 +2474,28 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                               const key = `${skill.name}-${rootDir}`;
                               if (alwaysEnabled) {
                                 return (
-                                  <AstryxButton
+                                  <ClickableCard
                                     key={key}
                                     data-flip-key={key}
-                                    type="button"
-                                    aria-label={`${t("settings.skillsInstalledPreviewOpen")}: ${skill.name}`}
-                                    onClick={() => {
-                                      if (bulkMode) return;
-                                      openInstalledSkillPreview(skill);
-                                    }}
-                                    className={cn(
-                                      "hub-skill-card skill-card-enter group flex h-full w-full cursor-pointer flex-col rounded-2xl border border-border/50 bg-background/75 p-3.5 text-left shadow-[0_1px_0_rgba(255,255,255,0.55)_inset,0_4px_18px_-12px_rgba(15,23,42,0.16)] transition-all hover:-translate-y-0.5 hover:border-border/60 hover:bg-background/85 hover:shadow-[0_4px_16px_-10px_rgba(15,23,42,0.18)] dark:border-white/[0.08] dark:bg-white/[0.05] dark:shadow-[0_1px_0_rgba(255,255,255,0.05)_inset,0_4px_18px_-12px_rgba(0,0,0,0.5)] dark:hover:border-white/[0.12] dark:hover:bg-white/[0.07] dark:hover:shadow-[0_4px_16px_-10px_rgba(0,0,0,0.55)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-foreground/15",
-                                      bulkMode ? "cursor-default hover:translate-y-0" : null,
-                                    )}
+                                    label={`${t("settings.skillsInstalledPreviewOpen")}: ${skill.name}`}
+                                    onClick={() => openInstalledSkillPreview(skill)}
+                                    isDisabled={bulkMode}
+                                    padding={3}
+                                    width="100%"
+                                    height="100%"
+                                    elevation="low"
+                                    className="hub-skill-card skill-card-enter group"
                                   >
                                     {card}
-                                  </AstryxButton>
+                                  </ClickableCard>
                                 );
                               }
 
                               return (
-                                // biome-ignore lint/a11y/useSemanticElements: The card contains nested controls and cannot be a native button.
-                                <AstryxView
-                                  layout="flex"
-                                  direction="vertical"
+                                <ClickableCard
                                   key={key}
                                   data-flip-key={key}
-                                  role="button"
-                                  tabIndex={0}
-                                  aria-label={`${t("settings.skillsInstalledPreviewOpen")}: ${skill.name}`}
+                                  label={`${t("settings.skillsInstalledPreviewOpen")}: ${skill.name}`}
                                   onClick={(event) => {
                                     if (bulkMode) {
                                       handleBulkInstalledCardClick(
@@ -2692,36 +2507,20 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                                     }
                                     openInstalledSkillPreview(skill);
                                   }}
-                                  onMouseDown={(event) => {
-                                    // Shift+点击做区间选择时避免浏览器拖出文本选区
-                                    if (bulkMode && event.shiftKey) event.preventDefault();
-                                  }}
-                                  onKeyDown={(event) => {
-                                    if (bulkMode && (event.key === "Enter" || event.key === " ")) {
-                                      event.preventDefault();
-                                      handleBulkInstalledCardClick(
-                                        skill.name,
-                                        sortedFiltered.map((entry) => entry.skill.name),
-                                        event.shiftKey,
-                                      );
-                                      return;
-                                    }
-                                    handleInstalledSkillCardKeyDown(event, skill);
-                                  }}
+                                  padding={3}
+                                  width="100%"
+                                  height="100%"
+                                  variant={checked ? "green" : "muted"}
+                                  elevation={checked ? "low" : "none"}
                                   className={cn(
-                                    "hub-skill-card skill-card-enter group relative flex h-full w-full flex-col rounded-2xl border p-3.5 text-left transition-all",
-                                    "cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-foreground/15",
-                                    // Enabled style always visible; bulk selection overlays primary ring.
-                                    checked
-                                      ? "border-emerald-500/35 bg-emerald-50/90 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset,0_4px_14px_-12px_rgba(16,185,129,0.28)] dark:border-emerald-400/30 dark:bg-emerald-500/12 dark:shadow-[0_1px_0_rgba(255,255,255,0.05)_inset,0_4px_14px_-12px_rgba(16,185,129,0.22)]"
-                                      : "border-border/40 bg-muted/45 text-muted-foreground shadow-none hover:-translate-y-0.5 hover:border-border/55 hover:bg-muted/55 dark:border-white/[0.06] dark:bg-white/[0.025] dark:hover:border-white/[0.10] dark:hover:bg-white/[0.04]",
+                                    "hub-skill-card skill-card-enter group relative",
                                     bulkSelected
                                       ? "ring-2 ring-primary/50 ring-offset-1 ring-offset-background"
                                       : null,
                                   )}
                                 >
                                   {card}
-                                </AstryxView>
+                                </ClickableCard>
                               );
                             })}
                           </AstryxView>
@@ -3536,7 +3335,9 @@ function InstalledSkillPreviewDrawer(props: {
       ? t("settings.skillsInstalledPreviewSelected")
       : t("settings.skillsInstalledPreviewUnselected");
 
-  const isCompact = useMediaQuery("(max-width: 640px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
 
   return (
     <Dialog
@@ -3549,8 +3350,9 @@ function InstalledSkillPreviewDrawer(props: {
       variant={isCompact ? "fullscreen" : "standard"}
       width={isCompact ? "100dvw" : "min(var(--xagent-drawer-width), 40dvw)"}
       padding={0}
-      className="ml-auto mr-0"
       style={{
+        marginInlineStart: "auto",
+        marginInlineEnd: 0,
         blockSize: "var(--xagent-viewport-height)",
         maxBlockSize: "var(--xagent-viewport-height)",
         ...(isCompact
@@ -4380,27 +4182,16 @@ function SkillsStoreView(props: {
                 const PrimaryCategoryIcon = STORE_CATEGORY_ICONS[categories[0] ?? "other"];
 
                 return (
-                  // biome-ignore lint/a11y/useSemanticElements: The card contains nested controls and cannot be a native button.
-                  <AstryxView
-                    layout="flex"
-                    direction="vertical"
+                  <ClickableCard
                     key={buildClawHubSkillKey(skill)}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={skill.displayName}
+                    label={skill.displayName}
                     onClick={() => setPreviewSkill(skill)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        setPreviewSkill(skill);
-                      }
-                    }}
-                    className={cn(
-                      "skill-card-enter group flex h-full cursor-pointer flex-col rounded-2xl border p-3.5 text-left transition-all focus:outline-none focus:ring-2 focus:ring-foreground/10",
-                      done
-                        ? "border-border/55 bg-background/80 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_4px_18px_-12px_rgba(15,23,42,0.18)] dark:border-white/[0.10] dark:bg-white/[0.07] dark:shadow-[0_1px_0_rgba(255,255,255,0.07)_inset,0_4px_18px_-12px_rgba(0,0,0,0.55)]"
-                        : "border-border/40 bg-background/60 hover:-translate-y-0.5 hover:border-border/55 hover:bg-background/75 hover:shadow-[0_4px_16px_-10px_rgba(15,23,42,0.18)] dark:border-white/[0.05] dark:bg-white/[0.03] dark:hover:border-white/[0.10] dark:hover:bg-white/[0.06] dark:hover:shadow-[0_4px_16px_-10px_rgba(0,0,0,0.55)]",
-                    )}
+                    padding={3}
+                    width="100%"
+                    height="100%"
+                    variant={done ? "default" : "muted"}
+                    elevation={done ? "low" : "none"}
+                    className="skill-card-enter group"
                   >
                     <AstryxView
                       layout="flex"
@@ -4438,17 +4229,18 @@ function SkillsStoreView(props: {
                               {skill.displayName}
                             </AstryxInline>
                             {link ? (
-                              <a
+                              <AstryxCoreButton
                                 href={link}
                                 target="_blank"
                                 rel="noreferrer"
+                                label={t("settings.skillsStoreOpenInClawHub")}
+                                tooltip={t("settings.skillsStoreOpenInClawHub")}
+                                icon={<ExternalLink className="h-3.5 w-3.5" />}
+                                isIconOnly
+                                variant="ghost"
+                                size="sm"
                                 onClick={(event) => event.stopPropagation()}
-                                onKeyDown={(event) => event.stopPropagation()}
-                                className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-                                title={t("settings.skillsStoreOpenInClawHub")}
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </a>
+                              />
                             ) : null}
                           </AstryxView>
                           <AstryxView
@@ -4612,7 +4404,7 @@ function SkillsStoreView(props: {
                             : t("settings.skillsStoreInstall")}
                       </Button>
                     </AstryxView>
-                  </AstryxView>
+                  </ClickableCard>
                 );
               })}
             </AstryxView>
@@ -4687,7 +4479,9 @@ function SkillsStorePreviewDrawer(props: {
       ? t("settings.skillsStoreInstalled")
       : t("settings.skillsStoreInstall");
 
-  const isCompact = useMediaQuery("(max-width: 640px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
 
   return (
     <Dialog
@@ -4700,8 +4494,9 @@ function SkillsStorePreviewDrawer(props: {
       variant={isCompact ? "fullscreen" : "standard"}
       width={isCompact ? "100dvw" : "min(var(--xagent-drawer-width), 40dvw)"}
       padding={0}
-      className="ml-auto mr-0"
       style={{
+        marginInlineStart: "auto",
+        marginInlineEnd: 0,
         blockSize: "var(--xagent-viewport-height)",
         maxBlockSize: "var(--xagent-viewport-height)",
         ...(isCompact

@@ -13,42 +13,40 @@ const executionModes = ["text", "tools", "agent-dev"];
 
 test("model pickers use popover semantics instead of menu semantics", () => {
   for (const source of headerSources) {
-    assert.match(source, /import \{ Popover \} from "@base-ui\/react"/);
-    assert.match(source, /<Popover\.Root open=\{isModelPickerOpen\}/);
-    assert.match(source, /<Popover\.Popup/);
-    assert.match(source, /aria-label=\{t\("chat\.selectModel"\)\}/);
+    assert.match(source, /import \{ ComplexSelector \} from "@astryxdesign\/core\/ComplexSelector"/);
+    assert.match(source, /<ComplexSelector<string>/);
+    assert.match(source, /label=\{t\("chat\.selectModel"\)\}/);
+    assert.match(source, /placement="below"/);
     assert.doesNotMatch(source, /DropdownMenu/);
+    assert.doesNotMatch(source, /@base-ui\/react/);
   }
 });
 
-test("execution mode switchers expose a native radio group", () => {
+test("execution mode switchers use Astryx single-select semantics", () => {
   for (const source of headerSources) {
-    assert.match(source, /role="radiogroup"/);
-    assert.match(source, /aria-label=\{t\("settings\.executionMode"\)\}/);
-    assert.equal((source.match(/type="radio"/g) ?? []).length, executionModes.length);
+    assert.match(source, /import \{ SegmentedControl, SegmentedControlItem \}/);
+    assert.match(source, /<SegmentedControl/);
+    assert.match(source, /value=\{props\.executionMode\}/);
+    assert.match(source, /label=\{t\("settings\.executionMode"\)\}/);
     for (const mode of executionModes) {
-      assert.match(source, new RegExp(`value="${mode}"`));
-      assert.match(source, new RegExp(`checked=\\{executionMode === "${mode}"\\}`));
-      assert.match(
-        source,
-        new RegExp(`onChange=\\{\\(\\) => onSelectExecutionMode\\("${mode}"\\)\\}`),
-      );
+      assert.match(source, new RegExp(`<SegmentedControlItem value="${mode}"`));
     }
-    assert.match(source, /has-\[:focus-visible\]:ring-2/);
+    assert.match(source, /onChange=\{\(value\) => props\.onSelectExecutionMode/);
   }
 });
 
 test("popover interactions preserve mode changes and close after model selection", () => {
   for (const source of headerSources) {
-    assert.match(source, /onClick=\{\(\) => toggleGroup\(group\.id\)\}/);
-    assert.match(source, /aria-pressed=\{isSelected\}/);
-    assert.match(source, /onSelectModel\(parsed\);\s+setIsModelPickerOpen\(false\);/);
+    assert.match(source, /onOpenChange=\{\(next\) =>/);
+    assert.match(source, /isSelected=\{isSelected\}/);
+    assert.match(source, /props\.onChange\(option\.value\);\s+props\.close\(\);/);
   }
 });
 
 test("model pickers search models and providers", () => {
   for (const source of headerSources) {
-    assert.match(source, /initialFocus=\{searchInputRef\}/);
+    assert.match(source, /<TextInput/);
+    assert.match(source, /hasAutoFocus/);
     assert.match(source, /placeholder=\{t\("chat\.searchModel"\)\}/);
     assert.match(source, /\w+\.model\.toLowerCase\(\)\.includes\(normalizedSearch\)/);
     assert.match(source, /\w+\.providerName\.toLowerCase\(\)\.includes\(normalizedSearch\)/);

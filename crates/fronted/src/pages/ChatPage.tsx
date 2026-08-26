@@ -1,6 +1,8 @@
 import { ResizeHandle, useResizable } from "@astryxdesign/core/Resizable";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
+import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import type { Context, Message, UserMessage } from "@earendil-works/pi-ai";
-import { invoke, listen, listenFileDrop, revealItemInDir } from "@xagent/runtime";
+import { invoke, isBrowserRuntime, listen, listenFileDrop, revealItemInDir } from "@xagent/runtime";
 import {
   Inline as AstryxInline,
   Paragraph as AstryxParagraph,
@@ -668,6 +670,7 @@ function parentWorkspacePath(path: string) {
 }
 
 export function ChatPage(props: ChatPageProps) {
+  const browserRuntime = isBrowserRuntime();
   const {
     settings,
     setSettings,
@@ -1969,7 +1972,7 @@ export function ChatPage(props: ChatPageProps) {
     });
   }, [desktopCommandHostAvailable, terminalProjectPathKey]);
   useEffect(() => {
-    if (!desktopBridgeEnabled) return;
+    if (!desktopBridgeEnabled || browserRuntime) return;
     let cancelled = false;
     let unlisten: (() => void) | null = null;
 
@@ -2044,7 +2047,7 @@ export function ChatPage(props: ChatPageProps) {
       cancelled = true;
       unlisten?.();
     };
-  }, [desktopBridgeEnabled, requestConfirmDialog, t]);
+  }, [browserRuntime, desktopBridgeEnabled, requestConfirmDialog, t]);
   // Local runner running-state → sidebar store: diff transitions so sidebar
   // dots (and running workdir keys) include local runs immediately; remote
   // runs arrive through the store's own event subscription.
@@ -4757,7 +4760,7 @@ export function ChatPage(props: ChatPageProps) {
   }, [handleNewConversation]);
 
   useEffect(() => {
-    if (nativeMobile) return;
+    if (nativeMobile || browserRuntime) return;
     let disposed = false;
     let unlistenAction: (() => void) | undefined;
     void listen<{ action?: string }>("app:action", (event) => {
@@ -4775,7 +4778,7 @@ export function ChatPage(props: ChatPageProps) {
       disposed = true;
       unlistenAction?.();
     };
-  }, [handleDesktopNewConversation, nativeMobile]);
+  }, [browserRuntime, handleDesktopNewConversation, nativeMobile]);
 
   const handleSelectConversation = useCallback(
     (id: string) => {
@@ -4797,7 +4800,7 @@ export function ChatPage(props: ChatPageProps) {
   const trayPrefs = useTrayPrefs();
 
   useEffect(() => {
-    if (nativeMobile) return;
+    if (nativeMobile || browserRuntime) return;
     let disposed = false;
     let unlistenAction: (() => void) | undefined;
     let unlistenFeedback: (() => void) | undefined;
@@ -4887,6 +4890,7 @@ export function ChatPage(props: ChatPageProps) {
     addNotify,
     handleSelectConversation,
     handleSelectWorkspaceProject,
+    browserRuntime,
     nativeMobile,
     runningConversationIds,
     t,
@@ -4894,7 +4898,7 @@ export function ChatPage(props: ChatPageProps) {
   ]);
 
   useEffect(() => {
-    if (nativeMobile) return;
+    if (nativeMobile || browserRuntime) return;
     const timer = window.setTimeout(() => {
       void syncTrayMenu(
         buildTrayMenuModel({
@@ -4916,6 +4920,7 @@ export function ChatPage(props: ChatPageProps) {
     automationState.cron.tasks,
     historyItems,
     locale,
+    browserRuntime,
     nativeMobile,
     runningConversationIds,
     settings.system.archivedWorkspaceProjectPaths,
@@ -5315,239 +5320,232 @@ export function ChatPage(props: ChatPageProps) {
   );
 
   return (
-    <AstryxView
-      layout="flex"
-      direction="horizontal"
-      className="flex h-full min-h-0 w-full overflow-hidden"
-    >
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden"
-      >
-        {!mobileExperience ? (
-          <WorkspaceNavigationRail
-            activeTarget={desktopNavigationTarget}
-            panelOpen={sidebarOpen}
-            workspaceToolsAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
-            fileTreeAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
-            appUpdate={appUpdate}
-            onTogglePanel={handleToggleSidebar}
-            onNewConversation={handleDesktopNewConversation}
-            onSelect={handleDesktopNavigationSelect}
-            onOpenSettings={() => onOpenSettings()}
-            onCreateSoul={() => onOpenSettings("soul", { createSoul: true })}
-          />
-        ) : null}
-        <MacOsTitleBarToggle
-          sidebarOpen={sidebarOpen}
-          onToggle={handleToggleSidebar}
-          onOpenSettings={() => {
-            if (mobileExperience) setSidebarOpen(false);
-            onOpenSettings();
-          }}
+    <HStack height="100%" width="100%" gap={0} style={{ position: "relative", overflow: "hidden" }}>
+      {!mobileExperience ? (
+        <WorkspaceNavigationRail
+          activeTarget={desktopNavigationTarget}
+          panelOpen={sidebarOpen}
+          workspaceToolsAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
+          fileTreeAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
           appUpdate={appUpdate}
+          onTogglePanel={handleToggleSidebar}
+          onNewConversation={handleDesktopNewConversation}
+          onSelect={handleDesktopNavigationSelect}
+          onOpenSettings={() => onOpenSettings()}
+          onCreateSoul={() => onOpenSettings("soul", { createSoul: true })}
         />
-        {/* ---- Sidebar ---- */}
-        <ChatSidebarContainer
-          store={sidebarStore}
-          currentConversationId={currentConversationId}
-          isOpen={sidebarOpen && (mobileExperience || desktopNavigationTarget === "conversations")}
-          desktopWidth={conversationSidebarResize.size}
-          fontScale={settings.customSettings.fontScale.sidebar}
-          activeView={activeView}
-          showProjects={isAgentMode}
-          projects={workspaceProjects}
-          workspaceProjectGroups={workspaceProjectGroups}
-          activeProjectId={activeWorkspaceProject?.id}
-          missingProjectPathKeys={missingWorkspaceProjectPathKeys}
-          projectRenamingId={projectRenamingId}
-          projectRenameDraft={projectRenameDraft}
-          projectsCollapsed={settings.customSettings.chatSidebar.projectsCollapsed}
-          recentCollapsed={settings.customSettings.chatSidebar.recentCollapsed}
-          onProjectsCollapsedChange={handleSidebarProjectsCollapsedChange}
-          onRecentCollapsedChange={handleSidebarRecentCollapsedChange}
-          onCreateProject={
-            desktopBridgeEnabled || nativeMobile ? handleOpenCreateWorkspaceProject : undefined
+      ) : null}
+      <MacOsTitleBarToggle
+        sidebarOpen={sidebarOpen}
+        onToggle={handleToggleSidebar}
+        onOpenSettings={() => {
+          if (mobileExperience) setSidebarOpen(false);
+          onOpenSettings();
+        }}
+        appUpdate={appUpdate}
+      />
+      {/* ---- Sidebar ---- */}
+      <ChatSidebarContainer
+        store={sidebarStore}
+        currentConversationId={currentConversationId}
+        isOpen={sidebarOpen && (mobileExperience || desktopNavigationTarget === "conversations")}
+        desktopWidth={conversationSidebarResize.size}
+        fontScale={settings.customSettings.fontScale.sidebar}
+        activeView={activeView}
+        showProjects={isAgentMode}
+        projects={workspaceProjects}
+        workspaceProjectGroups={workspaceProjectGroups}
+        activeProjectId={activeWorkspaceProject?.id}
+        missingProjectPathKeys={missingWorkspaceProjectPathKeys}
+        projectRenamingId={projectRenamingId}
+        projectRenameDraft={projectRenameDraft}
+        projectsCollapsed={settings.customSettings.chatSidebar.projectsCollapsed}
+        recentCollapsed={settings.customSettings.chatSidebar.recentCollapsed}
+        onProjectsCollapsedChange={handleSidebarProjectsCollapsedChange}
+        onRecentCollapsedChange={handleSidebarRecentCollapsedChange}
+        onCreateProject={
+          desktopBridgeEnabled || nativeMobile ? handleOpenCreateWorkspaceProject : undefined
+        }
+        onCreateWorkspaceGroup={handleCreateWorkspaceGroup}
+        onRenameWorkspaceGroup={handleRenameWorkspaceGroup}
+        onDeleteWorkspaceGroup={handleDeleteWorkspaceGroup}
+        onMoveProjectToGroup={handleMoveWorkspaceProjectToGroup}
+        onToggleWorkspaceGroupCollapsed={handleToggleWorkspaceGroupCollapsed}
+        onSelectProject={handleSelectWorkspaceProject}
+        onNewConversationForProject={handleNewConversationForProject}
+        onBrowseProjectInFileTree={
+          desktopCommandHostAvailable ? handleBrowseWorkspaceProjectInFileTree : undefined
+        }
+        onBrowseProjectInSystemFileManager={
+          desktopBridgeEnabled ? handleBrowseWorkspaceProjectInSystemFileManager : undefined
+        }
+        onStartRenamingProject={handleStartRenamingWorkspaceProject}
+        onProjectRenameDraftChange={setProjectRenameDraft}
+        onCommitProjectRename={handleCommitWorkspaceProjectRename}
+        onCancelProjectRename={handleCancelWorkspaceProjectRename}
+        onSetProjectPinned={handleSetWorkspaceProjectPinned}
+        onRemoveProject={handleRemoveWorkspaceProject}
+        onArchiveProject={handleArchiveWorkspaceProject}
+        onUnarchiveProject={handleUnarchiveWorkspaceProject}
+        archivedProjectPathKeys={archivedWorkspaceProjectPathKeys}
+        onNewConversation={() => {
+          setActiveView("chat");
+          if (activeView !== "chat" && isDraftConversation) {
+            return;
           }
-          onCreateWorkspaceGroup={handleCreateWorkspaceGroup}
-          onRenameWorkspaceGroup={handleRenameWorkspaceGroup}
-          onDeleteWorkspaceGroup={handleDeleteWorkspaceGroup}
-          onMoveProjectToGroup={handleMoveWorkspaceProjectToGroup}
-          onToggleWorkspaceGroupCollapsed={handleToggleWorkspaceGroupCollapsed}
-          onSelectProject={handleSelectWorkspaceProject}
-          onNewConversationForProject={handleNewConversationForProject}
-          onBrowseProjectInFileTree={
-            desktopCommandHostAvailable ? handleBrowseWorkspaceProjectInFileTree : undefined
+          handleNewConversation();
+        }}
+        onSelectConversation={(id) => {
+          setActiveView("chat");
+          handleSelectConversation(id);
+        }}
+        onConversationDeleted={handleConversationDeleted}
+        onConversationCwdChanged={handleConversationCwdChanged}
+        onCloseSidebar={handleCloseSidebar}
+        onOpenSettings={() => {
+          if (mobileExperience) setSidebarOpen(false);
+          onOpenSettings();
+        }}
+        onCreateSoul={() => {
+          if (mobileExperience) setSidebarOpen(false);
+          onOpenSettings("soul", { createSoul: true });
+        }}
+        appUpdate={appUpdate}
+        onOpenSkillsHub={() => {
+          if (mobileExperience) {
+            cacheActiveComposerDraft();
+            setWorkspaceToolsOpen(false);
+            setActiveView("skills-hub");
+            setDesktopNavigationTarget("skills");
+            setSidebarOpen(false);
+          } else {
+            showDesktopWorkspaceTool("skills");
           }
-          onBrowseProjectInSystemFileManager={
-            desktopBridgeEnabled ? handleBrowseWorkspaceProjectInSystemFileManager : undefined
+        }}
+        onOpenMcpHub={() => {
+          if (mobileExperience) {
+            cacheActiveComposerDraft();
+            setWorkspaceToolsOpen(false);
+            setActiveView("mcp-hub");
+            setDesktopNavigationTarget("mcp");
+            setSidebarOpen(false);
+          } else {
+            showDesktopWorkspaceTool("mcp");
           }
-          onStartRenamingProject={handleStartRenamingWorkspaceProject}
-          onProjectRenameDraftChange={setProjectRenameDraft}
-          onCommitProjectRename={handleCommitWorkspaceProjectRename}
-          onCancelProjectRename={handleCancelWorkspaceProjectRename}
-          onSetProjectPinned={handleSetWorkspaceProjectPinned}
-          onRemoveProject={handleRemoveWorkspaceProject}
-          onArchiveProject={handleArchiveWorkspaceProject}
-          onUnarchiveProject={handleUnarchiveWorkspaceProject}
-          archivedProjectPathKeys={archivedWorkspaceProjectPathKeys}
-          onNewConversation={() => {
-            setActiveView("chat");
-            if (activeView !== "chat" && isDraftConversation) {
-              return;
-            }
-            handleNewConversation();
-          }}
-          onSelectConversation={(id) => {
-            setActiveView("chat");
-            handleSelectConversation(id);
-          }}
-          onConversationDeleted={handleConversationDeleted}
-          onConversationCwdChanged={handleConversationCwdChanged}
-          onCloseSidebar={handleCloseSidebar}
-          onOpenSettings={() => {
-            if (mobileExperience) setSidebarOpen(false);
-            onOpenSettings();
-          }}
-          onCreateSoul={() => {
-            if (mobileExperience) setSidebarOpen(false);
-            onOpenSettings("soul", { createSoul: true });
-          }}
-          appUpdate={appUpdate}
-          onOpenSkillsHub={() => {
-            if (mobileExperience) {
-              cacheActiveComposerDraft();
-              setWorkspaceToolsOpen(false);
-              setActiveView("skills-hub");
-              setDesktopNavigationTarget("skills");
-              setSidebarOpen(false);
-            } else {
-              showDesktopWorkspaceTool("skills");
-            }
-          }}
-          onOpenMcpHub={() => {
-            if (mobileExperience) {
-              cacheActiveComposerDraft();
-              setWorkspaceToolsOpen(false);
-              setActiveView("mcp-hub");
-              setDesktopNavigationTarget("mcp");
-              setSidebarOpen(false);
-            } else {
-              showDesktopWorkspaceTool("mcp");
-            }
-          }}
-          mobileExperience={mobileExperience}
-          desktopPanelMode={!mobileExperience}
-          workspaceToolsAvailable={
-            mobileExperience
-              ? nativeMobile || desktopCommandHostAvailable
-              : desktopCommandHostAvailable && !terminalDisabledMessage
-          }
-          fileTreeAvailable={
-            mobileExperience
-              ? Boolean(mobileWorkspacePathKey)
-              : desktopCommandHostAvailable && !terminalDisabledMessage
-          }
-          onOpenWorkspaceTool={handleOpenWorkspaceTool}
+        }}
+        mobileExperience={mobileExperience}
+        desktopPanelMode={!mobileExperience}
+        workspaceToolsAvailable={
+          mobileExperience
+            ? nativeMobile || desktopCommandHostAvailable
+            : desktopCommandHostAvailable && !terminalDisabledMessage
+        }
+        fileTreeAvailable={
+          mobileExperience
+            ? Boolean(mobileWorkspacePathKey)
+            : desktopCommandHostAvailable && !terminalDisabledMessage
+        }
+        onOpenWorkspaceTool={handleOpenWorkspaceTool}
+      />
+
+      {!mobileExperience && sidebarOpen && desktopNavigationTarget === "conversations" ? (
+        <ResizeHandle
+          direction="horizontal"
+          hasDivider
+          pillPlacement="center"
+          resizable={conversationSidebarResize.props}
+          label={t("chat.resizeSidebarWidth")}
         />
+      ) : null}
 
-        {!mobileExperience && sidebarOpen && desktopNavigationTarget === "conversations" ? (
-          <ResizeHandle
-            direction="horizontal"
-            hasDivider
-            pillPlacement="center"
-            resizable={conversationSidebarResize.props}
-            label={t("chat.resizeSidebarWidth")}
-          />
-        ) : null}
+      {confirmDialog}
 
-        {confirmDialog}
+      {activeView === "chat" &&
+      sidebarOpen &&
+      workspaceToolsOpen &&
+      workspaceToolLaunchRequest &&
+      (desktopCommandHostAvailable ||
+        workspaceToolLaunchRequest.target === "skills" ||
+        workspaceToolLaunchRequest.target === "mcp") ? (
+        <WorkspaceSidePanel
+          width={workspacePanelResize.size}
+          target={workspaceToolLaunchRequest.target}
+          shell={workspaceToolLaunchRequest.shell}
+          requestNonce={workspaceToolLaunchRequest.nonce}
+          fontScale={settings.customSettings.fontScale.workspaceTools}
+          projectPathKey={terminalProjectPathKey}
+          cwd={terminalProjectPath}
+          sessions={terminalSessions}
+          sessionsLoaded={terminalSessionsLoaded}
+          theme={effectiveTheme}
+          disabledMessage={terminalDisabledMessage}
+          projectState={workspaceToolsProjectState}
+          fileTreeState={workspaceFileTreeState}
+          sshHosts={settings.ssh.hosts}
+          associatedSshHostIds={associatedSshHostIds}
+          client={tauriTerminalClient}
+          gitClient={tauriGitClient}
+          workspaceActivityClient={tauriWorkspaceActivityClient}
+          settings={settings}
+          setSettings={setSettings}
+          onProjectStateChange={handleWorkspaceToolsProjectStateChange}
+          onFileTreeStateChange={handleWorkspaceFileTreeStateChange}
+          onSshProjectHostIdsChange={handleSshProjectHostIdsChange}
+          onOpenSshSession={handleOpenSshTerminal}
+          onSessionsChange={handleWorkspaceToolsSessionsChange}
+          onInsertFileMention={handleWorkspaceToolsInsertFileMention}
+          onOpenFile={handleOpenWorkspaceFile}
+          gitReviewFocusRequest={gitReviewFocusRequest}
+          onGitReviewFocusRequestHandled={handleGitReviewFocusRequestHandled}
+          onInsertCodeReviewSkill={
+            codeReviewSkill ? handleWorkspaceToolsInsertCodeReviewSkill : undefined
+          }
+          onInsertCommitMention={handleWorkspaceToolsInsertCommitMention}
+          onInsertGitFileMention={handleWorkspaceToolsInsertGitFileMention}
+          onShellOptionsChange={setTerminalShellOptions}
+          initialSkills={availableSkills}
+          initialSkillsRootDir={skillsRootDir}
+          isAgentMode={isAgentMode}
+        />
+      ) : null}
 
-        {activeView === "chat" &&
-        sidebarOpen &&
-        workspaceToolsOpen &&
-        workspaceToolLaunchRequest &&
-        (desktopCommandHostAvailable ||
-          workspaceToolLaunchRequest.target === "skills" ||
-          workspaceToolLaunchRequest.target === "mcp") ? (
-          <WorkspaceSidePanel
-            width={workspacePanelResize.size}
-            target={workspaceToolLaunchRequest.target}
-            shell={workspaceToolLaunchRequest.shell}
-            requestNonce={workspaceToolLaunchRequest.nonce}
-            fontScale={settings.customSettings.fontScale.workspaceTools}
-            projectPathKey={terminalProjectPathKey}
-            cwd={terminalProjectPath}
-            sessions={terminalSessions}
-            sessionsLoaded={terminalSessionsLoaded}
-            theme={effectiveTheme}
-            disabledMessage={terminalDisabledMessage}
-            projectState={workspaceToolsProjectState}
-            fileTreeState={workspaceFileTreeState}
-            sshHosts={settings.ssh.hosts}
-            associatedSshHostIds={associatedSshHostIds}
-            client={tauriTerminalClient}
-            gitClient={tauriGitClient}
-            workspaceActivityClient={tauriWorkspaceActivityClient}
-            settings={settings}
-            setSettings={setSettings}
-            onProjectStateChange={handleWorkspaceToolsProjectStateChange}
-            onFileTreeStateChange={handleWorkspaceFileTreeStateChange}
-            onSshProjectHostIdsChange={handleSshProjectHostIdsChange}
-            onOpenSshSession={handleOpenSshTerminal}
-            onSessionsChange={handleWorkspaceToolsSessionsChange}
-            onInsertFileMention={handleWorkspaceToolsInsertFileMention}
-            onOpenFile={handleOpenWorkspaceFile}
-            gitReviewFocusRequest={gitReviewFocusRequest}
-            onGitReviewFocusRequestHandled={handleGitReviewFocusRequestHandled}
-            onInsertCodeReviewSkill={
-              codeReviewSkill ? handleWorkspaceToolsInsertCodeReviewSkill : undefined
-            }
-            onInsertCommitMention={handleWorkspaceToolsInsertCommitMention}
-            onInsertGitFileMention={handleWorkspaceToolsInsertGitFileMention}
-            onShellOptionsChange={setTerminalShellOptions}
-            initialSkills={availableSkills}
-            initialSkillsRootDir={skillsRootDir}
-            isAgentMode={isAgentMode}
-          />
-        ) : null}
+      {activeView === "chat" &&
+      sidebarOpen &&
+      workspaceToolsOpen &&
+      workspaceToolLaunchRequest &&
+      !mobileExperience &&
+      (desktopCommandHostAvailable ||
+        workspaceToolLaunchRequest.target === "skills" ||
+        workspaceToolLaunchRequest.target === "mcp") ? (
+        <ResizeHandle
+          direction="horizontal"
+          hasDivider
+          pillPlacement="center"
+          resizable={workspacePanelResize.props}
+          label={t("projectTools.resizePanelWidth")}
+        />
+      ) : null}
 
-        {activeView === "chat" &&
-        sidebarOpen &&
-        workspaceToolsOpen &&
-        workspaceToolLaunchRequest &&
-        !mobileExperience &&
-        (desktopCommandHostAvailable ||
-          workspaceToolLaunchRequest.target === "skills" ||
-          workspaceToolLaunchRequest.target === "mcp") ? (
-          <ResizeHandle
-            direction="horizontal"
-            hasDivider
-            pillPlacement="center"
-            resizable={workspacePanelResize.props}
-            label={t("projectTools.resizePanelWidth")}
-          />
-        ) : null}
-
-        {/* ---- Main content ----
+      {/* ---- Main content ----
             字体缩放仅作用于聊天视图：Skills/MCP Hub 页面存在大量未迁移的固定
             像素字号，整列缩放会造成混排（聊天区设置也只应影响聊天区）。 */}
-        <AstryxView
-          layout="flex"
-          direction="vertical"
-          className={cn(
-            "chat-workspace-main relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background",
-            activeView === "chat" && "zone-font-scale",
-          )}
-          style={
-            activeView === "chat"
-              ? ({
-                  "--zone-font-scale": settings.customSettings.fontScale.chat,
-                } as CSSProperties)
-              : undefined
-          }
-        >
+      <StackItem
+        size="fill"
+        className={cn(
+          "chat-workspace-main zone-scroll-region",
+          activeView === "chat" && "zone-font-scale",
+        )}
+        style={
+          activeView === "chat"
+            ? ({
+                "--zone-font-scale": settings.customSettings.fontScale.chat,
+                position: "relative",
+                overflow: "hidden",
+              } as CSSProperties)
+            : { position: "relative", overflow: "hidden" }
+        }
+      >
+        <VStack height="100%" width="100%" gap={0}>
           {activeView === "skills-hub" ? (
             <SkillsHubPage
               settings={settings}
@@ -5606,70 +5604,50 @@ export function ChatPage(props: ChatPageProps) {
                   onOpenSidebar={handleOpenSidebar}
                   mobileExperience={mobileExperience}
                   preThemeActions={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        setChatSurface((surface) =>
-                          surface === "trajectory" ? "conversation" : "trajectory",
-                        )
-                      }
-                      title={
+                    <ToggleButton
+                      label={
                         chatSurface === "trajectory"
                           ? t("chat.trajectory.backToChat")
                           : t("chat.trajectory.open")
                       }
-                      aria-label={
+                      tooltip={
                         chatSurface === "trajectory"
                           ? t("chat.trajectory.backToChat")
                           : t("chat.trajectory.open")
                       }
-                      aria-pressed={chatSurface === "trajectory"}
-                      className={cn(
-                        "h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground",
-                        chatSurface === "trajectory" && "bg-accent text-foreground",
-                      )}
-                    >
-                      {chatSurface === "trajectory" ? (
-                        <MessageSquare className="h-4 w-4" />
-                      ) : (
-                        <Activity className="h-4 w-4" />
-                      )}
-                    </Button>
+                      isIconOnly
+                      size="sm"
+                      isPressed={chatSurface === "trajectory"}
+                      icon={<Activity className="h-4 w-4" />}
+                      pressedIcon={<MessageSquare className="h-4 w-4" />}
+                      onPressedChange={(isPressed) =>
+                        setChatSurface(isPressed ? "trajectory" : "conversation")
+                      }
+                    />
                   }
                   trailingActions={
                     mobileExperience ? (
                       <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            setChatSurface((surface) =>
-                              surface === "trajectory" ? "conversation" : "trajectory",
-                            )
-                          }
-                          title={
+                        <ToggleButton
+                          label={
                             chatSurface === "trajectory"
                               ? t("chat.trajectory.backToChat")
                               : t("chat.trajectory.open")
                           }
-                          aria-label={
+                          tooltip={
                             chatSurface === "trajectory"
                               ? t("chat.trajectory.backToChat")
                               : t("chat.trajectory.open")
                           }
-                          aria-pressed={chatSurface === "trajectory"}
-                          className={cn(
-                            "h-10 w-10 rounded-xl text-muted-foreground hover:text-foreground",
-                            chatSurface === "trajectory" && "bg-accent text-foreground",
-                          )}
-                        >
-                          {chatSurface === "trajectory" ? (
-                            <MessageSquare className="h-4 w-4" />
-                          ) : (
-                            <Activity className="h-4 w-4" />
-                          )}
-                        </Button>
+                          isIconOnly
+                          size="lg"
+                          isPressed={chatSurface === "trajectory"}
+                          icon={<Activity className="h-4 w-4" />}
+                          pressedIcon={<MessageSquare className="h-4 w-4" />}
+                          onPressedChange={(isPressed) =>
+                            setChatSurface(isPressed ? "trajectory" : "conversation")
+                          }
+                        />
                         <MobileQuickActions
                           onOpenTerminal={() => handleOpenWorkspaceTool("terminal")}
                           onOpenRootfs={() => {
@@ -5948,193 +5926,193 @@ export function ChatPage(props: ChatPageProps) {
               ) : null}
             </>
           )}
-        </AstryxView>
+        </VStack>
+      </StackItem>
 
-        <BrowserPanel />
-        {mobileExperience ? (
-          <MobileBackgroundTasksPanel
-            open={mobileWorkspaceDestination?.kind === "background-tasks"}
-            settings={settings}
-            setSettings={setSettings}
-            managedProcessesAvailable={!nativeMobile && desktopCommandHostAvailable}
-            onClose={() => setMobileWorkspaceDestination(null)}
-          />
-        ) : null}
-        {mobileExperience ? (
-          <MobileBrowserSettingsPanel
-            open={mobileBrowserSettingsOpen}
-            settings={settings}
-            setSettings={setSettings}
-            onClose={() => setMobileWorkspaceDestination(null)}
-          />
-        ) : null}
-        {mobileExperience ? (
-          <MobileFilesPanel
-            open={mobileFilesOpen}
-            projectPathKey={mobileWorkspacePathKey}
-            cwd={mobileWorkspacePath}
+      <BrowserPanel />
+      {mobileExperience ? (
+        <MobileBackgroundTasksPanel
+          open={mobileWorkspaceDestination?.kind === "background-tasks"}
+          settings={settings}
+          setSettings={setSettings}
+          managedProcessesAvailable={!nativeMobile && desktopCommandHostAvailable}
+          onClose={() => setMobileWorkspaceDestination(null)}
+        />
+      ) : null}
+      {mobileExperience ? (
+        <MobileBrowserSettingsPanel
+          open={mobileBrowserSettingsOpen}
+          settings={settings}
+          setSettings={setSettings}
+          onClose={() => setMobileWorkspaceDestination(null)}
+        />
+      ) : null}
+      {mobileExperience ? (
+        <MobileFilesPanel
+          open={mobileFilesOpen}
+          projectPathKey={mobileWorkspacePathKey}
+          cwd={mobileWorkspacePath}
+          theme={effectiveTheme}
+          fileTreeState={mobileFileTreeState}
+          terminalClient={tauriTerminalClient}
+          workspaceActivityClient={null}
+          onFileTreeStateChange={handleMobileFileTreeStateChange}
+          onInsertFileMention={handleWorkspaceToolsInsertFileMention}
+          onOpenFile={handleOpenMobileWorkspaceFile}
+          onClose={() => setMobileWorkspaceDestination(null)}
+        />
+      ) : null}
+      {mobileExperience ? (
+        <MobileGitReviewPanel
+          open={mobileWorkspaceDestination?.kind === "git-review"}
+          workdir={mobileWorkspacePath}
+          onClose={() => setMobileWorkspaceDestination(null)}
+        />
+      ) : null}
+      {nativeMobile ? (
+        <MobileSshPanel
+          open={mobileWorkspaceDestination?.kind === "ssh"}
+          workdir={mobileWorkspacePath}
+          projectPathKey={mobileWorkspacePathKey}
+          hosts={settings.ssh.hosts}
+          associatedHostIds={mobileAssociatedSshHostIds}
+          onAssociatedHostIdsChange={handleMobileSshProjectHostIdsChange}
+          onOpenSettings={() => {
+            setMobileWorkspaceDestination(null);
+            onOpenSettings("ssh");
+          }}
+          onClose={() => setMobileWorkspaceDestination(null)}
+        />
+      ) : null}
+      {mobileExperience ? (
+        <MobileTerminalPanel
+          open={mobileTerminalOpen}
+          workdir={mobileWorkspacePath}
+          mode={mobileTerminalDestination?.mode ?? "terminal"}
+          sshHosts={settings.ssh.hosts}
+          initialCommand={mobileTerminalDestination?.initialCommand ?? ""}
+          autoRunInitialCommand={mobileTerminalDestination?.autoRun ?? false}
+          onClose={() => setMobileWorkspaceDestination(null)}
+        />
+      ) : null}
+      {nativeMobile || desktopBridgeEnabled ? (
+        <MobileWorkspaceCreateDialog
+          open={mobileWorkspaceCreateOpen}
+          parent={parentWorkspacePath(getDefaultWorkspaceProjectPath(settings.system))}
+          cloneAvailable={desktopBridgeEnabled}
+          onCreated={(path, kind) => {
+            setMobileWorkspaceCreateOpen(false);
+            activateWorkspaceProject(createWorkspaceProjectFromPath(path, kind));
+          }}
+          onCloneStarted={() => setMobileWorkspaceCreateOpen(false)}
+          onClose={() => setMobileWorkspaceCreateOpen(false)}
+        />
+      ) : null}
+      {desktopBridgeEnabled ? (
+        <WorkspaceCloneTaskOverlay
+          onOpenWorkspace={(path) => {
+            activateWorkspaceProject(createWorkspaceProjectFromPath(path, "managed"));
+          }}
+        />
+      ) : null}
+      {workspaceEditorMounted ? (
+        <Suspense
+          fallback={
+            <AstryxView
+              layout="flex"
+              direction="vertical"
+              className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
+            >
+              <MacOsTitleBarSpacer className="bg-muted/45" />
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex min-h-0 flex-1 items-center justify-center"
+              >
+                {t("workspaceEditor.loading")}
+              </AstryxView>
+            </AstryxView>
+          }
+        >
+          <WorkspaceCodeEditorOverlay
+            openRequest={workspaceEditorOpenRequest}
+            closeRequestId={workspaceEditorCloseRequestId}
+            isOpen={workspaceEditorOpen}
+            finalCloseRequested={workspaceEditorCleanupPending}
             theme={effectiveTheme}
-            fileTreeState={mobileFileTreeState}
-            terminalClient={tauriTerminalClient}
-            workspaceActivityClient={null}
-            onFileTreeStateChange={handleMobileFileTreeStateChange}
-            onInsertFileMention={handleWorkspaceToolsInsertFileMention}
-            onOpenFile={handleOpenMobileWorkspaceFile}
-            onClose={() => setMobileWorkspaceDestination(null)}
-          />
-        ) : null}
-        {mobileExperience ? (
-          <MobileGitReviewPanel
-            open={mobileWorkspaceDestination?.kind === "git-review"}
-            workdir={mobileWorkspacePath}
-            onClose={() => setMobileWorkspaceDestination(null)}
-          />
-        ) : null}
-        {nativeMobile ? (
-          <MobileSshPanel
-            open={mobileWorkspaceDestination?.kind === "ssh"}
-            workdir={mobileWorkspacePath}
-            projectPathKey={mobileWorkspacePathKey}
-            hosts={settings.ssh.hosts}
-            associatedHostIds={mobileAssociatedSshHostIds}
-            onAssociatedHostIdsChange={handleMobileSshProjectHostIdsChange}
-            onOpenSettings={() => {
-              setMobileWorkspaceDestination(null);
-              onOpenSettings("ssh");
-            }}
-            onClose={() => setMobileWorkspaceDestination(null)}
-          />
-        ) : null}
-        {mobileExperience ? (
-          <MobileTerminalPanel
-            open={mobileTerminalOpen}
-            workdir={mobileWorkspacePath}
-            mode={mobileTerminalDestination?.mode ?? "terminal"}
-            sshHosts={settings.ssh.hosts}
-            initialCommand={mobileTerminalDestination?.initialCommand ?? ""}
-            autoRunInitialCommand={mobileTerminalDestination?.autoRun ?? false}
-            onClose={() => setMobileWorkspaceDestination(null)}
-          />
-        ) : null}
-        {nativeMobile || desktopBridgeEnabled ? (
-          <MobileWorkspaceCreateDialog
-            open={mobileWorkspaceCreateOpen}
-            parent={parentWorkspacePath(getDefaultWorkspaceProjectPath(settings.system))}
-            cloneAvailable={desktopBridgeEnabled}
-            onCreated={(path, kind) => {
-              setMobileWorkspaceCreateOpen(false);
-              activateWorkspaceProject(createWorkspaceProjectFromPath(path, kind));
-            }}
-            onCloneStarted={() => setMobileWorkspaceCreateOpen(false)}
-            onClose={() => setMobileWorkspaceCreateOpen(false)}
-          />
-        ) : null}
-        {desktopBridgeEnabled ? (
-          <WorkspaceCloneTaskOverlay
-            onOpenWorkspace={(path) => {
-              activateWorkspaceProject(createWorkspaceProjectFromPath(path, "managed"));
+            onPreviewFile={(request) => openWorkspaceFilePreview(request)}
+            onInsertCodeMention={handleInsertCodeMention}
+            onHide={() => setWorkspaceEditorOpen(false)}
+            onClose={() => {
+              setWorkspaceEditorOpen(false);
+              setWorkspaceEditorMounted(false);
+              setWorkspaceEditorCleanupPending(false);
+              setWorkspaceEditorOpenRequest(null);
+              setWorkspaceEditorCloseRequestId(0);
             }}
           />
-        ) : null}
-        {workspaceEditorMounted ? (
-          <Suspense
-            fallback={
+        </Suspense>
+      ) : null}
+      {workspaceFilePreviewMounted ? (
+        <Suspense
+          fallback={
+            <AstryxView
+              layout="flex"
+              direction="vertical"
+              className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
+            >
+              <MacOsTitleBarSpacer className="bg-muted/45" />
               <AstryxView
                 layout="flex"
-                direction="vertical"
-                className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
+                direction="horizontal"
+                className="flex min-h-0 flex-1 items-center justify-center"
               >
-                <MacOsTitleBarSpacer className="bg-muted/45" />
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex min-h-0 flex-1 items-center justify-center"
-                >
-                  {t("workspaceEditor.loading")}
-                </AstryxView>
+                {t("workspaceFilePreview.loading")}
               </AstryxView>
-            }
-          >
-            <WorkspaceCodeEditorOverlay
-              openRequest={workspaceEditorOpenRequest}
-              closeRequestId={workspaceEditorCloseRequestId}
-              isOpen={workspaceEditorOpen}
-              finalCloseRequested={workspaceEditorCleanupPending}
-              theme={effectiveTheme}
-              onPreviewFile={(request) => openWorkspaceFilePreview(request)}
-              onInsertCodeMention={handleInsertCodeMention}
-              onHide={() => setWorkspaceEditorOpen(false)}
-              onClose={() => {
-                setWorkspaceEditorOpen(false);
-                setWorkspaceEditorMounted(false);
-                setWorkspaceEditorCleanupPending(false);
-                setWorkspaceEditorOpenRequest(null);
-                setWorkspaceEditorCloseRequestId(0);
-              }}
-            />
-          </Suspense>
-        ) : null}
-        {workspaceFilePreviewMounted ? (
-          <Suspense
-            fallback={
+            </AstryxView>
+          }
+        >
+          <WorkspaceFilePreviewOverlay
+            openRequest={workspaceFilePreviewOpenRequest}
+            isOpen={workspaceFilePreviewOpen}
+            onOpenEditor={(request) => openWorkspaceEditorFile(request)}
+            onRequestClose={requestWorkspaceFilePreviewClose}
+            onClose={handleWorkspaceFilePreviewClosed}
+          />
+        </Suspense>
+      ) : null}
+      {desktopBridgeEnabled && workspaceSshTerminalMounted ? (
+        <Suspense
+          fallback={
+            <AstryxView
+              layout="flex"
+              direction="vertical"
+              className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
+            >
+              <MacOsTitleBarSpacer className="bg-muted/45" />
               <AstryxView
                 layout="flex"
-                direction="vertical"
-                className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
+                direction="horizontal"
+                className="flex min-h-0 flex-1 items-center justify-center"
               >
-                <MacOsTitleBarSpacer className="bg-muted/45" />
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex min-h-0 flex-1 items-center justify-center"
-                >
-                  {t("workspaceFilePreview.loading")}
-                </AstryxView>
+                {t("workspaceSshTerminal.loading")}
               </AstryxView>
-            }
-          >
-            <WorkspaceFilePreviewOverlay
-              openRequest={workspaceFilePreviewOpenRequest}
-              isOpen={workspaceFilePreviewOpen}
-              onOpenEditor={(request) => openWorkspaceEditorFile(request)}
-              onRequestClose={requestWorkspaceFilePreviewClose}
-              onClose={handleWorkspaceFilePreviewClosed}
-            />
-          </Suspense>
-        ) : null}
-        {desktopBridgeEnabled && workspaceSshTerminalMounted ? (
-          <Suspense
-            fallback={
-              <AstryxView
-                layout="flex"
-                direction="vertical"
-                className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
-              >
-                <MacOsTitleBarSpacer className="bg-muted/45" />
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex min-h-0 flex-1 items-center justify-center"
-                >
-                  {t("workspaceSshTerminal.loading")}
-                </AstryxView>
-              </AstryxView>
-            }
-          >
-            <WorkspaceSshTerminalOverlay
-              openRequest={workspaceSshTerminalOpenRequest}
-              projectPathKey={terminalProjectPathKey}
-              sessions={terminalSessions}
-              client={tauriTerminalClient}
-              sftpClient={tauriSftpClient}
-              localForwardClient={tauriSshLocalForwardClient}
-              theme={effectiveTheme}
-              isOpen={workspaceSshTerminalOpen}
-              onHide={() => setWorkspaceSshTerminalOpen(false)}
-            />
-          </Suspense>
-        ) : null}
-      </AstryxView>
-    </AstryxView>
+            </AstryxView>
+          }
+        >
+          <WorkspaceSshTerminalOverlay
+            openRequest={workspaceSshTerminalOpenRequest}
+            projectPathKey={terminalProjectPathKey}
+            sessions={terminalSessions}
+            client={tauriTerminalClient}
+            sftpClient={tauriSftpClient}
+            localForwardClient={tauriSshLocalForwardClient}
+            theme={effectiveTheme}
+            isOpen={workspaceSshTerminalOpen}
+            onHide={() => setWorkspaceSshTerminalOpen(false)}
+          />
+        </Suspense>
+      ) : null}
+    </HStack>
   );
 }

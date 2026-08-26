@@ -3542,6 +3542,7 @@ export const MentionComposer = memo(
           label={contextMenuLabels.copy}
           menuWidth="var(--xagent-context-menu-width)"
           size="sm"
+          data-testid="mention-composer-context-trigger"
           isDisabled={preferNativeContextMenu}
           onOpenChange={(isOpen) => {
             if (!isOpen) closeComposerContextMenu();

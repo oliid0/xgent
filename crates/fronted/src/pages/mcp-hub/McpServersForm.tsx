@@ -1,3 +1,4 @@
+import { Switch } from "@astryxdesign/core/Switch";
 import { isBrowserRuntime } from "@xagent/runtime";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
@@ -296,26 +297,13 @@ const McpServerCard = memo(function McpServerCard(props: {
         direction="horizontal"
         className="mcp-server-card-row flex items-center gap-3 px-4 py-3"
       >
-        {/* Toggle */}
-        <AstryxButton
-          type="button"
-          title={enabled ? t("settings.disable") : t("settings.enable")}
-          onClick={() => patchServer({ enabled: !enabled })}
-          className={cn(
-            "mcp-server-toggle",
-            "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full ring-1 transition-colors",
-            enabled
-              ? "bg-foreground/80 ring-foreground/30 shadow-[0_2px_8px_-3px_rgba(15,23,42,0.4)] dark:shadow-[0_2px_8px_-3px_rgba(0,0,0,0.6)]"
-              : "bg-muted-foreground/25 ring-border/40",
-          )}
-        >
-          <AstryxInline
-            className={cn(
-              "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
-              enabled ? "translate-x-[1.05rem]" : "translate-x-[0.125rem]",
-            )}
-          />
-        </AstryxButton>
+        <Switch
+          label={enabled ? t("settings.disable") : t("settings.enable")}
+          isLabelHidden
+          size="sm"
+          value={enabled}
+          onChange={(value) => patchServer({ enabled: value })}
+        />
 
         {/* Clickable body */}
         <AstryxButton

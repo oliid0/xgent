@@ -99,8 +99,9 @@ for (const { label, loader, page } of implementations) {
     assert.match(source, /ref=\{installedGridRef\}/);
     assert.equal(source.match(/data-flip-key=\{key\}/g)?.length, 2);
     assert.match(source, /prefers-reduced-motion: reduce/);
-    assert.match(source, /\[color-scheme:light\][^"]*dark:\[color-scheme:dark\]/);
-    assert.match(source, /<option[\s\S]*className="bg-background text-foreground"/);
+    assert.match(source, /import \{ Switch \} from "@astryxdesign\/core\/Switch"/);
+    assert.match(source, /import \{ Tab, TabList \} from "@astryxdesign\/core\/TabList"/);
+    assert.match(source, /import \{ TextInput \} from "@astryxdesign\/core\/TextInput"/);
     assert.match(source, /followElement\?\.scrollIntoView\(\{/);
     assert.match(source, /block: "nearest"/);
     assert.match(source, /behavior: reducedMotion \? "auto" : "smooth"/);
@@ -144,32 +145,16 @@ for (const { label, loader, page } of implementations) {
     assert.match(source, /element\.style\.zIndex = ""/);
     assert.match(source, /clearAnimation\(\);[\s\S]*const grid = gridRef\.current/);
     assert.match(source, /element\.style\.translate/);
-    assert.match(source, /h-10 max-w-\[11rem\][^"]*bg-background\/95/);
-    assert.match(source, /h-10 w-full[^"]*bg-background\/95/);
-    assert.match(source, /dark:bg-popover\/95/);
-    assert.match(source, /hub-panel-enter flex items-center justify-between gap-3 max-sm:flex-col max-sm:items-stretch max-sm:gap-2/);
-    assert.match(source, /max-sm:max-w-full max-sm:overflow-x-auto max-sm:\[scrollbar-width:none\] max-sm:\[&::-webkit-scrollbar\]:hidden/);
-    assert.match(source, /max-sm:max-w-\[7\.5rem\] max-sm:px-2/);
-    assert.match(source, /relative w-full min-w-0 max-w-md max-sm:flex-1/);
-    assert.match(source, /pb-\[calc\(10rem\+env\(safe-area-inset-bottom\)\)\] sm:pb-24/);
-    assert.equal(
-      source.match(/max-sm:bottom-\[calc\(1rem\+env\(safe-area-inset-bottom\)\)\]/g)?.length,
-      2,
-    );
-    assert.match(source, /max-sm:bottom-\[calc\(0\.75rem\+env\(safe-area-inset-bottom\)\)\]/);
-    assert.equal(source.match(/fixed inset-0 z-50 flex justify-end bg-background\/55/g)?.length, 2);
-    assert.equal(
-      source.match(/hub-panel-enter pointer-events-auto[^"]*bg-background\/95/g)?.length,
-      3,
-    );
-    assert.match(source, /notify-toast-enter[^"]*bg-amber-50/);
-    assert.doesNotMatch(source, /<select[^>]*backdrop-blur/);
-    assert.doesNotMatch(source, /<input[^>]*backdrop-blur/);
-    assert.doesNotMatch(source, /hub-skill-card[^"]*backdrop-blur/);
-    assert.doesNotMatch(source, /skill-card-enter group flex h-full[^"]*backdrop-blur/);
-    assert.doesNotMatch(source, /hub-panel-enter pointer-events-auto[^"]*backdrop-blur/);
-    assert.doesNotMatch(source, /notify-toast-enter[^"]*backdrop-blur/);
-    assert.doesNotMatch(source, /fixed inset-0 z-50 flex justify-end[^"]*backdrop-blur/);
-    assert.doesNotMatch(source, /flex h-full w-full flex-col border-l[^"]*backdrop-blur/);
+    assert.match(source, /<Banner/);
+    assert.match(source, /<Switch[\s\S]*onChange=\{setSkillsEnabled\}/);
+    assert.match(source, /<TabList[\s\S]*role="tablist"/);
+    assert.match(source, /panelId="skills-panel-installed"/);
+    assert.match(source, /<TextInput[\s\S]*startIcon=\{Search\}[\s\S]*hasClear/);
+    assert.doesNotMatch(source, /role="switch"/);
+    assert.doesNotMatch(source, /HubSegmentedControl/);
+    assert.match(source, /id=\{`skills-panel-\$\{view\}`\}/);
+    assert.match(source, /role="tabpanel"/);
+    assert.match(source, /<Badge label=\{selectableSkills\.length\}/);
+    assert.doesNotMatch(source, /AstryxInput/);
   });
 }

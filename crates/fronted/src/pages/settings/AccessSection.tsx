@@ -1,3 +1,4 @@
+import { Selector } from "@astryxdesign/core/Selector";
 import { invoke, isBrowserRuntime, listen } from "@xagent/runtime";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
@@ -597,22 +598,23 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
               direction="horizontal"
               className="grid gap-3 sm:grid-cols-[1fr_140px]"
             >
-              <AstryxLabel className="space-y-1.5 text-xs font-medium text-muted-foreground">
-                <AstryxInline>{t("settings.accessScope")}</AstryxInline>
-                <select
-                  value={settings.access.webUiScope}
-                  disabled={browser}
-                  onChange={(event) =>
-                    updateAccess(setSettings, {
-                      webUiScope: event.currentTarget.value === "loopback" ? "loopback" : "lan",
-                    })
-                  }
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                >
-                  <option value="lan">{t("settings.accessScopeLan")}</option>
-                  <option value="loopback">{t("settings.accessScopeLoopback")}</option>
-                </select>
-              </AstryxLabel>
+              <Selector
+                label={t("settings.accessScope")}
+                value={settings.access.webUiScope}
+                isDisabled={browser}
+                disabledMessage={browser ? t("settings.accessWebUiHint") : undefined}
+                width="100%"
+                size="sm"
+                options={[
+                  { value: "lan", label: t("settings.accessScopeLan") },
+                  { value: "loopback", label: t("settings.accessScopeLoopback") },
+                ]}
+                onChange={(value) =>
+                  updateAccess(setSettings, {
+                    webUiScope: value === "loopback" ? "loopback" : "lan",
+                  })
+                }
+              />
               <AstryxLabel className="space-y-1.5 text-xs font-medium text-muted-foreground">
                 <AstryxInline>{t("settings.accessPort")}</AstryxInline>
                 <Input

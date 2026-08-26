@@ -977,82 +977,88 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
     <SettingsModalShell
       onClose={onClose}
       ariaLabel={task.name}
-      panelClassName="settings-cron-view-panel h-[80vh] max-w-4xl !flex-row max-sm:h-full max-sm:!flex-col"
+      panelClassName="h-[80vh] max-w-4xl max-sm:h-full"
     >
-      {compactViewport ? (
-        <AstryxView
-          as="header"
-          className="flex min-h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top,0px)]"
-        >
-          <AstryxButton
-            type="button"
-            onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted"
-            aria-label={t("settings.cronViewClose")}
-          >
-            <X className="h-4 w-4" />
-          </AstryxButton>
+      <AstryxView
+        layout="flex"
+        direction={compactViewport ? "vertical" : "horizontal"}
+        className="settings-cron-view-panel flex h-full min-h-0 w-full overflow-hidden"
+      >
+        {compactViewport ? (
           <AstryxView
-            layout="grid"
-            direction="horizontal"
-            className="grid min-w-0 flex-1 grid-cols-2 rounded-lg bg-muted p-0.5"
+            as="header"
+            className="flex min-h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top,0px)]"
           >
             <AstryxButton
               type="button"
-              onClick={() => setCompactTab("details")}
-              className={`h-8 rounded-md text-xs font-medium transition-colors ${
-                compactTab === "details"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground"
-              }`}
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted"
+              aria-label={t("settings.cronViewClose")}
             >
-              {t("settings.cronViewConfig")}
+              <X className="h-4 w-4" />
             </AstryxButton>
-            <AstryxButton
-              type="button"
-              onClick={() => setCompactTab("logs")}
-              className={`h-8 rounded-md text-xs font-medium transition-colors ${
-                compactTab === "logs"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground"
-              }`}
+            <AstryxView
+              layout="grid"
+              direction="horizontal"
+              className="grid min-w-0 flex-1 grid-cols-2 rounded-lg bg-muted p-0.5"
             >
-              {t("settings.cronViewLogs")}
-            </AstryxButton>
+              <AstryxButton
+                type="button"
+                onClick={() => setCompactTab("details")}
+                className={`h-8 rounded-md text-xs font-medium transition-colors ${
+                  compactTab === "details"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {t("settings.cronViewConfig")}
+              </AstryxButton>
+              <AstryxButton
+                type="button"
+                onClick={() => setCompactTab("logs")}
+                className={`h-8 rounded-md text-xs font-medium transition-colors ${
+                  compactTab === "logs"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {t("settings.cronViewLogs")}
+              </AstryxButton>
+            </AstryxView>
           </AstryxView>
-        </AstryxView>
-      ) : null}
-      {/* ── Left: task detail ── */}
-      {!compactViewport || compactTab === "details" ? (
-        <AstryxView
-          layout="flex"
-          direction="vertical"
-          className="settings-cron-view-left flex w-[380px] shrink-0 flex-col border-r border-border/40 bg-background max-sm:min-h-0 max-sm:w-full max-sm:flex-1 max-sm:border-r-0"
-        >
-          <LeftPanel
-            task={task}
-            t={t}
-            cfg={cfg}
-            isRunningNow={isRunningNow}
-            runNowError={runNowError}
-            onRunNow={() => {
-              void handleRunNow(task.id);
-            }}
-            onClose={onClose}
-          />
-        </AstryxView>
-      ) : null}
+        ) : null}
+        {/* ── Left: task detail ── */}
+        {!compactViewport || compactTab === "details" ? (
+          <AstryxView
+            layout="flex"
+            direction="vertical"
+            className="settings-cron-view-left flex w-[380px] shrink-0 flex-col border-r border-border/40 bg-background max-sm:min-h-0 max-sm:w-full max-sm:flex-1 max-sm:border-r-0"
+          >
+            <LeftPanel
+              task={task}
+              t={t}
+              cfg={cfg}
+              isRunningNow={isRunningNow}
+              runNowError={runNowError}
+              onRunNow={() => {
+                void handleRunNow(task.id);
+              }}
+              onClose={onClose}
+            />
+          </AstryxView>
+        ) : null}
 
-      {/* ── Right: logs ── */}
-      {!compactViewport || compactTab === "logs" ? (
-        <AstryxView
-          layout="flex"
-          direction="vertical"
-          className="settings-cron-view-right flex min-w-0 flex-1 flex-col bg-background"
-        >
-          <RightPanel task={task} t={t} onClose={onClose} hideClose={compactViewport} />
-        </AstryxView>
-      ) : null}
+        {/* ── Right: logs ── */}
+        {!compactViewport || compactTab === "logs" ? (
+          <AstryxView
+            layout="flex"
+            direction="vertical"
+            className="settings-cron-view-right flex min-w-0 flex-1 flex-col bg-background"
+          >
+            <RightPanel task={task} t={t} onClose={onClose} hideClose={compactViewport} />
+          </AstryxView>
+        ) : null}
+      </AstryxView>
     </SettingsModalShell>
   );
 }

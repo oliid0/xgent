@@ -1,3 +1,4 @@
+import { Selector } from "@astryxdesign/core/Selector";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 import {
@@ -308,7 +309,11 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
               className="h-10 rounded-xl"
             />
           </AstryxLabel>
-          <AstryxLabel className="grid min-h-16 grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(14rem,1.2fr)] sm:items-center">
+          <AstryxView
+            layout="grid"
+            direction="horizontal"
+            className="grid min-h-16 grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(14rem,1.2fr)] sm:items-center"
+          >
             <AstryxInline>
               <AstryxInline className="block text-sm font-medium">
                 {t("settings.soulLanguage")}
@@ -317,18 +322,21 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
                 {t("settings.soulLanguageHint")}
               </AstryxInline>
             </AstryxInline>
-            <select
+            <Selector
+              label={t("settings.soulLanguage")}
+              isLabelHidden
+              width="100%"
               value={draft.metadata.lang}
-              onChange={(event) => updateMetadata({ lang: event.currentTarget.value })}
-              className="h-10 rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/40"
-            >
-              <option value="auto">{t("settings.soulLanguageAuto")}</option>
-              <option value="zh-CN">简体中文</option>
-              <option value="en-US">English</option>
-              <option value="ja-JP">日本語</option>
-              <option value="ko-KR">한국어</option>
-            </select>
-          </AstryxLabel>
+              onChange={(lang) => updateMetadata({ lang })}
+              options={[
+                { value: "auto", label: t("settings.soulLanguageAuto") },
+                { value: "zh-CN", label: "简体中文" },
+                { value: "en-US", label: "English" },
+                { value: "ja-JP", label: "日本語" },
+                { value: "ko-KR", label: "한국어" },
+              ]}
+            />
+          </AstryxView>
         </AstryxView>
       </AstryxView>
 

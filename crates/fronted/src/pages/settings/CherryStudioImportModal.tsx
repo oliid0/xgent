@@ -1,13 +1,15 @@
+import { Badge } from "@astryxdesign/core/Badge";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { SelectableCard } from "@astryxdesign/core/SelectableCard";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useMemo, useState } from "react";
 import {
-  Check,
   ClaudeIcon,
   FolderOpen,
   GeminiIcon,
@@ -19,7 +21,6 @@ import { AdaptiveDialog } from "../../components/ui/adaptive-dialog";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import type { CodexRequestFormat, ProviderId } from "../../lib/settings";
-import { cn } from "../../lib/shared/utils";
 
 export type CherryProviderImportItem = {
   sourceId: string;
@@ -107,7 +108,9 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
   const candidates = response.providers;
   const resolvedDataPath = dataPath ?? response.dataPath ?? "";
   const [pathDialogOpen, setPathDialogOpen] = useState(false);
-  const isCompact = useMediaQuery("(max-width: 640px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
   const hasSyncableItems = useMemo(
     () => candidates.some((item) => item.enabled && item.importable),
     [candidates],
@@ -241,7 +244,11 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
             </AstryxView>
           </AstryxView>
 
-          <AstryxView layout="flex" direction="horizontal" className="flex min-h-0 flex-1">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex min-h-0 flex-1 max-[720px]:flex-col"
+          >
             {groups.length === 0 ? (
               <AstryxView
                 layout="flex"
@@ -252,128 +259,139 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
               </AstryxView>
             ) : (
               <>
-                <AstryxView
-                  layout="flex"
-                  direction="vertical"
-                  className="flex w-44 shrink-0 flex-col gap-1 overflow-y-auto border-r bg-muted/30 p-2"
-                >
-                  {groups.map((group) => {
-                    const groupSelected = group.items.filter(
-                      (item) => item.importable && selected.has(itemKey(item)),
-                    ).length;
-                    const active = group.type === activeGroup?.type;
-                    return (
-                      <AstryxButton
-                        key={group.type}
-                        type="button"
-                        onClick={() => setActiveType(group.type)}
-                        className={cn(
-                          "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors",
-                          active
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-                        )}
-                      >
-                        <AstryxView
-                          as="span"
-                          layout="flex"
-                          direction="horizontal"
-                          className="flex w-5 shrink-0 items-center justify-center text-base"
-                        >
-                          <ProviderTypeIcon type={group.type} />
-                        </AstryxView>
-                        <AstryxInline className="min-w-0 flex-1">
-                          <AstryxInline className="block truncate text-sm font-medium">
-                            {PROVIDER_LABELS[group.type]}
-                          </AstryxInline>
-                          <AstryxInline className="block text-[11px] text-muted-foreground">
-                            {group.items.length} 项配置
-                          </AstryxInline>
-                        </AstryxInline>
-                        {groupSelected > 0 ? (
-                          <AstryxInline className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                            {groupSelected}
-                          </AstryxInline>
-                        ) : null}
-                      </AstryxButton>
-                    );
-                  })}
-                </AstryxView>
+                {isCompact ? (
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="shrink-0 border-b bg-muted/30 px-3 pt-2"
+                  >
+                    <TabList
+                      value={activeGroup?.type ?? groups[0].type}
+                      onChange={(value) => setActiveType(value as ProviderId)}
+                      role="tablist"
+                      overflow="scroll"
+                      size="sm"
+                    >
+                      {groups.map((group) => {
+                        const groupSelected = group.items.filter(
+                          (item) => item.importable && selected.has(itemKey(item)),
+                        ).length;
+                        return (
+                          <Tab
+                            key={group.type}
+                            value={group.type}
+                            label={PROVIDER_LABELS[group.type]}
+                            panelId="cherry-provider-import-panel"
+                            icon={<ProviderTypeIcon type={group.type} />}
+                            endContent={
+                              groupSelected > 0 ? (
+                                <Badge label={groupSelected} variant="neutral" />
+                              ) : undefined
+                            }
+                          />
+                        );
+                      })}
+                    </TabList>
+                  </AstryxView>
+                ) : (
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="w-44 shrink-0 overflow-y-auto border-r bg-muted/30 p-2"
+                  >
+                    <List density="compact">
+                      {groups.map((group) => {
+                        const groupSelected = group.items.filter(
+                          (item) => item.importable && selected.has(itemKey(item)),
+                        ).length;
+                        return (
+                          <ListItem
+                            key={group.type}
+                            label={PROVIDER_LABELS[group.type]}
+                            description={`${group.items.length} 项配置`}
+                            startContent={<ProviderTypeIcon type={group.type} />}
+                            endContent={
+                              groupSelected > 0 ? (
+                                <Badge label={groupSelected} variant="neutral" />
+                              ) : undefined
+                            }
+                            isSelected={group.type === activeGroup?.type}
+                            onClick={() => setActiveType(group.type)}
+                          />
+                        );
+                      })}
+                    </List>
+                  </AstryxView>
+                )}
 
                 <AstryxView
+                  id="cherry-provider-import-panel"
+                  role="tabpanel"
                   layout="block"
                   direction="horizontal"
-                  className="min-h-0 flex-1 overflow-y-auto px-5 py-4"
+                  className="min-h-0 flex-1 overflow-y-auto px-5 py-4 max-[720px]:px-3 max-[720px]:pb-[calc(var(--spacing-4)+env(safe-area-inset-bottom,0px))]"
                 >
                   <AstryxView layout="block" direction="horizontal" className="space-y-2">
                     {activeItems.map((item) => {
                       const checked = selected.has(itemKey(item));
                       const existing = isExisting(item);
                       return (
-                        <AstryxButton
+                        <SelectableCard
                           key={itemKey(item)}
-                          type="button"
-                          className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
-                            item.importable
-                              ? checked
-                                ? "border-primary/45 bg-primary/[0.06]"
-                                : "hover:bg-accent/40"
-                              : "cursor-not-allowed bg-muted/25 opacity-65"
-                          }`}
-                          onClick={() => toggleItem(item)}
-                          disabled={!item.importable || importing}
+                          label={item.name}
+                          isSelected={checked}
+                          isDisabled={!item.importable || importing}
+                          onChange={() => toggleItem(item)}
+                          width="100%"
+                          padding={3}
+                          variant={item.importable ? "default" : "muted"}
                         >
-                          <AstryxInline
-                            className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                              checked && item.importable
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-muted-foreground/40"
-                            }`}
-                          >
-                            {checked && item.importable ? <Check className="h-3 w-3" /> : null}
-                          </AstryxInline>
-                          <AstryxInline className="min-w-0 flex-1">
-                            <AstryxView
-                              as="span"
-                              layout="flex"
-                              direction="horizontal"
-                              className="flex flex-wrap items-center gap-2"
-                            >
-                              <strong className="text-sm font-medium">{item.name}</strong>
-                              <AstryxInline className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                {itemProtocolLabel(item)}
-                              </AstryxInline>
-                              {existing ? (
-                                <AstryxInline className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-600 dark:text-blue-300">
-                                  将更新
+                          <HStack gap={3} width="100%" vAlign="start">
+                            <StackItem size="fill" className="min-w-0">
+                              <VStack gap={1}>
+                                <AstryxView
+                                  as="span"
+                                  layout="flex"
+                                  direction="horizontal"
+                                  className="flex flex-wrap items-center gap-2"
+                                >
+                                  <strong className="text-sm font-medium">{item.name}</strong>
+                                  <AstryxInline className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                    {itemProtocolLabel(item)}
+                                  </AstryxInline>
+                                  {existing ? (
+                                    <AstryxInline className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-600 dark:text-blue-300">
+                                      将更新
+                                    </AstryxInline>
+                                  ) : null}
+                                  {!item.enabled ? (
+                                    <AstryxInline className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
+                                      Cherry 中已禁用
+                                    </AstryxInline>
+                                  ) : null}
+                                </AstryxView>
+                                <AstryxInline className="mt-1 block truncate text-xs text-muted-foreground">
+                                  {item.baseUrl || "未配置 Base URL"}
                                 </AstryxInline>
-                              ) : null}
-                              {!item.enabled ? (
-                                <AstryxInline className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
-                                  Cherry 中已禁用
+                                <AstryxInline className="mt-1 block text-xs text-muted-foreground">
+                                  {item.apiKeyCount > 0 ? "密钥已配置" : "无可迁移密钥"}
+                                  {item.excludedModelCount > 0
+                                    ? ` · Cherry 中识别到 ${item.excludedModelCount} 个非聊天模型`
+                                    : ""}
                                 </AstryxInline>
-                              ) : null}
-                            </AstryxView>
-                            <AstryxInline className="mt-1 block truncate text-xs text-muted-foreground">
-                              {item.baseUrl || "未配置 Base URL"}
-                            </AstryxInline>
-                            <AstryxInline className="mt-1 block text-xs text-muted-foreground">
-                              {item.apiKeyCount > 0 ? "密钥已配置" : "无可迁移密钥"}
-                              {item.excludedModelCount > 0
-                                ? ` · Cherry 中识别到 ${item.excludedModelCount} 个非聊天模型`
-                                : ""}
-                            </AstryxInline>
-                            {item.reason ? (
-                              <AstryxInline className="mt-1.5 block text-xs text-destructive">
-                                {item.reason}
-                              </AstryxInline>
-                            ) : item.warning ? (
-                              <AstryxInline className="mt-1.5 block text-xs text-amber-700 dark:text-amber-300">
-                                {item.warning}
-                              </AstryxInline>
-                            ) : null}
-                          </AstryxInline>
-                        </AstryxButton>
+                                {item.reason ? (
+                                  <AstryxInline className="mt-1.5 block text-xs text-destructive">
+                                    {item.reason}
+                                  </AstryxInline>
+                                ) : item.warning ? (
+                                  <AstryxInline className="mt-1.5 block text-xs text-amber-700 dark:text-amber-300">
+                                    {item.warning}
+                                  </AstryxInline>
+                                ) : null}
+                              </VStack>
+                            </StackItem>
+                          </HStack>
+                        </SelectableCard>
                       );
                     })}
                   </AstryxView>
@@ -385,7 +403,7 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
           <AstryxView
             layout="flex"
             direction="horizontal"
-            className="flex shrink-0 items-center justify-between gap-3 border-t bg-background px-6 py-4"
+            className="flex shrink-0 items-center justify-between gap-3 border-t bg-background px-6 py-4 max-[720px]:flex-col max-[720px]:items-stretch max-[720px]:px-3 max-[720px]:pb-[calc(var(--spacing-3)+env(safe-area-inset-bottom,0px))]"
           >
             <AstryxView
               layout="block"
@@ -394,12 +412,12 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
             >
               已选择 {selectedItems.length} 个供应商配置
             </AstryxView>
-            <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
-              <Button variant="outline" onClick={onClose} disabled={importing}>
+            <AstryxView layout="grid" direction="horizontal" className="grid grid-cols-2 gap-2">
+              <Button variant="outline" className="w-full" onClick={onClose} disabled={importing}>
                 取消
               </Button>
               <Button
-                className="min-w-32 gap-2"
+                className="w-full min-w-0 gap-2"
                 onClick={() => onConfirm(selectedItems)}
                 disabled={importing || selectedItems.length === 0}
               >

@@ -1916,10 +1916,12 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     <AstryxView
       as="aside"
       data-mobile-left-drawer
+      data-mobile-experience={mobileExperience ? "true" : "false"}
+      data-open={isOpen ? "true" : "false"}
       aria-hidden={!isOpen}
       inert={!isOpen}
       className={cn(
-        "chat-history-sidebar zone-font-scale fixed inset-y-0 left-0 z-50 flex h-full w-[min(90vw,360px)] shrink-0 flex-col overflow-hidden border-r border-border bg-body pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pt-[env(safe-area-inset-top,0px)] shadow-lg transition-[width,opacity,transform] duration-200 ease-out md:relative md:inset-auto md:z-auto md:p-0 md:shadow-none",
+        "chat-history-sidebar zone-font-scale fixed inset-y-0 left-0 z-50 flex h-full w-[min(90vw,360px)] shrink-0 flex-col overflow-hidden border-r border-border bg-body pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] shadow-lg transition-[width,opacity,transform] duration-200 ease-out md:relative md:inset-auto md:z-auto md:p-0 md:shadow-none",
         isOpen
           ? desktopPanelMode
             ? "translate-x-0 opacity-100 md:w-[var(--xagent-chat-sidebar-width)]"
@@ -1953,7 +1955,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
             <AstryxView
               layout="block"
               direction="horizontal"
-              className="hidden h-8 items-center px-2 text-base font-semibold md:flex"
+              className="chat-sidebar-desktop-title hidden h-8 items-center px-2 text-base font-semibold md:flex"
             >
               {t("chat.recentConversation")}
             </AstryxView>

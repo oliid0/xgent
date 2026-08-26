@@ -1,3 +1,4 @@
+import { Switch } from "@astryxdesign/core/Switch";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
 import {
@@ -102,7 +103,7 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
         <AstryxView
           layout="flex"
           direction="horizontal"
-          className="settings-skills-actions flex items-center gap-2"
+          className="settings-skills-title flex items-center gap-2"
         >
           <AstryxView
             layout="flex"
@@ -121,7 +122,11 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
           </AstryxView>
         </AstryxView>
 
-        <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="settings-skills-actions flex items-center gap-2"
+        >
           {selectableSkills.length > 0 ? (
             <AstryxView
               layout="flex"
@@ -144,25 +149,14 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
             </AstryxView>
           ) : null}
 
-          <AstryxButton
-            type="button"
-            role="switch"
-            aria-checked={settings.skills.enabled ? "true" : "false"}
-            aria-label={t("settings.skillsEnable")}
-            disabled={skillsLockedByChatMode}
-            onClick={() =>
-              setSettings((prev) => updateSkills(prev, { enabled: !prev.skills.enabled }))
-            }
-            className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              settings.skills.enabled ? "bg-primary" : "bg-muted-foreground/30"
-            }`}
-          >
-            <AstryxInline
-              className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-xs transition-transform ${
-                settings.skills.enabled ? "translate-x-5" : "translate-x-1"
-              }`}
-            />
-          </AstryxButton>
+          <Switch
+            label={t("settings.skillsEnable")}
+            isLabelHidden
+            value={settings.skills.enabled}
+            isDisabled={skillsLockedByChatMode}
+            onChange={(enabled) => setSettings((prev) => updateSkills(prev, { enabled }))}
+            size="sm"
+          />
 
           <Button
             variant="outline"

@@ -6,8 +6,8 @@
 
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { type ISOTimeString, TimeInput } from "@astryxdesign/core/TimeInput";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
 import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -242,12 +242,6 @@ export function MemorySettingsDrawer(props: {
     });
   }
 
-  function flushOrganizerTimeLocal() {
-    if (timeLocalDraft !== settings.memory.organizerSchedule.timeLocal) {
-      updateOrganizerSchedule({ timeLocal: timeLocalDraft });
-    }
-  }
-
   async function handleRunNow() {
     setOrganizerFeedback(null);
     if (!settings.memory.organizerModel) {
@@ -283,7 +277,9 @@ export function MemorySettingsDrawer(props: {
     }
   }
 
-  const isCompact = useMediaQuery("(max-width: 640px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
 
   return (
     <Dialog
@@ -296,8 +292,9 @@ export function MemorySettingsDrawer(props: {
       variant={isCompact ? "fullscreen" : "standard"}
       width={isCompact ? "100dvw" : "min(var(--xagent-drawer-width-compact), 40dvw)"}
       padding={0}
-      className="ml-auto mr-0"
       style={{
+        marginInlineStart: "auto",
+        marginInlineEnd: 0,
         blockSize: "var(--xagent-viewport-height)",
         maxBlockSize: "var(--xagent-viewport-height)",
         ...(isCompact
@@ -448,7 +445,7 @@ export function MemorySettingsDrawer(props: {
                   <AstryxView
                     layout="grid"
                     direction="horizontal"
-                    className="grid grid-cols-[1fr_108px] gap-2.5"
+                    className="memory-organizer-schedule-grid"
                   >
                     <AstryxLabel className="block space-y-1.5">
                       <AstryxInline className="text-[11.5px] text-muted-foreground/90">
@@ -469,26 +466,15 @@ export function MemorySettingsDrawer(props: {
                         }))}
                       />
                     </AstryxLabel>
-                    <AstryxLabel className="block space-y-1.5">
-                      <AstryxInline className="text-[11.5px] text-muted-foreground/90">
-                        {t("settings.memoryOrganizerTime")}
-                      </AstryxInline>
-                      <AstryxInput
-                        type="time"
-                        aria-label={t("settings.memoryOrganizerTime")}
-                        value={timeLocalDraft}
-                        disabled={organizerTimingDisabled}
-                        onChange={(event) => setTimeLocalDraft(event.currentTarget.value)}
-                        onBlur={flushOrganizerTimeLocal}
-                        className={[
-                          "h-9 w-full rounded-lg border border-foreground/[0.08] bg-white/55 px-3 text-[13px] leading-none text-foreground/90",
-                          "outline-none transition-[background-color,border-color] focus:border-foreground/[0.18] focus:bg-white/80",
-                          "focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0",
-                          "disabled:cursor-not-allowed disabled:opacity-50",
-                          "dark:bg-white/[0.04] dark:focus:bg-white/[0.08]",
-                        ].join(" ")}
-                      />
-                    </AstryxLabel>
+                    <TimeInput
+                      label={t("settings.memoryOrganizerTime")}
+                      value={(timeLocalDraft || undefined) as ISOTimeString | undefined}
+                      onChange={(nextValue) => setTimeLocalDraft(nextValue ?? "")}
+                      isDisabled={organizerTimingDisabled}
+                      hourFormat="24h"
+                      size="sm"
+                      width="100%"
+                    />
                   </AstryxView>
                   {settings.memory.organizerSchedule.frequency === "weekly" ? (
                     <AstryxLabel className="block space-y-1.5">

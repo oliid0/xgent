@@ -37,7 +37,7 @@ export function ConfirmActionPopover(props: {
       onOpenChange={setIsOpen}
       placement={side === "top" ? "above" : "below"}
       alignment={align}
-      width={320}
+      width="min(var(--xagent-confirm-popover-width), calc(100dvw - (var(--spacing-3) * 2)))"
       label={title}
       content={
         <VStack gap={3}>
@@ -76,7 +76,7 @@ export function ConfirmActionPopover(props: {
         </VStack>
       }
     >
-      {children(() => {})}
+      {children(() => setIsOpen(true))}
     </Popover>
   );
 }

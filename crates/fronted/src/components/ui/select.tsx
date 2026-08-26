@@ -66,6 +66,10 @@ function getNodeText(node: ReactNode): string {
   return "";
 }
 
+function hasExplicitWidth(className: string | undefined): boolean {
+  return className?.split(/\s+/).some((name) => /^(?:[a-z-]+:)*w-/.test(name)) ?? false;
+}
+
 function parseSelect(children: ReactNode): ParsedSelect {
   const parsed: ParsedSelect = { options: [] };
 
@@ -130,6 +134,7 @@ export function Select({
       variant={isGhost ? "ghost" : "input"}
       className={className}
       style={parsed.trigger?.style}
+      width={hasExplicitWidth(className) ? undefined : "100%"}
       renderValue={
         valueDisplay == null
           ? undefined

@@ -16,6 +16,10 @@ function getAccessibleLabel(props: InputProps): string {
   return "Input";
 }
 
+function hasExplicitWidth(className: string | undefined): boolean {
+  return className?.split(/\s+/).some((name) => /^(?:[a-z-]+:)*w-/.test(name)) ?? false;
+}
+
 function createNumberChangeEvent(value: number | null): ChangeEvent<HTMLInputElement> {
   const input = { value: value == null ? "" : String(value) } as HTMLInputElement;
   return {
@@ -64,6 +68,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(pro
     ...rest
   } = props;
   const label = getAccessibleLabel({ ...props, label: explicitLabel });
+  const width = hasExplicitWidth(className) ? undefined : "100%";
 
   if (type === "number") {
     const numericValue = value === "" || value == null ? null : Number(value);
@@ -91,6 +96,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(pro
         onBlur={onBlur}
         onKeyDown={onKeyDown}
         isWheelEnabled={false}
+        width={width}
       />
     );
   }
@@ -118,6 +124,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(pro
       onFocus={onFocus}
       onBlur={onBlur}
       onKeyDown={onKeyDown}
+      width={width}
     />
   );
 });

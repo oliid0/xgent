@@ -72,7 +72,9 @@ function BackgroundTaskLogDialog(props: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSelection, setHasSelection] = useState(false);
-  const isCompact = useMediaQuery("(max-width: 640px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
 
   const refresh = useCallback(
     (silent = false) => {

@@ -123,10 +123,12 @@ jobs:
 
       - name: Enforce frontend validation result
         if: >-
+          ${{
           steps.frontend_tests.outcome == 'failure' ||
           (steps.frontend_lint.outcome == 'failure' &&
           (github.event_name != 'push' || github.ref != 'refs/heads/main' ||
           steps.frontend_lint_verify.outcome != 'success'))
+          }}
         run: exit 1
 
   tauri-rust:

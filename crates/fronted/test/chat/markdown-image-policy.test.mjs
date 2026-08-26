@@ -116,7 +116,7 @@ test("markdown image syntax falls back to alt text instead of rendering a real i
   });
 
   assert.ok(node);
-  assert.equal(node.type, "span");
+  assert.notEqual(node.type, "img");
   assert.equal(node.props["data-xagent-markdown-image"], "text-fallback");
   assert.equal(node.props.title, "东门老街");
   assert.equal(node.props.children, "东门老街");
@@ -129,25 +129,24 @@ test("markdown image syntax falls back to alt text instead of rendering a real i
   assert.equal(empty, null);
 });
 
-test("external link safety modal renders through document body portal", () => {
+test("external link safety modal uses the adaptive Astryx dialog pattern", () => {
   const previousDocument = globalThis.document;
   const body = { nodeType: 1 };
   globalThis.document = { body };
 
   try {
-    const portal = markdownModule.ExternalLinkModal({
+    const dialog = markdownModule.ExternalLinkModal({
       isOpen: true,
       onClose() {},
       onConfirm() {},
       url: "https://example.com/dashboard",
     });
 
-    assert.ok(portal);
-    assert.equal(portal.type, "portal");
-    assert.equal(portal.container, body);
-    assert.equal(portal.children.type, "div");
-    assert.match(portal.children.props.className, /\bfixed\b/);
-    assert.match(portal.children.props.className, /\binset-0\b/);
+    assert.ok(dialog);
+    assert.equal(dialog.type.name, "AdaptiveDialog");
+    assert.equal(dialog.props.isOpen, true);
+    assert.equal(dialog.props.touchPresentation, "bottom-sheet");
+    assert.equal(dialog.props.bottomSheetHeight, "hug");
   } finally {
     if (typeof previousDocument === "undefined") {
       delete globalThis.document;

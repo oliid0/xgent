@@ -74,6 +74,9 @@ export function HubHeader(props: {
         style={{
           position: "relative",
           zIndex: "var(--xagent-z-hub-header)",
+          paddingBlockStart: "max(var(--spacing-4), env(safe-area-inset-top, 0px))",
+          paddingInlineStart: "max(var(--spacing-4), env(safe-area-inset-left, 0px))",
+          paddingInlineEnd: "max(var(--spacing-4), env(safe-area-inset-right, 0px))",
           backgroundColor: "var(--xagent-hub-header-background)",
           backdropFilter: "blur(var(--xagent-hub-header-blur))",
         }}

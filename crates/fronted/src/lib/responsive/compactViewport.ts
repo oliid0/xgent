@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-export const COMPACT_VIEWPORT_MEDIA_QUERY = "(max-width: 767px)";
+export const COMPACT_VIEWPORT_MEDIA_QUERY = "(max-width: 768px)";
 
 export function isCompactViewport(): boolean {
   return (

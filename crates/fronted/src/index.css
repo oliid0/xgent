@@ -49,6 +49,10 @@
     --xagent-hub-content-max-width: 82.5rem;
     --xagent-hub-header-control-size: 2.75rem;
     --xagent-hub-header-icon-size: 2.5rem;
+    --xagent-hub-sort-control-width: 11.25rem;
+    --xagent-hub-search-control-width: 18rem;
+    --xagent-confirm-popover-width: 20rem;
+    --xagent-memory-schedule-control-min-width: 10rem;
     --xagent-hub-sidebar-reserve: 2.75rem;
     --xagent-hub-header-blur: 1.25rem;
     --xagent-hub-header-background: color-mix(
@@ -60,6 +64,7 @@
     --xagent-z-task-overlay: 95;
     --xagent-content-width-lg: 45rem;
     --xagent-content-width-xl: 56rem;
+    --xagent-settings-content-max-width: 73.75rem;
     --xagent-macos-titlebar-inset: 14.5rem;
     --xagent-drawer-width: 34rem;
     --xagent-drawer-width-compact: 26.25rem;
@@ -325,6 +330,63 @@
     --git-review-graph-ref-base: var(--color-text-orange);
   }
 }
+
+[dir="rtl"] .chat-history-sidebar[data-mobile-experience="true"]:not([data-open="true"]) {
+  transform: translateX(100%);
+}
+
+@layer components {
+  /*
+   * The migration boundary must preserve the CSS formatting context requested by
+   * each call site. Astryx Stack is a flex primitive, so using it for a legacy
+   * block container without resetting display makes every arbitrary wrapper a
+   * flex formatting context. Components sits after Astryx's layers but before
+   * utilities, so responsive hidden/flex/grid utilities still win when present.
+   */
+  .astryx-stack.astryx-view-block {
+    display: block;
+  }
+
+  .astryx-stack.astryx-view-inline-flex {
+    display: inline-flex;
+  }
+
+  .astryx-grid.astryx-view-inline-grid,
+  .astryx-view-inline-grid {
+    display: inline-grid;
+  }
+
+  /*
+   * Legacy compound actions can contain complete row/grid compositions rather
+   * than a text label. Keep Astryx's interaction, focus and motion surface, but
+   * remove its label wrapper from layout so the original semantic children are
+   * the flex/grid items instead of being clipped inside a single inline span.
+   */
+  .astryx-button[data-xagent-rich-layout="true"] > span
+    > span:has(> [class], > [data-astryx-theme]) {
+    display: contents;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .memory-organizer-schedule-grid {
+    width: 100%;
+    grid-template-columns: repeat(
+        auto-fit,
+        minmax(min(100%, var(--xagent-memory-schedule-control-min-width)), 1fr)
+      );
+    gap: var(--spacing-3);
+  }
+
+  .mcp-hub-content {
+    padding-block-end: max(var(--spacing-5), env(safe-area-inset-bottom, 0px));
+  }
+
+  .skills-hub-toolbar,
+  .skills-hub-actions {
+    min-width: 0;
+  }
+}
 @layer base {
   * {
     border-color: var(--color-border);
@@ -384,10 +446,20 @@
   }
 
   .app-safe-area {
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-right: env(safe-area-inset-right, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    padding-left: env(safe-area-inset-left, 0px);
+    /* Safe areas belong to the edge-owning region (header, composer, sheet or
+       fullscreen dialog). Padding the whole application duplicates those
+       insets on iOS and shifts every page inward twice. */
+    padding: 0;
+  }
+
+  .app-chrome,
+  .app-chrome-content,
+  .zone-scroll-region {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--color-background-body);
   }
 
   input,
@@ -1113,40 +1185,6 @@
     overflow: hidden;
   }
 
-  /* Settings modal open/close motion shared by all frontend targets. */
-  .settings-modal-overlay {
-    opacity: 0;
-    transition: opacity 180ms ease;
-    will-change: opacity;
-  }
-
-  .settings-modal-overlay[data-state="open"] {
-    opacity: 1;
-  }
-
-  .settings-modal-overlay[data-state="closed"] {
-    pointer-events: none;
-  }
-
-  .settings-modal-panel {
-    opacity: 0;
-    transform: translateY(12px) scale(0.985);
-    transition:
-      opacity 180ms ease,
-      transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
-    will-change: opacity, transform;
-  }
-
-  .settings-modal-overlay[data-state="open"] .settings-modal-panel {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-
-  .settings-modal-overlay[data-state="closed"] .settings-modal-panel {
-    opacity: 0;
-    transform: translateY(8px) scale(0.985);
-  }
-
   @keyframes settingsSectionIn {
     from {
       opacity: 0;
@@ -1338,14 +1376,17 @@
     }
 
     .ssh-auth-panel,
-    .ssh-collapsible,
-    .settings-modal-overlay,
-    .settings-modal-panel {
+    .ssh-collapsible {
       transition-duration: 1ms;
     }
   }
 
   /* Mention composer placeholder */
+  [data-testid="mention-composer-context-trigger"] {
+    width: 100%;
+    min-width: 0;
+  }
+
   .mention-composer.is-empty::before {
     content: attr(data-placeholder);
     color: var(--muted-foreground);
@@ -1842,10 +1883,6 @@
     animation: hubLoadingProgress 1.45s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
 
-  .hub-status-dot {
-    animation: hubStatusPulse 1.6s ease-in-out infinite;
-  }
-
   /* macOS frosted-glass loading hero — calm, monochrome, minimal */
 
   @keyframes hubFrostSpinnerFade {
@@ -2220,7 +2257,6 @@
     .hub-empty-state-enter,
     .hub-chip-enter,
     .hub-loading-progress,
-    .hub-status-dot,
     .hub-frost-hero::after,
     .hub-frost-spinner > i,
     .hub-frost-track::before,
@@ -2296,7 +2332,7 @@
  * Tailwind flex/align/gap/padding utilities on the same elements
  * (utilities layer > components layer in Tailwind v4 cascade).
  */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .settings-section-heading-row {
     flex-direction: column;
     align-items: stretch;
@@ -2327,9 +2363,8 @@
  * WebUI controllers. Semantic component classes keep one responsive settings
  * implementation across desktop, web, and mobile.
  */
-@media (max-width: 720px) {
-  .settings-mobile-home,
-  .settings-mobile-detail {
+@media (max-width: 768px) {
+  .settings-page-compact {
     background:
       radial-gradient(
         circle at 100% 0%,
@@ -2339,13 +2374,15 @@
       color-mix(in srgb, var(--muted) calc(0.22 * 100%), transparent);
   }
 
-  .settings-mobile-detail [data-settings-section] {
-    padding: 10px 12px calc(16px + env(safe-area-inset-bottom, 0px));
+  .settings-page-compact [data-settings-section] {
+    padding-right: max(var(--spacing-3), env(safe-area-inset-right, 0px));
+    padding-bottom: max(var(--spacing-4), env(safe-area-inset-bottom, 0px));
+    padding-left: max(var(--spacing-3), env(safe-area-inset-left, 0px));
   }
 
-  .settings-mobile-detail .settings-section-shell {
+  .settings-page-compact .settings-section-shell {
     width: 100%;
-    max-width: 680px;
+    max-width: var(--xagent-content-width-lg);
     margin-inline: auto;
   }
 
@@ -2362,63 +2399,6 @@
     font-weight: 650;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-  }
-
-  .settings-system-form[data-compact="true"] .settings-execution-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--border) calc(0.55 * 100%), transparent);
-    border-radius: 16px;
-    background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
-    box-shadow:
-      inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.8 * 100%), transparent),
-      0 10px 28px -26px color-mix(in srgb, var(--foreground) calc(0.45 * 100%), transparent);
-  }
-
-  .settings-system-form[data-compact="true"] .settings-execution-choice {
-    min-height: 68px;
-    flex-direction: row;
-    align-items: center;
-    gap: 12px;
-    border-width: 0;
-    border-radius: 0;
-    padding: 10px 44px 10px 12px;
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .settings-system-form[data-compact="true"]
-    .settings-execution-choice
-    + .settings-execution-choice {
-    border-top: 1px solid color-mix(in srgb, var(--border) calc(0.5 * 100%), transparent);
-  }
-
-  .settings-system-form[data-compact="true"] .settings-execution-choice[class*="bg-primary"] {
-    background: color-mix(in srgb, var(--primary) calc(0.07 * 100%), transparent);
-  }
-
-  .settings-system-form[data-compact="true"] .settings-execution-choice > div:first-child {
-    width: 34px;
-    height: 34px;
-    border-radius: 999px;
-  }
-
-  .settings-system-form[data-compact="true"] .settings-execution-choice > div:nth-child(2) {
-    min-width: 0;
-    flex: 1;
-  }
-
-  .settings-system-form[data-compact="true"]
-    .settings-execution-choice
-    > div:nth-child(2)
-    > div:last-child {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-height: 1.35;
   }
 
   .settings-system-form[data-compact="true"] .settings-system-divider {
@@ -2439,61 +2419,12 @@
     box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.75 * 100%), transparent);
   }
 
-  .settings-system-form[data-compact="true"] .settings-theme-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 7px;
-  }
-
-  .settings-system-form[data-compact="true"] .settings-theme-grid .settings-choice-card {
-    min-height: 74px;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 8px 4px;
-    text-align: center;
-  }
-
-  .settings-system-form[data-compact="true"]
-    .settings-theme-grid
-    .settings-choice-card
-    > div:first-child {
-    width: 32px;
-    height: 32px;
-    border-radius: 999px;
-  }
-
-  .settings-system-form[data-compact="true"]
-    .settings-theme-grid
-    .settings-choice-card
-    > div:nth-child(2) {
-    padding-right: 0;
-  }
-
-  .settings-system-form[data-compact="true"]
-    .settings-theme-grid
-    .settings-choice-card
-    > div:last-child {
-    top: 6px;
-    right: 6px;
-  }
-
   .settings-system-form[data-compact="true"] .settings-locale-grid {
     gap: 7px;
   }
 
-  .settings-system-form[data-compact="true"] .settings-locale-grid .settings-choice-card {
-    min-height: 58px;
-    padding: 9px 10px;
-  }
-
   .settings-system-form[data-compact="true"] .settings-proxy-card {
     padding-block: 13px;
-  }
-
-  .settings-system-form[data-compact="true"] .settings-proxy-disclosure {
-    min-height: 36px;
   }
 
   .settings-system-form[data-compact="true"] .settings-proxy-details {
@@ -2571,39 +2502,12 @@
     background: color-mix(in srgb, var(--background) calc(0.58 * 100%), transparent);
   }
 
-  .settings-mobile-detail [data-settings-section="providers"] {
+  .settings-page-compact [data-settings-section="providers"] {
     padding-inline: 0;
   }
 
-  .settings-mobile-detail [data-settings-section="providers"] .settings-section-shell {
+  .settings-page-compact [data-settings-section="providers"] .settings-section-shell {
     max-width: none;
-  }
-
-  .providers-tabbar-row {
-    gap: 6px;
-    margin: 0;
-    padding: 8px 12px;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
-    background: color-mix(in srgb, var(--background) calc(0.76 * 100%), transparent);
-  }
-
-  .providers-tabbar {
-    min-width: 0;
-    flex: 1;
-    height: 38px;
-    border-radius: 11px;
-  }
-
-  .providers-tabbar > button {
-    min-width: 0;
-    flex: 1;
-    gap: 4px;
-    padding-inline: 5px;
-    font-size: 12px;
-  }
-
-  .providers-pages {
-    padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
   }
 
   .provider-list {
@@ -2624,34 +2528,8 @@
     overscroll-behavior: contain;
   }
 
-  .provider-list-card {
-    min-height: 64px;
-    gap: 11px;
-    border-color: color-mix(in srgb, var(--border) calc(0.5 * 100%), transparent);
-    border-radius: 16px;
-    padding: 10px 8px 10px 13px;
-    background: color-mix(in srgb, var(--card) calc(0.84 * 100%), transparent);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.72 * 100%), transparent);
-  }
-
-  .provider-list-card > div:first-child {
-    width: 32px;
-    height: 32px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--muted) calc(0.72 * 100%), transparent);
-  }
-
-  .provider-list-card-actions {
-    opacity: 1;
-  }
-
-  .provider-list-card-actions button {
-    width: 38px;
-    height: 38px;
-  }
-
-  .settings-mobile-detail input,
-  .settings-mobile-detail textarea {
+  .settings-page-compact input,
+  .settings-page-compact textarea {
     font-size: 16px;
   }
 }
@@ -2682,49 +2560,11 @@
   backdrop-filter: blur(18px) saturate(1.25);
 }
 
-.settings-page-desktop .settings-sidebar {
-  width: 248px;
-  padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--border) calc(0.42 * 100%), transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--card) calc(0.68 * 100%), transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.72 * 100%), transparent),
-    0 18px 42px -34px color-mix(in srgb, var(--foreground) calc(0.3 * 100%), transparent);
-}
-
-.settings-page-desktop .settings-nav-item {
-  min-height: 44px;
-  gap: 10px;
-  border-radius: 12px;
-  padding-inline: 9px;
-  transition:
-    color 140ms ease,
-    background-color 140ms ease,
-    transform 100ms ease;
-}
-
-.settings-page-desktop .settings-nav-item-active {
-  background: color-mix(in srgb, var(--background) calc(0.92 * 100%), transparent);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--border) calc(0.38 * 100%), transparent),
-    0 5px 16px -13px color-mix(in srgb, var(--foreground) calc(0.4 * 100%), transparent);
-}
-
-.settings-nav-icon,
-.settings-mobile-row-icon {
-  box-shadow:
-    inset 0 1px 0 hsl(0 0% 100% / 0.28),
-    0 3px 8px -5px hsl(0 0% 0% / 0.6);
-}
-
 .settings-page-desktop .settings-section-shell {
-  max-width: 1180px;
+  max-width: var(--xagent-settings-content-max-width);
   margin-inline: auto;
 }
 
-.settings-page-desktop .settings-section-hero,
-.settings-page-desktop .settings-hooks-event-selector,
 .settings-page-desktop .settings-hooks-detail,
 .settings-page-desktop .settings-memory-status-group,
 .settings-page-desktop .settings-memory-layout,
@@ -2738,13 +2578,6 @@
     0 16px 36px -32px color-mix(in srgb, var(--foreground) calc(0.36 * 100%), transparent);
 }
 
-.settings-mobile-toolbar {
-  border-bottom: 1px solid color-mix(in srgb, var(--border) calc(0.32 * 100%), transparent);
-  background: color-mix(in srgb, var(--background) calc(0.82 * 100%), transparent);
-  -webkit-backdrop-filter: blur(20px) saturate(1.25);
-  backdrop-filter: blur(20px) saturate(1.25);
-}
-
 .settings-mobile-group {
   border: 1px solid color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
   background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
@@ -2753,56 +2586,19 @@
     0 14px 32px -28px color-mix(in srgb, var(--foreground) calc(0.4 * 100%), transparent);
 }
 
-.settings-mobile-row {
-  transition:
-    background-color 140ms ease,
-    transform 100ms ease;
-}
-
-.settings-mobile-row:active,
 .settings-memory-back:active,
 .settings-page-compact .settings-section-action:active {
   transform: scale(0.97);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .settings-mobile-row:hover {
-    background: color-mix(in srgb, var(--muted) calc(0.42 * 100%), transparent);
-  }
-
-  .settings-page-desktop .settings-nav-item:hover {
-    background: color-mix(in srgb, var(--background) calc(0.7 * 100%), transparent);
-  }
-}
-
-@media (max-width: 720px) {
-  .settings-mobile-home > div {
-    padding-top: 2px;
-  }
-
+@media (max-width: 768px) {
   .xagent-icon {
     display: block;
     flex-shrink: 0;
     color: inherit;
   }
 
-  .settings-mobile-home section {
-    padding-top: 12px;
-  }
-
-  .settings-mobile-home section > h2 {
-    margin-bottom: 7px;
-    padding-inline: 12px;
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: 0.055em;
-  }
-
-  .settings-mobile-detail [data-settings-section] {
-    padding: 12px 12px calc(18px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .settings-mobile-detail [data-settings-section="memory"] {
+  .settings-page-compact [data-settings-section="memory"] {
     padding-inline: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
@@ -2886,40 +2682,11 @@
     gap: 12px;
   }
 
-  .settings-hooks-event-option:active {
-    transform: scale(0.97);
-  }
-
-  .settings-hooks-event-selector,
   .settings-hooks-detail {
     border-color: color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
     border-radius: 16px;
     background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
     box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.74 * 100%), transparent);
-  }
-
-  .settings-hooks-event-option {
-    min-width: min(72vw, 220px);
-    min-height: 52px;
-  }
-
-  .settings-mobile-home .settings-mobile-row {
-    min-height: 54px;
-    padding-block: 7px;
-  }
-
-  .settings-mobile-home .settings-mobile-row > span:nth-child(2) > span:first-child {
-    font-size: 14px;
-    line-height: 20px;
-  }
-
-  .settings-mobile-home .settings-mobile-row > span:nth-child(2) > span:last-child {
-    display: none;
-  }
-
-  .settings-modal-panel {
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .settings-modal-header,
@@ -2937,25 +2704,6 @@
 
   .settings-modal-actions > button {
     min-height: 44px;
-  }
-
-  .settings-hooks-event-selector {
-    display: flex;
-    margin-inline: -12px;
-    padding-inline: 12px;
-    border-inline: 0;
-    border-radius: 0;
-    scrollbar-width: none;
-    scroll-padding-inline: 12px;
-    overscroll-behavior-inline: contain;
-  }
-
-  .settings-hooks-event-selector::-webkit-scrollbar {
-    display: none;
-  }
-
-  .settings-hooks-event-selector .settings-hooks-event-option {
-    flex: 0 0 min(72vw, 220px);
   }
 
   .settings-hooks-detail-header {
@@ -3171,7 +2919,6 @@
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .settings-mobile-toolbar,
   .settings-page-desktop > header {
     background: var(--background);
     -webkit-backdrop-filter: none;
@@ -3181,8 +2928,6 @@
 
 @media (prefers-contrast: more) {
   .settings-mobile-group,
-  .settings-page-desktop .settings-sidebar,
-  .settings-page-desktop .settings-section-hero,
   .settings-page-desktop .settings-memory-status-group,
   .settings-page-desktop .settings-memory-layout {
     border-color: color-mix(in srgb, var(--foreground) calc(0.42 * 100%), transparent);
@@ -3190,49 +2935,6 @@
 }
 
 /* Skills and MCP share one platform-adaptive hub chrome. */
-.hub-backdrop {
-  background: var(--hub-canvas, var(--color-background-body));
-}
-
-.hub-backdrop[data-hub-tone="violet"] {
-  background:
-    radial-gradient(circle at 86% 0%, hsl(270 82% 60% / 0.055), transparent 31%),
-    var(--hub-canvas, var(--color-background-body));
-}
-
-.hub-backdrop[data-hub-tone="amber"] {
-  background:
-    radial-gradient(circle at 86% 0%, hsl(38 92% 55% / 0.06), transparent 31%),
-    var(--hub-canvas, var(--color-background-body));
-}
-
-.hub-header {
-  border-bottom: 1px solid color-mix(in srgb, var(--border) calc(0.36 * 100%), transparent);
-  background: color-mix(in srgb, var(--background) calc(0.8 * 100%), transparent);
-  -webkit-backdrop-filter: blur(20px) saturate(1.25);
-  backdrop-filter: blur(20px) saturate(1.25);
-}
-
-.hub-header-icon {
-  border: 1px solid color-mix(in srgb, var(--border) calc(0.42 * 100%), transparent);
-  background: color-mix(in srgb, var(--muted) calc(0.62 * 100%), transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.78 * 100%), transparent),
-    0 8px 20px -17px color-mix(in srgb, var(--foreground) calc(0.45 * 100%), transparent);
-}
-
-.hub-header-icon[data-hub-tone="violet"] {
-  color: hsl(270 70% 55%);
-  background: hsl(270 82% 60% / 0.09);
-}
-
-.hub-header-icon[data-hub-tone="amber"] {
-  color: hsl(38 86% 48%);
-  background: hsl(38 92% 55% / 0.1);
-}
-
-.hub-status-panel,
-.hub-panel,
 .mcp-server-card,
 .hub-skill-card {
   border-color: color-mix(in srgb, var(--border) calc(0.42 * 100%), transparent);
@@ -3240,15 +2942,6 @@
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.72 * 100%), transparent),
     0 16px 36px -32px color-mix(in srgb, var(--foreground) calc(0.34 * 100%), transparent);
-}
-
-.hub-segmented-control {
-  border: 1px solid color-mix(in srgb, var(--border) calc(0.34 * 100%), transparent);
-  background: color-mix(in srgb, var(--muted) calc(0.58 * 100%), transparent);
-}
-
-.hub-segmented-button:active {
-  transform: scale(0.97);
 }
 
 .workspace-side-panel[data-workspace-tool="skills"],
@@ -3266,35 +2959,10 @@
   gap: 10px;
 }
 
-.hub-page-embedded .hub-status-panel {
-  border-radius: 14px;
-}
-
-.hub-page-embedded .hub-status-panel > div {
-  min-height: 64px;
-  padding: 10px 12px;
-}
-
-.hub-page-embedded .hub-status-panel button {
-  min-width: 40px;
-  min-height: 40px;
-}
-
 .hub-page-embedded .hub-tab-row {
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
-}
-
-.hub-page-embedded .hub-tab-row > .hub-segmented-control {
-  display: grid;
-  width: 100%;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.hub-page-embedded .hub-segmented-button {
-  min-width: 0;
-  padding-inline: 7px;
 }
 
 .hub-page-embedded .hub-view-stage {
@@ -3316,10 +2984,6 @@
 }
 
 @container workspace-hub-panel (max-width: 460px) {
-  .hub-page-embedded .hub-status-panel > div {
-    flex-wrap: wrap;
-  }
-
   .hub-page-embedded .hub-tab-row > div:last-child {
     flex-wrap: wrap;
     justify-content: stretch;
@@ -3339,55 +3003,7 @@
   filter: drop-shadow(0 12px 18px hsl(0 0% 0% / 0.12));
 }
 
-@media (max-width: 720px) {
-  .hub-header {
-    min-height: 58px;
-    padding: calc(9px + env(safe-area-inset-top, 0px)) 12px 9px;
-  }
-
-  .hub-header > .mx-auto {
-    gap: 10px;
-  }
-
-  .hub-header-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 11px;
-  }
-
-  .hub-header h1 {
-    font-size: 17px;
-    line-height: 22px;
-  }
-
-  .hub-header p {
-    max-width: min(58vw, 360px);
-    font-size: 11px;
-  }
-
-  .hub-header-sidebar-button {
-    left: 8px;
-    top: calc(7px + env(safe-area-inset-top, 0px));
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-  }
-
-  .hub-header[data-close-navigation="true"] {
-    min-height: calc(68px + env(safe-area-inset-top, 0px));
-    border-bottom-color: color-mix(in srgb, var(--border) calc(0.24 * 100%), transparent);
-    background: color-mix(in srgb, var(--background) calc(0.92 * 100%), transparent);
-  }
-
-  .hub-header[data-close-navigation="true"] > .mx-auto {
-    min-height: 50px;
-  }
-
-  .hub-header[data-close-navigation="true"] h1 {
-    font-size: 19px;
-    line-height: 24px;
-  }
-
+@media (max-width: 768px) {
   .hub-scroll {
     padding: 10px 12px calc(14px + env(safe-area-inset-bottom, 0px));
   }
@@ -3396,47 +3012,10 @@
     gap: 10px;
   }
 
-  .hub-status-panel {
-    border-radius: 16px;
-  }
-
-  .hub-status-panel > div {
-    min-height: 68px;
-    flex-wrap: wrap;
-    gap: 10px;
-    padding: 11px 12px;
-  }
-
-  .hub-status-panel > div > button,
-  .hub-status-panel > div > div:last-child button {
-    min-width: 44px;
-    min-height: 44px;
-  }
-
   .hub-tab-row {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
-  }
-
-  .hub-tab-row > .hub-segmented-control {
-    display: grid;
-    width: 100%;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    overflow: visible;
-    border-radius: 13px;
-  }
-
-  .hub-tab-row > .hub-segmented-control .hub-segmented-button {
-    min-width: 0;
-    min-height: 42px;
-    padding-inline: 6px;
-  }
-
-  .hub-tab-row > .hub-segmented-control .hub-segmented-button > span:nth-child(2) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .hub-view-stage {
@@ -3453,11 +3032,6 @@
     flex-wrap: wrap;
     gap: 10px;
     padding: 12px;
-  }
-
-  .mcp-server-toggle {
-    width: 42px;
-    height: 24px;
   }
 
   .mcp-server-body {
@@ -3558,12 +3132,44 @@
   .mcp-server-card:hover {
     transform: none;
   }
+
+  .chat-history-sidebar[data-mobile-experience="true"] button {
+    pointer-events: auto;
+    opacity: 1;
+  }
+}
+
+/* Native iOS/Android remains a drawer even on tablet-sized logical viewports;
+   viewport-only md utilities must never turn it back into the desktop rail. */
+[data-native-mobile="true"] .chat-history-sidebar[data-mobile-experience="true"] {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inset-inline-end: auto;
+  z-index: var(--xagent-z-mobile-panel);
+  width: min(90vw, 22.5rem);
+  padding-top: 0;
+  transform: translateX(-100%);
+}
+
+[data-native-mobile="true"] .chat-history-sidebar[data-mobile-experience="true"][data-open="true"] {
+  transform: translateX(0);
+}
+
+[data-native-mobile="true"]
+  .chat-history-sidebar[data-mobile-experience="true"]
+  .chat-history-sidebar-inner {
+  width: 100%;
+  min-width: 0;
+}
+
+[data-native-mobile="true"]
+  .chat-history-sidebar[data-mobile-experience="true"]
+  .chat-sidebar-desktop-title {
+  display: none;
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .hub-header,
-  .hub-status-panel,
-  .hub-panel,
   .mcp-server-card,
   .hub-skill-card {
     background: var(--background);
@@ -3573,12 +3179,8 @@
 }
 
 @media (prefers-contrast: more) {
-  .hub-header,
-  .hub-status-panel,
-  .hub-panel,
   .mcp-server-card,
-  .hub-skill-card,
-  .hub-segmented-control {
+  .hub-skill-card {
     border-color: color-mix(in srgb, var(--foreground) calc(0.42 * 100%), transparent);
   }
 }
@@ -3794,7 +3396,58 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   margin-inline-end: 0.375rem;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
+  .mcp-hub-content {
+    padding: var(--spacing-3);
+    padding-block-end: max(var(--spacing-3), env(safe-area-inset-bottom, 0px));
+  }
+
+  .skills-hub-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .skills-hub-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .skills-hub-bulk,
+  .skills-hub-sort,
+  .skills-hub-search {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .skills-hub-search {
+    grid-column: 1 / -1;
+  }
+
+  .chat-history-sidebar[data-mobile-experience="true"] {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    inset-inline-end: auto;
+    z-index: var(--xagent-z-mobile-panel);
+    width: min(90vw, 360px);
+    padding-top: 0;
+    transform: translateX(-100%);
+  }
+
+  .chat-history-sidebar[data-mobile-experience="true"][data-open="true"] {
+    transform: translateX(0);
+  }
+
+  .chat-history-sidebar[data-mobile-experience="true"] .chat-history-sidebar-inner {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .chat-history-sidebar[data-mobile-experience="true"] .chat-sidebar-desktop-title {
+    display: none;
+  }
+
   [data-mobile-left-drawer].chat-history-sidebar {
     width: min(88vw, 344px);
     border-right-color: color-mix(in srgb, var(--border) calc(0.42 * 100%), transparent);
@@ -3806,7 +3459,8 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   }
 
   .chat-history-sidebar .chat-sidebar-header {
-    padding: 14px 12px 12px;
+    padding: calc(var(--spacing-3) + env(safe-area-inset-top, 0px)) var(--spacing-3)
+      var(--spacing-3);
     border-bottom-color: transparent;
   }
 
@@ -3855,6 +3509,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 
   [data-mobile-chat-header="true"] {
     min-height: calc(58px + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
     padding-inline: 12px;
     border-bottom: 1px solid color-mix(in srgb, var(--border) calc(0.34 * 100%), transparent);
     background: color-mix(in srgb, var(--background) calc(0.82 * 100%), transparent);
@@ -3863,7 +3518,8 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   }
 
   .mobile-panel-header {
-    min-height: 58px;
+    min-height: calc(58px + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
     padding-inline: 10px 14px;
   }
 
@@ -3879,6 +3535,35 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 
   .chat-history-sidebar button:active {
     opacity: 0.72;
+  }
+}
+
+@media (max-width: 1024px) and (pointer: coarse) and (hover: none) {
+  .mcp-hub-content {
+    padding: var(--spacing-3);
+    padding-block-end: max(var(--spacing-3), env(safe-area-inset-bottom, 0px));
+  }
+
+  .skills-hub-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .skills-hub-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .skills-hub-bulk,
+  .skills-hub-sort,
+  .skills-hub-search {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .skills-hub-search {
+    grid-column: 1 / -1;
   }
 }
 
@@ -3943,7 +3628,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     0 5px 16px -12px color-mix(in srgb, var(--foreground) calc(0.22 * 100%), transparent);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   [data-mobile-chat-header="true"].chat-header {
     min-height: 56px;
     padding-inline: 10px;
@@ -4083,12 +3768,19 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 [data-native-mobile="true"] .mobile-fullscreen-panel,
-[data-native-mobile="true"] .settings-page-compact,
-[data-native-mobile="true"] .settings-mobile-home,
-[data-native-mobile="true"] .settings-mobile-detail {
+[data-native-mobile="true"] .settings-page-compact {
   width: 100%;
   min-width: 0;
   max-width: 100vw;
+}
+
+.mobile-panel-safe-content {
+  padding-block-end: env(safe-area-inset-bottom, 0px);
+}
+
+[data-native-mobile="true"] .mobile-panel-header {
+  min-height: calc(var(--xagent-mobile-header-height) + env(safe-area-inset-top, 0px));
+  padding-block-start: env(safe-area-inset-top, 0px);
 }
 
 [data-native-mobile="true"] [data-mobile-left-drawer].chat-history-sidebar {
@@ -4099,7 +3791,8 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 [data-native-mobile="true"] [data-mobile-chat-header="true"].chat-header {
-  min-height: 56px;
+  min-height: calc(56px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
   padding-inline: 10px;
   border-color: color-mix(in srgb, var(--border) calc(0.3 * 100%), transparent);
   background: color-mix(in srgb, var(--background) calc(0.82 * 100%), transparent);
@@ -4133,8 +3826,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   padding-left: max(10px, env(safe-area-inset-left, 0px));
 }
 
-[data-native-mobile="true"] .settings-mobile-home,
-[data-native-mobile="true"] .settings-mobile-detail {
+[data-native-mobile="true"] .settings-page-compact {
   background:
     radial-gradient(
       circle at 100% 0%,
@@ -4144,15 +3836,16 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     color-mix(in srgb, var(--muted) calc(0.22 * 100%), transparent);
 }
 
-[data-native-mobile="true"] .settings-mobile-detail [data-settings-section] {
-  padding: 12px max(12px, env(safe-area-inset-right, 0px))
-    calc(18px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+[data-native-mobile="true"] .settings-page-compact [data-settings-section] {
+  padding-right: max(var(--spacing-3), env(safe-area-inset-right, 0px));
+  padding-bottom: max(var(--spacing-4), env(safe-area-inset-bottom, 0px));
+  padding-left: max(var(--spacing-3), env(safe-area-inset-left, 0px));
 }
 
-[data-native-mobile="true"] .settings-mobile-detail .settings-section-shell {
+[data-native-mobile="true"] .settings-page-compact .settings-section-shell {
   width: 100%;
   min-width: 0;
-  max-width: 680px;
+  max-width: var(--xagent-content-width-lg);
   margin-inline: auto;
 }
 
@@ -4171,36 +3864,9 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   background: color-mix(in srgb, var(--card) calc(0.84 * 100%), transparent);
 }
 
-[data-native-mobile="true"] .settings-mobile-detail input,
-[data-native-mobile="true"] .settings-mobile-detail textarea,
-[data-native-mobile="true"] .settings-mobile-detail select {
+[data-native-mobile="true"] .settings-page-compact input,
+[data-native-mobile="true"] .settings-page-compact textarea,
+[data-native-mobile="true"] .settings-page-compact select {
   max-width: 100%;
   font-size: 16px;
-}
-
-.settings-page-compact .settings-tool-permissions-category-header {
-  flex-wrap: wrap;
-  align-items: stretch;
-}
-
-.settings-page-compact .settings-tool-permissions-category-actions {
-  display: grid;
-  width: 100%;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.settings-page-compact .settings-tool-permissions-category-actions > button,
-.settings-page-compact .settings-tool-permissions-policies > button {
-  min-width: 0;
-  min-height: 40px;
-}
-
-.settings-page-compact .settings-tool-permissions-row {
-  min-width: 0;
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.settings-page-compact .settings-tool-permissions-policies {
-  width: 100%;
 }

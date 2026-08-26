@@ -1807,7 +1807,13 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
                         {t("workspaceSftp.empty")}
                       </AstryxView>
                     ) : (
-                      <AstryxView layout="block" direction="horizontal" className="space-y-1">
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        role="listbox"
+                        aria-multiselectable="true"
+                        className="space-y-1"
+                      >
                         {pane.entries.map((entry) => {
                           const isSelected = pane.selectedPaths.includes(entry.path);
                           return (
@@ -1820,7 +1826,8 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
                               data-sftp-drop-path={
                                 entry.kind === "directory" ? entry.path : undefined
                               }
-                              aria-pressed={isSelected}
+                              role="option"
+                              aria-selected={isSelected}
                               className={cn(
                                 "grid w-full touch-none cursor-default grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-3 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted",
                                 isSelected &&

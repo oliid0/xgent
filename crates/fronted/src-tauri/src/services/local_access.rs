@@ -464,7 +464,10 @@ impl LocalAccessController {
             .get(REFERER)
             .and_then(|value| value.to_str().ok())
             .is_some_and(|value| value == expected_origin || value.starts_with(&format!("{expected_origin}/")));
-        if !same_origin_fetch || !matching_referer {
+        // EventSource does not consistently send both Referer and
+        // Sec-Fetch-Site. Host is already restricted to the active local
+        // server above, so either browser signal is sufficient here.
+        if !same_origin_fetch && !matching_referer {
             return Err("request is missing same-origin browser metadata".to_string());
         }
         Ok(())
@@ -1133,6 +1136,7 @@ fn authorize_local_command(
         "git_commit_diff",
     ];
     if command == "settings_load_all"
+        || command == "workspace_watch_set"
         || command == "system_home_dir"
         || command == "system_load_soul"
         || command == "system_list_souls"
@@ -1202,7 +1206,10 @@ fn authorize_local_event(event: &str, config: &AccessSettingsPayload) -> Result<
     }
     if matches!(
         event,
-        "terminal:event" | "terminal:stream" | "managed-process:changed"
+        "terminal:event"
+            | "terminal:stream"
+            | "terminal:exit-requested"
+            | "managed-process:changed"
     ) && config.allow_terminal
     {
         return Ok(());

@@ -1,3 +1,4 @@
+import { Badge } from "@astryxdesign/core/Badge";
 import { Button as AstryxNativeButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Dialog } from "@astryxdesign/core/Dialog";
@@ -10,6 +11,7 @@ import { Popover } from "@astryxdesign/core/Popover";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { TextInput } from "@astryxdesign/core/TextInput";
+import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { invoke } from "@xagent/runtime";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
@@ -686,7 +688,9 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
       : firstHeaderIssue === "invalid"
         ? t("settings.invalidCustomHeaderKey")
         : null;
-  const isCompact = useMediaQuery("(max-width: 720px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
 
   return (
     <Dialog
@@ -755,50 +759,71 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
           direction="horizontal"
           className="flex min-h-0 flex-1 max-[720px]:flex-col"
         >
-          <AstryxView
-            as="nav"
-            className="flex w-[172px] shrink-0 flex-col gap-1 border-r bg-muted/30 p-2.5 max-[720px]:w-full max-[720px]:flex-row max-[720px]:overflow-x-auto max-[720px]:border-b max-[720px]:border-r-0 max-[720px]:px-2.5 max-[720px]:py-2"
-            aria-label={t("settings.providerDialogNavigation")}
-          >
-            <AstryxButton
-              type="button"
-              className={cn(
-                "flex h-10 items-center gap-2 rounded-lg px-3 text-left text-sm text-muted-foreground max-[720px]:min-w-max max-[720px]:flex-1 max-[720px]:justify-center max-[720px]:px-2 max-[720px]:text-xs transition-colors hover:bg-accent/50 hover:text-foreground",
-                activePanel === "general" && "bg-primary/10 font-medium text-primary",
-              )}
-              onClick={() => setActivePanel("general")}
-              aria-current={activePanel === "general" ? "page" : undefined}
+          {isCompact ? (
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="shrink-0 border-b bg-muted/30 px-3 pt-2"
             >
-              <Settings className="h-4 w-4 shrink-0 max-[720px]:h-3.5 max-[720px]:w-3.5" />
-              {t("settings.providerDialogGeneral")}
-            </AstryxButton>
-            <AstryxButton
-              type="button"
-              className={cn(
-                "flex h-10 items-center gap-2 rounded-lg px-3 text-left text-sm text-muted-foreground max-[720px]:min-w-max max-[720px]:flex-1 max-[720px]:justify-center max-[720px]:px-2 max-[720px]:text-xs transition-colors hover:bg-accent/50 hover:text-foreground",
-                activePanel === "request" && "bg-primary/10 font-medium text-primary",
-              )}
-              onClick={() => setActivePanel("request")}
-              aria-current={activePanel === "request" ? "page" : undefined}
+              <TabList
+                value={activePanel}
+                onChange={(value) => setActivePanel(value as "general" | "request")}
+                role="tablist"
+                layout="fill"
+                size="sm"
+              >
+                <Tab
+                  value="general"
+                  label={t("settings.providerDialogGeneral")}
+                  panelId="provider-settings-panel"
+                  icon={<Settings className="h-4 w-4" />}
+                />
+                <Tab
+                  value="request"
+                  label={t("settings.providerDialogRequest")}
+                  panelId="provider-settings-panel"
+                  icon={<Globe className="h-4 w-4" />}
+                  endContent={
+                    customHeaders.length > 0 ? (
+                      <Badge label={customHeaders.length} variant="neutral" />
+                    ) : undefined
+                  }
+                />
+              </TabList>
+            </AstryxView>
+          ) : (
+            <AstryxView
+              as="nav"
+              layout="block"
+              direction="horizontal"
+              className="w-[172px] shrink-0 border-r bg-muted/30 p-2.5"
+              aria-label={t("settings.providerDialogNavigation")}
             >
-              <Globe className="h-4 w-4 shrink-0 max-[720px]:h-3.5 max-[720px]:w-3.5" />
-              <AstryxInline className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]">
-                {t("settings.providerDialogRequest")}
-              </AstryxInline>
-              {customHeaders.length > 0 ? (
-                <AstryxInline
-                  className={cn(
-                    "min-w-5 rounded-full bg-muted px-1.5 py-0.5 text-center text-[10px] tabular-nums text-muted-foreground",
-                    activePanel === "request" && "bg-primary text-primary-foreground",
-                  )}
-                >
-                  {customHeaders.length}
-                </AstryxInline>
-              ) : null}
-            </AstryxButton>
-          </AstryxView>
+              <AstryxList density="compact">
+                <ListItem
+                  label={t("settings.providerDialogGeneral")}
+                  startContent={<Settings className="h-4 w-4" />}
+                  isSelected={activePanel === "general"}
+                  onClick={() => setActivePanel("general")}
+                />
+                <ListItem
+                  label={t("settings.providerDialogRequest")}
+                  startContent={<Globe className="h-4 w-4" />}
+                  endContent={
+                    customHeaders.length > 0 ? (
+                      <Badge label={customHeaders.length} variant="neutral" />
+                    ) : undefined
+                  }
+                  isSelected={activePanel === "request"}
+                  onClick={() => setActivePanel("request")}
+                />
+              </AstryxList>
+            </AstryxView>
+          )}
 
           <AstryxView
+            id="provider-settings-panel"
+            role="tabpanel"
             layout="block"
             direction="horizontal"
             className="min-w-0 flex-1 overflow-y-auto px-6 py-5 max-[720px]:px-3.5 max-[720px]:pb-[calc(0.875rem+env(safe-area-inset-bottom))] max-[720px]:pt-3.5"
@@ -844,23 +869,25 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                         ? (["api-key", "oauth-managed", "oauth-token"] as const)
                         : (["api-key", "oauth-token"] as const)
                       ).map((mode) => (
-                        <AstryxButton
+                        <ToggleButton
                           key={mode}
-                          type="button"
-                          aria-pressed={authMode === mode}
-                          onClick={() => setAuthMode(mode)}
-                          className={cn(
-                            "h-9 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors",
-                            authMode === mode &&
-                              "bg-background text-foreground shadow-sm ring-1 ring-border/50",
-                          )}
+                          label={
+                            mode === "api-key"
+                              ? t("settings.providerAuthApiKey")
+                              : mode === "oauth-managed"
+                                ? t("settings.providerAuthOAuth")
+                                : t("settings.providerAuthToken")
+                          }
+                          isPressed={authMode === mode}
+                          onPressedChange={() => setAuthMode(mode)}
+                          size="sm"
                         >
                           {mode === "api-key"
                             ? t("settings.providerAuthApiKey")
                             : mode === "oauth-managed"
                               ? t("settings.providerAuthOAuth")
                               : t("settings.providerAuthToken")}
-                        </AstryxButton>
+                        </ToggleButton>
                       ))}
                     </AstryxView>
                     {authMode === "oauth-managed" ? (
@@ -1487,19 +1514,15 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                             ["long", "settings.promptCacheRetentionLong"],
                           ] as const
                         ).map(([value, labelKey]) => (
-                          <AstryxButton
+                          <ToggleButton
                             key={value}
-                            type="button"
-                            className={cn(
-                              "rounded-full border px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary",
-                              promptCacheRetention === value &&
-                                "border-primary bg-primary/10 text-primary",
-                            )}
-                            aria-pressed={promptCacheRetention === value}
-                            onClick={() => setPromptCacheRetention(value)}
+                            label={t(labelKey)}
+                            isPressed={promptCacheRetention === value}
+                            onPressedChange={() => setPromptCacheRetention(value)}
+                            size="sm"
                           >
                             {t(labelKey)}
-                          </AstryxButton>
+                          </ToggleButton>
                         ))}
                       </AstryxView>
                     ) : null}
@@ -1539,20 +1562,21 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                 </AstryxView>
 
                 {customHeaders.length === 0 ? (
-                  <AstryxButton
-                    type="button"
-                    className="mt-3 flex w-full flex-col items-center gap-1 rounded-xl border border-dashed px-4 py-8 text-center transition-colors hover:border-primary/50 hover:bg-accent/20"
-                    onClick={() => addCustomHeader()}
-                    disabled={isBrowser}
-                  >
-                    <List className="h-5 w-5 text-muted-foreground/60" />
-                    <AstryxInline className="mt-1 text-xs font-medium text-muted-foreground">
-                      {t("settings.noCustomHeaders")}
-                    </AstryxInline>
-                    <AstryxInline className="text-[11px] text-muted-foreground/75">
-                      {t("settings.noCustomHeadersHint")}
-                    </AstryxInline>
-                  </AstryxButton>
+                  <EmptyState
+                    isCompact
+                    icon={<List className="h-5 w-5" />}
+                    title={t("settings.noCustomHeaders")}
+                    description={t("settings.noCustomHeadersHint")}
+                    actions={
+                      <AstryxNativeButton
+                        label={t("settings.addCustomHeader")}
+                        variant="secondary"
+                        size="sm"
+                        isDisabled={isBrowser}
+                        onClick={() => addCustomHeader()}
+                      />
+                    }
+                  />
                 ) : (
                   <AstryxView layout="block" direction="horizontal" className="mt-3 space-y-2">
                     <AstryxView
@@ -1810,7 +1834,9 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
 function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => void }) {
   const { settings, setSettings, onClose } = props;
   const { t } = useLocale();
-  const isCompact = useMediaQuery("(max-width: 640px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
   const modelOptions = useMemo(() => buildModelOptions(settings), [settings]);
   const conversationTitleModel = settings.customSettings.conversationTitleModel;
   const selectedValue = conversationTitleModel
@@ -1851,8 +1877,9 @@ function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => voi
       width={isCompact ? "100dvw" : "var(--xagent-drawer-width-compact)"}
       maxHeight="var(--xagent-viewport-height)"
       padding={0}
-      className="ml-auto mr-0"
       style={{
+        marginInlineStart: "auto",
+        marginInlineEnd: 0,
         blockSize: "var(--xagent-viewport-height)",
         ...(isCompact
           ? {}
@@ -2125,7 +2152,9 @@ function CcsImportModal(props: {
 }) {
   const { initialType, items, existingProviders, onImport, onClose } = props;
   const { t } = useLocale();
-  const isCompact = useMediaQuery("(max-width: 720px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
 
   const existingIdentity = useMemo(
     () => new Set(existingProviders.map(ccsImportIdentity)),

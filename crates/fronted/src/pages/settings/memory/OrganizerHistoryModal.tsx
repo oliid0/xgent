@@ -220,7 +220,9 @@ export function OrganizerHistoryModal(props: {
     }
   }
 
-  const isCompact = useMediaQuery("(max-width: 640px)");
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
 
   return (
     <>

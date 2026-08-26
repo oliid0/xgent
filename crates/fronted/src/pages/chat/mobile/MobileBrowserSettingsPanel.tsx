@@ -57,7 +57,15 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
       />
 
       <StackItem size="fill" isScrollable>
-        <VStack gap={6} padding={4}>
+        <VStack
+          gap={6}
+          padding={4}
+          style={{
+            paddingBlockEnd: "max(var(--spacing-4), env(safe-area-inset-bottom, 0px))",
+            paddingInlineStart: "max(var(--spacing-4), env(safe-area-inset-left, 0px))",
+            paddingInlineEnd: "max(var(--spacing-4), env(safe-area-inset-right, 0px))",
+          }}
+        >
           <VStack gap={2}>
             <Heading level={3}>{t("browser.homePage")}</Heading>
             <form onSubmit={saveHomePage}>

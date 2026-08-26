@@ -388,11 +388,15 @@ export function createTsModuleLoader(options = {}) {
     const wrapped = `(function (exports, require, module, __filename, __dirname) {\n${executableSource}\n})`;
     const script = new vm.Script(wrapped, { filename: filePath });
     const previousWindow = globalThis.window;
+    const previousRequestAnimationFrame = globalThis.requestAnimationFrame;
     if (typeof globalThis.window === "undefined") {
       globalThis.window = {
         setTimeout,
         clearTimeout,
       };
+    }
+    if (typeof globalThis.requestAnimationFrame === "undefined") {
+      globalThis.requestAnimationFrame = (callback) => setTimeout(() => callback(Date.now()), 0);
     }
 
     try {
@@ -403,6 +407,11 @@ export function createTsModuleLoader(options = {}) {
         delete globalThis.window;
       } else {
         globalThis.window = previousWindow;
+      }
+      if (typeof previousRequestAnimationFrame === "undefined") {
+        delete globalThis.requestAnimationFrame;
+      } else {
+        globalThis.requestAnimationFrame = previousRequestAnimationFrame;
       }
     }
     return module.exports;

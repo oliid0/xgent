@@ -23,7 +23,7 @@ export function MobileBackgroundTasksPanel(props: MobileBackgroundTasksPanelProp
         onBack={props.onClose}
         leading={<Clock3 className="h-4 w-4 text-muted-foreground" />}
       />
-      <StackItem size="fill">
+      <StackItem size="fill" className="mobile-panel-safe-content">
         <BackgroundServicesPanel
           settings={props.settings}
           setSettings={props.setSettings}
