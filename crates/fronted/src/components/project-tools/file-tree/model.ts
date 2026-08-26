@@ -23,10 +23,6 @@ export type FileTreeNode = {
 
 export type FileTreeNodes = Record<string, FileTreeNode>;
 
-export type FileTreeRowModel =
-  | { type: "node"; key: string; path: string; depth: number }
-  | { type: "error"; key: string; path: string; depth: number; message: string };
-
 export const ROOT_PATH = "";
 
 // Desktop-only OS integration (`fs_open_workspace_path`) exists only behind
@@ -35,12 +31,6 @@ export const ROOT_PATH = "";
 export const FILE_TREE_HAS_OS_INTEGRATION =
   typeof window !== "undefined" &&
   "__TAURI_INTERNALS__" in (window as unknown as Record<string, unknown>);
-
-// Pointer modality, not the presence of Tauri, decides row density. Android
-// and iOS are Tauri runtimes too; treating every Tauri target as a desktop
-// produced 28px tap targets in the mobile file browser.
-export const FILE_TREE_ROW_HEIGHT =
-  typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches ? 44 : 28;
 
 // ---------------------------------------------------------------------------
 // Path helpers
@@ -283,33 +273,6 @@ export function remapExpandedPathsForRename(
     result.push(mapped);
   }
   return result;
-}
-
-// ---------------------------------------------------------------------------
-// Visible-row flattening (expanded set -> flat array for the virtual list)
-// ---------------------------------------------------------------------------
-
-export function flattenFileTreeRows(
-  nodes: FileTreeNodes,
-  expanded: ReadonlySet<string>,
-): FileTreeRowModel[] {
-  const rows: FileTreeRowModel[] = [];
-  const visited = new Set<string>();
-  const visit = (path: string, depth: number) => {
-    const node = nodes[path];
-    if (!node || visited.has(path)) return;
-    visited.add(path);
-    rows.push({ type: "node", key: path === ROOT_PATH ? "__root__" : path, path, depth });
-    if (node.error) {
-      rows.push({ type: "error", key: `${path}\u0000error`, path, depth, message: node.error });
-    }
-    if (node.kind !== "dir" || !expanded.has(path)) return;
-    for (const childPath of node.children) {
-      visit(childPath, depth + 1);
-    }
-  };
-  visit(ROOT_PATH, 0);
-  return rows;
 }
 
 // ---------------------------------------------------------------------------

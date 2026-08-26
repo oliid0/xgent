@@ -1,3 +1,5 @@
+import { Icon } from "@astryxdesign/core/Icon";
+import { Spinner } from "@astryxdesign/core/Spinner";
 import { type ComponentType, type SVGProps, useId } from "react";
 import McpLogoSource from "~icons/gravity-ui/logo-mcp";
 import ConnectionIconSource from "~icons/gravity-ui/plug-connection";
@@ -62,8 +64,6 @@ import LightbulbOffSource from "~icons/lucide/lightbulb-off";
 import Link2Source from "~icons/lucide/link-2";
 import ListSource from "~icons/lucide/list";
 import ListChecksSource from "~icons/lucide/list-checks";
-import Loader2Source from "~icons/lucide/loader-circle";
-import LoaderCircleSource from "~icons/lucide/loader-circle";
 import LockSource from "~icons/lucide/lock";
 import LogOutSource from "~icons/lucide/log-out";
 import Maximize2Source from "~icons/lucide/maximize-2";
@@ -136,19 +136,28 @@ type IconProps = SVGProps<SVGSVGElement> & {
 export type IconComponent = ComponentType<IconProps>;
 
 function createIcon(Source: IconSource): IconComponent {
-  return function Icon({ className, height, size, width, ...props }) {
-    const nextProps: IconProps = {
-      ...props,
-      className: ["xagent-icon", className].filter(Boolean).join(" "),
-    };
-    if (size !== undefined) {
-      nextProps.width = width ?? size;
-      nextProps.height = height ?? size;
-    } else {
-      if (width !== undefined) nextProps.width = width;
-      if (height !== undefined) nextProps.height = height;
-    }
-    return <Source {...nextProps} />;
+  return function XagentIcon({ className, color, height, size, style, width, ...props }) {
+    const numericSize = typeof size === "number" ? size : Number.parseFloat(String(size ?? ""));
+    const astryxSize = Number.isFinite(numericSize)
+      ? numericSize <= 12
+        ? "xsm"
+        : numericSize <= 16
+          ? "sm"
+          : numericSize <= 20
+            ? "md"
+            : "lg"
+      : "md";
+    return (
+      <Icon
+        icon={Source}
+        size={astryxSize}
+        className={["xagent-icon", className].filter(Boolean).join(" ")}
+        width={width ?? size}
+        height={height ?? size}
+        style={{ ...style, color }}
+        {...props}
+      />
+    );
   };
 }
 
@@ -516,8 +525,24 @@ export const Lightbulb = createIcon(LightbulbSource);
 export const LightbulbOff = createIcon(LightbulbOffSource);
 export const List = createIcon(ListSource);
 export const ListChecks = createIcon(ListChecksSource);
-export const Loader2 = createIcon(Loader2Source);
-export const LoaderCircle = createIcon(LoaderCircleSource);
+function LoadingSpinner({ className, style, "aria-label": ariaLabel }: SVGProps<SVGSVGElement>) {
+  const nativeClassName = className
+    ?.split(/\s+/)
+    .filter((name) => name !== "animate-spin" && !name.startsWith("motion-reduce:animate-"))
+    .join(" ");
+  return (
+    <Spinner
+      size="sm"
+      shade="inherit"
+      className={nativeClassName}
+      style={style}
+      aria-label={ariaLabel ?? "Loading"}
+    />
+  );
+}
+
+export const Loader2 = LoadingSpinner;
+export const LoaderCircle = LoadingSpinner;
 export const Lock = createIcon(LockSource);
 export const LogOut = createIcon(LogOutSource);
 export const Maximize2 = createIcon(Maximize2Source);

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { StackItem, VStack } from "@astryxdesign/core/Layout";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { useLocale } from "../../i18n";
 import type { AppSettings } from "../../lib/settings";
-import { cn } from "../../lib/shared/utils";
 import { CronSection } from "../../pages/settings/CronSection";
 import { HooksSection } from "../../pages/settings/HooksSection";
 import { Clock3, Cpu, Zap } from "../icons";
@@ -42,46 +43,40 @@ export function BackgroundServicesPanel(props: BackgroundServicesPanelProps) {
   }, [managedProcessesAvailable, view]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
-      <div
-        className={cn(
-          "grid shrink-0 gap-1 border-b border-border/55 p-2",
-          managedProcessesAvailable ? "grid-cols-3" : "grid-cols-2",
-        )}
-      >
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setView(tab.id)}
-              className={cn(
-                "flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs transition-colors",
-                view === tab.id
-                  ? "bg-muted font-medium text-foreground"
-                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-              )}
-            >
-              <Icon className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+    <VStack height="100%" className="min-h-0 bg-[var(--color-bg-primary)]">
+      <VStack padding={2} className="shrink-0 border-b border-[var(--color-border-subtle)]">
+        <SegmentedControl
+          value={view}
+          onChange={(value) => setView(value as BackgroundServiceView)}
+          label={t("sidebar.backgroundTasks")}
+          layout="fill"
+        >
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <SegmentedControlItem
+                key={tab.id}
+                value={tab.id}
+                label={tab.label}
+                icon={<Icon />}
+              />
+            );
+          })}
+        </SegmentedControl>
+      </VStack>
+      <StackItem size="fill" isScrollable>
         {view === "processes" ? (
           <BackgroundTasksPanel active />
         ) : view === "hooks" ? (
-          <div className="h-full p-3">
+          <VStack height="100%" padding={3}>
             <HooksSection settings={props.settings} setSettings={props.setSettings} />
-          </div>
+          </VStack>
         ) : (
-          <div className="h-full p-3">
+          <VStack height="100%" padding={3}>
             <CronSection settings={props.settings} setSettings={props.setSettings} />
-          </div>
+          </VStack>
         )}
-      </div>
-    </div>
+      </StackItem>
+    </VStack>
   );
 }

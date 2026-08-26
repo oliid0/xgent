@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { Heading, Text } from "@astryxdesign/core/Text";
 import { ArrowLeft } from "../../../components/icons";
 import { cn } from "../../../lib/shared/utils";
 
@@ -6,7 +9,6 @@ type MobileFullscreenPanelProps = {
   open: boolean;
   children: ReactNode;
   label: string;
-  className?: string;
   keepMounted?: boolean;
 };
 
@@ -17,18 +19,22 @@ type MobileFullscreenPanelProps = {
 export function MobileFullscreenPanel(props: MobileFullscreenPanelProps) {
   if (!props.open && !props.keepMounted) return null;
   return (
-    <section
+    <VStack
+      as="section"
+      gap={0}
+      width="100vw"
+      height="100dvh"
       data-edge-swipe-ignore
       aria-label={props.label}
       aria-hidden={!props.open}
       className={cn(
-        "mobile-fullscreen-panel fixed inset-0 z-[74] flex h-[100dvh] w-screen min-h-0 flex-col overflow-hidden bg-background pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] pt-[env(safe-area-inset-top,0px)] text-foreground",
-        !props.open && "pointer-events-none translate-x-[8%] opacity-0",
-        props.className,
+        "mobile-fullscreen-panel app-safe-area fixed inset-0 z-[var(--xagent-z-mobile-panel)] min-h-0 overflow-hidden bg-background text-foreground transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--ease-standard)] motion-reduce:transition-none",
+        !props.open &&
+          "pointer-events-none translate-x-[var(--xagent-mobile-panel-hidden-offset)] opacity-0",
       )}
     >
       {props.children}
-    </section>
+    </VStack>
   );
 }
 
@@ -39,31 +45,37 @@ export function MobilePanelHeader(props: {
   actions?: ReactNode;
   onBack: () => void;
   backLabel: string;
-  className?: string;
 }) {
   return (
-    <header
-      className={cn(
-        "mobile-panel-header flex min-h-14 shrink-0 items-center gap-3 border-b border-border/55 bg-background/90 px-3 backdrop-blur-xl",
-        props.className,
-      )}
+    <HStack
+      as="header"
+      gap={3}
+      vAlign="center"
+      paddingInline={3}
+      className="mobile-panel-header shrink-0 border-b border-border/55 bg-background/90 backdrop-blur-xl"
     >
-      <button
-        type="button"
+      <IconButton
+        label={props.backLabel}
+        tooltip={props.backLabel}
+        icon={<ArrowLeft size={20} />}
+        variant="ghost"
+        size="lg"
         onClick={props.onBack}
-        className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground transition-colors active:bg-muted active:text-foreground"
-        aria-label={props.backLabel}
-      >
-        <ArrowLeft className="h-5 w-5" />
-      </button>
+      />
       {props.leading}
-      <div className="min-w-0 flex-1">
-        <h1 className="truncate text-[17px] font-semibold tracking-tight">{props.title}</h1>
-        {props.subtitle ? (
-          <p className="truncate text-[11px] text-muted-foreground">{props.subtitle}</p>
-        ) : null}
-      </div>
+      <StackItem size="fill">
+        <VStack gap={0.5}>
+          <Heading level={2} maxLines={1}>
+            {props.title}
+          </Heading>
+          {props.subtitle ? (
+            <Text type="supporting" color="secondary" maxLines={1}>
+              {props.subtitle}
+            </Text>
+          ) : null}
+        </VStack>
+      </StackItem>
       {props.actions}
-    </header>
+    </HStack>
   );
 }

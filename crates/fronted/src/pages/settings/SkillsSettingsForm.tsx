@@ -23,6 +23,11 @@ import {
   type SkillSummary,
 } from "../../lib/skills";
 import type { SettingsSectionProps } from "./types";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
+import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 export function SkillsSettingsForm(props: SettingsSectionProps) {
   const { settings, setSettings } = props;
@@ -86,36 +91,58 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
   }
 
   return (
-    <div className="settings-skills-section space-y-5">
-      <div className="settings-skills-header flex items-start justify-between gap-4">
-        <div className="settings-skills-actions flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+    <AstryxView layout="block" direction="horizontal" className="settings-skills-section space-y-5">
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="settings-skills-header flex items-start justify-between gap-4"
+      >
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="settings-skills-actions flex items-center gap-2"
+        >
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"
+          >
             <Sparkles className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold">Skills</h3>
-            <p className="text-xs text-muted-foreground">{t("settings.skillsDesc")}</p>
-          </div>
-        </div>
+          </AstryxView>
+          <AstryxView layout="block" direction="horizontal">
+            <AstryxHeading level={3} className="text-sm font-semibold">
+              Skills
+            </AstryxHeading>
+            <AstryxParagraph className="text-xs text-muted-foreground">
+              {t("settings.skillsDesc")}
+            </AstryxParagraph>
+          </AstryxView>
+        </AstryxView>
 
-        <div className="flex items-center gap-2">
+        <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
           {selectableSkills.length > 0 ? (
-            <div className="flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1">
-              <div
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1"
+            >
+              <AstryxView
+                layout="block"
+                direction="horizontal"
                 className={`h-1.5 w-1.5 rounded-full ${
                   selectedCount > 0 ? "bg-emerald-500" : "bg-muted-foreground/40"
                 }`}
               />
-              <span className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">{selectedCount}</span>
-                <span className="mx-0.5 text-muted-foreground/50">/</span>
-                <span>{selectableSkills.length}</span>
-                <span className="ml-1">{t("settings.skillsSelected")}</span>
-              </span>
-            </div>
+              <AstryxInline className="text-xs text-muted-foreground">
+                <AstryxInline className="font-medium text-foreground">{selectedCount}</AstryxInline>
+                <AstryxInline className="mx-0.5 text-muted-foreground/50">/</AstryxInline>
+                <AstryxInline>{selectableSkills.length}</AstryxInline>
+                <AstryxInline className="ml-1">{t("settings.skillsSelected")}</AstryxInline>
+              </AstryxInline>
+            </AstryxView>
           ) : null}
 
-          <button
+          <AstryxButton
             type="button"
             role="switch"
             aria-checked={settings.skills.enabled ? "true" : "false"}
@@ -128,12 +155,12 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
               settings.skills.enabled ? "bg-primary" : "bg-muted-foreground/30"
             }`}
           >
-            <span
+            <AstryxInline
               className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-xs transition-transform ${
                 settings.skills.enabled ? "translate-x-5" : "translate-x-1"
               }`}
             />
-          </button>
+          </AstryxButton>
 
           <Button
             variant="outline"
@@ -147,54 +174,79 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
             />
             {loading ? t("settings.skillsScanning") : t("settings.skillsScan")}
             {loading && (
-              <span className="ml-0.5 inline-flex gap-[2px]">
-                <span className="skills-scan-dot h-1 w-1 rounded-full bg-primary" />
-                <span className="skills-scan-dot h-1 w-1 rounded-full bg-primary" />
-                <span className="skills-scan-dot h-1 w-1 rounded-full bg-primary" />
-              </span>
+              <AstryxView
+                as="span"
+                layout="inline-flex"
+                direction="horizontal"
+                className="ml-0.5 inline-flex gap-[2px]"
+              >
+                <AstryxInline className="skills-scan-dot h-1 w-1 rounded-full bg-primary" />
+                <AstryxInline className="skills-scan-dot h-1 w-1 rounded-full bg-primary" />
+                <AstryxInline className="skills-scan-dot h-1 w-1 rounded-full bg-primary" />
+              </AstryxView>
             )}
           </Button>
-        </div>
-      </div>
+        </AstryxView>
+      </AstryxView>
 
       {skillsLockedByChatMode ? (
-        <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5"
+        >
           <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">
+          <AstryxInline className="text-xs text-muted-foreground">
             {t("settings.skillsDisabledInChatMode")}
-          </span>
-        </div>
+          </AstryxInline>
+        </AstryxView>
       ) : (
         <>
           {loadError ? (
-            <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5"
+            >
               <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-              <span className="text-xs text-destructive">{loadError}</span>
-            </div>
+              <AstryxInline className="text-xs text-destructive">{loadError}</AstryxInline>
+            </AstryxView>
           ) : null}
 
           {!settings.skills.enabled ? (
-            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5"
+            >
               <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">
+              <AstryxInline className="text-xs text-muted-foreground">
                 {t("settings.skillsDisabledHint")}
-              </span>
-            </div>
+              </AstryxInline>
+            </AstryxView>
           ) : null}
 
           {!loading && skills.length === 0 && !loadError ? (
-            <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border/60 py-12 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <AstryxView
+              layout="flex"
+              direction="vertical"
+              className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border/60 py-12 text-center"
+            >
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-muted"
+              >
                 <BookOpen className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground">
+              </AstryxView>
+              <AstryxView layout="block" direction="horizontal" className="space-y-1">
+                <AstryxParagraph className="text-sm font-medium text-muted-foreground">
                   {t("settings.skillsNotFound")}
-                </p>
-                <p className="text-xs text-muted-foreground/70">
+                </AstryxParagraph>
+                <AstryxParagraph className="text-xs text-muted-foreground/70">
                   {t("settings.skillsNotFoundHint")}
-                </p>
-              </div>
+                </AstryxParagraph>
+              </AstryxView>
               <Button
                 variant="outline"
                 size="sm"
@@ -204,47 +256,74 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
                 <RefreshCw className="h-3.5 w-3.5" />
                 {t("settings.skillsRescan")}
               </Button>
-            </div>
+            </AstryxView>
           ) : null}
 
           {loading && skills.length === 0 ? (
-            <div className="space-y-3">
+            <AstryxView layout="block" direction="horizontal" className="space-y-3">
               {[1, 2, 3, 4].map((item) => (
-                <div key={item} className="skill-card-enter rounded-xl border border-border/40 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="skills-skeleton-shimmer h-9 w-9 shrink-0 rounded-lg" />
-                    <div className="flex-1 space-y-2">
-                      <div className="skills-skeleton-shimmer h-3.5 w-28 rounded" />
-                      <div className="skills-skeleton-shimmer h-3 w-48 rounded" />
-                    </div>
-                    <div className="skills-skeleton-shimmer h-5 w-5 shrink-0 rounded-md" />
-                  </div>
-                </div>
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  key={item}
+                  className="skill-card-enter rounded-xl border border-border/40 p-4"
+                >
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="flex items-center gap-3"
+                  >
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="skills-skeleton-shimmer h-9 w-9 shrink-0 rounded-lg"
+                    />
+                    <AstryxView layout="block" direction="horizontal" className="flex-1 space-y-2">
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="skills-skeleton-shimmer h-3.5 w-28 rounded"
+                      />
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="skills-skeleton-shimmer h-3 w-48 rounded"
+                      />
+                    </AstryxView>
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="skills-skeleton-shimmer h-5 w-5 shrink-0 rounded-md"
+                    />
+                  </AstryxView>
+                </AstryxView>
               ))}
-            </div>
+            </AstryxView>
           ) : null}
 
           {skills.length > 4 ? (
-            <div className="relative">
+            <AstryxView layout="block" direction="horizontal" className="relative">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <input
+              <AstryxInput
                 type="text"
                 value={filter}
                 onChange={(e) => setFilter(e.currentTarget.value)}
                 placeholder={t("settings.skillsSearch")}
                 className="h-9 w-full rounded-lg border bg-background pl-9 pr-3 text-sm outline-hidden transition-colors placeholder:text-muted-foreground/60 focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
               />
-            </div>
+            </AstryxView>
           ) : null}
 
           {filtered.length > 0 ? (
-            <div className="space-y-2">
+            <AstryxView layout="block" direction="horizontal" className="space-y-2">
               {filtered.map((skill) => {
                 const alwaysEnabled = isAlwaysEnabledSkillName(skill.name);
                 const checked = alwaysEnabled || selected.has(skill.name);
                 const content = (
                   <>
-                    <div
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
                       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
                         checked
                           ? "bg-primary/15 text-primary"
@@ -252,33 +331,47 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
                       }`}
                     >
                       <Sparkles className="h-4 w-4" />
-                    </div>
+                    </AstryxView>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium leading-none">{skill.name}</span>
-                      </div>
+                    <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
+                        className="flex items-center gap-2"
+                      >
+                        <AstryxInline className="text-sm font-medium leading-none">
+                          {skill.name}
+                        </AstryxInline>
+                      </AstryxView>
                       {skill.description ? (
-                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                        <AstryxParagraph className="mt-1 truncate text-xs text-muted-foreground">
                           {skill.description}
-                        </p>
+                        </AstryxParagraph>
                       ) : null}
-                      <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground/60">
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
+                        className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground/60"
+                      >
                         <FileText className="h-3 w-3" />
-                        <span className="truncate">{skill.skillFile}</span>
-                      </div>
-                    </div>
+                        <AstryxInline className="truncate">{skill.skillFile}</AstryxInline>
+                      </AstryxView>
+                    </AstryxView>
 
                     {alwaysEnabled ? (
-                      <div
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
                         className="flex shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary"
                         title={t("settings.skillsAlwaysOn")}
                       >
                         <Lock className="h-3 w-3" />
-                        <span>{t("settings.skillsAlwaysOn")}</span>
-                      </div>
+                        <AstryxInline>{t("settings.skillsAlwaysOn")}</AstryxInline>
+                      </AstryxView>
                     ) : (
-                      <div
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
                         className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-[color,background-color,border-color] duration-150 ${
                           checked
                             ? "border-primary bg-primary text-primary-foreground"
@@ -286,24 +379,26 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
                         }`}
                       >
                         {checked ? <Check className="skill-check-enter h-3 w-3" /> : null}
-                      </div>
+                      </AstryxView>
                     )}
                   </>
                 );
 
                 if (alwaysEnabled) {
                   return (
-                    <div
+                    <AstryxView
+                      layout="flex"
+                      direction="horizontal"
                       key={`${skill.name}-${scanGeneration}`}
                       className="skill-card-enter flex w-full items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 text-left shadow-xs"
                     >
                       {content}
-                    </div>
+                    </AstryxView>
                   );
                 }
 
                 return (
-                  <button
+                  <AstryxButton
                     key={`${skill.name}-${scanGeneration}`}
                     type="button"
                     onClick={() => toggleSkill(skill.name, !checked)}
@@ -314,21 +409,21 @@ export function SkillsSettingsForm(props: SettingsSectionProps) {
                     }`}
                   >
                     {content}
-                  </button>
+                  </AstryxButton>
                 );
               })}
-            </div>
+            </AstryxView>
           ) : null}
 
           {filter.trim() && filtered.length === 0 && skills.length > 0 ? (
-            <div className="py-8 text-center">
-              <p className="text-sm text-muted-foreground">
+            <AstryxView layout="block" direction="horizontal" className="py-8 text-center">
+              <AstryxParagraph className="text-sm text-muted-foreground">
                 {t("settings.skillsNoMatch").replace("{filter}", filter)}
-              </p>
-            </div>
+              </AstryxParagraph>
+            </AstryxView>
           ) : null}
         </>
       )}
-    </div>
+    </AstryxView>
   );
 }

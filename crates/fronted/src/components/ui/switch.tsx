@@ -1,32 +1,46 @@
+import { Switch as AstryxSwitch } from "@astryxdesign/core/Switch";
 import type { ButtonHTMLAttributes } from "react";
 
 type SwitchProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onChange"> & {
   checked: boolean;
   onCheckedChange?: (checked: boolean) => void;
+  label?: string;
+  required?: boolean;
 };
 
-export function Switch({ checked, onCheckedChange, className, disabled, ...props }: SwitchProps) {
+/** Astryx-native compatibility boundary for the previous checked/onCheckedChange API. */
+export function Switch({
+  checked,
+  onCheckedChange,
+  label: explicitLabel,
+  className,
+  style,
+  disabled,
+  title,
+  "aria-label": ariaLabel,
+  name,
+  required,
+  onFocus,
+  onBlur,
+  color: _color,
+  children: _children,
+  ...props
+}: SwitchProps) {
+  const label = explicitLabel ?? ariaLabel ?? title ?? name ?? "Toggle";
   return (
-    <button
+    <AstryxSwitch
       {...props}
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={(event) => {
-        props.onClick?.(event);
-        if (!event.defaultPrevented && !disabled) onCheckedChange?.(!checked);
-      }}
-      className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors ${
-        checked ? "border-sky-500 bg-sky-500" : "border-border bg-muted-foreground/30"
-      } ${disabled ? "cursor-not-allowed opacity-60" : ""} ${className ?? ""}`}
-    >
-      <span
-        aria-hidden="true"
-        className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${
-          checked ? "translate-x-5" : "translate-x-0"
-        }`}
-      />
-    </button>
+      label={label}
+      isLabelHidden
+      value={checked}
+      onChange={onCheckedChange}
+      isDisabled={disabled}
+      htmlName={name}
+      isRequired={required}
+      onFocus={onFocus as never}
+      onBlur={onBlur as never}
+      className={className}
+      style={style}
+    />
   );
 }

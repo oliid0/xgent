@@ -1,9 +1,12 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, StackItem } from "@astryxdesign/core/Layout";
+import { Text } from "@astryxdesign/core/Text";
+import { type CSSProperties, type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import iconSimpleUrl from "../../src-tauri/icons/icon-simple.png";
 import { useLocale } from "../i18n";
-import { cn } from "../lib/shared/utils";
 import { Maximize2, Minimize2, Minus, X } from "./icons";
 
 type TauriRuntimeWindow = Window & {
@@ -123,7 +126,7 @@ export function WindowsTitleBar() {
   }, [getAppWindow, isVisible, syncMaximized]);
 
   const startDragging = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
+    (event: MouseEvent<HTMLElement>) => {
       if (event.button !== 0 || event.detail !== 1) {
         return;
       }
@@ -144,7 +147,7 @@ export function WindowsTitleBar() {
   }, [getAppWindow]);
 
   const handleTitleDoubleClick = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
+    (event: MouseEvent<HTMLElement>) => {
       if (event.button !== 0) {
         return;
       }
@@ -172,66 +175,100 @@ export function WindowsTitleBar() {
   const maximizeLabel = isMaximized ? t("window.restore") : t("window.maximize");
 
   return (
-    <header
-      className={cn(
-        "relative z-50 flex h-8 shrink-0 select-none items-center border-b border-black/[0.06] bg-white/65 text-foreground/90 backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-white/55 dark:border-white/[0.06] dark:bg-neutral-900/70 dark:supports-[backdrop-filter]:bg-neutral-900/55",
-        "shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
-        !isFocused && "text-foreground/55",
-      )}
+    <HStack
+      as="header"
+      width="100%"
+      height="var(--xagent-windows-titlebar-height)"
+      vAlign="center"
+      style={{
+        position: "relative",
+        zIndex: "var(--xagent-z-window-chrome)",
+        flexShrink: 0,
+        userSelect: "none",
+        color: "var(--color-text-primary)",
+        opacity: isFocused ? 1 : "var(--xagent-window-chrome-opacity-inactive)",
+        backgroundColor: "var(--xagent-window-chrome-background)",
+        borderBlockEnd: "var(--border-width) solid var(--color-border)",
+        boxShadow: "var(--shadow-low)",
+        backdropFilter: "blur(var(--xagent-window-chrome-blur)) saturate(var(--xagent-window-chrome-saturation))",
+        transitionProperty: "opacity, background-color",
+        transitionDuration: "var(--duration-fast)",
+        transitionTimingFunction: "var(--ease-standard)",
+      } as CSSProperties}
     >
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Native titlebar dragging and double-click maximize are pointer gestures; the adjacent controls remain keyboard accessible. */}
-      <div
-        className="flex h-full min-w-0 flex-1 items-center gap-1.5 pl-2.5 pr-3"
-        onDoubleClick={handleTitleDoubleClick}
-        onMouseDown={startDragging}
-      >
-        <img
-          src={iconSimpleUrl}
-          alt=""
-          className="h-[15px] w-[15px] shrink-0 rounded-xs"
-          draggable={false}
-        />
-        <span className="truncate text-[12px] font-medium leading-[1.45] tracking-[0.01em] text-foreground/80">
-          {t("app.name")}
-        </span>
-      </div>
+      <StackItem size="fill">
+        <HStack
+          gap={1.5}
+          vAlign="center"
+          height="100%"
+          paddingInlineStart={3}
+          paddingInlineEnd={3}
+          onDoubleClick={handleTitleDoubleClick}
+          onMouseDown={startDragging}
+        >
+          <img
+            src={iconSimpleUrl}
+            alt=""
+            style={{
+              width: "var(--xagent-window-app-icon-size)",
+              height: "var(--xagent-window-app-icon-size)",
+              flexShrink: 0,
+              borderRadius: "var(--radius-element)",
+            }}
+            draggable={false}
+          />
+          <Text type="label" maxLines={1} color="primary">
+            {t("app.name")}
+          </Text>
+        </HStack>
+      </StackItem>
 
-      <fieldset
-        className="m-0 flex h-full shrink-0 items-stretch border-0 p-0"
+      <HStack
+        height="100%"
+        vAlign="stretch"
+        role="toolbar"
         aria-label={t("window.controls")}
       >
-        <button
-          type="button"
-          className="group flex h-full w-[38px] items-center justify-center text-foreground/55 transition-colors duration-150 hover:bg-black/[0.05] hover:text-foreground/90 focus-visible:outline-hidden focus-visible:bg-black/[0.05] focus-visible:text-foreground/90 dark:hover:bg-white/[0.07] dark:focus-visible:bg-white/[0.07]"
-          aria-label={t("window.minimize")}
-          title={t("window.minimize")}
+        <IconButton
+          label={t("window.minimize")}
+          tooltip={t("window.minimize")}
+          icon={<Icon icon={Minus} size="sm" color="inherit" />}
+          size="sm"
+          variant="ghost"
           onClick={minimizeWindow}
-        >
-          <Minus className="h-[13px] w-[13px]" strokeWidth={1.4} />
-        </button>
-        <button
-          type="button"
-          className="group flex h-full w-[38px] items-center justify-center text-foreground/55 transition-colors duration-150 hover:bg-black/[0.05] hover:text-foreground/90 focus-visible:outline-hidden focus-visible:bg-black/[0.05] focus-visible:text-foreground/90 dark:hover:bg-white/[0.07] dark:focus-visible:bg-white/[0.07]"
-          aria-label={maximizeLabel}
-          title={maximizeLabel}
+          style={{
+            width: "var(--xagent-window-control-width)",
+            height: "100%",
+          }}
+        />
+        <IconButton
+          label={maximizeLabel}
+          tooltip={maximizeLabel}
+          icon={
+            <Icon icon={isMaximized ? Minimize2 : Maximize2} size="sm" color="inherit" />
+          }
+          size="sm"
+          variant="ghost"
           onClick={toggleMaximize}
-        >
-          {isMaximized ? (
-            <Minimize2 className="h-[12px] w-[12px]" strokeWidth={1.4} />
-          ) : (
-            <Maximize2 className="h-[12px] w-[12px]" strokeWidth={1.4} />
-          )}
-        </button>
-        <button
-          type="button"
-          className="group flex h-full w-[42px] items-center justify-center text-foreground/55 transition-colors duration-150 hover:bg-[#e81123] hover:text-white focus-visible:outline-hidden focus-visible:bg-[#e81123] focus-visible:text-white"
-          aria-label={t("window.close")}
-          title={t("window.close")}
+          style={{
+            width: "var(--xagent-window-control-width)",
+            height: "100%",
+          }}
+        />
+        <IconButton
+          label={t("window.close")}
+          tooltip={t("window.close")}
+          icon={<Icon icon={X} size="sm" color="inherit" />}
+          size="sm"
+          variant="destructive"
           onClick={closeWindow}
-        >
-          <X className="h-[13px] w-[13px]" strokeWidth={1.5} />
-        </button>
-      </fieldset>
-    </header>
+          style={{
+            width: "var(--xagent-window-close-control-width)",
+            height: "100%",
+          }}
+        />
+      </HStack>
+    </HStack>
   );
 }

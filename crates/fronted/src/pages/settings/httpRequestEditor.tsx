@@ -17,6 +17,9 @@ import {
   type HttpRequestSpec,
 } from "../../lib/automation";
 import { createUuid } from "../../lib/shared/id";
+import { View as AstryxView } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 export type HttpRequestDraft = {
   id: string;
@@ -145,20 +148,30 @@ export function HttpRequestListEditor({
   }
 
   return (
-    <div className="space-y-3">
+    <AstryxView layout="block" direction="horizontal" className="space-y-3">
       {requests.map((request, index) => {
         const bodyEnabled = canHttpMethodHaveBody(request.method);
         const isExpanded = expandedRequestId === request.id;
 
         return (
-          <div
+          <AstryxView
+            layout="block"
+            direction="horizontal"
             key={request.id}
             className="overflow-hidden rounded-xl border border-border/60 bg-background/80 transition-colors hover:border-border/80"
           >
-            <div className="settings-http-row flex items-center gap-3 px-4 py-3">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="settings-http-row flex items-center gap-3 px-4 py-3"
+            >
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-xs font-bold text-emerald-600 dark:text-emerald-400"
+              >
                 {index + 1}
-              </div>
+              </AstryxView>
 
               <Select
                 value={request.method}
@@ -192,8 +205,8 @@ export function HttpRequestListEditor({
                 }}
               />
 
-              <div className="flex items-center gap-1">
-                <button
+              <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-1">
+                <AstryxButton
                   type="button"
                   onClick={() => onExpand(isExpanded ? null : request.id)}
                   className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-muted/50 ${
@@ -203,8 +216,8 @@ export function HttpRequestListEditor({
                   <ChevronDown
                     className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "" : "-rotate-90"}`}
                   />
-                </button>
-                <button
+                </AstryxButton>
+                <AstryxButton
                   type="button"
                   onClick={() => {
                     onDirty();
@@ -217,14 +230,22 @@ export function HttpRequestListEditor({
                   title={t("settings.delete")}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
+                </AstryxButton>
+              </AstryxView>
+            </AstryxView>
 
             {isExpanded ? (
-              <div className="border-t border-border/30 bg-muted/10 px-4 py-4">
-                <div className="settings-form-grid grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="border-t border-border/30 bg-muted/10 px-4 py-4"
+              >
+                <AstryxView
+                  layout="grid"
+                  direction="horizontal"
+                  className="settings-form-grid grid gap-4 sm:grid-cols-2"
+                >
+                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                     <Label className="text-xs font-medium text-muted-foreground">Headers</Label>
                     <Textarea
                       value={request.headersText}
@@ -235,8 +256,8 @@ export function HttpRequestListEditor({
                         updateRequest(request.id, { headersText: e.currentTarget.value });
                       }}
                     />
-                  </div>
-                  <div className="space-y-1.5">
+                  </AstryxView>
+                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                     <Label className="text-xs font-medium text-muted-foreground">Body</Label>
                     {bodyEnabled ? (
                       <Textarea
@@ -249,26 +270,34 @@ export function HttpRequestListEditor({
                         }}
                       />
                     ) : (
-                      <div className="flex min-h-[100px] items-center justify-center rounded-lg border border-dashed border-border/50 bg-muted/10 text-xs text-muted-foreground/60">
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
+                        className="flex min-h-[100px] items-center justify-center rounded-lg border border-dashed border-border/50 bg-muted/10 text-xs text-muted-foreground/60"
+                      >
                         {t("settings.cronHttpBodyDisabled")}
-                      </div>
+                      </AstryxView>
                     )}
-                  </div>
-                </div>
-              </div>
+                  </AstryxView>
+                </AstryxView>
+              </AstryxView>
             ) : null}
-          </div>
+          </AstryxView>
         );
       })}
 
       {requests.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border/50 bg-muted/5 py-8 text-center">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="rounded-xl border border-dashed border-border/50 bg-muted/5 py-8 text-center"
+        >
           <Globe className="mx-auto h-6 w-6 text-muted-foreground/30" />
-          <p className="mt-2 text-xs text-muted-foreground">
+          <AstryxParagraph className="mt-2 text-xs text-muted-foreground">
             {t("settings.cronHttpRequestRequired")}
-          </p>
-        </div>
+          </AstryxParagraph>
+        </AstryxView>
       ) : null}
-    </div>
+    </AstryxView>
   );
 }

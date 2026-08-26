@@ -5,6 +5,11 @@ import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { useLocale } from "../../i18n";
 import { DEFAULT_SOUL_METADATA, type SoulDraft, useSoul, validateSoulDraft } from "../../lib/soul";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
+import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
+import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 
 type SoulSectionProps = {
   createRequestId?: number;
@@ -123,19 +128,37 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 pb-4">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-500">
+    <AstryxView
+      layout="block"
+      direction="horizontal"
+      className="mx-auto w-full max-w-3xl space-y-6 pb-4"
+    >
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="flex items-start justify-between gap-4"
+      >
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex min-w-0 items-center gap-3"
+        >
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-500"
+          >
             <Sparkles className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold">{t("settings.soulTitle")}</h2>
-            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+          </AstryxView>
+          <AstryxView layout="block" direction="horizontal" className="min-w-0">
+            <AstryxHeading level={2} className="text-base font-semibold">
+              {t("settings.soulTitle")}
+            </AstryxHeading>
+            <AstryxParagraph className="mt-0.5 text-xs leading-5 text-muted-foreground">
               {t("settings.soulDescription")}
-            </p>
-          </div>
-        </div>
+            </AstryxParagraph>
+          </AstryxView>
+        </AstryxView>
         <Button
           type="button"
           size="sm"
@@ -146,14 +169,21 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
           <Save className="h-3.5 w-3.5" />
           {soul.saving ? t("settings.saving") : t("settings.soulSave")}
         </Button>
-      </div>
+      </AstryxView>
 
-      <section>
-        <div className="mb-2 flex items-center justify-between gap-3 px-1">
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <AstryxView as="section">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="mb-2 flex items-center justify-between gap-3 px-1"
+        >
+          <AstryxHeading
+            level={3}
+            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
             {t("settings.soulPresetsGroup")}
-          </h3>
-          <div className="flex items-center gap-1.5">
+          </AstryxHeading>
+          <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-1.5">
             {creating ? (
               <Button
                 type="button"
@@ -178,20 +208,29 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
               <Plus className="h-3.5 w-3.5" />
               {t("settings.soulAddPreset")}
             </Button>
-          </div>
-        </div>
-        <div className="divide-y divide-border/55 overflow-hidden rounded-2xl border border-border/60 bg-card">
+          </AstryxView>
+        </AstryxView>
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="divide-y divide-border/55 overflow-hidden rounded-2xl border border-border/60 bg-card"
+        >
           {soul.presets.map((preset) => {
             const active = preset.id === soul.activeId;
             return (
-              <div key={preset.id} className="flex min-h-14 items-center gap-3 px-3 py-2">
-                <button
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                key={preset.id}
+                className="flex min-h-14 items-center gap-3 px-3 py-2"
+              >
+                <AstryxButton
                   type="button"
                   onClick={() => void handleSelect(preset.id)}
                   disabled={soul.saving}
                   className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-1 py-1 text-left"
                 >
-                  <span
+                  <AstryxInline
                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                       active ? "bg-violet-500 text-white" : "bg-violet-500/10 text-violet-500"
                     }`}
@@ -201,16 +240,16 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
                     ) : (
                       <Sparkles className="h-4 w-4" />
                     )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">
+                  </AstryxInline>
+                  <AstryxInline className="min-w-0 flex-1">
+                    <AstryxInline className="block truncate text-sm font-medium">
                       {preset.metadata.name || t("settings.soulNewDefaultName")}
-                    </span>
-                    <span className="block truncate text-xs text-muted-foreground">
+                    </AstryxInline>
+                    <AstryxInline className="block truncate text-xs text-muted-foreground">
                       {preset.metadata.style || t("settings.soulPresetNoStyle")}
-                    </span>
-                  </span>
-                </button>
+                    </AstryxInline>
+                  </AstryxInline>
+                </AstryxButton>
                 <Button
                   type="button"
                   variant="ghost"
@@ -222,44 +261,59 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
-              </div>
+              </AstryxView>
             );
           })}
-        </div>
-      </section>
+        </AstryxView>
+      </AstryxView>
 
       {creating ? (
-        <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-4 py-3 text-sm text-violet-700 dark:text-violet-300">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-4 py-3 text-sm text-violet-700 dark:text-violet-300"
+        >
           {t("settings.soulCreateDraftHint")}
-        </div>
+        </AstryxView>
       ) : null}
 
-      <section>
-        <h3 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <AstryxView as="section">
+        <AstryxHeading
+          level={3}
+          className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+        >
           {t("settings.soulIdentityGroup")}
-        </h3>
-        <div className="divide-y divide-border/55 overflow-hidden rounded-2xl border border-border/60 bg-card">
-          <label className="grid min-h-16 grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(14rem,1.2fr)] sm:items-center">
-            <span>
-              <span className="block text-sm font-medium">{t("settings.soulName")}</span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">
+        </AstryxHeading>
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="divide-y divide-border/55 overflow-hidden rounded-2xl border border-border/60 bg-card"
+        >
+          <AstryxLabel className="grid min-h-16 grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(14rem,1.2fr)] sm:items-center">
+            <AstryxInline>
+              <AstryxInline className="block text-sm font-medium">
+                {t("settings.soulName")}
+              </AstryxInline>
+              <AstryxInline className="mt-0.5 block text-xs text-muted-foreground">
                 {t("settings.soulNameHint")}
-              </span>
-            </span>
+              </AstryxInline>
+            </AstryxInline>
             <Input
               value={draft.metadata.name}
               onChange={(event) => updateMetadata({ name: event.currentTarget.value })}
               maxLength={64}
               className="h-10 rounded-xl"
             />
-          </label>
-          <label className="grid min-h-16 grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(14rem,1.2fr)] sm:items-center">
-            <span>
-              <span className="block text-sm font-medium">{t("settings.soulLanguage")}</span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">
+          </AstryxLabel>
+          <AstryxLabel className="grid min-h-16 grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(14rem,1.2fr)] sm:items-center">
+            <AstryxInline>
+              <AstryxInline className="block text-sm font-medium">
+                {t("settings.soulLanguage")}
+              </AstryxInline>
+              <AstryxInline className="mt-0.5 block text-xs text-muted-foreground">
                 {t("settings.soulLanguageHint")}
-              </span>
-            </span>
+              </AstryxInline>
+            </AstryxInline>
             <select
               value={draft.metadata.lang}
               onChange={(event) => updateMetadata({ lang: event.currentTarget.value })}
@@ -271,32 +325,41 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
               <option value="ja-JP">日本語</option>
               <option value="ko-KR">한국어</option>
             </select>
-          </label>
-        </div>
-      </section>
+          </AstryxLabel>
+        </AstryxView>
+      </AstryxView>
 
-      <section>
-        <h3 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <AstryxView as="section">
+        <AstryxHeading
+          level={3}
+          className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+        >
           {t("settings.soulVoiceGroup")}
-        </h3>
-        <div className="space-y-4 rounded-2xl border border-border/60 bg-card p-4">
-          <label className="block">
-            <span className="text-sm font-medium">{t("settings.soulStyle")}</span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
+        </AstryxHeading>
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="space-y-4 rounded-2xl border border-border/60 bg-card p-4"
+        >
+          <AstryxLabel className="block">
+            <AstryxInline className="text-sm font-medium">{t("settings.soulStyle")}</AstryxInline>
+            <AstryxInline className="mt-0.5 block text-xs text-muted-foreground">
               {t("settings.soulStyleHint")}
-            </span>
+            </AstryxInline>
             <Input
               value={draft.metadata.style}
               onChange={(event) => updateMetadata({ style: event.currentTarget.value })}
               placeholder={t("settings.soulStylePlaceholder")}
               className="mt-2 h-10 rounded-xl"
             />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium">{t("settings.soulPersonality")}</span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
+          </AstryxLabel>
+          <AstryxLabel className="block">
+            <AstryxInline className="text-sm font-medium">
+              {t("settings.soulPersonality")}
+            </AstryxInline>
+            <AstryxInline className="mt-0.5 block text-xs text-muted-foreground">
               {t("settings.soulPersonalityHint")}
-            </span>
+            </AstryxInline>
             <Textarea
               value={draft.body}
               onChange={(event) => {
@@ -305,7 +368,7 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
               }}
               className="mt-2 min-h-56 resize-y rounded-xl font-mono text-[13px] leading-6"
             />
-            <span
+            <AstryxInline
               className={`mt-2 block text-right text-[11px] tabular-nums ${
                 validation.valid ? "text-muted-foreground" : "text-destructive"
               }`}
@@ -314,25 +377,40 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
               {validation.countKind === "characters"
                 ? t("settings.soulCharacters")
                 : t("settings.soulWords")}
-            </span>
-          </label>
-        </div>
-      </section>
+            </AstryxInline>
+          </AstryxLabel>
+        </AstryxView>
+      </AstryxView>
 
       {localError || soul.error ? (
-        <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
           {localError ?? soul.error}
-        </div>
+        </AstryxView>
       ) : saved ? (
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400"
+        >
           {t("settings.soulSaved")}
-        </div>
+        </AstryxView>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3 border-t border-border/55 pt-4">
-        <p className="min-w-0 truncate text-xs text-muted-foreground" title={soul.document?.path}>
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="flex items-center justify-between gap-3 border-t border-border/55 pt-4"
+      >
+        <AstryxParagraph
+          className="min-w-0 truncate text-xs text-muted-foreground"
+          title={soul.document?.path}
+        >
           {soul.document?.path || t("settings.soulLoading")}
-        </p>
+        </AstryxParagraph>
         <Button
           type="button"
           variant="outline"
@@ -344,7 +422,7 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
           <RefreshCw className={`h-3.5 w-3.5 ${soul.loading ? "animate-spin" : ""}`} />
           {t("settings.soulReload")}
         </Button>
-      </div>
-    </div>
+      </AstryxView>
+    </AstryxView>
   );
 }

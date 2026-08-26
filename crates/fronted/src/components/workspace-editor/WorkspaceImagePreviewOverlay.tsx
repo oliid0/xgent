@@ -1,8 +1,24 @@
+import { Banner } from "@astryxdesign/core/Banner";
+import { Center } from "@astryxdesign/core/Center";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import {
+  HStack,
+  Layout,
+  LayoutContent,
+  LayoutFooter,
+  LayoutHeader,
+  StackItem,
+  VStack,
+} from "@astryxdesign/core/Layout";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Heading, Text } from "@astryxdesign/core/Text";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { useLocale } from "../../i18n";
-import { cn } from "../../lib/shared/utils";
 import { invokeFs } from "../../lib/tools/fsBackend";
-import { AlertTriangle, ImageIcon, ImageOff, Loader2, RefreshCw, X } from "../icons";
+import { ImageIcon, ImageOff, RefreshCw, X } from "../icons";
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
 
 export type WorkspaceImagePreviewOpenRequest = {
@@ -26,7 +42,7 @@ type WorkspaceImagePreviewOverlayProps = {
   onClose: () => void;
 };
 
-const IMAGE_PREVIEW_OVERLAY_ANIMATION_MS = 180;
+const IMAGE_PREVIEW_OVERLAY_ANIMATION_MS = 200;
 
 function basename(path: string) {
   const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
@@ -119,78 +135,114 @@ export function WorkspaceImagePreviewOverlay(props: WorkspaceImagePreviewOverlay
   const activePath = image?.path ?? openRequest?.path ?? "";
 
   return (
-    <div
-      className={cn(
-        "workspace-image-preview-overlay absolute inset-0 z-50 flex min-h-0 min-w-0 transform-gpu flex-col overflow-hidden border-r border-border bg-background transition-[opacity,transform,box-shadow] duration-200 ease-out motion-reduce:transition-none",
-        isVisible
-          ? "pointer-events-auto translate-x-0 opacity-100 shadow-2xl"
-          : "pointer-events-none -translate-x-2 opacity-0 shadow-lg",
-      )}
+    <VStack
+      className="xagent-workspace-preview-overlay"
+      data-visible={isVisible ? "true" : "false"}
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: "var(--xagent-z-workspace-overlay)",
+        minWidth: 0,
+        minHeight: 0,
+        overflow: "hidden",
+        backgroundColor: "var(--color-background-body)",
+        borderInlineEnd: "var(--border-width) solid var(--color-border)",
+      }}
     >
-      <MacOsTitleBarSpacer className="bg-muted/45" />
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-muted/45 px-3">
-        <ImageIcon className="h-4 w-4 shrink-0 text-primary" />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold leading-tight">
-            {t("workspaceImagePreview.title")}
-          </div>
-          <div className="truncate text-[11px] text-muted-foreground">{activePath}</div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-45"
-            title={t("workspaceImagePreview.reload")}
-            aria-label={t("workspaceImagePreview.reload")}
-            disabled={!openRequest || loading}
-            onClick={() => openRequest && void loadImage(openRequest)}
-          >
-            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            title={t("workspaceImagePreview.close")}
-            aria-label={t("workspaceImagePreview.close")}
-            onClick={onRequestClose}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      {error ? (
-        <div className="flex shrink-0 items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <div className="min-w-0 flex-1 truncate">{error}</div>
-        </div>
-      ) : null}
-
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-muted/25 p-4 sm:p-6">
-        {loading ? (
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        ) : source ? (
-          <img
-            className="max-h-full max-w-full object-contain"
-            src={source}
-            alt={basename(activePath)}
-          />
-        ) : (
-          <div className="flex flex-col items-center gap-3 text-center text-sm text-muted-foreground">
-            <ImageOff className="h-7 w-7" />
-            <span>{t("workspaceImagePreview.empty")}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/35 px-3 text-[11px] text-muted-foreground">
-        <span className="min-w-0 truncate">{activePath}</span>
-        {image ? (
-          <span className="shrink-0">
-            {image.mimeType} · {formatBytes(image.sizeBytes)}
-          </span>
-        ) : null}
-      </div>
-    </div>
+      <MacOsTitleBarSpacer />
+      <Layout
+        height="100%"
+        header={
+          <LayoutHeader hasDivider padding={3}>
+            <HStack gap={2} vAlign="center">
+              <Icon icon={ImageIcon} size="sm" color="accent" />
+              <StackItem size="fill">
+                <VStack gap={0.5}>
+                  <Heading level={4}>{t("workspaceImagePreview.title")}</Heading>
+                  <Text type="supporting" color="secondary" maxLines={1}>
+                    {activePath}
+                  </Text>
+                </VStack>
+              </StackItem>
+              <IconButton
+                label={t("workspaceImagePreview.reload")}
+                tooltip={t("workspaceImagePreview.reload")}
+                icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+                size="sm"
+                variant="ghost"
+                isLoading={loading}
+                isDisabled={!openRequest}
+                onClick={() => openRequest && void loadImage(openRequest)}
+              />
+              <IconButton
+                label={t("workspaceImagePreview.close")}
+                tooltip={t("workspaceImagePreview.close")}
+                icon={<Icon icon={X} size="sm" color="inherit" />}
+                size="sm"
+                variant="ghost"
+                onClick={onRequestClose}
+              />
+            </HStack>
+          </LayoutHeader>
+        }
+        content={
+          <LayoutContent padding={0} isScrollable>
+            <VStack height="100%" gap={0}>
+              {error ? (
+                <Banner
+                  status="error"
+                  title={t("workspaceImagePreview.openFailed")}
+                  description={error}
+                  container="section"
+                  collapsible={false}
+                />
+              ) : null}
+              <Center
+                style={{
+                  minHeight: "var(--xagent-workspace-image-stage-min-height)",
+                  flex: 1,
+                  overflow: "auto",
+                  backgroundColor: "var(--color-background-muted)",
+                }}
+              >
+                {loading ? (
+                  <Spinner size="lg" label={t("workspaceImagePreview.loading")} />
+                ) : source ? (
+                  <img
+                    src={source}
+                    alt={basename(activePath)}
+                    style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                  />
+                ) : (
+                  <EmptyState
+                    title={t("workspaceImagePreview.empty")}
+                    icon={<Icon icon={ImageOff} size="lg" color="secondary" />}
+                    isCompact
+                  />
+                )}
+              </Center>
+            </VStack>
+          </LayoutContent>
+        }
+        footer={
+          <LayoutFooter hasDivider padding={2}>
+            <HStack gap={3} vAlign="center" hAlign="between">
+              <StackItem size="fill">
+                <Text type="supporting" color="secondary" maxLines={1}>
+                  {activePath}
+                </Text>
+              </StackItem>
+              {image ? (
+                <Text type="supporting" color="secondary" hasTabularNumbers>
+                  {image.mimeType} · {formatBytes(image.sizeBytes)}
+                </Text>
+              ) : null}
+            </HStack>
+          </LayoutFooter>
+        }
+      />
+    </VStack>
   );
 }

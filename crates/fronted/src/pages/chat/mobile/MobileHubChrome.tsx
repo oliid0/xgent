@@ -1,5 +1,11 @@
 import type { ReactNode } from "react";
-import { Search } from "../../../components/icons";
+import { Center } from "@astryxdesign/core/Center";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Heading } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { PanelLeft, Search } from "../../../components/icons";
 
 type MobileHubHeaderProps = {
   title: string;
@@ -15,23 +21,40 @@ type MobileHubHeaderProps = {
  */
 export function MobileHubHeader(props: MobileHubHeaderProps) {
   return (
-    <header className="shrink-0 border-b border-border bg-background px-4 pb-4 pt-3">
-      <div className="flex min-h-12 items-center gap-3">
-        <button
-          type="button"
+    <VStack
+      as="header"
+      gap={0}
+      paddingInline={4}
+      paddingBlock={3}
+      className="shrink-0 border-b border-border bg-background"
+    >
+      <HStack
+        gap={3}
+        vAlign="center"
+        minHeight="var(--xagent-mobile-header-action-size)"
+        width="100%"
+      >
+        <IconButton
+          label={props.title}
+          tooltip={props.title}
+          icon={<PanelLeft />}
+          size="lg"
+          variant="secondary"
           onClick={props.onOpenSidebar}
-          className="flex h-12 w-12 shrink-0 flex-col items-center justify-center gap-[5px] rounded-full border border-border/55 bg-background text-foreground shadow-sm active:bg-muted"
-          aria-label={props.title}
+        />
+        <StackItem size="fill">
+          <Heading level={1} maxLines={1} justify="center">
+            {props.title}
+          </Heading>
+        </StackItem>
+        <Center
+          width="var(--xagent-mobile-header-action-size)"
+          height="var(--xagent-mobile-header-action-size)"
         >
-          <span className="h-[3px] w-6 rounded-full bg-current" />
-          <span className="h-[3px] w-4 rounded-full bg-current" />
-        </button>
-        <h1 className="min-w-0 flex-1 text-center text-[24px] font-semibold tracking-tight">
-          {props.title}
-        </h1>
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center">{props.trailing}</div>
-      </div>
-    </header>
+          {props.trailing}
+        </Center>
+      </HStack>
+    </VStack>
   );
 }
 
@@ -41,17 +64,19 @@ export function MobileHubSearch(props: {
   placeholder: string;
 }) {
   return (
-    <label className="mx-4 mt-5 flex min-h-12 items-center gap-3 rounded-[1.6rem] border border-border/55 bg-background px-4 shadow-sm">
-      <Search className="h-5 w-5 shrink-0 text-muted-foreground" />
-      <input
+    <HStack paddingInline={4} paddingBlockStart={5}>
+      <TextInput
+        label={props.placeholder}
+        isLabelHidden
+        startIcon={Search}
+        hasClear
+        size="lg"
+        width="100%"
         value={props.value}
-        onChange={(event) => props.onChange(event.currentTarget.value)}
+        onChange={props.onChange}
         placeholder={props.placeholder}
-        className="h-11 min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted-foreground/70"
-        autoCapitalize="none"
-        autoCorrect="off"
       />
-    </label>
+    </HStack>
   );
 }
 
@@ -62,22 +87,13 @@ export function MobileToggle(props: {
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={props.checked}
-      aria-label={props.label}
-      disabled={props.disabled}
-      onClick={() => props.onChange(!props.checked)}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-[background-color,border-color] duration-150 disabled:opacity-45 ${
-        props.checked ? "border-blue-500 bg-blue-500" : "border-border bg-muted-foreground/[0.28]"
-      }`}
-    >
-      <span
-        className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.32)] transition-transform duration-150 ${
-          props.checked ? "translate-x-5" : "translate-x-0"
-        }`}
-      />
-    </button>
+    <Switch
+      label={props.label}
+      isLabelHidden
+      value={props.checked}
+      isDisabled={props.disabled}
+      onChange={props.onChange}
+      size="md"
+    />
   );
 }

@@ -1,4 +1,8 @@
-import { CheckCircle2, Circle, Loader2 } from "../../../../components/icons";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Token } from "@astryxdesign/core/Token";
+import { CheckCircle2, Circle } from "../../../../components/icons";
 import { useLocale } from "../../../../i18n";
 import type { TodoItem } from "../../../../lib/tools/builtinTypes";
 
@@ -24,34 +28,41 @@ export function sanitizeTodoItems(value: unknown): TodoItem[] {
 
 function TodoRow(props: { todo: TodoItem }) {
   const { todo } = props;
+  const { t } = useLocale();
   const label = todo.status === "in_progress" ? todo.activeForm : todo.content;
+  const statusLabel =
+    todo.status === "completed"
+      ? t("chat.tool.todoCompleted")
+      : todo.status === "in_progress"
+        ? t("chat.tool.todoInProgress")
+        : t("chat.tool.todoPending");
 
   return (
-    <li className="flex items-start gap-2 py-1 text-[13px] leading-5">
-      <span className="mt-0.5 shrink-0">
-        {todo.status === "completed" ? (
-          <CheckCircle2 className="h-3.5 w-3.5 text-[hsl(var(--chat-success))]" />
+    <ListItem
+      label={label}
+      startContent={
+        todo.status === "completed" ? (
+          <CheckCircle2 />
         ) : todo.status === "in_progress" ? (
-          <Loader2
-            className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
-            style={{ color: "hsl(var(--tool-list-accent))" }}
-          />
+          <Spinner size="sm" label={statusLabel} />
         ) : (
-          <Circle className="h-3.5 w-3.5 text-muted-foreground/50" />
-        )}
-      </span>
-      <span
-        className={
-          todo.status === "completed"
-            ? "text-muted-foreground line-through"
-            : todo.status === "in_progress"
-              ? "shimmer font-normal text-muted-foreground"
-              : "text-foreground/80"
-        }
-      >
-        {label}
-      </span>
-    </li>
+          <Circle />
+        )
+      }
+      endContent={
+        <Token
+          label={statusLabel}
+          size="sm"
+          color={
+            todo.status === "completed"
+              ? "green"
+              : todo.status === "in_progress"
+                ? "purple"
+                : "gray"
+          }
+        />
+      }
+    />
   );
 }
 
@@ -60,15 +71,15 @@ export function TodoListView(props: { todos: TodoItem[] }) {
   const { t } = useLocale();
 
   if (!Array.isArray(todos) || todos.length === 0) {
-    return <div className="py-1 text-[13px] text-muted-foreground">{t("chat.tool.todoEmpty")}</div>;
+    return <EmptyState isCompact title={t("chat.tool.todoEmpty")} />;
   }
 
   return (
-    <ul className="todo-list-view tool-text-scroll space-y-0.5 overflow-y-hidden">
+    <List density="compact" hasDividers={false}>
       {todos.map((todo, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: todos are a full-replace snapshot with no stable id
         <TodoRow key={index} todo={todo} />
       ))}
-    </ul>
+    </List>
   );
 }

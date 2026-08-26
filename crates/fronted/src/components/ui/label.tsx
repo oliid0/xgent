@@ -1,12 +1,21 @@
-import * as React from "react";
+import { Text } from "@astryxdesign/core/Text";
+import { forwardRef, type LabelHTMLAttributes } from "react";
 
-import { cn } from "../../lib/shared/utils";
-
-export const Label = React.forwardRef<
-  HTMLLabelElement,
-  React.LabelHTMLAttributes<HTMLLabelElement>
->(({ className, ...props }, ref) => (
-  <label ref={ref} className={cn("text-sm font-medium leading-none", className)} {...props} />
-));
-
-Label.displayName = "Label";
+/** Astryx typography-backed form label used during field-by-field migration. */
+export const Label = forwardRef<HTMLLabelElement, LabelHTMLAttributes<HTMLLabelElement>>(
+  function Label({ className, style, children, color: _color, ...props }, ref) {
+    return (
+      <Text
+        {...props}
+        ref={ref}
+        as="label"
+        type="label"
+        weight="medium"
+        className={className}
+        style={style}
+      >
+        {children}
+      </Text>
+    );
+  },
+);

@@ -1,3 +1,10 @@
+import { Button } from "@astryxdesign/core/Button";
+import { Code } from "@astryxdesign/core/Code";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { Section } from "@astryxdesign/core/Section";
+import { Text } from "@astryxdesign/core/Text";
+import { VStack } from "@astryxdesign/core/Layout";
+
 import { useChangedFilesActions } from "../../../../components/chat/ChangedFilesCard";
 import { useLocale } from "../../../../i18n";
 import type {
@@ -5,13 +12,7 @@ import type {
   FileToolPreview,
 } from "../../../../lib/chat/messages/toolPreview";
 import { EditDiffView } from "./EditDiffView";
-import {
-  MetaTags,
-  PathDisplay,
-  ToolScrollablePre,
-  ToolSurface,
-  ToolSurfaceLabel,
-} from "./ToolResultDisplay";
+import { MetaTags } from "./ToolResultDisplay";
 
 // Streaming args display for the file-writing tools (Write / Edit /
 // NotebookEdit): live-updating path, true char/line counts and a bounded
@@ -19,11 +20,11 @@ import {
 
 function StreamingArgPlaceholder({ label }: { label: string }) {
   return (
-    <ToolSurface>
-      <div className="text-[calc(11.5px*var(--zone-font-scale,1))] leading-[1.6] text-muted-foreground/62">
+    <Section variant="transparent" paddingBlock={0.5} paddingInline={0}>
+      <Text type="supporting" color="secondary">
         {label}
-      </div>
-    </ToolSurface>
+      </Text>
+    </Section>
   );
 }
 
@@ -37,55 +38,62 @@ function StreamingTextPreviewSurface({
   preview: FileToolFieldPreview;
 }) {
   return (
-    <ToolSurface className="overflow-hidden px-0 py-0">
-      <div className="px-2.5 pt-2">
-        <ToolSurfaceLabel label={label} />
-      </div>
-      {preview.has ? (
-        preview.text ? (
-          <ToolScrollablePre className="max-h-56 rounded-none bg-black/[0.02] dark:bg-white/[0.03]">
-            {preview.text}
-          </ToolScrollablePre>
+    <Section variant="muted" padding={2}>
+      <VStack gap={1}>
+        <Text type="supporting" color="secondary" weight="medium">
+          {label}
+        </Text>
+        {preview.has ? (
+          preview.text ? (
+            <CodeBlock
+              code={preview.text}
+              language="text"
+              size="sm"
+              width="100%"
+              maxHeight="var(--xagent-tool-preview-max-height)"
+              container="section"
+              isWrapped
+            />
+          ) : (
+            <Text type="supporting" color="secondary">
+              {emptyLabel}
+            </Text>
+          )
         ) : (
-          <div className="px-2.5 pb-2 text-[calc(11.5px*var(--zone-font-scale,1))] leading-[1.6] text-muted-foreground/62">
-            {emptyLabel}
-          </div>
-        )
-      ) : (
-        <div className="px-2.5 pb-2 text-[calc(11.5px*var(--zone-font-scale,1))] leading-[1.6] text-muted-foreground/62">
-          Waiting for {label}...
-        </div>
-      )}
-    </ToolSurface>
+          <Text type="supporting" color="secondary">
+            Waiting for {label}...
+          </Text>
+        )}
+      </VStack>
+    </Section>
   );
 }
 
 function PathSurface({ path }: { path: string }) {
   const { t } = useLocale();
   const onOpenFile = useChangedFilesActions()?.onOpenFile;
+  const openLabel = `${t("chat.changedFiles.open")}: ${path}`;
+
   return (
-    <ToolSurface>
-      <ToolSurfaceLabel label="path" />
-      {onOpenFile ? (
-        // 文件引用可点击：与回复末尾变更卡一致，直接打开工作区编辑器。
-        <button
-          type="button"
-          onClick={() => onOpenFile(path)}
-          title={t("chat.changedFiles.open")}
-          className="block w-full text-left focus-visible:outline-none"
-        >
-          <PathDisplay
-            path={path}
-            className="block min-w-0 break-all font-mono text-[calc(11.5px*var(--zone-font-scale,1))] leading-[1.6] transition-colors hover:text-foreground hover:underline"
+    <Section variant="transparent" paddingBlock={0.5} paddingInline={0}>
+      <VStack gap={1}>
+        <Text type="supporting" color="secondary" weight="medium">
+          path
+        </Text>
+        {onOpenFile ? (
+          <Button
+            label={path}
+            tooltip={openLabel}
+            variant="ghost"
+            size="sm"
+            width="100%"
+            onClick={() => onOpenFile(path)}
           />
-        </button>
-      ) : (
-        <PathDisplay
-          path={path}
-          className="block min-w-0 break-all font-mono text-[calc(11.5px*var(--zone-font-scale,1))] leading-[1.6]"
-        />
-      )}
-    </ToolSurface>
+        ) : (
+          <Code color="secondary">{path}</Code>
+        )}
+      </VStack>
+    </Section>
   );
 }
 
@@ -96,7 +104,7 @@ export function FileToolArgsDisplay({ preview }: { preview: FileToolPreview }) {
     }
     const fieldLabel = preview.field === "new_source" ? "new source" : "content";
     return (
-      <div className="tool-expand flex flex-col gap-2">
+      <VStack gap={2} className="tool-expand">
         {preview.path ? <PathSurface path={preview.path} /> : null}
         {preview.content.has ? (
           <MetaTags
@@ -113,7 +121,7 @@ export function FileToolArgsDisplay({ preview }: { preview: FileToolPreview }) {
           emptyLabel={`(empty ${fieldLabel})`}
           preview={preview.content}
         />
-      </div>
+      </VStack>
     );
   }
 
@@ -121,7 +129,7 @@ export function FileToolArgsDisplay({ preview }: { preview: FileToolPreview }) {
     return <StreamingArgPlaceholder label="Waiting for replacement strings..." />;
   }
   return (
-    <div className="tool-expand flex flex-col gap-2">
+    <VStack gap={2} className="tool-expand">
       {preview.path ? <PathSurface path={preview.path} /> : null}
       <MetaTags
         tags={[
@@ -163,6 +171,6 @@ export function FileToolArgsDisplay({ preview }: { preview: FileToolPreview }) {
           />
         </>
       )}
-    </div>
+    </VStack>
   );
 }

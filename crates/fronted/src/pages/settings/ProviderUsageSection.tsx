@@ -1,5 +1,20 @@
 import { useState } from "react";
-import { Loader2, RefreshCw, Wallet } from "../../components/icons";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { Grid, GridSpan } from "@astryxdesign/core/Grid";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { Section } from "@astryxdesign/core/Section";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { RefreshCw, Wallet } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   type ProviderUsageResult,
@@ -14,7 +29,6 @@ import {
   type UsageQueryMode,
   updateCustomProviders,
 } from "../../lib/settings";
-import { cn } from "../../lib/shared/utils";
 import type { SettingsSectionProps } from "./types";
 
 const MODES: UsageQueryMode[] = ["coding-plan", "balance", "general", "newapi", "custom"];
@@ -26,28 +40,46 @@ function formatAmount(value: number | undefined, unit?: string) {
 
 function UsageResultView({ result }: { result: ProviderUsageResult | null }) {
   if (!result) return null;
-  if (result.error) return <p className="mt-3 text-xs text-destructive">{result.error}</p>;
+  if (result.error) return <Banner status="error" title={result.error} collapsible={false} />;
   return (
-    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+    <Grid columns={{ minWidth: 220, max: 2, repeat: "fit" }} gap={2} width="100%">
       {result.data.map((item, index) => (
-        <div
+        <Card
           key={`${item.planName ?? "usage"}-${index}`}
-          className="rounded-xl bg-muted/45 p-3 text-xs"
+          padding={3}
+          variant="muted"
+          width="100%"
         >
-          <div className="font-medium text-foreground">
-            {item.planName || item.extra || "Usage"}
-          </div>
-          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
-            <span>Remaining: {formatAmount(item.remaining, item.unit)}</span>
-            <span>Used: {formatAmount(item.used, item.unit)}</span>
-            <span>Total: {formatAmount(item.total, item.unit)}</span>
-          </div>
-          {item.isValid === false ? (
-            <p className="mt-1 text-destructive">{item.invalidMessage || "Invalid account"}</p>
-          ) : null}
-        </div>
+          <VStack gap={2}>
+            <Heading level={4}>{item.planName || item.extra || "Usage"}</Heading>
+            <MetadataList>
+              <MetadataListItem label="Remaining">
+                <Text type="body" hasTabularNumbers>
+                  {formatAmount(item.remaining, item.unit)}
+                </Text>
+              </MetadataListItem>
+              <MetadataListItem label="Used">
+                <Text type="body" hasTabularNumbers>
+                  {formatAmount(item.used, item.unit)}
+                </Text>
+              </MetadataListItem>
+              <MetadataListItem label="Total">
+                <Text type="body" hasTabularNumbers>
+                  {formatAmount(item.total, item.unit)}
+                </Text>
+              </MetadataListItem>
+            </MetadataList>
+            {item.isValid === false ? (
+              <Banner
+                status="error"
+                title={item.invalidMessage || "Invalid account"}
+                collapsible={false}
+              />
+            ) : null}
+          </VStack>
+        </Card>
       ))}
-    </div>
+    </Grid>
   );
 }
 
@@ -99,251 +131,204 @@ export function ProviderUsageSection({ settings, setSettings }: SettingsSectionP
   };
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-2xl border border-border/60 bg-card p-4">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
-            <Wallet className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 className="text-sm font-semibold">{t("settings.usage.title")}</h2>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+    <VStack gap={4}>
+      <Section padding={4} width="100%">
+        <HStack gap={3} vAlign="start">
+          <Wallet />
+          <VStack gap={1}>
+            <Heading level={2}>{t("settings.usage.title")}</Heading>
+            <Text type="supporting" color="secondary">
               {t("settings.usage.desc")}
-            </p>
-          </div>
-        </div>
-      </section>
+            </Text>
+          </VStack>
+        </HStack>
+      </Section>
 
       {settings.customProviders.map((provider) => {
         const config = provider.usageQuery ?? getDefaultUsageQueryConfig();
         const liveState = usage.getState(provider.id);
         const shownResult = testResults[provider.id] ?? liveState.result;
         return (
-          <details
-            key={provider.id}
-            className="group rounded-2xl border border-border/60 bg-card"
-            open={config.enabled}
-          >
-            <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{provider.name}</div>
-                <div className="truncate text-xs text-muted-foreground">
-                  {provider.baseUrl || provider.type} · {t(`settings.usage.mode.${config.mode}`)}
-                </div>
-              </div>
+          <Section key={provider.id} padding={0} width="100%">
+            <HStack gap={3} vAlign="center" padding={4}>
+              <StackItem size="fill">
+                <VStack gap={1}>
+                  <Heading level={3} maxLines={1}>{provider.name}</Heading>
+                  <Text type="supporting" color="secondary" maxLines={1}>
+                    {provider.baseUrl || provider.type} · {t(`settings.usage.mode.${config.mode}`)}
+                  </Text>
+                </VStack>
+              </StackItem>
               {liveState.loading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <Spinner accessibleLabel={t("settings.usage.refresh")} size="sm" />
               ) : null}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={config.enabled}
-                onClick={(event) => {
-                  event.preventDefault();
-                  patchProvider(provider.id, { enabled: !config.enabled });
-                }}
-                className={cn(
-                  "relative h-6 w-11 rounded-full transition-colors",
-                  config.enabled ? "bg-emerald-500" : "bg-muted-foreground/25",
-                )}
-              >
-                <span
-                  className={cn(
-                    "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                    config.enabled ? "translate-x-5" : "translate-x-0.5",
-                  )}
-                />
-              </button>
-            </summary>
-
-            <div className="border-t border-border/50 px-4 py-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label>
-                  <span className="text-xs font-medium">{t("settings.usage.mode")}</span>
-                  <select
-                    value={config.mode}
-                    onChange={(event) =>
-                      patchProvider(provider.id, { mode: event.target.value as UsageQueryMode })
-                    }
-                    className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                  >
-                    {MODES.map((mode) => (
-                      <option key={mode} value={mode}>
-                        {t(`settings.usage.mode.${mode}`)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span className="text-xs font-medium">{t("settings.usage.timeout")}</span>
-                  <input
-                    type="number"
-                    min={2}
-                    max={30}
-                    value={config.timeoutSecs ?? 10}
-                    onChange={(event) =>
-                      patchProvider(provider.id, { timeoutSecs: Number(event.target.value) })
-                    }
-                    className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                  />
-                </label>
-                <label className="sm:col-span-2">
-                  <span className="text-xs font-medium">{t("settings.usage.baseUrl")}</span>
-                  <input
-                    value={config.baseUrl}
-                    onChange={(event) =>
-                      patchProvider(provider.id, { baseUrl: event.target.value })
-                    }
-                    placeholder={provider.baseUrl}
-                    className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                  />
-                </label>
-                <label>
-                  <span className="text-xs font-medium">API Key</span>
-                  <input
-                    type="password"
-                    value={config.apiKey}
-                    onChange={(event) => patchProvider(provider.id, { apiKey: event.target.value })}
-                    placeholder={
-                      config.apiKeyConfigured
-                        ? t("settings.usage.secretSaved")
-                        : t("settings.usage.providerCredential")
-                    }
-                    className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                  />
-                </label>
-                {config.mode === "newapi" ? (
-                  <>
-                    <label>
-                      <span className="text-xs font-medium">Access Token</span>
-                      <input
-                        type="password"
-                        value={config.accessToken}
-                        onChange={(event) =>
-                          patchProvider(provider.id, { accessToken: event.target.value })
-                        }
-                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                      />
-                    </label>
-                    <label>
-                      <span className="text-xs font-medium">User ID</span>
-                      <input
-                        value={config.userId}
-                        onChange={(event) =>
-                          patchProvider(provider.id, { userId: event.target.value })
-                        }
-                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                      />
-                    </label>
-                  </>
-                ) : null}
-                {config.mode === "coding-plan" ? (
-                  <>
-                    <label>
-                      <span className="text-xs font-medium">Plan Provider</span>
-                      <input
-                        value={config.codingPlanProvider}
-                        onChange={(event) =>
-                          patchProvider(provider.id, { codingPlanProvider: event.target.value })
-                        }
-                        placeholder="auto / zhipu_team / zenmux"
-                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                      />
-                    </label>
-                    <label>
-                      <span className="text-xs font-medium">Organization ID</span>
-                      <input
-                        value={config.teamOrganizationId}
-                        onChange={(event) =>
-                          patchProvider(provider.id, { teamOrganizationId: event.target.value })
-                        }
-                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                      />
-                    </label>
-                    <label>
-                      <span className="text-xs font-medium">Project ID</span>
-                      <input
-                        value={config.teamProjectId}
-                        onChange={(event) =>
-                          patchProvider(provider.id, { teamProjectId: event.target.value })
-                        }
-                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                      />
-                    </label>
-                    <label>
-                      <span className="text-xs font-medium">Access Key ID</span>
-                      <input
-                        value={config.accessKeyId}
-                        onChange={(event) =>
-                          patchProvider(provider.id, { accessKeyId: event.target.value })
-                        }
-                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                      />
-                    </label>
-                    <label>
-                      <span className="text-xs font-medium">Secret Access Key</span>
-                      <input
-                        type="password"
-                        value={config.secretAccessKey}
-                        onChange={(event) =>
-                          patchProvider(provider.id, { secretAccessKey: event.target.value })
-                        }
-                        className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                      />
-                    </label>
-                  </>
-                ) : null}
-                {config.mode === "general" ||
-                config.mode === "newapi" ||
-                config.mode === "custom" ? (
-                  <label className="sm:col-span-2">
-                    <span className="text-xs font-medium">{t("settings.usage.script")}</span>
-                    <textarea
-                      value={config.script}
-                      onChange={(event) =>
-                        patchProvider(provider.id, { script: event.target.value })
+              <Switch
+                value={config.enabled}
+                label={`${provider.name}: ${t("settings.usage.title")}`}
+                isLabelHidden
+                onChange={(enabled) => patchProvider(provider.id, { enabled })}
+              />
+            </HStack>
+            <Collapsible
+              defaultIsOpen={config.enabled}
+              trigger={`${t("settings.usage.mode")}: ${t(`settings.usage.mode.${config.mode}`)}`}
+            >
+              <Section variant="transparent" dividers={["top"]} padding={4} width="100%">
+                <VStack gap={4}>
+                  <Grid columns={{ minWidth: 240, max: 2, repeat: "fit" }} gap={3} width="100%">
+                    <Selector
+                      label={t("settings.usage.mode")}
+                      value={config.mode}
+                      onChange={(mode) =>
+                        patchProvider(provider.id, { mode: mode as UsageQueryMode })
                       }
-                      rows={8}
-                      placeholder={
-                        config.mode === "custom"
-                          ? t("settings.usage.scriptRequired")
-                          : t("settings.usage.scriptPreset")
-                      }
-                      className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2 font-mono text-xs"
+                      options={MODES.map((mode) => ({
+                        value: mode,
+                        label: t(`settings.usage.mode.${mode}`),
+                      }))}
+                      width="100%"
                     />
-                  </label>
-                ) : null}
-              </div>
+                    <NumberInput
+                      label={t("settings.usage.timeout")}
+                      min={2}
+                      max={30}
+                      value={config.timeoutSecs ?? 10}
+                      onChange={(value) =>
+                        patchProvider(provider.id, { timeoutSecs: value ?? 10 })
+                      }
+                      width="100%"
+                      isWheelEnabled={false}
+                    />
+                    <GridSpan columns="full">
+                      <TextInput
+                        label={t("settings.usage.baseUrl")}
+                        value={config.baseUrl}
+                        onChange={(baseUrl) => patchProvider(provider.id, { baseUrl })}
+                        placeholder={provider.baseUrl}
+                        width="100%"
+                      />
+                    </GridSpan>
+                    <TextInput
+                      label="API Key"
+                      type="password"
+                      value={config.apiKey}
+                      onChange={(apiKey) => patchProvider(provider.id, { apiKey })}
+                      placeholder={
+                        config.apiKeyConfigured
+                          ? t("settings.usage.secretSaved")
+                          : t("settings.usage.providerCredential")
+                      }
+                      width="100%"
+                    />
+                    {config.mode === "newapi" ? (
+                      <>
+                        <TextInput
+                          label="Access Token"
+                          type="password"
+                          value={config.accessToken}
+                          onChange={(accessToken) => patchProvider(provider.id, { accessToken })}
+                          width="100%"
+                        />
+                        <TextInput
+                          label="User ID"
+                          value={config.userId}
+                          onChange={(userId) => patchProvider(provider.id, { userId })}
+                          width="100%"
+                        />
+                      </>
+                    ) : null}
+                    {config.mode === "coding-plan" ? (
+                      <>
+                        <TextInput
+                          label="Plan Provider"
+                          value={config.codingPlanProvider}
+                          onChange={(codingPlanProvider) =>
+                            patchProvider(provider.id, { codingPlanProvider })
+                          }
+                          placeholder="auto / zhipu_team / zenmux"
+                          width="100%"
+                        />
+                        <TextInput
+                          label="Organization ID"
+                          value={config.teamOrganizationId}
+                          onChange={(teamOrganizationId) =>
+                            patchProvider(provider.id, { teamOrganizationId })
+                          }
+                          width="100%"
+                        />
+                        <TextInput
+                          label="Project ID"
+                          value={config.teamProjectId}
+                          onChange={(teamProjectId) =>
+                            patchProvider(provider.id, { teamProjectId })
+                          }
+                          width="100%"
+                        />
+                        <TextInput
+                          label="Access Key ID"
+                          value={config.accessKeyId}
+                          onChange={(accessKeyId) => patchProvider(provider.id, { accessKeyId })}
+                          width="100%"
+                        />
+                        <TextInput
+                          label="Secret Access Key"
+                          type="password"
+                          value={config.secretAccessKey}
+                          onChange={(secretAccessKey) =>
+                            patchProvider(provider.id, { secretAccessKey })
+                          }
+                          width="100%"
+                        />
+                      </>
+                    ) : null}
+                    {config.mode === "general" ||
+                    config.mode === "newapi" ||
+                    config.mode === "custom" ? (
+                      <GridSpan columns="full">
+                        <TextArea
+                          label={t("settings.usage.script")}
+                          value={config.script}
+                          onChange={(script) => patchProvider(provider.id, { script })}
+                          rows={8}
+                          placeholder={
+                            config.mode === "custom"
+                              ? t("settings.usage.scriptRequired")
+                              : t("settings.usage.scriptPreset")
+                          }
+                          width="100%"
+                          hasSpellCheck={false}
+                        />
+                      </GridSpan>
+                    ) : null}
+                  </Grid>
 
-              <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  disabled={testingId === provider.id}
-                  onClick={() => void runTest(provider)}
-                  className="inline-flex h-9 items-center gap-2 rounded-xl bg-foreground px-3 text-xs font-medium text-background disabled:opacity-50"
-                >
-                  {testingId === provider.id ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-3.5 w-3.5" />
-                  )}
-                  {t("settings.usage.test")}
-                </button>
-                {config.enabled ? (
-                  <button
-                    type="button"
-                    onClick={() => void usage.refresh(provider.id)}
-                    className="h-9 rounded-xl border border-border px-3 text-xs"
-                  >
-                    {t("settings.usage.refresh")}
-                  </button>
-                ) : null}
-              </div>
-              <UsageResultView result={shownResult} />
-            </div>
-          </details>
+                  <HStack gap={2} wrap="wrap">
+                    <Button
+                      type="button"
+                      label={t("settings.usage.test")}
+                      icon={<RefreshCw />}
+                      variant="primary"
+                      isLoading={testingId === provider.id}
+                      isDisabled={testingId === provider.id}
+                      onClick={() => void runTest(provider)}
+                    />
+                    {config.enabled ? (
+                      <Button
+                        type="button"
+                        label={t("settings.usage.refresh")}
+                        variant="secondary"
+                        isLoading={liveState.loading}
+                        onClick={() => void usage.refresh(provider.id)}
+                      />
+                    ) : null}
+                  </HStack>
+                  <UsageResultView result={shownResult} />
+                </VStack>
+              </Section>
+            </Collapsible>
+          </Section>
         );
       })}
-    </div>
+    </VStack>
   );
 }

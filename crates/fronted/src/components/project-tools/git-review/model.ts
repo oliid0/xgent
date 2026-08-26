@@ -93,34 +93,6 @@ export type GitHistoryRow =
 
 export type ChangeListSection = "staged" | "changes";
 
-export type ChangeContextMenuState = {
-  x: number;
-  y: number;
-  path: string;
-  section: ChangeListSection;
-};
-
-export type HistoryContextMenuState =
-  | {
-      kind: "commit";
-      x: number;
-      y: number;
-      commitSha: string;
-    }
-  | {
-      kind: "file";
-      x: number;
-      y: number;
-      commitSha: string;
-      path: string;
-    };
-
-export type ChangesMenuState = {
-  x: number;
-  y: number;
-  section: ChangeListSection;
-};
-
 export type GitCommitContextPayload = GitCommitDetails & {
   githubUrl?: string;
 };
@@ -136,25 +108,6 @@ export type GitFileContextPayload = {
   remoteUrl: string;
   githubUrl?: string;
 };
-
-export const CHANGE_CONTEXT_MENU_ITEM_CLASS =
-  "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-45";
-export const CONTEXT_MENU_CONTAINER_CLASS =
-  "editor-context-menu select-none overflow-hidden rounded-xl border border-border/60 bg-popover/80 p-1 text-xs text-popover-foreground shadow-2xl ring-1 ring-black/[0.03] backdrop-blur-xl dark:ring-white/[0.06]";
-export const CONTEXT_MENU_SEPARATOR_CLASS = "mx-1 my-1 h-px bg-border/60";
-
-// Clamp a rendered context menu into its bounds using measured rects (no
-// hard-coded menu dimensions). Returns the correction delta to apply to the
-// menu's stored position; {0, 0} when it already fits.
-export function clampMenuRectWithinRect(menuRect: DOMRect, boundsRect: DOMRect, margin: number) {
-  const minLeft = boundsRect.left + margin;
-  const maxLeft = Math.max(minLeft, boundsRect.right - menuRect.width - margin);
-  const minTop = boundsRect.top + margin;
-  const maxTop = Math.max(minTop, boundsRect.bottom - menuRect.height - margin);
-  const left = Math.min(Math.max(menuRect.left, minLeft), maxLeft);
-  const top = Math.min(Math.max(menuRect.top, minTop), maxTop);
-  return { dx: left - menuRect.left, dy: top - menuRect.top };
-}
 
 export type GitRefreshOptions = {
   append?: boolean;

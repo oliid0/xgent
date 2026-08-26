@@ -1,6 +1,18 @@
 import { invoke } from "@xagent/runtime";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Button as AstryxNativeButton } from "@astryxdesign/core/Button";
+import { Dialog } from "@astryxdesign/core/Dialog";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { List as AstryxList, ListItem } from "@astryxdesign/core/List";
+import { Popover } from "@astryxdesign/core/Popover";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import ccswitchLogoUrl from "../../../src-tauri/icons/custom/ccswitch.png";
 import cherryStudioLogoUrl from "../../../src-tauri/icons/custom/cherrystudio.png";
 import {
@@ -87,6 +99,9 @@ import {
 } from "./providerUtils";
 import { ConfirmDeletePopover } from "./shared";
 import type { SettingsSectionProps } from "./types";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 type ModalProps = {
   providerType: ProviderId;
@@ -204,28 +219,13 @@ function DialogSwitch(props: {
 }) {
   const { checked, onCheckedChange, ariaLabel } = props;
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
-      className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      onClick={() => onCheckedChange(!checked)}
-    >
-      <span
-        className={cn(
-          "relative block h-5 w-9 rounded-full bg-muted-foreground/35 transition-colors",
-          checked && "bg-primary",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform",
-            checked && "translate-x-4",
-          )}
-        />
-      </span>
-    </button>
+    <Switch
+      label={ariaLabel}
+      isLabelHidden
+      size="sm"
+      value={checked}
+      onChange={onCheckedChange}
+    />
   );
 }
 function formatTokenCount(value: number): string {
@@ -288,12 +288,10 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
   const [activePanel, setActivePanel] = useState<ProviderDialogPanel>("general");
   const [visibleHeaderValues, setVisibleHeaderValues] = useState<Set<number>>(new Set());
   const [headerValidationSubmitted, setHeaderValidationSubmitted] = useState(false);
-  const [headerSuggest, setHeaderSuggest] = useState<{
-    index: number;
-    rect: { left: number; top: number; width: number };
-  } | null>(null);
+  const [headerSuggest, setHeaderSuggest] = useState<{ index: number } | null>(null);
   const [headerSuggestActive, setHeaderSuggestActive] = useState(0);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [saveAttempted, setSaveAttempted] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevFetchKey = useRef("");
@@ -562,11 +560,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
   function openHeaderSuggest(index: number) {
     const input = headerKeyRefs.current[index];
     if (!input) return;
-    const rect = input.getBoundingClientRect();
-    setHeaderSuggest({
-      index,
-      rect: { left: rect.left, top: rect.bottom + 4, width: rect.width },
-    });
+    setHeaderSuggest({ index });
     setHeaderSuggestActive(0);
   }
 
@@ -578,7 +572,15 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
   }
 
   function handleSave() {
-    if (!name.trim()) return;
+    setSaveAttempted(true);
+    if (!name.trim()) {
+      setActivePanel("general");
+      return;
+    }
+    if (authMode === "oauth-managed" && !managedOAuthAccountId.trim()) {
+      setActivePanel("general");
+      return;
+    }
     const invalidHeaderIndex = customHeaders.findIndex(
       (header) => getCustomHeaderKeyIssue(header.key, true) !== null,
     );
@@ -688,26 +690,57 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
       : firstHeaderIssue === "invalid"
         ? t("settings.invalidCustomHeaderKey")
         : null;
+  const isCompact = useMediaQuery("(max-width: 720px)");
 
-  return createPortal(
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 max-[720px]:p-0">
-      <div className="absolute inset-0 bg-black/35 max-[720px]:hidden" onClick={onClose} />
-
-      <div className="relative z-10 flex h-[600px] max-h-[calc(100dvh-2rem)] w-full max-w-[860px] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl max-[720px]:h-[100dvh] max-[720px]:max-h-[100dvh] max-[720px]:max-w-none max-[720px]:rounded-none max-[720px]:border-0">
-        <div className="flex shrink-0 items-center justify-between gap-4 border-b px-5 py-4 max-[720px]:px-3.5 max-[720px]:py-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center text-xl text-foreground">
+  return (
+    <Dialog
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
+      purpose="form"
+      variant={isCompact ? "fullscreen" : "standard"}
+      width={isCompact ? "100dvw" : "var(--xagent-provider-dialog-width)"}
+      maxHeight={
+        isCompact ? "var(--xagent-viewport-height)" : "var(--xagent-provider-dialog-height)"
+      }
+      padding={0}
+    >
+      <AstryxView
+        layout="flex"
+        direction="vertical"
+        className="flex h-full min-h-0 w-full flex-col overflow-hidden"
+      >
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex shrink-0 items-center justify-between gap-4 border-b px-5 py-4 max-[720px]:px-3.5 max-[720px]:py-3"
+        >
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex min-w-0 items-center gap-3"
+          >
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex h-9 w-9 shrink-0 items-center justify-center text-xl text-foreground"
+            >
               <ProviderBrandIcon type={providerType} />
-            </div>
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <div className="text-sm font-semibold">
+            </AstryxView>
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex min-w-0 flex-wrap items-center gap-2"
+            >
+              <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
                 {isEditing ? t("settings.editProvider") : t("settings.addProvider")}
-              </div>
-              <span className="rounded-full border bg-muted/60 px-2.5 py-0.5 text-[11px] text-muted-foreground">
+              </AstryxView>
+              <AstryxInline className="rounded-full border bg-muted/60 px-2.5 py-0.5 text-[11px] text-muted-foreground">
                 {typeLabel} {t("settings.compatible")}
-              </span>
-            </div>
-          </div>
+              </AstryxInline>
+            </AstryxView>
+          </AstryxView>
           <Button
             type="button"
             variant="ghost"
@@ -719,14 +752,19 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
           >
             <X className="h-4 w-4" />
           </Button>
-        </div>
+        </AstryxView>
 
-        <div className="flex min-h-0 flex-1 max-[720px]:flex-col">
-          <nav
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex min-h-0 flex-1 max-[720px]:flex-col"
+        >
+          <AstryxView
+            as="nav"
             className="flex w-[172px] shrink-0 flex-col gap-1 border-r bg-muted/30 p-2.5 max-[720px]:w-full max-[720px]:flex-row max-[720px]:overflow-x-auto max-[720px]:border-b max-[720px]:border-r-0 max-[720px]:px-2.5 max-[720px]:py-2"
             aria-label={t("settings.providerDialogNavigation")}
           >
-            <button
+            <AstryxButton
               type="button"
               className={cn(
                 "flex h-10 items-center gap-2 rounded-lg px-3 text-left text-sm text-muted-foreground max-[720px]:min-w-max max-[720px]:flex-1 max-[720px]:justify-center max-[720px]:px-2 max-[720px]:text-xs transition-colors hover:bg-accent/50 hover:text-foreground",
@@ -737,8 +775,8 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
             >
               <Settings className="h-4 w-4 shrink-0 max-[720px]:h-3.5 max-[720px]:w-3.5" />
               {t("settings.providerDialogGeneral")}
-            </button>
-            <button
+            </AstryxButton>
+            <AstryxButton
               type="button"
               className={cn(
                 "flex h-10 items-center gap-2 rounded-lg px-3 text-left text-sm text-muted-foreground max-[720px]:min-w-max max-[720px]:flex-1 max-[720px]:justify-center max-[720px]:px-2 max-[720px]:text-xs transition-colors hover:bg-accent/50 hover:text-foreground",
@@ -748,43 +786,59 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
               aria-current={activePanel === "request" ? "page" : undefined}
             >
               <Globe className="h-4 w-4 shrink-0 max-[720px]:h-3.5 max-[720px]:w-3.5" />
-              <span className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]">
+              <AstryxInline className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]">
                 {t("settings.providerDialogRequest")}
-              </span>
+              </AstryxInline>
               {customHeaders.length > 0 ? (
-                <span
+                <AstryxInline
                   className={cn(
                     "min-w-5 rounded-full bg-muted px-1.5 py-0.5 text-center text-[10px] tabular-nums text-muted-foreground",
                     activePanel === "request" && "bg-primary text-primary-foreground",
                   )}
                 >
                   {customHeaders.length}
-                </span>
+                </AstryxInline>
               ) : null}
-            </button>
-          </nav>
+            </AstryxButton>
+          </AstryxView>
 
-          <div
+          <AstryxView
+            layout="block"
+            direction="horizontal"
             className="min-w-0 flex-1 overflow-y-auto px-6 py-5 max-[720px]:px-3.5 max-[720px]:pb-[calc(0.875rem+env(safe-area-inset-bottom))] max-[720px]:pt-3.5"
             onScroll={() => setHeaderSuggest(null)}
           >
             {activePanel === "general" ? (
-              <section key="general" className="provider-panel-enter">
-                <div className="text-sm font-semibold">{t("settings.basicInformation")}</div>
+              <AstryxView as="section" key="general" className="provider-panel-enter">
+                <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
+                  {t("settings.basicInformation")}
+                </AstryxView>
 
-                <div className="mt-3 space-y-1.5">
-                  <Label htmlFor="modal-name">{t("settings.providerName")}</Label>
-                  <Input
-                    id="modal-name"
+                <VStack gap={1.5}>
+                  <TextInput
+                    label={t("settings.providerName")}
                     value={name}
-                    onChange={(event) => setName(event.currentTarget.value)}
+                    onChange={(value) => {
+                      setName(value);
+                      if (value.trim()) setSaveAttempted(false);
+                    }}
+                    isRequired
+                    hasAutoFocus={!initialData}
+                    status={
+                      saveAttempted && !name.trim()
+                        ? { type: "error", message: t("settings.providerNameRequired") }
+                        : undefined
+                    }
+                    width="100%"
                   />
-                </div>
+                </VStack>
 
                 {supportsOAuth ? (
-                  <div className="mt-4 space-y-2">
+                  <AstryxView layout="block" direction="horizontal" className="mt-4 space-y-2">
                     <Label>{t("settings.providerAuthMethod")}</Label>
-                    <div
+                    <AstryxView
+                      layout="grid"
+                      direction="horizontal"
                       className={cn(
                         "grid rounded-xl bg-muted/65 p-1",
                         providerType === "codex" ? "grid-cols-3" : "grid-cols-2",
@@ -794,7 +848,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                         ? (["api-key", "oauth-managed", "oauth-token"] as const)
                         : (["api-key", "oauth-token"] as const)
                       ).map((mode) => (
-                        <button
+                        <AstryxButton
                           key={mode}
                           type="button"
                           aria-pressed={authMode === mode}
@@ -810,44 +864,46 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                             : mode === "oauth-managed"
                               ? t("settings.providerAuthOAuth")
                               : t("settings.providerAuthToken")}
-                        </button>
+                        </AstryxButton>
                       ))}
-                    </div>
+                    </AstryxView>
                     {authMode === "oauth-managed" ? (
-                      <p className="text-xs leading-5 text-muted-foreground">
+                      <AstryxParagraph className="text-xs leading-5 text-muted-foreground">
                         {t("settings.providerOAuthManagedHintCodex")}
-                      </p>
+                      </AstryxParagraph>
                     ) : authMode === "oauth-token" ? (
-                      <p className="text-xs leading-5 text-muted-foreground">
+                      <AstryxParagraph className="text-xs leading-5 text-muted-foreground">
                         {providerType === "claude_code"
                           ? t("settings.providerOAuthHintAnthropic")
                           : t("settings.providerOAuthHintCodex")}
-                      </p>
+                      </AstryxParagraph>
                     ) : null}
-                  </div>
+                  </AstryxView>
                 ) : null}
 
-                <div
+                <AstryxView
+                  layout="grid"
+                  direction="horizontal"
                   className={cn(
                     "mt-4 grid gap-3 max-[720px]:grid-cols-1",
                     authMode === "oauth-managed" ? "grid-cols-1" : "grid-cols-2",
                   )}
                 >
-                  <div className="space-y-1.5">
+                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                     <Label htmlFor="modal-baseurl">Base URL</Label>
                     <Input
                       id="modal-baseurl"
                       value={baseUrl}
                       onChange={(event) => setBaseUrl(event.currentTarget.value)}
                     />
-                  </div>
+                  </AstryxView>
 
                   {authMode !== "oauth-managed" ? (
-                    <div className="space-y-1.5">
+                    <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                       <Label htmlFor="modal-apikey">
                         {authMode === "oauth-token" ? t("settings.providerOAuthToken") : "API Key"}
                       </Label>
-                      <div className="relative">
+                      <AstryxView layout="block" direction="horizontal" className="relative">
                         <Input
                           id="modal-apikey"
                           type={showApiKey ? "text" : "password"}
@@ -877,27 +933,45 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                             <Eye className="h-4 w-4" />
                           )}
                         </Button>
-                      </div>
-                    </div>
+                      </AstryxView>
+                    </AstryxView>
                   ) : null}
-                </div>
+                </AstryxView>
 
-                <div className="mt-3 grid gap-3 rounded-xl border bg-muted/20 p-3 sm:grid-cols-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium">{t("settings.providerFullUrl")}</div>
-                      <div className="text-xs text-muted-foreground">
+                <AstryxView
+                  layout="grid"
+                  direction="horizontal"
+                  className="mt-3 grid gap-3 rounded-xl border bg-muted/20 p-3 sm:grid-cols-2"
+                >
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <AstryxView layout="block" direction="horizontal">
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="text-sm font-medium"
+                      >
+                        {t("settings.providerFullUrl")}
+                      </AstryxView>
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="text-xs text-muted-foreground"
+                      >
                         {t("settings.providerFullUrlDesc")}
-                      </div>
-                    </div>
+                      </AstryxView>
+                    </AstryxView>
                     <DialogSwitch
                       checked={isFullUrl}
                       onCheckedChange={setIsFullUrl}
                       ariaLabel={t("settings.providerFullUrl")}
                     />
-                  </div>
+                  </AstryxView>
                   {providerType !== "gemini" ? (
-                    <div className="space-y-1.5">
+                    <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                       <Label htmlFor="modal-models-url">{t("settings.providerModelsUrl")}</Label>
                       <Input
                         id="modal-models-url"
@@ -905,23 +979,23 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                         onChange={(event) => setModelsUrl(event.currentTarget.value)}
                         placeholder="https://example.com/v1/models"
                       />
-                    </div>
+                    </AstryxView>
                   ) : null}
-                </div>
+                </AstryxView>
 
                 {providerType === "codex" && authMode === "oauth-managed" ? (
-                  <div className="mt-4 space-y-1.5">
+                  <AstryxView layout="block" direction="horizontal" className="mt-4 space-y-1.5">
                     <Label>{t("settings.providerOAuthAccounts")}</Label>
                     <CodexOAuthAccounts
                       value={managedOAuthAccountId}
                       onChange={setManagedOAuthAccountId}
                       browserRuntime={isBrowser}
                     />
-                  </div>
+                  </AstryxView>
                 ) : null}
 
                 {providerType === "codex" && authMode === "oauth-token" ? (
-                  <div className="mt-4 space-y-1.5">
+                  <AstryxView layout="block" direction="horizontal" className="mt-4 space-y-1.5">
                     <Label htmlFor="modal-oauth-account-id">
                       {t("settings.providerOAuthAccountId")}
                     </Label>
@@ -932,14 +1006,14 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                       onChange={(event) => setManualOAuthAccountId(event.currentTarget.value)}
                       placeholder={t("settings.providerOAuthAccountIdPlaceholder")}
                     />
-                    <p className="text-xs leading-5 text-muted-foreground">
+                    <AstryxParagraph className="text-xs leading-5 text-muted-foreground">
                       {t("settings.providerOAuthAccountIdHint")}
-                    </p>
-                  </div>
+                    </AstryxParagraph>
+                  </AstryxView>
                 ) : null}
 
                 {providerType === "codex" ? (
-                  <div className="mt-4 space-y-1.5">
+                  <AstryxView layout="block" direction="horizontal" className="mt-4 space-y-1.5">
                     <Label>{t("settings.requestFormat")}</Label>
                     <Select
                       value={requestFormat}
@@ -956,13 +1030,31 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </AstryxView>
                 ) : null}
 
-                <div className="mt-6 text-sm font-semibold">{t("settings.models")}</div>
-                <div className="mt-3 overflow-hidden rounded-xl border">
-                  <div className="flex items-center gap-2 border-b bg-muted/30 p-2.5 max-[720px]:flex-wrap">
-                    <div className="relative min-w-0 flex-1 max-[720px]:basis-full">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="mt-6 text-sm font-semibold"
+                >
+                  {t("settings.models")}
+                </AstryxView>
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="mt-3 overflow-hidden rounded-xl border"
+                >
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="flex items-center gap-2 border-b bg-muted/30 p-2.5 max-[720px]:flex-wrap"
+                  >
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="relative min-w-0 flex-1 max-[720px]:basis-full"
+                    >
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         value={modelSearch}
@@ -977,7 +1069,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                         }}
                       />
                       {modelSearch ? (
-                        <button
+                        <AstryxButton
                           type="button"
                           className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                           onClick={() => setModelSearch("")}
@@ -985,9 +1077,9 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                           aria-label={t("settings.clearModelSearch")}
                         >
                           <X className="h-3.5 w-3.5" />
-                        </button>
+                        </AstryxButton>
                       ) : null}
-                    </div>
+                    </AstryxView>
                     <Button
                       type="button"
                       variant="outline"
@@ -1009,16 +1101,24 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                       <Plus className="h-3.5 w-3.5" />
                       {t("settings.manualAddModel")}
                     </Button>
-                  </div>
+                  </AstryxView>
 
                   {fetchError ? (
-                    <div className="border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                    >
                       {fetchError}
-                    </div>
+                    </AstryxView>
                   ) : null}
 
                   {addingModel ? (
-                    <div className="flex gap-2 border-b bg-muted/20 p-2.5 max-[720px]:flex-wrap">
+                    <AstryxView
+                      layout="flex"
+                      direction="horizontal"
+                      className="flex gap-2 border-b bg-muted/20 p-2.5 max-[720px]:flex-wrap"
+                    >
                       <Input
                         autoFocus
                         value={newModelName}
@@ -1042,38 +1142,65 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                       >
                         {t("settings.cancel")}
                       </Button>
-                    </div>
+                    </AstryxView>
                   ) : null}
 
-                  <div className="divide-y">
+                  <AstryxView layout="block" direction="horizontal" className="divide-y">
                     {visibleModels.length === 0 ? (
-                      <div className="px-3 py-8 text-center text-xs text-muted-foreground">
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="px-3 py-8 text-center text-xs text-muted-foreground"
+                      >
                         {models.length > 0 && modelSearchQuery
                           ? t("settings.noMatchingModels")
                           : baseUrl.trim() && modelFetchCredential
                             ? t("settings.fetchFailed")
                             : t("settings.fetchHint")}
-                      </div>
+                      </AstryxView>
                     ) : (
                       visibleModels.map((model) => {
                         const isEditingModel = editingModel?.model.id === model.id;
                         return (
-                          <div key={model.id} className="group hover:bg-accent/30">
-                            <div className="flex items-center gap-2 px-3 py-2 max-[720px]:flex-wrap">
+                          <AstryxView
+                            layout="block"
+                            direction="horizontal"
+                            key={model.id}
+                            className="group hover:bg-accent/30"
+                          >
+                            <AstryxView
+                              layout="flex"
+                              direction="horizontal"
+                              className="flex items-center gap-2 px-3 py-2 max-[720px]:flex-wrap"
+                            >
                               <DialogSwitch
                                 checked={activeModels.has(model.id)}
                                 onCheckedChange={() => toggleModel(model.id)}
                                 ariaLabel={model.id}
                               />
-                              <div className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]">
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <span className="truncate text-sm font-medium">{model.id}</span>
-                                </div>
-                              </div>
-                              <div className="shrink-0 text-[11px] tabular-nums text-muted-foreground max-[720px]:order-3 max-[720px]:ml-12 max-[720px]:basis-full">
+                              <AstryxView
+                                layout="block"
+                                direction="horizontal"
+                                className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]"
+                              >
+                                <AstryxView
+                                  layout="flex"
+                                  direction="horizontal"
+                                  className="flex min-w-0 items-center gap-2"
+                                >
+                                  <AstryxInline className="truncate text-sm font-medium">
+                                    {model.id}
+                                  </AstryxInline>
+                                </AstryxView>
+                              </AstryxView>
+                              <AstryxView
+                                layout="block"
+                                direction="horizontal"
+                                className="shrink-0 text-[11px] tabular-nums text-muted-foreground max-[720px]:order-3 max-[720px]:ml-12 max-[720px]:basis-full"
+                              >
                                 {formatTokenCount(model.contextWindow)} ctx ·{" "}
                                 {formatTokenCount(model.maxOutputToken)} out
-                              </div>
+                              </AstryxView>
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -1099,12 +1226,24 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
-                            </div>
+                            </AstryxView>
 
                             {isEditingModel && editingModel ? (
-                              <div className="mx-3 mb-3 rounded-lg border bg-muted/20 p-3">
-                                <div className="grid grid-cols-2 gap-3 max-[720px]:grid-cols-1">
-                                  <div className="space-y-1.5">
+                              <AstryxView
+                                layout="block"
+                                direction="horizontal"
+                                className="mx-3 mb-3 rounded-lg border bg-muted/20 p-3"
+                              >
+                                <AstryxView
+                                  layout="grid"
+                                  direction="horizontal"
+                                  className="grid grid-cols-2 gap-3 max-[720px]:grid-cols-1"
+                                >
+                                  <AstryxView
+                                    layout="block"
+                                    direction="horizontal"
+                                    className="space-y-1.5"
+                                  >
                                     <Label>{t("settings.contextWindow")}</Label>
                                     <Input
                                       inputMode="numeric"
@@ -1123,8 +1262,12 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                                         );
                                       }}
                                     />
-                                  </div>
-                                  <div className="space-y-1.5">
+                                  </AstryxView>
+                                  <AstryxView
+                                    layout="block"
+                                    direction="horizontal"
+                                    className="space-y-1.5"
+                                  >
                                     <Label>{t("settings.maxOutputToken")}</Label>
                                     <Input
                                       inputMode="numeric"
@@ -1143,16 +1286,28 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                                         );
                                       }}
                                     />
-                                  </div>
-                                </div>
+                                  </AstryxView>
+                                </AstryxView>
 
-                                <div className="mt-3 text-xs font-medium text-muted-foreground">
+                                <AstryxView
+                                  layout="block"
+                                  direction="horizontal"
+                                  className="mt-3 text-xs font-medium text-muted-foreground"
+                                >
                                   {t("settings.modelCost")}
-                                </div>
-                                <div className="mt-1 text-[11px] text-muted-foreground/80">
+                                </AstryxView>
+                                <AstryxView
+                                  layout="block"
+                                  direction="horizontal"
+                                  className="mt-1 text-[11px] text-muted-foreground/80"
+                                >
                                   {t("settings.modelCostHint")}
-                                </div>
-                                <div className="mt-2 grid grid-cols-2 gap-3 max-[720px]:grid-cols-1">
+                                </AstryxView>
+                                <AstryxView
+                                  layout="grid"
+                                  direction="horizontal"
+                                  className="mt-2 grid grid-cols-2 gap-3 max-[720px]:grid-cols-1"
+                                >
                                   {(
                                     [
                                       ["costInput", "settings.modelCostInput"],
@@ -1161,7 +1316,12 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                                       ["costCacheWrite", "settings.modelCostCacheWrite"],
                                     ] as const
                                   ).map(([field, labelKey]) => (
-                                    <div key={field} className="space-y-1.5">
+                                    <AstryxView
+                                      layout="block"
+                                      direction="horizontal"
+                                      key={field}
+                                      className="space-y-1.5"
+                                    >
                                       <Label>{t(labelKey)}</Label>
                                       <Input
                                         inputMode="decimal"
@@ -1183,17 +1343,25 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                                           );
                                         }}
                                       />
-                                    </div>
+                                    </AstryxView>
                                   ))}
-                                </div>
+                                </AstryxView>
 
                                 {!canSaveEditingModel ? (
-                                  <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                                  <AstryxView
+                                    layout="block"
+                                    direction="horizontal"
+                                    className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                                  >
                                     {t("settings.positiveIntegerRequired")}
-                                  </div>
+                                  </AstryxView>
                                 ) : null}
 
-                                <div className="mt-3 flex justify-end gap-2">
+                                <AstryxView
+                                  layout="flex"
+                                  direction="horizontal"
+                                  className="mt-3 flex justify-end gap-2"
+                                >
                                   <Button
                                     type="button"
                                     variant="outline"
@@ -1210,86 +1378,120 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                                   >
                                     {t("settings.save")}
                                   </Button>
-                                </div>
-                              </div>
+                                </AstryxView>
+                              </AstryxView>
                             ) : null}
-                          </div>
+                          </AstryxView>
                         );
                       })
                     )}
-                  </div>
-                </div>
-              </section>
+                  </AstryxView>
+                </AstryxView>
+              </AstryxView>
             ) : (
-              <section key="request" className="provider-panel-enter">
-                <div className="text-sm font-semibold">{t("settings.providerDialogRequest")}</div>
+              <AstryxView as="section" key="request" className="provider-panel-enter">
+                <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
+                  {t("settings.providerDialogRequest")}
+                </AstryxView>
 
-                <div
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
                   className={cn(
                     "mt-3 flex items-center gap-3 rounded-xl border bg-card px-4 py-3 transition-colors",
                     useSystemProxy && "border-primary/35 bg-primary/[0.04]",
                   )}
                 >
-                  <span
+                  <AstryxView
+                    as="span"
+                    layout="flex"
+                    direction="horizontal"
                     className={cn(
                       "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors",
                       useSystemProxy && "bg-primary/15 text-primary",
                     )}
                   >
                     <Waypoints className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0 flex-1 text-sm font-medium">
+                  </AstryxView>
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="min-w-0 flex-1 text-sm font-medium"
+                  >
                     {t("settings.providerUseSystemProxy")}
-                  </div>
+                  </AstryxView>
                   <DialogSwitch
                     checked={useSystemProxy}
                     onCheckedChange={setUseSystemProxy}
                     ariaLabel={t("settings.providerUseSystemProxy")}
                   />
-                </div>
+                </AstryxView>
 
                 {providerType === "claude_code" || providerType === "codex" ? (
-                  <div
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
                     className={cn(
                       "mt-3 rounded-xl border bg-card px-4 py-3 transition-colors",
                       promptCachingEnabled && "border-primary/35 bg-primary/[0.04]",
                     )}
                   >
-                    <div className="flex items-center gap-3">
-                      <span
+                    <AstryxView
+                      layout="flex"
+                      direction="horizontal"
+                      className="flex items-center gap-3"
+                    >
+                      <AstryxView
+                        as="span"
+                        layout="flex"
+                        direction="horizontal"
                         className={cn(
                           "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors",
                           promptCachingEnabled && "bg-primary/15 text-primary",
                         )}
                       >
                         <Zap className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium">{t("settings.promptCaching")}</div>
-                        <div className="text-xs text-muted-foreground">
+                      </AstryxView>
+                      <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+                        <AstryxView
+                          layout="block"
+                          direction="horizontal"
+                          className="text-sm font-medium"
+                        >
+                          {t("settings.promptCaching")}
+                        </AstryxView>
+                        <AstryxView
+                          layout="block"
+                          direction="horizontal"
+                          className="text-xs text-muted-foreground"
+                        >
                           {providerType === "claude_code"
                             ? t("settings.promptCachingDescClaude")
                             : t("settings.promptCachingDescCodex")}
-                        </div>
-                      </div>
+                        </AstryxView>
+                      </AstryxView>
                       <DialogSwitch
                         checked={promptCachingEnabled}
                         onCheckedChange={setPromptCachingEnabled}
                         ariaLabel={t("settings.promptCaching")}
                       />
-                    </div>
+                    </AstryxView>
                     {providerType === "claude_code" && promptCachingEnabled ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-                        <span className="text-xs text-muted-foreground">
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
+                        className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
+                      >
+                        <AstryxInline className="text-xs text-muted-foreground">
                           {t("settings.promptCacheRetention")}
-                        </span>
+                        </AstryxInline>
                         {(
                           [
                             ["short", "settings.promptCacheRetentionShort"],
                             ["long", "settings.promptCacheRetentionLong"],
                           ] as const
                         ).map(([value, labelKey]) => (
-                          <button
+                          <AstryxButton
                             key={value}
                             type="button"
                             className={cn(
@@ -1301,22 +1503,32 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                             onClick={() => setPromptCacheRetention(value)}
                           >
                             {t(labelKey)}
-                          </button>
+                          </AstryxButton>
                         ))}
-                      </div>
+                      </AstryxView>
                     ) : null}
-                  </div>
+                  </AstryxView>
                 ) : null}
 
-                <div className="mt-6 flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="text-sm font-semibold">{t("settings.customHeaders")}</span>
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="mt-6 flex items-center justify-between gap-3"
+                >
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="flex min-w-0 items-center gap-2"
+                  >
+                    <AstryxInline className="text-sm font-semibold">
+                      {t("settings.customHeaders")}
+                    </AstryxInline>
                     {customHeaders.length > 0 ? (
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                      <AstryxInline className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
                         {customHeaders.length}
-                      </span>
+                      </AstryxInline>
                     ) : null}
-                  </div>
+                  </AstryxView>
                   <Button
                     type="button"
                     variant="outline"
@@ -1328,26 +1540,28 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                     <Plus className="h-3.5 w-3.5" />
                     {t("settings.addCustomHeader")}
                   </Button>
-                </div>
+                </AstryxView>
 
                 {customHeaders.length === 0 ? (
-                  <button
+                  <AstryxButton
                     type="button"
                     className="mt-3 flex w-full flex-col items-center gap-1 rounded-xl border border-dashed px-4 py-8 text-center transition-colors hover:border-primary/50 hover:bg-accent/20"
                     onClick={() => addCustomHeader()}
                     disabled={isBrowser}
                   >
                     <List className="h-5 w-5 text-muted-foreground/60" />
-                    <span className="mt-1 text-xs font-medium text-muted-foreground">
+                    <AstryxInline className="mt-1 text-xs font-medium text-muted-foreground">
                       {t("settings.noCustomHeaders")}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground/75">
+                    </AstryxInline>
+                    <AstryxInline className="text-[11px] text-muted-foreground/75">
                       {t("settings.noCustomHeadersHint")}
-                    </span>
-                  </button>
+                    </AstryxInline>
+                  </AstryxButton>
                 ) : (
-                  <div className="mt-3 space-y-2">
-                    <div
+                  <AstryxView layout="block" direction="horizontal" className="mt-3 space-y-2">
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
                       className="-m-0.5 max-h-[196px] space-y-2 overflow-y-auto p-0.5 max-[720px]:max-h-[360px]"
                       onScroll={() => setHeaderSuggest(null)}
                     >
@@ -1367,7 +1581,9 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                           headerSuggest?.index === index && headerSuggestItems.length > 0;
 
                         return (
-                          <div
+                          <AstryxView
+                            layout="flex"
+                            direction="horizontal"
                             key={index}
                             className={cn(
                               "provider-panel-enter group relative flex items-stretch overflow-hidden rounded-lg border bg-card transition-all focus-within:border-primary/45 focus-within:ring-2 focus-within:ring-primary/10 hover:border-muted-foreground/30 max-[720px]:flex-wrap",
@@ -1437,7 +1653,11 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                                 focusCustomHeader(index, "value");
                               }}
                             />
-                            <div className="relative min-w-0 flex-1 max-[720px]:basis-full">
+                            <AstryxView
+                              layout="block"
+                              direction="horizontal"
+                              className="relative min-w-0 flex-1 max-[720px]:basis-full"
+                            >
                               <Input
                                 ref={(element) => {
                                   headerValueRefs.current[index] = element;
@@ -1460,7 +1680,11 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                                   else focusCustomHeader(index + 1, "key");
                                 }}
                               />
-                              <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 max-[720px]:opacity-100">
+                              <AstryxView
+                                layout="flex"
+                                direction="horizontal"
+                                className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 max-[720px]:opacity-100"
+                              >
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -1497,35 +1721,49 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
-                              </div>
-                            </div>
-                          </div>
+                              </AstryxView>
+                            </AstryxView>
+                          </AstryxView>
                         );
                       })}
-                    </div>
-                  </div>
+                    </AstryxView>
+                  </AstryxView>
                 )}
 
                 {headerIssueMessage ? (
-                  <p className="mt-2 text-xs leading-relaxed text-destructive" role="alert">
+                  <AstryxParagraph
+                    className="mt-2 text-xs leading-relaxed text-destructive"
+                    role="alert"
+                  >
                     {headerIssueMessage}
-                  </p>
+                  </AstryxParagraph>
                 ) : null}
 
-                {headerSuggest && headerSuggestItems.length > 0
-                  ? createPortal(
-                      <div
+                {headerSuggest && headerSuggestItems.length > 0 ? (
+                  <Popover
+                    anchorRef={{
+                      current: headerKeyRefs.current[headerSuggest.index] as HTMLElement,
+                    }}
+                    isOpen
+                    onOpenChange={(isOpen) => {
+                      if (!isOpen) setHeaderSuggest(null);
+                    }}
+                    placement="below"
+                    alignment="start"
+                    width="var(--xagent-provider-header-menu-width)"
+                    label={t("settings.customHeaderKeyPlaceholder")}
+                    role="none"
+                    hasAutoFocus={false}
+                    hasCloseButton={false}
+                    content={
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
                         id="provider-header-suggest"
                         role="listbox"
-                        className="fixed z-[70] overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg"
-                        style={{
-                          left: headerSuggest.rect.left,
-                          top: headerSuggest.rect.top,
-                          width: headerSuggest.rect.width,
-                        }}
                       >
                         {headerSuggestItems.map((preset, itemIndex) => (
-                          <button
+                          <AstryxButton
                             key={preset}
                             type="button"
                             role="option"
@@ -1539,46 +1777,44 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                             onClick={() => applyHeaderSuggestion(preset)}
                           >
                             {preset}
-                          </button>
+                          </AstryxButton>
                         ))}
-                      </div>,
-                      document.body,
-                    )
-                  : null}
-              </section>
+                      </AstryxView>
+                    }
+                  />
+                ) : null}
+              </AstryxView>
             )}
-          </div>
-        </div>
+          </AstryxView>
+        </AstryxView>
 
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t bg-muted/20 px-5 py-3.5 max-[720px]:px-3.5 max-[720px]:pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-[720px]:pt-3">
-          <Button
-            variant="outline"
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex shrink-0 items-center justify-end gap-2 border-t bg-muted/20 px-5 py-3.5 max-[720px]:px-3.5 max-[720px]:pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-[720px]:pt-3"
+        >
+          <AstryxNativeButton
+            label={t("settings.cancel")}
+            variant="secondary"
             onClick={onClose}
-            className="max-[720px]:h-10 max-[720px]:flex-1"
-          >
-            {t("settings.cancel")}
-          </Button>
-          <Button
+            width={isCompact ? "100%" : undefined}
+          />
+          <AstryxNativeButton
+            label={t("settings.save")}
+            variant="primary"
             onClick={handleSave}
-            disabled={
-              !name.trim() || (authMode === "oauth-managed" && !managedOAuthAccountId.trim())
-            }
-            className="max-[720px]:h-10 max-[720px]:flex-1"
-          >
-            {t("settings.save")}
-          </Button>
-        </div>
-      </div>
-    </div>,
-    document.body,
+            width={isCompact ? "100%" : undefined}
+          />
+        </AstryxView>
+      </AstryxView>
+    </Dialog>
   );
 }
 
 function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => void }) {
   const { settings, setSettings, onClose } = props;
   const { t } = useLocale();
-  const [closing, setClosing] = useState(false);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isCompact = useMediaQuery("(max-width: 640px)");
   const modelOptions = useMemo(() => buildModelOptions(settings), [settings]);
   const conversationTitleModel = settings.customSettings.conversationTitleModel;
   const selectedValue = conversationTitleModel
@@ -1598,23 +1834,6 @@ function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => voi
         ]
       : modelOptions;
 
-  useEffect(
-    () => () => {
-      if (closeTimerRef.current !== null) {
-        clearTimeout(closeTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  function requestClose() {
-    if (closing) return;
-    setClosing(true);
-    closeTimerRef.current = setTimeout(() => {
-      onClose();
-    }, 220);
-  }
-
   function handleTitleModelChange(value: string) {
     // "" comes from the picker's follow-current entry and parses to undefined.
     setSettings((prev) =>
@@ -1624,55 +1843,83 @@ function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => voi
     );
   }
 
-  return createPortal(
-    <div
-      className={`${
-        closing ? "skills-drawer-backdrop-closing" : "skills-drawer-backdrop"
-      } fixed inset-0 z-50 flex justify-end bg-black/35 max-sm:bg-transparent`}
-      role="dialog"
-      aria-modal="true"
+  return (
+    <Dialog
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
       aria-labelledby="provider-custom-settings-title"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) requestClose();
+      purpose="form"
+      variant={isCompact ? "fullscreen" : "standard"}
+      width={isCompact ? "100dvw" : "var(--xagent-drawer-width-compact)"}
+      maxHeight="var(--xagent-viewport-height)"
+      padding={0}
+      className="ml-auto mr-0"
+      style={{
+        blockSize: "var(--xagent-viewport-height)",
+        ...(isCompact
+          ? {}
+          : { borderRadius: "var(--radius-container) 0 0 var(--radius-container)" }),
       }}
     >
-      <aside
-        className={`${
-          closing ? "skills-drawer-panel-closing" : "skills-drawer-panel"
-        } relative flex h-full w-full flex-col overflow-hidden border-l border-border bg-background shadow-[-24px_0_55px_-32px_rgba(15,23,42,0.35)] sm:max-w-[440px] max-sm:border-l-0`}
-      >
-        <div className="relative flex items-start gap-3 px-6 pb-4 pt-[22px]">
-          <div className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]">
-            <div
+      <AstryxView as="aside" className="relative flex h-full w-full flex-col overflow-hidden">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="relative flex items-start gap-3 px-6 pb-4 pt-[22px]"
+        >
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]"
+          >
+            <AstryxView
+              layout="block"
+              direction="horizontal"
               id="provider-custom-settings-title"
               className="text-[17px] font-semibold leading-tight tracking-tight text-foreground/95"
             >
               {t("settings.customSettings")}
-            </div>
-            <div className="mt-1 text-[12px] leading-relaxed text-muted-foreground/90">
+            </AstryxView>
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="mt-1 text-[12px] leading-relaxed text-muted-foreground/90"
+            >
               {t("settings.conversationTitleModelHint")}
-            </div>
-          </div>
-          <button
+            </AstryxView>
+          </AstryxView>
+          <AstryxButton
             type="button"
-            onClick={requestClose}
+            onClick={onClose}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] text-muted-foreground/80 transition-colors hover:bg-foreground/[0.12] hover:text-foreground"
             title={t("settings.closeCustomSettings")}
             aria-label={t("settings.closeCustomSettings")}
           >
             <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+          </AstryxButton>
+        </AstryxView>
 
-        <div
+        <AstryxView
+          layout="block"
+          direction="horizontal"
           aria-hidden="true"
           className="relative mx-6 h-px bg-gradient-to-r from-transparent via-foreground/[0.08] to-transparent"
         />
 
-        <div className="relative min-h-0 flex-1 overflow-y-auto px-6 py-5">
-          <section className="space-y-3">
-            <div className="rounded-xl border border-border bg-muted/25 p-4">
-              <div className="space-y-2">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="relative min-h-0 flex-1 overflow-y-auto px-6 py-5"
+        >
+          <AstryxView as="section" className="space-y-3">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="rounded-xl border border-border bg-muted/25 p-4"
+            >
+              <AstryxView layout="block" direction="horizontal" className="space-y-2">
                 <Label className="text-[12.5px] font-medium text-foreground/85">
                   {t("settings.conversationTitleModel")}
                 </Label>
@@ -1683,20 +1930,22 @@ function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => voi
                   placeholder={t("settings.conversationTitleModelFollowCurrent")}
                   noneLabel={t("settings.conversationTitleModelFollowCurrent")}
                   ariaLabel={t("settings.conversationTitleModel")}
-                  triggerClassName="h-9 rounded-lg border-border bg-background text-[13px] shadow-none"
                 />
                 {modelOptions.length === 0 ? (
-                  <div className="mt-1 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2 text-[11.5px] leading-relaxed text-amber-700 dark:text-amber-300">
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="mt-1 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2 text-[11.5px] leading-relaxed text-amber-700 dark:text-amber-300"
+                  >
                     {t("settings.customSettingsModelEmpty")}
-                  </div>
+                  </AstryxView>
                 ) : null}
-              </div>
-            </div>
-          </section>
-        </div>
-      </aside>
-    </div>,
-    document.body,
+              </AstryxView>
+            </AstryxView>
+          </AstryxView>
+        </AstryxView>
+      </AstryxView>
+    </Dialog>
   );
 }
 
@@ -1880,6 +2129,7 @@ function CcsImportModal(props: {
 }) {
   const { initialType, items, existingProviders, onImport, onClose } = props;
   const { t } = useLocale();
+  const isCompact = useMediaQuery("(max-width: 720px)");
 
   const existingIdentity = useMemo(
     () => new Set(existingProviders.map(ccsImportIdentity)),
@@ -1967,20 +2217,46 @@ function CcsImportModal(props: {
     }
   }
 
-  return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/35" onClick={submitting ? undefined : onClose} />
-
-      <div className="relative z-10 flex h-[min(35rem,85vh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
-        <div className="flex items-center gap-3 border-b px-6 py-4">
+  return (
+    <Dialog
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen && !submitting) onClose();
+      }}
+      purpose="form"
+      variant={isCompact ? "fullscreen" : "standard"}
+      width={isCompact ? "100dvw" : "var(--xagent-dialog-width-lg)"}
+      maxHeight={isCompact ? "var(--xagent-viewport-height)" : "var(--xagent-dialog-height-md)"}
+      padding={0}
+    >
+      <AstryxView
+        layout="flex"
+        direction="vertical"
+        className="flex h-full min-h-0 w-full flex-col overflow-hidden"
+      >
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex items-center gap-3 border-b px-6 py-4"
+        >
           <CcsSourceLogo className="h-9 w-9" />
-          <div className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]">
-            <div className="text-sm font-semibold">从 CC Switch 导入</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]"
+          >
+            <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
+              从 CC Switch 导入
+            </AstryxView>
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="mt-0.5 text-xs text-muted-foreground"
+            >
               左侧选择供应商类型，右侧勾选要导入的配置，导入后自动获取并激活模型
-            </div>
-          </div>
-          <button
+            </AstryxView>
+          </AstryxView>
+          <AstryxButton
             type="button"
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
             onClick={onClose}
@@ -1989,17 +2265,29 @@ function CcsImportModal(props: {
             aria-label={t("settings.cancel")}
           >
             <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+          </AstryxButton>
+        </AstryxView>
 
-        <div className="flex min-h-0 flex-1 max-[720px]:flex-col">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex min-h-0 flex-1 max-[720px]:flex-col"
+        >
           {groups.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center px-6 py-10 text-sm text-muted-foreground">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex flex-1 items-center justify-center px-6 py-10 text-sm text-muted-foreground"
+            >
               未发现可导入的供应商
-            </div>
+            </AstryxView>
           ) : (
             <>
-              <div className="flex w-44 shrink-0 flex-col gap-1 overflow-y-auto border-r bg-muted/30 p-2">
+              <AstryxView
+                layout="flex"
+                direction="vertical"
+                className="flex w-44 shrink-0 flex-col gap-1 overflow-y-auto border-r bg-muted/30 p-2"
+              >
                 {groups.map((group) => {
                   const groupSelectable = group.rows.filter((row) => row.selectable);
                   const groupSelected = groupSelectable.filter((row) =>
@@ -2007,7 +2295,7 @@ function CcsImportModal(props: {
                   ).length;
                   const active = group.type === activeGroup?.type;
                   return (
-                    <button
+                    <AstryxButton
                       key={group.type}
                       type="button"
                       onClick={() => setActiveType(group.type)}
@@ -2018,32 +2306,49 @@ function CcsImportModal(props: {
                           : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
                       )}
                     >
-                      <span className="flex w-5 shrink-0 items-center justify-center text-base">
+                      <AstryxView
+                        as="span"
+                        layout="flex"
+                        direction="horizontal"
+                        className="flex w-5 shrink-0 items-center justify-center text-base"
+                      >
                         <ProviderBrandIcon type={group.type} />
-                      </span>
-                      <span className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]">
-                        <span className="block truncate text-sm font-medium">
+                      </AstryxView>
+                      <AstryxInline className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]">
+                        <AstryxInline className="block truncate text-sm font-medium">
                           {getProviderLabel(group.type)}
-                        </span>
-                        <span className="block text-[11px] text-muted-foreground">
+                        </AstryxInline>
+                        <AstryxInline className="block text-[11px] text-muted-foreground">
                           {group.rows.length} 项配置
-                        </span>
-                      </span>
+                        </AstryxInline>
+                      </AstryxInline>
                       {groupSelected > 0 ? (
-                        <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                        <AstryxInline className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                           {groupSelected}
-                        </span>
+                        </AstryxInline>
                       ) : null}
-                    </button>
+                    </AstryxButton>
                   );
                 })}
-              </div>
+              </AstryxView>
 
-              <div className="flex min-w-0 flex-1 flex-col">
-                <div className="flex items-center justify-between gap-2 border-b bg-muted/20 px-5 py-2">
-                  <div className="text-xs text-muted-foreground">
+              <AstryxView
+                layout="flex"
+                direction="vertical"
+                className="flex min-w-0 flex-1 flex-col"
+              >
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex items-center justify-between gap-2 border-b bg-muted/20 px-5 py-2"
+                >
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="text-xs text-muted-foreground"
+                  >
                     已选 {activeSelectedCount} / {activeSelectableKeys.length} 个可导入
-                  </div>
+                  </AstryxView>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -2053,70 +2358,106 @@ function CcsImportModal(props: {
                   >
                     {activeAllSelected ? t("settings.deselectAll") : t("settings.selectAll")}
                   </Button>
-                </div>
+                </AstryxView>
 
-                <div className="min-h-0 flex-1 divide-y overflow-y-auto">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="min-h-0 flex-1 divide-y overflow-y-auto"
+                >
                   {activeRows.map(({ item, key, exists, transferable, selectable }) => {
                     return (
-                      <label
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
                         key={key}
                         className={cn(
                           "flex items-center gap-3 px-5 py-3 transition-colors",
                           selectable ? "cursor-pointer hover:bg-accent/40" : "opacity-55",
                         )}
                       >
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 shrink-0 accent-primary"
-                          checked={selectable && selected.has(key)}
-                          disabled={!selectable || submitting}
+                        <CheckboxInput
+                          label={item.name}
+                          isLabelHidden
+                          value={selectable && selected.has(key)}
+                          isDisabled={!selectable || submitting}
                           onChange={() => toggleRow(key)}
+                          size="sm"
                         />
-                        <div className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate text-sm font-medium">{item.name}</span>
+                        <AstryxView
+                          layout="block"
+                          direction="horizontal"
+                          className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]"
+                        >
+                          <AstryxView
+                            layout="flex"
+                            direction="horizontal"
+                            className="flex items-center gap-2"
+                          >
+                            <AstryxInline className="truncate text-sm font-medium">
+                              {item.name}
+                            </AstryxInline>
                             {exists ? (
-                              <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                              <AstryxInline className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
                                 已导入
-                              </span>
+                              </AstryxInline>
                             ) : !transferable ? (
-                              <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                              <AstryxInline className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
                                 无 API 配置
-                              </span>
+                              </AstryxInline>
                             ) : null}
-                          </div>
-                          <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                          </AstryxView>
+                          <AstryxView
+                            layout="block"
+                            direction="horizontal"
+                            className="mt-0.5 truncate text-xs text-muted-foreground"
+                          >
                             {item.baseUrl || "未配置 Base URL"}
-                          </div>
-                        </div>
+                          </AstryxView>
+                        </AstryxView>
                         {item.apiKey.trim() ? (
-                          <span className="shrink-0 text-muted-foreground" title="已包含 API Key">
+                          <AstryxInline
+                            className="shrink-0 text-muted-foreground"
+                            title="已包含 API Key"
+                          >
                             <Key className="h-3 w-3" />
-                          </span>
+                          </AstryxInline>
                         ) : null}
-                      </label>
+                      </AstryxView>
                     );
                   })}
-                </div>
-              </div>
+                </AstryxView>
+              </AstryxView>
             </>
           )}
-        </div>
+        </AstryxView>
 
         {result ? (
-          <div className="border-t px-6 py-3">
-            <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+          <AstryxView layout="block" direction="horizontal" className="border-t px-6 py-3">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300"
+            >
               <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>{result}</span>
-            </div>
-          </div>
+              <AstryxInline>{result}</AstryxInline>
+            </AstryxView>
+          </AstryxView>
         ) : null}
 
-        <div className="flex items-center justify-between gap-2 border-t px-6 py-4">
-          <div className="text-xs text-muted-foreground">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex items-center justify-between gap-2 border-t px-6 py-4"
+        >
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="text-xs text-muted-foreground"
+          >
             共已选 {selectedCount} / {selectableKeys.length} 个可导入
-          </div>
-          <div className="flex items-center gap-2">
+          </AstryxView>
+          <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
             <Button
               variant="outline"
               onClick={onClose}
@@ -2139,11 +2480,10 @@ function CcsImportModal(props: {
                 `导入 ${selectedCount} 个供应商`
               )}
             </Button>
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body,
+          </AstryxView>
+        </AstryxView>
+      </AstryxView>
+    </Dialog>
   );
 }
 
@@ -2232,18 +2572,33 @@ function ProviderList(props: {
   const thirdPartyImporting = cherryImporting;
 
   return (
-    <div className="provider-list flex h-full min-h-0 flex-col gap-4">
-      <div className="provider-list-header flex shrink-0 items-center justify-between gap-3">
-        <div className="text-sm text-muted-foreground">
+    <AstryxView
+      layout="flex"
+      direction="vertical"
+      className="provider-list flex h-full min-h-0 flex-col gap-4"
+    >
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="provider-list-header flex shrink-0 items-center justify-between gap-3"
+      >
+        <AstryxView layout="block" direction="horizontal" className="text-sm text-muted-foreground">
           {filtered.length === 0
             ? t("settings.noProviders")
             : `${filtered.length} ${t("settings.navProviders")}`}
-        </div>
-        <div className="provider-list-actions flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={onAdd}>
-            <Plus className="h-3.5 w-3.5" />
-            {t("settings.addProvider")}
-          </Button>
+        </AstryxView>
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="provider-list-actions flex items-center gap-2"
+        >
+          <AstryxNativeButton
+            label={t("settings.addProvider")}
+            variant="primary"
+            size="sm"
+            icon={<Plus />}
+            onClick={onAdd}
+          />
           {thirdPartyImportEnabled ? (
             <DropdownMenu open={syncMenuOpen} onOpenChange={handleSyncMenuOpenChange}>
               <DropdownMenuTrigger
@@ -2275,7 +2630,11 @@ function ProviderList(props: {
                 collisionPadding={8}
                 className="model-selector-dropdown w-80 overflow-hidden rounded-xl border-border/40 bg-popover/70 p-0 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.25)] ring-1 ring-white/10 backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-popover/55"
               >
-                <div className="flex items-center justify-between gap-2 px-3 py-1.5">
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex items-center justify-between gap-2 px-3 py-1.5"
+                >
                   <DropdownMenuLabel className="p-0 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
                     导入来源
                   </DropdownMenuLabel>
@@ -2289,31 +2648,41 @@ function ProviderList(props: {
                   >
                     <RefreshCw className={cn("h-3.5 w-3.5", thirdPartyLoading && "animate-spin")} />
                   </DropdownMenuItem>
-                </div>
+                </AstryxView>
                 <DropdownMenuSeparator className="my-0 bg-border/40" />
-                <div className="p-1.5">
+                <AstryxView layout="block" direction="horizontal" className="p-1.5">
                   <DropdownMenuItem
                     className="model-selector-item cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2.5"
                     disabled={ccsLoading || !ccsAll.length}
                     onSelect={onOpenCcsImport}
                   >
                     <CcsSourceLogo className="h-9 w-9" />
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="flex items-center gap-1.5 text-sm font-medium">
+                    <AstryxView
+                      as="span"
+                      layout="flex"
+                      direction="vertical"
+                      className="flex min-w-0 flex-1 flex-col gap-0.5"
+                    >
+                      <AstryxView
+                        as="span"
+                        layout="flex"
+                        direction="horizontal"
+                        className="flex items-center gap-1.5 text-sm font-medium"
+                      >
                         CC Switch
                         {ccsAll.length > 0 ? (
-                          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                          <AstryxInline className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                             {ccsAll.length}
-                          </span>
+                          </AstryxInline>
                         ) : null}
-                      </span>
-                      <span
+                      </AstryxView>
+                      <AstryxInline
                         className="line-clamp-2 text-xs text-muted-foreground"
                         title={ccsSubtitle}
                       >
                         {ccsSubtitle}
-                      </span>
-                    </span>
+                      </AstryxInline>
+                    </AstryxView>
                     {ccsLoading ? (
                       <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
                     ) : null}
@@ -2324,102 +2693,108 @@ function ProviderList(props: {
                     onSelect={onOpenCherryImport}
                   >
                     <CherrySourceLogo className="h-9 w-9" />
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="flex items-center gap-1.5 text-sm font-medium">
+                    <AstryxView
+                      as="span"
+                      layout="flex"
+                      direction="vertical"
+                      className="flex min-w-0 flex-1 flex-col gap-0.5"
+                    >
+                      <AstryxView
+                        as="span"
+                        layout="flex"
+                        direction="horizontal"
+                        className="flex items-center gap-1.5 text-sm font-medium"
+                      >
                         Cherry Studio
                         {cherryReady > 0 ? (
-                          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                          <AstryxInline className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                             {cherryReady}
-                          </span>
+                          </AstryxInline>
                         ) : null}
-                      </span>
-                      <span
+                      </AstryxView>
+                      <AstryxInline
                         className="line-clamp-2 text-xs text-muted-foreground"
                         title={cherrySubtitle}
                       >
                         {cherrySubtitle}
-                      </span>
-                    </span>
+                      </AstryxInline>
+                    </AstryxView>
                     {cherryLoading || cherryImporting ? (
                       <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
                     ) : null}
                   </DropdownMenuItem>
-                </div>
+                </AstryxView>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
-        </div>
-      </div>
+        </AstryxView>
+      </AstryxView>
 
-      <div className="provider-list-scroll min-h-0 flex-1 overflow-y-auto pr-1">
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        className="provider-list-scroll min-h-0 flex-1 overflow-y-auto pr-1"
+      >
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-12 text-center">
-            <div className="mb-3 flex items-center justify-center text-3xl text-foreground">
-              <ProviderBrandIcon type={type} />
-            </div>
-            <p className="text-sm font-medium">{t("settings.noProvidersHint")}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{t("settings.noProvidersAdd")}</p>
-          </div>
+          <EmptyState
+            icon={<ProviderBrandIcon type={type} />}
+            title={t("settings.noProvidersHint")}
+            description={t("settings.noProvidersAdd")}
+            actions={
+              <AstryxNativeButton
+                label={t("settings.addProvider")}
+                variant="primary"
+                size="sm"
+                icon={<Plus />}
+                onClick={onAdd}
+              />
+            }
+          />
         ) : (
-          <div className="space-y-2 pb-1">
+          <AstryxList density="compact" hasDividers>
             {filtered.map((provider) => (
-              <div
+              <ListItem
                 key={provider.id}
-                className="provider-list-card group flex items-center gap-3 rounded-xl border bg-card px-4 py-3 transition-colors hover:bg-accent/30"
-              >
-                <div className="flex w-5 shrink-0 items-center justify-center text-lg text-foreground">
-                  <ProviderBrandIcon type={type} />
-                </div>
-                <div className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-medium">{provider.name}</span>
+                label={provider.name}
+                description={`${provider.baseUrl || t("settings.noBaseUrl")} · ${provider.activeModels.length} ${t("settings.activeModels")}`}
+                startContent={<ProviderBrandIcon type={type} />}
+                endContent={
+                  <HStack gap={1} vAlign="center">
                     {provider.useSystemProxy ? (
-                      <span
-                        className="shrink-0 text-blue-500 dark:text-blue-400"
-                        title={t("settings.providerUseSystemProxy")}
-                      >
-                        <Waypoints className="h-3 w-3" />
-                      </span>
+                      <Waypoints title={t("settings.providerUseSystemProxy")} />
                     ) : null}
-                  </div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {provider.baseUrl || t("settings.noBaseUrl")} {" · "}
-                    {provider.activeModels.length} {t("settings.activeModels")}
-                  </div>
-                </div>
-                <div className="provider-list-card-actions flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                    onClick={() => onEdit(provider)}
-                    title={t("settings.edit")}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <ConfirmDeletePopover
-                    name={provider.name}
-                    onConfirm={() => onDelete(provider.id)}
-                  >
-                    {(open) => (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={open}
-                        title={t("settings.delete")}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </ConfirmDeletePopover>
-                </div>
-              </div>
+                    <IconButton
+                      label={t("settings.edit")}
+                      tooltip={t("settings.edit")}
+                      variant="ghost"
+                      size="sm"
+                      icon={<Pencil />}
+                      onClick={() => onEdit(provider)}
+                    />
+                    <ConfirmDeletePopover
+                      name={provider.name}
+                      onConfirm={() => onDelete(provider.id)}
+                    >
+                      {(open) => (
+                        <IconButton
+                          label={t("settings.delete")}
+                          tooltip={t("settings.delete")}
+                          variant="ghost"
+                          size="sm"
+                          icon={<Trash2 />}
+                          onClick={open}
+                        />
+                      )}
+                    </ConfirmDeletePopover>
+                  </HStack>
+                }
+                onClick={() => onEdit(provider)}
+              />
             ))}
-          </div>
+          </AstryxList>
         )}
-      </div>
-    </div>
+      </AstryxView>
+    </AstryxView>
   );
 }
 
@@ -2820,77 +3195,70 @@ export function ProvidersSection(
     );
   }
 
-  const activeTabIndex = Math.max(0, PROVIDER_TABS.indexOf(activeTab));
-
   return (
     <>
-      <div className="providers-tabbar-row mb-4 flex min-w-0 shrink-0 items-center justify-between gap-3">
-        <div className="providers-tabbar inline-flex h-9 min-w-0 max-w-full items-center overflow-x-auto rounded-lg bg-muted p-1 text-muted-foreground">
+      <Toolbar
+        label={t("settings.navProviders")}
+        size="sm"
+        dividers={["bottom"]}
+        startContent={
+          <TabList
+            value={activeTab}
+            onChange={(value) => setActiveTab(value as ProviderId)}
+            size="sm"
+            overflow="scroll"
+            role="tablist"
+          >
           {PROVIDER_TABS.map((tab) => (
-            <button
+            <Tab
               key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all ${
-                activeTab === tab
-                  ? "bg-background text-foreground shadow"
-                  : "hover:text-foreground/80"
-              }`}
-            >
-              <ProviderBrandIcon type={tab} />
-              {getProviderLabel(tab)}
-            </button>
+              value={tab}
+              label={getProviderLabel(tab)}
+              icon={<ProviderBrandIcon type={tab} />}
+              panelId={`provider-panel-${tab}`}
+            />
           ))}
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
-          onClick={() => setCustomSettingsOpen(true)}
-          title={t("settings.openCustomSettings")}
-          aria-label={t("settings.openCustomSettings")}
-        >
-          <Settings className="h-4 w-4" />
-        </Button>
-      </div>
+          </TabList>
+        }
+        endContent={
+          <IconButton
+            label={t("settings.openCustomSettings")}
+            tooltip={t("settings.openCustomSettings")}
+            variant="ghost"
+            size="sm"
+            icon={<Settings />}
+            onClick={() => setCustomSettingsOpen(true)}
+          />
+        }
+      />
 
-      <div className="providers-pages min-h-0 flex-1 overflow-hidden">
-        <div
-          className="flex h-full transition-transform duration-300 ease-in-out"
-          style={{ transform: `translateX(-${activeTabIndex * 100}%)` }}
-        >
-          {PROVIDER_TABS.map((tab) => (
-            <div
-              key={tab}
-              className="w-full shrink-0 overflow-hidden"
-              aria-hidden={activeTab !== tab}
-              inert={activeTab !== tab}
-            >
-              <ProviderList
-                type={tab}
-                isActive={activeTab === tab}
-                providers={settings.customProviders}
-                onAdd={openAdd}
-                onEdit={openEdit}
-                onDelete={handleDelete}
-                ccsProviders={ccsProviders}
-                ccsLoading={ccsLoading}
-                ccsMessage={ccsMessage}
-                cherryProviders={cherryProviders}
-                cherryLoading={cherryLoading}
-                cherryImporting={cherryImporting}
-                cherryMessage={cherryMessage}
-                onEnsureThirdPartyScan={ensureThirdPartyScan}
-                onRefreshThirdPartyProviders={() => void refreshThirdPartyProviders()}
-                onOpenCcsImport={() => setCcsImportType(tab)}
-                onOpenCherryImport={() => setCherryImportType(tab)}
-                thirdPartyImportEnabled={thirdPartyImportEnabled}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
+      <VStack
+        id={`provider-panel-${activeTab}`}
+        role="tabpanel"
+        aria-labelledby={undefined}
+        height="100%"
+      >
+        <ProviderList
+          type={activeTab}
+          isActive
+          providers={settings.customProviders}
+          onAdd={openAdd}
+          onEdit={openEdit}
+          onDelete={handleDelete}
+          ccsProviders={ccsProviders}
+          ccsLoading={ccsLoading}
+          ccsMessage={ccsMessage}
+          cherryProviders={cherryProviders}
+          cherryLoading={cherryLoading}
+          cherryImporting={cherryImporting}
+          cherryMessage={cherryMessage}
+          onEnsureThirdPartyScan={ensureThirdPartyScan}
+          onRefreshThirdPartyProviders={() => void refreshThirdPartyProviders()}
+          onOpenCcsImport={() => setCcsImportType(activeTab)}
+          onOpenCherryImport={() => setCherryImportType(activeTab)}
+          thirdPartyImportEnabled={thirdPartyImportEnabled}
+        />
+      </VStack>
 
       {modalOpen ? (
         <ProviderModal

@@ -1,6 +1,10 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
-import { ChevronRight, Lightbulb, RefreshCw } from "../../../../components/icons";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { HStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Text } from "@astryxdesign/core/Text";
+import { Lightbulb, RefreshCw } from "../../../../components/icons";
 import { Markdown } from "../../../../components/Markdown";
 import { useLocale } from "../../../../i18n";
 import type { ChatFileLink } from "../../../../lib/chat/chatFileLinks";
@@ -9,12 +13,12 @@ import type { ToolTraceItem, UiRound } from "../../../../lib/chat/messages/uiMes
 import { normalizeLiveToolStatus, VIBING_STATUS } from "../../../../lib/chat/page/chatPageHelpers";
 import { type GroupedRoundBlock, groupRoundBlocks } from "./assistantBubbleUtils";
 import { HostedSearchGroupView } from "./HostedSearchGroupView";
-import { LazyCollapse } from "./LazyCollapse";
 import { AssistantStatus, CompactingText, VibingText } from "./StatusText";
 import { MemoToolCallItem } from "./ToolCallItem";
 import { getNativeDisplayImagePayload, NativeDisplayImageBlock } from "./ToolImages";
 import { ToolTraceGroup } from "./ToolTraceGroup";
 import { UsagePanel } from "./UsagePanel";
+import { View as AstryxView } from "@xagent/ui/components/ui/view";
 
 const ThinkingBlock = memo(function ThinkingBlock({
   text,
@@ -40,41 +44,32 @@ const ThinkingBlock = memo(function ThinkingBlock({
   if (!hasText) return null;
 
   return (
-    <div className="group/think w-full">
-      <button
-        type="button"
-        aria-expanded={isOpen}
-        onClick={() => {
+    <Collapsible
+      isOpen={isOpen}
+      onOpenChange={(nextOpen) => {
           userInteractedRef.current = true;
-          setIsOpen((prev) => !prev);
+          setIsOpen(nextOpen);
         }}
-        className="thinking-block-toggle flex w-full cursor-pointer select-none items-center gap-2 py-1.5 text-left text-[calc(13px*var(--zone-font-scale,1))] font-normal text-muted-foreground/80 hover:text-foreground"
-      >
-        {isRunning ? (
-          <AssistantStatus className="min-h-0">{t("chat.thinking")}</AssistantStatus>
+      trigger={
+        isRunning ? (
+          <AssistantStatus>{t("chat.thinking")}</AssistantStatus>
         ) : (
-          <>
+          <HStack gap={2} vAlign="center">
             <Lightbulb className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-            <span className="thinking-block-label">{t("chat.thinkingProcess")}</span>
-          </>
-        )}
-        <ChevronRight
-          className={`ml-auto h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200 ease-out ${isOpen ? "rotate-90" : ""}`}
-        />
-      </button>
-      <LazyCollapse open={isOpen}>
-        {() => (
-          <div className="pb-1 pt-1.5">
-            <Markdown
-              content={text}
-              className="thinking-markdown space-y-1.5"
-              renderMode={renderMode}
-              showCaret={false}
-            />
-          </div>
-        )}
-      </LazyCollapse>
-    </div>
+            <Text type="supporting" color="secondary">
+              {t("chat.thinkingProcess")}
+            </Text>
+          </HStack>
+        )
+      }
+    >
+      <Markdown
+        content={text}
+        className="thinking-markdown"
+        renderMode={renderMode}
+        showCaret={false}
+      />
+    </Collapsible>
   );
 });
 
@@ -89,42 +84,34 @@ export const RetryDetailsBlock = memo(function RetryDetailsBlock({
   if (attempts.length === 0) return null;
 
   return (
-    <div className="group/retry w-full">
-      <button
-        type="button"
-        aria-expanded={isOpen}
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="retry-details-toggle flex w-full cursor-pointer select-none items-center gap-2 py-1.5 text-left text-[calc(13px*var(--zone-font-scale,1))] font-normal text-muted-foreground/80 hover:text-foreground"
-      >
-        <RefreshCw className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-        <span>{t("chat.retryDetailsToggle").replace("{count}", String(attempts.length))}</span>
-        <ChevronRight
-          className={`ml-auto h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200 ease-out ${isOpen ? "rotate-90" : ""}`}
-        />
-      </button>
-      <LazyCollapse open={isOpen}>
-        {() => (
-          <div className="space-y-1 pb-1 pt-1.5">
-            {/* Index-keyed: attempt ordinals can repeat within one list (text
-                mode's tool-recovery loop restarts each wrapper's counter at 1)
-                and the list is append-only, so the index is the stable key. */}
-            {attempts.map((entry, index) => (
-              <div
-                key={`${index}-${entry.attempt}-${entry.maxAttempts}`}
-                className="rounded-md border border-border/60 bg-muted/30 px-2.5 py-1.5 text-[calc(12px*var(--zone-font-scale,1))] text-muted-foreground"
-              >
-                <div className="font-medium text-foreground/80">
-                  {t("chat.retryAttemptLabel")
-                    .replace("{attempt}", String(entry.attempt))
-                    .replace("{maxAttempts}", String(entry.maxAttempts))}
-                </div>
-                <div className="whitespace-pre-wrap break-words">{entry.errorMessage}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </LazyCollapse>
-    </div>
+    <Collapsible
+      isOpen={isOpen}
+      onOpenChange={setIsOpen}
+      trigger={
+        <HStack gap={2} vAlign="center">
+          <RefreshCw />
+          <Text type="supporting" color="secondary">
+            {t("chat.retryDetailsToggle").replace("{count}", String(attempts.length))}
+          </Text>
+        </HStack>
+      }
+    >
+      <List density="compact" hasDividers>
+        {/* Index-keyed: attempt ordinals can repeat within one list (text
+            mode's tool-recovery loop restarts each wrapper's counter at 1)
+            and the list is append-only, so the index is the stable key. */}
+        {attempts.map((entry, index) => (
+          <ListItem
+            key={`${index}-${entry.attempt}-${entry.maxAttempts}`}
+            label={t("chat.retryAttemptLabel")
+              .replace("{attempt}", String(entry.attempt))
+              .replace("{maxAttempts}", String(entry.maxAttempts))}
+            description={entry.errorMessage}
+            startContent={<RefreshCw />}
+          />
+        ))}
+      </List>
+    </Collapsible>
   );
 });
 
@@ -286,12 +273,12 @@ export const RoundContent = memo(function RoundContent(props: {
   if (!hasContent) return null;
 
   return (
-    <div className="space-y-2">
+    <AstryxView layout="block" direction="horizontal" className="space-y-2">
       {isActive &&
       isLive &&
       normalizedToolStatus &&
       (!hasRunningToolCall || isCompactionStatus || isVibingStatus) ? (
-        <div className="py-1.5">
+        <AstryxView layout="block" direction="horizontal" className="py-1.5">
           {isCompactionStatus ? (
             <CompactingText />
           ) : isVibingStatus ? (
@@ -299,7 +286,7 @@ export const RoundContent = memo(function RoundContent(props: {
           ) : (
             <AssistantStatus>{normalizedToolStatus}</AssistantStatus>
           )}
-        </div>
+        </AstryxView>
       ) : null}
 
       {isActive && isLive && retryAttempts && retryAttempts.length > 0 ? (
@@ -379,6 +366,6 @@ export const RoundContent = memo(function RoundContent(props: {
       {showUsage ? (
         <UsagePanel usage={round.meta?.usage} contextWindow={usageContextWindow} />
       ) : null}
-    </div>
+    </AstryxView>
   );
 });

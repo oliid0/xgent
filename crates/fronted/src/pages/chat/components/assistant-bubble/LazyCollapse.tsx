@@ -1,3 +1,5 @@
+import { Grid } from "@astryxdesign/core/Grid";
+import { VStack } from "@astryxdesign/core/Layout";
 import { type ReactNode, useState } from "react";
 
 import { cn } from "../../../../lib/shared/utils";
@@ -31,7 +33,8 @@ export function LazyCollapse(props: {
   }
 
   return (
-    <div
+    <Grid
+      columns={1}
       aria-hidden={!open}
       className={cn(
         "grid",
@@ -39,13 +42,15 @@ export function LazyCollapse(props: {
         className,
       )}
     >
-      <div className="min-h-0 overflow-hidden">
+      <VStack className="min-h-0 overflow-hidden">
         {mounted ? (
           // Dropping the class on collapse resets the CSS animation, so
           // every re-expand replays the entrance.
-          <div className={open ? "lazy-collapse-reveal" : "invisible"}>{children()}</div>
+          <VStack className={open ? "lazy-collapse-reveal" : "invisible"}>
+            {children()}
+          </VStack>
         ) : null}
-      </div>
-    </div>
+      </VStack>
+    </Grid>
   );
 }

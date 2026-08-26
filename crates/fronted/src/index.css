@@ -1,5 +1,130 @@
-@import "tailwindcss";
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
+@import "@astryxdesign/core/tailwind-theme.css";
+@import "tailwindcss/utilities.css" layer(utilities);
 @config "../tailwind.config.js";
+
+@layer theme {
+  :root {
+    --xagent-content-width-sm: 24rem;
+    --xagent-content-width-md: 48rem;
+    --xagent-chat-measure: 50em;
+  --xagent-approval-summary-max-height: 6rem;
+  --xagent-tool-preview-max-height: 14rem;
+  --xagent-image-preview-stage-min-height: 16rem;
+  --xagent-image-preview-max-height: calc(100dvh - 9rem);
+  --xagent-image-preview-slider-max-width: 20rem;
+  --xagent-workspace-image-stage-min-height: 12rem;
+  --xagent-z-workspace-overlay: 50;
+  --xagent-z-workspace-navigation: 30;
+  --xagent-oauth-list-min-height: 8rem;
+  --xagent-chat-empty-stage-min-height: calc(100dvh - 13.75rem);
+  --xagent-z-chat-floating-action: 10;
+  --xagent-artifacts-list-max-height: 9.375rem;
+  --xagent-changed-files-list-max-height: 13.125rem;
+  --xagent-assistant-avatar-size: 1.75rem;
+  --xagent-opacity-compacted: 0.7;
+  --xagent-macos-titlebar-spacer-height: 2.375rem;
+  --xagent-macos-titlebar-leading-inset: 5.5rem;
+  --xagent-windows-titlebar-height: 2rem;
+  --xagent-window-app-icon-size: 0.9375rem;
+  --xagent-window-control-width: 2.375rem;
+  --xagent-window-close-control-width: 2.625rem;
+  --xagent-window-chrome-opacity-inactive: 0.55;
+  --xagent-window-chrome-background: color-mix(
+    in srgb,
+    var(--color-background-surface) 82%,
+    transparent
+  );
+  --xagent-window-chrome-blur: 1.25rem;
+  --xagent-window-chrome-saturation: 1.35;
+  --xagent-z-titlebar-actions: 49;
+  --xagent-z-window-chrome: 50;
+  --xagent-z-hub-header: 10;
+  --xagent-hub-content-max-width: 82.5rem;
+  --xagent-hub-header-control-size: 2.75rem;
+  --xagent-hub-header-icon-size: 2.5rem;
+  --xagent-hub-sidebar-reserve: 2.75rem;
+  --xagent-hub-header-blur: 1.25rem;
+  --xagent-hub-header-background: color-mix(
+    in srgb,
+    var(--color-background-surface) 82%,
+    transparent
+  );
+    --xagent-task-overlay-width: 23.75rem;
+    --xagent-z-task-overlay: 95;
+    --xagent-content-width-lg: 45rem;
+    --xagent-content-width-xl: 56rem;
+    --xagent-macos-titlebar-inset: 14.5rem;
+    --xagent-drawer-width: 34rem;
+    --xagent-drawer-width-compact: 26.25rem;
+    --xagent-viewport-height: 100dvh;
+    --xagent-dialog-width-xl: min(72rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xagent-dialog-width-lg: min(42rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xagent-dialog-width-md: min(36rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xagent-dialog-width-sm: min(28rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xagent-dialog-height-xl: min(47.5rem, calc(100dvh - (var(--spacing-4) * 2)));
+    --xagent-dialog-height-lg: calc(100dvh - (var(--spacing-4) * 2));
+    --xagent-dialog-height-md: min(35rem, 88dvh);
+    --xagent-context-menu-width: 9.5rem;
+    --xagent-editor-context-menu-width: 15rem;
+    --xagent-sftp-context-menu-width: 14rem;
+    --xagent-sftp-path-popover-width: min(26rem, calc(100dvw - var(--spacing-6)));
+    --xagent-file-tree-context-menu-width: 14rem;
+    --xagent-file-tree-search-results-height: 10rem;
+    --xagent-soul-menu-width: 16rem;
+    --xagent-git-context-menu-width: 15rem;
+    --xagent-mobile-actions-width: min(19rem, calc(100dvw - var(--spacing-6)));
+    --xagent-tool-input-max-height: 10rem;
+    --xagent-tool-output-max-height: 16rem;
+    --xagent-terminal-output-max-height: 24rem;
+    --xagent-trajectory-code-height: 13rem;
+    --xagent-provider-dialog-width: min(53.75rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xagent-provider-dialog-height: min(37.5rem, calc(100dvh - (var(--spacing-4) * 2)));
+    --xagent-provider-header-menu-width: min(20rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xagent-hover-card-min-width: min(12.5rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xagent-hover-card-width: min(27.5rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xagent-hover-card-height: min(32.5rem, calc(100dvh - (var(--spacing-4) * 2)));
+    --xagent-composer-popup-width: min(45rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xagent-model-selector-width: min(20rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xagent-model-selector-trigger-width: min(20rem, calc(100dvw - 8.5rem));
+    --xagent-model-selector-list-height: min(20rem, 50dvh);
+    --xagent-mobile-panel-hidden-offset: 8%;
+    --xagent-mobile-header-action-size: 3rem;
+    --xagent-mobile-header-height: 3.5rem;
+    --xagent-mobile-activity-width: min(26.25rem, 86vw);
+    --xagent-z-mobile-panel: 74;
+  }
+}
+
+.xagent-workspace-preview-overlay {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(calc(-1 * var(--spacing-2)));
+  box-shadow: var(--shadow-low);
+  transition-property: opacity, transform, box-shadow;
+  transition-duration: var(--duration-medium);
+  transition-timing-function: var(--ease-standard);
+}
+
+.xagent-workspace-preview-overlay[data-visible="true"] {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translateX(0);
+  box-shadow: var(--shadow-high);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .xagent-workspace-preview-overlay {
+    transform: none;
+    transition-duration: 0s;
+  }
+}
 
 /* shimmer — ejected from shadcn/tailwind.css */
 @property --shimmer-angle {
@@ -145,164 +270,64 @@
 
 @layer base {
   :root {
-    color-scheme: light;
-
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    /* Sidebar */
-    --sidebar-bg: 220 14% 96%;
-
-    /* Hub pages (MCP/Skills) canvas — in dark it sits below --background so
-       background-tinted glass panels read as elevated surfaces. */
-    --hub-canvas: var(--background);
-
-    /* Chip / pill buttons (MCP, Skills, 新对话) */
-    --chip-bg: 220 13% 91%;
-    --chip-bg-hover: 220 13% 86%;
-    /* Send button disabled */
-    --send-disabled-bg: 220 13% 91%;
-
-    /* Chat-specific tokens */
-    --chat-user-bg: 220 9% 91%;
-    --chat-user-fg: 222 84% 5%;
-    --chat-assistant-bg: 0 0% 100%;
-    --chat-assistant-fg: 222.2 84% 4.9%;
-    --chat-tool-bg: 0 0% 100%;
-    --chat-tool-border: 220 13% 91%;
-    --chat-thinking-bg: 220 14% 97%;
-    --chat-thinking-border: 220 13% 90%;
-    --chat-success: 152 60% 42%;
-    --chat-error: 0 72% 51%;
-    --chat-running: 252 56% 57%;
-
-    /* Tool card frosted glass tokens */
-    --tool-card-bg: 0 0% 100% / 0.72;
-    --tool-card-border: 0 0% 0% / 0.06;
-    --tool-bash-accent: 142 70% 45%;
-    --tool-file-accent: 220 70% 55%;
-    --tool-search-accent: 38 92% 50%;
-    --tool-list-accent: 262 52% 56%;
-
-    /* Context checkpoint tokens – macOS frosted glass */
-    --checkpoint-accent: 220 9% 46%;
-    --checkpoint-bg: 0 0% 100% / 0.72;
-    --checkpoint-border: 0 0% 0% / 0.06;
-    --checkpoint-icon-bg: 220 10% 95%;
-    --checkpoint-icon-fg: 220 9% 46%;
-
-    /* VS Code SCM graph reference colors */
-    --git-review-graph-ref-local: #0063d3;
-    --git-review-graph-ref-remote: #652d90;
-    --git-review-graph-ref-base: #ea5c00;
-  }
-
-  .dark {
-    color-scheme: dark;
-
-    --background: 224 22% 9%;
-    --foreground: 210 30% 96%;
-
-    --card: 224 22% 10%;
-    --card-foreground: 210 30% 96%;
-
-    --popover: 224 20% 12%;
-    --popover-foreground: 210 30% 96%;
-
-    --primary: 210 30% 96%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 220 18% 17%;
-    --secondary-foreground: 210 30% 96%;
-
-    --muted: 220 18% 17%;
-    --muted-foreground: 215 18% 76%;
-
-    --accent: 220 18% 17%;
-    --accent-foreground: 210 30% 96%;
-
-    --destructive: 0 62.8% 36%;
-    --destructive-foreground: 210 30% 96%;
-
-    --border: 220 14% 26%;
-    --input: 220 14% 26%;
-    --ring: 212.7 26.8% 83.9%;
-
-    /* Chip / pill buttons (dark) */
-    --chip-bg: 220 16% 24%;
-    --chip-bg-hover: 220 16% 30%;
-    /* Send button disabled (dark) */
-    --send-disabled-bg: 220 16% 24%;
-
-    /* Hub pages canvas (dark) — deeper than --background for glass elevation */
-    --hub-canvas: 224 24% 6.5%;
-
-    /* Chat-specific tokens (dark) */
-    --sidebar-bg: 224 22% 11%;
-    --chat-user-bg: 220 14% 28%;
-    --chat-user-fg: 210 30% 96%;
-    --chat-assistant-bg: 224 22% 9%;
-    --chat-assistant-fg: 210 30% 96%;
-    --chat-tool-bg: 224 22% 9%;
-    --chat-tool-border: 220 14% 24%;
-    --chat-thinking-bg: 220 18% 13%;
-    --chat-thinking-border: 220 14% 22%;
-    --chat-success: 152 56% 52%;
-    --chat-error: 0 75% 65%;
-    --chat-running: 252 60% 70%;
-
-    /* Tool card frosted glass tokens (dark) */
-    --tool-card-bg: 0 0% 100% / 0.08;
-    --tool-card-border: 0 0% 100% / 0.14;
-    --tool-bash-accent: 142 60% 62%;
-    --tool-file-accent: 220 70% 72%;
-    --tool-search-accent: 38 90% 66%;
-    --tool-list-accent: 262 60% 74%;
-
-    /* Context checkpoint tokens – macOS frosted glass (dark) */
-    --checkpoint-accent: 220 12% 78%;
-    --checkpoint-bg: 0 0% 100% / 0.08;
-    --checkpoint-border: 0 0% 100% / 0.14;
-    --checkpoint-icon-bg: 220 12% 22%;
-    --checkpoint-icon-fg: 220 14% 76%;
-
-    /* VS Code SCM graph reference colors (dark) */
-    --git-review-graph-ref-local: #59a4f9;
-    --git-review-graph-ref-remote: #b180d7;
-    --git-review-graph-ref-base: #ea5c00;
+    /* Temporary semantic aliases for product-specific CSS. Every value is
+       sourced from Astryx; no independent color, radius, or elevation system
+       remains. */
+    --background: var(--color-background-surface);
+    --foreground: var(--color-text-primary);
+    --card: var(--color-background-card);
+    --card-foreground: var(--color-text-primary);
+    --popover: var(--color-background-popover);
+    --popover-foreground: var(--color-text-primary);
+    --primary: var(--color-accent);
+    --primary-foreground: var(--color-on-accent);
+    --secondary: var(--color-background-muted);
+    --secondary-foreground: var(--color-text-primary);
+    --muted: var(--color-background-muted);
+    --muted-foreground: var(--color-text-secondary);
+    --accent: var(--color-accent-muted);
+    --accent-foreground: var(--color-text-accent);
+    --destructive: var(--color-error);
+    --destructive-foreground: var(--color-on-error);
+    --border: var(--color-border);
+    --input: var(--color-border);
+    --ring: var(--color-accent);
+    --radius: var(--radius-element);
+    --sidebar-bg: var(--color-background-body);
+    --hub-canvas: var(--color-background-body);
+    --chip-bg: var(--color-neutral);
+    --chip-bg-hover: var(--color-overlay-hover);
+    --send-disabled-bg: var(--color-neutral);
+    --chat-user-bg: var(--color-neutral);
+    --chat-user-fg: var(--color-text-primary);
+    --chat-assistant-bg: var(--color-background-surface);
+    --chat-assistant-fg: var(--color-text-primary);
+    --chat-tool-bg: var(--color-background-surface);
+    --chat-tool-border: var(--color-border);
+    --chat-thinking-bg: var(--color-background-muted);
+    --chat-thinking-border: var(--color-border);
+    --chat-success: var(--color-success);
+    --chat-error: var(--color-error);
+    --chat-running: var(--color-text-purple);
+    --tool-card-bg: color-mix(in srgb, var(--color-background-card) 82%, transparent);
+    --tool-card-border: var(--color-border);
+    --tool-bash-accent: var(--color-text-green);
+    --tool-file-accent: var(--color-text-blue);
+    --tool-search-accent: var(--color-text-orange);
+    --tool-list-accent: var(--color-text-purple);
+    --checkpoint-accent: var(--color-text-secondary);
+    --checkpoint-bg: color-mix(in srgb, var(--color-background-card) 82%, transparent);
+    --checkpoint-border: var(--color-border);
+    --checkpoint-icon-bg: var(--color-background-muted);
+    --checkpoint-icon-fg: var(--color-icon-secondary);
+    --git-review-graph-ref-local: var(--color-text-blue);
+    --git-review-graph-ref-remote: var(--color-text-purple);
+    --git-review-graph-ref-base: var(--color-text-orange);
   }
 }
-
 @layer base {
   * {
-    @apply border-border;
+    border-color: var(--color-border);
   }
 
   html,
@@ -319,7 +344,8 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    background: var(--color-background-surface);
+    color: var(--color-text-primary);
     font-family: var(
       --app-font-family,
       ui-sans-serif,
@@ -389,7 +415,7 @@
   [role="textbox"]:focus-visible {
     --tw-ring-offset-shadow: 0 0 #0000;
     --tw-ring-shadow: 0 0 #0000;
-    border-color: hsl(var(--input));
+    border-color: var(--input);
     box-shadow: var(--tw-shadow, 0 0 #0000);
   }
 
@@ -402,11 +428,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.2);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.2 * 100%), transparent);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.35);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.35 * 100%), transparent);
   }
 
   /* Upload file list scrollbar */
@@ -416,7 +442,8 @@
     transition: scrollbar-color 0.3s;
   }
   .upload-file-list:hover {
-    scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
+    scrollbar-color: color-mix(in srgb, var(--muted-foreground) calc(0.25 * 100%), transparent)
+      transparent;
   }
   .upload-file-list::-webkit-scrollbar {
     height: 4px;
@@ -431,10 +458,10 @@
     transition: background 0.3s;
   }
   .upload-file-list:hover::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.25);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.25 * 100%), transparent);
   }
   .upload-file-list:hover::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.4);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.4 * 100%), transparent);
   }
 
   .chat-queue-scroll {
@@ -455,8 +482,8 @@
     z-index: 2;
     width: 8px;
     border-radius: 999px;
-    background: hsl(var(--muted) / 0.36);
-    box-shadow: inset 0 0 0 1px hsl(var(--background) / 0.42);
+    background: color-mix(in srgb, var(--muted) calc(0.36 * 100%), transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--background) calc(0.42 * 100%), transparent);
     cursor: default;
     touch-action: none;
   }
@@ -467,17 +494,17 @@
     top: 0;
     min-height: 24px;
     border-radius: 999px;
-    background: hsl(var(--muted-foreground) / 0.42);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.42 * 100%), transparent);
     box-shadow:
-      inset 0 0 0 1px hsl(var(--background) / 0.55),
+      inset 0 0 0 1px color-mix(in srgb, var(--background) calc(0.55 * 100%), transparent),
       0 1px 2px hsl(220 22% 10% / 0.08);
     transition: background-color 0.16s ease;
   }
   .chat-queue-scrollbar:hover .chat-queue-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.56);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.56 * 100%), transparent);
   }
   .chat-queue-scrollbar-thumb:active {
-    background: hsl(var(--muted-foreground) / 0.7);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.7 * 100%), transparent);
   }
 
   .tool-text-scroll {
@@ -486,7 +513,8 @@
     transition: scrollbar-color 0.2s ease;
   }
   .tool-text-scroll:hover {
-    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+    scrollbar-color: color-mix(in srgb, var(--muted-foreground) calc(0.3 * 100%), transparent)
+      transparent;
   }
   .tool-text-scroll::-webkit-scrollbar {
     width: 10px;
@@ -498,14 +526,14 @@
   }
   .tool-text-scroll::-webkit-scrollbar-thumb {
     border-radius: 999px;
-    background: hsl(var(--muted-foreground) / 0.14);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.14 * 100%), transparent);
     transition: background 0.2s ease;
   }
   .tool-text-scroll:hover::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.22);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.22 * 100%), transparent);
   }
   .tool-text-scroll:hover::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.38);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.38 * 100%), transparent);
   }
 
   /* SSH/Bash terminal viewport - keep padding on .xterm so fit() measures rows correctly. */
@@ -513,7 +541,7 @@
     --project-terminal-padding-x: 0.75rem;
     --project-terminal-padding-y: 0.625rem;
     --project-terminal-scrollbar-size: 8px;
-    --project-terminal-background: hsl(var(--background));
+    --project-terminal-background: var(--background);
     background: var(--project-terminal-background);
   }
   .project-terminal-viewport .xterm {
@@ -538,7 +566,8 @@
     transition: scrollbar-color 0.2s ease;
   }
   .project-terminal-viewport:hover .xterm-viewport {
-    scrollbar-color: hsl(var(--muted-foreground) / 0.32) transparent;
+    scrollbar-color: color-mix(in srgb, var(--muted-foreground) calc(0.32 * 100%), transparent)
+      transparent;
   }
   .project-terminal-viewport .xterm-viewport::-webkit-scrollbar {
     width: var(--project-terminal-scrollbar-size);
@@ -553,10 +582,10 @@
     transition: background 0.2s ease;
   }
   .project-terminal-viewport:hover .xterm-viewport::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.28);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.28 * 100%), transparent);
   }
   .project-terminal-viewport .xterm-viewport::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.45);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.45 * 100%), transparent);
   }
 
   .git-review-transient-scrollbar {
@@ -573,7 +602,7 @@
     position: fixed;
     z-index: 60;
     border-radius: 999px;
-    background-color: hsl(var(--muted-foreground) / 0.34);
+    background-color: color-mix(in srgb, var(--muted-foreground) calc(0.34 * 100%), transparent);
     opacity: 0;
     pointer-events: none;
     transition:
@@ -589,7 +618,7 @@
   }
   .git-review-floating-scrollbar:hover,
   .git-review-floating-scrollbar[data-dragging="true"] {
-    background-color: hsl(var(--muted-foreground) / 0.52);
+    background-color: color-mix(in srgb, var(--muted-foreground) calc(0.52 * 100%), transparent);
   }
   .git-review-floating-scrollbar-vertical {
     width: 3px;
@@ -603,25 +632,25 @@
   .git-review-history-row {
     color: inherit;
     background: transparent;
-    --git-review-graph-background: hsl(var(--background));
+    --git-review-graph-background: var(--background);
   }
 
   .git-review-history-row:hover:not([data-selected="true"]):not([data-context-open="true"]) {
-    background: hsl(var(--muted) / 0.38);
-    --git-review-graph-background: hsl(var(--muted) / 0.38);
+    background: color-mix(in srgb, var(--muted) calc(0.38 * 100%), transparent);
+    --git-review-graph-background: color-mix(in srgb, var(--muted) calc(0.38 * 100%), transparent);
   }
 
   .git-review-history-row[data-selected="true"] {
-    background: hsl(var(--accent) / 0.8);
-    color: hsl(var(--accent-foreground));
-    --git-review-graph-background: hsl(var(--accent) / 0.8);
+    background: color-mix(in srgb, var(--accent) calc(0.8 * 100%), transparent);
+    color: var(--accent-foreground);
+    --git-review-graph-background: color-mix(in srgb, var(--accent) calc(0.8 * 100%), transparent);
   }
 
   .git-review-history-row[data-context-open="true"] {
-    background: hsl(var(--primary) / 0.1);
-    color: hsl(var(--foreground));
-    box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.35);
-    --git-review-graph-background: hsl(var(--primary) / 0.1);
+    background: color-mix(in srgb, var(--primary) calc(0.1 * 100%), transparent);
+    color: var(--foreground);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) calc(0.35 * 100%), transparent);
+    --git-review-graph-background: color-mix(in srgb, var(--primary) calc(0.1 * 100%), transparent);
   }
 
   /* Git review tab & pane transition animations */
@@ -695,252 +724,188 @@
   }
 
   .chat-markdown {
-    @apply text-[calc(15px*var(--zone-font-scale,1))] leading-8 text-foreground;
+    color: var(--color-text-primary);
+    font-size: calc(var(--font-size-sm) * var(--zone-font-scale, 1));
+    line-height: 1.7;
   }
 
-  .chat-markdown p {
-    @apply my-2 min-w-0 max-w-full break-words text-[calc(15px*var(--zone-font-scale,1))] leading-8 text-foreground [overflow-wrap:anywhere];
+  .chat-markdown :where(p, ul, ol, blockquote, pre, table, [data-streamdown="mermaid-block"]) {
+    margin-block: var(--spacing-2);
   }
 
-  .chat-markdown strong,
-  .chat-markdown [data-streamdown="strong"] {
-    @apply font-medium text-foreground;
+  .chat-markdown :where(p, li) {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
   }
 
-  .chat-markdown em {
-    @apply text-foreground/90;
+  .chat-markdown :where(strong, [data-streamdown="strong"]) {
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-semibold);
   }
 
-  /* Hide the retained Streamdown caret without removing its inline slot. */
   .chat-markdown--caret-off > *:last-child::after {
     opacity: 0;
   }
 
-  /* Headings */
-  .chat-markdown [data-streamdown="heading-1"] {
-    @apply mb-2 mt-6 text-xl font-semibold tracking-tight text-foreground;
-  }
-  .chat-markdown [data-streamdown="heading-2"] {
-    @apply mb-2 mt-5 text-lg font-semibold tracking-tight text-foreground;
-  }
-  .chat-markdown [data-streamdown="heading-3"] {
-    @apply mb-1.5 mt-4 text-base font-semibold tracking-tight text-foreground;
-  }
-  .chat-markdown [data-streamdown="heading-4"],
-  .chat-markdown [data-streamdown="heading-5"] {
-    @apply mb-1 mt-4 text-sm font-semibold tracking-tight text-foreground;
-  }
-  .chat-markdown [data-streamdown="heading-6"] {
-    @apply mb-1 mt-4 text-xs font-semibold tracking-wide text-muted-foreground;
+  .chat-markdown [data-streamdown^="heading-"] {
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: -0.01em;
+    margin-block: var(--spacing-4) var(--spacing-1);
   }
 
-  /* Links */
+  .chat-markdown :where([data-streamdown="heading-1"], [data-streamdown="heading-2"]) {
+    font-size: var(--font-size-lg);
+  }
+
+  .chat-markdown :where([data-streamdown="heading-3"], [data-streamdown="heading-4"]) {
+    font-size: var(--font-size-base);
+  }
+
   .chat-markdown [data-streamdown="link"] {
-    @apply rounded-xs font-medium text-primary underline decoration-primary/30 underline-offset-2 transition-colors hover:decoration-primary/70;
+    color: var(--color-text-accent);
+    font-weight: var(--font-weight-medium);
+    text-decoration: underline;
+    text-underline-offset: var(--spacing-0-5);
+    transition: color var(--duration-fast) var(--ease-standard);
   }
 
-  /* Inline code */
   .chat-markdown [data-streamdown="inline-code"] {
-    @apply whitespace-pre-wrap break-words rounded-md border-0 bg-foreground/[0.05] px-1.5 py-0.5 font-mono text-[0.92em] font-normal text-foreground [overflow-wrap:anywhere];
+    background: var(--color-background-muted);
+    border-radius: var(--radius-inner);
+    color: var(--color-text-primary);
+    font-family: var(--font-family-code);
+    font-size: 0.92em;
+    padding: var(--spacing-0-5) var(--spacing-1-5);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 
-  /* Code blocks — container, header, body (safe in components layer) */
   .chat-markdown [data-streamdown="code-block"] {
-    @apply relative my-4 w-full min-w-0 overflow-visible rounded-none border-0 bg-transparent p-0 shadow-none outline-none ring-0;
+    margin-block: var(--spacing-4);
+    min-width: 0;
+    width: 100%;
   }
+
   .chat-markdown [data-streamdown="code-block-header"] {
-    @apply h-8 border-0 bg-transparent px-2 py-0 text-[calc(11px*var(--zone-font-scale,1))] font-medium tracking-[0.06em] text-muted-foreground/85 shadow-none;
+    color: var(--color-text-secondary);
+    font-family: var(--font-family-code);
+    font-size: var(--font-size-2xs);
   }
-  .chat-markdown [data-streamdown="code-block-header"] > span {
-    @apply ml-0 font-mono tracking-[0.06em];
-  }
+
   .chat-markdown [data-streamdown="code-block-body"] {
-    @apply w-full min-w-0 overflow-x-auto rounded-xl border-0 bg-muted/40 p-4 text-[calc(13px*var(--zone-font-scale,1))] shadow-none outline-none ring-0;
-  }
-  .chat-markdown [data-streamdown="code-block-body"] pre {
-    @apply leading-6;
-  }
-  .chat-markdown--streaming [data-streamdown="code-block"][data-incomplete="true"] {
-    @apply relative border-0 bg-transparent;
-  }
-  .chat-markdown--streaming [data-streamdown="code-block"][data-incomplete="true"]::after {
-    display: none;
-  }
-  .chat-markdown--streaming
-    [data-streamdown="code-block"][data-incomplete="true"]
-    [data-streamdown="code-block-header"] {
-    @apply border-0 bg-transparent text-muted-foreground/85;
+    background: var(--color-background-muted);
+    border-radius: var(--radius-container);
+    font-size: var(--font-size-xs);
+    min-width: 0;
+    overflow-x: auto;
+    padding: var(--spacing-4);
+    width: 100%;
   }
 
-  /* Blockquotes */
   .chat-markdown [data-streamdown="blockquote"] {
-    @apply my-3 min-w-0 max-w-full border-l-2 border-border/70 pl-4 italic text-muted-foreground [overflow-wrap:anywhere];
-  }
-  .chat-markdown [data-streamdown="blockquote"] p {
-    @apply my-0;
+    border-inline-start: medium solid var(--color-border-emphasized);
+    color: var(--color-text-secondary);
+    font-style: italic;
+    padding-inline-start: var(--spacing-4);
   }
 
-  /* Lists */
+  .chat-markdown :where([data-streamdown="unordered-list"], [data-streamdown="ordered-list"]) {
+    padding-inline-start: var(--spacing-5);
+  }
+
   .chat-markdown [data-streamdown="unordered-list"] {
-    @apply my-2 ml-1 list-disc space-y-0.5 pl-5;
+    list-style: disc;
   }
+
   .chat-markdown [data-streamdown="ordered-list"] {
-    @apply my-2 ml-1 list-decimal space-y-0.5 pl-5;
+    list-style: decimal;
   }
-  .chat-markdown [data-streamdown="list-item"] {
-    @apply min-w-0 max-w-full break-words pl-1 text-[calc(15px*var(--zone-font-scale,1))] leading-8 [overflow-wrap:anywhere];
-  }
+
   .chat-markdown .contains-task-list {
-    @apply list-none pl-0;
+    list-style: none;
+    padding-inline-start: 0;
   }
+
   .chat-markdown .task-list-item {
-    @apply flex items-start gap-2 pl-0;
-  }
-  .chat-markdown .task-list-item input[type="checkbox"] {
-    @apply mt-[0.45rem] h-3.5 w-3.5 rounded border border-border align-middle accent-emerald-500;
+    align-items: flex-start;
+    display: flex;
+    gap: var(--spacing-2);
   }
 
-  /* Tables */
   .chat-markdown [data-streamdown="table-wrapper"] {
-    @apply my-4 w-full min-w-0 gap-0 rounded-none border-0 bg-transparent p-0 shadow-none outline-none ring-0;
+    margin-block: var(--spacing-4);
+    min-width: 0;
+    overflow-x: auto;
+    width: 100%;
   }
-  .chat-markdown [data-streamdown="table-wrapper"] > div:first-child {
-    @apply justify-end gap-1 px-0 pt-0;
-  }
-  .chat-markdown [data-streamdown="table-wrapper"] > div:last-child {
-    @apply w-full min-w-0 overflow-x-auto overflow-y-hidden rounded-none border-0 bg-transparent p-0 shadow-none outline-none ring-0;
-  }
-  .chat-markdown [data-streamdown="table-wrapper"] button {
-    @apply rounded-md border-0 bg-transparent shadow-none transition-colors hover:bg-foreground/[0.04] hover:text-foreground;
-  }
+
   .chat-markdown [data-streamdown="table"] {
-    @apply my-2 w-full min-w-full table-auto border-collapse border-0 bg-transparent text-sm shadow-none outline-none ring-0;
+    border-collapse: collapse;
+    min-width: 100%;
+    width: 100%;
   }
-  .chat-markdown [data-streamdown="table-header"] {
-    @apply bg-transparent;
+
+  .chat-markdown :where([data-streamdown="table-header-cell"], [data-streamdown="table-cell"]) {
+    border-block-end: thin solid var(--color-border);
+    padding: var(--spacing-2) var(--spacing-4) var(--spacing-2) 0;
+    text-align: start;
   }
+
   .chat-markdown [data-streamdown="table-header-cell"] {
-    @apply border-0 border-b border-border/50 px-0 py-2 pr-8 text-left align-bottom text-sm font-semibold tracking-tight text-foreground;
-  }
-  .chat-markdown [data-streamdown="table-cell"] {
-    @apply border-0 border-b border-border/30 px-0 py-1 pr-8 text-left align-middle leading-8 text-foreground/90;
-  }
-  .chat-markdown [data-streamdown="table-body"] [data-streamdown="table-row"]:nth-child(even) {
-    @apply bg-transparent;
-  }
-  .chat-markdown [data-streamdown="table-header-cell"]:last-child,
-  .chat-markdown [data-streamdown="table-cell"]:last-child {
-    @apply pr-0;
-  }
-  .chat-markdown [data-streamdown="table-row"]:last-child [data-streamdown="table-cell"] {
-    @apply border-b-0;
+    font-weight: var(--font-weight-semibold);
   }
 
-  /* Mermaid */
-  .chat-markdown [data-streamdown="mermaid-block"] {
-    @apply my-4 flex w-full min-w-0 gap-2 rounded-none border-0 bg-transparent p-0 shadow-none;
-  }
-  .chat-markdown [data-streamdown="mermaid-block"] > div:last-child,
-  .chat-markdown [data-streamdown="mermaid"] {
-    @apply w-full min-w-0 rounded-none border-0 bg-transparent p-0 shadow-none;
-  }
-  .chat-markdown [data-streamdown="mermaid"] {
-    @apply my-0 block max-h-[280px] overflow-hidden;
-  }
-  .chat-markdown [data-streamdown="mermaid"] svg {
-    @apply mx-auto block h-auto max-h-[280px] max-w-full bg-transparent;
-  }
-  .chat-markdown [data-streamdown="mermaid-block-actions"] {
-    @apply gap-2 rounded-none border-0 bg-transparent p-0 shadow-none backdrop-blur-none;
+  .chat-markdown
+    :where(
+      [data-streamdown="mermaid-block"],
+      [data-streamdown="mermaid"],
+      [data-streamdown="image-wrapper"]
+    ) {
+    background: transparent;
+    border: 0;
+    max-width: 100%;
+    min-width: 0;
   }
 
-  /* Math */
-  .chat-markdown .katex {
-    @apply text-[1.04em];
+  .chat-markdown :where([data-streamdown="mermaid"] svg, [data-streamdown="image"]) {
+    background: transparent;
+    border-radius: var(--radius-container);
+    display: block;
+    height: auto;
+    margin-inline: auto;
+    max-height: 50dvh;
+    max-width: 100%;
+    object-fit: contain;
   }
+
   .chat-markdown .katex-display {
-    @apply my-3.5 block max-w-full overflow-x-auto overflow-y-hidden px-1 py-1.5 text-center;
+    max-width: 100%;
+    overflow-x: auto;
+    text-align: center;
   }
 
-  /* Thinking markdown */
-  .chat-markdown.thinking-markdown {
-    @apply text-[calc(12px*var(--zone-font-scale,1))] leading-6 text-muted-foreground/80;
-  }
+  .chat-markdown.thinking-markdown,
   .chat-markdown.thinking-markdown p {
-    @apply my-1 text-[calc(12px*var(--zone-font-scale,1))] leading-6 text-muted-foreground/80;
-  }
-  .chat-markdown.thinking-markdown [data-streamdown^="heading-"] {
-    @apply mb-0 mt-1 text-[calc(12px*var(--zone-font-scale,1))] font-medium leading-6 tracking-normal text-muted-foreground/90;
-  }
-  .chat-markdown.thinking-markdown [data-streamdown="unordered-list"],
-  .chat-markdown.thinking-markdown [data-streamdown="ordered-list"] {
-    @apply my-1 pl-4;
-  }
-  .chat-markdown.thinking-markdown [data-streamdown="list-item"] {
-    @apply text-[calc(12px*var(--zone-font-scale,1))] leading-5 text-muted-foreground/80;
-  }
-  .chat-markdown.thinking-markdown [data-streamdown="blockquote"] {
-    @apply my-1 border-l-0 pl-0 not-italic text-muted-foreground/75;
-  }
-  .chat-markdown.thinking-markdown [data-streamdown="inline-code"] {
-    @apply bg-foreground/[0.03] text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground/90;
-  }
-  .chat-markdown.thinking-markdown [data-streamdown="code-block-body"] {
-    @apply bg-muted/20 p-3 text-[calc(11px*var(--zone-font-scale,1))];
+    color: var(--color-text-secondary);
+    font-size: calc(var(--font-size-xs) * var(--zone-font-scale, 1));
   }
 
-  /* Images */
-  .chat-markdown [data-streamdown="image-wrapper"] {
-    @apply my-4 overflow-visible rounded-none border-0 bg-transparent shadow-none;
-  }
-  .chat-markdown [data-streamdown="image"] {
-    @apply block max-h-[34rem] max-w-full rounded-xl border border-border/60 bg-muted/10 object-contain;
-  }
-
-  /* Horizontal rule */
-  .chat-markdown [data-streamdown="horizontal-rule"] {
-    @apply my-5 border-border/45;
-  }
-
-  /* First/last child margin reset */
   .chat-markdown > *:first-child,
   .chat-markdown > *:first-child > *:first-child {
     margin-top: 0;
   }
+
   .chat-markdown > *:last-child,
   .chat-markdown > *:last-child > *:last-child {
     margin-bottom: 0;
   }
 
   .release-notes-markdown {
-    @apply text-xs leading-relaxed text-muted-foreground;
-  }
-  .release-notes-markdown p {
-    @apply my-2 text-xs leading-relaxed text-muted-foreground;
-  }
-  .release-notes-markdown [data-streamdown="heading-1"] {
-    @apply mb-2 mt-3 text-sm font-semibold text-foreground;
-  }
-  .release-notes-markdown [data-streamdown="heading-2"] {
-    @apply mb-2 mt-3 text-sm font-semibold text-foreground;
-  }
-  .release-notes-markdown [data-streamdown="heading-3"] {
-    @apply mb-1.5 mt-3 text-xs font-semibold text-foreground;
-  }
-  .release-notes-markdown [data-streamdown="unordered-list"] {
-    @apply my-2 ml-0 list-disc space-y-1 pl-5;
-  }
-  .release-notes-markdown [data-streamdown="ordered-list"] {
-    @apply my-2 ml-0 list-decimal space-y-1 pl-5;
-  }
-  .release-notes-markdown [data-streamdown="list-item"] {
-    @apply pl-1 text-xs leading-relaxed text-muted-foreground;
-  }
-  .release-notes-markdown [data-streamdown="blockquote"] {
-    @apply my-2 border-l-2 border-border/70 pl-3 text-xs not-italic text-muted-foreground;
-  }
-  .release-notes-markdown [data-streamdown="inline-code"] {
-    @apply rounded border border-border/50 bg-muted/60 px-1 py-0.5 font-mono text-[calc(11px*var(--zone-font-scale,1))] text-foreground/90;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.6;
   }
 
   /* Smooth entrance for chat bubbles */
@@ -978,37 +943,23 @@
    * theme tint + blur/saturate, white-tint override in dark). */
   .chat-jump-to-bottom {
     transform: translateX(-50%);
-    animation: chatJumpToBottomIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-    border: 1px solid hsl(var(--border) / 0.55);
-    background: hsl(var(--background) / 0.45);
-    -webkit-backdrop-filter: blur(18px) saturate(180%);
-    backdrop-filter: blur(18px) saturate(180%);
-    box-shadow:
-      0 1px 0 hsl(0 0% 100% / 0.45) inset,
-      0 8px 24px -14px hsl(0 0% 0% / 0.35);
-  }
-  .chat-jump-to-bottom:hover {
-    background: hsl(var(--background) / 0.65);
-  }
-  .dark .chat-jump-to-bottom {
-    border-color: hsl(0 0% 100% / 0.12);
-    background: hsl(0 0% 100% / 0.06);
-    box-shadow:
-      0 1px 0 hsl(0 0% 100% / 0.08) inset,
-      0 8px 24px -14px hsl(0 0% 0% / 0.6);
-  }
-  .dark .chat-jump-to-bottom:hover {
-    background: hsl(0 0% 100% / 0.11);
+    animation: chatJumpToBottomIn var(--duration-fast) var(--ease-standard);
   }
 
   @keyframes chatJumpToBottomIn {
     from {
       opacity: 0;
-      transform: translateX(-50%) translateY(6px);
+      transform: translateX(-50%) translateY(var(--spacing-2));
     }
     to {
       opacity: 1;
       transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chat-jump-to-bottom {
+      animation: none;
     }
   }
 
@@ -1397,7 +1348,7 @@
   /* Mention composer placeholder */
   .mention-composer.is-empty::before {
     content: attr(data-placeholder);
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
     pointer-events: none;
     position: absolute;
   }
@@ -1936,11 +1887,11 @@
     position: relative;
     overflow: hidden;
     border-radius: 14px;
-    border: 1px solid hsl(var(--border) / 0.55);
+    border: 1px solid color-mix(in srgb, var(--border) calc(0.55 * 100%), transparent);
     background: linear-gradient(
       180deg,
-      hsl(var(--background) / 0.82),
-      hsl(var(--background) / 0.55)
+      color-mix(in srgb, var(--background) calc(0.82 * 100%), transparent),
+      color-mix(in srgb, var(--background) calc(0.55 * 100%), transparent)
     );
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     backdrop-filter: blur(24px) saturate(180%);
@@ -1972,7 +1923,7 @@
     position: relative;
     width: 18px;
     height: 18px;
-    color: hsl(var(--foreground) / 0.72);
+    color: color-mix(in srgb, var(--foreground) calc(0.72 * 100%), transparent);
   }
   .hub-frost-spinner > i {
     position: absolute;
@@ -2041,7 +1992,7 @@
     height: 2px;
     width: 100%;
     border-radius: 9999px;
-    background: hsl(var(--muted-foreground) / 0.1);
+    background: color-mix(in srgb, var(--muted-foreground) calc(0.1 * 100%), transparent);
     overflow: hidden;
   }
   .hub-frost-track::before {
@@ -2051,7 +2002,12 @@
     left: 0;
     width: 38%;
     border-radius: inherit;
-    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.5), transparent);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--foreground) calc(0.5 * 100%), transparent),
+      transparent
+    );
     animation: hubFrostTrack 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
   }
 
@@ -2059,8 +2015,8 @@
     position: relative;
     overflow: hidden;
     border-radius: 14px;
-    border: 1px solid hsl(var(--border) / 0.35);
-    background: hsl(var(--background) / 0.5);
+    border: 1px solid color-mix(in srgb, var(--border) calc(0.35 * 100%), transparent);
+    background: color-mix(in srgb, var(--background) calc(0.5 * 100%), transparent);
     -webkit-backdrop-filter: blur(18px) saturate(170%);
     backdrop-filter: blur(18px) saturate(170%);
   }
@@ -2071,7 +2027,7 @@
     background: linear-gradient(
       115deg,
       transparent 30%,
-      hsl(var(--foreground) / 0.04) 50%,
+      color-mix(in srgb, var(--foreground) calc(0.04 * 100%), transparent) 50%,
       transparent 70%
     );
     background-size: 200% 100%;
@@ -2124,9 +2080,9 @@
   .skills-skeleton-shimmer {
     background: linear-gradient(
       90deg,
-      hsl(var(--muted-foreground) / 0.08) 25%,
-      hsl(var(--muted-foreground) / 0.16) 50%,
-      hsl(var(--muted-foreground) / 0.08) 75%
+      color-mix(in srgb, var(--muted-foreground) calc(0.08 * 100%), transparent) 25%,
+      color-mix(in srgb, var(--muted-foreground) calc(0.16 * 100%), transparent) 50%,
+      color-mix(in srgb, var(--muted-foreground) calc(0.08 * 100%), transparent) 75%
     );
     background-size: 200% 100%;
     animation: skillsSkeletonShimmer 2s ease-in-out infinite;
@@ -2135,15 +2091,15 @@
   @keyframes skillsSkeletonPulse {
     0%,
     100% {
-      background-color: hsl(var(--muted-foreground) / 0.1);
+      background-color: color-mix(in srgb, var(--muted-foreground) calc(0.1 * 100%), transparent);
     }
     50% {
-      background-color: hsl(var(--muted-foreground) / 0.22);
+      background-color: color-mix(in srgb, var(--muted-foreground) calc(0.22 * 100%), transparent);
     }
   }
 
   .skills-skeleton-pulse {
-    background-color: hsl(var(--muted-foreground) / 0.1);
+    background-color: color-mix(in srgb, var(--muted-foreground) calc(0.1 * 100%), transparent);
     animation: skillsSkeletonPulse 1.6s ease-in-out infinite;
   }
   .skills-skeleton-pulse:nth-child(2) {
@@ -2307,10 +2263,10 @@
   @keyframes fileDropBorderPulse {
     0%,
     100% {
-      box-shadow: 0 0 0 0 hsl(var(--foreground) / 0);
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--foreground) calc(0 * 100%), transparent);
     }
     50% {
-      box-shadow: 0 0 0 3px hsl(var(--foreground) / 0.04);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--foreground) calc(0.04 * 100%), transparent);
     }
   }
 
@@ -2375,8 +2331,12 @@
   .settings-mobile-home,
   .settings-mobile-detail {
     background:
-      radial-gradient(circle at 100% 0%, hsl(var(--primary) / 0.055), transparent 34%),
-      hsl(var(--muted) / 0.22);
+      radial-gradient(
+        circle at 100% 0%,
+        color-mix(in srgb, var(--primary) calc(0.055 * 100%), transparent),
+        transparent 34%
+      ),
+      color-mix(in srgb, var(--muted) calc(0.22 * 100%), transparent);
   }
 
   .settings-mobile-detail [data-settings-section] {
@@ -2397,7 +2357,7 @@
 
   .settings-system-form[data-compact="true"] .settings-group-heading {
     padding-inline: 4px;
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
     font-size: 11px;
     font-weight: 650;
     letter-spacing: 0.06em;
@@ -2409,12 +2369,12 @@
     flex-direction: column;
     gap: 0;
     overflow: hidden;
-    border: 1px solid hsl(var(--border) / 0.55);
+    border: 1px solid color-mix(in srgb, var(--border) calc(0.55 * 100%), transparent);
     border-radius: 16px;
-    background: hsl(var(--card) / 0.82);
+    background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
     box-shadow:
-      inset 0 1px 0 hsl(var(--background) / 0.8),
-      0 10px 28px -26px hsl(var(--foreground) / 0.45);
+      inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.8 * 100%), transparent),
+      0 10px 28px -26px color-mix(in srgb, var(--foreground) calc(0.45 * 100%), transparent);
   }
 
   .settings-system-form[data-compact="true"] .settings-execution-choice {
@@ -2432,11 +2392,11 @@
   .settings-system-form[data-compact="true"]
     .settings-execution-choice
     + .settings-execution-choice {
-    border-top: 1px solid hsl(var(--border) / 0.5);
+    border-top: 1px solid color-mix(in srgb, var(--border) calc(0.5 * 100%), transparent);
   }
 
   .settings-system-form[data-compact="true"] .settings-execution-choice[class*="bg-primary"] {
-    background: hsl(var(--primary) / 0.07);
+    background: color-mix(in srgb, var(--primary) calc(0.07 * 100%), transparent);
   }
 
   .settings-system-form[data-compact="true"] .settings-execution-choice > div:first-child {
@@ -2472,11 +2432,11 @@
   }
 
   .settings-system-form[data-compact="true"] .settings-system-card {
-    border-color: hsl(var(--border) / 0.55);
+    border-color: color-mix(in srgb, var(--border) calc(0.55 * 100%), transparent);
     border-radius: 16px;
     padding: 12px;
-    background: hsl(var(--card) / 0.82);
-    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.75);
+    background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.75 * 100%), transparent);
   }
 
   .settings-system-form[data-compact="true"] .settings-theme-grid {
@@ -2538,7 +2498,7 @@
 
   .settings-system-form[data-compact="true"] .settings-proxy-details {
     padding-top: 4px;
-    border-top: 1px solid hsl(var(--border) / 0.45);
+    border-top: 1px solid color-mix(in srgb, var(--border) calc(0.45 * 100%), transparent);
   }
 
   .settings-system-form[data-compact="true"] .settings-proxy-details input,
@@ -2550,7 +2510,7 @@
   .settings-system-form[data-compact="true"] .settings-font-zone {
     align-items: stretch;
     gap: 8px;
-    border-color: hsl(var(--border) / 0.45);
+    border-color: color-mix(in srgb, var(--border) calc(0.45 * 100%), transparent);
     padding: 10px;
   }
 
@@ -2576,13 +2536,13 @@
 
   .settings-access-section .settings-access-card,
   .settings-mobile-execution-card {
-    border-color: hsl(var(--border) / 0.55);
+    border-color: color-mix(in srgb, var(--border) calc(0.55 * 100%), transparent);
     border-radius: 16px;
     padding: 13px;
-    background: hsl(var(--card) / 0.84);
+    background: color-mix(in srgb, var(--card) calc(0.84 * 100%), transparent);
     box-shadow:
-      inset 0 1px 0 hsl(var(--background) / 0.74),
-      0 10px 28px -26px hsl(var(--foreground) / 0.4);
+      inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.74 * 100%), transparent),
+      0 10px 28px -26px color-mix(in srgb, var(--foreground) calc(0.4 * 100%), transparent);
   }
 
   .settings-access-section input:not([type="checkbox"]),
@@ -2594,7 +2554,7 @@
 
   .settings-access-section .settings-cloud-details {
     padding-top: 12px;
-    border-top: 1px solid hsl(var(--border) / 0.45);
+    border-top: 1px solid color-mix(in srgb, var(--border) calc(0.45 * 100%), transparent);
   }
 
   .settings-access-section .settings-cloud-vault {
@@ -2608,7 +2568,7 @@
   .settings-mobile-execution-card label {
     min-height: 58px;
     border-radius: 13px;
-    background: hsl(var(--background) / 0.58);
+    background: color-mix(in srgb, var(--background) calc(0.58 * 100%), transparent);
   }
 
   .settings-mobile-detail [data-settings-section="providers"] {
@@ -2623,8 +2583,8 @@
     gap: 6px;
     margin: 0;
     padding: 8px 12px;
-    border-bottom: 1px solid hsl(var(--border) / 0.4);
-    background: hsl(var(--background) / 0.76);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
+    background: color-mix(in srgb, var(--background) calc(0.76 * 100%), transparent);
   }
 
   .providers-tabbar {
@@ -2667,18 +2627,18 @@
   .provider-list-card {
     min-height: 64px;
     gap: 11px;
-    border-color: hsl(var(--border) / 0.5);
+    border-color: color-mix(in srgb, var(--border) calc(0.5 * 100%), transparent);
     border-radius: 16px;
     padding: 10px 8px 10px 13px;
-    background: hsl(var(--card) / 0.84);
-    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.72);
+    background: color-mix(in srgb, var(--card) calc(0.84 * 100%), transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.72 * 100%), transparent);
   }
 
   .provider-list-card > div:first-child {
     width: 32px;
     height: 32px;
     border-radius: 999px;
-    background: hsl(var(--muted) / 0.72);
+    background: color-mix(in srgb, var(--muted) calc(0.72 * 100%), transparent);
   }
 
   .provider-list-card-actions {
@@ -2702,18 +2662,22 @@
  * intentionally unlayered so they can refine utility classes consistently.
  */
 .settings-page {
-  color: hsl(var(--foreground));
+  color: var(--foreground);
 }
 
 .settings-page-desktop {
   background:
-    radial-gradient(circle at 82% 0%, hsl(var(--primary) / 0.045), transparent 30%),
-    hsl(var(--background));
+    radial-gradient(
+      circle at 82% 0%,
+      color-mix(in srgb, var(--primary) calc(0.045 * 100%), transparent),
+      transparent 30%
+    ),
+    var(--background);
 }
 
 .settings-page-desktop > header {
-  border-color: hsl(var(--border) / 0.38);
-  background: hsl(var(--background) / 0.82);
+  border-color: color-mix(in srgb, var(--border) calc(0.38 * 100%), transparent);
+  background: color-mix(in srgb, var(--background) calc(0.82 * 100%), transparent);
   -webkit-backdrop-filter: blur(18px) saturate(1.25);
   backdrop-filter: blur(18px) saturate(1.25);
 }
@@ -2721,12 +2685,12 @@
 .settings-page-desktop .settings-sidebar {
   width: 248px;
   padding: 10px;
-  border: 1px solid hsl(var(--border) / 0.42);
+  border: 1px solid color-mix(in srgb, var(--border) calc(0.42 * 100%), transparent);
   border-radius: 18px;
-  background: hsl(var(--card) / 0.68);
+  background: color-mix(in srgb, var(--card) calc(0.68 * 100%), transparent);
   box-shadow:
-    inset 0 1px 0 hsl(var(--background) / 0.72),
-    0 18px 42px -34px hsl(var(--foreground) / 0.3);
+    inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.72 * 100%), transparent),
+    0 18px 42px -34px color-mix(in srgb, var(--foreground) calc(0.3 * 100%), transparent);
 }
 
 .settings-page-desktop .settings-nav-item {
@@ -2741,10 +2705,10 @@
 }
 
 .settings-page-desktop .settings-nav-item-active {
-  background: hsl(var(--background) / 0.92);
+  background: color-mix(in srgb, var(--background) calc(0.92 * 100%), transparent);
   box-shadow:
-    inset 0 0 0 1px hsl(var(--border) / 0.38),
-    0 5px 16px -13px hsl(var(--foreground) / 0.4);
+    inset 0 0 0 1px color-mix(in srgb, var(--border) calc(0.38 * 100%), transparent),
+    0 5px 16px -13px color-mix(in srgb, var(--foreground) calc(0.4 * 100%), transparent);
 }
 
 .settings-nav-icon,
@@ -2767,26 +2731,26 @@
 .settings-page-desktop .settings-cron-card,
 .settings-page-desktop .settings-ssh-host-card,
 .settings-page-desktop .settings-about-card {
-  border-color: hsl(var(--border) / 0.42);
-  background: hsl(var(--card) / 0.72);
+  border-color: color-mix(in srgb, var(--border) calc(0.42 * 100%), transparent);
+  background: color-mix(in srgb, var(--card) calc(0.72 * 100%), transparent);
   box-shadow:
-    inset 0 1px 0 hsl(var(--background) / 0.72),
-    0 16px 36px -32px hsl(var(--foreground) / 0.36);
+    inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.72 * 100%), transparent),
+    0 16px 36px -32px color-mix(in srgb, var(--foreground) calc(0.36 * 100%), transparent);
 }
 
 .settings-mobile-toolbar {
-  border-bottom: 1px solid hsl(var(--border) / 0.32);
-  background: hsl(var(--background) / 0.82);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) calc(0.32 * 100%), transparent);
+  background: color-mix(in srgb, var(--background) calc(0.82 * 100%), transparent);
   -webkit-backdrop-filter: blur(20px) saturate(1.25);
   backdrop-filter: blur(20px) saturate(1.25);
 }
 
 .settings-mobile-group {
-  border: 1px solid hsl(var(--border) / 0.4);
-  background: hsl(var(--card) / 0.82);
+  border: 1px solid color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
+  background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
   box-shadow:
-    inset 0 1px 0 hsl(var(--background) / 0.76),
-    0 14px 32px -28px hsl(var(--foreground) / 0.4);
+    inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.76 * 100%), transparent),
+    0 14px 32px -28px color-mix(in srgb, var(--foreground) calc(0.4 * 100%), transparent);
 }
 
 .settings-mobile-row {
@@ -2803,11 +2767,11 @@
 
 @media (hover: hover) and (pointer: fine) {
   .settings-mobile-row:hover {
-    background: hsl(var(--muted) / 0.42);
+    background: color-mix(in srgb, var(--muted) calc(0.42 * 100%), transparent);
   }
 
   .settings-page-desktop .settings-nav-item:hover {
-    background: hsl(var(--background) / 0.7);
+    background: color-mix(in srgb, var(--background) calc(0.7 * 100%), transparent);
   }
 }
 
@@ -2880,13 +2844,13 @@
   }
 
   .settings-memory-status-group {
-    border-color: hsl(var(--border) / 0.4);
-    background: hsl(var(--card) / 0.82);
-    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
+    border-color: color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
+    background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.74 * 100%), transparent);
   }
 
   .settings-memory-quota-row + .settings-memory-quota-row {
-    border-top: 1px solid hsl(var(--border) / 0.34);
+    border-top: 1px solid color-mix(in srgb, var(--border) calc(0.34 * 100%), transparent);
   }
 
   .settings-memory-summary-actions button,
@@ -2901,14 +2865,14 @@
 
   .settings-memory-entry-list > div > button,
   .settings-memory-entry-list details {
-    border-color: hsl(var(--border) / 0.38);
+    border-color: color-mix(in srgb, var(--border) calc(0.38 * 100%), transparent);
     border-radius: 14px;
-    background: hsl(var(--card) / 0.78);
+    background: color-mix(in srgb, var(--card) calc(0.78 * 100%), transparent);
   }
 
   .settings-memory-compact-toolbar {
-    border-color: hsl(var(--border) / 0.34);
-    background: hsl(var(--background) / 0.76);
+    border-color: color-mix(in srgb, var(--border) calc(0.34 * 100%), transparent);
+    background: color-mix(in srgb, var(--background) calc(0.76 * 100%), transparent);
   }
 
   .settings-memory-detail-section > div:not(.settings-memory-compact-toolbar) {
@@ -2928,10 +2892,10 @@
 
   .settings-hooks-event-selector,
   .settings-hooks-detail {
-    border-color: hsl(var(--border) / 0.4);
+    border-color: color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
     border-radius: 16px;
-    background: hsl(var(--card) / 0.82);
-    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
+    background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.74 * 100%), transparent);
   }
 
   .settings-hooks-event-option {
@@ -3012,7 +2976,7 @@
     width: 100%;
     justify-content: flex-end;
     padding-top: 8px;
-    border-top: 1px solid hsl(var(--border) / 0.32);
+    border-top: 1px solid color-mix(in srgb, var(--border) calc(0.32 * 100%), transparent);
   }
 
   .settings-hooks-card-actions button:not([role="switch"]) {
@@ -3074,10 +3038,10 @@
 
   .settings-cron-card,
   .settings-ssh-host-card {
-    border-color: hsl(var(--border) / 0.4);
+    border-color: color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
     border-radius: 16px;
-    background: hsl(var(--card) / 0.82);
-    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
+    background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.74 * 100%), transparent);
   }
 
   .settings-cron-card-row {
@@ -3101,7 +3065,7 @@
     justify-content: flex-start;
     margin-left: 52px;
     padding-top: 8px;
-    border-top: 1px solid hsl(var(--border) / 0.32);
+    border-top: 1px solid color-mix(in srgb, var(--border) calc(0.32 * 100%), transparent);
   }
 
   .settings-cron-action,
@@ -3124,8 +3088,8 @@
   }
 
   .settings-ssh-host-card:hover {
-    border-color: hsl(var(--border) / 0.4);
-    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
+    border-color: color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.74 * 100%), transparent);
   }
 
   .settings-ssh-host-card .settings-card-row {
@@ -3143,7 +3107,7 @@
     width: 100%;
     justify-content: flex-end;
     padding-top: 8px;
-    border-top: 1px solid hsl(var(--border) / 0.32);
+    border-top: 1px solid color-mix(in srgb, var(--border) calc(0.32 * 100%), transparent);
   }
 
   .settings-about-header {
@@ -3187,11 +3151,11 @@
   }
 
   .settings-about-card {
-    border-color: hsl(var(--border) / 0.4);
+    border-color: color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
     border-radius: 16px;
     padding: 14px;
-    background: hsl(var(--card) / 0.82);
-    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.74);
+    background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.74 * 100%), transparent);
   }
 
   .settings-about-version-row {
@@ -3202,14 +3166,14 @@
   .settings-about-release-notes {
     border-width: 0;
     border-radius: 13px;
-    background: hsl(var(--background) / 0.54);
+    background: color-mix(in srgb, var(--background) calc(0.54 * 100%), transparent);
   }
 }
 
 @media (prefers-reduced-transparency: reduce) {
   .settings-mobile-toolbar,
   .settings-page-desktop > header {
-    background: hsl(var(--background));
+    background: var(--background);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -3221,40 +3185,40 @@
   .settings-page-desktop .settings-section-hero,
   .settings-page-desktop .settings-memory-status-group,
   .settings-page-desktop .settings-memory-layout {
-    border-color: hsl(var(--foreground) / 0.42);
+    border-color: color-mix(in srgb, var(--foreground) calc(0.42 * 100%), transparent);
   }
 }
 
 /* Skills and MCP share one platform-adaptive hub chrome. */
 .hub-backdrop {
-  background: hsl(var(--hub-canvas, var(--background)));
+  background: var(--hub-canvas, var(--color-background-body));
 }
 
 .hub-backdrop[data-hub-tone="violet"] {
   background:
     radial-gradient(circle at 86% 0%, hsl(270 82% 60% / 0.055), transparent 31%),
-    hsl(var(--hub-canvas, var(--background)));
+    var(--hub-canvas, var(--color-background-body));
 }
 
 .hub-backdrop[data-hub-tone="amber"] {
   background:
     radial-gradient(circle at 86% 0%, hsl(38 92% 55% / 0.06), transparent 31%),
-    hsl(var(--hub-canvas, var(--background)));
+    var(--hub-canvas, var(--color-background-body));
 }
 
 .hub-header {
-  border-bottom: 1px solid hsl(var(--border) / 0.36);
-  background: hsl(var(--background) / 0.8);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) calc(0.36 * 100%), transparent);
+  background: color-mix(in srgb, var(--background) calc(0.8 * 100%), transparent);
   -webkit-backdrop-filter: blur(20px) saturate(1.25);
   backdrop-filter: blur(20px) saturate(1.25);
 }
 
 .hub-header-icon {
-  border: 1px solid hsl(var(--border) / 0.42);
-  background: hsl(var(--muted) / 0.62);
+  border: 1px solid color-mix(in srgb, var(--border) calc(0.42 * 100%), transparent);
+  background: color-mix(in srgb, var(--muted) calc(0.62 * 100%), transparent);
   box-shadow:
-    inset 0 1px 0 hsl(var(--background) / 0.78),
-    0 8px 20px -17px hsl(var(--foreground) / 0.45);
+    inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.78 * 100%), transparent),
+    0 8px 20px -17px color-mix(in srgb, var(--foreground) calc(0.45 * 100%), transparent);
 }
 
 .hub-header-icon[data-hub-tone="violet"] {
@@ -3271,16 +3235,16 @@
 .hub-panel,
 .mcp-server-card,
 .hub-skill-card {
-  border-color: hsl(var(--border) / 0.42);
-  background: hsl(var(--card) / 0.72);
+  border-color: color-mix(in srgb, var(--border) calc(0.42 * 100%), transparent);
+  background: color-mix(in srgb, var(--card) calc(0.72 * 100%), transparent);
   box-shadow:
-    inset 0 1px 0 hsl(var(--background) / 0.72),
-    0 16px 36px -32px hsl(var(--foreground) / 0.34);
+    inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.72 * 100%), transparent),
+    0 16px 36px -32px color-mix(in srgb, var(--foreground) calc(0.34 * 100%), transparent);
 }
 
 .hub-segmented-control {
-  border: 1px solid hsl(var(--border) / 0.34);
-  background: hsl(var(--muted) / 0.58);
+  border: 1px solid color-mix(in srgb, var(--border) calc(0.34 * 100%), transparent);
+  background: color-mix(in srgb, var(--muted) calc(0.58 * 100%), transparent);
 }
 
 .hub-segmented-button:active {
@@ -3411,8 +3375,8 @@
 
   .hub-header[data-close-navigation="true"] {
     min-height: calc(68px + env(safe-area-inset-top, 0px));
-    border-bottom-color: hsl(var(--border) / 0.24);
-    background: hsl(var(--background) / 0.92);
+    border-bottom-color: color-mix(in srgb, var(--border) calc(0.24 * 100%), transparent);
+    background: color-mix(in srgb, var(--background) calc(0.92 * 100%), transparent);
   }
 
   .hub-header[data-close-navigation="true"] > .mx-auto {
@@ -3505,7 +3469,7 @@
     width: 100%;
     justify-content: flex-end;
     padding-top: 8px;
-    border-top: 1px solid hsl(var(--border) / 0.3);
+    border-top: 1px solid color-mix(in srgb, var(--border) calc(0.3 * 100%), transparent);
   }
 
   .mcp-server-action {
@@ -3602,7 +3566,7 @@
   .hub-panel,
   .mcp-server-card,
   .hub-skill-card {
-    background: hsl(var(--background));
+    background: var(--background);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -3615,7 +3579,7 @@
   .mcp-server-card,
   .hub-skill-card,
   .hub-segmented-control {
-    border-color: hsl(var(--foreground) / 0.42);
+    border-color: color-mix(in srgb, var(--foreground) calc(0.42 * 100%), transparent);
   }
 }
 
@@ -3680,7 +3644,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   --edit-diff-plain-bg: hsl(0 0% 100% / 0.76);
   --edit-diff-plain-gutter-bg: hsl(0 0% 98% / 0.82);
   --edit-diff-hunk-bg: hsl(205 90% 96%);
-  color: hsl(var(--foreground) / 0.88);
+  color: color-mix(in srgb, var(--foreground) calc(0.88 * 100%), transparent);
 }
 
 .dark .edit-tool-diff-view {
@@ -3691,7 +3655,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   --edit-diff-plain-bg: hsl(224 18% 11% / 0.9);
   --edit-diff-plain-gutter-bg: hsl(224 16% 14% / 0.94);
   --edit-diff-hunk-bg: hsl(215 42% 17%);
-  color: hsl(var(--foreground) / 0.9);
+  color: color-mix(in srgb, var(--foreground) calc(0.9 * 100%), transparent);
 }
 
 .edit-tool-diff-view .diff-tailwindcss-wrapper {
@@ -3710,11 +3674,23 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   --diff-expand-lineNumber--: var(--edit-diff-plain-gutter-bg);
   --diff-hunk-content--: var(--edit-diff-hunk-bg);
   --diff-hunk-lineNumber--: var(--edit-diff-hunk-bg);
-  --diff-plain-lineNumber-color--: hsl(var(--muted-foreground) / 0.82);
-  --diff-expand-lineNumber-color--: hsl(var(--muted-foreground) / 0.66);
+  --diff-plain-lineNumber-color--: color-mix(
+    in srgb,
+    var(--muted-foreground) calc(0.82 * 100%),
+    transparent
+  );
+  --diff-expand-lineNumber-color--: color-mix(
+    in srgb,
+    var(--muted-foreground) calc(0.66 * 100%),
+    transparent
+  );
   --diff-add-content-highlight--: hsl(143 73% 78%);
   --diff-del-content-highlight--: hsl(3 100% 84%);
-  --diff-hunk-content-color--: hsl(var(--muted-foreground) / 0.72);
+  --diff-hunk-content-color--: color-mix(
+    in srgb,
+    var(--muted-foreground) calc(0.72 * 100%),
+    transparent
+  );
   background: transparent;
 }
 
@@ -3793,79 +3769,11 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   user-select: text;
 }
 
-@keyframes editorContextMenuIn {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.editor-context-menu {
-  animation: editorContextMenuIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-  transform-origin: top left;
-}
-
-/* Exit leg for menus driven by useMenuExitPresence (lib/shared/menuMotion.ts):
- * the hook keeps the menu mounted for MENU_EXIT_MS while this plays, so the
- * duration below must stay in sync with that constant. `forwards` holds the
- * faded-out frame in case the unmount timer lands a tick late. */
-@keyframes editorContextMenuOut {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.97);
-  }
-}
-
-.editor-context-menu-exit {
-  animation: editorContextMenuOut 0.12s cubic-bezier(0.4, 0, 1, 1) forwards;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .editor-context-menu {
-    animation: none;
-  }
-  .editor-context-menu-exit {
-    animation: none;
-    opacity: 0;
-  }
-}
-
-@keyframes sftpPathPopoverIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.sftp-path-popover-enter {
-  animation: sftpPathPopoverIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
-  transform-origin: top center;
-}
-
 .sftp-path-scroll {
   scrollbar-width: none;
 }
 .sftp-path-scroll::-webkit-scrollbar {
   display: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sftp-path-popover-enter {
-    animation: none;
-  }
 }
 
 .sidebar-project-name-fade {
@@ -3886,41 +3794,13 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   margin-inline-end: 0.375rem;
 }
 
-/* Mobile application chrome: touch-sized controls, compact hierarchy and anchored materials. */
-@keyframes mobileAnchoredMenuIn {
-  from {
-    opacity: 0;
-    transform: translateY(5px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.mobile-soul-anchor-menu {
-  transform-origin: bottom left;
-  animation: mobileAnchoredMenuIn 160ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.mobile-quick-actions-menu {
-  transition:
-    opacity 150ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.mobile-quick-actions-menu[data-starting-style],
-.mobile-quick-actions-menu[data-ending-style] {
-  opacity: 0;
-  transform: translateY(-4px) scale(0.98);
-}
-
 @media (max-width: 767px) {
   [data-mobile-left-drawer].chat-history-sidebar {
     width: min(88vw, 344px);
-    border-right-color: hsl(var(--border) / 0.42);
-    background: hsl(var(--background) / 0.94);
-    box-shadow: 20px 0 52px -32px hsl(var(--foreground) / 0.52);
+    border-right-color: color-mix(in srgb, var(--border) calc(0.42 * 100%), transparent);
+    background: color-mix(in srgb, var(--background) calc(0.94 * 100%), transparent);
+    box-shadow: 20px 0 52px -32px
+      color-mix(in srgb, var(--foreground) calc(0.52 * 100%), transparent);
     -webkit-backdrop-filter: saturate(1.25) blur(24px);
     backdrop-filter: saturate(1.25) blur(24px);
   }
@@ -3934,10 +3814,10 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     gap: 2px;
     margin-top: 14px;
     padding: 5px;
-    border: 1px solid hsl(var(--border) / 0.48);
+    border: 1px solid color-mix(in srgb, var(--border) calc(0.48 * 100%), transparent);
     border-radius: 16px;
-    background: hsl(var(--card) / 0.7);
-    box-shadow: inset 0 1px 0 hsl(var(--background) / 0.78);
+    background: color-mix(in srgb, var(--card) calc(0.7 * 100%), transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.78 * 100%), transparent);
   }
 
   .chat-history-sidebar .chat-history-new-conversation-button,
@@ -3951,8 +3831,8 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   }
 
   .chat-history-sidebar .chat-history-new-conversation-button {
-    background: hsl(var(--primary) / 0.08);
-    color: hsl(var(--foreground));
+    background: color-mix(in srgb, var(--primary) calc(0.08 * 100%), transparent);
+    color: var(--foreground);
   }
 
   .chat-history-sidebar .mobile-chat-sidebar-footer {
@@ -3976,8 +3856,8 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   [data-mobile-chat-header="true"] {
     min-height: calc(58px + env(safe-area-inset-top, 0px));
     padding-inline: 12px;
-    border-bottom: 1px solid hsl(var(--border) / 0.34);
-    background: hsl(var(--background) / 0.82);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) calc(0.34 * 100%), transparent);
+    background: color-mix(in srgb, var(--background) calc(0.82 * 100%), transparent);
     -webkit-backdrop-filter: saturate(1.22) blur(20px);
     backdrop-filter: saturate(1.22) blur(20px);
   }
@@ -3997,20 +3877,12 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     margin-top: 2px;
   }
 
-  .mobile-quick-actions-trigger:active,
-  .mobile-quick-actions-menu button:active,
-  .mobile-soul-anchor-menu button:active,
   .chat-history-sidebar button:active {
     opacity: 0.72;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mobile-soul-anchor-menu {
-    animation: none;
-  }
-
-  .mobile-quick-actions-menu,
   .mobile-fullscreen-panel,
   [data-mobile-left-drawer].chat-history-sidebar {
     transition: none;
@@ -4020,10 +3892,8 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 @media (prefers-reduced-transparency: reduce) {
   [data-mobile-left-drawer].chat-history-sidebar,
   [data-mobile-chat-header="true"],
-  .mobile-panel-header:not(.mobile-terminal-header),
-  .mobile-quick-actions-menu,
-  .mobile-soul-anchor-menu {
-    background: hsl(var(--background));
+  .mobile-panel-header:not(.mobile-terminal-header) {
+    background: var(--background);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -4036,24 +3906,26 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 @media (prefers-contrast: more) {
-  .mobile-quick-actions-menu,
-  .mobile-soul-anchor-menu,
   [data-mobile-left-drawer].chat-history-sidebar {
-    border-color: hsl(var(--foreground) / 0.42);
+    border-color: color-mix(in srgb, var(--foreground) calc(0.42 * 100%), transparent);
   }
 }
 
 /* Main conversation chrome shared by desktop and compact runtimes. */
 .chat-workspace-main {
   background:
-    radial-gradient(circle at 75% -10%, hsl(var(--primary) / 0.035), transparent 32%),
-    hsl(var(--background));
+    radial-gradient(
+      circle at 75% -10%,
+      color-mix(in srgb, var(--primary) calc(0.035 * 100%), transparent),
+      transparent 32%
+    ),
+    var(--background);
 }
 
 .chat-header {
   min-height: 52px;
-  border-bottom: 1px solid hsl(var(--border) / 0.3);
-  background: hsl(var(--background) / 0.76);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) calc(0.3 * 100%), transparent);
+  background: color-mix(in srgb, var(--background) calc(0.76 * 100%), transparent);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   backdrop-filter: blur(18px) saturate(1.2);
 }
@@ -4063,20 +3935,20 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 .composer-glass-card {
-  border-color: hsl(var(--border) / 0.5);
-  background: hsl(var(--background) / 0.76);
+  border-color: color-mix(in srgb, var(--border) calc(0.5 * 100%), transparent);
+  background: color-mix(in srgb, var(--background) calc(0.76 * 100%), transparent);
   box-shadow:
-    inset 0 1px 0 hsl(var(--background) / 0.82),
-    0 20px 50px -28px hsl(var(--foreground) / 0.38),
-    0 5px 16px -12px hsl(var(--foreground) / 0.22);
+    inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.82 * 100%), transparent),
+    0 20px 50px -28px color-mix(in srgb, var(--foreground) calc(0.38 * 100%), transparent),
+    0 5px 16px -12px color-mix(in srgb, var(--foreground) calc(0.22 * 100%), transparent);
 }
 
 @media (max-width: 720px) {
   [data-mobile-chat-header="true"].chat-header {
     min-height: 56px;
     padding-inline: 10px;
-    border-color: hsl(var(--border) / 0.3);
-    background: hsl(var(--background) / 0.82);
+    border-color: color-mix(in srgb, var(--border) calc(0.3 * 100%), transparent);
+    background: color-mix(in srgb, var(--background) calc(0.82 * 100%), transparent);
   }
 
   [data-mobile-chat-header="true"] .model-selector-trigger {
@@ -4126,10 +3998,10 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 
   .composer-glass-card {
     border-radius: 20px;
-    background: hsl(var(--background) / 0.86);
+    background: color-mix(in srgb, var(--background) calc(0.86 * 100%), transparent);
     box-shadow:
-      inset 0 1px 0 hsl(var(--background) / 0.86),
-      0 14px 36px -22px hsl(var(--foreground) / 0.44);
+      inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.86 * 100%), transparent),
+      0 14px 36px -22px color-mix(in srgb, var(--foreground) calc(0.44 * 100%), transparent);
   }
 
   .composer-glass-card > button {
@@ -4183,7 +4055,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 @media (prefers-reduced-transparency: reduce) {
   .chat-header,
   .composer-glass-card {
-    background: hsl(var(--background));
+    background: var(--background);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -4194,7 +4066,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   .composer-glass-card,
   .chat-suggestion-card,
   .model-selector-dropdown {
-    border-color: hsl(var(--foreground) / 0.42);
+    border-color: color-mix(in srgb, var(--foreground) calc(0.42 * 100%), transparent);
   }
 }
 
@@ -4221,16 +4093,16 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 
 [data-native-mobile="true"] [data-mobile-left-drawer].chat-history-sidebar {
   width: min(88vw, 344px);
-  border-right-color: hsl(var(--border) / 0.42);
-  background: hsl(var(--background) / 0.94);
-  box-shadow: 20px 0 52px -32px hsl(var(--foreground) / 0.52);
+  border-right-color: color-mix(in srgb, var(--border) calc(0.42 * 100%), transparent);
+  background: color-mix(in srgb, var(--background) calc(0.94 * 100%), transparent);
+  box-shadow: 20px 0 52px -32px color-mix(in srgb, var(--foreground) calc(0.52 * 100%), transparent);
 }
 
 [data-native-mobile="true"] [data-mobile-chat-header="true"].chat-header {
   min-height: 56px;
   padding-inline: 10px;
-  border-color: hsl(var(--border) / 0.3);
-  background: hsl(var(--background) / 0.82);
+  border-color: color-mix(in srgb, var(--border) calc(0.3 * 100%), transparent);
+  background: color-mix(in srgb, var(--background) calc(0.82 * 100%), transparent);
 }
 
 [data-native-mobile="true"] [data-mobile-chat-header="true"] .model-selector-trigger {
@@ -4264,8 +4136,12 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 [data-native-mobile="true"] .settings-mobile-home,
 [data-native-mobile="true"] .settings-mobile-detail {
   background:
-    radial-gradient(circle at 100% 0%, hsl(var(--primary) / 0.055), transparent 34%),
-    hsl(var(--muted) / 0.22);
+    radial-gradient(
+      circle at 100% 0%,
+      color-mix(in srgb, var(--primary) calc(0.055 * 100%), transparent),
+      transparent 34%
+    ),
+    color-mix(in srgb, var(--muted) calc(0.22 * 100%), transparent);
 }
 
 [data-native-mobile="true"] .settings-mobile-detail [data-settings-section] {
@@ -4289,10 +4165,10 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 [data-native-mobile="true"] .settings-mobile-execution-card {
-  border-color: hsl(var(--border) / 0.55);
+  border-color: color-mix(in srgb, var(--border) calc(0.55 * 100%), transparent);
   border-radius: 16px;
   padding: 13px;
-  background: hsl(var(--card) / 0.84);
+  background: color-mix(in srgb, var(--card) calc(0.84 * 100%), transparent);
 }
 
 [data-native-mobile="true"] .settings-mobile-detail input,

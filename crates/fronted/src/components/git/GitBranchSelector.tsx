@@ -1,5 +1,6 @@
+import { Dialog } from "@astryxdesign/core/Dialog";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useLocale } from "../../i18n";
 import type {
   GitBranch as GitBranchInfo,
@@ -49,6 +50,8 @@ import {
 } from "../ui/dropdown-menu";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 function assertGitOperationResult(value: unknown, fallbackMessage: string) {
   if (!value || typeof value !== "object") return;
@@ -139,41 +142,66 @@ function GitInitModal(props: {
   const branchId = useId();
   const userNameId = useId();
   const userEmailId = useId();
+  const isCompact = useMediaQuery("(max-width: 640px)");
 
   if (!open) return null;
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
+  return (
+    <Dialog
+      isOpen={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen && !loading) onClose();
+      }}
       aria-labelledby={titleId}
+      purpose="info"
+      variant={isCompact ? "fullscreen" : "standard"}
+      width="min(28rem, calc(100dvw - var(--spacing-8)))"
+      maxHeight={isCompact ? "100dvh" : "90dvh"}
+      padding={0}
     >
-      <div
-        className="absolute inset-0 bg-black/55 backdrop-blur-sm"
-        onClick={loading ? undefined : onClose}
-      />
-      <form
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border/70 bg-background shadow-2xl"
+      <AstryxView
+        as="form"
+        className="flex min-h-0 flex-col overflow-hidden"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit();
         }}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4"
+        >
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex min-w-0 items-start gap-3"
+          >
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+            >
               <GitBranch className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div id={titleId} className="text-sm font-semibold text-foreground">
+            </AstryxView>
+            <AstryxView layout="block" direction="horizontal" className="min-w-0">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                id={titleId}
+                className="text-sm font-semibold text-foreground"
+              >
                 {t("git.branchSelector.initRepositoryTitle")}
-              </div>
-              <div className="mt-1 text-xs leading-5 text-muted-foreground">
+              </AstryxView>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="mt-1 text-xs leading-5 text-muted-foreground"
+              >
                 {t("git.branchSelector.initRepositoryDescription")}
-              </div>
-            </div>
-          </div>
+              </AstryxView>
+            </AstryxView>
+          </AstryxView>
           <Button
             type="button"
             variant="ghost"
@@ -186,20 +214,22 @@ function GitInitModal(props: {
           >
             <X className="h-4 w-4" />
           </Button>
-        </div>
-        <div className="space-y-4 px-5 py-4">
-          <div className="space-y-1.5">
+        </AstryxView>
+        <AstryxView layout="block" direction="horizontal" className="space-y-4 px-5 py-4">
+          <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">
               {t("git.branchSelector.targetDirectory")}
             </Label>
-            <div
+            <AstryxView
+              layout="block"
+              direction="horizontal"
               className="truncate rounded-lg border border-border/70 bg-muted/35 px-3 py-2 text-xs text-foreground"
               title={workdir}
             >
               {workdir}
-            </div>
-          </div>
-          <div className="space-y-1.5">
+            </AstryxView>
+          </AstryxView>
+          <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
             <Label htmlFor={branchId} className="text-xs text-muted-foreground">
               {t("git.branchSelector.initialBranch")}
             </Label>
@@ -212,9 +242,9 @@ function GitInitModal(props: {
               autoFocus
               disabled={loading}
             />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
+          </AstryxView>
+          <AstryxView layout="grid" direction="horizontal" className="grid gap-3 sm:grid-cols-2">
+            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
               <Label htmlFor={userNameId} className="text-xs text-muted-foreground">
                 {t("git.branchSelector.userNameOptional")}
               </Label>
@@ -225,8 +255,8 @@ function GitInitModal(props: {
                 className="h-9 text-sm"
                 disabled={loading}
               />
-            </div>
-            <div className="space-y-1.5">
+            </AstryxView>
+            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
               <Label htmlFor={userEmailId} className="text-xs text-muted-foreground">
                 {t("git.branchSelector.userEmailOptional")}
               </Label>
@@ -237,15 +267,23 @@ function GitInitModal(props: {
                 className="h-9 text-sm"
                 disabled={loading}
               />
-            </div>
-          </div>
+            </AstryxView>
+          </AstryxView>
           {error ? (
-            <div className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
+            >
               {error}
-            </div>
+            </AstryxView>
           ) : null}
-        </div>
-        <div className="flex items-center justify-end gap-2 border-t border-border/60 px-5 py-4">
+        </AstryxView>
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex items-center justify-end gap-2 border-t border-border/60 px-5 py-4"
+        >
           <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={loading}>
             {t("chat.cancel")}
           </Button>
@@ -257,10 +295,9 @@ function GitInitModal(props: {
             )}
             {t("git.branchSelector.initRepository")}
           </Button>
-        </div>
-      </form>
-    </div>,
-    document.body,
+        </AstryxView>
+      </AstryxView>
+    </Dialog>
   );
 }
 
@@ -301,6 +338,7 @@ function BranchActionsModal(props: {
   const { t } = useLocale();
   const titleId = useId();
   const inputId = useId();
+  const isCompact = useMediaQuery("(max-width: 640px)");
 
   if (!action) return null;
 
@@ -315,42 +353,63 @@ function BranchActionsModal(props: {
       ? t("git.branchSelector.renameBranch")
       : t("git.branchSelector.createFromHere");
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[110] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
+  return (
+    <Dialog
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen && !busy) onClose();
+      }}
       aria-labelledby={titleId}
+      purpose="info"
+      variant={isCompact ? "fullscreen" : "standard"}
+      width="min(24rem, calc(100dvw - var(--spacing-8)))"
+      maxHeight={isCompact ? "100dvh" : "90dvh"}
+      padding={0}
     >
-      <div
-        className="absolute inset-0 bg-black/55 backdrop-blur-sm"
-        onClick={busy ? undefined : onClose}
-      />
-      <form
-        className="relative z-10 w-full max-w-sm overflow-hidden rounded-2xl border border-border/70 bg-background shadow-2xl"
+      <AstryxView
+        as="form"
+        className="flex min-h-0 flex-col overflow-hidden"
         onSubmit={(event) => {
           event.preventDefault();
           if (isForm) onSubmit();
         }}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4"
+        >
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex min-w-0 items-start gap-3"
+          >
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+            >
               <GitBranch className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div
+            </AstryxView>
+            <AstryxView layout="block" direction="horizontal" className="min-w-0">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
                 id={titleId}
                 className="truncate text-sm font-semibold text-foreground"
                 title={branch.fullName}
               >
                 {branch.fullName}
-              </div>
-              <div className="mt-1 text-xs leading-5 text-muted-foreground">
+              </AstryxView>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="mt-1 text-xs leading-5 text-muted-foreground"
+              >
                 {isForm ? formTitle : kindLabel}
-              </div>
-            </div>
-          </div>
+              </AstryxView>
+            </AstryxView>
+          </AstryxView>
           <Button
             type="button"
             variant="ghost"
@@ -363,44 +422,44 @@ function BranchActionsModal(props: {
           >
             <X className="h-4 w-4" />
           </Button>
-        </div>
+        </AstryxView>
         {mode === "menu" ? (
-          <div className="space-y-1 px-3 py-3">
+          <AstryxView layout="block" direction="horizontal" className="space-y-1 px-3 py-3">
             {canWrite ? (
-              <button
+              <AstryxButton
                 type="button"
                 className={ACTION_MENU_BUTTON_CLASS}
                 onClick={onShowCreateFrom}
                 disabled={busy}
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>{t("git.branchSelector.createFromHere")}</span>
-              </button>
+                <AstryxInline>{t("git.branchSelector.createFromHere")}</AstryxInline>
+              </AstryxButton>
             ) : null}
             {canWrite && isLocal ? (
-              <button
+              <AstryxButton
                 type="button"
                 className={ACTION_MENU_BUTTON_CLASS}
                 onClick={onShowRename}
                 disabled={busy}
               >
                 <Pencil className="h-3.5 w-3.5" />
-                <span>{t("git.branchSelector.renameBranch")}</span>
-              </button>
+                <AstryxInline>{t("git.branchSelector.renameBranch")}</AstryxInline>
+              </AstryxButton>
             ) : null}
-            <button
+            <AstryxButton
               type="button"
               className={ACTION_MENU_BUTTON_CLASS}
               onClick={onCopyName}
               disabled={busy}
             >
               <Copy className="h-3.5 w-3.5" />
-              <span>
+              <AstryxInline>
                 {copied ? t("git.branchSelector.copied") : t("git.branchSelector.copyName")}
-              </span>
-            </button>
+              </AstryxInline>
+            </AstryxButton>
             {canWrite && isLocal && !branch.current ? (
-              <button
+              <AstryxButton
                 type="button"
                 className={cn(
                   ACTION_MENU_BUTTON_CLASS,
@@ -414,31 +473,37 @@ function BranchActionsModal(props: {
                 ) : (
                   <Trash2 className="h-3.5 w-3.5" />
                 )}
-                <span>{t("git.branchSelector.deleteBranch")}</span>
-              </button>
+                <AstryxInline>{t("git.branchSelector.deleteBranch")}</AstryxInline>
+              </AstryxButton>
             ) : null}
             {error ? (
-              <div className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              >
                 {error}
-              </div>
+              </AstryxView>
             ) : null}
-          </div>
+          </AstryxView>
         ) : (
-          <div className="space-y-4 px-5 py-4">
+          <AstryxView layout="block" direction="horizontal" className="space-y-4 px-5 py-4">
             {mode === "createFrom" ? (
-              <div className="space-y-1.5">
+              <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">
                   {t("git.branchSelector.startPointLabel")}
                 </Label>
-                <div
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
                   className="truncate rounded-lg border border-border/70 bg-muted/35 px-3 py-2 text-xs text-foreground"
                   title={branch.fullName}
                 >
                   {branch.fullName}
-                </div>
-              </div>
+                </AstryxView>
+              </AstryxView>
             ) : null}
-            <div className="space-y-1.5">
+            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
               <Label htmlFor={inputId} className="text-xs text-muted-foreground">
                 {formTitle}
               </Label>
@@ -465,16 +530,24 @@ function BranchActionsModal(props: {
                 autoFocus
                 disabled={busy}
               />
-            </div>
+            </AstryxView>
             {error ? (
-              <div className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              >
                 {error}
-              </div>
+              </AstryxView>
             ) : null}
-          </div>
+          </AstryxView>
         )}
         {isForm ? (
-          <div className="flex items-center justify-end gap-2 border-t border-border/60 px-5 py-4">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex items-center justify-end gap-2 border-t border-border/60 px-5 py-4"
+          >
             <Button type="button" variant="ghost" size="sm" onClick={onBack} disabled={busy}>
               {t("chat.cancel")}
             </Button>
@@ -490,11 +563,10 @@ function BranchActionsModal(props: {
                 ? t("git.branchSelector.renameBranch")
                 : t("git.branchSelector.create")}
             </Button>
-          </div>
+          </AstryxView>
         ) : null}
-      </form>
-    </div>,
-    document.body,
+      </AstryxView>
+    </Dialog>
   );
 }
 
@@ -1061,8 +1133,11 @@ export function GitBranchSelector(props: {
       )}
     >
       {isCurrent ? <Check className="h-3.5 w-3.5" /> : <GitBranch className="h-3.5 w-3.5" />}
-      <span className="min-w-0 flex-1 truncate">{labelText}</span>
-      <span
+      <AstryxInline className="min-w-0 flex-1 truncate">{labelText}</AstryxInline>
+      <AstryxView
+        as="span"
+        layout="inline-flex"
+        direction="horizontal"
         role="button"
         tabIndex={-1}
         aria-label={t("git.branchSelector.branchActions")}
@@ -1084,7 +1159,7 @@ export function GitBranchSelector(props: {
         }}
       >
         <MoreHorizontal className="h-3.5 w-3.5" />
-      </span>
+      </AstryxView>
     </DropdownMenuItem>
   );
 
@@ -1107,21 +1182,29 @@ export function GitBranchSelector(props: {
           ) : (
             <GitBranch className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-300" />
           )}
-          <span className="min-w-0 truncate">{label}</span>
+          <AstryxInline className="min-w-0 truncate">{label}</AstryxInline>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           className="composer-branch-dropdown flex w-72 flex-col overflow-hidden p-0"
           side="top"
           align="start"
         >
-          <div className="flex shrink-0 items-center gap-1 border-b border-border/60 px-2 py-1.5">
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xs font-medium text-foreground">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex shrink-0 items-center gap-1 border-b border-border/60 px-2 py-1.5"
+          >
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex min-w-0 flex-1 items-center gap-1.5 text-xs font-medium text-foreground"
+            >
               <Github className="h-3.5 w-3.5 shrink-0" />
-              <span>Git</span>
-            </div>
+              <AstryxInline>Git</AstryxInline>
+            </AstryxView>
             {noRepo ? null : (
               <>
-                <button
+                <AstryxButton
                   type="button"
                   className={HEADER_ICON_BUTTON_CLASS}
                   disabled={!canWrite || mutating}
@@ -1134,9 +1217,14 @@ export function GitBranchSelector(props: {
                   ) : (
                     <CloudDownload className="h-3.5 w-3.5" />
                   )}
-                </button>
-                <span className="relative inline-flex">
-                  <button
+                </AstryxButton>
+                <AstryxView
+                  as="span"
+                  layout="inline-flex"
+                  direction="horizontal"
+                  className="relative inline-flex"
+                >
+                  <AstryxButton
                     type="button"
                     className={HEADER_ICON_BUTTON_CLASS}
                     disabled={!canWrite || mutating}
@@ -1149,15 +1237,20 @@ export function GitBranchSelector(props: {
                     ) : (
                       <Download className="h-3.5 w-3.5" />
                     )}
-                  </button>
+                  </AstryxButton>
                   {showSyncBadges && state.behind > 0 ? (
-                    <span className="pointer-events-none absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] font-medium leading-3 text-primary-foreground">
+                    <AstryxInline className="pointer-events-none absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] font-medium leading-3 text-primary-foreground">
                       {state.behind > 9 ? "9+" : state.behind}
-                    </span>
+                    </AstryxInline>
                   ) : null}
-                </span>
-                <span className="relative inline-flex">
-                  <button
+                </AstryxView>
+                <AstryxView
+                  as="span"
+                  layout="inline-flex"
+                  direction="horizontal"
+                  className="relative inline-flex"
+                >
+                  <AstryxButton
                     type="button"
                     className={HEADER_ICON_BUTTON_CLASS}
                     disabled={!canWrite || mutating}
@@ -1170,16 +1263,16 @@ export function GitBranchSelector(props: {
                     ) : (
                       <Upload className="h-3.5 w-3.5" />
                     )}
-                  </button>
+                  </AstryxButton>
                   {showSyncBadges && state.ahead > 0 ? (
-                    <span className="pointer-events-none absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] font-medium leading-3 text-primary-foreground">
+                    <AstryxInline className="pointer-events-none absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] font-medium leading-3 text-primary-foreground">
                       {state.ahead > 9 ? "9+" : state.ahead}
-                    </span>
+                    </AstryxInline>
                   ) : null}
-                </span>
+                </AstryxView>
               </>
             )}
-            <button
+            <AstryxButton
               type="button"
               className={HEADER_ICON_BUTTON_CLASS}
               onClick={() => {
@@ -1192,10 +1285,14 @@ export function GitBranchSelector(props: {
               aria-label={t("git.branchSelector.refresh")}
             >
               <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-            </button>
-          </div>
+            </AstryxButton>
+          </AstryxView>
           {repositories.length > 1 ? (
-            <div className="shrink-0 border-b border-border/60 p-1">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="shrink-0 border-b border-border/60 p-1"
+            >
               <DropdownMenuSub open={repoMenuOpen} onOpenChange={setRepoMenuOpen}>
                 <DropdownMenuSubTrigger
                   clickToggle
@@ -1204,16 +1301,16 @@ export function GitBranchSelector(props: {
                   aria-label={t("git.branchSelector.switchRepository")}
                 >
                   <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <span className="shrink-0 text-muted-foreground">
+                  <AstryxInline className="shrink-0 text-muted-foreground">
                     {t("git.branchSelector.repositoryLabel")}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-medium">
+                  </AstryxInline>
+                  <AstryxInline className="min-w-0 flex-1 truncate font-medium">
                     {selectedGitRepositoryLabel(repositories, selectedRepoRoot) ||
                       t("git.branchSelector.switchRepository")}
-                  </span>
-                  <span className="ml-auto shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] leading-4 text-muted-foreground">
+                  </AstryxInline>
+                  <AstryxInline className="ml-auto shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] leading-4 text-muted-foreground">
                     {repositories.length}
-                  </span>
+                  </AstryxInline>
                   <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="min-w-52">
@@ -1225,7 +1322,7 @@ export function GitBranchSelector(props: {
                       // must close only the submenu and keep the root menu
                       // open so the branch is still picked manually on the
                       // newly selected repository.
-                      <button
+                      <AstryxButton
                         key={repo.root}
                         type="button"
                         disabled={mutating}
@@ -1249,19 +1346,23 @@ export function GitBranchSelector(props: {
                         ) : (
                           <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         )}
-                        <span className="min-w-0 flex-1 truncate">
+                        <AstryxInline className="min-w-0 flex-1 truncate">
                           {gitDiscoveredRepositoryLabel(repo)}
-                        </span>
-                      </button>
+                        </AstryxInline>
+                      </AstryxButton>
                     );
                   })}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
-            </div>
+            </AstryxView>
           ) : null}
           {showFilter ? (
-            <div className="shrink-0 border-b border-border/60 px-2 py-1.5">
-              <div className="relative">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="shrink-0 border-b border-border/60 px-2 py-1.5"
+            >
+              <AstryxView layout="block" direction="horizontal" className="relative">
                 <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={filter}
@@ -1279,21 +1380,41 @@ export function GitBranchSelector(props: {
                   placeholder={t("git.branchSelector.filterBranches")}
                   className="h-8 pl-7 text-xs"
                 />
-              </div>
-            </div>
+              </AstryxView>
+            </AstryxView>
           ) : null}
-          <div className="min-h-0 flex-1 overflow-y-auto p-1">
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="min-h-0 flex-1 overflow-y-auto p-1"
+          >
             {visibleError ? (
-              <div className="px-2 py-1 text-xs text-destructive">{visibleError}</div>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="px-2 py-1 text-xs text-destructive"
+              >
+                {visibleError}
+              </AstryxView>
             ) : null}
             {!canWrite && disabledMessage ? (
-              <div className="px-2 py-1 text-xs text-muted-foreground">{disabledMessage}</div>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="px-2 py-1 text-xs text-muted-foreground"
+              >
+                {disabledMessage}
+              </AstryxView>
             ) : null}
             {noRepo && !visibleError ? (
               <>
-                <div className="px-2 py-2 text-xs text-muted-foreground">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="px-2 py-2 text-xs text-muted-foreground"
+                >
                   {t("git.branchSelector.noRepositoryFound")}
-                </div>
+                </AstryxView>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   disabled={!canWrite || initializing}
@@ -1306,7 +1427,7 @@ export function GitBranchSelector(props: {
                   ) : (
                     <Plus className="h-3.5 w-3.5" />
                   )}
-                  <span>{t("git.branchSelector.initRepository")}</span>
+                  <AstryxInline>{t("git.branchSelector.initRepository")}</AstryxInline>
                 </DropdownMenuItem>
               </>
             ) : noRepo ? null : (
@@ -1331,27 +1452,43 @@ export function GitBranchSelector(props: {
                   return renderBranchRow(branch, isCurrentUpstream, branch.fullName);
                 })}
                 {filteredRemoteBranches.length > REMOTE_BRANCH_DISPLAY_LIMIT ? (
-                  <div className="px-2 py-1 text-[11px] text-muted-foreground">
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="px-2 py-1 text-[11px] text-muted-foreground"
+                  >
                     {t("git.branchSelector.moreRemoteBranches").replace(
                       "{count}",
                       String(filteredRemoteBranches.length - REMOTE_BRANCH_DISPLAY_LIMIT),
                     )}
-                  </div>
+                  </AstryxView>
                 ) : null}
                 {normalizedFilter &&
                 filteredLocalBranches.length === 0 &&
                 filteredRemoteBranches.length === 0 ? (
-                  <div className="px-2 py-2 text-xs text-muted-foreground">
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="px-2 py-2 text-xs text-muted-foreground"
+                  >
                     {t("git.branchSelector.noMatches")}
-                  </div>
+                  </AstryxView>
                 ) : null}
               </>
             )}
-          </div>
+          </AstryxView>
           {noRepo ? null : (
-            <div className="shrink-0 border-t border-border/60 p-1">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="shrink-0 border-t border-border/60 p-1"
+            >
               {creating ? (
-                <div className="flex items-center gap-1 px-1 py-0.5">
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex items-center gap-1 px-1 py-0.5"
+                >
                   <Input
                     value={draftBranch}
                     onChange={(event) => setDraftBranch(event.target.value)}
@@ -1372,17 +1509,21 @@ export function GitBranchSelector(props: {
                     className="h-8 text-xs"
                     autoFocus
                   />
-                  <button
+                  <AstryxButton
                     type="button"
                     className="inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded bg-foreground px-2 text-xs text-background"
                     onClick={createBranch}
                   >
                     {t("git.branchSelector.create")}
-                  </button>
-                </div>
+                  </AstryxButton>
+                </AstryxView>
               ) : (
-                <div className="flex items-center gap-1">
-                  <button
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex items-center gap-1"
+                >
+                  <AstryxButton
                     type="button"
                     disabled={!canWrite || mutating}
                     title={!canWrite ? disabledMessage : undefined}
@@ -1395,7 +1536,7 @@ export function GitBranchSelector(props: {
                   >
                     <Plus className="h-3.5 w-3.5" />
                     {t("git.branchSelector.createNewBranch")}
-                  </button>
+                  </AstryxButton>
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger
                       clickToggle
@@ -1412,7 +1553,7 @@ export function GitBranchSelector(props: {
                         className="gap-2 text-xs"
                       >
                         <Download className="h-3.5 w-3.5" />
-                        <span>{t("git.branchSelector.stashPush")}</span>
+                        <AstryxInline>{t("git.branchSelector.stashPush")}</AstryxInline>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         disabled={!canWrite || mutating || state.stashCount === 0}
@@ -1420,16 +1561,16 @@ export function GitBranchSelector(props: {
                         className="gap-2 text-xs"
                       >
                         <Upload className="h-3.5 w-3.5" />
-                        <span>
+                        <AstryxInline>
                           {t("git.branchSelector.stashPop")}
                           {state.stashCount > 0 ? ` (${state.stashCount})` : ""}
-                        </span>
+                        </AstryxInline>
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
-                </div>
+                </AstryxView>
               )}
-            </div>
+            </AstryxView>
           )}
         </DropdownMenuContent>
       </DropdownMenu>

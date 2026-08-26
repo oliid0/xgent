@@ -1,22 +1,31 @@
 import { invoke } from "@xagent/runtime";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { Center } from "@astryxdesign/core/Center";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Token } from "@astryxdesign/core/Token";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertTriangle,
   ArrowLeft,
-  Check,
   Download,
   FileText,
   GitBranch,
   GitCommitHorizontal,
   History,
-  Loader2,
   RefreshCw,
   Undo2,
   Upload,
   X,
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
-import { cn } from "../../../lib/shared/utils";
 import { MobileFullscreenPanel } from "./MobilePanelScaffold";
 
 type ShellRunResponse = {
@@ -329,331 +338,346 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
 
   return (
     <MobileFullscreenPanel open label={t("chat.mobileGit.title")}>
-      <header className="mobile-panel-header flex min-h-14 shrink-0 items-center gap-3 border-b border-border/55 bg-background/90 px-3 backdrop-blur-xl">
+      <HStack
+        as="header"
+        gap={2}
+        vAlign="center"
+        paddingInline={3}
+        className="mobile-panel-header min-h-[var(--xagent-mobile-header-height)] shrink-0 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/90 backdrop-blur-xl"
+      >
         {showingDetail ? (
-          <button
-            type="button"
+          <IconButton
+            label={t("chat.mobileGit.back")}
+            tooltip={t("chat.mobileGit.back")}
+            icon={<ArrowLeft />}
+            variant="ghost"
             onClick={() => {
               setSelectedPath("");
               setSelectedCommit(null);
               setDetail("");
             }}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted"
-            aria-label={t("chat.mobileGit.back")}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
+          />
         ) : (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-foreground">
-            <GitBranch className="h-4 w-4" />
-          </span>
+          <GitBranch />
         )}
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[15px] font-semibold">
-            {selectedPath || selectedCommit?.subject || t("chat.mobileGit.title")}
-          </h2>
-          <p className="truncate text-[10px] text-muted-foreground">
-            {showingDetail
-              ? selectedCommit?.shortSha || snapshot?.branch || workdir
-              : snapshot?.branch || workdir}
-          </p>
-        </div>
-        <button
-          type="button"
-          disabled={Boolean(busy)}
+        <StackItem size="fill">
+          <VStack gap={0}>
+            <Heading level={2} maxLines={1}>
+              {selectedPath || selectedCommit?.subject || t("chat.mobileGit.title")}
+            </Heading>
+            <Text type="supporting" color="secondary" maxLines={1}>
+              {showingDetail
+                ? selectedCommit?.shortSha || snapshot?.branch || workdir
+                : snapshot?.branch || workdir}
+            </Text>
+          </VStack>
+        </StackItem>
+        <IconButton
+          label={t("projectTools.gitReview.refresh")}
+          tooltip={t("projectTools.gitReview.refresh")}
+          icon={<RefreshCw />}
+          variant="ghost"
+          isLoading={Boolean(busy)}
+          isDisabled={Boolean(busy)}
           onClick={() => void (view === "changes" ? refreshStatus() : refreshHistory())}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted disabled:opacity-45"
-          aria-label={t("projectTools.gitReview.refresh")}
-        >
-          <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} />
-        </button>
-        <button
-          type="button"
+        />
+        <IconButton
+          label={t("chat.mobileTerminal.close")}
+          tooltip={t("chat.mobileTerminal.close")}
+          icon={<X />}
+          variant="ghost"
           onClick={close}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted"
-          aria-label={t("chat.mobileTerminal.close")}
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </header>
+        />
+      </HStack>
 
       {!showingDetail ? (
-        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-2.5">
-          <div className="grid min-w-0 flex-1 grid-cols-2 rounded-xl bg-muted p-1">
-            {(["changes", "history"] as const).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setView(item)}
-                className={cn(
-                  "flex h-8 items-center justify-center gap-1.5 rounded-lg text-xs font-medium",
-                  view === item
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground",
-                )}
-              >
-                {item === "changes" ? (
-                  <FileText className="h-3.5 w-3.5" />
-                ) : (
-                  <History className="h-3.5 w-3.5" />
-                )}
-                {t(
-                  item === "changes"
-                    ? "projectTools.gitReview.localChangesView"
-                    : "projectTools.gitReview.commitHistoryView",
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        <HStack
+          padding={2}
+          className="shrink-0 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]"
+        >
+          <SegmentedControl
+            value={view}
+            onChange={(value) => setView(value as "changes" | "history")}
+            label={t("chat.mobileGit.title")}
+            layout="fill"
+          >
+            <SegmentedControlItem
+              value="changes"
+              label={t("projectTools.gitReview.localChangesView")}
+            />
+            <SegmentedControlItem
+              value="history"
+              label={t("projectTools.gitReview.commitHistoryView")}
+            />
+          </SegmentedControl>
+        </HStack>
       ) : null}
 
       {error && !notRepository ? (
-        <div className="mx-3 mt-3 flex shrink-0 items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/[0.06] px-3 py-2.5 text-xs text-destructive">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span className="min-w-0 flex-1 break-words">{error}</span>
-          <button type="button" onClick={() => setError("")} aria-label={t("settings.cancel")}>
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <Banner
+          status="error"
+          title={error}
+          collapsible={false}
+          isDismissable
+          onDismiss={() => setError("")}
+        />
       ) : null}
       {notice ? (
-        <div className="mx-3 mt-3 flex shrink-0 items-start gap-2 rounded-xl border border-border bg-muted/45 px-3 py-2.5 text-xs text-muted-foreground">
-          <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-          <span className="min-w-0 flex-1">{notice}</span>
-        </div>
+        <Banner
+          status="success"
+          title={notice}
+          collapsible={false}
+          isDismissable
+          onDismiss={() => setNotice("")}
+        />
       ) : null}
 
       {showingDetail ? (
-        <div className="min-h-0 flex-1 overflow-auto overscroll-contain px-3 py-4">
-          {selectedChange ? (
-            <div className="mb-3 flex flex-wrap gap-2">
-              {selectedChange.working ? (
-                <button
-                  type="button"
-                  disabled={Boolean(busy)}
-                  onClick={() =>
-                    void mutate(
-                      "stage",
-                      gitCommand(`add -- ${shellQuote(selectedChange.path)}`),
-                      t("projectTools.gitReview.stageChanges"),
-                    )
-                  }
-                  className="rounded-lg bg-foreground px-3 py-2 text-xs font-medium text-background disabled:opacity-45"
-                >
-                  {t("projectTools.gitReview.stageChanges")}
-                </button>
-              ) : null}
-              {selectedChange.staged ? (
-                <button
-                  type="button"
-                  disabled={Boolean(busy)}
-                  onClick={() =>
-                    void mutate(
-                      "unstage",
-                      gitCommand(`restore --staged -- ${shellQuote(selectedChange.path)}`),
-                      t("projectTools.gitReview.unstageChanges"),
-                    )
-                  }
-                  className="rounded-lg border border-border px-3 py-2 text-xs font-medium disabled:opacity-45"
-                >
-                  {t("projectTools.gitReview.unstageChanges")}
-                </button>
-              ) : null}
-              {selectedChange.working ? (
-                discardPath === selectedChange.path ? (
-                  <>
-                    <button
-                      type="button"
-                      disabled={Boolean(busy)}
-                      onClick={() =>
-                        void mutate(
-                          "discard",
-                          selectedChange.untracked
-                            ? `rm -f -- ${shellQuote(selectedChange.path)}`
-                            : gitCommand(
-                                `restore --worktree -- ${shellQuote(selectedChange.path)}`,
-                              ),
-                          t("projectTools.gitReview.discardSuccessMessage"),
-                        )
-                      }
-                      className="rounded-lg bg-destructive px-3 py-2 text-xs font-medium text-destructive-foreground disabled:opacity-45"
-                    >
-                      {t("projectTools.gitReview.discardChanges")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDiscardPath("")}
-                      className="rounded-lg border border-border px-3 py-2 text-xs font-medium"
-                    >
-                      {t("settings.cancel")}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setDiscardPath(selectedChange.path)}
-                    className="rounded-lg border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive"
-                  >
-                    {t("projectTools.gitReview.discardChanges")}
-                  </button>
-                )
-              ) : null}
-            </div>
-          ) : null}
-          <pre className="min-w-max whitespace-pre-wrap break-words font-mono text-[11px] leading-[1.65] text-foreground/90">
-            {busy && !detail ? t("chat.mobileTerminal.running") : detail}
-          </pre>
-        </div>
+        <StackItem size="fill" isScrollable>
+          <VStack gap={3} padding={3} className="min-h-full overscroll-contain">
+            {selectedChange ? (
+              <HStack gap={2} wrap="wrap">
+                {selectedChange.working ? (
+                  <Button
+                    label={t("projectTools.gitReview.stageChanges")}
+                    isDisabled={Boolean(busy)}
+                    onClick={() =>
+                      void mutate(
+                        "stage",
+                        gitCommand(`add -- ${shellQuote(selectedChange.path)}`),
+                        t("projectTools.gitReview.stageChanges"),
+                      )
+                    }
+                  />
+                ) : null}
+                {selectedChange.staged ? (
+                  <Button
+                    label={t("projectTools.gitReview.unstageChanges")}
+                    isDisabled={Boolean(busy)}
+                    onClick={() =>
+                      void mutate(
+                        "unstage",
+                        gitCommand(`restore --staged -- ${shellQuote(selectedChange.path)}`),
+                        t("projectTools.gitReview.unstageChanges"),
+                      )
+                    }
+                  />
+                ) : null}
+                {selectedChange.working ? (
+                  discardPath === selectedChange.path ? (
+                    <>
+                      <Button
+                        label={t("projectTools.gitReview.discardChanges")}
+                        variant="destructive"
+                        isDisabled={Boolean(busy)}
+                        onClick={() =>
+                          void mutate(
+                            "discard",
+                            selectedChange.untracked
+                              ? `rm -f -- ${shellQuote(selectedChange.path)}`
+                              : gitCommand(
+                                  `restore --worktree -- ${shellQuote(selectedChange.path)}`,
+                                ),
+                            t("projectTools.gitReview.discardSuccessMessage"),
+                          )
+                        }
+                      />
+                      <Button label={t("settings.cancel")} onClick={() => setDiscardPath("")} />
+                    </>
+                  ) : (
+                    <Button
+                      label={t("projectTools.gitReview.discardChanges")}
+                      variant="destructive"
+                      onClick={() => setDiscardPath(selectedChange.path)}
+                    />
+                  )
+                ) : null}
+              </HStack>
+            ) : null}
+            <CodeBlock
+              code={busy && !detail ? t("chat.mobileTerminal.running") : detail}
+              language="diff"
+              size="sm"
+              width="100%"
+              maxHeight="100%"
+              isWrapped
+              container="section"
+            />
+          </VStack>
+        </StackItem>
       ) : view === "changes" ? (
         <>
-          <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-border px-3 py-2.5">
-            {(["fetch", "pull", "push"] as const).map((operation) => {
-              const Icon = operation === "fetch" ? Download : operation === "pull" ? Undo2 : Upload;
-              return (
-                <button
-                  key={operation}
-                  type="button"
-                  disabled={Boolean(busy)}
-                  onClick={() => void remoteOperation(operation)}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-[11px] font-medium disabled:opacity-45"
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {t(`projectTools.gitReview.${operation}`)}
-                </button>
-              );
-            })}
+          <HStack
+            gap={2}
+            hAlign="between"
+            vAlign="center"
+            padding={2}
+            className="shrink-0 overflow-x-auto border-b border-[var(--color-border-subtle)]"
+          >
+            <HStack gap={2}>
+              {(["fetch", "pull", "push"] as const).map((operation) => {
+                const Icon =
+                  operation === "fetch" ? Download : operation === "pull" ? Undo2 : Upload;
+                return (
+                  <Button
+                    key={operation}
+                    label={t(`projectTools.gitReview.${operation}`)}
+                    icon={<Icon />}
+                    size="sm"
+                    isDisabled={Boolean(busy)}
+                    onClick={() => void remoteOperation(operation)}
+                  />
+                );
+              })}
+            </HStack>
             {snapshot ? (
-              <span className="ml-auto shrink-0 text-[10px] tabular-nums text-muted-foreground">
+              <Text type="supporting" color="secondary">
                 {snapshot.ahead > 0 ? `↑${snapshot.ahead} ` : ""}
                 {snapshot.behind > 0 ? `↓${snapshot.behind}` : ""}
-              </span>
+              </Text>
             ) : null}
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+          </HStack>
+          <StackItem size="fill" isScrollable>
+            <VStack padding={3} className="min-h-full overscroll-contain">
             {!snapshot && busy ? (
-              <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("chat.mobileTerminal.running")}
-              </div>
+              <Center height="100%">
+                <HStack gap={2} vAlign="center">
+                  <Spinner accessibleLabel={t("chat.mobileTerminal.running")} size="sm" />
+                  <Text type="supporting" color="secondary">
+                    {t("chat.mobileTerminal.running")}
+                  </Text>
+                </HStack>
+              </Center>
             ) : notRepository ? (
-              <div className="mx-auto flex h-full max-w-sm flex-col items-center justify-center gap-3 text-center">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-                  <GitBranch className="h-5 w-5" />
-                </span>
-                <div>
-                  <div className="text-sm font-semibold">
-                    {t("git.branchSelector.initRepositoryTitle")}
-                  </div>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {t("git.branchSelector.initRepositoryDescription")}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={Boolean(busy)}
-                  onClick={() => void initializeRepository()}
-                  className="min-h-11 rounded-xl bg-foreground px-4 text-sm font-medium text-background disabled:opacity-45"
-                >
-                  {t("git.branchSelector.initRepository")}
-                </button>
-              </div>
+              <EmptyState
+                icon={<GitBranch />}
+                title={t("git.branchSelector.initRepositoryTitle")}
+                description={t("git.branchSelector.initRepositoryDescription")}
+                actions={
+                  <Button
+                    label={t("git.branchSelector.initRepository")}
+                    variant="primary"
+                    isDisabled={Boolean(busy)}
+                    onClick={() => void initializeRepository()}
+                  />
+                }
+              />
             ) : snapshot?.changes.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                {t("projectTools.gitReview.noLocalChanges")}
-              </div>
+              <EmptyState
+                icon={<FileText />}
+                title={t("projectTools.gitReview.noLocalChanges")}
+                isCompact
+              />
             ) : (
-              <div className="space-y-2">
+              <List density="balanced" hasDividers>
                 {snapshot?.changes.map((change) => (
-                  <button
+                  <ListItem
                     key={`${change.indexStatus}${change.worktreeStatus}:${change.path}`}
-                    type="button"
-                    disabled={Boolean(busy)}
-                    onClick={() => void openChange(change)}
-                    className="flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left active:bg-muted disabled:opacity-55"
-                  >
-                    <span
-                      className={cn(
-                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-semibold",
-                        change.untracked
-                          ? "bg-emerald-500/10 text-emerald-600"
-                          : "bg-amber-500/10 text-amber-600",
-                      )}
-                    >
-                      {changeBadge(change)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium">{change.path}</span>
-                      <span className="mt-0.5 flex gap-2 text-[10px] text-muted-foreground">
+                    label={change.path}
+                    startContent={
+                      <Token
+                        label={changeBadge(change)}
+                        color={change.untracked ? "green" : "orange"}
+                        size="sm"
+                      />
+                    }
+                    description={
+                      <HStack gap={1} wrap="wrap">
                         {change.staged ? (
-                          <span>{t("projectTools.gitReview.labelStaged")}</span>
+                          <Token
+                            label={t("projectTools.gitReview.labelStaged")}
+                            color="green"
+                            size="sm"
+                          />
                         ) : null}
                         {change.working ? (
-                          <span>{t("projectTools.gitReview.labelUnstaged")}</span>
+                          <Token
+                            label={t("projectTools.gitReview.labelUnstaged")}
+                            color="orange"
+                            size="sm"
+                          />
                         ) : null}
-                      </span>
-                    </span>
-                  </button>
+                      </HStack>
+                    }
+                    isDisabled={Boolean(busy)}
+                    onClick={() => void openChange(change)}
+                  />
                 ))}
-              </div>
+              </List>
             )}
-          </div>
-          <form
+            </VStack>
+          </StackItem>
+          <HStack
+            as="form"
+            gap={2}
+            vAlign="end"
+            padding={3}
             onSubmit={(event) => void commit(event)}
-            className="flex shrink-0 gap-2 border-t border-border bg-background px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3"
+            className="shrink-0 border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)] pb-[calc(var(--spacing-3)+env(safe-area-inset-bottom,0px))]"
           >
-            <input
-              value={commitMessage}
-              onChange={(event) => setCommitMessage(event.currentTarget.value)}
-              disabled={Boolean(busy) || stagedCount === 0}
-              placeholder={t("projectTools.gitReview.commitMessagePlaceholder")}
-              className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-[13px] outline-none focus:ring-2 focus:ring-foreground/10 disabled:bg-muted/40"
-            />
-            <button
+            <StackItem size="fill">
+              <TextInput
+                label={t("projectTools.gitReview.commitMessagePlaceholder")}
+                isLabelHidden
+                value={commitMessage}
+                onChange={setCommitMessage}
+                isDisabled={Boolean(busy) || stagedCount === 0}
+                disabledMessage={
+                  stagedCount === 0 ? t("projectTools.gitReview.noStagedChanges") : undefined
+                }
+                placeholder={t("projectTools.gitReview.commitMessagePlaceholder")}
+                size="lg"
+                width="100%"
+              />
+            </StackItem>
+            <Button
               type="submit"
-              disabled={Boolean(busy) || stagedCount === 0 || !commitMessage.trim()}
-              className="flex h-11 shrink-0 items-center gap-1.5 rounded-xl bg-foreground px-4 text-xs font-medium text-background disabled:bg-muted disabled:text-muted-foreground"
-            >
-              <GitCommitHorizontal className="h-4 w-4" />
-              {t("projectTools.gitReview.commit")}
-            </button>
-          </form>
+              label={t("projectTools.gitReview.commit")}
+              icon={<GitCommitHorizontal />}
+              variant="primary"
+              size="lg"
+              isLoading={busy === "commit"}
+              isDisabled={Boolean(busy) || stagedCount === 0 || !commitMessage.trim()}
+            />
+          </HStack>
         </>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3">
+        <StackItem size="fill" isScrollable>
+          <VStack
+            padding={3}
+            className="min-h-full overscroll-contain pb-[calc(var(--spacing-3)+env(safe-area-inset-bottom,0px))]"
+          >
           {busy && history.length === 0 ? (
-            <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              {t("chat.mobileTerminal.running")}
-            </div>
+            <Center height="100%">
+              <HStack gap={2} vAlign="center">
+                <Spinner accessibleLabel={t("chat.mobileTerminal.running")} size="sm" />
+                <Text type="supporting" color="secondary">
+                  {t("chat.mobileTerminal.running")}
+                </Text>
+              </HStack>
+            </Center>
           ) : history.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              {t("projectTools.gitReview.noCommitHistory")}
-            </div>
+            <EmptyState
+              icon={<History />}
+              title={t("projectTools.gitReview.noCommitHistory")}
+              isCompact
+            />
           ) : (
-            <div className="space-y-2">
+            <List density="balanced" hasDividers>
               {history.map((entry) => (
-                <button
+                <ListItem
                   key={entry.sha}
-                  type="button"
-                  disabled={Boolean(busy)}
+                  label={entry.subject}
+                  description={`${entry.shortSha} · ${entry.author} · ${entry.date}`}
+                  startContent={<GitCommitHorizontal />}
+                  isDisabled={Boolean(busy)}
                   onClick={() => void openCommit(entry)}
-                  className="flex w-full items-start gap-3 rounded-xl border border-border bg-background p-3 text-left active:bg-muted disabled:opacity-55"
-                >
-                  <GitCommitHorizontal className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-medium leading-5">{entry.subject}</span>
-                    <span className="mt-1 flex flex-wrap gap-x-2 text-[10px] text-muted-foreground">
-                      <span className="font-mono">{entry.shortSha}</span>
-                      <span>{entry.author}</span>
-                      <span>{entry.date}</span>
-                    </span>
-                  </span>
-                </button>
+                />
               ))}
-            </div>
-          )}
-        </div>
+              </List>
+            )}
+          </VStack>
+        </StackItem>
       )}
     </MobileFullscreenPanel>
   );

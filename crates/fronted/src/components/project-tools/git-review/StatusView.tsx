@@ -4,16 +4,9 @@
 // Shared by every frontend runtime; only relative or @xagent/runtime imports
 // are allowed here.
 
-import {
-  type MouseEvent as ReactMouseEvent,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
+import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { useLocale } from "../../../i18n";
 import type { GitStatusEntry } from "../../../lib/git/types";
 import { cn } from "../../../lib/shared/utils";
@@ -37,14 +30,9 @@ import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
 import { DiffReviewCard } from "./DiffView";
 import {
   basename,
-  CHANGE_CONTEXT_MENU_ITEM_CLASS,
-  type ChangeContextMenuState,
   type ChangeListSection,
-  type ChangesMenuState,
-  CONTEXT_MENU_CONTAINER_CLASS,
   canStageEntry,
   canUnstageEntry,
-  clampMenuRectWithinRect,
   type DiffViewKind,
   GIT_REVIEW_SPLIT_GRID_CLASS,
   type GitDiscardConfirmState,
@@ -58,6 +46,8 @@ import {
 import { GitDiscardConfirmModal } from "./Toolbar";
 import type { GitReviewData } from "./useGitReviewData";
 import { GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS, useOverlayScrollbar } from "./useOverlayScrollbar";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 const INITIAL_CHANGE_ENTRY_RENDER_COUNT = 160;
 const CHANGE_ENTRY_RENDER_BATCH_SIZE = 160;
@@ -86,7 +76,6 @@ export function GitReviewStatusView(props: {
     onCommitMessageChange,
     onStackedPaneChange,
     onToggleSection,
-    panelRef,
     stackedDir,
     stackedPane,
     useSplitReviewLayout,
@@ -113,50 +102,9 @@ export function GitReviewStatusView(props: {
   const { t } = useLocale();
 
   const handleOverlayScroll = useOverlayScrollbar();
-  const [changeContextMenu, setChangeContextMenu] = useState<ChangeContextMenuState | null>(null);
-  const [changesMenu, setChangesMenu] = useState<ChangesMenuState | null>(null);
   const [discardConfirm, setDiscardConfirm] = useState<GitDiscardConfirmState | null>(null);
   const listPaneRef = useRef<HTMLElement | null>(null);
   const detailPaneRef = useRef<HTMLElement | null>(null);
-  const changeContextMenuRef = useRef<HTMLDivElement | null>(null);
-  const changesMenuRef = useRef<HTMLDivElement | null>(null);
-
-  // Clamp the menus against their measured size after they render (no
-  // hard-coded menu dimensions); useLayoutEffect corrects the position before
-  // paint, so an out-of-bounds menu never flashes at the raw pointer spot.
-  useLayoutEffect(() => {
-    if (!changeContextMenu) return;
-    const menu = changeContextMenuRef.current;
-    const panel = panelRef.current;
-    if (!menu || !panel) return;
-    const { dx, dy } = clampMenuRectWithinRect(
-      menu.getBoundingClientRect(),
-      panel.getBoundingClientRect(),
-      8,
-    );
-    if (dx !== 0 || dy !== 0) {
-      setChangeContextMenu({
-        ...changeContextMenu,
-        x: changeContextMenu.x + dx,
-        y: changeContextMenu.y + dy,
-      });
-    }
-  }, [changeContextMenu, panelRef]);
-
-  useLayoutEffect(() => {
-    if (!changesMenu) return;
-    const menu = changesMenuRef.current;
-    const panel = panelRef.current;
-    if (!menu || !panel) return;
-    const { dx, dy } = clampMenuRectWithinRect(
-      menu.getBoundingClientRect(),
-      panel.getBoundingClientRect(),
-      8,
-    );
-    if (dx !== 0 || dy !== 0) {
-      setChangesMenu({ ...changesMenu, x: changesMenu.x + dx, y: changesMenu.y + dy });
-    }
-  }, [changesMenu, panelRef]);
 
   useEffect(() => {
     if (useSplitReviewLayout) return;
@@ -200,54 +148,6 @@ export function GitReviewStatusView(props: {
     () => entries.find((entry) => entry.path === selectedPath) ?? null,
     [entries, selectedPath],
   );
-  const contextEntry = useMemo(
-    () => entries.find((entry) => entry.path === changeContextMenu?.path) ?? null,
-    [changeContextMenu?.path, entries],
-  );
-  const contextEntrySection = changeContextMenu?.section ?? "changes";
-  const contextEntryCanStage =
-    contextEntrySection === "changes" && contextEntry ? canStageEntry(contextEntry) : false;
-  const contextEntryCanUnstage =
-    contextEntrySection === "staged" && contextEntry ? canUnstageEntry(contextEntry) : false;
-  const contextEntryCanAddToGitignore =
-    contextEntrySection === "changes" && Boolean(contextEntry?.untracked);
-
-  useEffect(() => {
-    if (!changeContextMenu) return;
-    const closeMenu = () => setChangeContextMenu(null);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeMenu();
-    };
-    window.addEventListener("click", closeMenu);
-    window.addEventListener("resize", closeMenu);
-    window.addEventListener("scroll", closeMenu, true);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("click", closeMenu);
-      window.removeEventListener("resize", closeMenu);
-      window.removeEventListener("scroll", closeMenu, true);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [changeContextMenu]);
-
-  useEffect(() => {
-    if (!changesMenu) return;
-    const closeMenu = () => setChangesMenu(null);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeMenu();
-    };
-    window.addEventListener("click", closeMenu);
-    window.addEventListener("resize", closeMenu);
-    window.addEventListener("scroll", closeMenu, true);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("click", closeMenu);
-      window.removeEventListener("resize", closeMenu);
-      window.removeEventListener("scroll", closeMenu, true);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [changesMenu]);
-
   const selectEntry = useCallback(
     (entry: GitStatusEntry) => {
       selectPath(entry.path);
@@ -258,53 +158,15 @@ export function GitReviewStatusView(props: {
     [onStackedPaneChange, selectPath, useSplitReviewLayout],
   );
 
-  const openChangeContextMenu = useCallback(
-    (event: ReactMouseEvent, entry: GitStatusEntry, section: ChangeListSection) => {
-      event.preventDefault();
-      event.stopPropagation();
-      setChangesMenu(null);
-      const panelRect = panelRef.current?.getBoundingClientRect();
-      // Raw pointer position; the measured-clamp layout effect corrects it.
-      setChangeContextMenu({
-        x: panelRect ? event.clientX - panelRect.left : event.clientX,
-        y: panelRect ? event.clientY - panelRect.top : event.clientY,
-        path: entry.path,
-        section,
-      });
-    },
-    [panelRef],
-  );
-
   const toggleChangeSection = useCallback(
     (section: ChangeListSection) => {
-      setChangeContextMenu((current) => (current?.section === section ? null : current));
-      setChangesMenu((current) => (current?.section === section ? null : current));
       onToggleSection(section);
     },
     [onToggleSection],
   );
 
-  const openChangesMenu = useCallback(
-    (event: ReactMouseEvent<HTMLButtonElement>, section: ChangeListSection) => {
-      event.preventDefault();
-      event.stopPropagation();
-      setChangeContextMenu(null);
-      const panelRect = panelRef.current?.getBoundingClientRect();
-      const buttonRect = event.currentTarget.getBoundingClientRect();
-      // Anchor at the button's bottom-right corner; the menu right-aligns via
-      // translateX(-100%) and the measured-clamp layout effect corrects it.
-      setChangesMenu({
-        x: panelRect ? buttonRect.right - panelRect.left : buttonRect.right,
-        y: panelRect ? buttonRect.bottom - panelRect.top + 4 : buttonRect.bottom + 4,
-        section,
-      });
-    },
-    [panelRef],
-  );
-
   const viewEntryChanges = useCallback(
     (entry: GitStatusEntry) => {
-      setChangeContextMenu(null);
       onActiveDiffViewChange("workingTree");
       selectEntry(entry);
     },
@@ -313,7 +175,6 @@ export function GitReviewStatusView(props: {
 
   const stageEntry = useCallback(
     (entry: GitStatusEntry) => {
-      setChangeContextMenu(null);
       void runOperation("stage", () => gitClient!.stage(cwd, entry.path));
     },
     [cwd, gitClient, runOperation],
@@ -321,14 +182,12 @@ export function GitReviewStatusView(props: {
 
   const unstageEntry = useCallback(
     (entry: GitStatusEntry) => {
-      setChangeContextMenu(null);
       void runOperation("unstage", () => gitClient!.unstage(cwd, entry.path));
     },
     [cwd, gitClient, runOperation],
   );
 
   const discardEntry = useCallback((entry: GitStatusEntry) => {
-    setChangeContextMenu(null);
     setDiscardConfirm({
       kind: "entry",
       path: entry.path,
@@ -338,24 +197,20 @@ export function GitReviewStatusView(props: {
 
   const addEntryToGitignore = useCallback(
     (entry: GitStatusEntry) => {
-      setChangeContextMenu(null);
       void runOperation("add_to_gitignore", () => gitClient!.addToGitignore(cwd, entry.path));
     },
     [cwd, gitClient, runOperation],
   );
 
   const stageAllChanges = useCallback(() => {
-    setChangesMenu(null);
     void runOperation("stage_all", () => gitClient!.stageAll(cwd));
   }, [cwd, gitClient, runOperation]);
 
   const unstageAllChanges = useCallback(() => {
-    setChangesMenu(null);
     void runOperation("unstage_all", () => gitClient!.unstageAll(cwd));
   }, [cwd, gitClient, runOperation]);
 
   const discardAllChanges = useCallback(() => {
-    setChangesMenu(null);
     setDiscardConfirm({ kind: "all" });
   }, []);
 
@@ -382,7 +237,6 @@ export function GitReviewStatusView(props: {
   const revealEntryInFileTree = useCallback(
     (entry: GitStatusEntry) => {
       if (!onRevealInFileTree) return;
-      setChangeContextMenu(null);
       onRevealInFileTree(revealTargetForEntry(entry));
     },
     [onRevealInFileTree],
@@ -392,7 +246,6 @@ export function GitReviewStatusView(props: {
 
   const openEntrySystemFileLocation = useCallback(
     (entry: GitStatusEntry) => {
-      setChangeContextMenu(null);
       setError("");
       void gitClient?.openSystemFileLocation?.(cwd, entry.path).catch((err) => {
         setError(err instanceof Error ? err.message : String(err));
@@ -403,57 +256,115 @@ export function GitReviewStatusView(props: {
 
   const renderChangeEntry = (entry: GitStatusEntry, section: ChangeListSection) => {
     const selected = entry.path === selectedPath;
-    const contextMenuOpen =
-      entry.path === changeContextMenu?.path && section === changeContextMenu?.section;
     const TypeIcon = getFileTypeIcon(entry.path, "file");
     const fileName = basename(entry.path);
     const filePath = parentPath(entry.path);
     const deleted = isDeletedStatusEntry(entry);
+    const entryMenuItems: ContextMenuOption[] = [
+      {
+        label: t("projectTools.gitReview.viewChanges"),
+        icon: <Eye />,
+        onClick: () => viewEntryChanges(entry),
+      },
+      section === "staged"
+        ? {
+            label: t("projectTools.gitReview.unstageChanges"),
+            icon: <GitCommitHorizontal />,
+            isDisabled: writeDisabled || busy !== "" || !canUnstageEntry(entry),
+            onClick: () => unstageEntry(entry),
+          }
+        : {
+            label: t("projectTools.gitReview.stageChanges"),
+            icon: <FilePenLine />,
+            isDisabled: writeDisabled || busy !== "" || !canStageEntry(entry),
+            onClick: () => stageEntry(entry),
+          },
+      {
+        label: t("projectTools.gitReview.discardChanges"),
+        icon: <BrushCleaning />,
+        variant: "destructive",
+        isDisabled: writeDisabled || busy !== "",
+        onClick: () => discardEntry(entry),
+      },
+      ...(section === "changes" && entry.untracked
+        ? [
+            {
+              label: t("projectTools.gitReview.addToGitignore"),
+              icon: <GitCommitHorizontal />,
+              isDisabled: writeDisabled || busy !== "",
+              onClick: () => addEntryToGitignore(entry),
+            },
+          ]
+        : []),
+      { type: "divider" },
+      {
+        label: t("projectTools.gitReview.revealInFileTree"),
+        icon: <FolderTree />,
+        isDisabled: !onRevealInFileTree,
+        onClick: () => revealEntryInFileTree(entry),
+      },
+      ...(canOpenSystemFileLocation
+        ? [
+            {
+              label: t("projectTools.gitReview.openSystemFileLocation"),
+              icon: <ExternalLink />,
+              onClick: () => openEntrySystemFileLocation(entry),
+            },
+          ]
+        : []),
+    ];
     return (
-      <div
+      <ContextMenu
         key={`${section}:${entry.kind}:${entry.oldPath ?? ""}:${entry.path}`}
-        className={cn(
-          "select-none border-b border-l-2 border-border/60 border-l-transparent px-3 py-2 transition-colors hover:bg-muted/40",
-          selected && "border-l-emerald-500 bg-emerald-500/10",
-          contextMenuOpen && "border-l-primary bg-primary/10 ring-1 ring-inset ring-primary/35",
-        )}
-        onContextMenu={(event) => openChangeContextMenu(event, entry, section)}
+        items={entryMenuItems}
+        label={entry.path}
+        menuWidth="var(--xagent-git-context-menu-width)"
+        size="sm"
       >
-        <button
-          type="button"
-          className="flex w-full select-none items-start gap-2 rounded-sm bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          onClick={() => selectEntry(entry)}
-          title={entry.path}
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className={cn(
+            "select-none border-b border-l-2 border-border/60 border-l-transparent px-3 py-2 transition-colors hover:bg-muted/40",
+            selected && "border-l-emerald-500 bg-emerald-500/10",
+          )}
         >
-          <TypeIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="min-w-0 flex-1 select-none">
-            <span
-              className={cn(
-                "block truncate text-xs font-medium text-foreground",
-                deleted && "line-through",
-              )}
-            >
-              {fileName}
-            </span>
-            <span
-              className={cn(
-                "block truncate text-[calc(11px*var(--zone-font-scale,1))] leading-4 text-muted-foreground",
-                deleted && "line-through",
-              )}
-            >
-              {filePath}
-            </span>
-          </span>
-          <span
-            className={cn(
-              "mt-0.5 shrink-0 text-[calc(10px*var(--zone-font-scale,1))] font-semibold",
-              statusTone(entry),
-            )}
+          <AstryxButton
+            type="button"
+            className="flex w-full select-none items-start gap-2 rounded-sm bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            onClick={() => selectEntry(entry)}
+            title={entry.path}
           >
-            {statusLabel(entry)}
-          </span>
-        </button>
-      </div>
+            <TypeIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <AstryxInline className="min-w-0 flex-1 select-none">
+              <AstryxInline
+                className={cn(
+                  "block truncate text-xs font-medium text-foreground",
+                  deleted && "line-through",
+                )}
+              >
+                {fileName}
+              </AstryxInline>
+              <AstryxInline
+                className={cn(
+                  "block truncate text-[calc(11px*var(--zone-font-scale,1))] leading-4 text-muted-foreground",
+                  deleted && "line-through",
+                )}
+              >
+                {filePath}
+              </AstryxInline>
+            </AstryxInline>
+            <AstryxInline
+              className={cn(
+                "mt-0.5 shrink-0 text-[calc(10px*var(--zone-font-scale,1))] font-semibold",
+                statusTone(entry),
+              )}
+            >
+              {statusLabel(entry)}
+            </AstryxInline>
+          </AstryxButton>
+        </AstryxView>
+      </ContextMenu>
     );
   };
 
@@ -468,9 +379,16 @@ export function GitReviewStatusView(props: {
     collapsed: boolean,
     onToggle: () => void,
   ) => (
-    <section className="relative border-b border-border/60 bg-background last:border-b-0">
-      <div className="sticky top-0 z-20 grid h-7 w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-border/60 bg-muted px-3">
-        <button
+    <AstryxView
+      as="section"
+      className="relative border-b border-border/60 bg-background last:border-b-0"
+    >
+      <AstryxView
+        layout="grid"
+        direction="horizontal"
+        className="sticky top-0 z-20 grid h-7 w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-border/60 bg-muted px-3"
+      >
+        <AstryxButton
           type="button"
           className="flex min-w-0 items-center gap-1.5 rounded-sm bg-transparent p-0 text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           aria-expanded={!collapsed}
@@ -483,26 +401,65 @@ export function GitReviewStatusView(props: {
             )}
             aria-hidden="true"
           />
-          <span className="min-w-0 truncate text-[calc(11px*var(--zone-font-scale,1))] font-semibold text-muted-foreground">
+          <AstryxInline className="min-w-0 truncate text-[calc(11px*var(--zone-font-scale,1))] font-semibold text-muted-foreground">
             {title}
-          </span>
-        </button>
-        <span className="inline-flex h-4 min-w-6 shrink-0 items-center justify-center justify-self-end rounded bg-background/70 px-1.5 text-center text-[calc(10px*var(--zone-font-scale,1))] font-medium tabular-nums text-muted-foreground">
-          {sectionEntries.length}
-        </span>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="-mr-1 h-5 w-5 shrink-0 px-0 text-muted-foreground"
-          title={t("projectTools.gitReview.changesActions")}
-          aria-label={t("projectTools.gitReview.changesActions")}
-          onClick={(event) => openChangesMenu(event, section)}
+          </AstryxInline>
+        </AstryxButton>
+        <AstryxView
+          as="span"
+          layout="inline-flex"
+          direction="horizontal"
+          className="inline-flex h-4 min-w-6 shrink-0 items-center justify-center justify-self-end rounded bg-background/70 px-1.5 text-center text-[calc(10px*var(--zone-font-scale,1))] font-medium tabular-nums text-muted-foreground"
         >
-          <MoreHorizontal className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-      <div
+          {sectionEntries.length}
+        </AstryxView>
+        <DropdownMenu
+          button={{
+            label: t("projectTools.gitReview.changesActions"),
+            icon: <MoreHorizontal />,
+            isIconOnly: true,
+            variant: "ghost",
+            size: "sm",
+          }}
+          items={[
+            section === "changes"
+              ? {
+                  label: t("projectTools.gitReview.stageAllChanges"),
+                  icon: <FilePenLine />,
+                  isDisabled: writeDisabled || busy !== "" || !hasStageableChanges,
+                  onClick: stageAllChanges,
+                }
+              : {
+                  label: t("projectTools.gitReview.unstageAllChanges"),
+                  icon: <GitCommitHorizontal />,
+                  isDisabled: writeDisabled || busy !== "" || !hasStagedChanges,
+                  onClick: unstageAllChanges,
+                },
+            {
+              label: t("projectTools.gitReview.discardAllChanges"),
+              icon: <Trash2 />,
+              variant: "destructive",
+              isDisabled: writeDisabled || busy !== "" || !hasDiscardableChanges,
+              onClick: discardAllChanges,
+            },
+            {
+              label: t("projectTools.gitReview.refreshChanges"),
+              icon: <RefreshCw />,
+              isDisabled: loading,
+              onClick: () => {
+                void refresh();
+              },
+            },
+          ]}
+          menuWidth="var(--xagent-git-context-menu-width)"
+          placement="below"
+          alignment="end"
+          hasChevron={false}
+        />
+      </AstryxView>
+      <AstryxView
+        layout="grid"
+        direction="horizontal"
         aria-hidden={collapsed}
         inert={collapsed}
         className={cn(
@@ -510,19 +467,31 @@ export function GitReviewStatusView(props: {
           collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100",
         )}
       >
-        <div
+        <AstryxView
+          layout="block"
+          direction="horizontal"
           className={cn(
             "min-h-0 overflow-hidden transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none",
             collapsed ? "-translate-y-1 opacity-0" : "translate-y-0 opacity-100",
           )}
         >
           {sectionEntries.length === 0 ? (
-            <div className="px-3 py-3 text-xs text-muted-foreground">{emptyLabel}</div>
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="px-3 py-3 text-xs text-muted-foreground"
+            >
+              {emptyLabel}
+            </AstryxView>
           ) : (
             <>
               {visibleSectionEntries.map((entry) => renderChangeEntry(entry, section))}
               {hiddenCount > 0 ? (
-                <div className="border-b border-border/60 px-3 py-2">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="border-b border-border/60 px-3 py-2"
+                >
                   <Button
                     type="button"
                     variant="ghost"
@@ -535,13 +504,13 @@ export function GitReviewStatusView(props: {
                       String(hiddenCount),
                     )}
                   </Button>
-                </div>
+                </AstryxView>
               ) : null}
             </>
           )}
-        </div>
-      </div>
-    </section>
+        </AstryxView>
+      </AstryxView>
+    </AstryxView>
   );
 
   return (
@@ -552,14 +521,17 @@ export function GitReviewStatusView(props: {
         onClose={closeDiscardConfirm}
         onConfirm={confirmDiscardChanges}
       />
-      <div
+      <AstryxView
+        layout="flex"
+        direction="vertical"
         key="changes"
         className={cn(
           "git-review-tab-enter min-h-0 flex-1 gap-3 overflow-hidden p-3",
           useSplitReviewLayout ? `grid ${GIT_REVIEW_SPLIT_GRID_CLASS}` : "flex flex-col",
         )}
       >
-        <aside
+        <AstryxView
+          as="aside"
           ref={listPaneRef}
           className={cn(
             "min-h-0 flex-col overflow-hidden rounded-lg border border-border/70 bg-background",
@@ -567,7 +539,9 @@ export function GitReviewStatusView(props: {
             !useSplitReviewLayout && "flex-1",
           )}
         >
-          <div
+          <AstryxView
+            layout="block"
+            direction="horizontal"
             className={cn(
               GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS,
               "isolate min-h-0 flex-1 overflow-auto [overscroll-behavior:contain]",
@@ -575,9 +549,13 @@ export function GitReviewStatusView(props: {
             onScroll={handleOverlayScroll}
           >
             {entries.length === 0 ? (
-              <div className="px-3 py-6 text-xs text-muted-foreground">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="px-3 py-6 text-xs text-muted-foreground"
+              >
                 {t("projectTools.gitReview.noLocalChanges")}
-              </div>
+              </AstryxView>
             ) : (
               <>
                 {renderChangeSection(
@@ -610,9 +588,10 @@ export function GitReviewStatusView(props: {
                 )}
               </>
             )}
-          </div>
-        </aside>
-        <main
+          </AstryxView>
+        </AstryxView>
+        <AstryxView
+          as="main"
           ref={detailPaneRef}
           className={cn(
             "h-full min-h-0 flex-col overflow-hidden",
@@ -620,7 +599,11 @@ export function GitReviewStatusView(props: {
             !useSplitReviewLayout && "flex-1",
           )}
         >
-          <div className="mb-3 flex shrink-0 items-center gap-2">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="mb-3 flex shrink-0 items-center gap-2"
+          >
             <GitCommitHorizontal className="h-4 w-4 text-muted-foreground" />
             <Input
               value={commitMessage}
@@ -648,17 +631,28 @@ export function GitReviewStatusView(props: {
                 t("projectTools.gitReview.commit")
               )}
             </Button>
-          </div>
+          </AstryxView>
           {selectedEntry ? (
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-              <div className="flex shrink-0 items-center gap-2 rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-xs">
-                <span className="text-muted-foreground">
+            <AstryxView
+              layout="flex"
+              direction="vertical"
+              className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden"
+            >
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex shrink-0 items-center gap-2 rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-xs"
+              >
+                <AstryxInline className="text-muted-foreground">
                   {t("projectTools.gitReview.selected")}
-                </span>
-                <span className="min-w-0 flex-1 truncate font-medium" title={selectedEntry.path}>
+                </AstryxInline>
+                <AstryxInline
+                  className="min-w-0 flex-1 truncate font-medium"
+                  title={selectedEntry.path}
+                >
                   {selectedEntry.path}
-                </span>
-              </div>
+                </AstryxInline>
+              </AstryxView>
               <DiffReviewCard
                 activeView={activeDiffView}
                 branchDiff={branchDiff}
@@ -668,163 +662,18 @@ export function GitReviewStatusView(props: {
                 showStat={useSplitReviewLayout}
                 worktreeDiff={worktreeDiff}
               />
-            </div>
+            </AstryxView>
           ) : (
-            <div className="flex min-h-0 flex-1 items-center justify-center rounded-lg border border-border/70 bg-muted/10 px-4 text-center text-xs text-muted-foreground">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex min-h-0 flex-1 items-center justify-center rounded-lg border border-border/70 bg-muted/10 px-4 text-center text-xs text-muted-foreground"
+            >
               {t("projectTools.gitReview.selectFileToViewDiff")}
-            </div>
+            </AstryxView>
           )}
-        </main>
-      </div>
-      {changesMenu ? (
-        <div
-          ref={changesMenuRef}
-          role="menu"
-          className={cn("absolute z-[75] min-w-56", CONTEXT_MENU_CONTAINER_CLASS)}
-          style={{ left: changesMenu.x, top: changesMenu.y, transform: "translateX(-100%)" }}
-          onClick={(event) => event.stopPropagation()}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-        >
-          {changesMenu.section === "changes" ? (
-            <button
-              type="button"
-              role="menuitem"
-              className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-              disabled={writeDisabled || busy !== "" || !hasStageableChanges}
-              onClick={stageAllChanges}
-            >
-              <FilePenLine className="h-3.5 w-3.5" />
-              <span>{t("projectTools.gitReview.stageAllChanges")}</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              role="menuitem"
-              className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-              disabled={writeDisabled || busy !== "" || !hasStagedChanges}
-              onClick={unstageAllChanges}
-            >
-              <GitCommitHorizontal className="h-3.5 w-3.5" />
-              <span>{t("projectTools.gitReview.unstageAllChanges")}</span>
-            </button>
-          )}
-          <button
-            type="button"
-            role="menuitem"
-            className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-            disabled={writeDisabled || busy !== "" || !hasDiscardableChanges}
-            onClick={discardAllChanges}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            <span>{t("projectTools.gitReview.discardAllChanges")}</span>
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-            disabled={loading}
-            onClick={() => {
-              setChangesMenu(null);
-              void refresh();
-            }}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span>{t("projectTools.gitReview.refreshChanges")}</span>
-          </button>
-        </div>
-      ) : null}
-      {changeContextMenu && contextEntry ? (
-        <div
-          ref={changeContextMenuRef}
-          role="menu"
-          className={cn("absolute z-[80] min-w-56", CONTEXT_MENU_CONTAINER_CLASS)}
-          style={{ left: changeContextMenu.x, top: changeContextMenu.y }}
-          onClick={(event) => event.stopPropagation()}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-            onClick={() => viewEntryChanges(contextEntry)}
-          >
-            <Eye className="h-3.5 w-3.5" />
-            <span>{t("projectTools.gitReview.viewChanges")}</span>
-          </button>
-          {contextEntrySection === "staged" ? (
-            <button
-              type="button"
-              role="menuitem"
-              className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-              disabled={writeDisabled || busy !== "" || !contextEntryCanUnstage}
-              onClick={() => unstageEntry(contextEntry)}
-            >
-              <GitCommitHorizontal className="h-3.5 w-3.5" />
-              <span>{t("projectTools.gitReview.unstageChanges")}</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              role="menuitem"
-              className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-              disabled={writeDisabled || busy !== "" || !contextEntryCanStage}
-              onClick={() => stageEntry(contextEntry)}
-            >
-              <FilePenLine className="h-3.5 w-3.5" />
-              <span>{t("projectTools.gitReview.stageChanges")}</span>
-            </button>
-          )}
-          <button
-            type="button"
-            role="menuitem"
-            className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-            disabled={writeDisabled || busy !== ""}
-            onClick={() => discardEntry(contextEntry)}
-          >
-            <BrushCleaning className="h-3.5 w-3.5" />
-            <span>{t("projectTools.gitReview.discardChanges")}</span>
-          </button>
-          {contextEntryCanAddToGitignore ? (
-            <button
-              type="button"
-              role="menuitem"
-              className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-              disabled={writeDisabled || busy !== ""}
-              onClick={() => addEntryToGitignore(contextEntry)}
-            >
-              <GitCommitHorizontal className="h-3.5 w-3.5" />
-              <span>{t("projectTools.gitReview.addToGitignore")}</span>
-            </button>
-          ) : null}
-          <button
-            type="button"
-            role="menuitem"
-            className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-            disabled={!onRevealInFileTree}
-            onClick={() => revealEntryInFileTree(contextEntry)}
-          >
-            <FolderTree className="h-3.5 w-3.5" />
-            <span>{t("projectTools.gitReview.revealInFileTree")}</span>
-          </button>
-          {canOpenSystemFileLocation ? (
-            <button
-              type="button"
-              role="menuitem"
-              className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-              onClick={() => openEntrySystemFileLocation(contextEntry)}
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              <span>{t("projectTools.gitReview.openSystemFileLocation")}</span>
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+        </AstryxView>
+      </AstryxView>
     </>
   );
 }

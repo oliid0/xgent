@@ -1,16 +1,29 @@
+import { Card } from "@astryxdesign/core/Card";
+import { Center } from "@astryxdesign/core/Center";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, LayoutHeader, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import type { ReactNode } from "react";
+
 import { useLocale } from "../../i18n";
-import { cn } from "../../lib/shared/utils";
 import { PanelLeft, X } from "../icons";
 import { isMacOsTauri, MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
-import { Button } from "../ui/button";
 
-export function HubBackdrop(props: { tone?: "amber" | "violet" | "neutral" }) {
+type HubTone = "amber" | "violet" | "neutral";
+
+export function HubBackdrop(props: { tone?: HubTone }) {
   return (
-    <div
+    <Center
       aria-hidden="true"
       data-hub-tone={props.tone ?? "neutral"}
-      className="hub-backdrop pointer-events-none absolute inset-0"
+      style={{
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+        backgroundColor: "var(--color-background-body)",
+      }}
     />
   );
 }
@@ -19,7 +32,7 @@ export function HubHeader(props: {
   icon: ReactNode;
   title: string;
   subtitle?: string;
-  tone?: "amber" | "violet" | "neutral";
+  tone?: HubTone;
   actions?: ReactNode;
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
@@ -40,120 +53,162 @@ export function HubHeader(props: {
   const { t } = useLocale();
   const isMacTitleBarOverlay = isMacOsTauri();
   const showSidebarButton = !onClose && !sidebarOpen && !isMacTitleBarOverlay;
+  const closeActionLabel = closeLabel ?? t("settings.close");
+  const iconBackground =
+    tone === "amber"
+      ? "var(--color-background-orange)"
+      : tone === "violet"
+        ? "var(--color-background-purple)"
+        : "var(--color-background-muted)";
+
   return (
     <>
       <MacOsTitleBarSpacer />
-      <div
-        data-close-navigation={onClose ? "true" : undefined}
-        className="hub-header relative z-10 px-4 pb-3 pt-4 sm:px-6 lg:px-8 xl:px-10"
+      <LayoutHeader
+        role="banner"
+        label={title}
+        hasDivider
+        padding={4}
+        style={{
+          position: "relative",
+          zIndex: "var(--xagent-z-hub-header)",
+          backgroundColor: "var(--xagent-hub-header-background)",
+          backdropFilter: "blur(var(--xagent-hub-header-blur))",
+        }}
       >
         {showSidebarButton ? (
-          <Button
-            type="button"
+          <IconButton
+            label={t("tooltip.openSidebar")}
+            tooltip={t("tooltip.openSidebar")}
+            icon={<Icon icon={PanelLeft} size="sm" color="inherit" />}
+            size="md"
             variant="ghost"
-            size="icon"
             onClick={onOpenSidebar}
-            title={t("tooltip.openSidebar")}
-            className="hub-header-sidebar-button absolute left-3 top-3 h-10 w-10 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <PanelLeft className="h-4.5 w-4.5" />
-          </Button>
+            style={{
+              position: "absolute",
+              insetInlineStart: "var(--spacing-3)",
+              insetBlockStart: "var(--spacing-3)",
+            }}
+          />
         ) : null}
-        <div
-          className={cn(
-            "mx-auto flex w-full max-w-[1320px] items-center gap-4",
-            showSidebarButton && "pl-11 lg:pl-0",
-          )}
+        <HStack
+          width="100%"
+          maxWidth="var(--xagent-hub-content-max-width)"
+          gap={4}
+          vAlign="center"
+          style={{
+            marginInline: "auto",
+            paddingInlineStart: showSidebarButton ? "var(--xagent-hub-sidebar-reserve)" : 0,
+          }}
         >
-          {onClose ? <span className="h-11 w-11 shrink-0" aria-hidden="true" /> : null}
-          {!onClose ? (
-            <div
+          {onClose ? (
+            <HStack
+              aria-hidden="true"
+              width="var(--xagent-hub-header-control-size)"
+              height="var(--xagent-hub-header-control-size)"
+            />
+          ) : (
+            <Center
               data-hub-tone={tone}
-              className="hub-header-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-foreground/80"
+              style={{
+                width: "var(--xagent-hub-header-icon-size)",
+                height: "var(--xagent-hub-header-icon-size)",
+                flexShrink: 0,
+                color: "var(--color-icon-primary)",
+                backgroundColor: iconBackground,
+                borderRadius: "var(--radius-container)",
+              }}
             >
               {icon}
-            </div>
-          ) : null}
-          <div className={cn("min-w-0 flex-1", onClose && "text-center")}>
-            <h1 className="text-[21px] font-semibold leading-tight tracking-tight text-foreground">
-              {title}
-            </h1>
-            {subtitle ? (
-              <p
-                className={cn(
-                  "mt-0.5 truncate text-[12px] text-muted-foreground",
-                  onClose && "hidden",
-                )}
-                title={subtitle}
-              >
-                {subtitle}
-              </p>
-            ) : null}
-          </div>
+            </Center>
+          )}
+          <StackItem size="fill">
+            <VStack gap={0.5} hAlign={onClose ? "center" : "start"}>
+              <Heading level={1}>{title}</Heading>
+              {subtitle && !onClose ? (
+                <Text
+                  type="supporting"
+                  color="secondary"
+                  maxLines={1}
+                  hasTruncateTooltip="below"
+                >
+                  {subtitle}
+                </Text>
+              ) : null}
+            </VStack>
+          </StackItem>
           {actions ? (
-            <div className="hub-header-actions flex items-center gap-2">{actions}</div>
+            <HStack gap={2} vAlign="center">
+              {actions}
+            </HStack>
           ) : null}
           {onClose ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
+            <IconButton
+              label={closeActionLabel}
+              tooltip={closeActionLabel}
+              icon={<Icon icon={X} size="md" color="inherit" />}
+              size="lg"
+              variant="secondary"
               onClick={onClose}
-              title={closeLabel ?? t("settings.close")}
-              aria-label={closeLabel ?? t("settings.close")}
-              className="hub-header-close-button h-11 w-11 shrink-0 rounded-full border border-border/60 bg-background/80 text-foreground shadow-sm transition-[background-color,color,box-shadow] duration-150 active:bg-muted"
-            >
-              <X className="h-5 w-5" />
-            </Button>
+            />
           ) : null}
-        </div>
-      </div>
+        </HStack>
+      </LayoutHeader>
     </>
   );
 }
 
-/** Solid information surface shared by Skills and MCP hubs. */
+/** A discrete information surface shared by Skills and MCP hubs. */
 export function HubPanel(props: {
   children: ReactNode;
-  tone?: "default" | "muted" | "error" | "amber" | "violet" | "neutral";
+  tone?: "default" | "muted" | "error" | HubTone;
   active?: boolean;
   className?: string;
 }) {
   const { children, tone = "default", active = false, className } = props;
-  const toneClass = (() => {
-    switch (tone) {
-      case "muted":
-        return "border-border bg-muted";
-      case "error":
-        return "border-destructive/30 bg-destructive/5";
-      case "amber":
-      case "violet":
-      case "neutral":
-        return active ? "border-foreground/20 bg-card shadow-sm" : "border-border bg-card";
-      default:
-        return "border-border bg-card";
-    }
-  })();
+  const variant =
+    tone === "muted"
+      ? "muted"
+      : tone === "error"
+        ? "red"
+        : tone === "amber"
+          ? "orange"
+          : tone === "violet"
+            ? "purple"
+            : "default";
+
   return (
-    <div className={cn("hub-panel rounded-xl border px-4 py-3.5", toneClass, className)}>
+    <Card
+      padding={4}
+      variant={variant}
+      elevation={active ? "low" : "none"}
+      className={className}
+    >
       {children}
-    </div>
+    </Card>
   );
 }
 
-/** Temporary source-compatible alias while callers migrate to the semantic name. */
 export const GlassPanel = HubPanel;
 
 export function HubSegmentedControl(props: { children: ReactNode; className?: string }) {
   return (
-    <div
-      className={cn(
-        "hub-segmented-control inline-flex min-w-0 items-center rounded-xl bg-muted p-1",
-        props.className,
-      )}
+    <HStack
+      gap={1}
+      padding={1}
+      vAlign="center"
+      wrap="nowrap"
+      role="group"
+      className={props.className}
+      style={{
+        minWidth: 0,
+        borderRadius: "var(--radius-container)",
+        backgroundColor: "var(--color-background-muted)",
+        overflowX: "auto",
+      }}
     >
       {props.children}
-    </div>
+    </HStack>
   );
 }
 
@@ -166,21 +221,18 @@ export function HubSegmentedButton(props: {
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      aria-pressed={props.active}
-      disabled={props.disabled}
-      title={props.title}
-      onClick={props.onClick}
-      className={cn(
-        "hub-segmented-button inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-[12.5px] font-medium transition-[color,background-color,box-shadow,transform] duration-150 disabled:cursor-not-allowed disabled:opacity-50",
-        props.active
-          ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-          : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
-        props.className,
-      )}
+    <ToggleButton
+      label={props.title ?? "View"}
+      isPressed={props.active}
+      isDisabled={props.disabled}
+      size="sm"
+      onPressedChange={(_isPressed, event) => {
+        event.preventDefault();
+        props.onClick();
+      }}
+      style={{ flexShrink: 0 }}
     >
       {props.children}
-    </button>
+    </ToggleButton>
   );
 }

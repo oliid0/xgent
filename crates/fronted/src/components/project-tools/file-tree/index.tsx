@@ -1,10 +1,22 @@
-// Workspace navigation file tree: virtualized tree over the useFileTreeData
+// Workspace navigation file tree: Astryx TreeList over the useFileTreeData
 // layer, reading its wiring from the workspace-tools context.
 //
 // Shared by every frontend runtime; only relative, npm-package, or
 // @xagent/runtime imports are allowed here.
 
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Code } from "@astryxdesign/core/Code";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Grid } from "@astryxdesign/core/Grid";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Section } from "@astryxdesign/core/Section";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { TreeList, type TreeListItemData } from "@astryxdesign/core/TreeList";
 import {
   type MouseEvent as ReactMouseEvent,
   useCallback,
@@ -15,23 +27,18 @@ import {
 } from "react";
 import { useLocale } from "../../../i18n";
 import type { WorkspaceFileTreeStatePatch } from "../../../lib/settings";
-import { cn } from "../../../lib/shared/utils";
 import { getFileTypeIcon } from "../../chat/fileTypeIcons";
 import {
   Check,
   Edit3,
   FolderClosed,
   FolderOpen,
-  Loader2,
   Plus,
   RefreshCw,
-  Search,
   Trash2,
   X,
 } from "../../icons";
-import { Button } from "../../ui/button";
 import { useConfirmDialog } from "../../ui/confirm-dialog";
-import { Input } from "../../ui/input";
 import { isWorkspaceImagePath } from "../../workspace-editor/workspaceImagePreview";
 import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
 import { FileTreeContextMenu } from "./ContextMenu";
@@ -40,15 +47,12 @@ import {
   ancestorDirsOfPath,
   basename,
   dirname,
-  FILE_TREE_ROW_HEIGHT,
   type FileTreeKind,
-  flattenFileTreeRows,
   ROOT_PATH,
   remapExpandedPathsForRename,
   removeExpandedPath,
   removeExpandedSubtree,
 } from "./model";
-import { FileTreeErrorRow, FileTreeRow } from "./Row";
 import { useFileTreeData } from "./useFileTreeData";
 
 const FILE_TREE_QUERY_SYNC_DEBOUNCE_MS = 180;
@@ -56,8 +60,6 @@ const FILE_TREE_QUERY_SYNC_DEBOUNCE_MS = 180;
 type PendingAction = "file" | "folder" | "rename" | null;
 
 type ContextMenuState = {
-  x: number;
-  y: number;
   path: string;
 };
 
@@ -78,7 +80,6 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [revealTarget, setRevealTarget] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const { confirm: requestConfirmDialog, dialog: confirmDialog } = useConfirmDialog();
 
   const {
@@ -181,22 +182,6 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
     setRevealTarget(null);
   }, [projectPathKey]);
 
-  useEffect(() => {
-    if (!contextMenu) return;
-    const close = () => setContextMenu(null);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    window.addEventListener("click", close);
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("click", close);
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [contextMenu]);
-
   // Reveal: expand + load the ancestor chain, then scroll the row into view.
   // The expansion merge reads `expandedRef` *after* the awaits so manual
   // expands that happened while loading are preserved (the old panel captured
@@ -226,22 +211,18 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
     void revealPath(target, kind);
   }, [initialized, projectPathKey, revealPath, syncState.revision, syncState.selectedPath]);
 
-  const rows = useMemo(() => flattenFileTreeRows(nodes, expandedSet), [expandedSet, nodes]);
-
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => FILE_TREE_ROW_HEIGHT,
-    overscan: 12,
-  });
-
   useEffect(() => {
     if (!revealTarget) return;
-    const index = rows.findIndex((row) => row.type === "node" && row.path === revealTarget);
-    if (index < 0) return;
-    rowVirtualizer.scrollToIndex(index, { align: "center" });
-    setRevealTarget(null);
-  }, [revealTarget, rowVirtualizer, rows]);
+    const frame = window.requestAnimationFrame(() => {
+      const item = Array.from(
+        panelRef.current?.querySelectorAll<HTMLElement>("[data-tree-id]") ?? [],
+      ).find((element) => element.dataset.treeId === revealTarget);
+      if (!item) return;
+      item.scrollIntoView({ block: "center", inline: "nearest" });
+      setRevealTarget(null);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [expandedPaths, nodes, revealTarget]);
 
   const getSiblingImagePaths = useCallback((targetPath: string) => {
     if (!isWorkspaceImagePath(targetPath)) return [];
@@ -279,17 +260,38 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
   const openContextMenu = useCallback(
     (event: ReactMouseEvent, path: string) => {
       event.preventDefault();
-      event.stopPropagation();
       const targetPath = nodesRef.current[path] ? path : ROOT_PATH;
       selectPath(targetPath);
-      const rect = panelRef.current?.getBoundingClientRect();
       setContextMenu({
-        x: event.clientX - (rect?.left ?? 0),
-        y: event.clientY - (rect?.top ?? 0),
         path: targetPath,
       });
     },
     [selectPath],
+  );
+
+  const openContextMenuFromTree = useCallback(
+    (event: ReactMouseEvent) => {
+      let item = (event.target as HTMLElement).closest<HTMLElement>("[data-tree-id]");
+      let path = item?.dataset.treeId;
+      while (item && (path === undefined || nodesRef.current[path] === undefined)) {
+        item = item.parentElement?.closest<HTMLElement>("[data-tree-id]") ?? null;
+        path = item?.dataset.treeId;
+      }
+      openContextMenu(event, path ?? selectedPath ?? ROOT_PATH);
+    },
+    [openContextMenu, selectedPath],
+  );
+
+  const syncTreeChevronToggle = useCallback(
+    (event: ReactMouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-tree-toggle]")) return;
+      const item = target.closest<HTMLElement>("[data-tree-id]");
+      const path = item?.dataset.treeId;
+      if (path === undefined || nodesRef.current[path]?.kind !== "dir") return;
+      toggleDirectory(path, expandedSet.has(path));
+    },
+    [expandedSet, toggleDirectory],
   );
 
   const startAction = useCallback(
@@ -363,19 +365,13 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
         title: t("projectTools.fileTree.deleteConfirm").replace("{path}", targetPath),
         subtitle: t("projectTools.fileTree.deleteConfirmDescription"),
         description: (
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-destructive/25 bg-destructive/10 text-destructive">
-              <Trash2 className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-foreground">
-                {basename(targetPath)}
-              </div>
-              <p className="mt-1.5 break-all text-xs leading-5 text-muted-foreground">
-                {targetPath}
-              </p>
-            </div>
-          </div>
+          <VStack gap={2}>
+            <HStack gap={2} vAlign="center">
+              <Trash2 />
+              <Text type="label">{basename(targetPath)}</Text>
+            </HStack>
+            <Code>{targetPath}</Code>
+          </VStack>
         ),
         confirmLabel: t("projectTools.fileTree.delete"),
         cancelLabel: t("settings.cancel"),
@@ -432,112 +428,179 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
     return "";
   }, [pendingAction, t]);
 
+  const treeItems = useMemo<TreeListItemData[]>(() => {
+    const visited = new Set<string>();
+
+    const buildItem = (path: string): TreeListItemData | null => {
+      const node = nodes[path];
+      if (!node || visited.has(path)) return null;
+      visited.add(path);
+      const TypeIcon = getFileTypeIcon(node.path, node.kind, {
+        expanded: expandedSet.has(node.path),
+      });
+      const loadedChildren = node.children
+        .map(buildItem)
+        .filter((item): item is TreeListItemData => item !== null);
+      let children: TreeListItemData[] | undefined;
+      if (node.kind === "dir") {
+        if (loadedChildren.length > 0) {
+          children = loadedChildren;
+        } else if (!node.loaded || node.loading || node.error) {
+          children = [
+            {
+              id: `${node.path}\u0000state`,
+              label: node.error ?? t("projectTools.loading"),
+              startContent: node.loading ? (
+                <Spinner size="sm" label={t("projectTools.loading")} />
+              ) : undefined,
+              isDisabled: true,
+            },
+          ];
+        }
+      }
+
+      return {
+        id: node.path,
+        label: node.name,
+        description: node.error,
+        startContent: <TypeIcon />,
+        endContent: node.loading ? (
+          <Spinner size="sm" label={t("projectTools.loading")} />
+        ) : undefined,
+        children,
+        isExpanded: expandedSet.has(node.path),
+        isSelected: selectedPath === node.path,
+        onClick: (event) => {
+          selectPath(node.path);
+          const keyboardActivation = event.detail === 0;
+          const alternateActivation = event.detail >= 2;
+          if (node.kind === "dir") {
+            if (keyboardActivation || alternateActivation) {
+              toggleDirectory(node.path, expandedSet.has(node.path));
+            }
+            return;
+          }
+          if (touchActions || keyboardActivation || alternateActivation) {
+            handleOpenFile(node.path);
+          }
+        },
+      };
+    };
+
+    const root = buildItem(ROOT_PATH);
+    return root ? [root] : [];
+  }, [expandedSet, handleOpenFile, nodes, selectPath, selectedPath, t, toggleDirectory, touchActions]);
+
   if (!initialized) {
     return (
-      <div className="flex h-full min-h-0 flex-col items-center justify-center gap-4 px-6 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/80">
-          <FolderOpen className="h-6 w-6 text-muted-foreground" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <div className="text-sm font-medium text-foreground">{t("projectTools.newFileTree")}</div>
-          <div className="text-xs text-muted-foreground">
-            {t("projectTools.fileTreeDescription")}
-          </div>
-        </div>
-        <Button
-          size="sm"
-          onClick={() => {
-            fileTree.onInitializedChange(true);
-            void loadChildren(ROOT_PATH, { force: true });
-          }}
-        >
-          {t("projectTools.newFileTree")}
-        </Button>
-      </div>
+      <VStack height="100%" hAlign="center" vAlign="center">
+        <EmptyState
+          isCompact
+          icon={<FolderOpen />}
+          title={t("projectTools.newFileTree")}
+          description={t("projectTools.fileTreeDescription")}
+          actions={
+            <Button
+              label={t("projectTools.newFileTree")}
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                fileTree.onInitializedChange(true);
+                void loadChildren(ROOT_PATH, { force: true });
+              }}
+            />
+          }
+        />
+      </VStack>
     );
   }
 
-  const contextNode = contextMenu ? (nodes[contextMenu.path] ?? nodes[ROOT_PATH]) : null;
+  const contextNode =
+    nodes[contextMenu?.path ?? selectedPath] ?? nodes[selectedPath] ?? nodes[ROOT_PATH];
 
   return (
-    <div ref={panelRef} className="relative flex h-full min-h-0 select-none flex-col">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-            placeholder={t("projectTools.fileTree.searchPlaceholder")}
-            className="h-8 pl-7 text-[calc(11px*var(--zone-font-scale,1))] placeholder:text-[calc(11px*var(--zone-font-scale,1))]"
+    <VStack ref={panelRef} height="100%" gap={0}>
+      <Section variant="transparent" padding={2} dividers={["bottom"]}>
+        <HStack gap={2} vAlign="center">
+          <StackItem size="fill">
+            <TextInput
+              label={t("projectTools.fileTree.searchPlaceholder")}
+              isLabelHidden
+              value={query}
+              onChange={setQuery}
+              placeholder={t("projectTools.fileTree.searchPlaceholder")}
+              startIcon="search"
+              hasClear
+              size="sm"
+              width="100%"
+            />
+          </StackItem>
+          <IconButton
+            label={t("projectTools.fileTree.refresh")}
+            tooltip={t("projectTools.fileTree.refresh")}
+            icon={<RefreshCw />}
+            variant="ghost"
+            size="sm"
+            onClick={() => refreshVisible()}
           />
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 rounded-lg"
-          title={t("projectTools.fileTree.refresh")}
-          onClick={() => refreshVisible()}
-        >
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-      </div>
+        </HStack>
+      </Section>
 
       {touchActions ? (
-        <div className="grid shrink-0 grid-cols-4 gap-1 border-b border-border/60 px-2 py-1.5">
+        <Section variant="transparent" padding={1.5} dividers={["bottom"]}>
+          <Grid columns={4} gap={1} width="100%">
           <Button
-            type="button"
+            label={t("projectTools.fileTree.newFile")}
             variant="ghost"
-            className="h-9 gap-1.5 rounded-lg px-1 text-[11px] font-normal"
-            disabled={!canMutate || busyAction}
+            size="sm"
+            width="100%"
+            icon={<Plus />}
+            isDisabled={!canMutate || busyAction}
             onClick={() => startAction("file", selectedPath)}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span className="truncate">{t("projectTools.fileTree.newFile")}</span>
-          </Button>
+          />
           <Button
-            type="button"
+            label={t("projectTools.fileTree.newFolder")}
             variant="ghost"
-            className="h-9 gap-1.5 rounded-lg px-1 text-[11px] font-normal"
-            disabled={!canMutate || busyAction}
+            size="sm"
+            width="100%"
+            icon={<FolderClosed />}
+            isDisabled={!canMutate || busyAction}
             onClick={() => startAction("folder", selectedPath)}
-          >
-            <FolderClosed className="h-3.5 w-3.5" />
-            <span className="truncate">{t("projectTools.fileTree.newFolder")}</span>
-          </Button>
+          />
           <Button
-            type="button"
+            label={t("projectTools.fileTree.rename")}
             variant="ghost"
-            className="h-9 gap-1.5 rounded-lg px-1 text-[11px] font-normal"
-            disabled={!canMutate || !selectedPath || busyAction}
+            size="sm"
+            width="100%"
+            icon={<Edit3 />}
+            isDisabled={!canMutate || !selectedPath || busyAction}
             onClick={() => startAction("rename", selectedPath)}
-          >
-            <Edit3 className="h-3.5 w-3.5" />
-            <span className="truncate">{t("projectTools.fileTree.rename")}</span>
-          </Button>
+          />
           <Button
-            type="button"
-            variant="ghost"
-            className="h-9 gap-1.5 rounded-lg px-1 text-[11px] font-normal text-destructive hover:bg-destructive/10 hover:text-destructive"
-            disabled={!canMutate || !selectedPath || busyAction}
+            label={t("projectTools.fileTree.delete")}
+            variant="destructive"
+            size="sm"
+            width="100%"
+            icon={<Trash2 />}
+            isDisabled={!canMutate || !selectedPath || busyAction}
             onClick={() => void deletePath(selectedPath)}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            <span className="truncate">{t("projectTools.fileTree.delete")}</span>
-          </Button>
-        </div>
+          />
+          </Grid>
+        </Section>
       ) : null}
 
       {pendingAction ? (
-        <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-3 py-2">
-          <Input
-            autoFocus
+        <Section variant="muted" padding={2} dividers={["bottom"]}>
+          <HStack gap={2} vAlign="center">
+          <StackItem size="fill">
+          <TextInput
+            label={actionPlaceholder}
+            isLabelHidden
+            hasAutoFocus
             value={draftName}
-            onChange={(event) => setDraftName(event.currentTarget.value)}
+            onChange={setDraftName}
+            onEnter={() => void finishAction()}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                void finishAction();
-              }
               if (event.key === "Escape") {
                 event.preventDefault();
                 setPendingAction(null);
@@ -546,151 +609,101 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
               }
             }}
             placeholder={actionPlaceholder}
-            className="h-8 text-[calc(11px*var(--zone-font-scale,1))] placeholder:text-[calc(11px*var(--zone-font-scale,1))]"
+            size="sm"
+            width="100%"
           />
-          <Button
-            size="icon"
+          </StackItem>
+          <IconButton
+            label={t("settings.save")}
             variant="ghost"
-            className="h-8 w-8 rounded-lg"
-            disabled={busyAction}
+            size="sm"
+            icon={<Check />}
+            isLoading={busyAction}
+            isDisabled={busyAction}
             onClick={() => void finishAction()}
-          >
-            {busyAction ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Check className="h-4 w-4" />
-            )}
-          </Button>
-          <Button
-            size="icon"
+          />
+          <IconButton
+            label={t("settings.cancel")}
             variant="ghost"
-            className="h-8 w-8 rounded-lg"
+            size="sm"
+            icon={<X />}
             onClick={() => {
               setPendingAction(null);
               setPendingTargetPath(null);
             }}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+          />
+          </HStack>
+        </Section>
       ) : null}
 
       {actionError ? (
-        <div className="shrink-0 border-b border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {actionError}
-        </div>
+        <Section variant="transparent" padding={2} dividers={["bottom"]}>
+          <Banner status="error" title={actionError} />
+        </Section>
       ) : null}
 
       {query.trim() ? (
-        <div className="project-file-tree-panel-scroll max-h-40 shrink-0 overflow-auto border-b border-border/60 px-2 py-2">
+        <Section
+          variant="transparent"
+          padding={2}
+          dividers={["bottom"]}
+          style={{ maxHeight: "var(--xagent-file-tree-search-results-height)", overflowY: "auto" }}
+        >
           {search.loading ? (
-            <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              {t("projectTools.fileTree.searching")}
-            </div>
+            <HStack gap={2} vAlign="center">
+              <Spinner size="sm" label={t("projectTools.fileTree.searching")} />
+              <Text type="supporting" color="secondary">
+                {t("projectTools.fileTree.searching")}
+              </Text>
+            </HStack>
           ) : search.error ? (
-            <div className="px-2 py-1 text-xs text-destructive">{search.error}</div>
+            <Banner status="error" title={search.error} />
           ) : search.results.length === 0 ? (
-            <div className="px-2 py-1 text-xs text-muted-foreground">
-              {t("projectTools.fileTree.noMatches")}
-            </div>
+            <EmptyState
+              isCompact
+              title={t("projectTools.fileTree.noMatches")}
+              actions={
+                <Button
+                  label={t("projectTools.fileTree.searchPlaceholder")}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setQuery("")}
+                />
+              }
+            />
           ) : (
-            search.results.map((entry) => {
-              const TypeIcon = getFileTypeIcon(entry.path, entry.kind);
-              return (
-                <button
-                  key={`${entry.kind}:${entry.path}`}
-                  type="button"
-                  className={cn(
-                    "flex w-full select-none items-center gap-1.5 rounded-md px-2 text-left text-xs leading-5 text-muted-foreground hover:bg-muted hover:text-foreground",
-                    entry.hidden && "opacity-60 hover:opacity-80",
-                  )}
-                  style={{ minHeight: FILE_TREE_ROW_HEIGHT }}
-                  title={entry.path}
-                  onClick={() => {
-                    if (touchActions && entry.kind === "file") {
-                      handleOpenFile(entry.path);
-                      return;
-                    }
-                    void revealPath(entry.path, entry.kind);
-                  }}
-                >
-                  <TypeIcon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="min-w-0 truncate">{entry.path}</span>
-                </button>
-              );
-            })
+            <List density="compact" hasDividers={false}>
+              {search.results.map((entry) => {
+                const TypeIcon = getFileTypeIcon(entry.path, entry.kind);
+                return (
+                  <ListItem
+                    key={`${entry.kind}:${entry.path}`}
+                    label={entry.path}
+                    startContent={<TypeIcon />}
+                    onClick={() => {
+                      if (touchActions && entry.kind === "file") {
+                        handleOpenFile(entry.path);
+                        return;
+                      }
+                      void revealPath(entry.path, entry.kind);
+                    }}
+                  />
+                );
+              })}
+            </List>
           )}
           {search.truncated ? (
-            <div className="px-2 pt-1 text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground">
+            <Text type="supporting" color="secondary" display="block">
               {t("projectTools.fileTree.resultsTruncated")}
-            </div>
+            </Text>
           ) : null}
-        </div>
+        </Section>
       ) : null}
 
-      <div
-        role="tree"
-        ref={scrollRef}
-        className="project-file-tree-panel-scroll min-h-0 flex-1 select-none overflow-auto px-2 py-2"
-        onContextMenu={(event) => openContextMenu(event, selectedPath || ROOT_PATH)}
-      >
-        <div className="relative w-full" style={{ height: rowVirtualizer.getTotalSize() }}>
-          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-            const row = rows[virtualRow.index];
-            if (!row) return null;
-            if (row.type === "error") {
-              return (
-                <div
-                  key={row.key}
-                  ref={rowVirtualizer.measureElement}
-                  data-index={virtualRow.index}
-                  className="absolute left-0 top-0 w-full"
-                  style={{ transform: `translateY(${virtualRow.start}px)` }}
-                >
-                  <FileTreeErrorRow depth={row.depth} message={row.message} />
-                </div>
-              );
-            }
-            const node = nodes[row.path];
-            if (!node) return null;
-            return (
-              <div
-                key={row.key}
-                ref={rowVirtualizer.measureElement}
-                data-index={virtualRow.index}
-                className="absolute left-0 top-0 w-full"
-                style={{ transform: `translateY(${virtualRow.start}px)` }}
-              >
-                <FileTreeRow
-                  path={node.path}
-                  name={node.name}
-                  kind={node.kind}
-                  hidden={node.hidden}
-                  depth={row.depth}
-                  expanded={expandedSet.has(row.path)}
-                  selected={selectedPath === row.path}
-                  loading={node.loading}
-                  title={row.path || cwd}
-                  onToggle={toggleDirectory}
-                  onSelect={selectPath}
-                  onOpen={handleOpenFile}
-                  onContextMenu={openContextMenu}
-                  openFilesOnSingleClick={touchActions}
-                />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {contextMenu && contextNode ? (
+      <StackItem size="fill" isScrollable>
         <FileTreeContextMenu
-          key={`${contextMenu.path}:${contextMenu.x}:${contextMenu.y}`}
-          anchor={{ x: contextMenu.x, y: contextMenu.y }}
-          containerRef={panelRef}
-          path={contextNode.path}
-          kind={contextNode.kind}
+          path={contextNode?.path ?? ROOT_PATH}
+          kind={contextNode?.kind ?? "dir"}
           canMutate={canMutate}
           canOpenFile={Boolean(fileTree.onOpenFile)}
           canInsertMention={Boolean(fileTree.onInsertFileMention)}
@@ -705,10 +718,25 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
           onRefresh={handleMenuRefresh}
           onToggleHidden={() => emitState({ showHidden: !syncState.showHidden })}
           onActionError={setActionError}
-        />
-      ) : null}
+        >
+          <Section
+            variant="transparent"
+            padding={2}
+            minHeight="100%"
+            onContextMenu={openContextMenuFromTree}
+            onClickCapture={syncTreeChevronToggle}
+          >
+            <TreeList
+              key={`${projectPathKey}:${syncState.revision}`}
+              items={treeItems}
+              density={touchActions ? "balanced" : "compact"}
+              variant="lineGuides"
+            />
+          </Section>
+        </FileTreeContextMenu>
+      </StackItem>
 
       {confirmDialog}
-    </div>
+    </VStack>
   );
 }

@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { Check, Loader2, Mic } from "../../components/icons";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { FormLayout } from "@astryxdesign/core/FormLayout";
+import { Grid, GridSpan } from "@astryxdesign/core/Grid";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { Section } from "@astryxdesign/core/Section";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Check, Mic } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   normalizeSettings,
@@ -7,7 +17,6 @@ import {
   type SttProviderId,
   type SttProviderSettings,
 } from "../../lib/settings";
-import { cn } from "../../lib/shared/utils";
 import { desktopSttSettingsService } from "../../lib/stt/desktopSttSettingsService";
 import type { SttSecretField } from "../../lib/stt/types";
 import type { SettingsSectionProps } from "./types";
@@ -101,68 +110,53 @@ export function SttSettingsSection({ settings, setSettings }: SettingsSectionPro
   };
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-2xl border border-border/60 bg-card p-4">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-300">
-            <Mic className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold">{t("settings.stt.title")}</h2>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+    <VStack gap={5}>
+      <Section padding={4} width="100%">
+        <HStack gap={3} vAlign="start">
+          <Mic />
+          <StackItem size="fill">
+            <VStack gap={1}>
+            <Heading level={2}>
+              {t("settings.stt.title")}
+            </Heading>
+            <Text type="supporting" color="secondary">
               {t("settings.stt.desc")}
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={settings.stt.enabled}
-            onClick={() =>
-              setSettings((prev) =>
-                normalizeSettings({ ...prev, stt: { ...prev.stt, enabled: !prev.stt.enabled } }),
-              )
+            </Text>
+            </VStack>
+          </StackItem>
+          <Switch
+            value={settings.stt.enabled}
+            label={t("settings.stt.title")}
+            isLabelHidden
+            onChange={(enabled) =>
+              setSettings((prev) => normalizeSettings({ ...prev, stt: { ...prev.stt, enabled } }))
             }
-            className={cn(
-              "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-              settings.stt.enabled ? "bg-rose-500" : "bg-muted-foreground/25",
-            )}
-          >
-            <span
-              className={cn(
-                "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                settings.stt.enabled ? "translate-x-5" : "translate-x-0.5",
-              )}
-            />
-          </button>
-        </div>
-      </section>
+          />
+        </HStack>
+      </Section>
 
-      <section className="rounded-2xl border border-border/60 bg-card p-4">
-        <label className="text-xs font-medium text-foreground">{t("settings.stt.provider")}</label>
-        <select
-          value={providerId}
-          onChange={(event) => {
-            const next = event.target.value as SttProviderId;
-            if (!STT_PROVIDER_IDS.includes(next)) return;
-            setTestResult(null);
-            setSettings((prev) =>
-              normalizeSettings({ ...prev, stt: { ...prev.stt, provider: next } }),
-            );
-          }}
-          className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-rose-500/50"
-        >
-          {STT_PROVIDER_IDS.map((id) => (
-            <option key={id} value={id}>
-              {PROVIDER_LABELS[id]}
-            </option>
-          ))}
-        </select>
+      <Section padding={4} width="100%">
+        <VStack gap={4}>
+          <Selector
+            label={t("settings.stt.provider")}
+            value={providerId}
+            onChange={(value) => {
+              const next = value as SttProviderId;
+              if (!STT_PROVIDER_IDS.includes(next)) return;
+              setTestResult(null);
+              setSettings((prev) =>
+                normalizeSettings({ ...prev, stt: { ...prev.stt, provider: next } }),
+              );
+            }}
+            options={STT_PROVIDER_IDS.map((id) => ({ value: id, label: PROVIDER_LABELS[id] }))}
+            width="100%"
+          />
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Grid columns={{ minWidth: 240, max: 2, repeat: "fit" }} gap={3} width="100%">
           {PROVIDER_FIELDS[providerId].map((field) => (
-            <label key={field.key} className={field.key === "websocketUrl" ? "sm:col-span-2" : ""}>
-              <span className="text-xs font-medium text-foreground">{field.label}</span>
-              <input
+            <GridSpan key={field.key} columns={field.key === "websocketUrl" ? "full" : 1}>
+              <TextInput
+                label={field.label}
                 type={field.secret ? "password" : "text"}
                 value={typeof provider[field.key] === "string" ? String(provider[field.key]) : ""}
                 placeholder={
@@ -170,36 +164,32 @@ export function SttSettingsSection({ settings, setSettings }: SettingsSectionPro
                     ? t("settings.stt.secretSaved")
                     : field.placeholder
                 }
-                onChange={(event) => patchProvider({ [field.key]: event.target.value })}
-                className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-rose-500/50"
+                onChange={(value) => patchProvider({ [field.key]: value })}
+                width="100%"
               />
-            </label>
+            </GridSpan>
           ))}
-        </div>
+          </Grid>
 
-        <div className="mt-4 flex items-center gap-3">
-          <button
+          <HStack gap={3} vAlign="center" wrap="wrap">
+          <Button
             type="button"
-            disabled={testing}
+            label={t("settings.stt.test")}
+            icon={<Check />}
+            isLoading={testing}
+            isDisabled={testing}
             onClick={() => void testConnection()}
-            className="inline-flex h-9 items-center gap-2 rounded-xl bg-foreground px-3 text-xs font-medium text-background disabled:opacity-50"
-          >
-            {testing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Check className="h-3.5 w-3.5" />
-            )}
-            {t("settings.stt.test")}
-          </button>
+          />
           {testResult ? (
-            <span
-              className={cn("text-xs", testResult.ok ? "text-emerald-600" : "text-destructive")}
-            >
-              {testResult.message}
-            </span>
+            <Banner
+              status={testResult.ok ? "success" : "error"}
+              title={testResult.message}
+              collapsible={false}
+            />
           ) : null}
-        </div>
-      </section>
-    </div>
+          </HStack>
+        </VStack>
+      </Section>
+    </VStack>
   );
 }

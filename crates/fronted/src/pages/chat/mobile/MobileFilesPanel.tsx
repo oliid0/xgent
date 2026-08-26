@@ -1,4 +1,5 @@
 import { openUrl } from "@xagent/runtime";
+import { StackItem } from "@astryxdesign/core/Layout";
 import { useCallback, useMemo } from "react";
 import { HubHeader } from "../../../components/hub/HubChrome";
 import { FolderTree } from "../../../components/icons";
@@ -143,9 +144,9 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
           closeLabel={t("chat.cancel")}
         />
 
-        <div className="min-h-0 flex-1 pb-[env(safe-area-inset-bottom,0px)]">
+        <StackItem size="fill">
           <FileTreePanel active touchActions />
-        </div>
+        </StackItem>
       </MobileFullscreenPanel>
     </WorkspaceToolsContext.Provider>
   );

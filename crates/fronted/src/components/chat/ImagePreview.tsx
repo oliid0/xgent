@@ -1,9 +1,23 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Lightbox from "yet-another-react-lightbox";
-import Zoom from "yet-another-react-lightbox/plugins/zoom";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { ButtonGroup } from "@astryxdesign/core/ButtonGroup";
+import { Center } from "@astryxdesign/core/Center";
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import {
+  HStack,
+  Layout,
+  LayoutContent,
+  LayoutFooter,
+  VStack,
+} from "@astryxdesign/core/Layout";
+import { Slider } from "@astryxdesign/core/Slider";
+import { Text } from "@astryxdesign/core/Text";
+import { memo, useCallback, useEffect, useRef, useState, type WheelEvent } from "react";
+
 import { useLocale } from "../../i18n";
-import { Copy, Download, ExternalLink, Loader2 } from "../icons";
-import "yet-another-react-lightbox/styles.css";
+import { ArrowLeft, ChevronRight, Copy, Download, ExternalLink, X } from "../icons";
 
 export type ImagePreviewSlide = {
   src: string;
@@ -25,8 +39,6 @@ type ImagePreviewProps = {
   onClose: () => void;
 };
 
-const imagePreviewPlugins = [Zoom];
-
 function normalizeImagePreviewIndex(index: number | undefined) {
   return Number.isFinite(index) ? Math.trunc(index as number) : 0;
 }
@@ -36,12 +48,17 @@ function clampImagePreviewIndex(index: number, slideCount: number) {
   return Math.min(Math.max(index, 0), slideCount - 1);
 }
 
+function clampZoom(value: number) {
+  return Math.min(Math.max(value, 1), 3);
+}
+
 export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps) {
   const { t } = useLocale();
   const { open, slides, index = 0, closeLabel = "关闭预览", onClose } = props;
   const requestedIndex = normalizeImagePreviewIndex(index);
   const clampedRequestedIndex = clampImagePreviewIndex(requestedIndex, slides.length);
   const [activeIndex, setActiveIndex] = useState(clampedRequestedIndex);
+  const [zoom, setZoom] = useState(1);
   const [pendingAction, setPendingAction] = useState<"copy" | "save" | "open" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const wasOpenRef = useRef(open);
@@ -72,6 +89,7 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
   const activeSlide = slides[clampedIndex];
 
   useEffect(() => {
+    setZoom(1);
     setActionError(null);
     setPendingAction(null);
     if (!open || !activeSlide?.onPrepare) return;
@@ -80,29 +98,14 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
     });
   }, [activeSlide, open]);
 
-  const handleView = useCallback(
-    ({ index: nextIndex }: { index: number }) => {
+  const changeSlide = useCallback(
+    (nextIndex: number) => {
       setActiveIndex(clampImagePreviewIndex(nextIndex, slides.length));
     },
     [slides.length],
   );
 
-  const callbacks = useMemo(
-    () => ({
-      view: handleView,
-    }),
-    [handleView],
-  );
-
   if (slides.length === 0) return null;
-
-  const singleSlideRender =
-    slides.length > 1
-      ? undefined
-      : {
-          buttonPrev: () => null,
-          buttonNext: () => null,
-        };
 
   const runAction = async (
     action: "copy" | "save" | "open",
@@ -120,107 +123,163 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
     }
   };
 
-  const hasActions = Boolean(activeSlide?.onCopy || activeSlide?.onSave || activeSlide?.onOpen);
+  const handleWheel = (event: WheelEvent<HTMLElement>) => {
+    event.preventDefault();
+    const direction = event.deltaY > 0 ? -1 : 1;
+    setZoom((current) => clampZoom(current + direction * 0.1));
+  };
+
+  const dialogTitle = activeSlide?.title || activeSlide?.alt || t("chat.image.preview");
+  const positionLabel = `${clampedIndex + 1} / ${slides.length}`;
+
+  const actionButtons = (
+    <ButtonGroup size="sm">
+      {activeSlide?.onCopy ? (
+        <Button
+          label={t("chat.image.copy")}
+          tooltip={t("chat.image.copy")}
+          icon={<Icon icon={Copy} size="sm" color="inherit" />}
+          variant="ghost"
+          isLoading={pendingAction === "copy"}
+          isDisabled={pendingAction !== null && pendingAction !== "copy"}
+          onClick={() => void runAction("copy", activeSlide.onCopy)}
+        />
+      ) : null}
+      {activeSlide?.onSave ? (
+        <Button
+          label={t("chat.image.save")}
+          tooltip={t("chat.image.save")}
+          icon={<Icon icon={Download} size="sm" color="inherit" />}
+          variant="ghost"
+          isLoading={pendingAction === "save"}
+          isDisabled={pendingAction !== null && pendingAction !== "save"}
+          onClick={() => void runAction("save", activeSlide.onSave)}
+        />
+      ) : null}
+      {activeSlide?.onOpen ? (
+        <Button
+          label={t("chat.image.openSystem")}
+          tooltip={t("chat.image.openSystem")}
+          icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
+          variant="ghost"
+          isLoading={pendingAction === "open"}
+          isDisabled={pendingAction !== null && pendingAction !== "open"}
+          onClick={() => void runAction("open", activeSlide.onOpen)}
+        />
+      ) : null}
+    </ButtonGroup>
+  );
 
   return (
-    <>
-      <Lightbox
-        open={open}
-        close={onClose}
-        index={clampedIndex}
-        slides={slides}
-        on={callbacks}
-        plugins={imagePreviewPlugins}
-        labels={{
-          Close: closeLabel,
-          Next: t("chat.image.next"),
-          Previous: t("chat.image.previous"),
-        }}
-        carousel={{
-          finite: true,
-          imageFit: "contain",
-        }}
-        controller={{
-          aria: true,
-          closeOnBackdropClick: true,
-        }}
-        render={singleSlideRender}
-        zoom={{
-          maxZoomPixelRatio: 3,
-          scrollToZoom: true,
-        }}
-        styles={{
-          container: {
-            backgroundColor: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(8px)",
-          },
-        }}
+    <Dialog
+      isOpen={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
+      variant="fullscreen"
+      purpose="info"
+      padding={0}
+    >
+      <Layout
+        defaultHasDividers
+        header={
+          <DialogHeader
+            title={dialogTitle}
+            subtitle={slides.length > 1 ? positionLabel : undefined}
+            endContent={
+              <HStack gap={2} vAlign="center">
+                {actionButtons}
+                <IconButton
+                  label={closeLabel}
+                  tooltip={closeLabel}
+                  icon={<Icon icon={X} size="sm" color="inherit" />}
+                  size="sm"
+                  variant="ghost"
+                  onClick={onClose}
+                />
+              </HStack>
+            }
+          />
+        }
+        content={
+          <LayoutContent padding={0} isScrollable>
+            <VStack height="100%" gap={0}>
+              {actionError ? (
+                <Banner status="error" title={actionError} container="section" />
+              ) : null}
+              <Center
+                onWheel={handleWheel}
+                style={{
+                  minHeight: "var(--xagent-image-preview-stage-min-height)",
+                  flex: 1,
+                  overflow: "auto",
+                  backgroundColor: "var(--color-background-inverted)",
+                  touchAction: "pan-x pan-y pinch-zoom",
+                }}
+              >
+                <img
+                  src={activeSlide.src}
+                  alt={activeSlide.alt ?? dialogTitle}
+                  width={activeSlide.width}
+                  height={activeSlide.height}
+                  draggable={false}
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "var(--xagent-image-preview-max-height)",
+                    objectFit: "contain",
+                    transform: `scale(${zoom})`,
+                    transformOrigin: "center",
+                    transitionProperty: "transform",
+                    transitionDuration: "var(--duration-fast)",
+                    transitionTimingFunction: "var(--ease-standard)",
+                  }}
+                />
+              </Center>
+            </VStack>
+          </LayoutContent>
+        }
+        footer={
+          <LayoutFooter padding={3}>
+            <HStack gap={3} vAlign="center" hAlign="center" wrap="wrap">
+              <IconButton
+                label={t("chat.image.previous")}
+                tooltip={t("chat.image.previous")}
+                icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
+                size="sm"
+                variant="ghost"
+                isDisabled={clampedIndex <= 0}
+                onClick={() => changeSlide(clampedIndex - 1)}
+              />
+              <Slider
+                label={t("chat.image.zoom")}
+                isLabelHidden
+                value={zoom}
+                min={1}
+                max={3}
+                step={0.1}
+                valueDisplay="text"
+                width="min(40vw, var(--xagent-image-preview-slider-max-width))"
+                formatValue={(value) => `${Math.round(value * 100)}%`}
+                onChange={(value) => {
+                  if (typeof value === "number") setZoom(value);
+                }}
+              />
+              <Text type="supporting" color="secondary" hasTabularNumbers>
+                {positionLabel}
+              </Text>
+              <IconButton
+                label={t("chat.image.next")}
+                tooltip={t("chat.image.next")}
+                icon={<Icon icon={ChevronRight} size="sm" color="inherit" />}
+                size="sm"
+                variant="ghost"
+                isDisabled={clampedIndex >= slides.length - 1}
+                onClick={() => changeSlide(clampedIndex + 1)}
+              />
+            </HStack>
+          </LayoutFooter>
+        }
       />
-      {open && hasActions ? (
-        <div className="pointer-events-none fixed top-[calc(env(safe-area-inset-top)+0.75rem)] left-1/2 z-[10001] flex max-w-[calc(100vw-8rem)] -translate-x-1/2 flex-col items-center gap-2">
-          <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-white/15 bg-black/55 p-1 text-white shadow-xl backdrop-blur-xl">
-            {activeSlide?.onCopy ? (
-              <button
-                type="button"
-                className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs transition-colors hover:bg-white/15 disabled:opacity-60"
-                disabled={pendingAction !== null}
-                onClick={() => void runAction("copy", activeSlide.onCopy)}
-                aria-label={t("chat.image.copy")}
-                title={t("chat.image.copy")}
-              >
-                {pendingAction === "copy" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-                <span className="hidden sm:inline">{t("chat.image.copy")}</span>
-              </button>
-            ) : null}
-            {activeSlide?.onSave ? (
-              <button
-                type="button"
-                className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs transition-colors hover:bg-white/15 disabled:opacity-60"
-                disabled={pendingAction !== null}
-                onClick={() => void runAction("save", activeSlide.onSave)}
-                aria-label={t("chat.image.save")}
-                title={t("chat.image.save")}
-              >
-                {pendingAction === "save" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-                <span className="hidden sm:inline">{t("chat.image.save")}</span>
-              </button>
-            ) : null}
-            {activeSlide?.onOpen ? (
-              <button
-                type="button"
-                className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs transition-colors hover:bg-white/15 disabled:opacity-60"
-                disabled={pendingAction !== null}
-                onClick={() => void runAction("open", activeSlide.onOpen)}
-                aria-label={t("chat.image.openSystem")}
-                title={t("chat.image.openSystem")}
-              >
-                {pendingAction === "open" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ExternalLink className="h-4 w-4" />
-                )}
-                <span className="hidden sm:inline">{t("chat.image.openSystem")}</span>
-              </button>
-            ) : null}
-          </div>
-          {actionError ? (
-            <div
-              role="status"
-              className="pointer-events-auto max-w-[min(28rem,calc(100vw-2rem))] rounded-lg bg-red-950/85 px-3 py-2 text-center text-xs text-red-100 shadow-xl"
-            >
-              {actionError}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </>
+    </Dialog>
   );
 });

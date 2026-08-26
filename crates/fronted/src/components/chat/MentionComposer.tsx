@@ -1,4 +1,6 @@
 import { openUrl } from "@xagent/runtime";
+import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
+import { Popover } from "@astryxdesign/core/Popover";
 import {
   type ClipboardEvent,
   type FocusEvent,
@@ -10,12 +12,10 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
 import { useLocale } from "../../i18n";
 import {
   type CodeMentionReference,
@@ -45,6 +45,8 @@ import {
   type PromptHistoryStash,
   stepPromptHistory,
 } from "./promptHistory";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -109,8 +111,6 @@ type MentionSuggestion =
   | { type: "skill"; skill: MentionComposerSkill };
 
 type ComposerContextMenuState = {
-  x: number;
-  y: number;
   selectedText: string;
   hasContent: boolean;
 };
@@ -239,9 +239,6 @@ const LARGE_PASTE_TAG_ATTR = "data-large-paste-id";
 const LARGE_PASTE_CHAR_THRESHOLD = 8_000;
 const LARGE_PASTE_LINE_THRESHOLD = 200;
 const LARGE_PASTE_PREVIEW_CHARS = 160;
-const COMPOSER_CONTEXT_MENU_WIDTH = 184;
-const COMPOSER_CONTEXT_MENU_HEIGHT = 154;
-const COMPOSER_CONTEXT_MENU_MARGIN = 12;
 const CARET_ANCHOR_TEXT = "\u200B";
 const IME_ENTER_SUPPRESS_WINDOW_MS = 300;
 const IME_COMPOSITION_END_ENTER_TAIL_MS = 80;
@@ -585,22 +582,6 @@ function deleteComposerSelection(
   normalizeCaretAfterChip(root);
   ensureTrailingCaretAnchor(root);
   return true;
-}
-
-function clampComposerContextMenuPosition(x: number, y: number) {
-  const maxLeft = Math.max(
-    COMPOSER_CONTEXT_MENU_MARGIN,
-    window.innerWidth - COMPOSER_CONTEXT_MENU_WIDTH - COMPOSER_CONTEXT_MENU_MARGIN,
-  );
-  const maxTop = Math.max(
-    COMPOSER_CONTEXT_MENU_MARGIN,
-    window.innerHeight - COMPOSER_CONTEXT_MENU_HEIGHT - COMPOSER_CONTEXT_MENU_MARGIN,
-  );
-
-  return {
-    left: Math.min(Math.max(COMPOSER_CONTEXT_MENU_MARGIN, x), maxLeft),
-    top: Math.min(Math.max(COMPOSER_CONTEXT_MENU_MARGIN, y), maxTop),
-  };
 }
 
 function normalizeMentionQuery(query: string) {
@@ -1745,6 +1726,7 @@ function Popup({
   showEmpty,
   emptyLabel,
   onSelect,
+  onDismiss,
 }: {
   anchorRef: RefObject<HTMLElement | null>;
   trigger: MentionContext["trigger"];
@@ -1755,143 +1737,166 @@ function Popup({
   showEmpty: boolean;
   emptyLabel: string;
   onSelect: (suggestion: MentionSuggestion) => void;
+  onDismiss: () => void;
 }) {
-  const popupRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const hlRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     hlRef.current?.scrollIntoView({ block: "nearest" });
   }, [highlightIndex]);
 
-  useLayoutEffect(() => {
-    const anchor = anchorRef.current;
-    const popup = popupRef.current;
-    if (!anchor || !popup) return;
-    const inputSurface = anchor.closest<HTMLElement>(".composer-glass-card") ?? anchor;
-
-    const update = () => {
-      const rect = inputSurface.getBoundingClientRect();
-      popup.style.left = `${rect.left}px`;
-      popup.style.bottom = `${Math.max(8, window.innerHeight - rect.top + 8)}px`;
-      popup.style.width = `${rect.width}px`;
-    };
-
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(inputSurface);
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [anchorRef]);
-
-  return createPortal(
-    <div
-      ref={popupRef}
-      className={cn(
-        "mention-popup-enter fixed z-[100] overflow-hidden rounded-2xl",
-        "border border-black/[0.075] bg-popover text-popover-foreground shadow-sm ring-0 dark:border-white/[0.15]",
-      )}
-      onMouseDown={(event) => {
-        // Any mousedown inside the popup must not blur the editor (blur closes
-        // the mention session), except on the native scrollbar strip where
-        // preventDefault would break thumb dragging in some engines.
-        const list = listRef.current;
-        if (list) {
-          const rect = list.getBoundingClientRect();
-          const onScrollbar =
-            event.clientX >= rect.left + list.clientLeft + list.clientWidth &&
-            event.clientY >= rect.top &&
-            event.clientY <= rect.bottom;
-          if (onScrollbar) return;
-        }
-        event.preventDefault();
+  return (
+    <Popover
+      anchorRef={{ current: anchorRef.current as HTMLElement }}
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onDismiss();
       }}
-    >
-      <div className="px-3.5 pb-1.5 pt-3 text-xs font-medium text-muted-foreground">
-        {trigger === "skill" ? "Skills" : "文件"}
-      </div>
-      <div
-        ref={listRef}
-        className="mention-popup-scroll relative flex max-h-[320px] flex-col overflow-y-auto px-2 pb-2"
-      >
-        {isLoading && (
-          <div className="px-2 py-2 text-xs text-muted-foreground">Indexing files...</div>
-        )}
-        {error && !isLoading && <div className="px-2 py-2 text-xs text-destructive">{error}</div>}
-        {suggestions.map((suggestion, i) => {
-          const isSkill = suggestion.type === "skill";
-          const entry = suggestion.type === "file" ? suggestion.entry : null;
-          const skill = suggestion.type === "skill" ? suggestion.skill : null;
-          const isDir = entry?.kind === "dir";
-          const parts = entry ? entry.path.split("/") : [];
-          const fileName = parts.pop() || "";
-          const dirPath = parts.join("/");
-          const Icon = entry ? getFileTypeIcon(entry.path, entry.kind) : null;
-          const title = skill?.name ?? fileName;
-          const subtitle = skill?.description ?? (dirPath ? `${dirPath}/` : "");
-          return (
-            <div
-              key={
-                entry ? `${entry.kind}:${entry.path}` : `skill:${skill?.skillFile ?? skill?.name}`
-              }
-              ref={i === highlightIndex ? hlRef : undefined}
-              className={cn(
-                // Rows are 38px hitboxes with 2px transparent borders so the
-                // visual 34px row keeps the 4px gap while clicks in the gap
-                // still land on a row instead of a dead strip. shrink-0 stops
-                // the max-h flex column from compressing rows before it scrolls.
-                "mention-popup-item group flex h-[38px] shrink-0 cursor-pointer items-center gap-3 rounded-lg border-y-2 border-transparent bg-clip-padding px-3 text-xs leading-5 transition-colors",
-                i === highlightIndex
-                  ? "bg-foreground/[0.07] text-foreground"
-                  : "text-foreground/85 hover:bg-foreground/[0.05] dark:text-foreground/90",
-              )}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onSelect(suggestion);
-              }}
-            >
-              <span
-                className={cn(
-                  "flex h-4 w-4 shrink-0 items-center justify-center",
-                  isSkill
-                    ? "text-foreground/85"
-                    : isDir
-                      ? "text-amber-600 dark:text-amber-300"
-                      : "text-muted-foreground",
-                )}
+      placement="above"
+      alignment="start"
+      width="var(--xagent-composer-popup-width)"
+      label={trigger === "skill" ? "Skills" : "文件"}
+      role="none"
+      hasAutoFocus={false}
+      hasCloseButton={false}
+      content={
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="overflow-hidden"
+          onMouseDown={(event) => {
+            // Any mousedown inside the popup must not blur the editor (blur closes
+            // the mention session), except on the native scrollbar strip where
+            // preventDefault would break thumb dragging in some engines.
+            const list = listRef.current;
+            if (list) {
+              const rect = list.getBoundingClientRect();
+              const onScrollbar =
+                event.clientX >= rect.left + list.clientLeft + list.clientWidth &&
+                event.clientY >= rect.top &&
+                event.clientY <= rect.bottom;
+              if (onScrollbar) return;
+            }
+            event.preventDefault();
+          }}
+        >
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="px-3.5 pb-1.5 pt-3 text-xs font-medium text-muted-foreground"
+          >
+            {trigger === "skill" ? "Skills" : "文件"}
+          </AstryxView>
+          <AstryxView
+            layout="flex"
+            direction="vertical"
+            ref={listRef}
+            className="mention-popup-scroll relative flex max-h-[320px] flex-col overflow-y-auto px-2 pb-2"
+          >
+            {isLoading && (
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="px-2 py-2 text-xs text-muted-foreground"
               >
-                {Icon ? <Icon width={16} height={16} /> : <Blend className="h-4 w-4" />}
-              </span>
-              <span className="min-w-0 flex-1 truncate">
-                <span className="font-normal text-foreground/95">{title}</span>
-                {subtitle && (
-                  <span className="ml-2 text-xs text-muted-foreground/75">{subtitle}</span>
-                )}
-              </span>
-              {isSkill ? (
-                <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/60">
-                  skill
-                </span>
-              ) : (
-                isDir && (
-                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/60">
-                    dir
-                  </span>
-                )
-              )}
-            </div>
-          );
-        })}
-        {showEmpty && !isLoading && !error && suggestions.length === 0 && (
-          <div className="px-2 py-2 text-xs text-muted-foreground">{emptyLabel}</div>
-        )}
-      </div>
-    </div>,
-    document.body,
+                Indexing files...
+              </AstryxView>
+            )}
+            {error && !isLoading && (
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="px-2 py-2 text-xs text-destructive"
+              >
+                {error}
+              </AstryxView>
+            )}
+            {suggestions.map((suggestion, i) => {
+              const isSkill = suggestion.type === "skill";
+              const entry = suggestion.type === "file" ? suggestion.entry : null;
+              const skill = suggestion.type === "skill" ? suggestion.skill : null;
+              const isDir = entry?.kind === "dir";
+              const parts = entry ? entry.path.split("/") : [];
+              const fileName = parts.pop() || "";
+              const dirPath = parts.join("/");
+              const Icon = entry ? getFileTypeIcon(entry.path, entry.kind) : null;
+              const title = skill?.name ?? fileName;
+              const subtitle = skill?.description ?? (dirPath ? `${dirPath}/` : "");
+              return (
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  key={
+                    entry
+                      ? `${entry.kind}:${entry.path}`
+                      : `skill:${skill?.skillFile ?? skill?.name}`
+                  }
+                  ref={i === highlightIndex ? hlRef : undefined}
+                  className={cn(
+                    // Rows are 38px hitboxes with 2px transparent borders so the
+                    // visual 34px row keeps the 4px gap while clicks in the gap
+                    // still land on a row instead of a dead strip. shrink-0 stops
+                    // the max-h flex column from compressing rows before it scrolls.
+                    "mention-popup-item group flex h-[38px] shrink-0 cursor-pointer items-center gap-3 rounded-lg border-y-2 border-transparent bg-clip-padding px-3 text-xs leading-5 transition-colors",
+                    i === highlightIndex
+                      ? "bg-foreground/[0.07] text-foreground"
+                      : "text-foreground/85 hover:bg-foreground/[0.05] dark:text-foreground/90",
+                  )}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onSelect(suggestion);
+                  }}
+                >
+                  <AstryxView
+                    as="span"
+                    layout="flex"
+                    direction="horizontal"
+                    className={cn(
+                      "flex h-4 w-4 shrink-0 items-center justify-center",
+                      isSkill
+                        ? "text-foreground/85"
+                        : isDir
+                          ? "text-amber-600 dark:text-amber-300"
+                          : "text-muted-foreground",
+                    )}
+                  >
+                    {Icon ? <Icon width={16} height={16} /> : <Blend className="h-4 w-4" />}
+                  </AstryxView>
+                  <AstryxInline className="min-w-0 flex-1 truncate">
+                    <AstryxInline className="font-normal text-foreground/95">{title}</AstryxInline>
+                    {subtitle && (
+                      <AstryxInline className="ml-2 text-xs text-muted-foreground/75">
+                        {subtitle}
+                      </AstryxInline>
+                    )}
+                  </AstryxInline>
+                  {isSkill ? (
+                    <AstryxInline className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                      skill
+                    </AstryxInline>
+                  ) : (
+                    isDir && (
+                      <AstryxInline className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                        dir
+                      </AstryxInline>
+                    )
+                  )}
+                </AstryxView>
+              );
+            })}
+            {showEmpty && !isLoading && !error && suggestions.length === 0 && (
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="px-2 py-2 text-xs text-muted-foreground"
+              >
+                {emptyLabel}
+              </AstryxView>
+            )}
+          </AstryxView>
+        </AstryxView>
+      }
+    />
   );
 }
 
@@ -1943,30 +1948,16 @@ function commitStatLabel(template: string, count: string) {
   return template.replace("{count}", count);
 }
 
-function CommitMentionTooltip({
+function CommitMentionCard({
   commit,
-  rect,
   onMouseEnter,
   onMouseLeave,
 }: {
   commit: MentionComposerCommitMention;
-  rect: DOMRect;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
 }) {
   const { locale, t } = useLocale();
-  const maxWidth = Math.min(440, window.innerWidth - 16);
-  const minWidth = Math.min(200, maxWidth);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const [tooltipWidth, setTooltipWidth] = useState(minWidth);
-  const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - tooltipWidth - 8));
-  const availableAbove = rect.top - 16;
-  const availableBelow = window.innerHeight - rect.bottom - 16;
-  const placeAbove = availableAbove > 260 || availableAbove > availableBelow;
-  const maxHeight = Math.max(120, Math.min(520, placeAbove ? availableAbove : availableBelow));
-  const top = placeAbove
-    ? Math.max(8, rect.top - 8)
-    : Math.min(window.innerHeight - 8, rect.bottom + 8);
   const shortSha = commit.shortSha || commit.sha.slice(0, 7);
   const author = commit.authorName || t("chat.composer.commitTooltipUnknownAuthor");
   const date = formatCommitTooltipDate(commit.authorDate, locale);
@@ -1987,73 +1978,92 @@ function CommitMentionTooltip({
   const subject = commit.subject.trim() || shortSha;
   const authorLabel = commit.authorEmail ? `${author} <${commit.authorEmail}>` : author;
 
-  useLayoutEffect(() => {
-    const node = tooltipRef.current;
-    if (!node) return;
-    const measuredWidth = Math.ceil(node.getBoundingClientRect().width);
-    setTooltipWidth(Math.min(maxWidth, Math.max(minWidth, measuredWidth)));
-  }, [commit, maxWidth, minWidth]);
-
-  return createPortal(
-    <div
-      ref={tooltipRef}
-      className="fixed z-[10000] overflow-y-auto rounded-xl border border-border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-xl"
+  return (
+    <AstryxView
+      layout="block"
+      direction="horizontal"
+      className="overflow-y-auto"
       style={{
-        left,
-        top,
-        width: "fit-content",
-        minWidth,
-        maxWidth,
-        maxHeight,
-        transform: placeAbove ? "translateY(-100%)" : "none",
+        minWidth: "var(--xagent-hover-card-min-width)",
+        maxWidth: "var(--xagent-hover-card-width)",
+        maxHeight: "var(--xagent-hover-card-height)",
       }}
       onMouseDown={(event) => event.preventDefault()}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <div className="flex items-start gap-2">
+      <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-2">
         <GitHubMarkIcon className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
-        <div className="min-w-0">
-          <div className="break-words font-medium leading-tight">{authorLabel}</div>
+        <AstryxView layout="block" direction="horizontal" className="min-w-0">
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="break-words font-medium leading-tight"
+          >
+            {authorLabel}
+          </AstryxView>
           {date ? (
-            <div className="mt-0.5 text-[calc(11px*var(--zone-font-scale,1))] leading-tight text-muted-foreground">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="mt-0.5 text-[calc(11px*var(--zone-font-scale,1))] leading-tight text-muted-foreground"
+            >
               {date.relative} ({date.absolute})
-            </div>
+            </AstryxView>
           ) : null}
-        </div>
-      </div>
-      <div className="mt-2 whitespace-pre-wrap break-words font-medium leading-snug">{subject}</div>
+        </AstryxView>
+      </AstryxView>
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        className="mt-2 whitespace-pre-wrap break-words font-medium leading-snug"
+      >
+        {subject}
+      </AstryxView>
       {messageBody ? (
-        <div className="mt-1.5 whitespace-pre-wrap break-words leading-snug text-muted-foreground">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="mt-1.5 whitespace-pre-wrap break-words leading-snug text-muted-foreground"
+        >
           {messageBody}
-        </div>
+        </AstryxView>
       ) : null}
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[calc(11px*var(--zone-font-scale,1))] leading-tight">
-        <span className="text-muted-foreground">{filesChangedLabel}</span>
-        <span className="font-medium text-emerald-600 dark:text-emerald-400">
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[calc(11px*var(--zone-font-scale,1))] leading-tight"
+      >
+        <AstryxInline className="text-muted-foreground">{filesChangedLabel}</AstryxInline>
+        <AstryxInline className="font-medium text-emerald-600 dark:text-emerald-400">
           {insertionsLabel}
-        </span>
-        <span className="font-medium text-rose-600 dark:text-rose-400">{deletionsLabel}</span>
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/70 pt-1.5 text-[calc(11px*var(--zone-font-scale,1))] leading-tight text-muted-foreground">
-        <span className="font-mono text-foreground">{shortSha}</span>
-        {commit.remoteName ? <span>{commit.remoteName}</span> : null}
+        </AstryxInline>
+        <AstryxInline className="font-medium text-rose-600 dark:text-rose-400">
+          {deletionsLabel}
+        </AstryxInline>
+      </AstryxView>
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/70 pt-1.5 text-[calc(11px*var(--zone-font-scale,1))] leading-tight text-muted-foreground"
+      >
+        <AstryxInline className="font-mono text-foreground">{shortSha}</AstryxInline>
+        {commit.remoteName ? <AstryxInline>{commit.remoteName}</AstryxInline> : null}
         {commit.githubUrl ? (
           <>
-            <span className="text-border">|</span>
-            <button
+            <AstryxInline className="text-border">|</AstryxInline>
+            <AstryxButton
               type="button"
               className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-primary hover:bg-primary/10"
               onClick={() => void openUrl(commit.githubUrl!)}
             >
               <GitHubMarkIcon className="h-3 w-3" />
               {t("chat.composer.commitTooltipOpenGithub")}
-            </button>
+            </AstryxButton>
           </>
         ) : null}
-      </div>
-    </div>,
-    document.body,
+      </AstryxView>
+    </AstryxView>
   );
 }
 
@@ -2081,7 +2091,6 @@ export const MentionComposer = memo(
     const { locale, t } = useLocale();
     const editorRef = useRef<HTMLDivElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
-    const composerContextMenuRef = useRef<HTMLDivElement>(null);
     const composerContextMenuRangeRef = useRef<Range | null>(null);
     const commitTooltipCloseTimerRef = useRef<number | null>(null);
     const commitTooltipChipRef = useRef<HTMLElement | null>(null);
@@ -2106,10 +2115,7 @@ export const MentionComposer = memo(
     const [composerContextMenu, setComposerContextMenu] = useState<ComposerContextMenuState | null>(
       null,
     );
-    const [commitTooltip, setCommitTooltip] = useState<{
-      commit: MentionComposerCommitMention;
-      rect: DOMRect;
-    } | null>(null);
+    const [commitTooltip, setCommitTooltip] = useState<MentionComposerCommitMention | null>(null);
 
     const closeCommitTooltip = useCallback(() => {
       commitTooltipChipRef.current = null;
@@ -2264,46 +2270,6 @@ export const MentionComposer = memo(
       closeMentionSession();
       setBusy(false);
     }, [disabled, closeMentionSession, setBusy]);
-
-    useEffect(() => {
-      if (!composerContextMenu) return;
-
-      const handlePointerDown = (event: PointerEvent) => {
-        const target = event.target;
-        if (!(target instanceof Node)) {
-          closeComposerContextMenu();
-          return;
-        }
-        if (composerContextMenuRef.current?.contains(target)) {
-          return;
-        }
-        closeComposerContextMenu();
-      };
-
-      const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-        if (event.key === "Escape") {
-          closeComposerContextMenu();
-        }
-      };
-
-      const handleClose = () => {
-        closeComposerContextMenu();
-      };
-
-      window.addEventListener("pointerdown", handlePointerDown, true);
-      window.addEventListener("keydown", handleKeyDown, true);
-      window.addEventListener("scroll", handleClose, true);
-      window.addEventListener("resize", handleClose);
-      window.addEventListener("blur", handleClose);
-
-      return () => {
-        window.removeEventListener("pointerdown", handlePointerDown, true);
-        window.removeEventListener("keydown", handleKeyDown, true);
-        window.removeEventListener("scroll", handleClose, true);
-        window.removeEventListener("resize", handleClose);
-        window.removeEventListener("blur", handleClose);
-      };
-    }, [closeComposerContextMenu, composerContextMenu]);
 
     const normalizedMentionQuery = mentionCtx ? normalizeMentionQuery(mentionCtx.query) : "";
     const suggestions = useMemo<MentionSuggestion[]>(() => {
@@ -2861,9 +2827,6 @@ export const MentionComposer = memo(
       }
     }, []);
 
-    const contextMenuPosition = composerContextMenu
-      ? clampComposerContextMenuPosition(composerContextMenu.x, composerContextMenu.y)
-      : null;
     const contextMenuLabels =
       locale === "en-US"
         ? {
@@ -2972,6 +2935,36 @@ export const MentionComposer = memo(
       closeComposerContextMenu();
     }, [closeComposerContextMenu, closeMentionSession, composerContextMenu?.hasContent]);
 
+    const composerContextMenuItems: ContextMenuOption[] = [
+      {
+        label: contextMenuLabels.cut,
+        icon: <Scissors />,
+        isDisabled: !contextMenuCanMutate || !contextMenuHasSelection,
+        onClick: handleComposerContextCut,
+      },
+      {
+        label: contextMenuLabels.copy,
+        icon: <Copy />,
+        isDisabled: !contextMenuHasSelection,
+        onClick: handleComposerContextCopy,
+      },
+      {
+        label: contextMenuLabels.paste,
+        icon: <ClipboardPaste />,
+        isDisabled: !contextMenuCanMutate,
+        onClick: () => {
+          void handleComposerContextPaste();
+        },
+      },
+      { type: "divider" },
+      {
+        label: contextMenuLabels.selectAll,
+        icon: <ScanText />,
+        isDisabled: !composerContextMenu?.hasContent,
+        onClick: handleComposerContextSelectAll,
+      },
+    ];
+
     // ---- Event handlers ----
     const handleContextMenu = useCallback(
       (event: MouseEvent<HTMLDivElement>) => {
@@ -3002,8 +2995,6 @@ export const MentionComposer = memo(
 
         composerContextMenuRangeRef.current = rangeForMenu;
         setComposerContextMenu({
-          x: event.clientX,
-          y: event.clientY,
           selectedText,
           hasContent: !editorTextIsEmpty(el),
         });
@@ -3114,7 +3105,7 @@ export const MentionComposer = memo(
           return;
         }
         commitTooltipChipRef.current = chip;
-        setCommitTooltip({ commit, rect: chip.getBoundingClientRect() });
+        setCommitTooltip(commit);
       },
       [closeCommitTooltip],
     );
@@ -3491,21 +3482,24 @@ export const MentionComposer = memo(
         busyReleaseTimerRef.current = null;
       }
       setBusy(false);
-      closeComposerContextMenu();
       closeMentionSession();
       cancelCommitTooltipClose();
       closeCommitTooltip();
     }, [
       cancelCommitTooltipClose,
       closeCommitTooltip,
-      closeComposerContextMenu,
       closeMentionSession,
       rememberEditorSelection,
       setBusy,
     ]);
 
     return (
-      <div ref={wrapperRef} className="relative w-full min-w-0 max-w-full flex-1">
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        ref={wrapperRef}
+        className="relative w-full min-w-0 max-w-full flex-1"
+      >
         {popupVisible && (
           <Popup
             anchorRef={wrapperRef}
@@ -3517,126 +3511,78 @@ export const MentionComposer = memo(
             showEmpty={showEmpty}
             emptyLabel={popupEmptyLabel}
             onSelect={selectSuggestion}
+            onDismiss={closeMentionSession}
           />
         )}
-        {commitTooltip ? (
-          <CommitMentionTooltip
-            commit={commitTooltip.commit}
-            rect={commitTooltip.rect}
-            onMouseEnter={cancelCommitTooltipClose}
-            onMouseLeave={scheduleCommitTooltipClose}
+        {commitTooltip && commitTooltipChipRef.current ? (
+          <Popover
+            anchorRef={{ current: commitTooltipChipRef.current }}
+            isOpen
+            onOpenChange={(isOpen) => {
+              if (!isOpen) closeCommitTooltip();
+            }}
+            placement="above"
+            alignment="start"
+            width="var(--xagent-hover-card-width)"
+            label={commitTooltip.subject || commitTooltip.shortSha}
+            role="dialog"
+            hasAutoFocus={false}
+            hasCloseButton={false}
+            content={
+              <CommitMentionCard
+                commit={commitTooltip}
+                onMouseEnter={cancelCommitTooltipClose}
+                onMouseLeave={scheduleCommitTooltipClose}
+              />
+            }
           />
         ) : null}
-        {!preferNativeContextMenu && composerContextMenu && contextMenuPosition
-          ? createPortal(
-              <div
-                ref={composerContextMenuRef}
-                role="menu"
-                className="fixed z-[120] w-max min-w-[9.5rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-border/70 bg-popover p-1.5 text-popover-foreground shadow-[0_20px_60px_-20px_rgba(15,23,42,0.35)]"
-                style={{
-                  left: contextMenuPosition.left,
-                  top: contextMenuPosition.top,
-                }}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                }}
-              >
-                <button
-                  type="button"
-                  role="menuitem"
-                  disabled={!contextMenuCanMutate || !contextMenuHasSelection}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/90 transition-colors hover:bg-accent hover:text-accent-foreground",
-                    "disabled:pointer-events-none disabled:opacity-45",
-                  )}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={handleComposerContextCut}
-                >
-                  <Scissors className="h-3.5 w-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{contextMenuLabels.cut}</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  disabled={!contextMenuHasSelection}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/90 transition-colors hover:bg-accent hover:text-accent-foreground",
-                    "disabled:pointer-events-none disabled:opacity-45",
-                  )}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={handleComposerContextCopy}
-                >
-                  <Copy className="h-3.5 w-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{contextMenuLabels.copy}</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  disabled={!contextMenuCanMutate}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/90 transition-colors hover:bg-accent hover:text-accent-foreground",
-                    "disabled:pointer-events-none disabled:opacity-45",
-                  )}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    void handleComposerContextPaste();
-                  }}
-                >
-                  <ClipboardPaste className="h-3.5 w-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{contextMenuLabels.paste}</span>
-                </button>
-                <div className="my-1 h-px bg-border/70" />
-                <button
-                  type="button"
-                  role="menuitem"
-                  disabled={!composerContextMenu.hasContent}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/90 transition-colors hover:bg-accent hover:text-accent-foreground",
-                    "disabled:pointer-events-none disabled:opacity-45",
-                  )}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={handleComposerContextSelectAll}
-                >
-                  <ScanText className="h-3.5 w-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{contextMenuLabels.selectAll}</span>
-                </button>
-              </div>,
-              document.body,
-            )
-          : null}
-        {/* biome-ignore lint/a11y/useSemanticElements: The composer is contenteditable so it can host inline mention chips. */}
-        <div
-          ref={editorRef}
-          contentEditable={!disabled && !isTypewriting}
-          suppressContentEditableWarning
-          role="textbox"
-          tabIndex={disabled ? undefined : 0}
-          aria-multiline
-          aria-placeholder={placeholder}
-          aria-disabled={disabled}
-          onInput={handleInput}
-          onKeyDown={handleKeyDown}
-          onKeyUp={handleKeyUp}
-          onFocus={handleFocus}
-          onMouseLeave={scheduleCommitTooltipClose}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onPaste={handlePaste}
-          onContextMenu={handleContextMenu}
-          data-native-context-menu={preferNativeContextMenu ? "true" : undefined}
-          onCompositionStart={handleCompositionStart}
-          onCompositionEnd={handleCompositionEnd}
-          onBlur={handleBlur}
-          className={cn(
-            "mention-composer min-h-[70px] max-h-[160px] w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] outline-hidden",
-            "text-sm",
-            isDomEmpty && "is-empty",
-            disabled && "cursor-not-allowed opacity-60",
-            className,
-          )}
-          data-placeholder={placeholder}
-        />
-      </div>
+        <ContextMenu
+          items={composerContextMenuItems}
+          label={contextMenuLabels.copy}
+          menuWidth="var(--xagent-context-menu-width)"
+          size="sm"
+          isDisabled={preferNativeContextMenu}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) closeComposerContextMenu();
+          }}
+        >
+          {/* biome-ignore lint/a11y/useSemanticElements: The composer is contenteditable so it can host inline mention chips. */}
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            ref={editorRef}
+            contentEditable={!disabled && !isTypewriting}
+            suppressContentEditableWarning
+            role="textbox"
+            tabIndex={disabled ? undefined : 0}
+            aria-multiline
+            aria-placeholder={placeholder}
+            aria-disabled={disabled}
+            onInput={handleInput}
+            onKeyDown={handleKeyDown}
+            onKeyUp={handleKeyUp}
+            onFocus={handleFocus}
+            onMouseLeave={scheduleCommitTooltipClose}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onPaste={handlePaste}
+            onContextMenu={handleContextMenu}
+            data-native-context-menu={preferNativeContextMenu ? "true" : undefined}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
+            onBlur={handleBlur}
+            className={cn(
+              "mention-composer min-h-[70px] max-h-[160px] w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] outline-hidden",
+              "text-sm",
+              isDomEmpty && "is-empty",
+              disabled && "cursor-not-allowed opacity-60",
+              className,
+            )}
+            data-placeholder={placeholder}
+          />
+        </ContextMenu>
+      </AstryxView>
     );
   }),
 );

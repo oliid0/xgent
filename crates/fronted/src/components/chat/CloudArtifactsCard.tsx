@@ -1,3 +1,9 @@
+import { Card } from "@astryxdesign/core/Card";
+import { Icon } from "@astryxdesign/core/Icon";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Heading, Text } from "@astryxdesign/core/Text";
 import { memo, useState } from "react";
 
 import { useLocale } from "../../i18n";
@@ -35,41 +41,39 @@ function ArtifactRow({ artifact }: { artifact: CloudArtifactAttachment }) {
     }
   };
 
+  const revealLabel = `${t("chat.cloudArtifacts.reveal")}: ${artifactFileName(artifact)}`;
+
   return (
-    <div className="group/cloud-artifact min-w-0 rounded-lg px-2 py-1.5 transition-colors hover:bg-foreground/[0.04]">
-      <div className="flex min-w-0 items-center gap-2">
-        <Archive className="h-4 w-4 shrink-0 text-muted-foreground/75" />
-        <button
-          type="button"
-          disabled={opening}
-          onClick={() => void reveal()}
-          title={artifact.localPath}
-          className="min-w-0 flex-1 text-left focus-visible:outline-none disabled:opacity-60"
-        >
-          <span className="block truncate font-mono text-[calc(11.5px*var(--zone-font-scale,1))] leading-[1.5] text-foreground/90">
-            {artifactFileName(artifact)}
-          </span>
-          <span className="block truncate text-[calc(10.5px*var(--zone-font-scale,1))] text-muted-foreground/65">
+    <ListItem
+      label={
+        <Text type="label" maxLines={1} hasTruncateTooltip="above">
+          {artifactFileName(artifact)}
+        </Text>
+      }
+      description={
+        error ? (
+          <Text type="supporting" color="error" wordBreak="break-word">
+            {error}
+          </Text>
+        ) : (
+          <Text type="supporting" color="secondary" maxLines={1} hasTabularNumbers>
             {formatBytes(artifact.sizeBytes)} · {artifact.taskId}
-          </span>
-        </button>
-        <button
-          type="button"
-          disabled={opening}
-          onClick={() => void reveal()}
-          title={t("chat.cloudArtifacts.reveal")}
-          aria-label={t("chat.cloudArtifacts.reveal")}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-foreground/[0.07] hover:text-foreground focus-visible:outline-none disabled:opacity-50"
-        >
-          <FolderOpen className="h-3.5 w-3.5" />
-        </button>
-      </div>
-      {error ? (
-        <div className="mt-1 break-words pl-6 text-[calc(10.5px*var(--zone-font-scale,1))] text-destructive">
-          {error}
-        </div>
-      ) : null}
-    </div>
+          </Text>
+        )
+      }
+      startContent={<Icon icon={Archive} size="sm" color="secondary" />}
+      endContent={
+        opening ? (
+          <Spinner size="sm" shade="subtle" aria-label={revealLabel} />
+        ) : (
+          <Icon icon={FolderOpen} size="sm" color="secondary" />
+        )
+      }
+      onClick={() => void reveal()}
+      isDisabled={opening}
+      title={artifact.localPath}
+      aria-label={revealLabel}
+    />
   );
 }
 
@@ -84,28 +88,37 @@ export const CloudArtifactsCard = memo(function CloudArtifactsCard({
   ).replace("{count}", String(artifacts.length));
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border/45 bg-background/60 backdrop-blur-sm dark:border-white/[0.07] dark:bg-white/[0.03]">
-      <div className="flex items-center gap-2.5 px-2.5 py-2">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/45 bg-background/75 text-foreground/70 dark:border-white/[0.08] dark:bg-white/[0.05]">
-          <Archive className="h-4 w-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[calc(12px*var(--zone-font-scale,1))] font-medium text-foreground/85">
-            {title}
-          </div>
-          <div className="text-[calc(10.5px*var(--zone-font-scale,1))] text-muted-foreground/65">
-            {t("chat.cloudArtifacts.hint")}
-          </div>
-        </div>
-      </div>
-      <div className="flex max-h-[calc(150px*var(--zone-font-scale,1))] flex-col gap-0.5 overflow-y-auto border-t border-border/35 px-1 py-1 dark:border-white/[0.05]">
-        {artifacts.map((artifact) => (
-          <ArtifactRow
-            key={`${artifact.taskId}:${artifact.artifactId}:${artifact.toolCallId}`}
-            artifact={artifact}
-          />
-        ))}
-      </div>
-    </div>
+    <Card padding={0} elevation="low">
+      <VStack gap={0}>
+        <HStack gap={3} vAlign="center" padding={3}>
+          <Icon icon={Archive} size="md" color="secondary" />
+          <StackItem size="fill">
+            <VStack gap={0.5}>
+              <Heading level={4}>{title}</Heading>
+              <Text type="supporting" color="secondary">
+                {t("chat.cloudArtifacts.hint")}
+              </Text>
+            </VStack>
+          </StackItem>
+        </HStack>
+        <List
+          density="compact"
+          hasDividers
+          aria-label={title}
+          style={{
+            maxHeight: "var(--xagent-artifacts-list-max-height)",
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+          }}
+        >
+          {artifacts.map((artifact) => (
+            <ArtifactRow
+              key={`${artifact.taskId}:${artifact.artifactId}:${artifact.toolCallId}`}
+              artifact={artifact}
+            />
+          ))}
+        </List>
+      </VStack>
+    </Card>
   );
 });

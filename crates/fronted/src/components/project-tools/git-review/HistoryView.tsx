@@ -6,13 +6,12 @@
 
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { openUrl } from "@xagent/runtime";
+import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
 import {
-  type MouseEvent as ReactMouseEvent,
   type UIEvent as ReactUIEvent,
   type RefObject,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -45,11 +44,7 @@ import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
 import { DiffContent } from "./DiffView";
 import {
   basename,
-  CHANGE_CONTEXT_MENU_ITEM_CLASS,
-  CONTEXT_MENU_CONTAINER_CLASS,
-  CONTEXT_MENU_SEPARATOR_CLASS,
   type CommitRefKind,
-  clampMenuRectWithinRect,
   commitFileStatusLabel,
   commitFileStatusTone,
   commitHistoryTitle,
@@ -63,7 +58,6 @@ import {
   gitFileContextPayload,
   gitHistoryMarkerRef,
   gitHubCommitUrl,
-  type HistoryContextMenuState,
   orderedCommitRefTags,
   parentPath,
   writeTextToClipboard,
@@ -71,6 +65,8 @@ import {
 import { GitBranchFromCommitModal } from "./Toolbar";
 import type { GitReviewData } from "./useGitReviewData";
 import { GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS, useOverlayScrollbar } from "./useOverlayScrollbar";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 const GRAPH_SWIMLANE_WIDTH = 11;
 const GRAPH_SVG_HEIGHT = 22;
@@ -222,7 +218,10 @@ function CommitRefTags({
   const hiddenCount = orderedRefs.length - visibleRefs.length;
 
   return (
-    <span
+    <AstryxView
+      as="span"
+      layout="flex"
+      direction="horizontal"
       className={
         variant === "detail"
           ? "mt-1.5 flex min-w-0 flex-wrap items-center gap-1 overflow-visible"
@@ -231,7 +230,7 @@ function CommitRefTags({
       title={orderedRefs.map((ref) => ref.title).join(", ")}
     >
       {visibleRefs.map((ref) => (
-        <span
+        <AstryxInline
           key={`${ref.kind}:${ref.label}`}
           title={ref.title}
           aria-label={ref.title}
@@ -241,15 +240,17 @@ function CommitRefTags({
           )}
         >
           <CommitRefTagIcon kind={ref.kind} variant={variant} />
-          <span className="truncate leading-[14px]">{ref.label}</span>
-        </span>
+          <AstryxInline className="truncate leading-[14px]">{ref.label}</AstryxInline>
+        </AstryxInline>
       ))}
       {hiddenCount > 0 ? (
-        <span className={cn(commitRefChipClass("ref", selected), "shrink-0 px-1.5 leading-[14px]")}>
+        <AstryxInline
+          className={cn(commitRefChipClass("ref", selected), "shrink-0 px-1.5 leading-[14px]")}
+        >
           +{hiddenCount}
-        </span>
+        </AstryxInline>
       ) : null}
-    </span>
+    </AstryxView>
   );
 }
 
@@ -364,7 +365,9 @@ function GitGraphSvgCell({ row }: { row: GraphRow }) {
   let outputIndex = 0;
 
   return (
-    <div
+    <AstryxView
+      layout="block"
+      direction="horizontal"
       className="shrink-0 self-center overflow-visible"
       style={{ width: layoutW, minWidth: layoutW, height: GRAPH_SVG_HEIGHT }}
     >
@@ -491,7 +494,7 @@ function GitGraphSvgCell({ row }: { row: GraphRow }) {
           isMerge={row.isMerge}
         />
       </svg>
-    </div>
+    </AstryxView>
   );
 }
 
@@ -499,7 +502,9 @@ function GitGraphContinuationCell({ row }: { row: GraphRow }) {
   const layoutW = graphLayoutWidth(row);
 
   return (
-    <div
+    <AstryxView
+      layout="block"
+      direction="horizontal"
       className="shrink-0 self-center overflow-visible"
       style={{ width: layoutW, minWidth: layoutW, height: GRAPH_SVG_HEIGHT }}
       aria-hidden="true"
@@ -522,7 +527,7 @@ function GitGraphContinuationCell({ row }: { row: GraphRow }) {
           />
         ))}
       </svg>
-    </div>
+    </AstryxView>
   );
 }
 
@@ -538,7 +543,6 @@ export function GitReviewHistoryView(props: {
   const {
     data,
     onStackedPaneChange,
-    panelRef,
     stackedDir,
     stackedPane,
     useSplitReviewLayout,
@@ -579,9 +583,6 @@ export function GitReviewHistoryView(props: {
   const { t } = useLocale();
   const operationBusy = busy !== "";
 
-  const [historyContextMenu, setHistoryContextMenu] = useState<HistoryContextMenuState | null>(
-    null,
-  );
   const [branchFromCommit, setBranchFromCommit] = useState<GitBranchFromCommitState | null>(null);
   const [branchFromCommitName, setBranchFromCommitName] = useState("");
   const [branchFromCommitError, setBranchFromCommitError] = useState("");
@@ -589,30 +590,7 @@ export function GitReviewHistoryView(props: {
   const historyListRef = useRef<HTMLDivElement | null>(null);
   const listPaneRef = useRef<HTMLElement | null>(null);
   const detailPaneRef = useRef<HTMLElement | null>(null);
-  const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const listPaneVisible = useSplitReviewLayout || stackedPane === "list";
-
-  // Clamp the menu against its measured size after it renders (no hard-coded
-  // menu dimensions); useLayoutEffect corrects the position before paint, so
-  // an out-of-bounds menu never flashes at the raw pointer spot.
-  useLayoutEffect(() => {
-    if (!historyContextMenu) return;
-    const menu = contextMenuRef.current;
-    const panel = panelRef.current;
-    if (!menu || !panel) return;
-    const { dx, dy } = clampMenuRectWithinRect(
-      menu.getBoundingClientRect(),
-      panel.getBoundingClientRect(),
-      8,
-    );
-    if (dx !== 0 || dy !== 0) {
-      setHistoryContextMenu({
-        ...historyContextMenu,
-        x: historyContextMenu.x + dx,
-        y: historyContextMenu.y + dy,
-      });
-    }
-  }, [historyContextMenu, panelRef]);
 
   useEffect(() => {
     if (useSplitReviewLayout) return;
@@ -633,19 +611,6 @@ export function GitReviewHistoryView(props: {
     () => selectedCommit?.files.find((file) => file.path === selectedCommitFilePath) ?? null,
     [selectedCommit, selectedCommitFilePath],
   );
-  const historyContextCommit = useMemo(() => {
-    if (!historyContextMenu) return null;
-    return historyCommits.find((commit) => commit.sha === historyContextMenu.commitSha) ?? null;
-  }, [historyCommits, historyContextMenu]);
-  const historyContextFile = useMemo(() => {
-    if (!historyContextMenu || historyContextMenu.kind !== "file" || !historyContextCommit) {
-      return null;
-    }
-    return historyContextCommit.files.find((file) => file.path === historyContextMenu.path) ?? null;
-  }, [historyContextCommit, historyContextMenu]);
-  const historyContextCommitGithubUrl = historyContextCommit
-    ? gitHubCommitUrl(state.remoteUrl, historyContextCommit.sha)
-    : "";
 
   const gitGraph = useMemo(
     () =>
@@ -724,7 +689,6 @@ export function GitReviewHistoryView(props: {
   }, [gitGraph.rows, historyRows, selectedCommitSha]);
   const revealCurrentHistoryItem = useCallback(() => {
     if (currentHistoryItemIndex < 0) return;
-    setHistoryContextMenu(null);
     if (!useSplitReviewLayout) {
       onStackedPaneChange("list", "back");
     }
@@ -745,24 +709,6 @@ export function GitReviewHistoryView(props: {
     [handleOverlayScroll, listPaneVisible, maybeLoadMoreHistory],
   );
 
-  useEffect(() => {
-    if (!historyContextMenu) return;
-    const closeMenu = () => setHistoryContextMenu(null);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeMenu();
-    };
-    window.addEventListener("click", closeMenu);
-    window.addEventListener("resize", closeMenu);
-    window.addEventListener("scroll", closeMenu, true);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("click", closeMenu);
-      window.removeEventListener("resize", closeMenu);
-      window.removeEventListener("scroll", closeMenu, true);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [historyContextMenu]);
-
   const goDetailPane = useCallback(() => {
     if (!useSplitReviewLayout) {
       onStackedPaneChange("detail", "forward");
@@ -777,60 +723,8 @@ export function GitReviewHistoryView(props: {
     [goDetailPane, selectCommitFileData],
   );
 
-  const openHistoryContextMenu = useCallback(
-    (
-      event: ReactMouseEvent,
-      target:
-        | { kind: "commit"; commitSha: string }
-        | { kind: "file"; commitSha: string; path: string },
-    ) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const panelRect = panelRef.current?.getBoundingClientRect();
-      // Raw pointer position; the measured-clamp layout effect corrects it.
-      const x = panelRect ? event.clientX - panelRect.left : event.clientX;
-      const y = panelRect ? event.clientY - panelRect.top : event.clientY;
-      if (target.kind === "file") {
-        setHistoryContextMenu({
-          kind: "file",
-          x,
-          y,
-          commitSha: target.commitSha,
-          path: target.path,
-        });
-      } else {
-        setHistoryContextMenu({
-          kind: "commit",
-          x,
-          y,
-          commitSha: target.commitSha,
-        });
-      }
-    },
-    [panelRef],
-  );
-
-  const openHistoryCommitContextMenu = useCallback(
-    (event: ReactMouseEvent, commit: GitCommitSummary) => {
-      openHistoryContextMenu(event, { kind: "commit", commitSha: commit.sha });
-    },
-    [openHistoryContextMenu],
-  );
-
-  const openHistoryFileContextMenu = useCallback(
-    (event: ReactMouseEvent, commit: GitCommitSummary, file: GitCommitFile) => {
-      openHistoryContextMenu(event, {
-        kind: "file",
-        commitSha: commit.sha,
-        path: file.path,
-      });
-    },
-    [openHistoryContextMenu],
-  );
-
   const openHistoryCommitDiff = useCallback(
     (commit: GitCommitSummary, file?: GitCommitFile | null) => {
-      setHistoryContextMenu(null);
       if (file) {
         selectCommitFile(commit, file);
         return;
@@ -843,7 +737,6 @@ export function GitReviewHistoryView(props: {
 
   const openHistoryCommitOnGithub = useCallback(
     (commit: GitCommitSummary) => {
-      setHistoryContextMenu(null);
       const url = gitHubCommitUrl(state.remoteUrl, commit.sha);
       if (!url) return;
       void openUrl(url).catch((err) => {
@@ -854,7 +747,6 @@ export function GitReviewHistoryView(props: {
   );
 
   const openCreateBranchFromCommit = useCallback((commit: GitCommitSummary) => {
-    setHistoryContextMenu(null);
     setBranchFromCommit({
       commitSha: commit.sha,
       shortSha: commit.shortSha || commit.sha.slice(0, 7),
@@ -892,7 +784,6 @@ export function GitReviewHistoryView(props: {
 
   const compareHistoryCommitWithRemote = useCallback(
     (commit: GitCommitSummary) => {
-      setHistoryContextMenu(null);
       if (!gitClient || !cwd.trim()) return;
       compareCommitWithRemote(commit);
       goDetailPane();
@@ -901,13 +792,11 @@ export function GitReviewHistoryView(props: {
   );
 
   const copyHistoryCommitHash = useCallback((commit: GitCommitSummary) => {
-    setHistoryContextMenu(null);
     writeTextToClipboard(commit.sha);
   }, []);
 
   const copyHistoryCommitMessage = useCallback(
     (commit: GitCommitSummary) => {
-      setHistoryContextMenu(null);
       void loadCommitDetails(commit.sha)
         .then((details) => writeTextToClipboard(commitMessageText(details) || commit.subject))
         .catch(() => writeTextToClipboard(commit.subject));
@@ -917,7 +806,6 @@ export function GitReviewHistoryView(props: {
 
   const addHistoryCommitToContext = useCallback(
     (commit: GitCommitSummary) => {
-      setHistoryContextMenu(null);
       if (!onInsertCommitMention) return;
       void loadCommitDetails(commit.sha)
         .then((details) => {
@@ -935,12 +823,77 @@ export function GitReviewHistoryView(props: {
 
   const addHistoryFileToContext = useCallback(
     (commit: GitCommitSummary, file: GitCommitFile) => {
-      setHistoryContextMenu(null);
       if (!onInsertGitFileMention) return;
       onInsertGitFileMention(gitFileContextPayload(commit, file, state));
     },
     [onInsertGitFileMention, state],
   );
+
+  const historyFileMenuItems = (
+    commit: GitCommitSummary,
+    file: GitCommitFile,
+  ): ContextMenuOption[] => [
+    {
+      label: t("projectTools.gitReview.openChange"),
+      icon: <Eye />,
+      onClick: () => openHistoryCommitDiff(commit, file),
+    },
+    {
+      label: t("projectTools.gitReview.addToContext"),
+      icon: <MessageSquareText />,
+      isDisabled: !onInsertGitFileMention,
+      onClick: () => addHistoryFileToContext(commit, file),
+    },
+  ];
+
+  const historyCommitMenuItems = (commit: GitCommitSummary): ContextMenuOption[] => {
+    const githubUrl = gitHubCommitUrl(state.remoteUrl, commit.sha);
+    return [
+      {
+        label: t("projectTools.gitReview.openChange"),
+        icon: <Eye />,
+        onClick: () => openHistoryCommitDiff(commit),
+      },
+      {
+        label: t("projectTools.gitReview.openOnGithub"),
+        icon: <ExternalLink />,
+        isDisabled: !githubUrl,
+        onClick: () => openHistoryCommitOnGithub(commit),
+      },
+      { type: "divider" },
+      {
+        label: t("projectTools.gitReview.createBranch"),
+        icon: <GitBranch />,
+        isDisabled: writeDisabled || operationBusy || state.status !== "ready",
+        onClick: () => openCreateBranchFromCommit(commit),
+      },
+      { type: "divider" },
+      {
+        label: t("projectTools.gitReview.compareWithRemote"),
+        icon: <RefreshCw />,
+        isDisabled: !gitClient,
+        onClick: () => compareHistoryCommitWithRemote(commit),
+      },
+      { type: "divider" },
+      {
+        label: t("projectTools.gitReview.copyCommitHash"),
+        icon: <Copy />,
+        onClick: () => copyHistoryCommitHash(commit),
+      },
+      {
+        label: t("projectTools.gitReview.copyCommitMessage"),
+        icon: <Copy />,
+        onClick: () => copyHistoryCommitMessage(commit),
+      },
+      { type: "divider" },
+      {
+        label: t("projectTools.gitReview.addToContext"),
+        icon: <MessageSquareText />,
+        isDisabled: !onInsertCommitMention,
+        onClick: () => addHistoryCommitToContext(commit),
+      },
+    ];
+  };
 
   return (
     <>
@@ -953,14 +906,17 @@ export function GitReviewHistoryView(props: {
         onClose={closeCreateBranchFromCommit}
         onSubmit={confirmCreateBranchFromCommit}
       />
-      <div
+      <AstryxView
+        layout="flex"
+        direction="vertical"
         key="history"
         className={cn(
           "git-review-tab-enter min-h-0 flex-1 gap-3 overflow-hidden p-3",
           useSplitReviewLayout ? `grid ${GIT_REVIEW_SPLIT_GRID_CLASS}` : "flex flex-col",
         )}
       >
-        <aside
+        <AstryxView
+          as="aside"
           ref={listPaneRef}
           className={cn(
             "min-h-0 flex-col overflow-hidden rounded-lg border border-border/70 bg-background",
@@ -968,12 +924,22 @@ export function GitReviewHistoryView(props: {
             !useSplitReviewLayout && "flex-1",
           )}
         >
-          <div className="relative z-10 flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-1.5">
-            <div className="flex min-w-0 items-center gap-2 truncate text-xs font-semibold">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="relative z-10 flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-1.5"
+          >
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex min-w-0 items-center gap-2 truncate text-xs font-semibold"
+            >
               <History className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate">{t("projectTools.gitReview.commitHistoryTitle")}</span>
-            </div>
-            <button
+              <AstryxInline className="truncate">
+                {t("projectTools.gitReview.commitHistoryTitle")}
+              </AstryxInline>
+            </AstryxView>
+            <AstryxButton
               type="button"
               aria-label={t("projectTools.gitReview.revealCurrentHistoryItem")}
               title={t("projectTools.gitReview.revealCurrentHistoryItem")}
@@ -982,24 +948,36 @@ export function GitReviewHistoryView(props: {
               onClick={revealCurrentHistoryItem}
             >
               <Target className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          </div>
-          <div
+            </AstryxButton>
+          </AstryxView>
+          <AstryxView
+            layout="block"
+            direction="horizontal"
             ref={historyListRef}
             className={cn(GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS, "min-h-0 flex-1 overflow-auto")}
             onScroll={handleHistoryListScroll}
           >
             {historyLoading && historyCommits.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-muted-foreground">
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-muted-foreground"
+              >
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>{t("projectTools.gitReview.commitHistoryTitle")}</span>
-              </div>
+                <AstryxInline>{t("projectTools.gitReview.commitHistoryTitle")}</AstryxInline>
+              </AstryxView>
             ) : historyCommits.length === 0 ? (
-              <div className="px-3 py-6 text-xs text-muted-foreground">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="px-3 py-6 text-xs text-muted-foreground"
+              >
                 {historyError || t("projectTools.gitReview.noCommitHistory")}
-              </div>
+              </AstryxView>
             ) : (
-              <div
+              <AstryxView
+                layout="block"
+                direction="horizontal"
                 className="relative"
                 style={{ height: `${historyVirtualizer.getTotalSize()}px` }}
               >
@@ -1008,14 +986,16 @@ export function GitReviewHistoryView(props: {
                   if (!row) return null;
                   if (row.type === "loadMore") {
                     return (
-                      <div
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
                         key={virtualRow.key}
                         ref={historyVirtualizer.measureElement}
                         data-index={virtualRow.index}
                         className="absolute left-0 top-0 w-full"
                         style={{ transform: `translateY(${virtualRow.start}px)` }}
                       >
-                        <button
+                        <AstryxButton
                           type="button"
                           className="flex min-h-[28px] w-full items-center justify-center gap-2 px-3 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-70"
                           disabled={historyLoadingMore}
@@ -1025,15 +1005,15 @@ export function GitReviewHistoryView(props: {
                           {historyLoadingMore ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : null}
-                          <span>
+                          <AstryxInline>
                             {historyLoadingMore
                               ? t("projectTools.gitReview.loadingMoreCommits")
                               : historyLoadMoreError
                                 ? t("projectTools.gitReview.loadMoreCommitsFailed")
                                 : t("projectTools.gitReview.loadMoreCommits")}
-                          </span>
-                        </button>
-                      </div>
+                          </AstryxInline>
+                        </AstryxButton>
+                      </AstryxView>
                     );
                   }
                   if (row.type === "marker") {
@@ -1050,29 +1030,33 @@ export function GitReviewHistoryView(props: {
                     );
                     const title = refLabel ? `${label} ${refLabel}` : label;
                     return (
-                      <div
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
                         key={virtualRow.key}
                         ref={historyVirtualizer.measureElement}
                         data-index={virtualRow.index}
                         className="absolute left-0 top-0 w-full"
                         style={{ transform: `translateY(${virtualRow.start}px)` }}
                       >
-                        <div
+                        <AstryxView
+                          layout="flex"
+                          direction="horizontal"
                           className="git-review-history-row flex h-[22px] w-full min-w-0 select-none items-center gap-1 px-1.5 text-left text-xs text-muted-foreground transition-colors"
                           title={title}
                           aria-label={title}
                         >
                           <GitGraphSvgCell row={graphRow} />
-                          <span className="min-w-0 flex-1 truncate text-[calc(12px*var(--zone-font-scale,1))] font-medium">
+                          <AstryxInline className="min-w-0 flex-1 truncate text-[calc(12px*var(--zone-font-scale,1))] font-medium">
                             {label}
-                          </span>
+                          </AstryxInline>
                           {refLabel ? (
-                            <span className="shrink-0 truncate text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground">
+                            <AstryxInline className="shrink-0 truncate text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground">
                               {refLabel}
-                            </span>
+                            </AstryxInline>
                           ) : null}
-                        </div>
-                      </div>
+                        </AstryxView>
+                      </AstryxView>
                     );
                   }
                   if (row.type === "file") {
@@ -1080,101 +1064,107 @@ export function GitReviewHistoryView(props: {
                     const fileSelected =
                       row.commit.sha === selectedCommitSha &&
                       row.file.path === selectedCommitFilePath;
-                    const fileContextMenuOpen =
-                      historyContextMenu?.kind === "file" &&
-                      historyContextMenu.commitSha === row.commit.sha &&
-                      historyContextMenu.path === row.file.path;
                     const fileName = basename(row.file.path);
                     const filePath = row.file.oldPath
                       ? `${parentPath(row.file.oldPath)} -> ${parentPath(row.file.path)}`
                       : parentPath(row.file.path);
                     const graphRow = gitGraph.rows[row.graphIndex];
                     return (
-                      <div
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
                         key={virtualRow.key}
                         ref={historyVirtualizer.measureElement}
                         data-index={virtualRow.index}
                         className="absolute left-0 top-0 w-full"
                         style={{ transform: `translateY(${virtualRow.start}px)` }}
                       >
-                        <button
-                          type="button"
-                          className="git-review-history-row flex h-[22px] w-full min-w-0 select-none items-center gap-1.5 px-1.5 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          data-selected={fileSelected || undefined}
-                          data-context-open={fileContextMenuOpen || undefined}
-                          title={
-                            row.file.oldPath
-                              ? `${row.file.oldPath} -> ${row.file.path}`
-                              : row.file.path
-                          }
-                          onContextMenu={(event) =>
-                            openHistoryFileContextMenu(event, row.commit, row.file)
-                          }
-                          onClick={() => selectCommitFile(row.commit, row.file)}
+                        <ContextMenu
+                          items={historyFileMenuItems(row.commit, row.file)}
+                          label={row.file.path}
+                          menuWidth="var(--xagent-git-context-menu-width)"
+                          size="sm"
                         >
-                          {graphRow ? <GitGraphContinuationCell row={graphRow} /> : null}
-                          <TypeIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                          <span className="min-w-0 flex-1 truncate">
-                            <span className="font-medium">{fileName}</span>
-                            <span className="ml-1 text-[calc(10px*var(--zone-font-scale,1))] text-muted-foreground">
-                              {filePath}
-                            </span>
-                          </span>
-                          <span
-                            className={cn(
-                              "shrink-0 text-[calc(10px*var(--zone-font-scale,1))] font-semibold",
-                              commitFileStatusTone(row.file),
-                            )}
+                          <AstryxButton
+                            type="button"
+                            className="git-review-history-row flex h-[22px] w-full min-w-0 select-none items-center gap-1.5 px-1.5 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            data-selected={fileSelected || undefined}
+                            title={
+                              row.file.oldPath
+                                ? `${row.file.oldPath} -> ${row.file.path}`
+                                : row.file.path
+                            }
+                            onClick={() => selectCommitFile(row.commit, row.file)}
                           >
-                            {commitFileStatusLabel(row.file)}
-                          </span>
-                        </button>
-                      </div>
+                            {graphRow ? <GitGraphContinuationCell row={graphRow} /> : null}
+                            <TypeIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            <AstryxInline className="min-w-0 flex-1 truncate">
+                              <AstryxInline className="font-medium">{fileName}</AstryxInline>
+                              <AstryxInline className="ml-1 text-[calc(10px*var(--zone-font-scale,1))] text-muted-foreground">
+                                {filePath}
+                              </AstryxInline>
+                            </AstryxInline>
+                            <AstryxInline
+                              className={cn(
+                                "shrink-0 text-[calc(10px*var(--zone-font-scale,1))] font-semibold",
+                                commitFileStatusTone(row.file),
+                              )}
+                            >
+                              {commitFileStatusLabel(row.file)}
+                            </AstryxInline>
+                          </AstryxButton>
+                        </ContextMenu>
+                      </AstryxView>
                     );
                   }
                   const commit = row.commit;
                   const commitSelected = commit.sha === selectedCommitSha;
-                  const commitContextMenuOpen =
-                    historyContextMenu?.kind === "commit" &&
-                    historyContextMenu.commitSha === commit.sha;
                   const commitExpanded = expandedCommitShas.has(commit.sha);
                   const graphRow = gitGraph.rows[row.graphIndex];
                   return (
-                    <div
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
                       key={virtualRow.key}
                       ref={historyVirtualizer.measureElement}
                       data-index={virtualRow.index}
                       className="absolute left-0 top-0 w-full"
                       style={{ transform: `translateY(${virtualRow.start}px)` }}
                     >
-                      <button
-                        type="button"
-                        className="git-review-history-row flex h-[22px] w-full min-w-0 select-none items-center gap-1 px-1.5 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        data-selected={commitSelected || undefined}
-                        data-context-open={commitContextMenuOpen || undefined}
-                        title={commitHistoryTitle(commit)}
-                        aria-expanded={commitExpanded}
-                        onContextMenu={(event) => openHistoryCommitContextMenu(event, commit)}
-                        onClick={() => selectCommitRow(commit)}
+                      <ContextMenu
+                        items={historyCommitMenuItems(commit)}
+                        label={commit.subject || commit.shortSha}
+                        menuWidth="var(--xagent-git-context-menu-width)"
+                        size="sm"
                       >
-                        {graphRow ? <GitGraphSvgCell row={graphRow} /> : null}
-                        <span className="min-w-0 flex-1 truncate text-[calc(12px*var(--zone-font-scale,1))] font-medium">
-                          {commit.subject || commit.shortSha}
-                        </span>
-                        <CommitRefTags
-                          refs={commit.refs}
-                          selected={commitSelected}
-                          remoteName={state.remoteName}
-                        />
-                      </button>
-                    </div>
+                        <AstryxButton
+                          type="button"
+                          className="git-review-history-row flex h-[22px] w-full min-w-0 select-none items-center gap-1 px-1.5 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          data-selected={commitSelected || undefined}
+                          title={commitHistoryTitle(commit)}
+                          aria-expanded={commitExpanded}
+                          onClick={() => selectCommitRow(commit)}
+                        >
+                          {graphRow ? <GitGraphSvgCell row={graphRow} /> : null}
+                          <AstryxInline className="min-w-0 flex-1 truncate text-[calc(12px*var(--zone-font-scale,1))] font-medium">
+                            {commit.subject || commit.shortSha}
+                          </AstryxInline>
+                          <CommitRefTags
+                            refs={commit.refs}
+                            selected={commitSelected}
+                            remoteName={state.remoteName}
+                          />
+                        </AstryxButton>
+                      </ContextMenu>
+                    </AstryxView>
                   );
                 })}
-              </div>
+              </AstryxView>
             )}
-          </div>
-        </aside>
-        <main
+          </AstryxView>
+        </AstryxView>
+        <AstryxView
+          as="main"
           ref={detailPaneRef}
           className={cn(
             "h-full min-h-0 flex-col overflow-hidden",
@@ -1183,16 +1173,26 @@ export function GitReviewHistoryView(props: {
           )}
         >
           {selectedCommit ? (
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-              <div className="flex shrink-0 items-start gap-2 rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-xs">
+            <AstryxView
+              layout="flex"
+              direction="vertical"
+              className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden"
+            >
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex shrink-0 items-start gap-2 rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-xs"
+              >
                 <GitCommitHorizontal className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <div
+                <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
                     className="truncate font-medium text-foreground"
                     title={commitHistoryTitle(selectedCommit)}
                   >
                     {selectedCommit.subject || selectedCommit.shortSha}
-                  </div>
+                  </AstryxView>
                   <CommitRefTags
                     refs={selectedCommit.refs}
                     selected={false}
@@ -1200,21 +1200,38 @@ export function GitReviewHistoryView(props: {
                     variant="detail"
                     limit={COMMIT_DETAIL_REF_TAG_LIMIT}
                   />
-                  <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground">
-                    <span className="font-mono">{selectedCommit.shortSha}</span>
-                    <span>{selectedCommit.authorName}</span>
-                    <span>{formatCommitDate(selectedCommit.authorDate)}</span>
-                  </div>
-                </div>
-              </div>
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground"
+                  >
+                    <AstryxInline className="font-mono">{selectedCommit.shortSha}</AstryxInline>
+                    <AstryxInline>{selectedCommit.authorName}</AstryxInline>
+                    <AstryxInline>{formatCommitDate(selectedCommit.authorDate)}</AstryxInline>
+                  </AstryxView>
+                </AstryxView>
+              </AstryxView>
               {selectedCommitFile || commitDiff || commitDiffLoading || historyError ? (
-                <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/70 bg-background">
-                  <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-2 border-b border-border/70 bg-background px-3 py-2">
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-semibold">
+                <AstryxView
+                  as="section"
+                  className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/70 bg-background"
+                >
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-2 border-b border-border/70 bg-background px-3 py-2"
+                  >
+                    <AstryxView layout="block" direction="horizontal" className="min-w-0">
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="truncate text-xs font-semibold"
+                      >
                         {historyDiffTitle || t("projectTools.gitReview.commitDiff")}
-                      </div>
-                      <div
+                      </AstryxView>
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
                         className="truncate text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground"
                         title={
                           historyDiffSubtitle || selectedCommitFile?.path || selectedCommit.sha
@@ -1222,12 +1239,12 @@ export function GitReviewHistoryView(props: {
                       >
                         {historyDiffSubtitle ||
                           `${selectedCommit.shortSha || selectedCommit.sha.slice(0, 7)} - ${selectedCommit.subject}`}
-                      </div>
-                    </div>
+                      </AstryxView>
+                    </AstryxView>
                     {commitDiffLoading ? (
                       <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
                     ) : null}
-                  </div>
+                  </AstryxView>
                   <DiffContent
                     title={historyDiffTitle || t("projectTools.gitReview.commitDiff")}
                     diff={commitDiff}
@@ -1235,133 +1252,28 @@ export function GitReviewHistoryView(props: {
                     loading={commitDiffLoading}
                     showStat={useSplitReviewLayout}
                   />
-                </section>
+                </AstryxView>
               ) : (
-                <div className="flex min-h-0 flex-1 items-center justify-center rounded-lg border border-border/70 bg-muted/10 px-4 text-center text-xs text-muted-foreground">
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex min-h-0 flex-1 items-center justify-center rounded-lg border border-border/70 bg-muted/10 px-4 text-center text-xs text-muted-foreground"
+                >
                   {t("projectTools.gitReview.selectCommitFileToViewDiff")}
-                </div>
+                </AstryxView>
               )}
-            </div>
+            </AstryxView>
           ) : (
-            <div className="flex min-h-0 flex-1 items-center justify-center rounded-lg border border-border/70 bg-muted/10 px-4 text-center text-xs text-muted-foreground">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex min-h-0 flex-1 items-center justify-center rounded-lg border border-border/70 bg-muted/10 px-4 text-center text-xs text-muted-foreground"
+            >
               {historyError || t("projectTools.gitReview.selectCommitToViewFiles")}
-            </div>
+            </AstryxView>
           )}
-        </main>
-      </div>
-      {historyContextMenu &&
-      historyContextCommit &&
-      (historyContextMenu.kind === "commit" || historyContextFile) ? (
-        <div
-          ref={contextMenuRef}
-          role="menu"
-          className={cn("absolute z-[75] min-w-56", CONTEXT_MENU_CONTAINER_CLASS)}
-          style={{ left: historyContextMenu.x, top: historyContextMenu.y }}
-          onClick={(event) => event.stopPropagation()}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-        >
-          {historyContextMenu.kind === "file" ? (
-            <>
-              <button
-                type="button"
-                role="menuitem"
-                className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-                onClick={() => openHistoryCommitDiff(historyContextCommit, historyContextFile!)}
-              >
-                <Eye className="h-3.5 w-3.5" />
-                <span>{t("projectTools.gitReview.openChange")}</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-                disabled={!onInsertGitFileMention}
-                onClick={() => addHistoryFileToContext(historyContextCommit, historyContextFile!)}
-              >
-                <MessageSquareText className="h-3.5 w-3.5" />
-                <span>{t("projectTools.gitReview.addToContext")}</span>
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                role="menuitem"
-                className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-                onClick={() => openHistoryCommitDiff(historyContextCommit, historyContextFile)}
-              >
-                <Eye className="h-3.5 w-3.5" />
-                <span>{t("projectTools.gitReview.openChange")}</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-                disabled={!historyContextCommitGithubUrl}
-                onClick={() => openHistoryCommitOnGithub(historyContextCommit)}
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                <span>{t("projectTools.gitReview.openOnGithub")}</span>
-              </button>
-              <div className={CONTEXT_MENU_SEPARATOR_CLASS} />
-              <button
-                type="button"
-                role="menuitem"
-                className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-                disabled={writeDisabled || operationBusy || state.status !== "ready"}
-                onClick={() => openCreateBranchFromCommit(historyContextCommit)}
-              >
-                <GitBranch className="h-3.5 w-3.5" />
-                <span>{t("projectTools.gitReview.createBranch")}</span>
-              </button>
-              <div className={CONTEXT_MENU_SEPARATOR_CLASS} />
-              <button
-                type="button"
-                role="menuitem"
-                className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-                disabled={!gitClient}
-                onClick={() => compareHistoryCommitWithRemote(historyContextCommit)}
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                <span>{t("projectTools.gitReview.compareWithRemote")}</span>
-              </button>
-              <div className={CONTEXT_MENU_SEPARATOR_CLASS} />
-              <button
-                type="button"
-                role="menuitem"
-                className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-                onClick={() => copyHistoryCommitHash(historyContextCommit)}
-              >
-                <Copy className="h-3.5 w-3.5" />
-                <span>{t("projectTools.gitReview.copyCommitHash")}</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-                onClick={() => copyHistoryCommitMessage(historyContextCommit)}
-              >
-                <Copy className="h-3.5 w-3.5" />
-                <span>{t("projectTools.gitReview.copyCommitMessage")}</span>
-              </button>
-              <div className={CONTEXT_MENU_SEPARATOR_CLASS} />
-              <button
-                type="button"
-                role="menuitem"
-                className={CHANGE_CONTEXT_MENU_ITEM_CLASS}
-                disabled={!onInsertCommitMention}
-                onClick={() => addHistoryCommitToContext(historyContextCommit)}
-              >
-                <MessageSquareText className="h-3.5 w-3.5" />
-                <span>{t("projectTools.gitReview.addToContext")}</span>
-              </button>
-            </>
-          )}
-        </div>
-      ) : null}
+        </AstryxView>
+      </AstryxView>
     </>
   );
 }

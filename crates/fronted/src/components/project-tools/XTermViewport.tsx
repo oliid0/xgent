@@ -13,6 +13,7 @@ import type {
   TerminalStreamHandle,
   TerminalStreamInputState,
 } from "../../lib/terminal/types";
+import { View as AstryxView } from "@xagent/ui/components/ui/view";
 
 type XTermViewportProps = {
   client: TerminalClient;
@@ -506,7 +507,9 @@ export function XTermViewport({
   }, [client, session.id, session.projectPathKey]);
 
   return (
-    <div
+    <AstryxView
+      layout="block"
+      direction="horizontal"
       ref={containerRef}
       style={viewportStyle}
       className={cn("project-terminal-viewport h-full min-h-0 w-full overflow-hidden", className)}

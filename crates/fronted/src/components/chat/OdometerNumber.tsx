@@ -1,3 +1,5 @@
+import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { Text } from "@astryxdesign/core/Text";
 import { cn } from "../../lib/shared/utils";
 
 const DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
@@ -12,28 +14,42 @@ export function OdometerNumber({ value, className }: { value: number; className?
   const safe = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
   const text = String(safe);
   return (
-    <span className={cn("inline-flex tabular-nums leading-none", className)}>
-      <span className="sr-only">{text}</span>
-      <span aria-hidden="true" className="inline-flex">
+    <HStack
+      as="span"
+      className={cn("inline-flex tabular-nums leading-none", className)}
+    >
+      <Text type="inherit" className="sr-only">{text}</Text>
+      <HStack as="span" aria-hidden="true" className="inline-flex">
         {Array.from(text).map((char, index) => {
           const digit = char.charCodeAt(0) - 48;
           const place = text.length - 1 - index;
           return (
-            <span key={`p${place}`} className="inline-block h-[1em] w-[1ch] overflow-hidden">
-              <span
-                className="flex flex-col transition-transform duration-300 ease-out will-change-transform motion-reduce:transition-none"
+            <HStack
+              as="span"
+              key={`p${place}`}
+              className="inline-block h-[1em] w-[1ch] overflow-hidden"
+            >
+              <VStack
+                as="span"
+                className="transition-transform duration-[var(--duration-medium)] ease-[var(--ease-standard)] will-change-transform motion-reduce:transition-none"
                 style={{ transform: `translateY(-${digit}em)` }}
               >
                 {DIGITS.map((strip) => (
-                  <span key={strip} className="flex h-[1em] w-[1ch] items-center justify-center">
+                  <HStack
+                    as="span"
+                    key={strip}
+                    hAlign="center"
+                    vAlign="center"
+                    className="h-[1em] w-[1ch]"
+                  >
                     {strip}
-                  </span>
+                  </HStack>
                 ))}
-              </span>
-            </span>
+              </VStack>
+            </HStack>
           );
         })}
-      </span>
-    </span>
+      </HStack>
+    </HStack>
   );
 }

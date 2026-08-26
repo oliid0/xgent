@@ -1,4 +1,6 @@
 import { invoke } from "@xagent/runtime";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Selector } from "@astryxdesign/core/Selector";
 import { useEffect, useMemo, useState } from "react";
 import { FolderTree, Loader2, Trash2 } from "../../components/icons";
 import { Button } from "../../components/ui/button";
@@ -19,6 +21,11 @@ import {
   type WorkspaceRootGrantState,
 } from "../../lib/workspaceRootGrants";
 import type { SettingsSectionProps } from "./types";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
+import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
+import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 
 type EditableRoot = WorkspaceRootGrantDraft & {
   localId: string;
@@ -203,38 +210,47 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
   };
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-2xl border border-border/60 bg-card p-4">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-300">
-            <FolderTree className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold">{t("settings.projectRoots.title")}</h2>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              {t("settings.projectRoots.desc")}
-            </p>
-          </div>
-        </div>
-        <label className="mt-4 block space-y-1.5 text-xs text-muted-foreground">
-          <span>{t("settings.projectRoots.project")}</span>
-          <select
-            value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
-            className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+    <AstryxView layout="block" direction="horizontal" className="space-y-5">
+      <AstryxView as="section" className="rounded-2xl border border-border/60 bg-card p-4">
+        <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-3">
+          <AstryxView
+            as="span"
+            layout="flex"
+            direction="horizontal"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-300"
           >
-            {projects.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name} — {item.path}
-              </option>
-            ))}
-          </select>
-        </label>
-      </section>
+            <FolderTree className="h-5 w-5" />
+          </AstryxView>
+          <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+            <AstryxHeading level={2} className="text-sm font-semibold">
+              {t("settings.projectRoots.title")}
+            </AstryxHeading>
+            <AstryxParagraph className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {t("settings.projectRoots.desc")}
+            </AstryxParagraph>
+          </AstryxView>
+        </AstryxView>
+        <Selector
+          label={t("settings.projectRoots.project")}
+          value={projectId}
+          onChange={setProjectId}
+          options={projects.map((item) => ({
+            value: item.id,
+            label: `${item.name} — ${item.path}`,
+          }))}
+          width="100%"
+        />
+      </AstryxView>
 
-      <section className="rounded-2xl border border-border/60 bg-card p-4">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold">{t("settings.projectRoots.grants")}</h3>
+      <AstryxView as="section" className="rounded-2xl border border-border/60 bg-card p-4">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex items-center justify-between gap-3"
+        >
+          <AstryxHeading level={3} className="text-sm font-semibold">
+            {t("settings.projectRoots.grants")}
+          </AstryxHeading>
           <Button
             size="sm"
             variant="outline"
@@ -244,42 +260,55 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
             <FolderTree className="mr-1.5 h-4 w-4" />
             {t("settings.projectRoots.add")}
           </Button>
-        </div>
+        </AstryxView>
 
         {loading ? (
-          <div className="flex items-center gap-2 py-6 text-xs text-muted-foreground">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex items-center gap-2 py-6 text-xs text-muted-foreground"
+          >
             <Loader2 className="h-4 w-4 animate-spin" />
             {t("settings.loading")}
-          </div>
+          </AstryxView>
         ) : roots.length === 0 ? (
-          <p className="mt-3 rounded-xl bg-muted/45 px-3 py-3 text-xs text-muted-foreground">
+          <AstryxParagraph className="mt-3 rounded-xl bg-muted/45 px-3 py-3 text-xs text-muted-foreground">
             {projects.length === 0
               ? t("settings.projectRoots.noProjects")
               : t("settings.projectRoots.empty")}
-          </p>
+          </AstryxParagraph>
         ) : (
-          <div className="mt-3 space-y-3">
+          <AstryxView layout="block" direction="horizontal" className="mt-3 space-y-3">
             {roots.map((root) => (
-              <div key={root.localId} className="rounded-xl border border-border/50 p-3">
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
-                  <label className="space-y-1 text-xs text-muted-foreground">
-                    <span>{t("settings.projectRoots.path")}</span>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                key={root.localId}
+                className="rounded-xl border border-border/50 p-3"
+              >
+                <AstryxView
+                  layout="grid"
+                  direction="horizontal"
+                  className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]"
+                >
+                  <AstryxLabel className="space-y-1 text-xs text-muted-foreground">
+                    <AstryxInline>{t("settings.projectRoots.path")}</AstryxInline>
                     <Input
                       value={root.displayPath}
                       onChange={(event) =>
                         updateRoot(root.localId, { displayPath: event.target.value })
                       }
                     />
-                  </label>
-                  <label className="space-y-1 text-xs text-muted-foreground">
-                    <span>{t("settings.projectRoots.alias")}</span>
+                  </AstryxLabel>
+                  <AstryxLabel className="space-y-1 text-xs text-muted-foreground">
+                    <AstryxInline>{t("settings.projectRoots.alias")}</AstryxInline>
                     <Input
                       value={root.alias}
                       maxLength={32}
                       onChange={(event) => updateRoot(root.localId, { alias: event.target.value })}
                     />
-                  </label>
-                  <button
+                  </AstryxLabel>
+                  <AstryxButton
                     type="button"
                     onClick={() =>
                       setRoots((previous) =>
@@ -290,11 +319,15 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
                     aria-label={t("settings.projectRoots.remove")}
                   >
                     <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  </AstryxButton>
+                </AstryxView>
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="mt-2 flex flex-wrap items-center gap-2"
+                >
                   {(["read", "write"] as const).map((access: WorkspaceRootAccess) => (
-                    <button
+                    <AstryxButton
                       key={access}
                       type="button"
                       onClick={() => updateRoot(root.localId, { access })}
@@ -305,27 +338,33 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
                       }`}
                     >
                       {t(`settings.projectRoots.${access}`)}
-                    </button>
+                    </AstryxButton>
                   ))}
                   {root.state && root.state !== "active" ? (
-                    <span className="text-xs text-amber-600 dark:text-amber-300">
+                    <AstryxInline className="text-xs text-amber-600 dark:text-amber-300">
                       {t(`settings.projectRoots.state.${root.state}`)}
-                    </span>
+                    </AstryxInline>
                   ) : null}
-                </div>
-              </div>
+                </AstryxView>
+              </AstryxView>
             ))}
-          </div>
+          </AstryxView>
         )}
 
-        <div className="mt-5 border-t border-border/50 pt-4">
-          <h3 className="text-sm font-semibold">{t("settings.projectRoots.resources")}</h3>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="mt-5 border-t border-border/50 pt-4"
+        >
+          <AstryxHeading level={3} className="text-sm font-semibold">
+            {t("settings.projectRoots.resources")}
+          </AstryxHeading>
+          <AstryxParagraph className="mt-1 text-xs leading-relaxed text-muted-foreground">
             {t("settings.projectRoots.resourcesDesc")}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          </AstryxParagraph>
+          <AstryxView layout="flex" direction="horizontal" className="mt-3 flex flex-wrap gap-2">
             {(["inherit", "custom"] as const).map((mode) => (
-              <button
+              <AstryxButton
                 key={mode}
                 type="button"
                 onClick={() => setResourceMode(mode)}
@@ -336,83 +375,92 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
                 }`}
               >
                 {t(`settings.projectRoots.resources.${mode}`)}
-              </button>
+              </AstryxButton>
             ))}
-          </div>
+          </AstryxView>
           {resourceMode === "custom" ? (
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div>
-                <div className="text-xs font-medium">{t("settings.projectRoots.skills")}</div>
-                <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-border/50 p-2">
+            <AstryxView
+              layout="grid"
+              direction="horizontal"
+              className="mt-4 grid gap-4 md:grid-cols-2"
+            >
+              <AstryxView layout="block" direction="horizontal">
+                <AstryxView layout="block" direction="horizontal" className="text-xs font-medium">
+                  {t("settings.projectRoots.skills")}
+                </AstryxView>
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-border/50 p-2"
+                >
                   {Array.from(
                     new Set([...availableSkills.map((skill) => skill.name), ...resourceSkillNames]),
                   ).map((name) => (
-                    <label
+                    <CheckboxInput
                       key={name}
-                      className="flex min-h-9 items-center gap-2 rounded-lg px-2 text-xs hover:bg-muted/50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={resourceSkillNames.includes(name)}
-                        onChange={(event) =>
-                          setResourceSkillNames((current) =>
-                            event.target.checked
-                              ? Array.from(new Set([...current, name]))
-                              : current.filter((item) => item !== name),
-                          )
-                        }
-                      />
-                      <span className="min-w-0 truncate">{name}</span>
-                    </label>
+                      label={name}
+                      value={resourceSkillNames.includes(name)}
+                      onChange={(checked) =>
+                        setResourceSkillNames((current) =>
+                          checked
+                            ? Array.from(new Set([...current, name]))
+                            : current.filter((item) => item !== name),
+                        )
+                      }
+                      size="sm"
+                    />
                   ))}
                   {availableSkills.length === 0 && resourceSkillNames.length === 0 ? (
-                    <p className="px-2 py-2 text-xs text-muted-foreground">
+                    <AstryxParagraph className="px-2 py-2 text-xs text-muted-foreground">
                       {t("settings.projectRoots.resourcesEmpty")}
-                    </p>
+                    </AstryxParagraph>
                   ) : null}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs font-medium">{t("settings.projectRoots.mcp")}</div>
-                <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-border/50 p-2">
+                </AstryxView>
+              </AstryxView>
+              <AstryxView layout="block" direction="horizontal">
+                <AstryxView layout="block" direction="horizontal" className="text-xs font-medium">
+                  {t("settings.projectRoots.mcp")}
+                </AstryxView>
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-border/50 p-2"
+                >
                   {settings.mcp.servers.map((server) => (
-                    <label
+                    <CheckboxInput
                       key={server.id}
-                      className="flex min-h-9 items-center gap-2 rounded-lg px-2 text-xs hover:bg-muted/50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={resourceMcpServerIds.includes(server.id)}
-                        disabled={!server.enabled}
-                        onChange={(event) =>
-                          setResourceMcpServerIds((current) =>
-                            event.target.checked
-                              ? Array.from(new Set([...current, server.id]))
-                              : current.filter((item) => item !== server.id),
-                          )
-                        }
-                      />
-                      <span className="min-w-0 flex-1 truncate">{server.id}</span>
-                      {!server.enabled ? (
-                        <span className="text-[10px] text-muted-foreground">
-                          {t("settings.projectRoots.disabled")}
-                        </span>
-                      ) : null}
-                    </label>
+                      label={server.id}
+                      description={server.enabled ? undefined : t("settings.projectRoots.disabled")}
+                      value={resourceMcpServerIds.includes(server.id)}
+                      isDisabled={!server.enabled}
+                      disabledMessage={
+                        server.enabled ? undefined : t("settings.projectRoots.disabled")
+                      }
+                      onChange={(checked) =>
+                        setResourceMcpServerIds((current) =>
+                          checked
+                            ? Array.from(new Set([...current, server.id]))
+                            : current.filter((item) => item !== server.id),
+                        )
+                      }
+                      size="sm"
+                    />
                   ))}
                   {settings.mcp.servers.length === 0 ? (
-                    <p className="px-2 py-2 text-xs text-muted-foreground">
+                    <AstryxParagraph className="px-2 py-2 text-xs text-muted-foreground">
                       {t("settings.projectRoots.resourcesEmpty")}
-                    </p>
+                    </AstryxParagraph>
                   ) : null}
-                </div>
-              </div>
-            </div>
+                </AstryxView>
+              </AstryxView>
+            </AstryxView>
           ) : null}
-        </div>
+        </AstryxView>
 
-        {error ? <p className="mt-3 text-xs text-destructive">{error}</p> : null}
-        <div className="mt-4 flex justify-end gap-2">
+        {error ? (
+          <AstryxParagraph className="mt-3 text-xs text-destructive">{error}</AstryxParagraph>
+        ) : null}
+        <AstryxView layout="flex" direction="horizontal" className="mt-4 flex justify-end gap-2">
           <Button variant="outline" disabled={!project || saving} onClick={revoke}>
             {t("settings.projectRoots.revoke")}
           </Button>
@@ -420,8 +468,8 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
             {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
             {t("settings.save")}
           </Button>
-        </div>
-      </section>
-    </div>
+        </AstryxView>
+      </AstryxView>
+    </AstryxView>
   );
 }

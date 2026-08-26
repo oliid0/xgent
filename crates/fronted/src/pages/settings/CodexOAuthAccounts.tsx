@@ -1,10 +1,20 @@
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Center } from "@astryxdesign/core/Center";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Text } from "@astryxdesign/core/Text";
 import { invoke, openUrl } from "@xagent/runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CheckCircle2, Loader2, Plus, Trash2 } from "../../components/icons";
-import { Button } from "../../components/ui/button";
+import { CheckCircle2, Plus, Trash2 } from "../../components/icons";
 import { useLocale } from "../../i18n";
-import { cn } from "../../lib/shared/utils";
 
 type CodexOAuthAccount = {
   id: string;
@@ -40,9 +50,7 @@ type Props = {
 
 export function CodexOAuthAccounts({ value, onChange, browserRuntime }: Props) {
   const { t } = useLocale();
-  const [status, setStatus] = useState<CodexOAuthStatus>({
-    accounts: [],
-  });
+  const [status, setStatus] = useState<CodexOAuthStatus>({ accounts: [] });
   const [deviceCode, setDeviceCode] = useState<CodexOAuthDeviceCode | null>(null);
   const [loading, setLoading] = useState(!browserRuntime);
   const [starting, setStarting] = useState(false);
@@ -130,111 +138,98 @@ export function CodexOAuthAccounts({ value, onChange, browserRuntime }: Props) {
 
   if (browserRuntime) {
     return (
-      <div className="rounded-xl border bg-muted/25 px-3 py-3 text-xs leading-5 text-muted-foreground">
-        {value
-          ? `${t("settings.providerOAuthSelectedAccount")}: ${value}`
-          : t("settings.providerOAuthManageInApp")}
-      </div>
+      <Banner
+        status="info"
+        title={
+          value
+            ? `${t("settings.providerOAuthSelectedAccount")}: ${value}`
+            : t("settings.providerOAuthManageInApp")
+        }
+        collapsible={false}
+      />
     );
   }
 
   return (
-    <div className="space-y-2">
-      <div className="overflow-hidden rounded-xl border">
-        {loading ? (
-          <div className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {t("settings.loading")}
-          </div>
-        ) : status.accounts.length > 0 ? (
-          <div className="divide-y">
-            {status.accounts.map((account) => {
-              const selected = value === account.id;
-              return (
-                <div
-                  key={account.id}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 transition-colors",
-                    selected ? "bg-primary/8" : "hover:bg-accent/35",
-                  )}
-                >
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                    onClick={() => onChange(account.id)}
-                  >
-                    <span
-                      className={cn(
-                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
-                        selected && "border-primary bg-primary text-primary-foreground",
-                      )}
-                    >
-                      {selected ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">
-                        {account.email || t("settings.providerOAuthOpenAIAccount")}
-                      </span>
-                      <span className="block truncate text-[11px] text-muted-foreground">
-                        {[account.planType, account.id].filter(Boolean).join(" · ")}
-                      </span>
-                    </span>
-                  </button>
-                  <Button
-                    type="button"
+    <VStack gap={3}>
+      {loading ? (
+        <Center style={{ minHeight: "var(--xagent-oauth-list-min-height)" }}>
+          <Spinner label={t("settings.loading")} />
+        </Center>
+      ) : status.accounts.length > 0 ? (
+        <List density="balanced" hasDividers aria-label={t("settings.providerOAuthSelectedAccount")}>
+          {status.accounts.map((account) => {
+            const selected = value === account.id;
+            const label = account.email || t("settings.providerOAuthOpenAIAccount");
+            return (
+              <ListItem
+                key={account.id}
+                label={label}
+                description={[account.planType, account.id].filter(Boolean).join(" · ")}
+                startContent={
+                  <StatusDot
+                    variant={selected ? "success" : "neutral"}
+                    label={selected ? t("settings.providerOAuthSelectedAccount") : label}
+                    icon={
+                      selected ? (
+                        <Icon icon={CheckCircle2} size="xsm" color="inherit" />
+                      ) : undefined
+                    }
+                  />
+                }
+                endContent={
+                  <IconButton
+                    label={t("settings.providerOAuthRemoveAccount")}
+                    tooltip={t("settings.providerOAuthRemoveAccount")}
+                    icon={<Icon icon={Trash2} size="sm" color="inherit" />}
+                    size="sm"
                     variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => void removeAccount(account.id)}
-                    title={t("settings.providerOAuthRemoveAccount")}
-                    aria-label={t("settings.providerOAuthRemoveAccount")}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="px-3 py-5 text-center text-xs text-muted-foreground">
-            {t("settings.providerOAuthNoAccounts")}
-          </div>
-        )}
-      </div>
+                  />
+                }
+                isSelected={selected}
+                onClick={() => onChange(account.id)}
+              />
+            );
+          })}
+        </List>
+      ) : (
+        <EmptyState title={t("settings.providerOAuthNoAccounts")} isCompact />
+      )}
 
       {deviceCode ? (
-        <div className="rounded-xl border border-primary/25 bg-primary/5 px-3 py-3">
-          <div className="text-xs font-medium">{t("settings.providerOAuthWaiting")}</div>
-          <button
-            type="button"
-            className="mt-2 rounded-lg border bg-background px-3 py-1.5 font-mono text-base font-semibold tracking-[0.18em]"
-            onClick={() => void navigator.clipboard?.writeText(deviceCode.userCode)}
-            title={t("settings.providerOAuthCopyCode")}
-          >
-            {deviceCode.userCode}
-          </button>
-          <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            {t("settings.providerOAuthWaitingHint")}
-          </div>
-        </div>
+        <Card variant="blue" padding={3}>
+          <VStack gap={2}>
+            <Text type="label" weight="medium">
+              {t("settings.providerOAuthWaiting")}
+            </Text>
+            <Button
+              label={deviceCode.userCode}
+              tooltip={t("settings.providerOAuthCopyCode")}
+              variant="secondary"
+              size="lg"
+              onClick={() => void navigator.clipboard?.writeText(deviceCode.userCode)}
+            />
+            <HStack gap={2} vAlign="center">
+              <Spinner size="sm" aria-hidden="true" />
+              <Text type="supporting" color="secondary">
+                {t("settings.providerOAuthWaitingHint")}
+              </Text>
+            </HStack>
+          </VStack>
+        </Card>
       ) : null}
 
       <Button
-        type="button"
-        variant="outline"
-        className="w-full gap-2"
-        disabled={starting || Boolean(deviceCode)}
+        label={t("settings.providerOAuthAddAccount")}
+        icon={<Icon icon={Plus} size="sm" color="inherit" />}
+        variant="secondary"
+        width="100%"
+        isLoading={starting}
+        isDisabled={Boolean(deviceCode)}
         onClick={() => void startLogin()}
-      >
-        {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-        {t("settings.providerOAuthAddAccount")}
-      </Button>
-      {error ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {error}
-        </div>
-      ) : null}
-    </div>
+      />
+      {error ? <Banner status="error" title={error} collapsible={false} /> : null}
+    </VStack>
   );
 }

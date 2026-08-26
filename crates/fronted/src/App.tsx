@@ -1,4 +1,13 @@
 import type { Context } from "@earendil-works/pi-ai";
+import { Center } from "@astryxdesign/core/Center";
+import { ContextMenu } from "@astryxdesign/core/ContextMenu";
+import { Dialog } from "@astryxdesign/core/Dialog";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { StackItem, VStack } from "@astryxdesign/core/Stack";
+import { ToastViewport } from "@astryxdesign/core/Toast";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { Theme } from "@astryxdesign/core/theme";
+import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 import {
   configureLanPcCommandHost,
   invoke,
@@ -53,20 +62,28 @@ function getDefaultContext(): Context {
 function AppChrome(props: { children: ReactNode; nativeMobile?: boolean }) {
   // Plain inputs get a shared cut/copy/paste menu; everything else keeps the
   // suppressed native menu (surfaces with their own menus opt out upstream).
-  const { onRootContextMenu, onRootMouseDownCapture, menu } = useNativeInputContextMenu({
-    enabled: !props.nativeMobile,
-  });
+  const { onRootContextMenu, onRootMouseDownCapture, contextMenuProps } = useNativeInputContextMenu(
+    {
+      enabled: !props.nativeMobile,
+    },
+  );
   return (
-    <div
-      data-native-mobile={props.nativeMobile ? "true" : undefined}
-      className="app-safe-area relative flex h-full w-full flex-col overflow-hidden bg-background"
-      onContextMenu={onRootContextMenu}
-      onMouseDownCapture={onRootMouseDownCapture}
-    >
-      <WindowsTitleBar />
-      <div className="relative min-h-0 flex-1 overflow-hidden bg-background">{props.children}</div>
-      {menu}
-    </div>
+    <ContextMenu {...contextMenuProps}>
+      <VStack
+        data-native-mobile={props.nativeMobile ? "true" : undefined}
+        height="100%"
+        width="100%"
+        gap={0}
+        className="app-safe-area relative overflow-hidden bg-body"
+        onContextMenu={onRootContextMenu}
+        onMouseDownCapture={onRootMouseDownCapture}
+      >
+        <WindowsTitleBar />
+        <StackItem size="fill" className="relative overflow-hidden bg-body">
+          {props.children}
+        </StackItem>
+      </VStack>
+    </ContextMenu>
   );
 }
 
@@ -94,6 +111,7 @@ export default function App() {
     platformResolved &&
     !browserRuntime &&
     (runtimePlatform === "android" || runtimePlatform === "ios");
+  const compactSettingsDialog = useMediaQuery("(max-width: 768px)") || nativeMobile;
   const desktopBridgeEnabled = browserRuntime || (platformResolved && !nativeMobile);
 
   useEffect(() => {
@@ -115,7 +133,6 @@ export default function App() {
     status: "idle",
   });
   const [context, setContext] = useState<Context>(() => getDefaultContext());
-  const [overlay, setOverlay] = useState<"closed" | "entering" | "open" | "leaving">("closed");
   const { confirm: requestRestartConfirm, dialog: restartConfirmDialog } = useConfirmDialog();
 
   const saveSequenceRef = useRef(0);
@@ -414,8 +431,6 @@ export default function App() {
         setSoulCreateRequestId(0);
       }
       setSettingsOpen(true);
-      setOverlay("entering");
-      requestAnimationFrame(() => requestAnimationFrame(() => setOverlay("open")));
       void reloadPersistedSettings().catch((error) => {
         setSettingsSaveState({
           status: "error",
@@ -432,15 +447,8 @@ export default function App() {
   );
 
   const closeSettings = useCallback(() => {
-    setOverlay("leaving");
+    setSettingsOpen(false);
   }, []);
-
-  const handleTransitionEnd = useCallback(() => {
-    if (overlay === "leaving") {
-      setSettingsOpen(false);
-      setOverlay("closed");
-    }
-  }, [overlay]);
 
   // 构建 locale context value，避免每次渲染重新创建
   const localeContextValue = useMemo(
@@ -530,64 +538,56 @@ export default function App() {
 
   if (!settingsReady || !platformResolved) {
     return (
-      <LocaleContext.Provider value={localeContextValue}>
-        <AppChrome nativeMobile={nativeMobile}>
-          <div className="flex h-full w-full items-center justify-center bg-background text-sm text-muted-foreground">
-            {translate("chat.loading", settings.locale)}
-          </div>
-        </AppChrome>
-      </LocaleContext.Provider>
+      <Theme theme={neutralTheme} mode={effectiveTheme}>
+        <ToastViewport position="topEnd" maxVisible={4}>
+          <LocaleContext.Provider value={localeContextValue}>
+            <AppChrome nativeMobile={nativeMobile}>
+              <Center width="100%" height="100%">
+                <Spinner label={translate("chat.loading", settings.locale)} />
+              </Center>
+            </AppChrome>
+          </LocaleContext.Provider>
+        </ToastViewport>
+      </Theme>
     );
   }
 
-  const visible = settingsOpen;
-  const active = overlay === "open";
-
   return (
-    <LocaleContext.Provider value={localeContextValue}>
-      <SoulProvider>
-        <AppChrome nativeMobile={nativeMobile}>
-          <CronPromptRunner settings={settings} />
-          <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
-          <AppErrorBoundary>
-            <ChatPage
-              settings={settings}
-              setSettings={setSettings}
-              getMcpSettings={getMcpSettings}
-              getToolPolicies={getToolPolicies}
-              context={context}
-              setContext={setContext}
-              onOpenSettings={openSettings}
-              onToggleTheme={toggleTheme}
-              appUpdate={appUpdate}
-              desktopBridgeEnabled={desktopBridgeEnabled}
-              lanPcCommandHostReady={lanPcCommandHostReady}
-              nativeMobile={nativeMobile}
-              onRunningConversationCountChange={handleRunningConversationCountChange}
-            />
-          </AppErrorBoundary>
-          {visible && (
-            <div
-              className={`absolute inset-0 z-50 flex bg-transparent transition-[background-color,opacity] duration-200 ease-out md:items-center md:justify-center md:bg-black/50 md:p-6 ${
-                active ? "opacity-100" : "pointer-events-none opacity-0"
-              }`}
-              onMouseDown={(event) => {
-                if (event.target === event.currentTarget && !nativeMobile) {
-                  closeSettings();
-                }
-              }}
-              onTransitionEnd={(event) => {
-                if (event.target === event.currentTarget) {
-                  handleTransitionEnd();
-                }
-              }}
-            >
-              <div
-                className={`h-full w-full overflow-hidden bg-background transition-[transform,opacity] duration-200 ease-out md:h-[85vh] md:max-h-[900px] md:w-[min(calc(100vw-2rem),900px)] md:rounded-2xl md:border md:border-border md:shadow-2xl ${
-                  active
-                    ? "translate-y-0 scale-100 opacity-100"
-                    : "translate-y-6 scale-100 opacity-0 md:translate-y-0 md:scale-95"
-                }`}
+    <Theme theme={neutralTheme} mode={effectiveTheme}>
+      <ToastViewport position="topEnd" maxVisible={4}>
+        <LocaleContext.Provider value={localeContextValue}>
+          <SoulProvider>
+            <AppChrome nativeMobile={nativeMobile}>
+              <CronPromptRunner settings={settings} />
+              <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
+              <AppErrorBoundary>
+                <ChatPage
+                  settings={settings}
+                  setSettings={setSettings}
+                  getMcpSettings={getMcpSettings}
+                  getToolPolicies={getToolPolicies}
+                  context={context}
+                  setContext={setContext}
+                  onOpenSettings={openSettings}
+                  onToggleTheme={toggleTheme}
+                  appUpdate={appUpdate}
+                  desktopBridgeEnabled={desktopBridgeEnabled}
+                  lanPcCommandHostReady={lanPcCommandHostReady}
+                  nativeMobile={nativeMobile}
+                  onRunningConversationCountChange={handleRunningConversationCountChange}
+                />
+              </AppErrorBoundary>
+              <Dialog
+                isOpen={settingsOpen}
+                onOpenChange={(isOpen) => {
+                  if (!isOpen) closeSettings();
+                }}
+                purpose="info"
+                variant={compactSettingsDialog ? "fullscreen" : "standard"}
+                width={900}
+                maxHeight={compactSettingsDialog ? "100dvh" : "85dvh"}
+                padding={0}
+                aria-label={translate("settings.title", settings.locale)}
               >
                 <AppErrorBoundary>
                   <SettingsPage
@@ -602,12 +602,12 @@ export default function App() {
                     appUpdate={appUpdate}
                   />
                 </AppErrorBoundary>
-              </div>
-            </div>
-          )}
-          {restartConfirmDialog}
-        </AppChrome>
-      </SoulProvider>
-    </LocaleContext.Provider>
+              </Dialog>
+              {restartConfirmDialog}
+            </AppChrome>
+          </SoulProvider>
+        </LocaleContext.Provider>
+      </ToastViewport>
+    </Theme>
   );
 }

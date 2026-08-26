@@ -17,6 +17,10 @@ import {
   normalizeBrowserAddress,
 } from "../../../lib/browser/browserSessionController";
 import { cn } from "../../../lib/shared/utils";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 
 function hostname(url: string) {
   try {
@@ -35,8 +39,12 @@ function BrowserTabs() {
   );
 
   return (
-    <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border/45 bg-muted/35 px-2">
-      <button
+    <AstryxView
+      layout="flex"
+      direction="horizontal"
+      className="flex h-11 shrink-0 items-center gap-1 border-b border-border/45 bg-muted/35 px-2"
+    >
+      <AstryxButton
         type="button"
         disabled={snapshot.sessions.length >= MAX_BROWSER_SESSIONS}
         onClick={() => void browserSessionController.newSession()}
@@ -44,8 +52,10 @@ function BrowserTabs() {
         aria-label={t("browser.newTab")}
       >
         <Plus className="h-4 w-4" />
-      </button>
-      <div
+      </AstryxButton>
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
         data-edge-swipe-ignore
         className="flex min-w-0 flex-1 gap-1 overflow-x-auto overscroll-x-contain py-1 [scrollbar-width:none]"
       >
@@ -53,7 +63,9 @@ function BrowserTabs() {
           const selected = session.sessionId === snapshot.activeSessionId;
           const busy = snapshot.busySessionIds.includes(session.sessionId);
           return (
-            <div
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
               key={session.sessionId}
               className={cn(
                 "group flex h-8 min-w-[112px] max-w-[190px] items-center gap-2 rounded-lg border px-2.5 text-left transition-colors",
@@ -62,7 +74,7 @@ function BrowserTabs() {
                   : "border-transparent text-muted-foreground hover:bg-background/55 hover:text-foreground",
               )}
             >
-              <button
+              <AstryxButton
                 type="button"
                 onClick={() => browserSessionController.selectSession(session.sessionId)}
                 className="flex min-w-0 flex-1 items-center gap-2 text-left"
@@ -72,11 +84,11 @@ function BrowserTabs() {
                 ) : (
                   <Globe className="h-3.5 w-3.5 shrink-0" />
                 )}
-                <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
+                <AstryxInline className="min-w-0 flex-1 truncate text-[11px] font-medium">
                   {session.title?.trim() || hostname(session.url) || t("browser.untitled")}
-                </span>
-              </button>
-              <button
+                </AstryxInline>
+              </AstryxButton>
+              <AstryxButton
                 type="button"
                 className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md opacity-45 hover:bg-muted hover:opacity-100"
                 aria-label={t("browser.closeTab")}
@@ -86,15 +98,15 @@ function BrowserTabs() {
                 }}
               >
                 <X className="h-3 w-3" />
-              </button>
-            </div>
+              </AstryxButton>
+            </AstryxView>
           );
         })}
-      </div>
-      <span className="shrink-0 px-1 font-mono text-[10px] text-muted-foreground/65">
+      </AstryxView>
+      <AstryxInline className="shrink-0 px-1 font-mono text-[10px] text-muted-foreground/65">
         {snapshot.sessions.length}/{MAX_BROWSER_SESSIONS}
-      </span>
-    </div>
+      </AstryxInline>
+    </AstryxView>
   );
 }
 
@@ -126,11 +138,12 @@ function BrowserAddressBar() {
   };
 
   return (
-    <form
+    <AstryxView
+      as="form"
       onSubmit={submit}
       className="flex h-12 shrink-0 items-center gap-2 border-b border-border/45 bg-background/90 px-2.5"
     >
-      <button
+      <AstryxButton
         type="button"
         disabled={!active || busy}
         onClick={() =>
@@ -141,8 +154,8 @@ function BrowserAddressBar() {
         aria-label={t("browser.back")}
       >
         <ArrowLeft className="h-4 w-4" />
-      </button>
-      <button
+      </AstryxButton>
+      <AstryxButton
         type="button"
         disabled={!active || busy}
         onClick={() =>
@@ -153,14 +166,14 @@ function BrowserAddressBar() {
         aria-label={t("browser.forward")}
       >
         <ArrowLeft className="h-4 w-4 rotate-180" />
-      </button>
-      <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-xl border border-border/55 bg-muted/45 px-3 shadow-inner">
+      </AstryxButton>
+      <AstryxLabel className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-xl border border-border/55 bg-muted/45 px-3 shadow-inner">
         {busy ? (
           <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-500" />
         ) : (
           <Lock className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
         )}
-        <input
+        <AstryxInput
           data-edge-swipe-ignore
           value={value}
           onChange={(event) => setValue(event.target.value)}
@@ -170,8 +183,8 @@ function BrowserAddressBar() {
           autoCorrect="off"
           spellCheck={false}
         />
-      </label>
-      <button
+      </AstryxLabel>
+      <AstryxButton
         type="button"
         disabled={!active || busy}
         onClick={() =>
@@ -182,8 +195,8 @@ function BrowserAddressBar() {
         aria-label={t("browser.reload")}
       >
         <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} />
-      </button>
-    </form>
+      </AstryxButton>
+    </AstryxView>
   );
 }
 
@@ -256,30 +269,48 @@ function BrowserViewportSlot() {
   }, [localNativeSurface, syncViewport]);
 
   return (
-    <div
+    <AstryxView
+      layout="block"
+      direction="horizontal"
       ref={slotRef}
       data-edge-swipe-ignore
       className="relative min-h-0 flex-1 overflow-hidden bg-white"
     >
       {!localNativeSurface ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background px-8 text-center text-muted-foreground">
+        <AstryxView
+          layout="flex"
+          direction="vertical"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background px-8 text-center text-muted-foreground"
+        >
           <Globe className="h-6 w-6" />
-          <div>
-            <div className="text-sm font-medium text-foreground">
+          <AstryxView layout="block" direction="horizontal">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="text-sm font-medium text-foreground"
+            >
               {t("browser.remoteHostTitle")}
-            </div>
-            <div className="mt-1 max-w-sm text-xs leading-5">
+            </AstryxView>
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="mt-1 max-w-sm text-xs leading-5"
+            >
               {t("browser.remoteHostDescription")}
-            </div>
-          </div>
-        </div>
+            </AstryxView>
+          </AstryxView>
+        </AstryxView>
       ) : !activeSessionId ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background text-center text-muted-foreground">
+        <AstryxView
+          layout="flex"
+          direction="vertical"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background text-center text-muted-foreground"
+        >
           <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="text-xs">{t("browser.preparing")}</span>
-        </div>
+          <AstryxInline className="text-xs">{t("browser.preparing")}</AstryxInline>
+        </AstryxView>
       ) : null}
-    </div>
+    </AstryxView>
   );
 }
 
@@ -298,52 +329,73 @@ export function BrowserPanel() {
   if (!snapshot.panelOpen) return null;
 
   return (
-    <section
+    <AstryxView
+      as="section"
       data-edge-swipe-ignore
       className="absolute inset-0 z-[66] flex flex-col overflow-hidden bg-background pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)]"
       aria-label={t("browser.title")}
     >
-      <header className="flex h-14 min-h-14 shrink-0 items-center gap-3 border-b border-border/45 bg-background/90 px-3 backdrop-blur-xl">
-        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-500/12 text-blue-600 dark:text-blue-300">
+      <AstryxView
+        as="header"
+        className="flex h-14 min-h-14 shrink-0 items-center gap-3 border-b border-border/45 bg-background/90 px-3 backdrop-blur-xl"
+      >
+        <AstryxView
+          as="span"
+          layout="flex"
+          direction="horizontal"
+          className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-500/12 text-blue-600 dark:text-blue-300"
+        >
           <Globe className="h-4 w-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-semibold tracking-tight">
+        </AstryxView>
+        <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="truncate text-[14px] font-semibold tracking-tight"
+          >
             {t("browser.title")}
-          </div>
-          <div className="truncate text-[10.5px] text-muted-foreground">
+          </AstryxView>
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="truncate text-[10.5px] text-muted-foreground"
+          >
             {snapshot.busySessionIds.length > 0
               ? t("browser.agentOperating")
               : t("browser.sharedSession")}
-          </div>
-        </div>
-        <button
+          </AstryxView>
+        </AstryxView>
+        <AstryxButton
           type="button"
           onClick={() => browserSessionController.closePanel()}
           className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label={t("browser.close")}
         >
           <X className="h-4 w-4" />
-        </button>
-      </header>
+        </AstryxButton>
+      </AstryxView>
 
       <BrowserTabs />
       <BrowserAddressBar />
 
       {snapshot.error ? (
-        <div className="flex shrink-0 items-center gap-2 border-b border-destructive/20 bg-destructive/8 px-3 py-2 text-[11px] text-destructive">
-          <span className="min-w-0 flex-1 break-words">{snapshot.error}</span>
-          <button
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex shrink-0 items-center gap-2 border-b border-destructive/20 bg-destructive/8 px-3 py-2 text-[11px] text-destructive"
+        >
+          <AstryxInline className="min-w-0 flex-1 break-words">{snapshot.error}</AstryxInline>
+          <AstryxButton
             type="button"
             className="rounded-md px-2 py-1 font-medium hover:bg-destructive/10"
             onClick={() => browserSessionController.clearError()}
           >
             {t("browser.dismissError")}
-          </button>
-        </div>
+          </AstryxButton>
+        </AstryxView>
       ) : null}
 
       <BrowserViewportSlot />
-    </section>
+    </AstryxView>
   );
 }

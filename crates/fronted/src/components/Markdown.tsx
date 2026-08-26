@@ -13,7 +13,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
+import { Link } from "@astryxdesign/core/Link";
 import remarkBreaks from "remark-breaks";
 import {
   type Components,
@@ -32,8 +32,11 @@ import {
 } from "../lib/markdownCodeBlockPolicy";
 import { normalizeLatexDelimiters } from "../lib/normalizeLatexDelimiters";
 import { cn } from "../lib/shared/utils";
-import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, X } from "./icons";
+import { Check, ChevronDown, ChevronUp, Copy, ExternalLink } from "./icons";
+import { AdaptiveDialog } from "./ui/adaptive-dialog";
 import { Button } from "./ui/button";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 type MarkdownProps = {
   content: string;
@@ -108,13 +111,13 @@ function MarkdownImageFallback(props: MarkdownImageFallbackProps) {
         : "";
   if (!label) return null;
   return (
-    <span
+    <AstryxInline
       className="text-xs italic text-muted-foreground"
       data-xagent-markdown-image="text-fallback"
       title={label}
     >
       {label}
-    </span>
+    </AstryxInline>
   );
 }
 
@@ -132,9 +135,12 @@ function MarkdownReadOnlyLink(props: MarkdownAnchorFallbackProps) {
         ? href.trim()
         : undefined;
   return (
-    <span className="text-primary underline decoration-primary/35 underline-offset-4" title={label}>
+    <AstryxInline
+      className="text-primary underline decoration-primary/35 underline-offset-4"
+      title={label}
+    >
       {children}
-    </span>
+    </AstryxInline>
   );
 }
 
@@ -184,9 +190,17 @@ function CodeBlockActions({ code }: { code: string }) {
   };
 
   return (
-    <div className="pointer-events-none absolute right-0 top-0 z-20 flex h-8 items-center justify-end">
-      <div className="pointer-events-auto flex shrink-0 items-center gap-2 rounded-md bg-background/95 px-1.5 py-1">
-        <button
+    <AstryxView
+      layout="flex"
+      direction="horizontal"
+      className="pointer-events-none absolute right-0 top-0 z-20 flex h-8 items-center justify-end"
+    >
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="pointer-events-auto flex shrink-0 items-center gap-2 rounded-md bg-background/95 px-1.5 py-1"
+      >
+        <AstryxButton
           type="button"
           aria-label={copied ? t("chat.markdown.copied") : t("chat.markdown.copyCode")}
           title={copied ? t("chat.markdown.copied") : t("chat.markdown.copyCode")}
@@ -194,9 +208,9 @@ function CodeBlockActions({ code }: { code: string }) {
           onClick={() => void handleCopy()}
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-        </button>
-      </div>
-    </div>
+        </AstryxButton>
+      </AstryxView>
+    </AstryxView>
   );
 }
 
@@ -217,39 +231,51 @@ function CollapsibleCodePre({ children }: MarkdownPreProps) {
   if (!isCollapsible) {
     const codeBlock = cloneElement(childElement, { "data-block": "true" });
     return (
-      <div className="relative w-full">
+      <AstryxView layout="block" direction="horizontal" className="relative w-full">
         {isMermaid ? null : <CodeBlockActions code={codeContent} />}
         {codeBlock}
-      </div>
+      </AstryxView>
     );
   }
 
   const previewContent = getCollapsedCodeBlockPreview(codeContent);
   return (
-    <div className="relative w-full">
+    <AstryxView layout="block" direction="horizontal" className="relative w-full">
       <CodeBlockActions code={codeContent} />
       {expanded ? (
-        <div className="w-full">{cloneElement(childElement, { "data-block": "true" })}</div>
+        <AstryxView layout="block" direction="horizontal" className="w-full">
+          {cloneElement(childElement, { "data-block": "true" })}
+        </AstryxView>
       ) : (
-        <div
+        <AstryxView
+          layout="block"
+          direction="horizontal"
           className="mt-2 w-full overflow-hidden rounded-xl bg-muted/40"
           data-xagent-code-preview="collapsed"
         >
-          <div className="flex h-8 items-center px-3 text-[11px] font-medium tracking-[0.06em] text-muted-foreground/85">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex h-8 items-center px-3 text-[11px] font-medium tracking-[0.06em] text-muted-foreground/85"
+          >
             {language || DEFAULT_CODE_BLOCK_LANGUAGE}
-          </div>
+          </AstryxView>
           <pre className="!m-0 !overflow-x-auto !pb-2">
             <code className="block w-max min-w-full whitespace-pre py-4 font-mono text-[13px] leading-5 text-foreground/90">
               {previewContent}
             </code>
           </pre>
-        </div>
+        </AstryxView>
       )}
       {expanded ? null : (
-        <div className="pointer-events-none absolute inset-x-0 bottom-7 h-20 bg-gradient-to-b from-transparent via-background/70 to-background" />
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="pointer-events-none absolute inset-x-0 bottom-7 h-20 bg-gradient-to-b from-transparent via-background/70 to-background"
+        />
       )}
-      <div className="flex justify-center">
-        <button
+      <AstryxView layout="flex" direction="horizontal" className="flex justify-center">
+        <AstryxButton
           type="button"
           onClick={() => setExpanded((current) => !current)}
           className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
@@ -259,14 +285,14 @@ function CollapsibleCodePre({ children }: MarkdownPreProps) {
           ) : (
             <ChevronDown className="h-3.5 w-3.5" />
           )}
-          <span>
+          <AstryxInline>
             {expanded
               ? t("chat.markdown.collapseCode")
               : t("chat.markdown.expandCode").replace("{count}", String(lineCount))}
-          </span>
-        </button>
-      </div>
-    </div>
+          </AstryxInline>
+        </AstryxButton>
+      </AstryxView>
+    </AstryxView>
   );
 }
 
@@ -326,78 +352,44 @@ export function ExternalLinkModal({ isOpen, onClose, onConfirm, url }: LinkSafet
     }
   };
 
-  const modal = (
-    <div
-      className="external-link-modal-overlay fixed inset-0 z-[100] flex items-center justify-center px-4 py-6"
-      data-state="open"
+  return (
+    <AdaptiveDialog
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title={streamdownTranslations.openExternalLink}
+      subtitle={streamdownTranslations.externalLinkWarning}
+      touchPresentation="bottom-sheet"
+      bottomSheetHeight="hug"
+      footer={
+        <HStack gap={2} hAlign="end" wrap="wrap">
+          <Button type="button" variant="ghost" onClick={handleCopyLink}>
+            <Copy className="size-4" />
+            {streamdownTranslations.copyLink}
+          </Button>
+          <Button type="button" variant="secondary" onClick={handleOpenLink}>
+            <ExternalLink className="size-4" />
+            {streamdownTranslations.openLink}
+          </Button>
+        </HStack>
+      }
     >
-      <button
-        type="button"
-        className="absolute inset-0 cursor-default bg-black/25 backdrop-blur-[2px]"
-        onClick={onClose}
-        aria-label={streamdownTranslations.close}
-      />
-      <div
-        className="external-link-modal-panel relative w-full max-w-[28rem] overflow-hidden rounded-2xl border border-border/60 bg-background shadow-[0_20px_60px_-28px_rgba(0,0,0,0.45)]"
-        role="dialog"
-        aria-modal="true"
-        aria-label={streamdownTranslations.openExternalLink}
-      >
-        <div className="flex items-start justify-between gap-4 px-5 pb-3 pt-5">
-          <div className="min-w-0 space-y-1.5">
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <ExternalLink className="size-4 text-muted-foreground" />
-              <span>{streamdownTranslations.openExternalLink}</span>
-            </div>
-            <p className="text-xs leading-5 text-muted-foreground">
-              {streamdownTranslations.externalLinkWarning}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            onClick={onClose}
-            aria-label={streamdownTranslations.close}
-          >
-            <X className="size-3.5" />
-          </button>
-        </div>
-        <div className="px-5 pb-5">
-          <div className="flex min-h-10 items-center gap-2 rounded-xl bg-muted/55 px-3 py-2.5 text-muted-foreground">
-            <ExternalLink className="size-3.5 shrink-0" />
-            <p
-              className="min-w-0 truncate font-mono text-xs leading-5 text-foreground/85"
-              title={url}
-            >
+      <VStack gap={2}>
+        <Text type="supporting" color="secondary">
+          {streamdownTranslations.externalLinkWarning}
+        </Text>
+        <Tooltip content={url} placement="above">
+          <HStack gap={2} vAlign="center" className="min-w-0">
+            <ExternalLink className="size-4 shrink-0" />
+            <Text type="supporting" className="min-w-0 truncate font-mono">
               {url}
-            </p>
-          </div>
-          <div className="mt-4 flex items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-8 gap-1.5 rounded-lg px-3 text-xs font-normal text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"
-              onClick={handleCopyLink}
-            >
-              <Copy className="size-3.5" />
-              <span>{streamdownTranslations.copyLink}</span>
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className="h-8 gap-1.5 rounded-lg bg-muted px-3 text-xs font-normal shadow-none hover:bg-muted/80"
-              onClick={handleOpenLink}
-            >
-              <ExternalLink className="size-3.5" />
-              <span>{streamdownTranslations.openLink}</span>
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+            </Text>
+          </HStack>
+        </Tooltip>
+      </VStack>
+    </AdaptiveDialog>
   );
-
-  return createPortal(modal, document.body);
 }
 
 const MARKDOWN_EMBED_CLASSNAME = cn(
@@ -450,22 +442,28 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
     if (!workdir?.trim() || !onOpenFileLink || readOnly) return undefined;
     return {
       a: function ChatFileAnchor(anchorProps: MarkdownAnchorFallbackProps) {
-        const { href, onClick, node: _node, ...rest } = anchorProps;
+        const { children, className, href, onClick, node: _node, rel, target, title } = anchorProps;
         const fileLink = parseChatFileLink(href);
         return (
-          <a
-            {...rest}
+          <Link
             href={href}
+            color="inherit"
+            className={className}
+            rel={rel}
+            target={target}
+            tooltip={title}
             onClick={(event) => {
               if (!fileLink) {
-                onClick?.(event);
+                onClick?.(event as React.MouseEvent<HTMLAnchorElement>);
                 return;
               }
               event.preventDefault();
               event.stopPropagation();
               onOpenFileLink(fileLink);
             }}
-          />
+          >
+            {children ?? href ?? ""}
+          </Link>
         );
       },
     };
@@ -476,7 +474,7 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
   );
 
   return (
-    <div>
+    <AstryxView layout="block" direction="horizontal">
       <Streamdown
         className={cn(
           "chat-markdown max-w-none break-words",
@@ -516,6 +514,9 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
       >
         {normalizedContent}
       </Streamdown>
-    </div>
+    </AstryxView>
   );
 });
+import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { Text } from "@astryxdesign/core/Text";
+import { Tooltip } from "@astryxdesign/core/Tooltip";

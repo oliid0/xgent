@@ -1,3 +1,4 @@
+import { ChatMessage, ChatMessageBubble } from "@astryxdesign/core/Chat";
 import { memo } from "react";
 
 import type { HistoryMessageRef } from "../../../lib/chat/conversation/conversationState";
@@ -65,11 +66,13 @@ export const UserMessageRow = memo(function UserMessageRow(props: UserMessageRow
   }
 
   return (
-    <div
+    <ChatMessage
+      sender="user"
+      density="compact"
       className={`chat-user-bubble-wrap group relative ml-auto max-w-[min(85%,calc(50em+2rem))] ${compactedClass}`}
     >
-      <div
-        className={`${animateEntrance ? "chat-bubble-enter " : ""}chat-user-bubble ml-auto w-fit max-w-full rounded-2xl rounded-br-md bg-[hsl(var(--chat-user-bg))] px-4 py-2.5 font-openai-chat text-[calc(14.5px*var(--zone-font-scale,1))] leading-relaxed text-[hsl(var(--chat-user-fg))]`}
+      <ChatMessageBubble
+        className={`${animateEntrance ? "chat-bubble-enter " : ""}chat-user-bubble font-openai-chat`}
       >
         <UserAttachmentCards files={visibleFiles} workspaceRoot={workspaceRoot} />
         {item.text ? (
@@ -79,7 +82,7 @@ export const UserMessageRow = memo(function UserMessageRow(props: UserMessageRow
             loadCommitDetails={loadCommitDetails}
           />
         ) : null}
-      </div>
+      </ChatMessageBubble>
       <UserRowFooter
         itemKey={item.key}
         text={item.text}
@@ -88,6 +91,6 @@ export const UserMessageRow = memo(function UserMessageRow(props: UserMessageRow
         messageId={effectiveMessageRef?.messageId}
         onStartEdit={onStartEdit}
       />
-    </div>
+    </ChatMessage>
   );
 });

@@ -21,6 +21,8 @@ import {
   sampleFloorEntries,
 } from "../../../lib/chat-floor-nav/floorModel";
 import { cn } from "../../../lib/shared/utils";
+import { View as AstryxView } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 /** 收起态短横线数量上限的绝对边界（实际数量随可用高度自适应）。 */
 const MIN_COLLAPSED_MARKERS = 8;
@@ -248,7 +250,9 @@ export function FloorNavRail(props: {
     const isActive = floor.rowKey === activeRowKey;
     const isBookmarked = bookmarks.has(floor.messageId);
     return (
-      <div
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
         key={isPinnedCopy ? `pinned-${floor.rowKey}` : floor.rowKey}
         // 收藏区的副本不带定位锚点，展开自动居中永远对准主列表里的当前行。
         data-floor-active={(isActive && !isPinnedCopy) || undefined}
@@ -257,7 +261,7 @@ export function FloorNavRail(props: {
           isActive ? "bg-foreground/[0.06]" : "hover:bg-foreground/[0.04]",
         )}
       >
-        <button
+        <AstryxButton
           type="button"
           onClick={() => handleJump(floor.rowKey)}
           className={cn(
@@ -267,8 +271,8 @@ export function FloorNavRail(props: {
           title={floor.preview}
         >
           {floor.preview}
-        </button>
-        <button
+        </AstryxButton>
+        <AstryxButton
           type="button"
           aria-label={isBookmarked ? unpinLabel : pinLabel}
           title={isBookmarked ? unpinLabel : pinLabel}
@@ -283,13 +287,14 @@ export function FloorNavRail(props: {
           )}
         >
           <Pin className={cn("h-3 w-3", isBookmarked && "fill-current")} />
-        </button>
-      </div>
+        </AstryxButton>
+      </AstryxView>
     );
   };
 
   return (
-    <nav
+    <AstryxView
+      as="nav"
       ref={setNavEl}
       aria-label={railLabel}
       aria-hidden={!railVisible || undefined}
@@ -300,7 +305,9 @@ export function FloorNavRail(props: {
       style={{ bottom: bottomOffset }}
     >
       {expanded ? (
-        <div
+        <AstryxView
+          layout="flex"
+          direction="vertical"
           className={cn(
             "floor-nav-panel flex max-h-[min(78%,560px)] w-60 max-w-[calc(100vw-2rem)] touch-manipulation flex-col overflow-hidden rounded-xl border border-border/50 bg-background/85 shadow-[0_12px_32px_-16px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.06]",
             // 隐藏态不吃指针事件：触摸透传给转写区，不会点到看不见的控件。
@@ -308,21 +315,36 @@ export function FloorNavRail(props: {
           )}
           {...hoverHandlers}
         >
-          <div ref={panelScrollRef} className="min-h-0 overflow-y-auto p-1.5">
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            ref={panelScrollRef}
+            className="min-h-0 overflow-y-auto p-1.5"
+          >
             {bookmarkedFloors.length > 0 ? (
-              <div className="mb-1.5 rounded-lg bg-amber-500/[0.07] p-1 ring-1 ring-amber-500/20">
-                <div className="flex items-center gap-1.5 px-1.5 pb-1 pt-0.5 text-[10.5px] font-medium text-amber-600/90 dark:text-amber-400/90">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="mb-1.5 rounded-lg bg-amber-500/[0.07] p-1 ring-1 ring-amber-500/20"
+              >
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex items-center gap-1.5 px-1.5 pb-1 pt-0.5 text-[10.5px] font-medium text-amber-600/90 dark:text-amber-400/90"
+                >
                   <Pin className="h-2.5 w-2.5 fill-current" />
                   {pinnedTitle}
-                </div>
+                </AstryxView>
                 {bookmarkedFloors.map((floor) => renderPanelRow(floor, true))}
-              </div>
+              </AstryxView>
             ) : null}
             {floors.map((floor) => renderPanelRow(floor))}
-          </div>
-        </div>
+          </AstryxView>
+        </AstryxView>
       ) : (
-        <div
+        <AstryxView
+          layout="flex"
+          direction="vertical"
           className={cn(
             "flex max-h-full touch-manipulation flex-col items-end gap-[7px] overflow-hidden py-2 pl-3 pr-0.5",
             railVisible ? "pointer-events-auto" : "pointer-events-none",
@@ -344,7 +366,7 @@ export function FloorNavRail(props: {
             const isActive = floor.rowKey === activeMarkerKey;
             const isBookmarked = bookmarks.has(floor.messageId);
             return (
-              <button
+              <AstryxButton
                 key={floor.rowKey}
                 type="button"
                 aria-label={floor.preview}
@@ -363,8 +385,8 @@ export function FloorNavRail(props: {
               />
             );
           })}
-        </div>
+        </AstryxView>
       )}
-    </nav>
+    </AstryxView>
   );
 }

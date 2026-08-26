@@ -1,34 +1,23 @@
-import {
-  memo,
-  type MouseEvent as ReactMouseEvent,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
+import { ChatMessageList } from "@astryxdesign/core/Chat";
+import { ContextMenu } from "@astryxdesign/core/ContextMenu";
+import { Center } from "@astryxdesign/core/Center";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { VStack } from "@astryxdesign/core/Layout";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { ChevronDown, Copy } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import { buildFloorEntries } from "../../../lib/chat-floor-nav/floorModel";
 import { BOTTOM_REATTACH_ZONE_PX } from "../../../lib/chat-scroll/scrollFollowCore";
 import { useScrollFollow } from "../../../lib/chat-scroll/useScrollFollow";
-import { useMenuExitPresence } from "../../../lib/shared/menuMotion";
-import { cn } from "../../../lib/shared/utils";
 import { ChatEmptyState } from "./ChatEmptyState";
 import { FloorNavRail } from "./FloorNavRail";
 import { RowInteractionProvider, useRowInteractionStore } from "./rowInteraction";
 import { TranscriptList, type TranscriptNavHandle } from "./TranscriptList";
 import { HistorySwitchLoadingOverlay } from "./TranscriptLoadingStates";
 import type { ChatTranscriptProps } from "./transcriptTypes";
-import {
-  clampTranscriptContextMenuPosition,
-  resolveTranscriptSelectionText,
-  type TranscriptContextMenuState,
-  writeTextToClipboard,
-} from "./transcriptUtils";
+import { resolveTranscriptSelectionText, writeTextToClipboard } from "./transcriptUtils";
 
 export type { ChatTranscriptProps } from "./transcriptTypes";
 
@@ -74,14 +63,8 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
   // ScrollArea geometry work on every WebKit scroll while retaining the same
   // content container and visual layout.
   const [scrollViewport, setScrollViewport] = useState<HTMLDivElement | null>(null);
-  const transcriptRootRef = useRef<HTMLDivElement | null>(null);
-  const transcriptContextMenuRef = useRef<HTMLDivElement | null>(null);
-  const [transcriptContextMenu, setTranscriptContextMenu] =
-    useState<TranscriptContextMenuState | null>(null);
-
-  const closeTranscriptContextMenu = useCallback(() => {
-    setTranscriptContextMenu(null);
-  }, []);
+  const transcriptRootRef = useRef<HTMLElement | null>(null);
+  const [selectedTranscriptText, setSelectedTranscriptText] = useState("");
 
   const { handle: scrollFollowHandle, following } = useScrollFollow({
     viewport: scrollViewport,
@@ -184,204 +167,140 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
     scrollFollowHandle.stickToBottom();
   }, [conversationId, scrollFollowHandle]);
 
-  useEffect(() => {
-    closeTranscriptContextMenu();
-  }, [closeTranscriptContextMenu, conversationId]);
-
-  useEffect(() => {
-    if (!transcriptContextMenu) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) {
-        closeTranscriptContextMenu();
-        return;
-      }
-      if (transcriptContextMenuRef.current?.contains(target)) {
-        return;
-      }
-      closeTranscriptContextMenu();
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeTranscriptContextMenu();
-      }
-    };
-
-    const handleSelectionChange = () => {
-      if (!resolveTranscriptSelectionText(transcriptRootRef.current)) {
-        closeTranscriptContextMenu();
-      }
-    };
-
-    const handleScroll = () => {
-      closeTranscriptContextMenu();
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown, true);
-    window.addEventListener("keydown", handleKeyDown, true);
-    window.addEventListener("scroll", handleScroll, true);
-    window.addEventListener("resize", handleScroll);
-    window.addEventListener("blur", handleScroll);
-    document.addEventListener("selectionchange", handleSelectionChange);
-
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown, true);
-      window.removeEventListener("keydown", handleKeyDown, true);
-      window.removeEventListener("scroll", handleScroll, true);
-      window.removeEventListener("resize", handleScroll);
-      window.removeEventListener("blur", handleScroll);
-      document.removeEventListener("selectionchange", handleSelectionChange);
-    };
-  }, [closeTranscriptContextMenu, transcriptContextMenu]);
-
-  const handleTranscriptContextMenu = useCallback(
-    (event: ReactMouseEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      const selectedText = resolveTranscriptSelectionText(transcriptRootRef.current);
-      if (!selectedText) {
-        closeTranscriptContextMenu();
-        return;
-      }
-      setTranscriptContextMenu({
-        x: event.clientX,
-        y: event.clientY,
-        selectedText,
-      });
-    },
-    [closeTranscriptContextMenu],
-  );
-
-  // Closing keeps the last snapshot mounted (inert) while the exit animation
-  // plays; only the live snapshot drives the dismiss listeners above.
-  const { rendered: renderedContextMenu, isExiting: isContextMenuExiting } =
-    useMenuExitPresence(transcriptContextMenu);
-  const transcriptContextMenuPosition = renderedContextMenu
-    ? clampTranscriptContextMenuPosition(renderedContextMenu.x, renderedContextMenu.y)
-    : null;
   const copySelectedTextLabel = locale === "en-US" ? "Copy selected text" : "复制选中文本";
   const jumpToBottomLabel = locale === "en-US" ? "Scroll to bottom" : "回到底部";
 
   return (
-    <div
-      ref={transcriptRootRef}
-      className="chat-transcript-root relative min-h-0 flex-1"
-      onContextMenu={handleTranscriptContextMenu}
+    <ContextMenu
+      label={copySelectedTextLabel}
+      size="sm"
+      items={[
+        {
+          label: copySelectedTextLabel,
+          icon: <Icon icon={Copy} size="sm" color="inherit" />,
+          isDisabled: !selectedTranscriptText,
+          onClick: () => writeTextToClipboard(selectedTranscriptText),
+        },
+      ]}
     >
-      <div
-        ref={setScrollViewport}
-        data-scroll-viewport
-        className="h-full w-full overflow-y-auto [overflow-anchor:none]"
+      <VStack
+        ref={transcriptRootRef}
+        minHeight={0}
+        style={{ position: "relative", flex: 1 }}
+        onContextMenuCapture={() => {
+          setSelectedTranscriptText(resolveTranscriptSelectionText(transcriptRootRef.current));
+        }}
       >
-        <div className="chat-transcript-content mx-auto w-full max-w-[768px] px-5 py-4">
-          {showNoModelsState || showStartChatState ? (
-            <div className="chat-empty-state-stage flex min-h-[calc(100vh-220px)] flex-col items-center justify-center">
-              {/* Keyed per conversation so the hero entrance replays when
-                  switching between empty conversations, not just on mount. */}
-              <ChatEmptyState
-                key={conversationId ?? "empty"}
-                variant={showNoModelsState ? "no-models" : "start-chat"}
-                onOpenSettings={onOpenSettings}
-                onSuggestionSelect={onSuggestionSelect}
-                suggestionsDisabled={suggestionsDisabled}
-              />
-            </div>
-          ) : null}
-
-          <div
-            className={`select-text transition-opacity duration-150 ${isTranscriptSettling ? "opacity-0" : "opacity-100"}`}
+        <VStack
+          ref={(element) => setScrollViewport(element as HTMLDivElement | null)}
+          data-scroll-viewport
+          width="100%"
+          height="100%"
+          isScrollable
+          style={{ overflowAnchor: "none" }}
+        >
+          <VStack
+            width="100%"
+            maxWidth="var(--xagent-content-width-md)"
+            paddingInline={5}
+            paddingBlock={4}
+            style={{ marginInline: "auto" }}
           >
-            <RowInteractionProvider value={rowInteractionStore}>
-              {/* Keyed remount per conversation: per-conversation state
+            {showNoModelsState || showStartChatState ? (
+              <Center
+                style={{ minHeight: "var(--xagent-chat-empty-stage-min-height)" }}
+              >
+                {/* Keyed per conversation so the hero entrance replays when
+                  switching between empty conversations, not just on mount. */}
+                <ChatEmptyState
+                  key={conversationId ?? "empty"}
+                  variant={showNoModelsState ? "no-models" : "start-chat"}
+                  onOpenSettings={onOpenSettings}
+                  onSuggestionSelect={onSuggestionSelect}
+                  suggestionsDisabled={suggestionsDisabled}
+                />
+              </Center>
+            ) : null}
+
+            <ChatMessageList
+              align="top"
+              gap={0}
+              density="balanced"
+              isStreaming={isSending}
+              style={{
+                userSelect: "text",
+                opacity: isTranscriptSettling ? 0 : 1,
+                transitionProperty: "opacity",
+                transitionDuration: "var(--duration-fast)",
+                transitionTimingFunction: "var(--ease-standard)",
+              }}
+            >
+              <RowInteractionProvider value={rowInteractionStore}>
+                {/* Keyed remount per conversation: per-conversation state
                   (row model, entrance registry, virtualizer measurements)
                   initializes fresh, and row keys can never collide across
                   conversations in the virtualizer's itemSizeCache. */}
-              <TranscriptList
-                key={conversationId}
-                conversationId={conversationId}
-                historyItems={historyItems}
-                liveTranscriptStore={liveTranscriptStore}
-                scrollViewport={scrollViewport}
-                isViewportFollowing={scrollFollowHandle.isFollowing}
-                isSending={isSending}
-                isAgentMode={isAgentMode}
-                isCompactionRunning={isCompactionRunning}
-                showUsage={showUsage}
-                usageContextWindow={usageContextWindow}
-                workspaceRoot={workspaceRoot}
-                gitClient={gitClient}
-                onOpenFileLink={onOpenFileLink}
-                navRef={transcriptNavRef}
-                onAnchorUserRowChange={setActiveFloorKey}
-                onResendFromEdit={onResendFromEdit}
-                onBranchConversation={onBranchConversation}
-                onFirstLayoutSettled={
-                  shouldDeferTranscriptReveal ? handleFirstLayoutSettled : undefined
-                }
-              />
-            </RowInteractionProvider>
-          </div>
+                <TranscriptList
+                  key={conversationId}
+                  conversationId={conversationId}
+                  historyItems={historyItems}
+                  liveTranscriptStore={liveTranscriptStore}
+                  scrollViewport={scrollViewport}
+                  isViewportFollowing={scrollFollowHandle.isFollowing}
+                  isSending={isSending}
+                  isAgentMode={isAgentMode}
+                  isCompactionRunning={isCompactionRunning}
+                  showUsage={showUsage}
+                  usageContextWindow={usageContextWindow}
+                  workspaceRoot={workspaceRoot}
+                  gitClient={gitClient}
+                  onOpenFileLink={onOpenFileLink}
+                  navRef={transcriptNavRef}
+                  onAnchorUserRowChange={setActiveFloorKey}
+                  onResendFromEdit={onResendFromEdit}
+                  onBranchConversation={onBranchConversation}
+                  onFirstLayoutSettled={
+                    shouldDeferTranscriptReveal ? handleFirstLayoutSettled : undefined
+                  }
+                />
+              </RowInteractionProvider>
+            </ChatMessageList>
 
-          <div style={{ height: transcriptBottomReservePx }} />
-        </div>
-      </div>
-      {!showNoModelsState && !showStartChatState && !isTranscriptSettling ? (
-        <FloorNavRail
-          conversationId={conversationId}
-          floors={floors}
-          activeRowKey={activeFloorKey}
-          bottomOffset={`${Math.ceil(transcriptBottomReservePx) + 8}px`}
-          scrollViewport={scrollViewport}
-          onJump={handleFloorJump}
-        />
-      ) : null}
-      {!following ? (
-        <button
-          type="button"
-          aria-label={jumpToBottomLabel}
-          title={jumpToBottomLabel}
-          onClick={() => scrollFollowHandle.jumpToBottom()}
-          className="chat-jump-to-bottom absolute left-1/2 z-10 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
-          style={{ bottom: Math.ceil(bottomReservePx) + 16 }}
-        >
-          <ChevronDown className="h-4 w-4" />
-        </button>
-      ) : null}
-      {renderedContextMenu && transcriptContextMenuPosition
-        ? createPortal(
-            <div
-              ref={transcriptContextMenuRef}
-              role="menu"
-              className={cn(
-                "editor-context-menu fixed z-[120] w-max min-w-[9.5rem] max-w-[calc(100vw-1.5rem)] select-none overflow-hidden rounded-lg border border-border/70 bg-popover p-1.5 text-popover-foreground shadow-[0_20px_60px_-20px_rgba(15,23,42,0.35)]",
-                isContextMenuExiting && "editor-context-menu-exit",
-              )}
-              style={{
-                left: transcriptContextMenuPosition.left,
-                top: transcriptContextMenuPosition.top,
-              }}
-              onContextMenu={(event) => {
-                event.preventDefault();
-              }}
-            >
-              <button
-                type="button"
-                role="menuitem"
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/90 transition-colors hover:bg-accent hover:text-accent-foreground"
-                onClick={() => {
-                  writeTextToClipboard(renderedContextMenu.selectedText);
-                  closeTranscriptContextMenu();
-                }}
-              >
-                <Copy className="h-3.5 w-3.5 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{copySelectedTextLabel}</span>
-              </button>
-            </div>,
-            document.body,
-          )
-        : null}
-      {isHistorySwitching || isTranscriptSettling ? <HistorySwitchLoadingOverlay /> : null}
-    </div>
+            <VStack
+              style={{ height: transcriptBottomReservePx }}
+            />
+          </VStack>
+        </VStack>
+        {!showNoModelsState && !showStartChatState && !isTranscriptSettling ? (
+          <FloorNavRail
+            conversationId={conversationId}
+            floors={floors}
+            activeRowKey={activeFloorKey}
+            bottomOffset={`${Math.ceil(transcriptBottomReservePx) + 8}px`}
+            scrollViewport={scrollViewport}
+            onJump={handleFloorJump}
+          />
+        ) : null}
+        {!following ? (
+          <IconButton
+            label={jumpToBottomLabel}
+            tooltip={jumpToBottomLabel}
+            icon={<Icon icon={ChevronDown} size="sm" color="inherit" />}
+            size="sm"
+            variant="secondary"
+            elevation="med"
+            onClick={() => scrollFollowHandle.jumpToBottom()}
+            className="chat-jump-to-bottom"
+            style={{
+              position: "absolute",
+              insetInlineStart: "50%",
+              zIndex: "var(--xagent-z-chat-floating-action)",
+              bottom: `calc(${Math.ceil(bottomReservePx)}px + var(--spacing-4))`,
+            }}
+          />
+        ) : null}
+        {isHistorySwitching || isTranscriptSettling ? <HistorySwitchLoadingOverlay /> : null}
+      </VStack>
+    </ContextMenu>
   );
 });

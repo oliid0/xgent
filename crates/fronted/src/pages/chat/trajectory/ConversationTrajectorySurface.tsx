@@ -1,16 +1,21 @@
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { Collapsible, CollapsibleGroup } from "@astryxdesign/core/Collapsible";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { Layout, LayoutContent, LayoutHeader } from "@astryxdesign/core/Layout";
+import { Section } from "@astryxdesign/core/Section";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { invoke } from "@xagent/runtime";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Circle,
-  RefreshCw,
-  Wrench,
-  XCircle,
-} from "../../../components/icons";
-import { Button } from "../../../components/ui/button";
+
+import { Circle, RefreshCw } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
-import { cn } from "../../../lib/shared/utils";
 import {
   desktopLiveTrajectoryEvents,
   desktopTrajectoryReloadVersion,
@@ -40,22 +45,14 @@ function numberField(event: TrajectoryEvent, key: string) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-function statusTone(event: TrajectoryEvent) {
+function statusVariant(event: TrajectoryEvent): "success" | "warning" | "error" | "accent" | "neutral" {
   if (event.err || event.st === "error") return "error";
-  if (event.st === "aborted") return "aborted";
+  if (event.st === "aborted") return "warning";
   if (event.st === "complete" || event.k === "tool_end" || event.k === "turn_end") {
-    return "complete";
+    return "success";
   }
+  if (event.k === "tool_start" || event.k === "first_token") return "accent";
   return "neutral";
-}
-
-function EventStatusIcon({ event }: { event: TrajectoryEvent }) {
-  const tone = statusTone(event);
-  if (tone === "error") return <XCircle className="h-4 w-4" />;
-  if (tone === "aborted") return <AlertTriangle className="h-4 w-4" />;
-  if (tone === "complete") return <CheckCircle2 className="h-4 w-4" />;
-  if (event.k === "tool_start") return <Wrench className="h-4 w-4" />;
-  return <Circle className="h-3.5 w-3.5" />;
 }
 
 function usageText(value: unknown) {
@@ -67,16 +64,14 @@ function usageText(value: unknown) {
     typeof usage.cacheRead === "number" ? `cache ${usage.cacheRead}` : undefined,
     typeof usage.totalTokens === "number" ? `total ${usage.totalTokens}` : undefined,
   ].filter(Boolean);
-  return parts.length > 0 ? parts.join(" \u00b7 ") : undefined;
+  return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
 function eventDetails(event: TrajectoryEvent): string[] {
   const details: Array<string | undefined> = [];
   if (event.k === "user") details.push(textField(event, "tx"));
   if (event.k === "context") details.push(textField(event, "src"), textField(event, "tx"));
-  if (event.k === "header") {
-    details.push(textField(event, "ch"), textField(event, "hid"));
-  }
+  if (event.k === "header") details.push(textField(event, "ch"), textField(event, "hid"));
   if (event.k === "step_start" || event.k === "first_token" || event.k === "step_end") {
     const step = numberField(event, "s");
     if (step !== undefined) details.push(`step ${step}`);
@@ -100,17 +95,13 @@ function eventDetails(event: TrajectoryEvent): string[] {
       textField(event, "err"),
     );
   }
-  if (event.k === "tool_start") {
-    details.push(textField(event, "n"), textField(event, "a"));
-  }
+  if (event.k === "tool_start") details.push(textField(event, "n"), textField(event, "a"));
   if (event.k === "tool_end") details.push(textField(event, "sum"));
   if (event.k === "compaction_end") {
     const before = numberField(event, "before");
     const after = numberField(event, "after");
     details.push(
-      before === undefined && after === undefined
-        ? undefined
-        : `${before ?? "?"} \u2192 ${after ?? "?"}`,
+      before === undefined && after === undefined ? undefined : `${before ?? "?"} → ${after ?? "?"}`,
       textField(event, "err"),
     );
   }
@@ -125,57 +116,38 @@ function eventLabel(event: TrajectoryEvent, translate: (key: string) => string) 
 }
 
 function TrajectoryEventRow({ event }: { event: TrajectoryEvent }) {
-  const { t, locale } = useLocale();
-  const tone = statusTone(event);
+  const { t } = useLocale();
+  const label = eventLabel(event, t);
   const details = eventDetails(event);
-  const time = new Date(event.at).toLocaleTimeString(locale, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  const timestamp = new Date(event.at).toISOString();
 
   return (
-    <div className="relative flex min-w-0 gap-3 pb-3 last:pb-0">
-      <div
-        className={cn(
-          "relative z-10 mt-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border bg-background",
-          tone === "complete" && "border-emerald-500/30 text-emerald-600 dark:text-emerald-400",
-          tone === "error" && "border-destructive/40 text-destructive",
-          tone === "aborted" && "border-amber-500/40 text-amber-600 dark:text-amber-400",
-          tone === "neutral" && "border-border text-muted-foreground",
-        )}
-      >
-        <EventStatusIcon event={event} />
-      </div>
-      <div className="min-w-0 flex-1 rounded-xl border border-border/70 bg-card/60 px-3 py-2.5 shadow-sm">
-        <div className="flex min-w-0 items-center justify-between gap-3">
-          <span className="truncate text-sm font-medium text-foreground">
-            {eventLabel(event, t)}
-          </span>
-          <time className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{time}</time>
-        </div>
-        {details.length > 0 ? (
-          <div className="mt-1.5 space-y-1">
-            {details.map((detail, index) => (
-              <div
-                key={`${event.k}-detail-${index}`}
-                className="break-words text-xs leading-5 text-muted-foreground"
-              >
-                {detail}
-              </div>
-            ))}
-          </div>
-        ) : null}
-        <details className="mt-1.5 text-[11px] text-muted-foreground">
-          <summary className="min-h-7 cursor-pointer select-none py-1 leading-5">
-            {t("chat.trajectory.details")}
-          </summary>
-          <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-muted/60 p-2 font-mono text-[10px] leading-4 text-foreground/80">
-            {JSON.stringify(event, null, 2)}
-          </pre>
-        </details>
-      </div>
-    </div>
+    <Collapsible
+      defaultIsOpen={false}
+      trigger={
+        <HStack gap={3} width="100%" vAlign="center">
+          <StatusDot variant={statusVariant(event)} label={label} />
+          <Timestamp value={timestamp} format="time" size="3xs" />
+        </HStack>
+      }
+    >
+      <VStack gap={2} paddingInlineStart={4} paddingBlockEnd={2}>
+        {details.map((detail, index) => (
+          <Text key={`${event.k}-detail-${index}`} type="supporting" color="secondary">
+            {detail}
+          </Text>
+        ))}
+        <CodeBlock
+          code={JSON.stringify(event, null, 2)}
+          language="json"
+          title={t("chat.trajectory.details")}
+          size="sm"
+          width="100%"
+          maxHeight="var(--xagent-trajectory-code-height)"
+          container="section"
+        />
+      </VStack>
+    </Collapsible>
   );
 }
 
@@ -238,90 +210,97 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
     [liveEvents, persistedEvents],
   );
   const groups = useMemo(() => groupTrajectoryEvents(events), [events]);
+  const refresh = () => setRefreshNonce((value) => value + 1);
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 px-3 py-2.5 sm:px-5">
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold text-foreground">
-            {t("chat.trajectory.title")}
-          </h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {t("chat.trajectory.summary")
-              .replace("{events}", String(events.length))
-              .replace("{segments}", String(segmentCount))}
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10 shrink-0 rounded-xl sm:h-8 sm:w-8"
-          disabled={loading}
-          onClick={() => setRefreshNonce((value) => value + 1)}
-          title={t("chat.trajectory.refresh")}
-          aria-label={t("chat.trajectory.refresh")}
-        >
-          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-        </Button>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-5">
-        <div className="mx-auto w-full max-w-4xl">
-          {truncated ? (
-            <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 text-xs leading-5 text-amber-700 dark:text-amber-300">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{t("chat.trajectory.truncated")}</span>
-            </div>
-          ) : null}
-          {error ? (
-            <div className="flex min-h-44 flex-col items-center justify-center gap-3 px-4 text-center">
-              <XCircle className="h-7 w-7 text-destructive" />
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  {t("chat.trajectory.loadFailed")}
-                </p>
-                <p className="mt-1 break-words text-xs text-muted-foreground">{error}</p>
-              </div>
-            </div>
-          ) : loading && events.length === 0 ? (
-            <div className="flex min-h-44 items-center justify-center gap-2 text-sm text-muted-foreground">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              {t("chat.trajectory.loading")}
-            </div>
-          ) : groups.length === 0 ? (
-            <div className="flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
-              <Circle className="h-7 w-7 text-muted-foreground/50" />
-              <p className="text-sm font-medium text-foreground">{t("chat.trajectory.empty")}</p>
-              <p className="max-w-md text-xs leading-5 text-muted-foreground">
-                {t("chat.trajectory.emptyHint")}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {groups.map((group) => (
-                <section key={group.key} className="min-w-0">
-                  <div className="mb-2 flex items-center gap-2 px-1">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {group.turn === null
-                        ? t("chat.trajectory.standalone")
-                        : t("chat.trajectory.turn").replace("{turn}", String(group.turn))}
-                    </span>
-                    <span className="h-px min-w-4 flex-1 bg-border/70" />
-                  </div>
-                  <div className="relative before:absolute before:bottom-4 before:left-3.5 before:top-4 before:w-px before:bg-border/70">
-                    {group.events.map((event, eventIndex) => (
-                      <TrajectoryEventRow
-                        key={`${group.key}-${event.k}-${event.at}-${eventIndex}`}
-                        event={event}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
+    <Layout
+      height="fill"
+      contentWidth="var(--xagent-content-width-xl)"
+      header={
+        <LayoutHeader hasDivider>
+          <HStack gap={3} width="100%" hAlign="between" vAlign="center">
+            <VStack gap={0.5}>
+              <Heading level={2}>{t("chat.trajectory.title")}</Heading>
+              <Text type="supporting" color="secondary">
+                {t("chat.trajectory.summary")
+                  .replace("{events}", String(events.length))
+                  .replace("{segments}", String(segmentCount))}
+              </Text>
+            </VStack>
+            <IconButton
+              label={t("chat.trajectory.refresh")}
+              tooltip={t("chat.trajectory.refresh")}
+              icon={<RefreshCw />}
+              variant="ghost"
+              isLoading={loading}
+              isDisabled={loading}
+              onClick={refresh}
+            />
+          </HStack>
+        </LayoutHeader>
+      }
+      content={
+        <LayoutContent>
+          <Section padding={3}>
+            <VStack gap={4}>
+              {truncated ? (
+                <Banner status="warning" title={t("chat.trajectory.truncated")} />
+              ) : null}
+              {error ? (
+                <Banner
+                  status="error"
+                  title={t("chat.trajectory.loadFailed")}
+                  description={error}
+                  endContent={
+                    <Button
+                      label={t("chat.trajectory.refresh")}
+                      variant="secondary"
+                      size="sm"
+                      onClick={refresh}
+                    />
+                  }
+                />
+              ) : loading && events.length === 0 ? (
+                <Spinner label={t("chat.trajectory.loading")} size="md" />
+              ) : groups.length === 0 ? (
+                <EmptyState
+                  icon={<Circle />}
+                  title={t("chat.trajectory.empty")}
+                  description={t("chat.trajectory.emptyHint")}
+                  actions={
+                    <Button
+                      label={t("chat.trajectory.refresh")}
+                      variant="secondary"
+                      onClick={refresh}
+                    />
+                  }
+                />
+              ) : (
+                <VStack gap={5}>
+                  {groups.map((group) => (
+                    <VStack key={group.key} gap={2}>
+                      <Text type="label" color="secondary">
+                        {group.turn === null
+                          ? t("chat.trajectory.standalone")
+                          : t("chat.trajectory.turn").replace("{turn}", String(group.turn))}
+                      </Text>
+                      <CollapsibleGroup type="multiple" hasDividers>
+                        {group.events.map((event, eventIndex) => (
+                          <TrajectoryEventRow
+                            key={`${group.key}-${event.k}-${event.at}-${eventIndex}`}
+                            event={event}
+                          />
+                        ))}
+                      </CollapsibleGroup>
+                    </VStack>
+                  ))}
+                </VStack>
+              )}
+            </VStack>
+          </Section>
+        </LayoutContent>
+      }
+    />
   );
 }
+

@@ -18,6 +18,11 @@ import { AlertTriangle, FolderTree, Loader2, Terminal, Waypoints, X } from "../i
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
 import { XTermViewport } from "../project-tools/XTermViewport";
 import { WorkspaceSftpPanel } from "./WorkspaceSftpPanel";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
+import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 
 export type WorkspaceSshTerminalOpenRequest = {
   id: number;
@@ -350,7 +355,9 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
   );
 
   return (
-    <div
+    <AstryxView
+      layout="flex"
+      direction="vertical"
       className={cn(
         "absolute inset-0 z-50 flex min-h-0 min-w-0 transform-gpu flex-col overflow-hidden border-r border-border bg-background transition-[opacity,transform,box-shadow] duration-200 ease-out motion-reduce:transition-none",
         isVisible
@@ -359,17 +366,29 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
       )}
     >
       <MacOsTitleBarSpacer className="bg-muted/45" />
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-muted/45 px-3">
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-muted/45 px-3"
+      >
         <Terminal className="h-4 w-4 shrink-0 text-primary" />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold leading-tight">
+        <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="truncate text-sm font-semibold leading-tight"
+          >
             {t("workspaceSshTerminal.title")}
-          </div>
-          <div className="truncate font-mono text-[11px] text-muted-foreground">
+          </AstryxView>
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="truncate font-mono text-[11px] text-muted-foreground"
+          >
             {activeSession ? sessionEndpointLabel(activeSession) : t("workspaceSshTerminal.empty")}
-          </div>
-        </div>
-        <button
+          </AstryxView>
+        </AstryxView>
+        <AstryxButton
           type="button"
           disabled={!activeSession || !localForwardClient}
           className={cn(
@@ -382,9 +401,9 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
           onClick={() => setForwardPanelOpen((open) => !open)}
         >
           <Waypoints className="h-4 w-4" />
-          <span>{activeForwards.length}</span>
-        </button>
-        <button
+          <AstryxInline>{activeForwards.length}</AstryxInline>
+        </AstryxButton>
+        <AstryxButton
           type="button"
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           title={t("workspaceSshTerminal.close")}
@@ -392,12 +411,18 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
           onClick={hideOverlay}
         >
           <X className="h-4 w-4" />
-        </button>
-      </div>
+        </AstryxButton>
+      </AstryxView>
 
-      <div className="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-border bg-background px-2 pt-1">
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-border bg-background px-2 pt-1"
+      >
         {openTabRecords.map(({ tab, session }) => (
-          <div
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
             key={tab.id}
             className={cn(
               "group flex h-8 max-w-[14rem] shrink-0 items-center gap-1.5 rounded-t-md border border-b-0 px-2 text-xs transition-colors",
@@ -407,12 +432,12 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
             )}
             title={sessionEndpointLabel(session)}
           >
-            <button
+            <AstryxButton
               type="button"
               className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
               onClick={() => activateTab(tab.id)}
             >
-              <span
+              <AstryxInline
                 className={cn("h-1.5 w-1.5 shrink-0 rounded-full", statusDotClassName(session))}
               />
               {tab.kind === "sftp" ? (
@@ -420,13 +445,13 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
               ) : (
                 <Terminal className="h-3.5 w-3.5 shrink-0" />
               )}
-              <span className="min-w-0 truncate">
+              <AstryxInline className="min-w-0 truncate">
                 {tab.kind === "sftp"
                   ? `${t("workspaceSshTerminal.sftpTab")} · ${sessionTitle(session, t("workspaceSshTerminal.title"))}`
                   : sessionTitle(session, t("workspaceSshTerminal.title"))}
-              </span>
-            </button>
-            <button
+              </AstryxInline>
+            </AstryxButton>
+            <AstryxButton
               type="button"
               className="ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground/75 hover:bg-background hover:text-foreground"
               title={t("workspaceSshTerminal.closeTab")}
@@ -437,50 +462,64 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
               }}
             >
               <X className="h-3 w-3" />
-            </button>
-          </div>
+            </AstryxButton>
+          </AstryxView>
         ))}
-      </div>
+      </AstryxView>
 
       {error ? (
-        <div className="flex shrink-0 items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex shrink-0 items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
+        >
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          <div className="min-w-0 flex-1 truncate">{error}</div>
-        </div>
+          <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1 truncate">
+            {error}
+          </AstryxView>
+        </AstryxView>
       ) : null}
 
       {forwardPanelOpen && localForwardClient ? (
-        <div className="shrink-0 border-b border-border bg-muted/20 p-3">
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_auto]">
-            <label className="space-y-1 text-[11px] text-muted-foreground">
-              <span>{t("workspaceSshTerminal.forwardRemoteHost")}</span>
-              <input
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="shrink-0 border-b border-border bg-muted/20 p-3"
+        >
+          <AstryxView
+            layout="grid"
+            direction="horizontal"
+            className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_auto]"
+          >
+            <AstryxLabel className="space-y-1 text-[11px] text-muted-foreground">
+              <AstryxInline>{t("workspaceSshTerminal.forwardRemoteHost")}</AstryxInline>
+              <AstryxInput
                 value={forwardRemoteHost}
                 onChange={(event) => setForwardRemoteHost(event.target.value)}
                 placeholder="127.0.0.1"
                 className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground"
               />
-            </label>
-            <label className="space-y-1 text-[11px] text-muted-foreground">
-              <span>{t("workspaceSshTerminal.forwardRemotePort")}</span>
-              <input
+            </AstryxLabel>
+            <AstryxLabel className="space-y-1 text-[11px] text-muted-foreground">
+              <AstryxInline>{t("workspaceSshTerminal.forwardRemotePort")}</AstryxInline>
+              <AstryxInput
                 value={forwardRemotePort}
                 onChange={(event) => setForwardRemotePort(event.target.value)}
                 inputMode="numeric"
                 className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground"
               />
-            </label>
-            <label className="space-y-1 text-[11px] text-muted-foreground">
-              <span>{t("workspaceSshTerminal.forwardLocalPort")}</span>
-              <input
+            </AstryxLabel>
+            <AstryxLabel className="space-y-1 text-[11px] text-muted-foreground">
+              <AstryxInline>{t("workspaceSshTerminal.forwardLocalPort")}</AstryxInline>
+              <AstryxInput
                 value={forwardLocalPort}
                 onChange={(event) => setForwardLocalPort(event.target.value)}
                 inputMode="numeric"
                 placeholder={t("workspaceSshTerminal.forwardAuto")}
                 className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground"
               />
-            </label>
-            <button
+            </AstryxLabel>
+            <AstryxButton
               type="button"
               disabled={!activeSession || forwardBusy}
               onClick={() => void startForward()}
@@ -488,43 +527,51 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
             >
               {forwardBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
               {t("workspaceSshTerminal.forwardStart")}
-            </button>
-          </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
+            </AstryxButton>
+          </AstryxView>
+          <AstryxParagraph className="mt-2 text-[11px] text-muted-foreground">
             {t("workspaceSshTerminal.forwardHelp")}
-          </p>
+          </AstryxParagraph>
           {activeForwards.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-2">
+            <AstryxView layout="flex" direction="horizontal" className="mt-2 flex flex-wrap gap-2">
               {activeForwards.map((forward) => (
-                <div
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
                   key={forward.id}
                   className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-2 py-1.5 text-xs"
                 >
-                  <span className="font-mono">
+                  <AstryxInline className="font-mono">
                     {forward.address || `${forward.localHost}:${forward.localPort}`} →{" "}
                     {forward.remoteHost}:{forward.remotePort}
-                  </span>
-                  <button
+                  </AstryxInline>
+                  <AstryxButton
                     type="button"
                     disabled={forwardBusy}
                     onClick={() => void stopForward(forward)}
                     className="text-muted-foreground hover:text-destructive"
                   >
                     {t("workspaceSshTerminal.forwardStop")}
-                  </button>
-                </div>
+                  </AstryxButton>
+                </AstryxView>
               ))}
-            </div>
+            </AstryxView>
           ) : null}
-        </div>
+        </AstryxView>
       ) : null}
 
-      <div className="relative min-h-0 flex-1 bg-background">
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        className="relative min-h-0 flex-1 bg-background"
+      >
         {shouldRenderPanes && openTabRecords.length > 0 ? (
           openTabRecords.map(({ tab, session }) => {
             const isActiveTerminal = effectiveActiveTabId === tab.id;
             return (
-              <div
+              <AstryxView
+                layout="block"
+                direction="horizontal"
                 key={tab.id}
                 aria-hidden={!isActiveTerminal}
                 className={cn("absolute inset-0 min-h-0", isActiveTerminal ? "block" : "hidden")}
@@ -545,18 +592,28 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
                     onError={(_sessionId, message) => setError(message)}
                   />
                 )}
-              </div>
+              </AstryxView>
             );
           })
         ) : openTabRecords.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/70">
+          <AstryxView
+            layout="flex"
+            direction="vertical"
+            className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground"
+          >
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/70"
+            >
               <Terminal className="h-5 w-5" />
-            </div>
-            <div>{t("workspaceSshTerminal.empty")}</div>
-          </div>
+            </AstryxView>
+            <AstryxView layout="block" direction="horizontal">
+              {t("workspaceSshTerminal.empty")}
+            </AstryxView>
+          </AstryxView>
         ) : null}
-      </div>
-    </div>
+      </AstryxView>
+    </AstryxView>
   );
 }

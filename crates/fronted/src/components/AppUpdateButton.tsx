@@ -1,8 +1,8 @@
+import { Button } from "@astryxdesign/core/Button";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import { useLocale } from "../i18n";
 import { type AppUpdateController, getAppUpdateDisplayVersion } from "../lib/appUpdates";
-import { cn } from "../lib/shared/utils";
-import { Download, Loader2, RefreshCw } from "./icons";
-import { Button } from "./ui/button";
+import { Download, RefreshCw } from "./icons";
 
 type AppUpdateButtonProps = {
   appUpdate: AppUpdateController;
@@ -41,59 +41,38 @@ export function AppUpdateButton({
         : version
           ? interpolate(t("appUpdate.updateTo"), { version })
           : t("appUpdate.update");
+  const action = () =>
+    void (installed ? appUpdate.restart() : appUpdate.installAndRestart()).catch(() => undefined);
+
+  if (iconOnly) {
+    return (
+      <IconButton
+        type="button"
+        label={title}
+        tooltip={title}
+        icon={installed ? <RefreshCw className={iconClassName} /> : <Download className={iconClassName} />}
+        variant="primary"
+        size="sm"
+        isLoading={busy}
+        isDisabled={busy}
+        className={className}
+        onClick={action}
+      />
+    );
+  }
 
   return (
     <Button
       type="button"
-      variant="default"
+      label={actionLabel}
+      icon={installed ? <RefreshCw className={iconClassName} /> : <Download className={iconClassName} />}
+      variant="primary"
       size="sm"
-      className={cn(
-        iconOnly
-          ? "group/update relative h-6 w-6 shrink-0 gap-0 overflow-hidden rounded-full bg-[#4096ff] px-0 text-[11px] font-medium leading-none text-white shadow-none transition-[width,background-color] duration-150 hover:w-10 hover:bg-[#1677ff] hover:text-white active:bg-[#0958d9]"
-          : "h-[22px] shrink-0 gap-[3px] rounded-full bg-[#4096ff] px-2 text-[11px] font-medium leading-none text-white shadow-none hover:bg-[#1677ff] hover:text-white active:bg-[#0958d9]",
-        className,
-      )}
-      disabled={busy}
-      title={title}
-      aria-label={title}
-      onClick={() =>
-        void (installed ? appUpdate.restart() : appUpdate.installAndRestart()).catch(
-          () => undefined,
-        )
-      }
-    >
-      {busy ? (
-        <Loader2
-          className={cn(iconOnly ? "h-3 w-3" : "h-[13px] w-[13px]", iconClassName, "animate-spin")}
-        />
-      ) : installed ? (
-        <RefreshCw
-          className={cn(
-            iconOnly
-              ? "h-3 w-3 transition-opacity duration-150 group-hover/update:opacity-0"
-              : "h-[13px] w-[13px]",
-            iconClassName,
-          )}
-        />
-      ) : (
-        <Download
-          className={cn(
-            iconOnly
-              ? "h-3 w-3 transition-opacity duration-150 group-hover/update:opacity-0"
-              : "h-[13px] w-[13px]",
-            iconClassName,
-          )}
-        />
-      )}
-      {iconOnly ? (
-        busy ? null : (
-          <span className="pointer-events-none absolute whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover/update:opacity-100">
-            {actionLabel}
-          </span>
-        )
-      ) : (
-        actionLabel
-      )}
-    </Button>
+      tooltip={title}
+      isLoading={busy}
+      isDisabled={busy}
+      className={className}
+      onClick={action}
+    />
   );
 }

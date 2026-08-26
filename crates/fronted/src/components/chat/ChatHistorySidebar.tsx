@@ -1,7 +1,9 @@
-import { Tooltip } from "@base-ui/react";
+import { BottomSheet } from "@astryxdesign/core/BottomSheet";
+import { VStack } from "@astryxdesign/core/Stack";
+import { Text } from "@astryxdesign/core/Text";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import iconSimpleUrl from "../../../src-tauri/icons/icon-simple.png";
 import { useLocale } from "../../i18n";
 import type { AppUpdateController } from "../../lib/appUpdates";
@@ -61,6 +63,9 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { Input } from "../ui/input";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 type ChatHistorySidebarProps = {
   items: readonly SidebarConversation[];
@@ -94,6 +99,7 @@ type ChatHistorySidebarProps = {
   renamingId: string | null;
   renameDraft: string;
   isOpen: boolean;
+  desktopWidth?: number;
   fontScale?: number;
   activeView?: "chat" | "skills-hub" | "mcp-hub";
   showProjects?: boolean;
@@ -191,19 +197,25 @@ function SoulPresetPicker(props: SoulPresetPickerProps) {
   const { t } = useLocale();
   return (
     <>
-      <div
+      <AstryxView
+        layout="block"
+        direction="horizontal"
         className={cn(
           "font-semibold uppercase tracking-[0.08em] text-muted-foreground/70",
           props.mobile ? "px-1 pb-3 text-[11px]" : "px-2 pb-1 pt-0.5 text-[10px]",
         )}
       >
         {t("sidebar.soulPresets")}
-      </div>
-      <div className={cn("overflow-y-auto", props.mobile ? "space-y-1" : "max-h-36 space-y-0.5")}>
+      </AstryxView>
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        className={cn("overflow-y-auto", props.mobile ? "space-y-1" : "max-h-36 space-y-0.5")}
+      >
         {props.presets.map((preset) => {
           const active = preset.id === props.activeId;
           return (
-            <button
+            <AstryxButton
               key={preset.id}
               type="button"
               role={props.mobile ? "menuitem" : undefined}
@@ -216,15 +228,22 @@ function SoulPresetPicker(props: SoulPresetPickerProps) {
                 active ? "bg-muted text-foreground" : "text-foreground/75 hover:bg-muted",
               )}
             >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+              <AstryxView
+                as="span"
+                layout="flex"
+                direction="horizontal"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-foreground"
+              >
                 {active ? <Check className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
-              </span>
-              <span className="min-w-0 flex-1 truncate">{preset.metadata.name || "XGent"}</span>
-            </button>
+              </AstryxView>
+              <AstryxInline className="min-w-0 flex-1 truncate">
+                {preset.metadata.name || "XGent"}
+              </AstryxInline>
+            </AstryxButton>
           );
         })}
-      </div>
-      <button
+      </AstryxView>
+      <AstryxButton
         type="button"
         role={props.mobile ? "menuitem" : undefined}
         onClick={props.onCreate}
@@ -235,8 +254,8 @@ function SoulPresetPicker(props: SoulPresetPickerProps) {
         )}
       >
         <Plus className="h-4 w-4 text-muted-foreground" />
-        <span>{t("sidebar.addSoul")}</span>
-      </button>
+        <AstryxInline>{t("sidebar.addSoul")}</AstryxInline>
+      </AstryxButton>
     </>
   );
 }
@@ -357,14 +376,18 @@ const HistoryRow = memo(function HistoryRow(props: {
 
   if (isPendingDelete) {
     return (
-      <div className="chat-history-row rounded-2xl border border-border/70 bg-background px-3 py-2.5 shadow-xs shadow-black/5">
-        <p className="truncate text-sm leading-5 text-foreground/80">
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        className="chat-history-row rounded-2xl border border-border/70 bg-background px-3 py-2.5 shadow-xs shadow-black/5"
+      >
+        <AstryxParagraph className="truncate text-sm leading-5 text-foreground/80">
           {t("chat.conversationDeleteConfirm").replace("{title}", item.title)}
-        </p>
-        <p className="mt-0.5 text-[calc(11px*var(--zone-font-scale,1))] leading-4 text-muted-foreground">
+        </AstryxParagraph>
+        <AstryxParagraph className="mt-0.5 text-[calc(11px*var(--zone-font-scale,1))] leading-4 text-muted-foreground">
           {t("chat.conversationDeleteWarning")}
-        </p>
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
+        </AstryxParagraph>
+        <AstryxView layout="grid" direction="horizontal" className="mt-2 grid grid-cols-2 gap-1.5">
           <Button
             type="button"
             variant="outline"
@@ -383,13 +406,15 @@ const HistoryRow = memo(function HistoryRow(props: {
           >
             {t("chat.delete")}
           </Button>
-        </div>
-      </div>
+        </AstryxView>
+      </AstryxView>
     );
   }
 
   return (
-    <div
+    <AstryxView
+      layout="grid"
+      direction="horizontal"
       className={cn(
         "chat-history-row group/item grid h-[30px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-lg pl-1 transition-colors",
         isSelected
@@ -400,7 +425,11 @@ const HistoryRow = memo(function HistoryRow(props: {
       )}
     >
       {isRenaming ? (
-        <div className="flex h-[30px] min-w-0 items-center px-2">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex h-[30px] min-w-0 items-center px-2"
+        >
           <Input
             ref={inputRef}
             value={renameDraft}
@@ -428,9 +457,9 @@ const HistoryRow = memo(function HistoryRow(props: {
             className="h-7 min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 text-[calc(14px*var(--zone-font-scale,1))] font-normal shadow-none outline-none focus-visible:border-0 focus-visible:bg-transparent"
             disabled={isRunning || isBusy}
           />
-        </div>
+        </AstryxView>
       ) : (
-        <button
+        <AstryxButton
           type="button"
           onClick={handleSelect}
           onDoubleClick={(event) => {
@@ -443,7 +472,10 @@ const HistoryRow = memo(function HistoryRow(props: {
           title={item.title}
         >
           {selectionMode ? (
-            <span
+            <AstryxView
+              as="span"
+              layout="flex"
+              direction="horizontal"
               className={cn(
                 "mr-1.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border",
                 isSelected
@@ -453,15 +485,17 @@ const HistoryRow = memo(function HistoryRow(props: {
               aria-hidden="true"
             >
               {isSelected ? <Check className="h-3 w-3" /> : null}
-            </span>
+            </AstryxView>
           ) : null}
-          <span className="sidebar-project-name-fade min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5">
+          <AstryxInline className="sidebar-project-name-fade min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5">
             {item.title}
-          </span>
-        </button>
+          </AstryxInline>
+        </AstryxButton>
       )}
       {!isRenaming ? (
-        <div
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
           className={cn(
             "relative flex items-center justify-end overflow-hidden transition-[max-width,opacity] duration-200 ease-out",
             isRunning
@@ -472,7 +506,10 @@ const HistoryRow = memo(function HistoryRow(props: {
           )}
         >
           {isRunning ? (
-            <span
+            <AstryxView
+              as="span"
+              layout="flex"
+              direction="horizontal"
               role="img"
               aria-label={t("chat.statusRunningReply")}
               title={t("chat.statusRunningReply")}
@@ -483,9 +520,11 @@ const HistoryRow = memo(function HistoryRow(props: {
               )}
             >
               <Loader2 className="h-4 w-4 animate-spin" />
-            </span>
+            </AstryxView>
           ) : null}
-          <div
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
             className={cn(
               "flex items-center gap-0.5 transition-opacity duration-200",
               isRunning
@@ -555,7 +594,9 @@ const HistoryRow = memo(function HistoryRow(props: {
                       className="gap-2"
                     >
                       <FolderTree className="h-3.5 w-3.5" />
-                      <span className="min-w-0 flex-1">{t("chat.conversationMove")}</span>
+                      <AstryxInline className="min-w-0 flex-1">
+                        {t("chat.conversationMove")}
+                      </AstryxInline>
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent
@@ -570,7 +611,7 @@ const HistoryRow = memo(function HistoryRow(props: {
                           className="gap-2"
                         >
                           <FolderClosed className="h-3.5 w-3.5 shrink-0" />
-                          <span className="min-w-0 truncate">{project.name}</span>
+                          <AstryxInline className="min-w-0 truncate">{project.name}</AstryxInline>
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuSubContent>
@@ -586,10 +627,10 @@ const HistoryRow = memo(function HistoryRow(props: {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        </div>
+          </AstryxView>
+        </AstryxView>
       ) : null}
-    </div>
+    </AstryxView>
   );
 });
 
@@ -701,14 +742,18 @@ const ProjectRow = memo(function ProjectRow(props: {
 
   if (isPendingRemove) {
     return (
-      <div className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2.5 text-sm text-destructive shadow-xs shadow-black/5">
-        <p className="truncate font-medium leading-5 text-destructive">
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2.5 text-sm text-destructive shadow-xs shadow-black/5"
+      >
+        <AstryxParagraph className="truncate font-medium leading-5 text-destructive">
           {t("chat.workspaceRemoveConfirm").replace("{name}", project.name)}
-        </p>
-        <p className="mt-0.5 text-[calc(11px*var(--zone-font-scale,1))] leading-4 text-destructive/75">
+        </AstryxParagraph>
+        <AstryxParagraph className="mt-0.5 text-[calc(11px*var(--zone-font-scale,1))] leading-4 text-destructive/75">
           {isRunning ? t("chat.workspaceRemoveRunning") : t("chat.workspaceRemoveDescription")}
-        </p>
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
+        </AstryxParagraph>
+        <AstryxView layout="grid" direction="horizontal" className="mt-2 grid grid-cols-2 gap-1.5">
           <Button
             type="button"
             variant="outline"
@@ -727,13 +772,15 @@ const ProjectRow = memo(function ProjectRow(props: {
           >
             {t("chat.remove")}
           </Button>
-        </div>
-      </div>
+        </AstryxView>
+      </AstryxView>
     );
   }
 
   return (
-    <div
+    <AstryxView
+      layout="grid"
+      direction="horizontal"
       ref={rowRef}
       className={cn(
         "group/project grid h-[30px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-lg pl-1 transition-colors",
@@ -747,7 +794,11 @@ const ProjectRow = memo(function ProjectRow(props: {
       )}
     >
       {isRenaming ? (
-        <div className="flex h-[30px] min-w-0 items-center gap-3 rounded-md px-2 text-left">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex h-[30px] min-w-0 items-center gap-3 rounded-md px-2 text-left"
+        >
           <ProjectFolderIcon
             className={cn(
               "h-4 w-4 shrink-0 transition-colors",
@@ -786,82 +837,77 @@ const ProjectRow = memo(function ProjectRow(props: {
             onClick={(e) => e.stopPropagation()}
             className="h-7 min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 text-[calc(14px*var(--zone-font-scale,1))] font-normal shadow-none outline-none focus-visible:border-0 focus-visible:bg-transparent"
           />
-        </div>
+        </AstryxView>
       ) : (
-        <Tooltip.Root>
-          <Tooltip.Trigger
-            delay={0}
-            closeOnClick
-            render={
-              <button
-                type="button"
-                aria-disabled={isArchived || undefined}
-                className={cn(
-                  "flex h-[30px] min-w-0 items-center gap-3 rounded-md px-2 text-left outline-hidden transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                  isMissing
-                    ? "hover:text-destructive focus-visible:bg-destructive/10"
-                    : isArchived
-                      ? "cursor-default"
-                      : "hover:text-foreground focus-visible:bg-foreground/[0.06]",
-                )}
-                onClick={() => {
-                  // Archived workspaces cannot be selected, so no new
-                  // conversations can start in them.
-                  if (!isArchived) {
-                    onSelectProject(project);
-                  }
-                }}
-                onDoubleClick={(event) => {
-                  event.preventDefault();
-                  if (!isDefaultProject) {
-                    onStartRenamingProject(project);
-                  }
-                }}
-              >
-                <ProjectFolderIcon
-                  className={cn(
-                    "h-4 w-4 shrink-0 transition-colors",
-                    isMissing
-                      ? "text-destructive"
-                      : isArchived
-                        ? "text-muted-foreground/40"
-                        : isActive
-                          ? "text-amber-500"
-                          : "text-foreground/65",
-                  )}
-                />
-                <span
-                  className={cn(
-                    "sidebar-project-name-fade min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5",
-                    isMissing ? "text-destructive" : undefined,
-                  )}
-                >
-                  {project.name}
-                </span>
-              </button>
-            }
-          />
-          <Tooltip.Portal>
-            <Tooltip.Positioner
-              anchor={rowRef}
-              side="right"
-              align="center"
-              sideOffset={10}
-              collisionPadding={8}
-              className="z-[9999]"
+        <Tooltip
+          anchorRef={rowRef}
+          placement="end"
+          alignment="center"
+          delay={0}
+          hasHoverIndication={false}
+          content={
+            <VStack gap={1} width={256}>
+              <Text type="label" weight="semibold" maxLines={1}>
+                {project.name}
+              </Text>
+              <Text type="supporting" color="secondary" wordBreak="break-all">
+                {project.path}
+              </Text>
+            </VStack>
+          }
+        >
+          <AstryxButton
+            type="button"
+            aria-disabled={isArchived || undefined}
+            className={cn(
+              "flex h-[30px] min-w-0 items-center gap-3 rounded-md px-2 text-left outline-hidden transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+              isMissing
+                ? "hover:text-destructive focus-visible:bg-destructive/10"
+                : isArchived
+                  ? "cursor-default"
+                  : "hover:text-foreground focus-visible:bg-foreground/[0.06]",
+            )}
+            onClick={() => {
+              // Archived workspaces cannot be selected, so no new
+              // conversations can start in them.
+              if (!isArchived) {
+                onSelectProject(project);
+              }
+            }}
+            onDoubleClick={(event) => {
+              event.preventDefault();
+              if (!isDefaultProject) {
+                onStartRenamingProject(project);
+              }
+            }}
+          >
+            <ProjectFolderIcon
+              className={cn(
+                "h-4 w-4 shrink-0 transition-colors",
+                isMissing
+                  ? "text-destructive"
+                  : isArchived
+                    ? "text-muted-foreground/40"
+                    : isActive
+                      ? "text-amber-500"
+                      : "text-foreground/65",
+              )}
+            />
+            <AstryxInline
+              className={cn(
+                "sidebar-project-name-fade min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5",
+                isMissing ? "text-destructive" : undefined,
+              )}
             >
-              <Tooltip.Popup className="w-64 rounded-xl border border-border/60 bg-popover px-3 py-2.5 text-popover-foreground shadow-lg outline-hidden data-[open]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:fade-in-0 data-[closed]:zoom-out-95 data-[open]:zoom-in-95">
-                <p className="truncate text-sm font-semibold leading-5">{project.name}</p>
-                <p className="mt-1 break-all text-xs leading-4 text-muted-foreground">
-                  {project.path}
-                </p>
-              </Tooltip.Popup>
-            </Tooltip.Positioner>
-          </Tooltip.Portal>
-        </Tooltip.Root>
+              {project.name}
+            </AstryxInline>
+          </AstryxButton>
+        </Tooltip>
       )}
       {!isRenaming ? (
-        <div
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
           className={cn(
             "relative flex items-center justify-end overflow-hidden transition-[max-width,opacity] duration-200 ease-out",
             isMissing
@@ -874,7 +920,10 @@ const ProjectRow = memo(function ProjectRow(props: {
           )}
         >
           {isRunning && !isMissing ? (
-            <span
+            <AstryxView
+              as="span"
+              layout="flex"
+              direction="horizontal"
               role="img"
               aria-label={t("chat.statusRunningReply")}
               title={t("chat.statusRunningReply")}
@@ -885,9 +934,11 @@ const ProjectRow = memo(function ProjectRow(props: {
               )}
             >
               <Loader2 className="h-4 w-4 animate-spin" />
-            </span>
+            </AstryxView>
           ) : null}
-          <div
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
             className={cn(
               "flex items-center gap-0.5 transition-opacity duration-200",
               isRunning && !isMissing
@@ -976,7 +1027,9 @@ const ProjectRow = memo(function ProjectRow(props: {
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger className="gap-2">
                           <FolderTree className="h-3.5 w-3.5" />
-                          <span className="min-w-0 flex-1">{t("chat.workspaceMoveToGroup")}</span>
+                          <AstryxInline className="min-w-0 flex-1">
+                            {t("chat.workspaceMoveToGroup")}
+                          </AstryxInline>
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent
@@ -994,7 +1047,7 @@ const ProjectRow = memo(function ProjectRow(props: {
                                 currentGroupId === null ? "opacity-100" : "opacity-0",
                               )}
                             />
-                            <span>{t("chat.workspaceUngrouped")}</span>
+                            <AstryxInline>{t("chat.workspaceUngrouped")}</AstryxInline>
                           </DropdownMenuItem>
                           {workspaceProjectGroups.map((group) => (
                             <DropdownMenuItem
@@ -1008,7 +1061,7 @@ const ProjectRow = memo(function ProjectRow(props: {
                                   currentGroupId === group.id ? "opacity-100" : "opacity-0",
                                 )}
                               />
-                              <span className="min-w-0 truncate">{group.name}</span>
+                              <AstryxInline className="min-w-0 truncate">{group.name}</AstryxInline>
                             </DropdownMenuItem>
                           ))}
                         </DropdownMenuSubContent>
@@ -1045,10 +1098,10 @@ const ProjectRow = memo(function ProjectRow(props: {
                 </DropdownMenu>
               </>
             )}
-          </div>
-        </div>
+          </AstryxView>
+        </AstryxView>
       ) : null}
-    </div>
+    </AstryxView>
   );
 });
 
@@ -1056,31 +1109,70 @@ function HistoryListLoadingSkeleton() {
   const { t } = useLocale();
 
   return (
-    <div
+    <AstryxView
+      layout="block"
+      direction="horizontal"
       className="space-y-1.5 pt-1"
       role="status"
       aria-live="polite"
       aria-label={t("sidebar.readingHistory")}
     >
-      <div className="flex items-center gap-2 px-2 pb-1 text-[calc(11px*var(--zone-font-scale,1))] font-medium text-muted-foreground/75">
-        <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/35 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-primary/70" />
-        </span>
-        <span>{t("sidebar.readingHistory")}</span>
-      </div>
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="flex items-center gap-2 px-2 pb-1 text-[calc(11px*var(--zone-font-scale,1))] font-medium text-muted-foreground/75"
+      >
+        <AstryxView
+          as="span"
+          layout="flex"
+          direction="horizontal"
+          className="relative flex h-2 w-2 shrink-0"
+          aria-hidden="true"
+        >
+          <AstryxView
+            as="span"
+            layout="inline-flex"
+            direction="horizontal"
+            className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/35 opacity-75"
+          />
+          <AstryxView
+            as="span"
+            layout="inline-flex"
+            direction="horizontal"
+            className="relative inline-flex h-2 w-2 rounded-full bg-primary/70"
+          />
+        </AstryxView>
+        <AstryxInline>{t("sidebar.readingHistory")}</AstryxInline>
+      </AstryxView>
       {HISTORY_LOADING_SKELETON_ROWS.map((row) => (
-        <div key={`${row.title}-${row.meta}`} className="rounded-lg px-2 py-2.5">
-          <div className="flex items-start gap-2">
-            <div className="skills-skeleton-shimmer mt-1 h-3.5 w-3.5 shrink-0 rounded-md" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className={cn("skills-skeleton-shimmer h-3.5 rounded", row.title)} />
-              <div className={cn("skills-skeleton-shimmer h-2.5 rounded", row.meta)} />
-            </div>
-          </div>
-        </div>
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          key={`${row.title}-${row.meta}`}
+          className="rounded-lg px-2 py-2.5"
+        >
+          <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-2">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="skills-skeleton-shimmer mt-1 h-3.5 w-3.5 shrink-0 rounded-md"
+            />
+            <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1 space-y-2">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className={cn("skills-skeleton-shimmer h-3.5 rounded", row.title)}
+              />
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className={cn("skills-skeleton-shimmer h-2.5 rounded", row.meta)}
+              />
+            </AstryxView>
+          </AstryxView>
+        </AstryxView>
       ))}
-    </div>
+    </AstryxView>
   );
 }
 
@@ -1094,7 +1186,9 @@ function SidebarStateCard(props: {
   const { title, description, tone = "default", onDismiss, dismissLabel } = props;
 
   return (
-    <div
+    <AstryxView
+      layout="block"
+      direction="horizontal"
       className={cn(
         "rounded-2xl border px-3 py-3 text-sm",
         tone === "error"
@@ -1102,17 +1196,23 @@ function SidebarStateCard(props: {
           : "border-border/60 bg-background/70 text-muted-foreground",
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="flex items-start justify-between gap-2"
+      >
+        <AstryxView
+          layout="block"
+          direction="horizontal"
           className={cn(
             "min-w-0 font-medium",
             tone === "error" ? "text-destructive" : "text-foreground/85",
           )}
         >
           {title}
-        </div>
+        </AstryxView>
         {onDismiss ? (
-          <button
+          <AstryxButton
             type="button"
             onClick={onDismiss}
             aria-label={dismissLabel}
@@ -1125,11 +1225,15 @@ function SidebarStateCard(props: {
             )}
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </AstryxButton>
         ) : null}
-      </div>
-      {description ? <div className="mt-1 text-xs leading-5">{description}</div> : null}
-    </div>
+      </AstryxView>
+      {description ? (
+        <AstryxView layout="block" direction="horizontal" className="mt-1 text-xs leading-5">
+          {description}
+        </AstryxView>
+      ) : null}
+    </AstryxView>
   );
 }
 
@@ -1153,6 +1257,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     renamingId,
     renameDraft,
     isOpen,
+    desktopWidth = 360,
     fontScale = 1,
     activeView = "chat",
     showProjects = false,
@@ -1805,42 +1910,64 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   );
 
   return (
-    <aside
+    <AstryxView
+      as="aside"
       data-mobile-left-drawer
       aria-hidden={!isOpen}
       inert={!isOpen}
       className={cn(
-        "chat-history-sidebar zone-font-scale fixed inset-y-0 left-0 z-50 flex h-full w-[min(90vw,360px)] shrink-0 flex-col overflow-hidden border-r border-border/50 bg-[hsl(var(--sidebar-bg))] pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pt-[env(safe-area-inset-top,0px)] shadow-2xl transition-[width,opacity,transform] duration-200 ease-out md:relative md:inset-auto md:z-auto md:p-0 md:shadow-none",
+        "chat-history-sidebar zone-font-scale fixed inset-y-0 left-0 z-50 flex h-full w-[min(90vw,360px)] shrink-0 flex-col overflow-hidden border-r border-border bg-body pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pt-[env(safe-area-inset-top,0px)] shadow-lg transition-[width,opacity,transform] duration-200 ease-out md:relative md:inset-auto md:z-auto md:p-0 md:shadow-none",
         isOpen
           ? desktopPanelMode
-            ? "translate-x-0 opacity-100 md:w-[360px]"
+            ? "translate-x-0 opacity-100 md:w-[var(--xagent-chat-sidebar-width)]"
             : "translate-x-0 opacity-100 md:w-[272px]"
           : "pointer-events-none -translate-x-full opacity-0 md:w-0 md:translate-x-0",
       )}
-      style={{ "--zone-font-scale": fontScale } as CSSProperties}
+      style={
+        {
+          "--zone-font-scale": fontScale,
+          "--xagent-chat-sidebar-width": `${desktopWidth}px`,
+        } as CSSProperties
+      }
     >
-      <div
+      <AstryxView
+        layout="flex"
+        direction="vertical"
         className={cn(
           "chat-history-sidebar-inner flex min-h-0 w-full min-w-0 flex-1 flex-col",
-          desktopPanelMode ? "md:w-[360px] md:min-w-[360px]" : "md:w-[272px] md:min-w-[272px]",
+          desktopPanelMode
+            ? "md:w-[var(--xagent-chat-sidebar-width)] md:min-w-[var(--xagent-chat-sidebar-width)]"
+            : "md:w-[272px] md:min-w-[272px]",
         )}
       >
-        <MacOsTitleBarSpacer
-          className={cn("bg-[hsl(var(--sidebar-bg))]", desktopPanelMode && "md:hidden")}
-        />
-        <div className="chat-sidebar-header shrink-0 border-b border-border/50 px-2 pb-3 pt-3">
+        <MacOsTitleBarSpacer className={cn("bg-body", desktopPanelMode && "md:hidden")} />
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="chat-sidebar-header shrink-0 border-b border-border/50 px-2 pb-3 pt-3"
+        >
           {desktopPanelMode ? (
-            <div className="hidden h-8 items-center px-2 text-base font-semibold md:flex">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="hidden h-8 items-center px-2 text-base font-semibold md:flex"
+            >
               {t("chat.recentConversation")}
-            </div>
+            </AstryxView>
           ) : null}
-          <div
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
             className={cn(
               "flex items-center justify-between gap-2",
               desktopPanelMode && "md:hidden",
             )}
           >
-            <div className="flex min-w-0 -translate-y-0.5 items-center gap-2">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex min-w-0 -translate-y-0.5 items-center gap-2"
+            >
               <img
                 src={iconSimpleUrl}
                 alt=""
@@ -1848,10 +1975,16 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                 draggable={false}
                 className="h-8 w-8 shrink-0 select-none rounded-xl object-contain"
               />
-              <div className="min-w-0">
-                <div className="truncate font-semibold tracking-tight">XAgent</div>
-              </div>
-            </div>
+              <AstryxView layout="block" direction="horizontal" className="min-w-0">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="truncate font-semibold tracking-tight"
+                >
+                  XAgent
+                </AstryxView>
+              </AstryxView>
+            </AstryxView>
 
             {!isMacOsTauri() && (
               <Button
@@ -1865,9 +1998,13 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                 <PanelLeftClose className="h-4 w-4" />
               </Button>
             )}
-          </div>
+          </AstryxView>
 
-          <div className="chat-sidebar-primary-nav mt-3 flex flex-col gap-0.5">
+          <AstryxView
+            layout="flex"
+            direction="vertical"
+            className="chat-sidebar-primary-nav mt-3 flex flex-col gap-0.5"
+          >
             <Button
               type="button"
               variant="ghost"
@@ -1880,9 +2017,9 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               )}
             >
               <CirclePlus className="h-4 w-4 shrink-0 text-foreground/85" />
-              <span className="chat-history-new-conversation-label">
+              <AstryxInline className="chat-history-new-conversation-label">
                 {t("chat.newConversation")}
-              </span>
+              </AstryxInline>
             </Button>
             <Button
               type="button"
@@ -1903,7 +2040,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   activeView === "skills-hub" ? "text-amber-500" : "text-foreground/85",
                 )}
               />
-              <span className="truncate">Skills</span>
+              <AstryxInline className="truncate">Skills</AstryxInline>
             </Button>
             <Button
               type="button"
@@ -1924,7 +2061,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   activeView === "mcp-hub" ? "text-violet-500" : "text-foreground/85",
                 )}
               />
-              <span className="truncate">MCP</span>
+              <AstryxInline className="truncate">MCP</AstryxInline>
             </Button>
             <Button
               type="button"
@@ -1938,12 +2075,14 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               title={t("sidebar.myFiles")}
             >
               <FolderTree className="h-4 w-4 shrink-0 text-sky-500" />
-              <span className="truncate">{t("sidebar.myFiles")}</span>
+              <AstryxInline className="truncate">{t("sidebar.myFiles")}</AstryxInline>
             </Button>
-          </div>
-        </div>
+          </AstryxView>
+        </AstryxView>
 
-        <div
+        <AstryxView
+          layout="grid"
+          direction="horizontal"
           ref={sidebarSectionsRef}
           style={{ gridTemplateRows: sidebarSectionLayout.gridTemplateRows }}
           className={cn(
@@ -1953,24 +2092,26 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
         >
           {showProjects ? (
             <>
-              <div
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
                 ref={projectsHeaderRef}
                 className="group/workspace-header flex items-center justify-between px-2 pb-1 pt-2"
               >
-                <button
+                <AstryxButton
                   type="button"
                   aria-expanded={!projectsCollapsed}
                   className="group flex min-w-0 items-center gap-1 rounded-md px-3 py-1 text-xs font-semibold text-muted-foreground outline-hidden"
                   onClick={() => onProjectsCollapsedChange?.(!projectsCollapsed)}
                 >
-                  <span>{t("chat.workspaceSection")}</span>
+                  <AstryxInline>{t("chat.workspaceSection")}</AstryxInline>
                   <ChevronRight
                     aria-hidden="true"
                     className="h-3.5 w-3.5 shrink-0 opacity-60 transition-[opacity,transform] duration-300 ease-in-out md:opacity-0 md:group-hover:opacity-100"
                     style={{ transform: `rotate(${projectsCollapsed ? 0 : 90}deg)` }}
                   />
-                </button>
-                <div className="flex items-center">
+                </AstryxButton>
+                <AstryxView layout="flex" direction="horizontal" className="flex items-center">
                   <Button
                     type="button"
                     variant="ghost"
@@ -2004,9 +2145,11 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
-                </div>
-              </div>
-              <div
+                </AstryxView>
+              </AstryxView>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
                 aria-hidden={projectsCollapsed}
                 inert={projectsCollapsed}
                 className={cn(
@@ -2014,9 +2157,18 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   projectsCollapsed ? "opacity-0" : "opacity-100",
                 )}
               >
-                <div ref={projectsBodyRef} className="space-y-0.5 px-2 pb-0.5">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  ref={projectsBodyRef}
+                  className="space-y-0.5 px-2 pb-0.5"
+                >
                   {creatingWorkspaceGroup ? (
-                    <div className="flex h-8 items-center gap-1 px-1">
+                    <AstryxView
+                      layout="flex"
+                      direction="horizontal"
+                      className="flex h-8 items-center gap-1 px-1"
+                    >
                       <Input
                         autoFocus
                         value={workspaceGroupDraft}
@@ -2062,7 +2214,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                       >
                         <X className="h-3.5 w-3.5" />
                       </Button>
-                    </div>
+                    </AstryxView>
                   ) : null}
                   {workspaceProjectGroups.map((group) => {
                     const groupProjects = activeProjects.filter(
@@ -2072,10 +2224,23 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     );
                     const isRenamingGroup = renamingWorkspaceGroupId === group.id;
                     return (
-                      <div key={group.id} className="pt-0.5">
-                        <div className="group/workspace-group flex h-7 items-center gap-1 rounded-md px-1">
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        key={group.id}
+                        className="pt-0.5"
+                      >
+                        <AstryxView
+                          layout="flex"
+                          direction="horizontal"
+                          className="group/workspace-group flex h-7 items-center gap-1 rounded-md px-1"
+                        >
                           {isRenamingGroup ? (
-                            <div className="flex min-w-0 flex-1 items-center gap-1">
+                            <AstryxView
+                              layout="flex"
+                              direction="horizontal"
+                              className="flex min-w-0 flex-1 items-center gap-1"
+                            >
                               <Input
                                 autoFocus
                                 value={workspaceGroupDraft}
@@ -2109,10 +2274,10 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                               >
                                 <Check className="h-3.5 w-3.5" />
                               </Button>
-                            </div>
+                            </AstryxView>
                           ) : (
                             <>
-                              <button
+                              <AstryxButton
                                 type="button"
                                 onClick={() => onToggleWorkspaceGroupCollapsed?.(group.id)}
                                 className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 text-left text-[calc(11.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground hover:text-foreground"
@@ -2123,11 +2288,13 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                                     !group.collapsed && "rotate-90",
                                   )}
                                 />
-                                <span className="min-w-0 flex-1 truncate">{group.name}</span>
-                                <span className="shrink-0 text-[10px] text-muted-foreground/65">
+                                <AstryxInline className="min-w-0 flex-1 truncate">
+                                  {group.name}
+                                </AstryxInline>
+                                <AstryxInline className="shrink-0 text-[10px] text-muted-foreground/65">
                                   {groupProjects.length}
-                                </span>
-                              </button>
+                                </AstryxInline>
+                              </AstryxButton>
                               <DropdownMenu>
                                 <DropdownMenuTrigger
                                   render={
@@ -2171,19 +2338,23 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                               </DropdownMenu>
                             </>
                           )}
-                        </div>
+                        </AstryxView>
                         {!group.collapsed ? groupProjects.map(renderActiveProjectRow) : null}
-                      </div>
+                      </AstryxView>
                     );
                   })}
                   {workspaceProjectGroups.length > 0 && renderedProjects.length > 0 ? (
-                    <div className="px-2 pt-1 text-[calc(10.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground/70">
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="px-2 pt-1 text-[calc(10.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground/70"
+                    >
                       {t("chat.workspaceUngrouped")}
-                    </div>
+                    </AstryxView>
                   ) : null}
                   {renderedProjects.map(renderActiveProjectRow)}
                   {hiddenProjectCount > 0 || showAllProjects ? (
-                    <button
+                    <AstryxButton
                       type="button"
                       onClick={() => setShowAllProjects((current) => !current)}
                       className="flex w-full items-center justify-center rounded-md px-2 py-1.5 text-[calc(11.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground/80 transition-colors hover:bg-foreground/[0.05] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
@@ -2194,11 +2365,11 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                             "{count}",
                             String(ungroupedActiveProjects.length),
                           )}
-                    </button>
+                    </AstryxButton>
                   ) : null}
                   {archivedProjects.length > 0 ? (
-                    <div className="pt-0.5">
-                      <button
+                    <AstryxView layout="block" direction="horizontal" className="pt-0.5">
+                      <AstryxButton
                         type="button"
                         onClick={() => setArchivedGroupOpen((current) => !current)}
                         className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-[calc(11.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground/80 transition-colors hover:bg-foreground/[0.05] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
@@ -2213,7 +2384,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                           "{count}",
                           String(archivedProjects.length),
                         )}
-                      </button>
+                      </AstryxButton>
                       {archivedGroupOpen
                         ? archivedProjects.map((project) => {
                             const pathKey = workspaceProjectPathKey(project.path);
@@ -2259,11 +2430,11 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                             );
                           })
                         : null}
-                    </div>
+                    </AstryxView>
                   ) : null}
-                </div>
-              </div>
-              <button
+                </AstryxView>
+              </AstryxView>
+              <AstryxButton
                 ref={sectionResizeHandleRef}
                 type="button"
                 aria-label={t("chat.resizeSidebarSections")}
@@ -2277,7 +2448,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     : "flex h-0 overflow-hidden",
                 )}
               >
-                <span
+                <AstryxInline
                   aria-hidden="true"
                   className={cn(
                     "h-0.5 w-10 rounded-full bg-muted-foreground/25 opacity-70 shadow-sm transition-[width,background-color,opacity]",
@@ -2286,38 +2457,46 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     !canResizeProjectSections && "hidden",
                   )}
                 />
-              </button>
+              </AstryxButton>
             </>
           ) : null}
 
-          <div
+          <AstryxView
+            layout="grid"
+            direction="horizontal"
             ref={recentHeaderRef}
             className={cn(
               "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-2 pb-2",
               showProjects ? "border-t border-border/35 pt-0.5" : "pt-3",
             )}
           >
-            <button
+            <AstryxButton
               type="button"
               aria-expanded={!recentCollapsed}
               className="group flex min-w-0 items-center gap-1 rounded-md px-3 py-1 text-xs font-semibold text-muted-foreground outline-hidden"
               onClick={() => onRecentCollapsedChange?.(!recentCollapsed)}
             >
-              <span className="min-w-0 truncate">{t("chat.recentConversation")}</span>
+              <AstryxInline className="min-w-0 truncate">
+                {t("chat.recentConversation")}
+              </AstryxInline>
               <ChevronRight
                 aria-hidden="true"
                 className="h-3.5 w-3.5 shrink-0 opacity-60 transition-[opacity,transform] duration-300 ease-in-out md:opacity-0 md:group-hover:opacity-100"
                 style={{ transform: `rotate(${recentCollapsed ? 0 : 90}deg)` }}
               />
-            </button>
+            </AstryxButton>
             {selectionMode ? (
-              <div className="flex min-w-0 items-center gap-0.5">
-                <span className="mr-1 whitespace-nowrap text-[11px] text-muted-foreground">
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex min-w-0 items-center gap-0.5"
+              >
+                <AstryxInline className="mr-1 whitespace-nowrap text-[11px] text-muted-foreground">
                   {t("chat.history.selectedCount").replace(
                     "{count}",
                     String(selectedConversationIds.size),
                   )}
-                </span>
+                </AstryxInline>
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     render={
@@ -2352,7 +2531,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                         className="gap-2"
                       >
                         <FolderClosed className="h-3.5 w-3.5 shrink-0" />
-                        <span className="min-w-0 truncate">{project.name}</span>
+                        <AstryxInline className="min-w-0 truncate">{project.name}</AstryxInline>
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -2392,7 +2571,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                 >
                   <X className="h-3.5 w-3.5" />
                 </Button>
-              </div>
+              </AstryxView>
             ) : (
               <Button
                 type="button"
@@ -2415,9 +2594,11 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                 )}
               </Button>
             )}
-          </div>
+          </AstryxView>
 
-          <div
+          <AstryxView
+            layout="flex"
+            direction="vertical"
             aria-hidden={recentCollapsed}
             inert={recentCollapsed}
             className={cn(
@@ -2428,8 +2609,8 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
             )}
           >
             {historySearchOpen ? (
-              <div className="shrink-0 px-2 pb-2">
-                <div className="relative">
+              <AstryxView layout="block" direction="horizontal" className="shrink-0 px-2 pb-2">
+                <AstryxView layout="block" direction="horizontal" className="relative">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     autoFocus
@@ -2446,20 +2627,20 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     className="h-8 pl-8 pr-8 text-xs"
                   />
                   {searchQuery ? (
-                    <button
+                    <AstryxButton
                       type="button"
                       onClick={() => onSearchQueryChange("")}
                       className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                       aria-label={t("chat.history.searchClear")}
                     >
                       <X className="h-3.5 w-3.5" />
-                    </button>
+                    </AstryxButton>
                   ) : null}
-                </div>
-              </div>
+                </AstryxView>
+              </AstryxView>
             ) : null}
             {errorMessage ? (
-              <div className="shrink-0 px-2 pb-2">
+              <AstryxView layout="block" direction="horizontal" className="shrink-0 px-2 pb-2">
                 <SidebarStateCard
                   title={errorMessage}
                   description={errorDetail ?? undefined}
@@ -2467,9 +2648,11 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   onDismiss={onDismissError}
                   dismissLabel={t("chat.cancel")}
                 />
-              </div>
+              </AstryxView>
             ) : null}
-            <div
+            <AstryxView
+              layout="block"
+              direction="horizontal"
               ref={historyScrollRef}
               aria-busy={isListLoading || isLoadingMore}
               className="chat-history-list min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-3"
@@ -2480,72 +2663,112 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   scope-keyed wrapper replays a soft enter transition when the
                   workspace scope changes. */}
               {searchQuery.trim() ? (
-                <div className="space-y-1 pt-1">
+                <AstryxView layout="block" direction="horizontal" className="space-y-1 pt-1">
                   {searchStatus === "loading" ? (
-                    <div className="flex items-center gap-2 px-2 py-4 text-xs text-muted-foreground">
+                    <AstryxView
+                      layout="flex"
+                      direction="horizontal"
+                      className="flex items-center gap-2 px-2 py-4 text-xs text-muted-foreground"
+                    >
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       {t("chat.history.searching")}
-                    </div>
+                    </AstryxView>
                   ) : searchStatus === "error" ? (
-                    <p className="px-2 py-4 text-xs text-destructive">
+                    <AstryxParagraph className="px-2 py-4 text-xs text-destructive">
                       {t("chat.history.searchFailed")}
-                    </p>
+                    </AstryxParagraph>
                   ) : searchStatus === "ready" && searchResults.length === 0 ? (
-                    <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                    <AstryxParagraph className="px-2 py-4 text-center text-xs text-muted-foreground">
                       {t("chat.history.searchEmpty")}
-                    </p>
+                    </AstryxParagraph>
                   ) : (
                     searchResults.map((result, index) => (
-                      <button
+                      <AstryxButton
                         key={`${result.conversationId}:${result.updatedAt}:${index}`}
                         type="button"
                         onClick={() => onSelectConversation(result.conversationId)}
                         className="w-full rounded-lg px-2 py-2 text-left transition-colors hover:bg-foreground/[0.05] focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <span className="block truncate text-xs font-medium text-foreground/90">
+                        <AstryxInline className="block truncate text-xs font-medium text-foreground/90">
                           {result.title || t("tray.untitledConversation")}
-                        </span>
-                        <span className="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-muted-foreground">
+                        </AstryxInline>
+                        <AstryxInline className="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-muted-foreground">
                           {result.snippet.replaceAll("[", "").replaceAll("]", "")}
-                        </span>
+                        </AstryxInline>
                         {result.cwd ? (
-                          <span className="mt-0.5 block truncate text-[10px] text-muted-foreground/65">
+                          <AstryxInline className="mt-0.5 block truncate text-[10px] text-muted-foreground/65">
                             {result.cwd}
-                          </span>
+                          </AstryxInline>
                         ) : null}
-                      </button>
+                      </AstryxButton>
                     ))
                   )}
-                </div>
+                </AstryxView>
               ) : isListLoading && items.length === 0 ? (
                 <HistoryListLoadingSkeleton />
               ) : (
-                <div key={scopeKey || "scope"} className="chat-history-scope-enter">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  key={scopeKey || "scope"}
+                  className="chat-history-scope-enter"
+                >
                   {listStatus === "syncing" ? (
-                    <div className="flex items-center gap-2 px-2 pb-1 pt-1 text-[calc(11px*var(--zone-font-scale,1))] font-medium text-muted-foreground/75">
-                      <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/35 opacity-75" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-primary/70" />
-                      </span>
-                      <span>{t("chat.history.syncing")}</span>
-                    </div>
+                    <AstryxView
+                      layout="flex"
+                      direction="horizontal"
+                      className="flex items-center gap-2 px-2 pb-1 pt-1 text-[calc(11px*var(--zone-font-scale,1))] font-medium text-muted-foreground/75"
+                    >
+                      <AstryxView
+                        as="span"
+                        layout="flex"
+                        direction="horizontal"
+                        className="relative flex h-2 w-2 shrink-0"
+                        aria-hidden="true"
+                      >
+                        <AstryxView
+                          as="span"
+                          layout="inline-flex"
+                          direction="horizontal"
+                          className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/35 opacity-75"
+                        />
+                        <AstryxView
+                          as="span"
+                          layout="inline-flex"
+                          direction="horizontal"
+                          className="relative inline-flex h-2 w-2 rounded-full bg-primary/70"
+                        />
+                      </AstryxView>
+                      <AstryxInline>{t("chat.history.syncing")}</AstryxInline>
+                    </AstryxView>
                   ) : null}
                   {items.length === 0 ? (
                     listStatus === "ready" && !errorMessage ? (
-                      <div className="flex items-center justify-center px-4 py-8 text-center">
-                        <p className="text-xs font-medium text-muted-foreground/60">
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
+                        className="flex items-center justify-center px-4 py-8 text-center"
+                      >
+                        <AstryxParagraph className="text-xs font-medium text-muted-foreground/60">
                           {t("chat.emptyChatHistory")}
-                        </p>
-                      </div>
+                        </AstryxParagraph>
+                      </AstryxView>
                     ) : null
                   ) : (
-                    <div className="relative" style={{ height: historyVirtualizer.getTotalSize() }}>
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="relative"
+                      style={{ height: historyVirtualizer.getTotalSize() }}
+                    >
                       {virtualHistoryRows.map((virtualRow) => {
                         const item = items[virtualRow.index];
                         if (!item) return null;
 
                         return (
-                          <div
+                          <AstryxView
+                            layout="block"
+                            direction="horizontal"
                             key={virtualRow.key}
                             data-index={virtualRow.index}
                             ref={historyVirtualizer.measureElement}
@@ -2553,31 +2776,41 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                             style={{ transform: `translateY(${virtualRow.start}px)` }}
                           >
                             {renderHistoryRow(item)}
-                          </div>
+                          </AstryxView>
                         );
                       })}
-                    </div>
+                    </AstryxView>
                   )}
-                </div>
+                </AstryxView>
               )}
               {!searchQuery.trim() && items.length > 0 && (hasMore || isLoadingMore) ? (
-                <div className="px-2 pb-2 pt-1 text-center text-[calc(11px*var(--zone-font-scale,1))] leading-5 text-muted-foreground/70">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="px-2 pb-2 pt-1 text-center text-[calc(11px*var(--zone-font-scale,1))] leading-5 text-muted-foreground/70"
+                >
                   {isLoadingMore
                     ? t("sidebar.loadingMoreHistory")
                     : t("sidebar.continueLoadingHistory")}
-                </div>
+                </AstryxView>
               ) : null}
-            </div>
-          </div>
-        </div>
-        <div
+            </AstryxView>
+          </AstryxView>
+        </AstryxView>
+        <AstryxView
+          layout="block"
+          direction="horizontal"
           className={cn(
-            "shrink-0 border-t border-border/50 bg-[hsl(var(--sidebar-bg))] px-2 py-1.5",
+            "shrink-0 border-t border-border bg-body px-2 py-1.5",
             desktopPanelMode && "md:hidden",
           )}
         >
           {soulLauncherOpen && !mobileExperience ? (
-            <div className="mb-1.5 space-y-0.5 rounded-xl border border-border bg-background p-1.5 shadow-sm">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="mb-1.5 space-y-0.5 rounded-xl border border-border bg-background p-1.5 shadow-sm"
+            >
               <SoulPresetPicker
                 presets={soul.presets}
                 activeId={soul.activeId}
@@ -2593,8 +2826,12 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               />
               {!mobileExperience ? (
                 <>
-                  <div className="mx-1 my-1 border-t border-border/50" />
-                  <button
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="mx-1 my-1 border-t border-border/50"
+                  />
+                  <AstryxButton
                     type="button"
                     onClick={() => {
                       onOpenWorkspaceTool?.("terminal");
@@ -2604,8 +2841,8 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07] disabled:opacity-45"
                   >
                     <Terminal className="h-4 w-4 text-muted-foreground" />
-                    <span className="min-w-0 flex-1">{t("sidebar.terminal")}</span>
-                  </button>
+                    <AstryxInline className="min-w-0 flex-1">{t("sidebar.terminal")}</AstryxInline>
+                  </AstryxButton>
                   {[
                     {
                       target: "gitReview" as const,
@@ -2623,7 +2860,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                       icon: <Cpu className="h-4 w-4 text-muted-foreground" />,
                     },
                   ].map((item) => (
-                    <button
+                    <AstryxButton
                       key={item.target}
                       type="button"
                       onClick={() => {
@@ -2634,23 +2871,31 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                       className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07] disabled:opacity-45"
                     >
                       {item.icon}
-                      <span>{item.label}</span>
-                    </button>
+                      <AstryxInline>{item.label}</AstryxInline>
+                    </AstryxButton>
                   ))}
-                  <div className="mx-1 my-1 border-t border-border/50" />
-                  <button
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="mx-1 my-1 border-t border-border/50"
+                  />
+                  <AstryxButton
                     type="button"
                     onClick={onOpenSettings}
                     className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07]"
                   >
                     <Settings className="h-4 w-4 text-muted-foreground" />
-                    <span>{t("tooltip.settings")}</span>
-                  </button>
+                    <AstryxInline>{t("tooltip.settings")}</AstryxInline>
+                  </AstryxButton>
                 </>
               ) : null}
-            </div>
+            </AstryxView>
           ) : null}
-          <div className="mobile-chat-sidebar-footer grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+          <AstryxView
+            layout="grid"
+            direction="horizontal"
+            className="mobile-chat-sidebar-footer grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2"
+          >
             <Button
               type="button"
               variant="ghost"
@@ -2710,17 +2955,22 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               className="h-10 w-full min-w-0 justify-start gap-2.5 rounded-xl px-2 text-[calc(13px*var(--zone-font-scale,1))] font-normal text-foreground/85 shadow-none hover:bg-foreground/[0.08] hover:text-foreground"
               title={t("sidebar.soulMenu")}
             >
-              <span className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500/25 via-sky-500/20 to-amber-500/25 ring-1 ring-border/70">
+              <AstryxView
+                as="span"
+                layout="flex"
+                direction="horizontal"
+                className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500/25 via-sky-500/20 to-amber-500/25 ring-1 ring-border/70"
+              >
                 <Sparkles className="h-3.5 w-3.5 text-violet-500" />
-              </span>
-              <span className="min-w-0 flex-1 text-left">
-                <span className="block truncate font-medium">
+              </AstryxView>
+              <AstryxInline className="min-w-0 flex-1 text-left">
+                <AstryxInline className="block truncate font-medium">
                   {soulDocument?.metadata.name.trim() || "XGent"}
-                </span>
-                <span className="block truncate text-[10px] leading-3 text-muted-foreground">
+                </AstryxInline>
+                <AstryxInline className="block truncate text-[10px] leading-3 text-muted-foreground">
                   {t("sidebar.soul")}
-                </span>
-              </span>
+                </AstryxInline>
+              </AstryxInline>
               <ChevronRight
                 className={cn(
                   "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
@@ -2731,55 +2981,39 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
             {appUpdate?.showUpdateButton ? (
               <AppUpdateButton appUpdate={appUpdate} iconOnly />
             ) : null}
-          </div>
-        </div>
-      </div>
-      {mobileExperience && soulLauncherOpen && typeof document !== "undefined"
-        ? createPortal(
-            <div className="pointer-events-none fixed inset-0 z-[100]" role="presentation">
-              <button
-                type="button"
-                tabIndex={-1}
-                aria-label={t("chat.mobileActivity.close")}
-                className="pointer-events-auto absolute inset-0 cursor-default bg-transparent"
-                onClick={() => {
-                  suppressSoulClickRef.current = false;
-                  setSoulLauncherOpen(false);
-                }}
-              />
-              <div
-                role="menu"
-                aria-label={t("sidebar.soulPresets")}
-                className="mobile-soul-anchor-menu pointer-events-auto absolute bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] left-[calc(0.75rem+env(safe-area-inset-left,0px))] w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-border/70 bg-popover/95 p-2.5 text-popover-foreground shadow-2xl backdrop-blur-2xl"
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                <div className="mb-2 flex items-center gap-2 px-1 pt-0.5">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-500/10 text-violet-500">
-                    <Sparkles className="h-3.5 w-3.5" />
-                  </span>
-                  <div className="min-w-0 flex-1 text-sm font-semibold">{t("sidebar.soul")}</div>
-                </div>
-                <SoulPresetPicker
-                  mobile
-                  presets={soul.presets}
-                  activeId={soul.activeId}
-                  saving={soul.saving}
-                  onSelect={(presetId) => {
-                    suppressSoulClickRef.current = false;
-                    setSoulLauncherOpen(false);
-                    void soul.select(presetId).catch(() => undefined);
-                  }}
-                  onCreate={() => {
-                    suppressSoulClickRef.current = false;
-                    setSoulLauncherOpen(false);
-                    onCreateSoul();
-                  }}
-                />
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-    </aside>
+          </AstryxView>
+        </AstryxView>
+      </AstryxView>
+      <BottomSheet
+        isOpen={mobileExperience && soulLauncherOpen}
+        onOpenChange={(isOpen) => {
+          suppressSoulClickRef.current = false;
+          setSoulLauncherOpen(isOpen);
+        }}
+        label={t("sidebar.soulPresets")}
+        purpose="info"
+        height="hug"
+      >
+        <VStack gap={3} padding={4}>
+          <Text type="label">{t("sidebar.soul")}</Text>
+          <SoulPresetPicker
+            mobile
+            presets={soul.presets}
+            activeId={soul.activeId}
+            saving={soul.saving}
+            onSelect={(presetId) => {
+              suppressSoulClickRef.current = false;
+              setSoulLauncherOpen(false);
+              void soul.select(presetId).catch(() => undefined);
+            }}
+            onCreate={() => {
+              suppressSoulClickRef.current = false;
+              setSoulLauncherOpen(false);
+              onCreateSoul();
+            }}
+          />
+        </VStack>
+      </BottomSheet>
+    </AstryxView>
   );
 });

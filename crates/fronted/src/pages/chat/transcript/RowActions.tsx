@@ -1,13 +1,9 @@
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack } from "@astryxdesign/core/Stack";
+import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { useState } from "react";
-import {
-  Check,
-  Copy,
-  GitBranch,
-  Loader2,
-  Pencil,
-  RefreshCw,
-  Undo2,
-} from "../../../components/icons";
+
+import { Check, Copy, GitBranch, Pencil, RefreshCw, Undo2 } from "../../../components/icons";
 import { ConfirmActionPopover } from "../../../components/ui/confirm-action-popover";
 import { useLocale } from "../../../i18n";
 import { useCheckpointRewind } from "../../../lib/chat/checkpointRewind";
@@ -17,13 +13,7 @@ import type {
 } from "../../../lib/chat/conversation/conversationState";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
 import { useRowInteraction } from "./rowInteraction";
-import { formatMessageTimestamp } from "./transcriptUtils";
 import { useCopiedFlag } from "./useCopiedFlag";
-
-// Row action bars live outside the memoized row bodies and read run-scoped
-// state (sending flag, in-flight branch anchor) from the row-interaction
-// store, so a run starting or settling never re-renders settled rows — only
-// these small footers.
 
 export type AssistantRowFooterProps = {
   timestamp?: number;
@@ -37,39 +27,44 @@ export type AssistantRowFooterProps = {
   onBranchConversation?: (messageRef: HistoryMessageRef) => void;
 };
 
+function MessageTimestamp({ value }: { value?: number }) {
+  if (!value || !Number.isFinite(value) || value <= 0) return null;
+  return <Timestamp value={new Date(value).toISOString()} format="auto" size="3xs" />;
+}
+
 export function AssistantRowFooter(props: AssistantRowFooterProps) {
   const { timestamp, replyText, retryTarget, onResendFromEdit, onBranchConversation } = props;
   const { t } = useLocale();
   const { copied, markCopied } = useCopiedFlag();
   const { isSending, branchPendingMessageId } = useRowInteraction();
-
   const retryMessageRef = retryTarget?.messageRef;
   const retryDisabled = isSending || !retryMessageRef;
   const retryTitle = retryMessageRef ? t("chat.retry") : "旧历史缺少稳定消息标识，无法重试";
   const branchPending = branchPendingMessageId != null;
   const isRowBranchPending =
-    branchPending && !!retryMessageRef && branchPendingMessageId === retryMessageRef.messageId;
+    branchPending && Boolean(retryMessageRef) && branchPendingMessageId === retryMessageRef?.messageId;
 
   return (
-    <div className="mt-1 flex items-center justify-start gap-1.5 pl-10">
-      <span className="select-none text-[calc(11px*var(--zone-font-scale,1))] tabular-nums text-muted-foreground/70">
-        {formatMessageTimestamp(timestamp ?? 0)}
-      </span>
-      <div
-        className={`flex gap-0.5 transition-opacity group-focus-within/assistant:opacity-100 group-hover/assistant:opacity-100 ${isRowBranchPending ? "opacity-100" : "opacity-0"}`}
+    <HStack gap={1.5} vAlign="center" className="mt-1 pl-10">
+      <MessageTimestamp value={timestamp} />
+      <HStack
+        gap={0.5}
+        className={`transition-opacity group-focus-within/assistant:opacity-100 group-hover/assistant:opacity-100 ${
+          isRowBranchPending ? "opacity-100" : "opacity-0"
+        }`}
       >
-        <button
-          type="button"
-          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-          title={t("chat.copy")}
-          disabled={!replyText}
+        <IconButton
+          label={t("chat.copy")}
+          tooltip={t("chat.copy")}
+          icon={copied ? <Check size={16} /> : <Copy size={16} />}
+          variant="ghost"
+          size="sm"
+          isDisabled={!replyText}
           onClick={() => {
-            navigator.clipboard.writeText(replyText);
+            void navigator.clipboard.writeText(replyText);
             markCopied();
           }}
-        >
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-        </button>
+        />
         <ConfirmActionPopover
           title={t("chat.retryConfirmTitle")}
           description={t("chat.retryConfirmDescription")}
@@ -82,14 +77,14 @@ export function AssistantRowFooter(props: AssistantRowFooterProps) {
           }}
         >
           {() => (
-            <button
-              type="button"
-              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-              title={retryTitle}
-              disabled={retryDisabled}
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-            </button>
+            <IconButton
+              label={retryTitle}
+              tooltip={retryTitle}
+              icon={<RefreshCw size={16} />}
+              variant="ghost"
+              size="sm"
+              isDisabled={retryDisabled}
+            />
           )}
         </ConfirmActionPopover>
         <ConfirmActionPopover
@@ -100,27 +95,23 @@ export function AssistantRowFooter(props: AssistantRowFooterProps) {
           align="start"
           side="top"
           onConfirm={() => {
-            if (!retryMessageRef) return;
-            onBranchConversation?.(retryMessageRef);
+            if (retryMessageRef) onBranchConversation?.(retryMessageRef);
           }}
         >
           {() => (
-            <button
-              type="button"
-              className={`rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground disabled:cursor-not-allowed ${isRowBranchPending ? "" : "disabled:opacity-40"}`}
-              title={retryMessageRef ? t("chat.branch") : t("chat.branchUnavailable")}
-              disabled={isSending || !retryMessageRef || !onBranchConversation || branchPending}
-            >
-              {isRowBranchPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <GitBranch className="h-3.5 w-3.5" />
-              )}
-            </button>
+            <IconButton
+              label={retryMessageRef ? t("chat.branch") : t("chat.branchUnavailable")}
+              tooltip={retryMessageRef ? t("chat.branch") : t("chat.branchUnavailable")}
+              icon={<GitBranch size={16} />}
+              variant="ghost"
+              size="sm"
+              isLoading={isRowBranchPending}
+              isDisabled={isSending || !retryMessageRef || !onBranchConversation || branchPending}
+            />
           )}
         </ConfirmActionPopover>
-      </div>
-    </div>
+      </HStack>
+    </HStack>
   );
 }
 
@@ -140,36 +131,35 @@ export function UserRowFooter(props: UserRowFooterProps) {
   const { isSending } = useRowInteraction();
   const checkpointRewind = useCheckpointRewind();
   const [rewindError, setRewindError] = useState<string | null>(null);
-
   const editDisabled = isSending || !hasStableRef;
   const editTitle = hasStableRef ? t("chat.edit") : "旧历史缺少稳定消息标识，无法编辑重发";
+  const isRewinding = checkpointRewind?.busyTurnId === messageId;
 
   return (
-    <div className="mt-1 flex items-center justify-end gap-1.5">
-      <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-        <button
-          type="button"
-          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-          title={t("chat.copy")}
+    <HStack gap={1.5} vAlign="center" hAlign="end" className="mt-1">
+      <HStack gap={0.5} className="opacity-0 transition-opacity group-hover:opacity-100">
+        <IconButton
+          label={t("chat.copy")}
+          tooltip={t("chat.copy")}
+          icon={copied ? <Check size={16} /> : <Copy size={16} />}
+          variant="ghost"
+          size="sm"
           onClick={() => {
-            navigator.clipboard.writeText(text);
+            void navigator.clipboard.writeText(text);
             markCopied();
           }}
-        >
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-        </button>
-        <button
-          type="button"
-          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-          title={editTitle}
-          disabled={editDisabled}
+        />
+        <IconButton
+          label={editTitle}
+          tooltip={editTitle}
+          icon={<Pencil size={16} />}
+          variant="ghost"
+          size="sm"
+          isDisabled={editDisabled}
           onClick={() => {
-            if (!hasStableRef) return;
-            onStartEdit(itemKey);
+            if (hasStableRef) onStartEdit(itemKey);
           }}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
+        />
         {checkpointRewind?.available && messageId ? (
           <ConfirmActionPopover
             title={t("chat.checkpointRewind.title")}
@@ -188,25 +178,20 @@ export function UserRowFooter(props: UserRowFooterProps) {
             }}
           >
             {() => (
-              <button
-                type="button"
-                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                title={t("chat.checkpointRewind.title")}
-                disabled={isSending || checkpointRewind.busyTurnId !== null}
-              >
-                {checkpointRewind.busyTurnId === messageId ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Undo2 className="h-3.5 w-3.5" />
-                )}
-              </button>
+              <IconButton
+                label={t("chat.checkpointRewind.title")}
+                tooltip={t("chat.checkpointRewind.title")}
+                icon={<Undo2 size={16} />}
+                variant="ghost"
+                size="sm"
+                isLoading={isRewinding}
+                isDisabled={isSending || checkpointRewind.busyTurnId !== null}
+              />
             )}
           </ConfirmActionPopover>
         ) : null}
-      </div>
-      <span className="select-none text-[calc(11px*var(--zone-font-scale,1))] tabular-nums text-muted-foreground/70">
-        {formatMessageTimestamp(timestamp)}
-      </span>
-    </div>
+      </HStack>
+      <MessageTimestamp value={timestamp} />
+    </HStack>
   );
 }

@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0-dev",
   "type": "module",
+  "astryx": {
+    "theme": "neutral"
+  },
   "scripts": {
     "dev": "vite",
     "dev:web": "vite --host 0.0.0.0",
@@ -20,7 +23,8 @@
     "lint:fix": "biome check --write src/"
   },
   "dependencies": {
-    "@base-ui/react": "^1.5.0",
+    "@astryxdesign/core": "0.5.0",
+    "@astryxdesign/theme-neutral": "0.5.0",
     "@earendil-works/pi-agent-core": "^0.80.6",
     "@earendil-works/pi-ai": "^0.80.6",
     "@git-diff-view/file": "^0.1.3",
@@ -35,7 +39,6 @@
     "@tauri-apps/plugin-opener": "^2.5.4",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
-    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "docx-preview": "^0.4.0",
     "eventsource-parser": "^3.0.6",
@@ -45,12 +48,13 @@
     "react-dom": "^19.2.4",
     "remark-breaks": "^4.0.0",
     "streamdown": "^2.5.0",
+    "@stylexjs/stylex": "^0.19.0",
     "tailwind-merge": "^3.5.0",
     "typebox": "1.1.38",
-    "xlsx": "^0.18.5",
-    "yet-another-react-lightbox": "^3.31.0"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@astryxdesign/cli": "0.5.0",
     "@biomejs/biome": "^2.4.15",
     "@iconify-json/logos": "^1.2.11",
     "@iconify-json/lucide": "^1.2.108",

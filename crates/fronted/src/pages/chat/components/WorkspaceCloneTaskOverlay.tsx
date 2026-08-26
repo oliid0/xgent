@@ -1,5 +1,13 @@
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Heading, Text } from "@astryxdesign/core/Text";
 import { useEffect, useState } from "react";
-import { FolderOpen, Loader2, X } from "../../../components/icons";
+import { FolderOpen, X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import {
   cancelGitClone,
@@ -34,81 +42,93 @@ export function WorkspaceCloneTaskOverlay(props: { onOpenWorkspace: (path: strin
   if (tasks.length === 0) return null;
 
   return (
-    <div
+    <VStack
+      gap={2}
       data-edge-swipe-ignore
-      className="fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] left-3 right-3 z-[95] space-y-2 md:left-auto md:right-4 md:w-[380px]"
+      className="fixed bottom-[calc(var(--spacing-3)+env(safe-area-inset-bottom,0px))] left-[var(--spacing-3)] right-[var(--spacing-3)] z-[var(--xagent-z-task-overlay)] md:left-auto md:right-[var(--spacing-4)] md:w-[var(--xagent-task-overlay-width)]"
     >
       {tasks.map((task) => {
         const running = task.status === "running" || task.status === "cancelling";
         const completed = task.status === "completed";
         return (
-          <div
-            key={task.id}
-            className="rounded-2xl border bg-background/95 p-3 shadow-2xl backdrop-blur"
-          >
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Card key={task.id} width="100%" padding={3} elevation="high">
+            <VStack gap={3}>
+              <HStack gap={3} vAlign="start">
                 {running ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Spinner accessibleLabel={task.repositoryName} size="sm" />
                 ) : (
-                  <FolderOpen className="h-4 w-4" />
+                  <FolderOpen />
                 )}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{task.repositoryName}</div>
-                <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                  {task.error || task.detail}
-                </div>
-              </div>
-              {!running ? (
-                <button
-                  type="button"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
-                  aria-label={t("chat.clone.dismiss")}
-                  onClick={() => {
-                    void dismissGitClone(task.id).then(setTasks);
-                  }}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              ) : null}
-            </div>
-            {running ? (
-              <div className="mt-3">
-                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary transition-[width] duration-300"
-                    style={{ width: `${task.progress ?? 8}%` }}
+                <StackItem size="fill">
+                  <VStack gap={1}>
+                    <Heading level={4} maxLines={1}>{task.repositoryName}</Heading>
+                    <Text type="supporting" color="secondary" maxLines={2}>
+                      {task.error || task.detail}
+                    </Text>
+                    <StatusDot
+                      label={task.status}
+                      variant={task.error ? "error" : completed ? "success" : "accent"}
+                      pulse={running}
+                    />
+                  </VStack>
+                </StackItem>
+                {!running ? (
+                  <IconButton
+                    type="button"
+                    label={t("chat.clone.dismiss")}
+                    tooltip={t("chat.clone.dismiss")}
+                    icon={<X />}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      void dismissGitClone(task.id).then(setTasks);
+                    }}
                   />
-                </div>
-                <button
+                ) : null}
+              </HStack>
+              {running ? (
+                <VStack gap={2}>
+                  <ProgressBar
+                    label={task.repositoryName}
+                    value={task.progress ?? 8}
+                    max={100}
+                    isLabelHidden
+                    variant="accent"
+                  />
+                  <Button
+                    type="button"
+                    label={
+                      task.status === "cancelling"
+                        ? t("chat.clone.cancelling")
+                        : t("chat.clone.cancel")
+                    }
+                    variant="destructive"
+                    size="sm"
+                    isLoading={task.status === "cancelling"}
+                    isDisabled={task.status === "cancelling"}
+                    onClick={() =>
+                      void cancelGitClone(task.id).then((next) =>
+                        setTasks((prev) =>
+                          prev.map((item) => (item.id === next.id ? next : item)),
+                        ),
+                      )
+                    }
+                  />
+                </VStack>
+              ) : completed ? (
+                <Button
                   type="button"
-                  disabled={task.status === "cancelling"}
-                  className="mt-2 text-xs font-medium text-destructive disabled:opacity-50"
-                  onClick={() =>
-                    void cancelGitClone(task.id).then((next) =>
-                      setTasks((prev) => prev.map((item) => (item.id === next.id ? next : item))),
-                    )
-                  }
-                >
-                  {task.status === "cancelling"
-                    ? t("chat.clone.cancelling")
-                    : t("chat.clone.cancel")}
-                </button>
-              </div>
-            ) : completed ? (
-              <button
-                type="button"
-                className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-primary text-xs font-semibold text-primary-foreground"
-                onClick={() => onOpenWorkspace(task.targetPath)}
-              >
-                <FolderOpen className="h-3.5 w-3.5" />
-                {t("chat.clone.open")}
-              </button>
-            ) : null}
-          </div>
+                  label={t("chat.clone.open")}
+                  icon={<FolderOpen />}
+                  variant="primary"
+                  width="100%"
+                  onClick={() => onOpenWorkspace(task.targetPath)}
+                />
+              ) : null}
+            </VStack>
+          </Card>
         );
       })}
-    </div>
+    </VStack>
   );
 }

@@ -1,6 +1,7 @@
 import { invoke, isBrowserRuntime } from "@xagent/runtime";
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   Check,
   ChevronDown,
@@ -32,7 +33,6 @@ import {
   updateSsh,
 } from "../../lib/settings";
 import { createUuid } from "../../lib/shared/id";
-import { useModalMotion } from "../../lib/shared/modalMotion";
 import {
   type SshImportCandidate,
   type SshScanResult,
@@ -40,6 +40,10 @@ import {
 } from "../../lib/ssh/scan";
 import { ConfirmActionPopover, ConfirmDeletePopover, PromptTag } from "./shared";
 import type { SettingsSectionProps } from "./types";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
+import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 type SshViewMode = "list" | "grid";
 type SshHostDraft = Omit<SshHostConfig, "id">;
@@ -92,7 +96,7 @@ function SshPasswordInput(props: {
   const toggleLabel = visible ? t("settings.sshHidePassword") : t("settings.sshShowPassword");
 
   return (
-    <div className="relative">
+    <AstryxView layout="block" direction="horizontal" className="relative">
       <Input
         id={id}
         type={visible ? "text" : "password"}
@@ -113,7 +117,7 @@ function SshPasswordInput(props: {
       >
         {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
       </Button>
-    </div>
+    </AstryxView>
   );
 }
 
@@ -145,7 +149,7 @@ function SshHostModal(props: {
   );
   const [proxyUsername, setProxyUsername] = useState(initialData?.proxy.username ?? "");
   const [proxyPassword, setProxyPassword] = useState(initialData?.proxy.password ?? "");
-  const { isClosing, modalState, requestClose } = useModalMotion(onClose);
+  const isCompact = useMediaQuery("(max-width: 640px)");
   const isEditing = Boolean(initialData);
   const isPasswordAuth = authType === "password";
   const isPrivateKeyAuth = authType === "privateKey";
@@ -176,7 +180,6 @@ function SshHostModal(props: {
   }
 
   function handleSave() {
-    if (isClosing) return;
     const trimmedName = name.trim();
     const trimmedHost = host.trim();
     if (!trimmedName || !trimmedHost) return;
@@ -224,53 +227,64 @@ function SshHostModal(props: {
           trimmedProxyPassword.length > 0 || initialData?.proxy.passwordConfigured === true,
       },
     });
-    requestClose();
+    onClose();
   }
 
-  return createPortal(
-    <div
-      className="settings-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
-      data-state={modalState}
+  return (
+    <Dialog
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
+      purpose="form"
+      variant={isCompact ? "fullscreen" : "standard"}
+      width={isCompact ? "100dvw" : "var(--xagent-content-width-md)"}
+      maxHeight={isCompact ? "var(--xagent-viewport-height)" : "var(--xagent-dialog-height-lg)"}
+      padding={0}
     >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={requestClose} />
-      <div className="settings-modal-panel relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
-        <div className="settings-modal-header flex items-center gap-3 border-b px-6 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
-            <Key className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
-            <div className="text-sm font-semibold">
-              {isEditing ? t("settings.sshEdit") : t("settings.sshAdd")}
-            </div>
-            <div className="text-xs text-muted-foreground">{t("settings.sshDesc")}</div>
-          </div>
-        </div>
+      <AstryxView
+        layout="flex"
+        direction="vertical"
+        className="flex h-full min-h-0 w-full flex-col overflow-hidden"
+      >
+        <DialogHeader
+          title={isEditing ? t("settings.sshEdit") : t("settings.sshAdd")}
+          subtitle={t("settings.sshDesc")}
+          startContent={<Key className="h-5 w-5" />}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) onClose();
+          }}
+        />
 
-        <div className="settings-modal-body flex-1 overflow-y-auto px-6 py-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="settings-modal-body flex-1 overflow-y-auto px-6 py-5"
+        >
+          <AstryxView layout="grid" direction="horizontal" className="grid grid-cols-2 gap-4">
+            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
               <Label htmlFor="ssh-name" className="text-xs font-medium text-muted-foreground">
                 {t("settings.sshName")}
-                <span className="ml-0.5 text-red-500">*</span>
+                <AstryxInline className="ml-0.5 text-red-500">*</AstryxInline>
               </Label>
               <Input
                 id="ssh-name"
                 value={name}
                 onChange={(event) => setName(event.currentTarget.value)}
               />
-            </div>
-            <div className="space-y-1.5">
+            </AstryxView>
+            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
               <Label htmlFor="ssh-host" className="text-xs font-medium text-muted-foreground">
                 {t("settings.sshHost")}
-                <span className="ml-0.5 text-red-500">*</span>
+                <AstryxInline className="ml-0.5 text-red-500">*</AstryxInline>
               </Label>
               <Input
                 id="ssh-host"
                 value={host}
                 onChange={(event) => setHost(event.currentTarget.value)}
               />
-            </div>
-            <div className="space-y-1.5">
+            </AstryxView>
+            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
               <Label htmlFor="ssh-username" className="text-xs font-medium text-muted-foreground">
                 {t("settings.sshUsername")}
               </Label>
@@ -279,8 +293,8 @@ function SshHostModal(props: {
                 value={username}
                 onChange={(event) => setUsername(event.currentTarget.value)}
               />
-            </div>
-            <div className="space-y-1.5">
+            </AstryxView>
+            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
               <Label htmlFor="ssh-port" className="text-xs font-medium text-muted-foreground">
                 {t("settings.sshPort")}
               </Label>
@@ -292,15 +306,23 @@ function SshHostModal(props: {
                 value={port}
                 onChange={(event) => setPort(event.currentTarget.value)}
               />
-            </div>
-          </div>
+            </AstryxView>
+          </AstryxView>
 
-          <div className="mt-4 space-y-2">
-            <div className="text-xs font-medium text-muted-foreground">
+          <AstryxView layout="block" direction="horizontal" className="mt-4 space-y-2">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="text-xs font-medium text-muted-foreground"
+            >
               {t("settings.sshAuthMethod")}
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <button
+            </AstryxView>
+            <AstryxView
+              layout="grid"
+              direction="horizontal"
+              className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+            >
+              <AstryxButton
                 type="button"
                 onClick={() => setAuthType("password")}
                 className={`group relative flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-all duration-200 ease-out hover:-translate-y-0.5 ${
@@ -314,20 +336,26 @@ function SshHostModal(props: {
                     isPasswordAuth ? "scale-110" : "group-hover:scale-105"
                   }`}
                 />
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">{t("settings.sshAuthPassword")}</div>
-                  <div className="text-xs text-muted-foreground">
+                <AstryxView layout="block" direction="horizontal" className="min-w-0">
+                  <AstryxView layout="block" direction="horizontal" className="text-sm font-medium">
+                    {t("settings.sshAuthPassword")}
+                  </AstryxView>
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="text-xs text-muted-foreground"
+                  >
                     {t("settings.sshAuthPasswordHint")}
-                  </div>
-                </div>
+                  </AstryxView>
+                </AstryxView>
                 <Check
                   aria-hidden="true"
                   className={`ml-auto h-4 w-4 shrink-0 text-emerald-500 transition-all duration-200 ${
                     isPasswordAuth ? "scale-100 opacity-100" : "scale-75 opacity-0"
                   }`}
                 />
-              </button>
-              <button
+              </AstryxButton>
+              <AstryxButton
                 type="button"
                 onClick={() => setAuthType("privateKey")}
                 className={`group relative flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-all duration-200 ease-out hover:-translate-y-0.5 ${
@@ -341,20 +369,26 @@ function SshHostModal(props: {
                     isPrivateKeyAuth ? "scale-110" : "group-hover:scale-105"
                   }`}
                 />
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">{t("settings.sshAuthPrivateKey")}</div>
-                  <div className="text-xs text-muted-foreground">
+                <AstryxView layout="block" direction="horizontal" className="min-w-0">
+                  <AstryxView layout="block" direction="horizontal" className="text-sm font-medium">
+                    {t("settings.sshAuthPrivateKey")}
+                  </AstryxView>
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="text-xs text-muted-foreground"
+                  >
                     {t("settings.sshAuthPrivateKeyHint")}
-                  </div>
-                </div>
+                  </AstryxView>
+                </AstryxView>
                 <Check
                   aria-hidden="true"
                   className={`ml-auto h-4 w-4 shrink-0 text-emerald-500 transition-all duration-200 ${
                     isPrivateKeyAuth ? "scale-100 opacity-100" : "scale-75 opacity-0"
                   }`}
                 />
-              </button>
-              <button
+              </AstryxButton>
+              <AstryxButton
                 type="button"
                 onClick={() => setAuthType("keyboardInteractive")}
                 className={`group relative flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-all duration-200 ease-out hover:-translate-y-0.5 ${
@@ -368,32 +402,38 @@ function SshHostModal(props: {
                     isKeyboardInteractiveAuth ? "scale-110" : "group-hover:scale-105"
                   }`}
                 />
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">
+                <AstryxView layout="block" direction="horizontal" className="min-w-0">
+                  <AstryxView layout="block" direction="horizontal" className="text-sm font-medium">
                     {t("settings.sshAuthKeyboardInteractive")}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
+                  </AstryxView>
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="text-xs text-muted-foreground"
+                  >
                     {t("settings.sshAuthKeyboardInteractiveHint")}
-                  </div>
-                </div>
+                  </AstryxView>
+                </AstryxView>
                 <Check
                   aria-hidden="true"
                   className={`ml-auto h-4 w-4 shrink-0 text-emerald-500 transition-all duration-200 ${
                     isKeyboardInteractiveAuth ? "scale-100 opacity-100" : "scale-75 opacity-0"
                   }`}
                 />
-              </button>
-            </div>
-          </div>
+              </AstryxButton>
+            </AstryxView>
+          </AstryxView>
 
-          <div className="mt-4">
-            <div
+          <AstryxView layout="block" direction="horizontal" className="mt-4">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
               aria-hidden={!isPasswordAuth}
               className="ssh-auth-panel ssh-auth-panel--password"
               data-state={isPasswordAuth ? "open" : "closed-up"}
               style={passwordAuthPanelStyle}
             >
-              <div className="space-y-1.5">
+              <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                 <Label htmlFor="ssh-password" className="text-xs font-medium text-muted-foreground">
                   {t("settings.sshPassword")}
                 </Label>
@@ -404,21 +444,27 @@ function SshHostModal(props: {
                   onChange={setPassword}
                 />
                 {initialData?.passwordConfigured && !password.trim() ? (
-                  <div className="text-[11px] text-muted-foreground">
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="text-[11px] text-muted-foreground"
+                  >
                     {t("settings.sshPasswordConfigured")}
-                  </div>
+                  </AstryxView>
                 ) : null}
-              </div>
-            </div>
+              </AstryxView>
+            </AstryxView>
 
-            <div
+            <AstryxView
+              layout="block"
+              direction="horizontal"
               aria-hidden={!isPrivateKeyAuth}
               className="ssh-auth-panel ssh-auth-panel--private-key"
               data-state={isPrivateKeyAuth ? "open" : "closed-down"}
               style={privateKeyAuthPanelStyle}
             >
-              <div className="space-y-3">
-                <div className="relative">
+              <AstryxView layout="block" direction="horizontal" className="space-y-3">
+                <AstryxView layout="block" direction="horizontal" className="relative">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -445,13 +491,17 @@ function SshHostModal(props: {
                     className="min-h-[180px] resize-y pr-12 font-mono text-xs leading-relaxed"
                     onChange={(event) => setPrivateKey(event.currentTarget.value)}
                   />
-                </div>
+                </AstryxView>
                 {initialData?.privateKeyConfigured && !privateKey.trim() ? (
-                  <div className="text-[11px] text-muted-foreground">
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="text-[11px] text-muted-foreground"
+                  >
                     {t("settings.sshPrivateKeyConfigured")}
-                  </div>
+                  </AstryxView>
                 ) : null}
-                <div className="space-y-1.5">
+                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                   <Label
                     htmlFor="ssh-private-key-passphrase"
                     className="text-xs font-medium text-muted-foreground"
@@ -465,45 +515,72 @@ function SshHostModal(props: {
                     onChange={setPrivateKeyPassphrase}
                   />
                   {initialData?.privateKeyPassphraseConfigured && !privateKeyPassphrase.trim() ? (
-                    <div className="text-[11px] text-muted-foreground">
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="text-[11px] text-muted-foreground"
+                    >
                       {t("settings.sshPrivateKeyPassphraseConfigured")}
-                    </div>
+                    </AstryxView>
                   ) : null}
-                </div>
-              </div>
-            </div>
-          </div>
+                </AstryxView>
+              </AstryxView>
+            </AstryxView>
+          </AstryxView>
 
-          <div className="mt-5 overflow-hidden rounded-xl border border-border/60 bg-muted/10">
-            <button
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="mt-5 overflow-hidden rounded-xl border border-border/60 bg-muted/10"
+          >
+            <AstryxButton
               type="button"
               className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-muted/30"
               onClick={() => setAdvancedOpen((open) => !open)}
             >
-              <span>{t("settings.sshAdvancedSettings")}</span>
+              <AstryxInline>{t("settings.sshAdvancedSettings")}</AstryxInline>
               <ChevronDown
                 className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
                   advancedOpen ? "rotate-180" : ""
                 }`}
               />
-            </button>
+            </AstryxButton>
 
-            <div className="ssh-collapsible" data-open={advancedOpen}>
-              <div
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="ssh-collapsible"
+              data-open={advancedOpen}
+            >
+              <AstryxView
+                layout="block"
+                direction="horizontal"
                 aria-hidden={!advancedOpen}
                 className={`ssh-collapsible-inner border-border/60 px-4 transition-[border-width,padding] duration-200 ease-out ${
                   advancedOpen ? "border-t py-4" : "border-t-0 py-0"
                 }`}
                 inert={!advancedOpen}
               >
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5 sm:col-span-2">
+                <AstryxView
+                  layout="grid"
+                  direction="horizontal"
+                  className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+                >
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="space-y-1.5 sm:col-span-2"
+                  >
                     <Label className="text-xs font-medium text-muted-foreground">
                       {t("settings.sshProxyType")}
                     </Label>
-                    <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/60 bg-background p-1">
+                    <AstryxView
+                      layout="grid"
+                      direction="horizontal"
+                      className="grid grid-cols-2 gap-2 rounded-xl border border-border/60 bg-background p-1"
+                    >
                       {(["socks5", "http"] as SshProxyType[]).map((type) => (
-                        <button
+                        <AstryxButton
                           key={type}
                           type="button"
                           className={`rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
@@ -516,11 +593,11 @@ function SshHostModal(props: {
                           {type === "socks5"
                             ? t("settings.sshProxyTypeSocks5")
                             : t("settings.sshProxyTypeHttp")}
-                        </button>
+                        </AstryxButton>
                       ))}
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
+                    </AstryxView>
+                  </AstryxView>
+                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                     <Label
                       htmlFor="ssh-proxy-url"
                       className="text-xs font-medium text-muted-foreground"
@@ -537,8 +614,8 @@ function SshHostModal(props: {
                       )}
                       onChange={(event) => setProxyUrl(event.currentTarget.value)}
                     />
-                  </div>
-                  <div className="space-y-1.5">
+                  </AstryxView>
+                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                     <Label
                       htmlFor="ssh-proxy-port"
                       className="text-xs font-medium text-muted-foreground"
@@ -553,8 +630,8 @@ function SshHostModal(props: {
                       value={proxyPort}
                       onChange={(event) => setProxyPort(event.currentTarget.value)}
                     />
-                  </div>
-                  <div className="space-y-1.5">
+                  </AstryxView>
+                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                     <Label
                       htmlFor="ssh-proxy-username"
                       className="text-xs font-medium text-muted-foreground"
@@ -566,8 +643,8 @@ function SshHostModal(props: {
                       value={proxyUsername}
                       onChange={(event) => setProxyUsername(event.currentTarget.value)}
                     />
-                  </div>
-                  <div className="space-y-1.5">
+                  </AstryxView>
+                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                     <Label
                       htmlFor="ssh-proxy-password"
                       className="text-xs font-medium text-muted-foreground"
@@ -581,30 +658,37 @@ function SshHostModal(props: {
                       onChange={setProxyPassword}
                     />
                     {initialData?.proxy.passwordConfigured && !proxyPassword.trim() ? (
-                      <div className="text-[11px] text-muted-foreground">
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="text-[11px] text-muted-foreground"
+                      >
                         {t("settings.sshProxyPasswordConfigured")}
-                      </div>
+                      </AstryxView>
                     ) : null}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+                  </AstryxView>
+                </AstryxView>
+              </AstryxView>
+            </AstryxView>
+          </AstryxView>
+        </AstryxView>
 
-        <div className="settings-modal-footer flex items-center justify-end border-t px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={requestClose}>
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="settings-modal-footer flex items-center justify-end border-t px-6 py-4"
+        >
+          <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
+            <Button variant="outline" onClick={onClose}>
               {t("settings.cancel")}
             </Button>
-            <Button onClick={handleSave} disabled={!name.trim() || !host.trim() || isClosing}>
+            <Button onClick={handleSave} disabled={!name.trim() || !host.trim()}>
               {t("settings.save")}
             </Button>
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body,
+          </AstryxView>
+        </AstryxView>
+      </AstryxView>
+    </Dialog>
   );
 }
 
@@ -618,7 +702,7 @@ function SshImportModal(props: {
   const [result, setResult] = useState<SshScanResult | null>(null);
   const [error, setError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
-  const { isClosing, modalState, requestClose } = useModalMotion(onClose);
+  const isCompact = useMediaQuery("(max-width: 640px)");
 
   useEffect(() => {
     let cancelled = false;
@@ -653,61 +737,106 @@ function SshImportModal(props: {
     });
   }
 
-  return createPortal(
-    <div
-      className="settings-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
-      data-state={modalState}
+  return (
+    <Dialog
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
+      purpose="info"
+      variant={isCompact ? "fullscreen" : "standard"}
+      width={isCompact ? "100dvw" : "var(--xagent-content-width-md)"}
+      maxHeight={isCompact ? "var(--xagent-viewport-height)" : "var(--xagent-dialog-height-lg)"}
+      padding={0}
     >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={requestClose} />
-      <div className="settings-modal-panel relative z-10 flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
-        <div className="settings-modal-header flex items-center gap-3 border-b px-6 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
-            <Upload className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
-            <div className="text-sm font-semibold">{t("settings.sshImport")}</div>
-            <div className="text-xs text-muted-foreground">{t("settings.sshImportDesc")}</div>
-          </div>
-        </div>
+      <AstryxView
+        layout="flex"
+        direction="vertical"
+        className="flex h-full min-h-0 w-full flex-col overflow-hidden"
+      >
+        <DialogHeader
+          title={t("settings.sshImport")}
+          subtitle={t("settings.sshImportDesc")}
+          startContent={<Upload className="h-5 w-5" />}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) onClose();
+          }}
+        />
 
-        <div className="settings-modal-body flex-1 overflow-y-auto px-6 py-5">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="settings-modal-body flex-1 overflow-y-auto px-6 py-5"
+        >
           {!result && !error ? (
-            <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 text-sm text-muted-foreground">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 text-sm text-muted-foreground"
+            >
               {t("settings.sshImportScanning")}
-            </div>
+            </AstryxView>
           ) : null}
 
           {error ? (
-            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+            >
               {t("settings.sshImportFailed")}: {error}
-            </div>
+            </AstryxView>
           ) : null}
 
           {result ? (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-                <div className="font-medium text-foreground">{result.sshDirPath}</div>
-                <div className="mt-1">
+            <AstryxView layout="block" direction="horizontal" className="space-y-4">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground"
+              >
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="font-medium text-foreground"
+                >
+                  {result.sshDirPath}
+                </AstryxView>
+                <AstryxView layout="block" direction="horizontal" className="mt-1">
                   {t("settings.sshImportFound")
                     .replace("{count}", String(candidates.length))
                     .replace("{keys}", String(result.keyFiles.length))}
-                </div>
-              </div>
+                </AstryxView>
+              </AstryxView>
 
               {candidates.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/60 bg-muted/20 py-12 text-center">
+                <AstryxView
+                  layout="flex"
+                  direction="vertical"
+                  className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/60 bg-muted/20 py-12 text-center"
+                >
                   <Key className="h-8 w-8 text-muted-foreground/50" />
-                  <div>
-                    <div className="text-sm font-medium">{t("settings.sshImportEmpty")}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
+                  <AstryxView layout="block" direction="horizontal">
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="text-sm font-medium"
+                    >
+                      {t("settings.sshImportEmpty")}
+                    </AstryxView>
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="mt-1 text-xs text-muted-foreground"
+                    >
                       {t("settings.sshImportEmptyHint")}
-                    </div>
-                  </div>
-                </div>
+                    </AstryxView>
+                  </AstryxView>
+                </AstryxView>
               ) : (
-                <div className="space-y-2">
+                <AstryxView layout="block" direction="horizontal" className="space-y-2">
                   {candidates.map((candidate) => (
-                    <button
+                    <AstryxButton
                       key={candidate.id}
                       type="button"
                       disabled={candidate.duplicate}
@@ -718,7 +847,7 @@ function SshImportModal(props: {
                           : "border-border/60 bg-card hover:border-border"
                       } ${candidate.duplicate ? "cursor-not-allowed opacity-60" : ""}`}
                     >
-                      <span
+                      <AstryxInline
                         className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors duration-150 ${
                           selectedIds.has(candidate.id)
                             ? "border-emerald-500 bg-emerald-500 text-white"
@@ -732,50 +861,67 @@ function SshImportModal(props: {
                               : "scale-90 opacity-0"
                           }`}
                         />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium">{candidate.name}</span>
+                      </AstryxInline>
+                      <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+                        <AstryxView
+                          layout="flex"
+                          direction="horizontal"
+                          className="flex items-center gap-2"
+                        >
+                          <AstryxInline className="truncate text-sm font-medium">
+                            {candidate.name}
+                          </AstryxInline>
                           <PromptTag label={authLabel(candidate, t)} />
                           {candidate.duplicate ? (
                             <PromptTag label={t("settings.sshImportDuplicate")} muted />
                           ) : null}
-                        </div>
-                        <div className="mt-1 truncate text-xs text-muted-foreground">
+                        </AstryxView>
+                        <AstryxView
+                          layout="block"
+                          direction="horizontal"
+                          className="mt-1 truncate text-xs text-muted-foreground"
+                        >
                           {candidate.username ? `${candidate.username}@` : ""}
                           {candidate.host}:{candidate.port}
-                        </div>
-                      </div>
-                    </button>
+                        </AstryxView>
+                      </AstryxView>
+                    </AstryxButton>
                   ))}
-                </div>
+                </AstryxView>
               )}
-            </div>
+            </AstryxView>
           ) : null}
-        </div>
+        </AstryxView>
 
-        <div className="settings-modal-footer flex items-center justify-between border-t px-6 py-4">
-          <div className="text-xs text-muted-foreground">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="settings-modal-footer flex items-center justify-between border-t px-6 py-4"
+        >
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="text-xs text-muted-foreground"
+          >
             {t("settings.sshImportSelected").replace("{count}", String(selected.length))}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={requestClose}>
+          </AstryxView>
+          <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
+            <Button variant="outline" onClick={onClose}>
               {t("settings.cancel")}
             </Button>
             <Button
-              disabled={selected.length === 0 || isClosing}
+              disabled={selected.length === 0}
               onClick={() => {
                 onImport(selected);
-                requestClose();
+                onClose();
               }}
             >
               {t("settings.sshImport")}
             </Button>
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body,
+          </AstryxView>
+        </AstryxView>
+      </AstryxView>
+    </Dialog>
   );
 }
 
@@ -799,7 +945,11 @@ function SshHostCard(props: {
   const hasFooter = hasMeta || resetStatus;
 
   const actions = (
-    <div className="settings-hover-actions settings-ssh-host-actions flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+    <AstryxView
+      layout="flex"
+      direction="horizontal"
+      className="settings-hover-actions settings-ssh-host-actions flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+    >
       <ConfirmActionPopover
         title={t("settings.sshKnownHostResetTitle")}
         description={t("settings.sshKnownHostResetDesc")}
@@ -842,80 +992,132 @@ function SshHostCard(props: {
           </Button>
         )}
       </ConfirmDeletePopover>
-    </div>
+    </AstryxView>
   );
 
   const metaTags = (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <AstryxView
+      layout="flex"
+      direction="horizontal"
+      className="flex flex-wrap items-center gap-1.5"
+    >
       {showKeyPath ? <PromptTag label={host.privateKeyPath} muted /> : null}
       {showKeyConfigured ? <PromptTag label={t("settings.sshPrivateKeyConfigured")} muted /> : null}
-    </div>
+    </AstryxView>
   );
 
   const resetStatusNode = resetStatus ? (
-    <div
+    <AstryxView
+      layout="block"
+      direction="horizontal"
       className={`text-xs leading-relaxed ${
         resetStatus.kind === "error" ? "text-destructive" : "text-muted-foreground"
       }`}
     >
       {resetStatus.message}
-    </div>
+    </AstryxView>
   ) : null;
 
   if (viewMode === "grid") {
     return (
-      <div className="settings-ssh-host-card group relative z-0 flex flex-col rounded-xl border border-border/60 bg-card p-4 transition-[border-color,box-shadow] duration-150 hover:z-10 hover:border-emerald-500/40 hover:shadow-md hover:shadow-emerald-500/10">
-        <div className="absolute right-3 top-3">{actions}</div>
-        <div className="flex items-start gap-3 pr-12">
-          <div className="settings-ssh-host-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+      <AstryxView
+        layout="flex"
+        direction="vertical"
+        className="settings-ssh-host-card group relative z-0 flex flex-col rounded-xl border border-border/60 bg-card p-4 transition-[border-color,box-shadow] duration-150 hover:z-10 hover:border-emerald-500/40 hover:shadow-md hover:shadow-emerald-500/10"
+      >
+        <AstryxView layout="block" direction="horizontal" className="absolute right-3 top-3">
+          {actions}
+        </AstryxView>
+        <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-3 pr-12">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="settings-ssh-host-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500"
+          >
             <Server className="h-[18px] w-[18px]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-foreground">{host.name}</div>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          </AstryxView>
+          <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="truncate text-sm font-medium text-foreground"
+            >
+              {host.name}
+            </AstryxView>
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="mt-1 flex flex-wrap items-center gap-1.5"
+            >
               <PromptTag label={authLabel(host, t)} />
               {showProxy ? <PromptTag label={t("settings.sshAdvancedProxy")} muted /> : null}
-            </div>
-          </div>
-        </div>
-        <div className="mt-3 truncate font-mono text-xs text-muted-foreground">
+            </AstryxView>
+          </AstryxView>
+        </AstryxView>
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="mt-3 truncate font-mono text-xs text-muted-foreground"
+        >
           {endpointLabel(host)}
-        </div>
+        </AstryxView>
         {hasFooter ? (
-          <div className="mt-auto space-y-2 pt-3">
+          <AstryxView layout="block" direction="horizontal" className="mt-auto space-y-2 pt-3">
             {hasMeta ? metaTags : null}
             {resetStatusNode}
-          </div>
+          </AstryxView>
         ) : null}
-      </div>
+      </AstryxView>
     );
   }
 
   return (
-    <div className="settings-ssh-host-card group relative z-0 rounded-xl border border-border/60 bg-card transition-[border-color,box-shadow] duration-150 hover:z-10 hover:border-emerald-500/40 hover:shadow-md hover:shadow-emerald-500/10">
-      <div className="settings-card-row flex items-center gap-3 px-4 py-3">
-        <div className="settings-ssh-host-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+    <AstryxView
+      layout="block"
+      direction="horizontal"
+      className="settings-ssh-host-card group relative z-0 rounded-xl border border-border/60 bg-card transition-[border-color,box-shadow] duration-150 hover:z-10 hover:border-emerald-500/40 hover:shadow-md hover:shadow-emerald-500/10"
+    >
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="settings-card-row flex items-center gap-3 px-4 py-3"
+      >
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="settings-ssh-host-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500"
+        >
           <Server className="h-4 w-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium text-foreground">{host.name}</span>
+        </AstryxView>
+        <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+          <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
+            <AstryxInline className="truncate text-sm font-medium text-foreground">
+              {host.name}
+            </AstryxInline>
             <PromptTag label={authLabel(host, t)} />
             {showProxy ? <PromptTag label={t("settings.sshAdvancedProxy")} muted /> : null}
-          </div>
-          <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
+          </AstryxView>
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="mt-1 truncate font-mono text-xs text-muted-foreground"
+          >
             {endpointLabel(host)}
-          </div>
-        </div>
+          </AstryxView>
+        </AstryxView>
         {actions}
-      </div>
+      </AstryxView>
       {hasFooter ? (
-        <div className="space-y-2 border-t border-border/40 px-4 py-2.5">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="space-y-2 border-t border-border/40 px-4 py-2.5"
+        >
           {hasMeta ? metaTags : null}
           {resetStatusNode}
-        </div>
+        </AstryxView>
       ) : null}
-    </div>
+    </AstryxView>
   );
 }
 
@@ -931,7 +1133,10 @@ function SshViewModeToggle(props: { value: SshViewMode; onChange: (value: SshVie
   return (
     <fieldset className="settings-ssh-view-toggle relative isolate grid min-w-0 grid-cols-2 rounded-lg border border-border/60 bg-muted/30 p-0.5 shadow-inner shadow-black/5">
       <legend className="sr-only">{groupLabel}</legend>
-      <span
+      <AstryxView
+        as="span"
+        layout="grid"
+        direction="horizontal"
         aria-hidden="true"
         className={`pointer-events-none absolute bottom-0.5 left-0.5 top-0.5 w-[calc(50%-0.125rem)] rounded-md bg-emerald-500/10 shadow-sm shadow-emerald-500/10 ring-1 ring-emerald-500/30 transition-transform duration-200 ease-out motion-reduce:transition-none ${
           value === "grid" ? "translate-x-full" : "translate-x-0"
@@ -941,7 +1146,7 @@ function SshViewModeToggle(props: { value: SshViewMode; onChange: (value: SshVie
         const Icon = option.icon;
         const active = value === option.value;
         return (
-          <button
+          <AstryxButton
             key={option.value}
             type="button"
             className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-md transition-colors duration-200 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background motion-reduce:transition-none ${
@@ -953,7 +1158,7 @@ function SshViewModeToggle(props: { value: SshViewMode; onChange: (value: SshVie
             onClick={() => onChange(option.value)}
           >
             <Icon className="h-3.5 w-3.5" />
-          </button>
+          </AstryxButton>
         );
       })}
     </fieldset>
@@ -1141,24 +1346,50 @@ export function SshSettingsSection(props: SettingsSectionProps) {
 
   return (
     <>
-      <div className="settings-ssh-section space-y-5">
-        <div className="settings-section-heading-row flex items-center justify-between gap-4">
-          <div className="settings-section-title-group flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10">
+      <AstryxView layout="block" direction="horizontal" className="settings-ssh-section space-y-5">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="settings-section-heading-row flex items-center justify-between gap-4"
+        >
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="settings-section-title-group flex items-center gap-3"
+          >
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10"
+            >
               <Key className="h-[18px] w-[18px] text-emerald-500" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold">{t("settings.sshTitle")}</h3>
-              <p className="text-xs text-muted-foreground">{t("settings.sshDesc")}</p>
-            </div>
-          </div>
+            </AstryxView>
+            <AstryxView layout="block" direction="horizontal">
+              <AstryxHeading level={3} className="text-sm font-semibold">
+                {t("settings.sshTitle")}
+              </AstryxHeading>
+              <AstryxParagraph className="text-xs text-muted-foreground">
+                {t("settings.sshDesc")}
+              </AstryxParagraph>
+            </AstryxView>
+          </AstryxView>
 
-          <div className="settings-section-actions settings-ssh-actions flex items-center gap-2">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="settings-section-actions settings-ssh-actions flex items-center gap-2"
+          >
             {hosts.length > 0 ? (
-              <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs text-muted-foreground">
-                <span className="tabular-nums font-medium text-foreground">{hosts.length}</span>
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex items-center gap-2 rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs text-muted-foreground"
+              >
+                <AstryxInline className="tabular-nums font-medium text-foreground">
+                  {hosts.length}
+                </AstryxInline>
                 {t("settings.sshCount")}
-              </div>
+              </AstryxView>
             ) : null}
             <SshViewModeToggle value={viewMode} onChange={setViewMode} />
             <Button
@@ -1174,21 +1405,31 @@ export function SshSettingsSection(props: SettingsSectionProps) {
               <Plus className="h-3.5 w-3.5" />
               {t("settings.sshAdd")}
             </Button>
-          </div>
-        </div>
+          </AstryxView>
+        </AstryxView>
 
         {hosts.length === 0 ? (
-          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border/60 bg-muted/20 py-14 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10">
+          <AstryxView
+            layout="flex"
+            direction="vertical"
+            className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border/60 bg-muted/20 py-14 text-center"
+          >
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10"
+            >
               <Key className="h-6 w-6 text-emerald-400" />
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium text-foreground">{t("settings.sshNoHosts")}</p>
-              <p className="mx-auto max-w-sm text-xs leading-relaxed text-muted-foreground">
+            </AstryxView>
+            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
+              <AstryxParagraph className="text-sm font-medium text-foreground">
+                {t("settings.sshNoHosts")}
+              </AstryxParagraph>
+              <AstryxParagraph className="mx-auto max-w-sm text-xs leading-relaxed text-muted-foreground">
                 {t("settings.sshNoHostsHint")}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
+              </AstryxParagraph>
+            </AstryxView>
+            <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -1202,10 +1443,12 @@ export function SshSettingsSection(props: SettingsSectionProps) {
                 <Plus className="h-3.5 w-3.5" />
                 {t("settings.sshAdd")}
               </Button>
-            </div>
-          </div>
+            </AstryxView>
+          </AstryxView>
         ) : (
-          <div
+          <AstryxView
+            layout="grid"
+            direction="horizontal"
             className={`settings-ssh-host-list ${
               viewMode === "grid" ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : "space-y-2"
             }`}
@@ -1224,9 +1467,9 @@ export function SshSettingsSection(props: SettingsSectionProps) {
                 onResetKnownHost={() => void handleResetKnownHost(host)}
               />
             ))}
-          </div>
+          </AstryxView>
         )}
-      </div>
+      </AstryxView>
 
       {modalOpen ? (
         <SshHostModal

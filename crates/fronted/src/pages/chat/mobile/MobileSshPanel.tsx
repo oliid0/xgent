@@ -1,11 +1,22 @@
 import { invoke } from "@xagent/runtime";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { ClickableCard } from "@astryxdesign/core/ClickableCard";
+import { Code, CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Token } from "@astryxdesign/core/Token";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
-  Check,
   Key,
   Link2,
-  Loader2,
   Send,
   Settings2,
   Square,
@@ -165,281 +176,299 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
 
   return (
     <MobileFullscreenPanel open label={t("chat.mobileSsh.title")}>
-      <header className="mobile-panel-header flex min-h-14 shrink-0 items-center gap-3 border-b border-border/55 bg-background/90 px-3 backdrop-blur-xl">
+      <HStack
+        as="header"
+        gap={2}
+        vAlign="center"
+        paddingInline={3}
+        className="mobile-panel-header min-h-[var(--xagent-mobile-header-height)] shrink-0 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/90 backdrop-blur-xl"
+      >
         {selectedHost ? (
-          <button
-            type="button"
+          <IconButton
+            label={t("chat.mobileSsh.back")}
+            tooltip={t("chat.mobileSsh.back")}
+            icon={<ArrowLeft />}
+            variant="ghost"
             onClick={() => {
               if (activeRunId) return;
               setSelectedHostId("");
               setKeyboardResponse("");
               setEntries([]);
             }}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted disabled:opacity-45"
-            disabled={Boolean(activeRunId)}
-            aria-label={t("chat.mobileSsh.back")}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
+            isDisabled={Boolean(activeRunId)}
+          />
         ) : (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-foreground">
-            <Key className="h-4 w-4" />
-          </span>
+          <Key />
         )}
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[15px] font-semibold">
-            {selectedHost?.name || t("chat.mobileSsh.title")}
-          </h2>
-          <p className="truncate text-[10px] text-muted-foreground">
-            {selectedHost ? endpoint(selectedHost) : t("chat.mobileSsh.savedHosts")}
-          </p>
-        </div>
+        <StackItem size="fill">
+          <VStack gap={0}>
+            <Heading level={2} maxLines={1}>
+              {selectedHost?.name || t("chat.mobileSsh.title")}
+            </Heading>
+            <Text type="supporting" color="secondary" maxLines={1}>
+              {selectedHost ? endpoint(selectedHost) : t("chat.mobileSsh.savedHosts")}
+            </Text>
+          </VStack>
+        </StackItem>
         {!selectedHost ? (
-          <button
-            type="button"
+          <IconButton
+            label={t("settings.sshTitle")}
+            tooltip={t("settings.sshTitle")}
+            icon={<Settings2 />}
+            variant="ghost"
             onClick={onOpenSettings}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted"
-            aria-label={t("settings.sshTitle")}
-          >
-            <Settings2 className="h-4 w-4" />
-          </button>
+          />
         ) : entries.length > 0 && !activeRunId ? (
-          <button
-            type="button"
+          <IconButton
+            label={t("chat.mobileTerminal.clear")}
+            tooltip={t("chat.mobileTerminal.clear")}
+            icon={<Trash2 />}
+            variant="ghost"
             onClick={() => setEntries([])}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted"
-            aria-label={t("chat.mobileTerminal.clear")}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          />
         ) : null}
-        <button
-          type="button"
+        <IconButton
+          label={t("chat.mobileTerminal.close")}
+          tooltip={t("chat.mobileTerminal.close")}
+          icon={<X />}
+          variant="ghost"
           onClick={close}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted"
-          aria-label={t("chat.mobileTerminal.close")}
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </header>
+        />
+      </HStack>
 
       {!selectedHost ? (
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-4">
+        <StackItem size="fill" isScrollable>
+          <VStack
+            gap={3}
+            padding={3}
+            className="min-h-full overscroll-contain pb-[calc(var(--spacing-4)+env(safe-area-inset-bottom,0px))]"
+          >
           {hosts.length === 0 ? (
-            <div className="flex min-h-full flex-col items-center justify-center px-8 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-                <Key className="h-5 w-5" />
-              </span>
-              <h3 className="mt-4 text-sm font-semibold">{t("settings.sshNoHosts")}</h3>
-              <p className="mt-1.5 max-w-sm text-xs leading-5 text-muted-foreground">
-                {t("settings.sshNoHostsHint")}
-              </p>
-              <button
-                type="button"
-                onClick={onOpenSettings}
-                className="mt-5 rounded-xl bg-foreground px-4 py-2.5 text-xs font-medium text-background"
-              >
-                {t("settings.sshAdd")}
-              </button>
-            </div>
+            <EmptyState
+              icon={<Key />}
+              title={t("settings.sshNoHosts")}
+              description={t("settings.sshNoHostsHint")}
+              actions={
+                <Button label={t("settings.sshAdd")} variant="primary" onClick={onOpenSettings} />
+              }
+            />
           ) : (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 rounded-2xl bg-muted/45 px-3 py-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-background text-muted-foreground shadow-sm ring-1 ring-border/55">
-                  <Link2 className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-semibold text-foreground">
-                    {t("projectTools.sshConnectionScopeProject")}
-                  </span>
-                  <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">
-                    {projectPathKey
-                      ? t("projectTools.sshConnectionConfiguredHosts").replace(
-                          "{count}",
-                          String(associatedSet.size),
-                        )
-                      : t("projectTools.sshConnectionNoProject")}
-                  </span>
-                </span>
-              </div>
-              <div className="space-y-2">
+            <VStack gap={3}>
+              <Banner
+                status="info"
+                icon={<Link2 />}
+                title={t("projectTools.sshConnectionScopeProject")}
+                description={
+                  projectPathKey
+                    ? t("projectTools.sshConnectionConfiguredHosts").replace(
+                        "{count}",
+                        String(associatedSet.size),
+                      )
+                    : t("projectTools.sshConnectionNoProject")
+                }
+                collapsible={false}
+              />
+              <VStack gap={2}>
                 {orderedHosts.map((host) => {
                   const associated = associatedSet.has(host.id);
+                  const associationLabel = associated
+                    ? t("chat.mobileSsh.removeAssociation")
+                    : t("chat.mobileSsh.associateHost");
                   return (
-                    <div
+                    <ClickableCard
                       key={host.id}
-                      className={`flex min-h-16 w-full items-center rounded-2xl border bg-background transition-colors ${
-                        associated ? "border-emerald-500/35" : "border-border"
-                      }`}
+                      label={host.name || host.host}
+                      onClick={() => setSelectedHostId(host.id)}
+                      padding={3}
+                      width="100%"
                     >
-                      <button
-                        type="button"
-                        onClick={() => setSelectedHostId(host.id)}
-                        className="flex min-w-0 flex-1 items-center gap-3 self-stretch rounded-l-2xl p-3 text-left active:bg-muted"
-                      >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                          <Key className="h-4 w-4" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <span className="truncate text-[13px] font-medium">
+                      <HStack gap={3} vAlign="center">
+                        <Key />
+                        <StackItem size="fill">
+                          <VStack gap={1}>
+                          <HStack gap={2} vAlign="center" wrap="wrap">
+                            <Text type="body" weight="medium">
                               {host.name || host.host}
-                            </span>
+                            </Text>
                             {associated ? (
-                              <span className="shrink-0 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700 dark:text-emerald-300">
-                                {t("chat.mobileSsh.associated")}
-                              </span>
+                              <Token
+                                label={t("chat.mobileSsh.associated")}
+                                color="green"
+                                size="sm"
+                              />
                             ) : null}
-                          </span>
-                          <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">
-                            {endpoint(host)}
-                          </span>
-                          <span className="mt-1 block text-[10px] text-muted-foreground">
-                            {authLabel(host, t)}
-                          </span>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleHostAssociation(host.id)}
-                        disabled={!projectPathKey}
-                        className={`mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-35 ${
-                          associated
-                            ? "bg-emerald-500 text-white"
-                            : "bg-muted text-muted-foreground active:bg-muted/70"
-                        }`}
-                        aria-pressed={associated}
-                        aria-label={
-                          associated
-                            ? t("chat.mobileSsh.removeAssociation")
-                            : t("chat.mobileSsh.associateHost")
-                        }
-                        title={
-                          associated
-                            ? t("chat.mobileSsh.removeAssociation")
-                            : t("chat.mobileSsh.associateHost")
-                        }
-                      >
-                        {associated ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
-                      </button>
-                    </div>
+                          </HStack>
+                          <Text type="supporting" color="secondary" maxLines={2}>
+                            {endpoint(host)} · {authLabel(host, t)}
+                          </Text>
+                          </VStack>
+                        </StackItem>
+                        <Switch
+                          label={associationLabel}
+                          isLabelHidden
+                          value={associated}
+                          isDisabled={!projectPathKey}
+                          disabledMessage={
+                            !projectPathKey ? t("projectTools.sshConnectionNoProject") : undefined
+                          }
+                          onChange={() => toggleHostAssociation(host.id)}
+                          size="md"
+                        />
+                      </HStack>
+                    </ClickableCard>
                   );
                 })}
-              </div>
-            </div>
+              </VStack>
+            </VStack>
           )}
-        </div>
+          </VStack>
+        </StackItem>
       ) : (
         <>
-          <div
-            ref={scrollRef}
-            className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 py-4 font-mono text-[12px] leading-5"
-          >
+          <StackItem size="fill">
+            <VStack
+              ref={scrollRef}
+              gap={4}
+              padding={3}
+              className="h-full overflow-y-auto overscroll-contain"
+            >
             {entries.length === 0 ? (
-              <div className="rounded-xl border border-border bg-muted/25 p-4 font-sans text-muted-foreground">
-                <div className="text-[13px] font-medium text-foreground">
-                  {t("chat.mobileSsh.commandMode")}
-                </div>
-                <div className="mt-1 text-[11px] leading-5">
-                  {selectedHost.authType === "keyboardInteractive"
+              <EmptyState
+                icon={<Key />}
+                title={t("chat.mobileSsh.commandMode")}
+                description={
+                  selectedHost.authType === "keyboardInteractive"
                     ? t("chat.mobileSsh.keyboardResponseHint")
-                    : t("chat.mobileSsh.commandHint")}
-                </div>
-              </div>
-            ) : null}
-            {entries.map((entry) => {
-              const response = entry.response;
-              const code = response?.exitCode ?? response?.exit_code;
-              return (
-                <article key={entry.id}>
-                  <div className="flex gap-2 text-emerald-600">
-                    <span>❯</span>
-                    <span className="min-w-0 break-all text-foreground">{entry.command}</span>
-                  </div>
-                  {entry.id === activeRunId ? (
-                    <div className="mt-2 flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      {t("chat.mobileTerminal.running")}
-                    </div>
-                  ) : null}
-                  {response?.stdout ? (
-                    <pre className="mt-2 whitespace-pre-wrap break-words text-foreground/90">
-                      {response.stdout}
-                    </pre>
-                  ) : null}
-                  {response?.stderr ? (
-                    <pre className="mt-2 whitespace-pre-wrap break-words text-amber-600">
-                      {response.stderr}
-                    </pre>
-                  ) : null}
-                  {entry.error ? (
-                    <pre className="mt-2 whitespace-pre-wrap break-words text-destructive">
-                      {entry.error}
-                    </pre>
-                  ) : null}
-                  {code !== undefined ? (
-                    <div className="mt-1 text-[10px] text-muted-foreground">
-                      {t("chat.mobileTerminal.exitCode").replace("{code}", String(code))}
-                    </div>
-                  ) : null}
-                </article>
-              );
-            })}
-          </div>
+                    : t("chat.mobileSsh.commandHint")
+                }
+                isCompact
+              />
+            ) : (
+              <VStack gap={4}>
+                {entries.map((entry) => {
+                  const response = entry.response;
+                  const code = response?.exitCode ?? response?.exit_code;
+                  return (
+                    <Card key={entry.id} padding={3} width="100%">
+                      <VStack gap={3}>
+                        <Text type="body" weight="medium">
+                          <Code>{`❯ ${entry.command}`}</Code>
+                        </Text>
+                        {entry.id === activeRunId ? (
+                          <HStack gap={2} vAlign="center">
+                            <Spinner accessibleLabel={t("chat.mobileTerminal.running")} size="sm" />
+                            <Text type="supporting" color="secondary">
+                              {t("chat.mobileTerminal.running")}
+                            </Text>
+                          </HStack>
+                        ) : null}
+                        {response?.stdout ? (
+                          <CodeBlock
+                            code={response.stdout}
+                            language="plaintext"
+                            title="stdout"
+                            size="sm"
+                            width="100%"
+                            maxHeight="var(--xagent-terminal-output-max-height)"
+                            isWrapped
+                            container="section"
+                          />
+                        ) : null}
+                        {response?.stderr ? (
+                          <CodeBlock
+                            code={response.stderr}
+                            language="plaintext"
+                            title="stderr"
+                            size="sm"
+                            width="100%"
+                            maxHeight="var(--xagent-terminal-output-max-height)"
+                            isWrapped
+                            container="section"
+                          />
+                        ) : null}
+                        {entry.error ? (
+                          <CodeBlock
+                            code={entry.error}
+                            language="plaintext"
+                            title="error"
+                            size="sm"
+                            width="100%"
+                            maxHeight="var(--xagent-terminal-output-max-height)"
+                            isWrapped
+                            container="section"
+                          />
+                        ) : null}
+                        {code !== undefined ? (
+                          <Token
+                            label={t("chat.mobileTerminal.exitCode").replace(
+                              "{code}",
+                              String(code),
+                            )}
+                            color={code === 0 ? "green" : "red"}
+                            size="sm"
+                          />
+                        ) : null}
+                      </VStack>
+                    </Card>
+                  );
+                })}
+              </VStack>
+            )}
+            </VStack>
+          </StackItem>
 
           {selectedHost.authType === "keyboardInteractive" ? (
-            <label className="shrink-0 border-t border-border bg-background px-3 pt-3">
-              <span className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
-                {t("chat.mobileSsh.keyboardResponse")}
-              </span>
-              <input
+            <HStack
+              padding={3}
+              className="shrink-0 border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]"
+            >
+              <TextInput
                 type="password"
+                label={t("chat.mobileSsh.keyboardResponse")}
                 value={keyboardResponse}
-                onChange={(event) => setKeyboardResponse(event.currentTarget.value)}
-                disabled={Boolean(activeRunId)}
-                autoComplete="off"
-                className="h-11 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-primary"
+                onChange={setKeyboardResponse}
+                isDisabled={Boolean(activeRunId)}
                 placeholder={t("chat.mobileSsh.keyboardResponsePlaceholder")}
+                size="lg"
+                width="100%"
               />
-            </label>
+            </HStack>
           ) : null}
-          <form
+          <HStack
+            as="form"
+            gap={2}
+            vAlign="end"
+            padding={3}
             onSubmit={(event) => void run(event)}
-            className="flex shrink-0 items-end gap-2 border-t border-border bg-background px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3"
+            className="shrink-0 border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)] pb-[calc(var(--spacing-3)+env(safe-area-inset-bottom,0px))]"
           >
-            <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-background px-3">
-              <span className="font-mono text-emerald-600">$</span>
-              <input
+            <StackItem size="fill">
+              <TextInput
+                label={t("chat.mobileSsh.remoteCommandPlaceholder")}
+                isLabelHidden
                 value={command}
-                onChange={(event) => setCommand(event.currentTarget.value)}
-                disabled={Boolean(activeRunId)}
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
+                onChange={setCommand}
+                isDisabled={Boolean(activeRunId)}
                 placeholder={t("chat.mobileSsh.remoteCommandPlaceholder")}
-                className="h-10 min-w-0 flex-1 bg-transparent font-mono text-[13px] outline-none placeholder:text-muted-foreground/60"
+                size="lg"
+                width="100%"
               />
-            </label>
-            <button
+            </StackItem>
+            <IconButton
               type={activeRunId ? "button" : "submit"}
+              label={activeRunId ? t("chat.mobileTerminal.stop") : t("chat.mobileTerminal.run")}
+              tooltip={activeRunId ? t("chat.mobileTerminal.stop") : t("chat.mobileTerminal.run")}
+              icon={activeRunId ? <Square /> : <Send />}
+              variant={activeRunId ? "destructive" : "primary"}
+              size="lg"
               onClick={activeRunId ? () => void cancel() : undefined}
-              disabled={
+              isDisabled={
                 !activeRunId &&
                 (!command.trim() ||
                   (selectedHost.authType === "keyboardInteractive" && !keyboardResponse.trim()))
               }
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-foreground text-background disabled:bg-muted disabled:text-muted-foreground"
-              aria-label={
-                activeRunId ? t("chat.mobileTerminal.stop") : t("chat.mobileTerminal.run")
-              }
-            >
-              {activeRunId ? (
-                <Square className="h-4 w-4 fill-current" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </button>
-          </form>
+            />
+          </HStack>
         </>
       )}
     </MobileFullscreenPanel>

@@ -1,7 +1,11 @@
 import { invoke } from "@xagent/runtime";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack } from "@astryxdesign/core/Layout";
+import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
+import { useLocale } from "../i18n";
 import type { AppUpdateController } from "../lib/appUpdates";
-import { cn } from "../lib/shared/utils";
 import { AppUpdateButton } from "./AppUpdateButton";
 import { PanelLeft, PanelLeftClose, Settings } from "./icons";
 
@@ -87,7 +91,13 @@ export function isMacOsTauri(): boolean {
 export function MacOsTitleBarSpacer({ className }: { className?: string }) {
   const [show] = useState(isMacOsTauri);
   if (!show) return null;
-  return <div data-tauri-drag-region className={cn("h-[38px] shrink-0", className)} />;
+  return (
+    <HStack
+      data-tauri-drag-region
+      height="var(--xagent-macos-titlebar-spacer-height)"
+      className={className}
+    />
+  );
 }
 
 /**
@@ -106,6 +116,7 @@ export function MacOsTitleBarToggle({
   onOpenSettings?: () => void;
   appUpdate?: AppUpdateController;
 }) {
+  const { t } = useLocale();
   const [show] = useState(isMacOsTauri);
   const trafficLightMetrics = useMacOsTrafficLightMetrics(show);
   if (!show) return null;
@@ -118,42 +129,59 @@ export function MacOsTitleBarToggle({
     ? MAC_OS_SIDEBAR_WIDTH - MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE - MAC_OS_SIDEBAR_TOGGLE_RIGHT_INSET
     : trafficLightLeft + trafficLightWidth + MAC_OS_TITLEBAR_TOGGLE_GAP;
   return (
-    <div
-      className="fixed z-49 flex items-center gap-0.5 transition-[left] duration-200 ease-out [-webkit-app-region:no-drag]"
+    <HStack
+      gap={0.5}
+      vAlign="center"
       style={{
+        position: "fixed",
+        zIndex: "var(--xagent-z-titlebar-actions)",
         top: toggleTop,
         left: toggleLeft,
         height: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
-      }}
+        transitionProperty: "left",
+        transitionDuration: "var(--duration-medium)",
+        transitionTimingFunction: "var(--ease-standard)",
+        WebkitAppRegion: "no-drag",
+      } as CSSProperties}
     >
-      <button
-        type="button"
+      <IconButton
+        label={t(sidebarOpen ? "tooltip.closeSidebar" : "tooltip.openSidebar")}
+        tooltip={t(sidebarOpen ? "tooltip.closeSidebar" : "tooltip.openSidebar")}
+        icon={
+          <Icon
+            icon={sidebarOpen ? PanelLeftClose : PanelLeft}
+            size="sm"
+            color="inherit"
+          />
+        }
+        size="sm"
+        variant="ghost"
         onClick={onToggle}
-        className="flex cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground [-webkit-app-region:no-drag]"
         style={{
           height: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
           width: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
-        }}
-      >
-        {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
-      </button>
+          WebkitAppRegion: "no-drag",
+        } as CSSProperties}
+      />
       {!sidebarOpen && onOpenSettings && (
-        <button
-          type="button"
+        <IconButton
+          label={t("tooltip.settings")}
+          tooltip={t("tooltip.settings")}
+          icon={<Icon icon={Settings} size="sm" color="inherit" />}
+          size="sm"
+          variant="ghost"
           onClick={onOpenSettings}
-          className="flex cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground [-webkit-app-region:no-drag]"
           style={{
             height: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
             width: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
-          }}
-        >
-          <Settings className="h-4 w-4" />
-        </button>
+            WebkitAppRegion: "no-drag",
+          } as CSSProperties}
+        />
       )}
       {!sidebarOpen && onOpenSettings && appUpdate ? (
-        <AppUpdateButton appUpdate={appUpdate} className="ml-1" />
+        <AppUpdateButton appUpdate={appUpdate} />
       ) : null}
-    </div>
+    </HStack>
   );
 }
 
@@ -164,5 +192,11 @@ export function MacOsTitleBarToggle({
 export function MacOsTitleBarLeadingInset({ className }: { className?: string }) {
   const [show] = useState(isMacOsTauri);
   if (!show) return null;
-  return <div data-tauri-drag-region className={cn("w-[88px] shrink-0", className)} />;
+  return (
+    <HStack
+      data-tauri-drag-region
+      width="var(--xagent-macos-titlebar-leading-inset)"
+      className={className}
+    />
+  );
 }

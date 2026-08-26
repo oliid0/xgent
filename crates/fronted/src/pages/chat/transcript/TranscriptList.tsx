@@ -1,4 +1,8 @@
 import { type Range, useVirtualizer } from "@tanstack/react-virtual";
+import { Card } from "@astryxdesign/core/Card";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { Text } from "@astryxdesign/core/Text";
 import {
   type MutableRefObject,
   memo,
@@ -12,7 +16,7 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { CheckCircle2, ChevronDown } from "../../../components/icons";
+import { CheckCircle2 } from "../../../components/icons";
 import { Markdown } from "../../../components/Markdown";
 import { useLocale } from "../../../i18n";
 import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
@@ -38,6 +42,7 @@ import { AssistantRenderUnit } from "./AssistantRenderUnit";
 import { extractRenderUnitRange } from "./renderUnitRangeExtractor";
 import { createTranscriptRowModel } from "./rowModel";
 import { UserMessageRow } from "./UserMessageRow";
+import { View as AstryxView } from "@xagent/ui/components/ui/view";
 
 // Measured row heights survive conversation switches: saved on unmount,
 // restored (width-gated) on the next open so the switch lays out with exact
@@ -47,44 +52,36 @@ const transcriptMeasurementsLru = createTranscriptMeasurementsLru();
 const SummaryCard = memo(function SummaryCard(props: { item: RenderSummaryCard }) {
   const { item } = props;
   const { locale } = useLocale();
-  const [expanded, setExpanded] = useState(false);
   const isEn = locale === "en-US";
 
   return (
-    <div className="flex justify-center px-2">
-      <div className="checkpoint-card w-full max-w-3xl overflow-hidden rounded-[14px] border border-black/[0.06] bg-white/[0.85] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)] dark:border-white/[0.1] dark:bg-white/[0.06] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_4px_12px_rgba(0,0,0,0.15)]">
-        <button
-          type="button"
-          onClick={() => setExpanded((prev) => !prev)}
-          className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors duration-150 hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
+    <HStack width="100%" hAlign="center" paddingInline={2}>
+      <Card width="100%" maxWidth="var(--xagent-content-width-md)" padding={3} elevation="low">
+        <Collapsible
+          defaultIsOpen={false}
+          trigger={
+            <HStack gap={3} vAlign="center" width="100%">
+              <CheckCircle2 size={16} strokeWidth={1.8} />
+              <VStack gap={0.5} width="100%">
+                <HStack gap={2} vAlign="center" wrap="wrap">
+                  <Text type="body" weight="medium">
+                    {isEn ? "Context Checkpoint" : "上下文检查点"}
+                  </Text>
+                  <Text type="supporting" color="secondary">
+                    {item.coveredMessageCount} {isEn ? "messages" : "条消息"}
+                  </Text>
+                </HStack>
+                <Text type="supporting" color="secondary">
+                  {item.generatedBy.providerId} · {item.generatedBy.model}
+                </Text>
+              </VStack>
+            </HStack>
+          }
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-black/[0.04] dark:bg-white/[0.08]">
-            <CheckCircle2 size={16} strokeWidth={1.8} className="text-muted-foreground" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[calc(13px*var(--zone-font-scale,1))] font-medium text-foreground/90">
-                {isEn ? "Context Checkpoint" : "上下文检查点"}
-              </span>
-              <span className="inline-flex items-center rounded-md bg-black/[0.05] px-1.5 py-[1px] text-[calc(11px*var(--zone-font-scale,1))] font-normal tabular-nums text-muted-foreground dark:bg-white/[0.08]">
-                {item.coveredMessageCount} {isEn ? "msgs" : "条消息"}
-              </span>
-            </div>
-            <div className="mt-[2px] text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground/70">
-              {item.generatedBy.providerId} · {item.generatedBy.model}
-            </div>
-          </div>
-          <ChevronDown
-            className={`h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition-transform duration-200 ${expanded ? "rotate-0" : "-rotate-90"}`}
-          />
-        </button>
-        {expanded ? (
-          <div className="checkpoint-expand border-t border-black/[0.05] px-3.5 py-3 dark:border-white/[0.06]">
-            <Markdown content={item.content} className="font-openai-chat text-sm" />
-          </div>
-        ) : null}
-      </div>
-    </div>
+          <Markdown content={item.content} className="font-openai-chat text-sm" />
+        </Collapsible>
+      </Card>
+    </HStack>
   );
 });
 
@@ -477,7 +474,12 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
   useEffect(() => () => saveMeasurementsRef.current(), []);
 
   return (
-    <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
+    <AstryxView
+      layout="block"
+      direction="horizontal"
+      className="relative"
+      style={{ height: virtualizer.getTotalSize() }}
+    >
       {virtualizer.getVirtualItems().map((virtualRow) => {
         const row = rows[virtualRow.index];
         if (!row) return null;
@@ -487,7 +489,7 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
           body = <SummaryCard item={row.item} />;
         } else if (row.kind === "user") {
           body = (
-            <div className="flex justify-end">
+            <AstryxView layout="flex" direction="horizontal" className="flex justify-end">
               <UserMessageRow
                 row={row}
                 isEditing={editingMessageKey === row.key}
@@ -498,11 +500,11 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
                 onCancelEdit={handleCancelEdit}
                 onResendFromEdit={onResendFromEdit}
               />
-            </div>
+            </AstryxView>
           );
         } else if (row.kind === "assistant-activity") {
           body = (
-            <div className="flex justify-start">
+            <AstryxView layout="flex" direction="horizontal" className="flex justify-start">
               <AssistantActivityRow
                 row={row}
                 showUsage={showUsage}
@@ -516,11 +518,11 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
                 onResendFromEdit={onResendFromEdit}
                 onBranchConversation={onBranchConversation}
               />
-            </div>
+            </AstryxView>
           );
         } else {
           body = (
-            <div className="flex justify-start">
+            <AstryxView layout="flex" direction="horizontal" className="flex justify-start">
               <AssistantRenderUnit
                 row={row}
                 showUsage={showUsage}
@@ -534,12 +536,14 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
                 onResendFromEdit={onResendFromEdit}
                 onBranchConversation={onBranchConversation}
               />
-            </div>
+            </AstryxView>
           );
         }
 
         return (
-          <div
+          <AstryxView
+            layout="block"
+            direction="horizontal"
             key={virtualRow.key}
             data-index={virtualRow.index}
             ref={virtualizer.measureElement}
@@ -548,11 +552,16 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
           >
             {body}
             {row.gapAfter > 0 && virtualRow.index < rows.length - 1 ? (
-              <div aria-hidden="true" style={{ height: row.gapAfter }} />
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                aria-hidden="true"
+                style={{ height: row.gapAfter }}
+              />
             ) : null}
-          </div>
+          </AstryxView>
         );
       })}
-    </div>
+    </AstryxView>
   );
 });

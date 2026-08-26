@@ -1,8 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Button as XdsButton } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { FormLayout } from "@astryxdesign/core/FormLayout";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import {
+  HStack,
+  Layout,
+  LayoutContent,
+  LayoutFooter,
+  LayoutHeader,
+  StackItem,
+  VStack,
+} from "@astryxdesign/core/Layout";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { Selector } from "@astryxdesign/core/Selector";
+import { SelectableCard } from "@astryxdesign/core/SelectableCard";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Token } from "@astryxdesign/core/Token";
 import { useLocale } from "../../i18n";
 import type { SshHostConfig } from "../../lib/settings";
 import { workspaceProjectPathKey } from "../../lib/settings";
-import { cn } from "../../lib/shared/utils";
 import type {
   TerminalClient,
   TerminalSession,
@@ -10,33 +36,18 @@ import type {
   TerminalSshPrompt,
 } from "../../lib/terminal/types";
 import {
-  AlertTriangle,
   ArrowLeft,
-  Check,
-  ChevronDown,
   Clock3,
   ConnectionIcon,
   FolderTree,
-  Globe,
   Key,
-  Loader2,
-  RefreshCw,
   Server,
   Settings,
   Shield,
   Terminal,
-  Wifi,
-  WifiOff,
   X,
 } from "../icons";
-import { Button } from "../ui/button";
 import { useConfirmDialog } from "../ui/confirm-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
 
 type SshConnectionScope = "project" | "all";
 type SshConnectionView = "list" | "settings" | "create";
@@ -174,17 +185,11 @@ function HostMetaTags(props: { host: SshHostConfig }) {
   }
   if (tags.length === 0) return null;
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+    <HStack gap={1.5} wrap="wrap" vAlign="center">
       {tags.map((tag) => (
-        <span
-          key={tag}
-          className="max-w-full truncate rounded-md bg-muted/70 px-1.5 py-0.5 text-[calc(10.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground"
-          title={tag}
-        >
-          {tag}
-        </span>
+        <Token key={tag} label={tag} size="sm" />
       ))}
-    </div>
+    </HStack>
   );
 }
 
@@ -209,7 +214,6 @@ export function SshConnectionPanel(props: SshConnectionPanelProps) {
   const [scope, setScope] = useState<SshConnectionScope>("project");
   const [view, setView] = useState<SshConnectionView>("list");
   const [createHostId, setCreateHostId] = useState("");
-  const [createHostMenuOpen, setCreateHostMenuOpen] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
   const [createSftpEnabled, setCreateSftpEnabled] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -544,27 +548,6 @@ export function SshConnectionPanel(props: SshConnectionPanelProps) {
     [client, closingSessionIds, onSessionClosed, requestCloseSessionConfirm, t],
   );
 
-  const listActive = view === "list";
-  const settingsActive = view === "settings";
-  const createActive = view === "create";
-  const listPageClassName = cn(
-    "absolute inset-0 flex min-h-0 flex-col bg-background transition-[opacity,transform] duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none",
-    listActive
-      ? "z-10 translate-x-0 opacity-100"
-      : "pointer-events-none z-0 -translate-x-4 opacity-0",
-  );
-  const settingsPageClassName = cn(
-    "absolute inset-0 flex min-h-0 flex-col bg-background transition-[opacity,transform] duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none",
-    settingsActive
-      ? "z-10 translate-x-0 opacity-100"
-      : "pointer-events-none z-0 translate-x-4 opacity-0",
-  );
-  const createPageClassName = cn(
-    "absolute inset-0 flex min-h-0 flex-col bg-background transition-[opacity,transform] duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none",
-    createActive
-      ? "z-10 translate-x-0 opacity-100"
-      : "pointer-events-none z-0 translate-x-4 opacity-0",
-  );
   const emptyTitle =
     scope === "project"
       ? t("projectTools.sshConnectionProjectEmpty")
@@ -598,660 +581,533 @@ export function SshConnectionPanel(props: SshConnectionPanelProps) {
     return t("projectTools.sshConnectionLatencyUnknown");
   };
 
-  return (
-    <div className="relative flex min-h-0 flex-1 overflow-hidden bg-background">
-      <div className={settingsPageClassName} aria-hidden={!settingsActive} inert={!settingsActive}>
-        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
-            title={t("projectTools.sshConnectionBack")}
-            onClick={() => setView("list")}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-foreground">
-              {t("projectTools.sshConnectionAssociateHosts")}
-            </div>
-            <div className="truncate text-xs text-muted-foreground">
-              {t("projectTools.sshConnectionAssociateHostsHint")}
-            </div>
-          </div>
-          <div className="rounded-md bg-muted/60 px-2 py-1 text-xs text-muted-foreground">
-            <span className="tabular-nums text-foreground">{associatedHosts.length}</span>{" "}
-            {t("projectTools.sshConnectionAssociatedCount")}
-          </div>
-        </div>
+  const backButton = (
+    <IconButton
+      label={t("projectTools.sshConnectionBack")}
+      tooltip={t("projectTools.sshConnectionBack")}
+      icon={<ArrowLeft size={16} />}
+      variant="ghost"
+      size="md"
+      onClick={() => setView("list")}
+    />
+  );
 
-        {hosts.length === 0 ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
-              <Key className="h-6 w-6" />
-            </div>
-            <div className="max-w-xs space-y-1">
-              <div className="text-sm font-medium text-foreground">
-                {t("projectTools.sshConnectionNoConfiguredHosts")}
-              </div>
-              <div className="text-xs leading-relaxed text-muted-foreground">
-                {t("projectTools.sshConnectionNoConfiguredHostsHint")}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-            <div className="space-y-2">
+  const settingsPage = (
+    <Layout
+      height="fill"
+      header={
+        <LayoutHeader hasDivider label={t("projectTools.sshConnectionAssociateHosts")}>
+          <HStack gap={2} vAlign="center">
+            {backButton}
+            <StackItem size="fill">
+              <VStack gap={0.5}>
+                <Heading level={4}>{t("projectTools.sshConnectionAssociateHosts")}</Heading>
+                <Text type="supporting" color="secondary" maxLines={1}>
+                  {t("projectTools.sshConnectionAssociateHostsHint")}
+                </Text>
+              </VStack>
+            </StackItem>
+            <HStack gap={1} vAlign="center">
+              <Badge label={String(associatedHosts.length)} />
+              <Text type="supporting" color="secondary" maxLines={1}>
+                {t("projectTools.sshConnectionAssociatedCount")}
+              </Text>
+            </HStack>
+          </HStack>
+        </LayoutHeader>
+      }
+      content={
+        <LayoutContent padding={3}>
+          {hosts.length === 0 ? (
+            <EmptyState
+              icon={<Key size={24} />}
+              title={t("projectTools.sshConnectionNoConfiguredHosts")}
+              description={t("projectTools.sshConnectionNoConfiguredHostsHint")}
+              isCompact
+            />
+          ) : (
+            <VStack gap={2}>
               {hosts.map((host) => {
                 const selected = associatedSet.has(host.id);
                 return (
-                  <button
+                  <SelectableCard
                     key={host.id}
-                    type="button"
-                    className={cn(
-                      "group flex w-full items-start gap-3 rounded-lg border border-border/60 bg-card px-3 py-3 text-left transition-all hover:border-emerald-500/40 hover:bg-muted/40",
-                      selected && "border-emerald-500/50 bg-emerald-500/5",
-                    )}
-                    aria-pressed={selected}
-                    onClick={() => toggleHost(host.id)}
+                    label={host.name}
+                    isSelected={selected}
+                    onChange={() => toggleHost(host.id)}
+                    width="100%"
+                    padding={3}
                   >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
-                      <Server className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm font-medium text-foreground">
-                          {host.name}
-                        </span>
-                        <span className="shrink-0 rounded-md bg-muted/70 px-1.5 py-0.5 text-[calc(10.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground">
-                          {authLabel(host, t)}
-                        </span>
-                        {hostHasProxy(host) ? (
-                          <span className="shrink-0 rounded-md bg-muted/70 px-1.5 py-0.5 text-[calc(10.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground">
-                            {t("settings.sshAdvancedProxy")}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                        {endpointLabel(host)}
-                      </div>
-                      <HostMetaTags host={host} />
-                    </div>
-                    <span
-                      className={cn(
-                        "mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors",
-                        selected
-                          ? "border-emerald-500 bg-emerald-500 text-white"
-                          : "border-border bg-background text-transparent",
-                      )}
-                      aria-hidden="true"
-                    >
-                      <Check className="h-3 w-3" />
-                    </span>
-                  </button>
+                    <HStack gap={3} vAlign="start">
+                      <Server size={20} />
+                      <StackItem size="fill">
+                        <VStack gap={1}>
+                          <HStack gap={1.5} wrap="wrap" vAlign="center">
+                            <Text type="label" maxLines={1}>
+                              {host.name}
+                            </Text>
+                            <Token label={authLabel(host, t)} size="sm" />
+                            {hostHasProxy(host) ? (
+                              <Token label={t("settings.sshAdvancedProxy")} size="sm" />
+                            ) : null}
+                          </HStack>
+                          <Text type="code" color="secondary" maxLines={1}>
+                            {endpointLabel(host)}
+                          </Text>
+                          <HostMetaTags host={host} />
+                        </VStack>
+                      </StackItem>
+                    </HStack>
+                  </SelectableCard>
                 );
               })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className={createPageClassName} aria-hidden={!createActive} inert={!createActive}>
-        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
-            title={t("projectTools.sshConnectionBack")}
-            onClick={() => setView("list")}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-foreground">
-              {t("projectTools.sshConnectionCreateTitle")}
-            </div>
-            <div className="truncate text-xs text-muted-foreground">
-              {t("projectTools.sshConnectionCreateHint")}
-            </div>
-          </div>
-        </div>
-
-        {createHosts.length === 0 ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
-              <Key className="h-6 w-6" />
-            </div>
-            <div className="max-w-xs space-y-1">
-              <div className="text-sm font-medium text-foreground">
-                {hosts.length === 0
-                  ? t("projectTools.sshConnectionNoConfiguredHosts")
-                  : t("projectTools.sshConnectionCreateNoAssociatedHosts")}
-              </div>
-              <div className="text-xs leading-relaxed text-muted-foreground">
-                {hosts.length === 0
-                  ? t("projectTools.sshConnectionNoConfiguredHostsHint")
-                  : t("projectTools.sshConnectionCreateNoAssociatedHostsHint")}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <form
-            className="min-h-0 flex-1 overflow-y-auto px-3 py-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              handleCreate();
-            }}
-          >
-            <div className="space-y-3">
-              <div className="block space-y-1.5">
-                <span className="text-xs font-medium text-foreground">
-                  {t("projectTools.sshConnectionHost")}
-                </span>
-                <DropdownMenu open={createHostMenuOpen} onOpenChange={setCreateHostMenuOpen}>
-                  <DropdownMenuTrigger
-                    type="button"
-                    className={cn(
-                      "flex min-h-12 w-full items-center gap-3 rounded-lg border border-border/70 bg-card/80 px-3 py-2 text-left shadow-[0_1px_2px_hsl(0_0%_0%_/_0.04)] outline-none transition-all hover:border-emerald-500/40 hover:bg-card focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/20",
-                      createHostMenuOpen && "border-emerald-500/50 ring-1 ring-emerald-500/20",
-                    )}
-                    aria-label={t("projectTools.sshConnectionHost")}
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
-                      <Server className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-semibold text-foreground">
-                        {selectedCreateHost?.name}
-                      </span>
-                      <span className="mt-0.5 block truncate font-mono text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground">
-                        {selectedCreateHost ? endpointLabel(selectedCreateHost) : ""}
-                      </span>
-                    </span>
-                    {selectedCreateHost ? (
-                      <span className="hidden shrink-0 rounded-md bg-muted/70 px-1.5 py-0.5 text-[calc(10.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground min-[360px]:inline-flex">
-                        {authLabel(selectedCreateHost, t)}
-                      </span>
-                    ) : null}
-                    <ChevronDown
-                      className={cn(
-                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
-                        createHostMenuOpen && "rotate-180 text-emerald-500",
-                      )}
-                      aria-hidden="true"
-                    />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={6}
-                    collisionPadding={12}
-                    className="z-[80] w-max max-w-[calc(100vw-2rem)] min-w-[var(--anchor-width)] rounded-xl border-border/70 bg-popover/95 p-1 shadow-[0_18px_46px_-24px_hsl(160_84%_25%_/_0.42),0_8px_24px_-18px_hsl(0_0%_0%_/_0.32)] backdrop-blur-xl"
-                  >
-                    <div className="max-h-72 overflow-y-auto p-0.5">
-                      {createHosts.map((host) => {
-                        const selected = host.id === selectedCreateHostId;
-                        return (
-                          <DropdownMenuItem
-                            key={host.id}
-                            onSelect={() => selectCreateHost(host.id)}
-                            className={cn(
-                              "group/item flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left outline-none transition-all data-[highlighted]:translate-x-0.5 data-[highlighted]:bg-emerald-500/10 data-[highlighted]:text-foreground",
-                              selected && "bg-emerald-500/10 text-foreground",
-                            )}
-                          >
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500 transition-colors group-data-[highlighted]/item:bg-emerald-500/15">
-                              <Server className="h-3.5 w-3.5" />
-                            </span>
-                            <span className="flex min-w-0 flex-1 items-center gap-2">
-                              <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
-                                {host.name}
-                              </span>
-                              <span className="shrink-0 whitespace-nowrap font-mono text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground">
-                                {endpointLabel(host)}
-                              </span>
-                              <span className="shrink-0 rounded-md bg-background/80 px-1.5 py-0.5 text-[calc(10.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground">
-                                {authLabel(host, t)}
-                              </span>
-                            </span>
-                            <span
-                              className={cn(
-                                "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors",
-                                selected
-                                  ? "border-emerald-500 bg-emerald-500 text-white"
-                                  : "border-border bg-background text-transparent",
-                              )}
-                              aria-hidden="true"
-                            >
-                              <Check className="h-3 w-3" />
-                            </span>
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-foreground">
-                  {t("projectTools.sshConnectionTabTitle")}
-                </span>
-                <input
-                  value={createTitle}
-                  onChange={(event) => setCreateTitle(event.currentTarget.value)}
-                  className="h-10 w-full rounded-lg border border-border/70 bg-background/80 px-3 text-[calc(11px*var(--zone-font-scale,1))] text-foreground outline-none transition-colors placeholder:text-[calc(11px*var(--zone-font-scale,1))] placeholder:text-muted-foreground/70 focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/20"
-                  placeholder={
-                    selectedCreateHost?.name || t("projectTools.sshConnectionTabTitlePlaceholder")
-                  }
-                />
-              </label>
-
-              <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/70 bg-background/80 px-3 py-2.5 text-sm text-foreground transition-colors hover:border-emerald-500/40">
-                <input
-                  type="checkbox"
-                  checked={createSftpEnabled}
-                  onChange={(event) => setCreateSftpEnabled(event.currentTarget.checked)}
-                  className="h-4 w-4 rounded border-border text-emerald-500 accent-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/20"
-                />
-                <span className="min-w-0 flex-1 text-xs font-medium">
-                  {t("projectTools.sshConnectionSftpEnabled")}
-                </span>
-              </label>
-
-              {selectedCreateHost ? (
-                <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Server className="h-4 w-4 shrink-0 text-emerald-500" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-xs font-medium text-foreground">
-                        {selectedCreateHost.name}
-                      </div>
-                      <div className="truncate font-mono text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground">
-                        {endpointLabel(selectedCreateHost)}
-                      </div>
-                    </div>
-                    <span className="shrink-0 rounded-md bg-background/70 px-1.5 py-0.5 text-[calc(10.5px*var(--zone-font-scale,1))] text-muted-foreground">
-                      {authLabel(selectedCreateHost, t)}
-                    </span>
-                  </div>
-                  {selectedHostMessage ? (
-                    <div className="mt-2 flex gap-2 rounded-md bg-destructive/10 px-2 py-1.5 text-[calc(11px*var(--zone-font-scale,1))] leading-relaxed text-destructive">
-                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      <span>{selectedHostMessage}</span>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {createError ? (
-                <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  {createError}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/60 pt-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 rounded-lg px-3 text-xs"
-                onClick={() => setView("list")}
-              >
-                {t("projectTools.sshConnectionCreateCancel")}
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                className="h-8 rounded-lg px-3 text-xs"
-                disabled={!canCreate}
-              >
-                {creating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-                {creating
-                  ? t("projectTools.sshConnectionConnecting")
-                  : t("projectTools.sshConnectionConnect")}
-              </Button>
-            </div>
-          </form>
-        )}
-      </div>
-
-      <div className={listPageClassName} aria-hidden={!listActive} inert={!listActive}>
-        <div className="shrink-0 border-b border-border/60 bg-background/80 px-4 pb-3 pt-3.5 backdrop-blur-xl">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background/80 text-foreground/70 shadow-[inset_0_1px_0_hsl(0_0%_100%_/_0.6),0_1px_2px_hsl(0_0%_0%_/_0.05)] dark:shadow-none">
-              <Key className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold tracking-tight text-foreground">
-                {t("projectTools.sshConnectionTitle")}
-              </div>
-              <div className="truncate text-xs text-muted-foreground">{statusText}</div>
-            </div>
-            {canShowCreateButton ? (
-              <button
-                type="button"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition-colors hover:border-border/60 hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                title={t("projectTools.newSshConnection")}
-                aria-label={t("projectTools.newSshConnection")}
-                onClick={openCreateView}
-              >
-                <ConnectionIcon height="1em" />
-              </button>
-            ) : null}
-            {scope === "project" ? (
-              <button
-                type="button"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition-colors hover:border-border/60 hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                title={t("projectTools.sshConnectionSettings")}
-                aria-label={t("projectTools.sshConnectionSettings")}
-                onClick={() => setView("settings")}
-              >
-                <Settings className="h-4 w-4" />
-              </button>
-            ) : null}
-          </div>
-
-          <fieldset
-            aria-label={t("projectTools.sshConnectionScopeGroup")}
-            className="relative m-0 mt-3 grid min-w-0 grid-cols-2 gap-0.5 rounded-lg border-0 bg-muted/70 p-0.5"
-          >
-            <div
-              aria-hidden="true"
-              className={cn(
-                "pointer-events-none absolute inset-y-0 left-0 z-0 w-1/2 transform-gpu rounded-[7px] bg-background shadow-sm transition-transform duration-200 ease-out motion-reduce:transition-none",
-                scope === "all" ? "translate-x-full" : "translate-x-0",
-              )}
-            />
-            {(["project", "all"] as const).map((option) => {
-              const selected = scope === option;
-              const Icon = option === "project" ? Server : Globe;
-              const label =
-                option === "project"
-                  ? t("projectTools.sshConnectionScopeProject")
-                  : t("projectTools.sshConnectionScopeAll");
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  className={cn(
-                    "relative z-10 flex h-7 min-w-0 transform-gpu items-center justify-center gap-1.5 rounded-[7px] px-2 text-xs text-muted-foreground transition-[color,transform] duration-200 ease-out hover:text-foreground active:scale-[0.98] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none motion-reduce:active:scale-100",
-                    selected && "font-medium text-foreground",
-                  )}
-                  title={label}
-                  aria-label={label}
-                  aria-pressed={selected}
-                  onClick={() => setScope(option)}
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{label}</span>
-                </button>
-              );
-            })}
-          </fieldset>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-          {listError ? (
-            <div className="mb-3 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              {listError}
-            </div>
-          ) : null}
-
-          {visibleSessionCount === 0 ? (
-            <div className="flex min-h-full items-center justify-center">
-              <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg bg-background/40 px-4 py-8 text-center">
-                <div className="mb-1.5 flex h-12 w-12 items-center justify-center rounded-xl border border-border/50 bg-background/80 text-muted-foreground/70 shadow-[inset_0_1px_0_hsl(0_0%_100%_/_0.6),0_1px_3px_hsl(0_0%_0%_/_0.05)] dark:shadow-none">
-                  <Key className="h-5 w-5" />
-                </div>
-                <div className="text-xs font-medium text-foreground/80">{emptyTitle}</div>
-                <div className="max-w-[16rem] text-[calc(11px*var(--zone-font-scale,1))] leading-relaxed text-muted-foreground">
-                  {emptyHint}
-                </div>
-                <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-                  {canShowCreateButton ? (
-                    <Button
-                      type="button"
-                      variant="default"
-                      size="sm"
-                      className="h-7 rounded-lg px-2.5 text-xs"
-                      onClick={openCreateView}
-                    >
-                      {t("projectTools.newSshConnection")}
-                    </Button>
-                  ) : null}
-                  {scope === "project" && associatedHosts.length === 0 ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 rounded-lg bg-background/70 px-2.5 text-xs"
-                      onClick={() => setView("settings")}
-                    >
-                      {t("projectTools.sshConnectionAssociateHosts")}
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {visibleSessions.map((session) => {
-                const title = sessionTitle(session, t("projectTools.sshConnectionTitle"));
-                const endpoint = sessionEndpointLabel(session);
-                const projectLabel = sessionProjectLabel(session);
-                const closing = closingSessionIds.has(session.id);
-                const sshStatus = sshSessionStatus(session);
-                const connected = sshSessionConnected(session);
-                return (
-                  <article
-                    key={session.id}
-                    className="rounded-lg border border-border/60 bg-card px-3 py-3 shadow-[0_1px_2px_hsl(0_0%_0%_/_0.04)]"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={cn(
-                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                          sshStatus === "disconnected"
-                            ? "bg-destructive/10 text-destructive"
-                            : sshStatus === "reconnecting"
-                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                              : "bg-emerald-500/10 text-emerald-500",
-                        )}
-                      >
-                        <Server className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="truncate text-sm font-medium text-foreground">
-                            {title}
-                          </span>
-                          <span
-                            className={cn(
-                              "inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[calc(10.5px*var(--zone-font-scale,1))] font-medium",
-                              sshStatus === "disconnected"
-                                ? "bg-destructive/10 text-destructive"
-                                : sshStatus === "reconnecting"
-                                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-                            )}
-                          >
-                            {sshStatus === "disconnected" ? (
-                              <WifiOff className="h-3 w-3" />
-                            ) : sshStatus === "reconnecting" ? (
-                              <RefreshCw className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Wifi className="h-3 w-3" />
-                            )}
-                            {sshStatusLabel(session, t)}
-                          </span>
-                        </div>
-                        <div className="mt-1 truncate font-mono text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground">
-                          {endpoint}
-                        </div>
-                        {scope === "all" && projectLabel ? (
-                          <div className="mt-1 truncate text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground">
-                            {projectLabel}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex items-end justify-between gap-3">
-                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                        <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-1.5 py-0.5 text-[calc(10.5px*var(--zone-font-scale,1))] text-muted-foreground">
-                          {latencyBySessionId[session.id]?.loading &&
-                          !latencyBySessionId[session.id]?.latencyMs ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Clock3 className="h-3 w-3" />
-                          )}
-                          {latencyText(session)}
-                        </span>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        <button
-                          type="button"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-background/70 text-muted-foreground transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:hover:text-emerald-400"
-                          title={t("projectTools.sshConnectionOpenBash")}
-                          aria-label={t("projectTools.sshConnectionOpenBash")}
-                          disabled={!connected}
-                          onClick={() => onOpenSession(session, "bash")}
-                        >
-                          <Terminal className="h-4 w-4" />
-                        </button>
-                        {session.ssh?.sftpEnabled ? (
-                          <button
-                            type="button"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-background/70 text-muted-foreground transition-colors hover:border-sky-500/40 hover:bg-sky-500/10 hover:text-sky-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:hover:text-sky-400"
-                            title={t("projectTools.sshConnectionOpenSftp")}
-                            aria-label={t("projectTools.sshConnectionOpenSftp")}
-                            disabled={!connected}
-                            onClick={() => onOpenSession(session, "sftp")}
-                          >
-                            <FolderTree className="h-4 w-4" />
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-background/70 text-muted-foreground transition-colors hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                          title={t("projectTools.sshConnectionCloseSession")}
-                          aria-label={t("projectTools.sshConnectionCloseSession")}
-                          disabled={closing}
-                          onClick={() => handleCloseSession(session)}
-                        >
-                          {closing ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+            </VStack>
           )}
-        </div>
-      </div>
+        </LayoutContent>
+      }
+    />
+  );
 
+  const createPage = (
+    <Layout
+      height="fill"
+      header={
+        <LayoutHeader hasDivider label={t("projectTools.sshConnectionCreateTitle")}>
+          <HStack gap={2} vAlign="center">
+            {backButton}
+            <StackItem size="fill">
+              <VStack gap={0.5}>
+                <Heading level={4}>{t("projectTools.sshConnectionCreateTitle")}</Heading>
+                <Text type="supporting" color="secondary" maxLines={1}>
+                  {t("projectTools.sshConnectionCreateHint")}
+                </Text>
+              </VStack>
+            </StackItem>
+          </HStack>
+        </LayoutHeader>
+      }
+      content={
+        <LayoutContent padding={3}>
+          {createHosts.length === 0 ? (
+            <EmptyState
+              icon={<Key size={24} />}
+              title={
+                hosts.length === 0
+                  ? t("projectTools.sshConnectionNoConfiguredHosts")
+                  : t("projectTools.sshConnectionCreateNoAssociatedHosts")
+              }
+              description={
+                hosts.length === 0
+                  ? t("projectTools.sshConnectionNoConfiguredHostsHint")
+                  : t("projectTools.sshConnectionCreateNoAssociatedHostsHint")
+              }
+              actions={
+                hosts.length > 0 ? (
+                  <XdsButton
+                    label={t("projectTools.sshConnectionAssociateHosts")}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setView("settings")}
+                  />
+                ) : undefined
+              }
+              isCompact
+            />
+          ) : (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleCreate();
+              }}
+            >
+              <VStack gap={4}>
+                <FormLayout>
+                  <Selector
+                    label={t("projectTools.sshConnectionHost")}
+                    value={selectedCreateHostId}
+                    onChange={selectCreateHost}
+                    options={createHosts.map((host) => ({
+                      value: host.id,
+                      label: host.name,
+                      description: endpointLabel(host) + " · " + authLabel(host, t),
+                    }))}
+                    startIcon={<Server size={16} />}
+                    width="100%"
+                    size="lg"
+                  />
+                  <TextInput
+                    label={t("projectTools.sshConnectionTabTitle")}
+                    value={createTitle}
+                    onChange={setCreateTitle}
+                    placeholder={
+                      selectedCreateHost?.name ||
+                      t("projectTools.sshConnectionTabTitlePlaceholder")
+                    }
+                    width="100%"
+                    size="lg"
+                  />
+                  <CheckboxInput
+                    label={t("projectTools.sshConnectionSftpEnabled")}
+                    value={createSftpEnabled}
+                    onChange={setCreateSftpEnabled}
+                    size="sm"
+                  />
+                </FormLayout>
+
+                {selectedCreateHost ? (
+                  <VStack gap={2}>
+                    <HStack gap={2} vAlign="center">
+                      <Server size={18} />
+                      <StackItem size="fill">
+                        <VStack gap={0.5}>
+                          <Text type="label" maxLines={1}>
+                            {selectedCreateHost.name}
+                          </Text>
+                          <Text type="code" color="secondary" maxLines={1}>
+                            {endpointLabel(selectedCreateHost)}
+                          </Text>
+                        </VStack>
+                      </StackItem>
+                      <Token label={authLabel(selectedCreateHost, t)} size="sm" />
+                    </HStack>
+                    {selectedHostMessage ? (
+                      <Banner status="error" title={selectedHostMessage} />
+                    ) : null}
+                  </VStack>
+                ) : null}
+
+                {createError ? <Banner status="error" title={createError} /> : null}
+
+                <HStack gap={2} hAlign="end" wrap="wrap">
+                  <XdsButton
+                    label={t("projectTools.sshConnectionCreateCancel")}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setView("list")}
+                  />
+                  <XdsButton
+                    type="submit"
+                    label={
+                      creating
+                        ? t("projectTools.sshConnectionConnecting")
+                        : t("projectTools.sshConnectionConnect")
+                    }
+                    size="sm"
+                    isDisabled={!canCreate}
+                    isLoading={creating}
+                  />
+                </HStack>
+              </VStack>
+            </form>
+          )}
+        </LayoutContent>
+      }
+    />
+  );
+
+  const hasEmptyActions =
+    canShowCreateButton || (scope === "project" && associatedHosts.length === 0);
+
+  const listPage = (
+    <Layout
+      height="fill"
+      header={
+        <LayoutHeader hasDivider label={t("projectTools.sshConnectionTitle")}>
+          <VStack gap={3}>
+            <HStack gap={2} vAlign="center">
+              <Key size={20} />
+              <StackItem size="fill">
+                <VStack gap={0.5}>
+                  <Heading level={4}>{t("projectTools.sshConnectionTitle")}</Heading>
+                  <Text type="supporting" color="secondary" maxLines={1}>
+                    {statusText}
+                  </Text>
+                </VStack>
+              </StackItem>
+              {canShowCreateButton ? (
+                <IconButton
+                  label={t("projectTools.newSshConnection")}
+                  tooltip={t("projectTools.newSshConnection")}
+                  icon={<ConnectionIcon height="1em" />}
+                  variant="ghost"
+                  size="md"
+                  onClick={openCreateView}
+                />
+              ) : null}
+              {scope === "project" ? (
+                <IconButton
+                  label={t("projectTools.sshConnectionSettings")}
+                  tooltip={t("projectTools.sshConnectionSettings")}
+                  icon={<Settings size={16} />}
+                  variant="ghost"
+                  size="md"
+                  onClick={() => setView("settings")}
+                />
+              ) : null}
+            </HStack>
+            <SegmentedControl
+              value={scope}
+              onChange={(value) => setScope(value as SshConnectionScope)}
+              label={t("projectTools.sshConnectionScopeGroup")}
+              layout="fill"
+              size="sm"
+            >
+              <SegmentedControlItem
+                value="project"
+                label={t("projectTools.sshConnectionScopeProject")}
+              />
+              <SegmentedControlItem
+                value="all"
+                label={t("projectTools.sshConnectionScopeAll")}
+              />
+            </SegmentedControl>
+          </VStack>
+        </LayoutHeader>
+      }
+      content={
+        <LayoutContent padding={3}>
+          <VStack gap={3} minHeight="100%">
+            {listError ? <Banner status="error" title={listError} /> : null}
+            {visibleSessionCount === 0 ? (
+              <EmptyState
+                icon={<Key size={24} />}
+                title={emptyTitle}
+                description={emptyHint}
+                actions={
+                  hasEmptyActions ? (
+                    <>
+                      {canShowCreateButton ? (
+                        <XdsButton
+                          label={t("projectTools.newSshConnection")}
+                          variant="primary"
+                          size="sm"
+                          onClick={openCreateView}
+                        />
+                      ) : null}
+                      {scope === "project" && associatedHosts.length === 0 ? (
+                        <XdsButton
+                          label={t("projectTools.sshConnectionAssociateHosts")}
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setView("settings")}
+                        />
+                      ) : null}
+                    </>
+                  ) : undefined
+                }
+                isCompact
+              />
+            ) : (
+              <VStack gap={2}>
+                {visibleSessions.map((session) => {
+                  const title = sessionTitle(session, t("projectTools.sshConnectionTitle"));
+                  const endpoint = sessionEndpointLabel(session);
+                  const projectLabel = sessionProjectLabel(session);
+                  const closing = closingSessionIds.has(session.id);
+                  const sshStatus = sshSessionStatus(session);
+                  const connected = sshSessionConnected(session);
+                  const latency = latencyBySessionId[session.id];
+                  const statusVariant =
+                    sshStatus === "disconnected"
+                      ? "error"
+                      : sshStatus === "reconnecting"
+                        ? "warning"
+                        : "success";
+                  const statusLabel = sshStatusLabel(session, t);
+                  return (
+                    <Card key={session.id} width="100%" padding={3} elevation="low">
+                      <VStack gap={3}>
+                        <HStack gap={3} vAlign="start">
+                          <Server size={20} />
+                          <StackItem size="fill">
+                            <VStack gap={1}>
+                              <HStack gap={1.5} wrap="wrap" vAlign="center">
+                                <Text type="label" maxLines={1}>
+                                  {title}
+                                </Text>
+                                <HStack gap={1} vAlign="center">
+                                  <StatusDot
+                                    variant={statusVariant}
+                                    label={statusLabel}
+                                    isPulsing={sshStatus === "reconnecting"}
+                                  />
+                                  <Text type="supporting" color="secondary">
+                                    {statusLabel}
+                                  </Text>
+                                </HStack>
+                              </HStack>
+                              <Text type="code" color="secondary" maxLines={1}>
+                                {endpoint}
+                              </Text>
+                              {scope === "all" && projectLabel ? (
+                                <Text type="supporting" color="secondary" maxLines={1}>
+                                  {projectLabel}
+                                </Text>
+                              ) : null}
+                            </VStack>
+                          </StackItem>
+                        </HStack>
+                        <HStack gap={2} hAlign="between" vAlign="center" wrap="wrap">
+                          <Token
+                            label={latencyText(session)}
+                            size="sm"
+                            icon={
+                              latency?.loading && !latency.latencyMs ? (
+                                <Spinner size="sm" aria-label={latencyText(session)} />
+                              ) : (
+                                <Clock3 size={12} />
+                              )
+                            }
+                          />
+                          <HStack gap={1} vAlign="center">
+                            <IconButton
+                              label={t("projectTools.sshConnectionOpenBash")}
+                              tooltip={t("projectTools.sshConnectionOpenBash")}
+                              icon={<Terminal size={16} />}
+                              variant="ghost"
+                              size="md"
+                              isDisabled={!connected}
+                              onClick={() => onOpenSession(session, "bash")}
+                            />
+                            {session.ssh?.sftpEnabled ? (
+                              <IconButton
+                                label={t("projectTools.sshConnectionOpenSftp")}
+                                tooltip={t("projectTools.sshConnectionOpenSftp")}
+                                icon={<FolderTree size={16} />}
+                                variant="ghost"
+                                size="md"
+                                isDisabled={!connected}
+                                onClick={() => onOpenSession(session, "sftp")}
+                              />
+                            ) : null}
+                            <IconButton
+                              label={t("projectTools.sshConnectionCloseSession")}
+                              tooltip={t("projectTools.sshConnectionCloseSession")}
+                              icon={<X size={16} />}
+                              variant="ghost"
+                              size="md"
+                              isLoading={closing}
+                              isDisabled={closing}
+                              onClick={() => handleCloseSession(session)}
+                            />
+                          </HStack>
+                        </HStack>
+                      </VStack>
+                    </Card>
+                  );
+                })}
+              </VStack>
+            )}
+          </VStack>
+        </LayoutContent>
+      }
+    />
+  );
+
+  return (
+    <>
+      {view === "settings" ? settingsPage : view === "create" ? createPage : listPage}
       {prompt ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/70 px-4 backdrop-blur-sm">
+        <Dialog
+          isOpen
+          onOpenChange={(isOpen) => {
+            if (!isOpen) handleCancelPrompt();
+          }}
+          purpose="form"
+        >
           <form
-            className="w-full max-w-md rounded-lg border border-border bg-card p-4 shadow-xl"
             onSubmit={(event) => {
               event.preventDefault();
               handleSubmitPrompt();
             }}
           >
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                <Shield className="h-4.5 w-4.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-foreground">
-                  {hostKeyPrompt
-                    ? t("projectTools.sshConnectionPromptTitle")
-                    : t("projectTools.sshConnectionAuthPromptTitle")}
-                </div>
-                <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  {prompt.message}
-                </div>
-              </div>
-            </div>
-            <div className="mt-3 space-y-2 rounded-lg bg-muted/40 px-3 py-2 text-xs">
-              <div className="flex gap-2">
-                <span className="shrink-0 text-muted-foreground">
-                  {t("projectTools.sshConnectionHost")}
-                </span>
-                <span className="min-w-0 flex-1 truncate font-mono text-foreground">
-                  {prompt.host}:{prompt.port}
-                </span>
-              </div>
-              {prompt.keyType ? (
-                <div className="flex gap-2">
-                  <span className="shrink-0 text-muted-foreground">
-                    {t("projectTools.sshConnectionKeyType")}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-foreground">
-                    {prompt.keyType}
-                  </span>
-                </div>
-              ) : null}
-              {prompt.fingerprintSha256 ? (
-                <div className="flex gap-2">
-                  <span className="shrink-0 text-muted-foreground">
-                    {t("projectTools.sshConnectionFingerprint")}
-                  </span>
-                  <span className="min-w-0 flex-1 break-all font-mono text-foreground">
-                    {prompt.fingerprintSha256}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-            {!hostKeyPrompt ? (
-              <input
-                value={promptAnswer}
-                onChange={(event) => setPromptAnswer(event.currentTarget.value)}
-                className="mt-3 h-10 w-full rounded-lg border border-border/70 bg-background/80 px-3 text-[calc(11px*var(--zone-font-scale,1))] text-foreground outline-none transition-colors placeholder:text-[calc(11px*var(--zone-font-scale,1))] placeholder:text-muted-foreground/70 focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/20"
-                type={prompt.answerEcho ? "text" : "password"}
-                aria-label={t("projectTools.sshConnectionAuthPromptTitle")}
-                autoFocus
-              />
-            ) : null}
-            <div className="mt-4 flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 rounded-lg px-3 text-xs"
-                onClick={handleCancelPrompt}
-                disabled={answeringPrompt}
-              >
-                {hostKeyPrompt
-                  ? t("projectTools.sshConnectionRejectHost")
-                  : t("projectTools.sshConnectionPromptCancel")}
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                className="h-8 rounded-lg px-3 text-xs"
-                disabled={promptSubmitDisabled}
-              >
-                {answeringPrompt ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-                {hostKeyPrompt
-                  ? t("projectTools.sshConnectionTrustHost")
-                  : t("projectTools.sshConnectionPromptSubmit")}
-              </Button>
-            </div>
+            <Layout
+              header={
+                <DialogHeader
+                  title={
+                    hostKeyPrompt
+                      ? t("projectTools.sshConnectionPromptTitle")
+                      : t("projectTools.sshConnectionAuthPromptTitle")
+                  }
+                  subtitle={prompt.message}
+                  startContent={<Shield size={18} />}
+                  onOpenChange={() => handleCancelPrompt()}
+                />
+              }
+              content={
+                <LayoutContent>
+                  <VStack gap={4}>
+                    <MetadataList>
+                      <MetadataListItem label={t("projectTools.sshConnectionHost")}>
+                        <Text type="code" wordBreak="break-word">
+                          {prompt.host}:{prompt.port}
+                        </Text>
+                      </MetadataListItem>
+                      {prompt.keyType ? (
+                        <MetadataListItem label={t("projectTools.sshConnectionKeyType")}>
+                          <Text type="code" wordBreak="break-word">
+                            {prompt.keyType}
+                          </Text>
+                        </MetadataListItem>
+                      ) : null}
+                      {prompt.fingerprintSha256 ? (
+                        <MetadataListItem
+                          label={t("projectTools.sshConnectionFingerprint")}
+                        >
+                          <Text type="code" wordBreak="break-all">
+                            {prompt.fingerprintSha256}
+                          </Text>
+                        </MetadataListItem>
+                      ) : null}
+                    </MetadataList>
+                    {!hostKeyPrompt ? (
+                      <TextInput
+                        label={t("projectTools.sshConnectionAuthPromptTitle")}
+                        isLabelHidden
+                        value={promptAnswer}
+                        onChange={setPromptAnswer}
+                        type={prompt.answerEcho ? "text" : "password"}
+                        hasAutoFocus
+                        width="100%"
+                        size="lg"
+                      />
+                    ) : null}
+                  </VStack>
+                </LayoutContent>
+              }
+              footer={
+                <LayoutFooter hasDivider>
+                  <HStack gap={2} hAlign="end" wrap="wrap">
+                    <XdsButton
+                      label={
+                        hostKeyPrompt
+                          ? t("projectTools.sshConnectionRejectHost")
+                          : t("projectTools.sshConnectionPromptCancel")
+                      }
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCancelPrompt}
+                      isDisabled={answeringPrompt}
+                    />
+                    <XdsButton
+                      type="submit"
+                      label={
+                        hostKeyPrompt
+                          ? t("projectTools.sshConnectionTrustHost")
+                          : t("projectTools.sshConnectionPromptSubmit")
+                      }
+                      size="sm"
+                      isDisabled={promptSubmitDisabled}
+                      isLoading={answeringPrompt}
+                    />
+                  </HStack>
+                </LayoutFooter>
+              }
+            />
           </form>
-        </div>
+        </Dialog>
       ) : null}
       {closeSessionConfirmDialog}
-    </div>
+    </>
   );
 }

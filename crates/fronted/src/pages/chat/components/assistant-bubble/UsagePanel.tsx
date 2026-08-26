@@ -1,4 +1,7 @@
 import type { Usage } from "@earendil-works/pi-ai";
+import { VStack } from "@astryxdesign/core/Layout";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 
 import { useLocale } from "../../../../i18n";
 
@@ -38,15 +41,6 @@ export function UsagePanel(props: { usage?: Usage; contextWindow?: number }) {
   if (!hasDisplayableUsage(usage)) return null;
 
   const stats: Array<{ key: string; label: string; value: string }> = [
-    ...(typeof contextWindow === "number" && contextWindow > 0
-      ? [
-          {
-            key: "context-window",
-            label: t("chat.contextWindow"),
-            value: formatUsageNumber(contextWindow, locale),
-          },
-        ]
-      : []),
     {
       key: "total",
       label: t("chat.usageTotal"),
@@ -90,16 +84,31 @@ export function UsagePanel(props: { usage?: Usage; contextWindow?: number }) {
         ]
       : []),
   ];
+  const contextUsed = Math.max(0, usage.input + usage.cacheRead + usage.cacheWrite);
+  const contextRatio =
+    typeof contextWindow === "number" && contextWindow > 0 ? contextUsed / contextWindow : 0;
 
   return (
-    <div className="overflow-x-auto pt-0.5 text-[calc(12px*var(--zone-font-scale,1))] leading-5 whitespace-nowrap text-muted-foreground/80">
-      {stats.map((item, index) => (
-        <span key={item.key}>
-          {index > 0 ? <span className="px-1.5 text-muted-foreground/45">·</span> : null}
-          <span>{item.label}</span>
-          <span className="ml-1 font-medium text-foreground/85">{item.value}</span>
-        </span>
-      ))}
-    </div>
+    <VStack gap={1.5}>
+      {typeof contextWindow === "number" && contextWindow > 0 ? (
+        <ProgressBar
+          label={t("chat.contextWindow")}
+          value={Math.min(contextUsed, contextWindow)}
+          max={contextWindow}
+          hasValueLabel
+          formatValueLabel={(value, max) =>
+            `${formatUsageNumber(value, locale)} / ${formatUsageNumber(max, locale)}`
+          }
+          variant={contextRatio >= 0.95 ? "error" : contextRatio >= 0.8 ? "warning" : "accent"}
+        />
+      ) : null}
+      <MetadataList orientation="horizontal" columns="multi" label={{ position: "top" }}>
+        {stats.map((item) => (
+          <MetadataListItem key={item.key} label={item.label}>
+            {item.value}
+          </MetadataListItem>
+        ))}
+      </MetadataList>
+    </VStack>
   );
 }

@@ -21,7 +21,6 @@ import {
   type HookEvent,
   type HookType,
 } from "../../lib/automation";
-import { useModalMotion } from "../../lib/shared/modalMotion";
 import {
   createEmptyRequestDraft,
   type HttpRequestDraft,
@@ -30,6 +29,10 @@ import {
   requestToDraft,
 } from "./httpRequestEditor";
 import { SettingsModalShell } from "./SettingsModalShell";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
+import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 const DEFAULT_HOOK_TIMEOUT_SECONDS = 60;
 
@@ -58,7 +61,6 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
   const [formError, setFormError] = useState<string | null>(null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const { isClosing, modalState, requestClose } = useModalMotion(onClose);
 
   const isEditing = Boolean(initialData);
 
@@ -95,7 +97,7 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
             ? parsedTimeoutSeconds * 1000
             : undefined,
       });
-      requestClose();
+      onClose();
     } catch (error) {
       setFormError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -107,50 +109,78 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
 
   return (
     <SettingsModalShell
-      onClose={requestClose}
-      state={modalState}
+      onClose={onClose}
+      purpose="form"
       ariaLabel={isEditing ? t("settings.hooksEdit") : t("settings.hooksAdd")}
     >
-      <div className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4"
+      >
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500"
+        >
           <Zap className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold">
+        </AstryxView>
+        <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+          <AstryxHeading level={2} className="text-base font-semibold">
             {isEditing ? t("settings.hooksEdit") : t("settings.hooksAdd")}
-          </h2>
-          <div className="mt-0.5 flex items-center gap-2">
-            <span className="rounded-md bg-muted/60 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+          </AstryxHeading>
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="mt-0.5 flex items-center gap-2"
+          >
+            <AstryxInline className="rounded-md bg-muted/60 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
               {event}
-            </span>
-            <span className="text-xs text-muted-foreground">
+            </AstryxInline>
+            <AstryxInline className="text-xs text-muted-foreground">
               {t(HOOK_EVENT_TRANSLATION_KEYS[event])}
-            </span>
-          </div>
-        </div>
-        <button
+            </AstryxInline>
+          </AstryxView>
+        </AstryxView>
+        <AstryxButton
           type="button"
-          onClick={requestClose}
+          onClick={onClose}
           title={t("settings.cancel")}
           aria-label={t("settings.cancel")}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
         >
           <X className="h-4 w-4" />
-        </button>
-      </div>
+        </AstryxButton>
+      </AstryxView>
 
-      <div className="settings-modal-body flex-1 overflow-y-auto">
-        <div className="border-b border-border/30 px-6 py-5">
-          <div className="mb-4 flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        className="settings-modal-body flex-1 overflow-y-auto"
+      >
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="border-b border-border/30 px-6 py-5"
+        >
+          <AstryxView layout="flex" direction="horizontal" className="mb-4 flex items-center gap-2">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary"
+            >
               1
-            </div>
-            <span className="text-sm font-semibold">{t("settings.hooksName")}</span>
-          </div>
+            </AstryxView>
+            <AstryxInline className="text-sm font-semibold">{t("settings.hooksName")}</AstryxInline>
+          </AstryxView>
 
-          <div className="space-y-4">
-            <div className="settings-form-grid grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
+          <AstryxView layout="block" direction="horizontal" className="space-y-4">
+            <AstryxView
+              layout="grid"
+              direction="horizontal"
+              className="settings-form-grid grid gap-4 sm:grid-cols-2"
+            >
+              <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                 <Label htmlFor="hook-name" className="text-xs font-medium text-muted-foreground">
                   {t("settings.hooksName")}
                 </Label>
@@ -163,8 +193,8 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
                     setName(e.currentTarget.value);
                   }}
                 />
-              </div>
-              <div className="space-y-1.5">
+              </AstryxView>
+              <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                 <Label
                   htmlFor="hook-description"
                   className="text-xs font-medium text-muted-foreground"
@@ -180,21 +210,33 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
                     setDescription(e.currentTarget.value);
                   }}
                 />
-              </div>
-            </div>
-          </div>
-        </div>
+              </AstryxView>
+            </AstryxView>
+          </AstryxView>
+        </AstryxView>
 
-        <div className="border-b border-border/30 px-6 py-5">
-          <div className="mb-4 flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="border-b border-border/30 px-6 py-5"
+        >
+          <AstryxView layout="flex" direction="horizontal" className="mb-4 flex items-center gap-2">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary"
+            >
               2
-            </div>
-            <span className="text-sm font-semibold">{t("settings.hooksType")}</span>
-          </div>
+            </AstryxView>
+            <AstryxInline className="text-sm font-semibold">{t("settings.hooksType")}</AstryxInline>
+          </AstryxView>
 
-          <div className="settings-choice-grid grid grid-cols-2 gap-3">
-            <button
+          <AstryxView
+            layout="grid"
+            direction="horizontal"
+            className="settings-choice-grid grid grid-cols-2 gap-3"
+          >
+            <AstryxButton
               type="button"
               onClick={() => {
                 setFormError(null);
@@ -206,7 +248,9 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
                   : "border-border/60 bg-background hover:border-border hover:bg-muted/20"
               }`}
             >
-              <div
+              <AstryxView
+                layout="block"
+                direction="horizontal"
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
                   type === "command"
                     ? "bg-blue-500/15 text-blue-500"
@@ -214,27 +258,33 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
                 }`}
               >
                 <Terminal className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div
+              </AstryxView>
+              <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
                   className={`text-sm font-semibold ${
                     type === "command" ? "text-blue-600 dark:text-blue-400" : "text-foreground"
                   }`}
                 >
                   {t("settings.hooksTypeCommand")}
-                </div>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                </AstryxView>
+                <AstryxParagraph className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                   {t("settings.hooksCommandHint")}
-                </p>
-              </div>
+                </AstryxParagraph>
+              </AstryxView>
               {type === "command" ? (
-                <div className="absolute right-3 top-3">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="absolute right-3 top-3"
+                >
                   <CheckCircle2 className="h-4.5 w-4.5 text-blue-500" />
-                </div>
+                </AstryxView>
               ) : null}
-            </button>
+            </AstryxButton>
 
-            <button
+            <AstryxButton
               type="button"
               onClick={() => {
                 setFormError(null);
@@ -246,7 +296,9 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
                   : "border-border/60 bg-background hover:border-border hover:bg-muted/20"
               }`}
             >
-              <div
+              <AstryxView
+                layout="block"
+                direction="horizontal"
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
                   type === "http"
                     ? "bg-emerald-500/15 text-emerald-500"
@@ -254,54 +306,68 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
                 }`}
               >
                 <Globe className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div
+              </AstryxView>
+              <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
                   className={`text-sm font-semibold ${
                     type === "http" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
                   }`}
                 >
                   {t("settings.hooksTypeHttp")}
-                </div>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                </AstryxView>
+                <AstryxParagraph className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                   {t("settings.hooksHttpHint")}
-                </p>
-              </div>
+                </AstryxParagraph>
+              </AstryxView>
               {type === "http" ? (
-                <div className="absolute right-3 top-3">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="absolute right-3 top-3"
+                >
                   <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500" />
-                </div>
+                </AstryxView>
               ) : null}
-            </button>
-          </div>
-        </div>
+            </AstryxButton>
+          </AstryxView>
+        </AstryxView>
 
-        <div className="px-6 py-5">
-          <div className="settings-modal-step-row mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
+        <AstryxView layout="block" direction="horizontal" className="px-6 py-5">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="settings-modal-step-row mb-4 flex items-center justify-between"
+          >
+            <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary"
+              >
                 3
-              </div>
-              <span className="text-sm font-semibold">
+              </AstryxView>
+              <AstryxInline className="text-sm font-semibold">
                 {type === "command"
                   ? t("settings.hooksCommandList")
                   : t("settings.hooksHttpRequests")}
-              </span>
-            </div>
+              </AstryxInline>
+            </AstryxView>
             {type === "command" ? (
-              <div className="flex items-center gap-2">
-                <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+              <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
+                <AstryxInline className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400">
                   {scriptLineCount} {t("settings.hooksScriptLinesCount")}
-                </span>
-                <span className="rounded-md bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                </AstryxInline>
+                <AstryxInline className="rounded-md bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                   {t("settings.hooksSequential")}
-                </span>
-              </div>
+                </AstryxInline>
+              </AstryxView>
             ) : (
-              <div className="flex items-center gap-2">
-                <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+              <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
+                <AstryxInline className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
                   {requests.length} {t("settings.hooksRequestsCount")}
-                </span>
+                </AstryxInline>
                 <Button
                   type="button"
                   variant="outline"
@@ -317,22 +383,36 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
                   <Plus className="h-3 w-3" />
                   {t("settings.add")}
                 </Button>
-              </div>
+              </AstryxView>
             )}
-          </div>
+          </AstryxView>
 
           {type === "command" ? (
-            <div className="space-y-3">
-              <div className="overflow-hidden rounded-xl border border-border/60 bg-muted/20">
-                <div className="flex items-center justify-between border-b border-border/30 px-3 py-2">
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <AstryxView layout="block" direction="horizontal" className="space-y-3">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="overflow-hidden rounded-xl border border-border/60 bg-muted/20"
+              >
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex items-center justify-between border-b border-border/30 px-3 py-2"
+                >
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+                  >
                     <Terminal className="h-3 w-3" />
-                    <span className="font-medium">{t("settings.hooksCommandList")}</span>
-                  </div>
-                  <span className="text-[11px] text-muted-foreground/60">
+                    <AstryxInline className="font-medium">
+                      {t("settings.hooksCommandList")}
+                    </AstryxInline>
+                  </AstryxView>
+                  <AstryxInline className="text-[11px] text-muted-foreground/60">
                     {t("settings.hooksCommandHint")}
-                  </span>
-                </div>
+                  </AstryxInline>
+                </AstryxView>
                 <Textarea
                   value={scriptText}
                   placeholder={"pnpm install\npnpm build\npnpm test"}
@@ -342,9 +422,13 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
                     setScriptText(e.currentTarget.value);
                   }}
                 />
-              </div>
-              <div className="settings-form-grid grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
+              </AstryxView>
+              <AstryxView
+                layout="grid"
+                direction="horizontal"
+                className="settings-form-grid grid gap-4 sm:grid-cols-2"
+              >
+                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                   <Label
                     htmlFor="hook-timeout"
                     className="text-xs font-medium text-muted-foreground"
@@ -363,9 +447,9 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
                       setTimeoutSeconds(next);
                     }}
                   />
-                </div>
-              </div>
-            </div>
+                </AstryxView>
+              </AstryxView>
+            </AstryxView>
           ) : (
             <HttpRequestListEditor
               requests={requests}
@@ -376,35 +460,48 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
               urlPlaceholder="https://example.com/hook"
             />
           )}
-        </div>
-      </div>
+        </AstryxView>
+      </AstryxView>
 
-      <div className="settings-modal-footer flex items-center justify-between border-t border-border/40 px-6 py-4">
-        <div className="min-w-0 flex-1">
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="settings-modal-footer flex items-center justify-between border-t border-border/40 px-6 py-4"
+      >
+        <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
           {formError ? (
-            <div className="flex items-center gap-1.5 text-xs text-destructive">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex items-center gap-1.5 text-xs text-destructive"
+            >
               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{formError}</span>
-            </div>
+              <AstryxInline className="truncate">{formError}</AstryxInline>
+            </AstryxView>
           ) : name.trim() && (type !== "command" || scriptText.trim()) ? (
-            <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"
+            >
               <Check className="h-3.5 w-3.5" />
-              <span>{t("settings.agentsReady")}</span>
-            </div>
+              <AstryxInline>{t("settings.agentsReady")}</AstryxInline>
+            </AstryxView>
           ) : null}
-        </div>
-        <div className="settings-modal-actions flex items-center gap-2">
-          <Button variant="outline" onClick={requestClose}>
+        </AstryxView>
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="settings-modal-actions flex items-center gap-2"
+        >
+          <Button variant="outline" onClick={onClose}>
             {t("settings.cancel")}
           </Button>
-          <Button
-            onClick={() => void handleSave()}
-            disabled={!name.trim() || isSaving || isClosing}
-          >
+          <Button onClick={() => void handleSave()} disabled={!name.trim() || isSaving}>
             {t("settings.save")}
           </Button>
-        </div>
-      </div>
+        </AstryxView>
+      </AstryxView>
     </SettingsModalShell>
   );
 }

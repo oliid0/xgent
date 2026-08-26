@@ -1,5 +1,11 @@
+import { Button } from "@astryxdesign/core/Button";
+import { FormLayout } from "@astryxdesign/core/FormLayout";
+import { StackItem, VStack } from "@astryxdesign/core/Layout";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Heading } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
 import { type FormEvent, useEffect, useState } from "react";
-import { Globe, Loader2, Shield, Trash2 } from "../../../components/icons";
+import { Globe, Shield, Trash2 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import {
   browserSessionController,
@@ -10,7 +16,6 @@ import {
   updateAccessSettings,
   updateCustomSettings,
 } from "../../../lib/settings";
-import { MobileToggle } from "./MobileHubChrome";
 import { MobileFullscreenPanel, MobilePanelHeader } from "./MobilePanelScaffold";
 
 type MobileBrowserSettingsPanelProps = {
@@ -44,91 +49,68 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
   };
 
   return (
-    <MobileFullscreenPanel open label={t("chat.mobileMenu.browserSettings")} className="bg-muted">
+    <MobileFullscreenPanel open label={t("chat.mobileMenu.browserSettings")}>
       <MobilePanelHeader
         title={t("chat.mobileMenu.browserSettings")}
         backLabel={t("settings.close")}
         onBack={props.onClose}
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-6">
-        <h2 className="px-2 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("browser.homePage")}
-        </h2>
-        <form
-          onSubmit={saveHomePage}
-          className="mt-2 overflow-hidden rounded-[1.5rem] bg-background shadow-sm ring-1 ring-border/40"
-        >
-          <label className="flex items-center gap-3 px-4 py-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white">
-              <Globe className="h-4 w-4" />
-            </span>
-            <input
-              value={homePage}
-              onChange={(event) => setHomePage(event.currentTarget.value)}
-              onBlur={() => saveHomePage()}
-              inputMode="url"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              className="h-11 min-w-0 flex-1 bg-transparent text-[14px] outline-none"
-              placeholder="https://www.google.com/"
-            />
-          </label>
-        </form>
+      <StackItem size="fill" isScrollable>
+        <VStack gap={6} padding={4}>
+          <VStack gap={2}>
+            <Heading level={3}>{t("browser.homePage")}</Heading>
+            <form onSubmit={saveHomePage}>
+              <FormLayout>
+                <TextInput
+                  label={t("browser.homePage")}
+                  startIcon={Globe}
+                  hasClear
+                  size="lg"
+                  width="100%"
+                  value={homePage}
+                  onChange={setHomePage}
+                  onBlur={() => saveHomePage()}
+                  placeholder="https://www.google.com/"
+                />
+              </FormLayout>
+            </form>
+          </VStack>
 
-        <h2 className="mt-7 px-2 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("browser.automation")}
-        </h2>
-        <div className="mt-2 overflow-hidden rounded-[1.5rem] bg-background shadow-sm ring-1 ring-border/40">
-          <div className="flex min-h-[72px] items-center gap-3 px-4">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-500 text-white">
-              <Shield className="h-4 w-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[15px] font-medium">
-                {t("settings.accessAllowBrowserAutomation")}
-              </div>
-              <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
-                {t("settings.accessAllowBrowserAutomationHint")}
-              </p>
-            </div>
-            <MobileToggle
-              checked={props.settings.access.allowBrowserAutomation}
+          <VStack gap={2}>
+            <Heading level={3}>{t("browser.automation")}</Heading>
+            <Switch
               label={t("settings.accessAllowBrowserAutomation")}
+              description={t("settings.accessAllowBrowserAutomationHint")}
+              labelIcon={Shield}
+              labelPosition="start"
+              labelSpacing="spread"
+              width="100%"
+              value={props.settings.access.allowBrowserAutomation}
               onChange={(allowBrowserAutomation) =>
                 props.setSettings((prev) => updateAccessSettings(prev, { allowBrowserAutomation }))
               }
             />
-          </div>
-        </div>
+          </VStack>
 
-        <h2 className="mt-7 px-2 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("browser.privacy")}
-        </h2>
-        <div className="mt-2 overflow-hidden rounded-[1.5rem] bg-background shadow-sm ring-1 ring-border/40">
-          <button
-            type="button"
-            disabled={clearing}
-            onClick={() => {
-              setClearing(true);
-              void browserSessionController.closeAllSessions().finally(() => setClearing(false));
-            }}
-            className="flex min-h-[64px] w-full items-center gap-3 px-4 text-left text-destructive active:bg-destructive/5 disabled:opacity-45"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10">
-              {clearing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-            </span>
-            <span className="min-w-0 flex-1 text-[15px] font-medium">
-              {t("browser.clearSessions")}
-            </span>
-          </button>
-        </div>
-      </div>
+          <VStack gap={2}>
+            <Heading level={3}>{t("browser.privacy")}</Heading>
+            <Button
+              label={t("browser.clearSessions")}
+              icon={<Trash2 />}
+              variant="destructive"
+              size="lg"
+              width="100%"
+              isLoading={clearing}
+              isDisabled={clearing}
+              onClick={() => {
+                setClearing(true);
+                void browserSessionController.closeAllSessions().finally(() => setClearing(false));
+              }}
+            />
+          </VStack>
+        </VStack>
+      </StackItem>
     </MobileFullscreenPanel>
   );
 }

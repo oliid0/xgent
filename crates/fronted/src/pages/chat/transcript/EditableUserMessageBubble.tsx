@@ -1,4 +1,8 @@
 import { memo, useEffect, useRef, useState } from "react";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { TextArea } from "@astryxdesign/core/TextArea";
 
 import { useLocale } from "../../../i18n";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
@@ -47,9 +51,14 @@ export const EditableUserMessageBubble = memo(function EditableUserMessageBubble
   const canSubmit = draftText.trim().length > 0 || draftAttachments.length > 0;
 
   return (
-    <div
-      className={`w-full max-w-[min(85%,calc(50em+2.5rem))] rounded-2xl border border-border bg-[hsl(var(--chat-user-bg))] p-3 ${compactedClass}`}
+    <Card
+      width="100%"
+      maxWidth="min(85%, calc(var(--xagent-chat-measure) + var(--spacing-10)))"
+      padding={3}
+      variant="muted"
+      className={compactedClass}
     >
+      <VStack gap={2}>
       <UserAttachmentCards
         files={draftAttachments}
         workspaceRoot={workspaceRoot}
@@ -57,40 +66,40 @@ export const EditableUserMessageBubble = memo(function EditableUserMessageBubble
           setDraftAttachments((prev) => prev.filter((file) => file.relativePath !== relativePath));
         }}
       />
-      <textarea
+      <TextArea
         ref={textareaRef}
-        className="w-full resize-none rounded-lg bg-transparent p-2 font-openai-chat text-[calc(14.5px*var(--zone-font-scale,1))] leading-relaxed text-[hsl(var(--chat-user-fg))] outline-none"
+        label={t("chat.editMessage")}
+        isLabelHidden
         value={draftText}
-        onChange={(e) => setDraftText(e.target.value)}
+        onChange={setDraftText}
         rows={Math.max(2, draftText.split("\n").length)}
-        aria-label={t("chat.editMessage")}
+        width="100%"
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             onCancel();
           }
         }}
       />
-      <div className="mt-2 flex justify-end gap-2">
-        <button
+      <HStack gap={2} hAlign="end">
+        <Button
           type="button"
-          className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
+          label={t("chat.cancel")}
+          variant="secondary"
           onClick={onCancel}
-        >
-          {t("chat.cancel")}
-        </button>
-        <button
+        />
+        <Button
           type="button"
-          className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground transition-colors hover:bg-primary/90"
-          disabled={!canSubmit}
+          label={t("chat.send")}
+          variant="primary"
+          isDisabled={!canSubmit}
           onClick={() => {
             const newText = draftText.trim();
             if (!canSubmit) return;
             onSubmit(newText, draftAttachments);
           }}
-        >
-          {t("chat.send")}
-        </button>
-      </div>
-    </div>
+        />
+      </HStack>
+      </VStack>
+    </Card>
   );
 });

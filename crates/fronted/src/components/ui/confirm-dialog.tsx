@@ -1,7 +1,13 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { AlertTriangle, X } from "../icons";
-import { Button } from "./button";
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
+import {
+  Children,
+  isValidElement,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 type ConfirmDialogTone = "warning" | "destructive";
 
@@ -20,22 +26,12 @@ type PendingConfirmDialog = ConfirmDialogOptions & {
   resolve: (confirmed: boolean) => void;
 };
 
-const toneClassNames: Record<
-  ConfirmDialogTone,
-  {
-    icon: string;
-    panel: string;
-  }
-> = {
-  warning: {
-    icon: "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-    panel: "border-amber-500/20 bg-amber-500/10",
-  },
-  destructive: {
-    icon: "border-destructive/25 bg-destructive/10 text-destructive",
-    panel: "border-destructive/20 bg-destructive/10",
-  },
-};
+function getNodeText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(getNodeText).join(" ").trim();
+  if (isValidElement<{ children?: ReactNode }>(node)) return getNodeText(node.props.children);
+  return Children.toArray(node).map(getNodeText).join(" ").trim();
+}
 
 function ConfirmDialog(
   props: ConfirmDialogOptions & { onCancel: () => void; onConfirm: () => void },
@@ -47,107 +43,29 @@ function ConfirmDialog(
     detail,
     confirmLabel,
     cancelLabel,
-    closeLabel = cancelLabel,
     tone = "destructive",
     onCancel,
     onConfirm,
   } = props;
-  const toneClasses = toneClassNames[tone];
+  const titleText = getNodeText(title);
+  const descriptionText = [subtitle, description, detail]
+    .map(getNodeText)
+    .filter(Boolean)
+    .join("\n\n");
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onCancel();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onCancel]);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4"
-      role="alertdialog"
-      aria-modal="true"
-      aria-label={typeof title === "string" ? title : undefined}
-    >
-      <button
-        type="button"
-        tabIndex={-1}
-        className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-sm"
-        onClick={onCancel}
-        aria-hidden="true"
-      />
-
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border/70 bg-background shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border ${toneClasses.icon}`}
-            >
-              <AlertTriangle className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="break-words text-base font-semibold text-foreground">{title}</div>
-              {subtitle ? (
-                <div className="mt-1 break-words text-xs leading-5 text-muted-foreground">
-                  {subtitle}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onCancel}
-            className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
-            title={closeLabel}
-            aria-label={closeLabel}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {description || detail ? (
-          <div className="space-y-3 px-5 py-5">
-            {description ? (
-              <div className={`rounded-xl border px-4 py-3 text-sm leading-6 ${toneClasses.panel}`}>
-                {description}
-              </div>
-            ) : null}
-            {detail ? (
-              <div className="break-words rounded-xl border border-border/60 bg-muted/25 px-3 py-2 text-xs leading-5 text-muted-foreground">
-                {detail}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="flex flex-col-reverse gap-2 border-t border-border/60 bg-muted/20 px-5 py-4 sm:flex-row sm:justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            autoFocus
-            className="w-full sm:w-auto"
-          >
-            {cancelLabel}
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={onConfirm}
-            className="w-full sm:w-auto"
-          >
-            {confirmLabel}
-          </Button>
-        </div>
-      </div>
-    </div>,
-    document.body,
+  return (
+    <AlertDialog
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onCancel();
+      }}
+      title={titleText}
+      description={descriptionText || titleText}
+      cancelLabel={cancelLabel}
+      actionLabel={confirmLabel}
+      actionVariant={tone === "destructive" ? "destructive" : "primary"}
+      onAction={onConfirm}
+    />
   );
 }
 

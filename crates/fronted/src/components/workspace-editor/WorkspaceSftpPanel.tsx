@@ -1,5 +1,11 @@
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { Button as XdsButton } from "@astryxdesign/core/Button";
+import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
+import { HStack } from "@astryxdesign/core/Layout";
+import { Popover } from "@astryxdesign/core/Popover";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { useToast } from "@astryxdesign/core/Toast";
 import { useLocale } from "../../i18n";
 import type { SftpClient, SftpEntry, SftpSide, SftpTransfer } from "../../lib/sftp/types";
 import { cn } from "../../lib/shared/utils";
@@ -20,6 +26,10 @@ import {
   Upload,
 } from "../icons";
 import { useConfirmDialog } from "../ui/confirm-dialog";
+import { AdaptiveDialog } from "../ui/adaptive-dialog";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
 
 type WorkspaceSftpPanelProps = {
   session: TerminalSession;
@@ -37,8 +47,6 @@ type PaneState = {
 };
 
 type ContextMenuState = {
-  x: number;
-  y: number;
   side: SftpSide;
   path: string;
   kind: string;
@@ -228,7 +236,12 @@ function PathCrumbRow(props: {
   }, [crumbs]);
 
   return (
-    <div ref={scrollRef} className="sftp-path-scroll flex min-w-0 items-center overflow-x-auto">
+    <AstryxView
+      layout="flex"
+      direction="horizontal"
+      ref={scrollRef}
+      className="sftp-path-scroll flex min-w-0 items-center overflow-x-auto"
+    >
       {crumbs.map((crumb, index) => {
         const isLast = index === crumbs.length - 1;
         return (
@@ -236,7 +249,7 @@ function PathCrumbRow(props: {
             {index > 0 ? (
               <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/40" />
             ) : null}
-            <button
+            <AstryxButton
               type="button"
               className={cn(
                 "shrink-0 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-foreground/[0.05]",
@@ -248,11 +261,11 @@ function PathCrumbRow(props: {
               onClick={() => onNavigate(crumb.path)}
             >
               {crumb.label || fallbackLabel || crumb.path}
-            </button>
+            </AstryxButton>
           </Fragment>
         );
       })}
-    </div>
+    </AstryxView>
   );
 }
 
@@ -282,6 +295,7 @@ function PathNavigator(props: {
   } = props;
   const listboxId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const anchorRef = useRef<HTMLDivElement | null>(null);
   const requestIdRef = useRef(0);
   const suggestionRefs = useRef(new Map<number, HTMLButtonElement>());
   const [editing, setEditing] = useState(false);
@@ -430,7 +444,10 @@ function PathNavigator(props: {
   };
 
   return (
-    <div
+    <AstryxView
+      layout="flex"
+      direction="horizontal"
+      ref={anchorRef}
       role="group"
       aria-label={t("workspaceSftp.pathSuggestions")}
       className="relative z-30 flex h-10 shrink-0 items-center border-b border-border/60 bg-muted/15 px-2"
@@ -441,9 +458,13 @@ function PathNavigator(props: {
       }}
     >
       {editing ? (
-        <div className="group relative flex h-8 min-w-0 flex-1 items-center rounded-lg border border-border/60 bg-background/85 shadow-sm transition-all focus-within:border-primary/40 focus-within:bg-background focus-within:ring-[3px] focus-within:ring-primary/10">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="group relative flex h-8 min-w-0 flex-1 items-center rounded-lg border border-border/60 bg-background/85 shadow-sm transition-all focus-within:border-primary/40 focus-within:bg-background focus-within:ring-[3px] focus-within:ring-primary/10"
+        >
           <FolderTree className="pointer-events-none absolute left-2.5 h-4 w-4 text-muted-foreground/70 transition-colors group-focus-within:text-primary" />
-          <input
+          <AstryxInput
             ref={inputRef}
             value={value}
             type="text"
@@ -470,17 +491,26 @@ function PathNavigator(props: {
             }}
             onKeyDown={handleKeyDown}
           />
-          <span className="pointer-events-none absolute right-2 flex items-center gap-1 text-[10px] text-muted-foreground/70">
+          <AstryxView
+            as="span"
+            layout="flex"
+            direction="horizontal"
+            className="pointer-events-none absolute right-2 flex items-center gap-1 text-[10px] text-muted-foreground/70"
+          >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> : null}
             <kbd className="rounded-[5px] border border-border/70 bg-background/80 px-1 py-0.5 font-sans text-muted-foreground/80">
               ↵
             </kbd>
-          </span>
-        </div>
+          </AstryxView>
+        </AstryxView>
       ) : (
-        <div className="flex h-8 min-w-0 flex-1 items-center rounded-lg px-0.5">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex h-8 min-w-0 flex-1 items-center rounded-lg px-0.5"
+        >
           <PathCrumbRow crumbs={crumbs} onNavigate={navigate} />
-          <button
+          <AstryxButton
             type="button"
             className="h-full min-w-4 flex-1 cursor-text"
             aria-label={t("workspaceSftp.pathEdit")}
@@ -490,96 +520,137 @@ function PathNavigator(props: {
           {loading ? (
             <Loader2 className="mx-1 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground/70" />
           ) : null}
-        </div>
+        </AstryxView>
       )}
 
       {editing && open ? (
-        <div
-          id={listboxId}
-          role="listbox"
-          className="sftp-path-popover-enter absolute inset-x-2 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-border/50 bg-popover/85 shadow-[0_18px_44px_-14px_rgba(0,0,0,0.28),0_2px_10px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.03] backdrop-blur-2xl dark:ring-white/[0.06]"
-        >
-          <div className="max-h-64 overflow-y-auto p-1">
-            {suggestionError ? (
-              <div
-                className="flex items-center gap-2 rounded-lg px-2.5 py-3 text-xs text-destructive"
-                title={suggestionError}
+        <Popover
+          anchorRef={{ current: anchorRef.current as HTMLElement }}
+          isOpen
+          onOpenChange={(isOpen) => {
+            if (!isOpen) closeEditor();
+          }}
+          placement="below"
+          alignment="start"
+          width="var(--xagent-sftp-path-popover-width)"
+          label={t("workspaceSftp.pathSuggestions")}
+          role="none"
+          hasAutoFocus={false}
+          hasCloseButton={false}
+          content={
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              id={listboxId}
+              role="listbox"
+              className="overflow-hidden"
+            >
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="max-h-64 overflow-y-auto p-1"
               >
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span className="truncate">{t("workspaceSftp.pathSearchFailed")}</span>
-              </div>
-            ) : suggestionsLoading ? (
-              <div className="flex items-center justify-center gap-2 px-3 py-5 text-xs text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("workspaceSftp.pathSearching")}
-              </div>
-            ) : suggestions.length ? (
-              suggestions.map((entry, index) => {
-                const DirectoryIcon = getFileTypeIcon(entry.name || entry.path, "dir", {
-                  expanded: true,
-                });
-                return (
-                  <button
-                    key={entry.path}
-                    ref={(element) => {
-                      if (element) suggestionRefs.current.set(index, element);
-                      else suggestionRefs.current.delete(index);
-                    }}
-                    id={`${listboxId}-option-${index}`}
-                    type="button"
-                    role="option"
-                    aria-selected={activeIndex === index}
-                    className={cn(
-                      "flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors",
-                      activeIndex === index
-                        ? "bg-primary/[0.08] text-foreground"
-                        : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
-                    )}
-                    title={entry.path}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => navigate(entry.path)}
+                {suggestionError ? (
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="flex items-center gap-2 rounded-lg px-2.5 py-3 text-xs text-destructive"
+                    title={suggestionError}
                   >
-                    <span
-                      className={cn(
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
-                        activeIndex === index
-                          ? "bg-primary/10 text-primary"
-                          : "bg-foreground/[0.04] text-muted-foreground",
-                      )}
-                    >
-                      <DirectoryIcon className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-medium text-foreground">
-                        {entry.name}
-                      </span>
-                      <span className="block truncate font-mono text-[10px] text-muted-foreground/80">
-                        {entry.path}
-                      </span>
-                    </span>
-                    <ChevronRight
-                      className={cn(
-                        "h-3.5 w-3.5 shrink-0 transition-opacity",
-                        activeIndex === index ? "opacity-60" : "opacity-30",
-                      )}
-                    />
-                  </button>
-                );
-              })
-            ) : (
-              <div className="px-3 py-5 text-center text-xs text-muted-foreground">
-                {t("workspaceSftp.pathNoMatches")}
-              </div>
-            )}
-          </div>
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <AstryxInline className="truncate">
+                      {t("workspaceSftp.pathSearchFailed")}
+                    </AstryxInline>
+                  </AstryxView>
+                ) : suggestionsLoading ? (
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="flex items-center justify-center gap-2 px-3 py-5 text-xs text-muted-foreground"
+                  >
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t("workspaceSftp.pathSearching")}
+                  </AstryxView>
+                ) : suggestions.length ? (
+                  suggestions.map((entry, index) => {
+                    const DirectoryIcon = getFileTypeIcon(entry.name || entry.path, "dir", {
+                      expanded: true,
+                    });
+                    return (
+                      <AstryxButton
+                        key={entry.path}
+                        ref={(element) => {
+                          if (element) suggestionRefs.current.set(index, element);
+                          else suggestionRefs.current.delete(index);
+                        }}
+                        id={`${listboxId}-option-${index}`}
+                        type="button"
+                        role="option"
+                        aria-selected={activeIndex === index}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors",
+                          activeIndex === index
+                            ? "bg-primary/[0.08] text-foreground"
+                            : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
+                        )}
+                        title={entry.path}
+                        onMouseEnter={() => setActiveIndex(index)}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => navigate(entry.path)}
+                      >
+                        <AstryxView
+                          as="span"
+                          layout="flex"
+                          direction="horizontal"
+                          className={cn(
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
+                            activeIndex === index
+                              ? "bg-primary/10 text-primary"
+                              : "bg-foreground/[0.04] text-muted-foreground",
+                          )}
+                        >
+                          <DirectoryIcon className="h-4 w-4" />
+                        </AstryxView>
+                        <AstryxInline className="min-w-0 flex-1">
+                          <AstryxInline className="block truncate text-xs font-medium text-foreground">
+                            {entry.name}
+                          </AstryxInline>
+                          <AstryxInline className="block truncate font-mono text-[10px] text-muted-foreground/80">
+                            {entry.path}
+                          </AstryxInline>
+                        </AstryxInline>
+                        <ChevronRight
+                          className={cn(
+                            "h-3.5 w-3.5 shrink-0 transition-opacity",
+                            activeIndex === index ? "opacity-60" : "opacity-30",
+                          )}
+                        />
+                      </AstryxButton>
+                    );
+                  })
+                ) : (
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="px-3 py-5 text-center text-xs text-muted-foreground"
+                  >
+                    {t("workspaceSftp.pathNoMatches")}
+                  </AstryxView>
+                )}
+              </AstryxView>
 
-          <div className="border-t border-border/50 bg-muted/25 px-3 py-1.5 text-[10px] text-muted-foreground/80">
-            {t("workspaceSftp.pathKeyboardHint")}
-          </div>
-        </div>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="border-t border-border/50 bg-muted/25 px-3 py-1.5 text-[10px] text-muted-foreground/80"
+              >
+                {t("workspaceSftp.pathKeyboardHint")}
+              </AstryxView>
+            </AstryxView>
+          }
+        />
       ) : null}
-    </div>
+    </AstryxView>
   );
 }
 
@@ -703,7 +774,6 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
   const pointerDragRef = useRef<PointerDragState | null>(null);
   const suppressNextClickRef = useRef(false);
   const suppressNextContextMenuRef = useRef(false);
-  const copyToastTimerRef = useRef<number | null>(null);
   const panePathRef = useRef({ local: INITIAL_LOCAL_PATH, remote: INITIAL_REMOTE_PATH });
   const [localPane, setLocalPane] = useState<PaneState>(() => initialPane(INITIAL_LOCAL_PATH));
   const [remotePane, setRemotePane] = useState<PaneState>(() => initialPane(INITIAL_REMOTE_PATH));
@@ -723,7 +793,7 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
   const [renameEntryName, setRenameEntryName] = useState("");
   const [renamingEntry, setRenamingEntry] = useState(false);
   const [copyPathDialog, setCopyPathDialog] = useState<string | null>(null);
-  const [copyToastVisible, setCopyToastVisible] = useState(false);
+  const showToast = useToast();
 
   const workdir = session.cwd;
   const projectPathKey = session.projectPathKey || session.cwd;
@@ -798,24 +868,8 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
       terminalTransfersRef.current.clear();
       pendingTransferStartsRef.current = 0;
       activeTransferIdsRef.current.clear();
-      if (copyToastTimerRef.current !== null) {
-        window.clearTimeout(copyToastTimerRef.current);
-      }
     };
   }, []);
-
-  useEffect(() => {
-    if (!contextMenu) return;
-    const close = () => setContextMenu(null);
-    window.addEventListener("click", close);
-    window.addEventListener("blur", close);
-    window.addEventListener("resize", close);
-    return () => {
-      window.removeEventListener("click", close);
-      window.removeEventListener("blur", close);
-      window.removeEventListener("resize", close);
-    };
-  }, [contextMenu]);
 
   useEffect(() => {
     return client.subscribeTransfers((event) => {
@@ -1078,15 +1132,14 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
   );
 
   const showCopyToast = useCallback(() => {
-    if (copyToastTimerRef.current !== null) {
-      window.clearTimeout(copyToastTimerRef.current);
-    }
-    setCopyToastVisible(true);
-    copyToastTimerRef.current = window.setTimeout(() => {
-      setCopyToastVisible(false);
-      copyToastTimerRef.current = null;
-    }, 1600);
-  }, []);
+    showToast({
+      body: t("workspaceSftp.copyPathCopied"),
+      type: "info",
+      isAutoHide: true,
+      uniqueID: "workspace-sftp-copy-path",
+      collisionBehavior: "overwrite",
+    });
+  }, [showToast, t]);
 
   const copyPath = useCallback(
     async (path: string) => {
@@ -1355,19 +1408,11 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
   const openContextMenu = useCallback(
     (event: React.MouseEvent, side: SftpSide, path: string, kind: string, isEntry = false) => {
       event.preventDefault();
-      event.stopPropagation();
       const items = getActionItems(side, path, kind, isEntry);
       if (isEntry && !selectedItemsForSide(side).some((entry) => entry.path === path)) {
         selectEntry(side, path, false);
       }
-      const rect = panelRef.current?.getBoundingClientRect();
-      const menuWidth = 220;
-      const menuHeight = 250;
-      const maxX = Math.max(8, (rect?.width ?? window.innerWidth) - menuWidth - 8);
-      const maxY = Math.max(8, (rect?.height ?? window.innerHeight) - menuHeight - 8);
       setContextMenu({
-        x: Math.min(Math.max(8, event.clientX - (rect?.left ?? 0)), maxX),
-        y: Math.min(Math.max(8, event.clientY - (rect?.top ?? 0)), maxY),
         side,
         path,
         kind,
@@ -1391,410 +1436,67 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
     [localPane, remotePane, session.ssh, session.title, t, workdir],
   );
 
-  if (!connected) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
-        <AlertTriangle className="h-8 w-8 text-amber-500" />
-        <div className="font-medium text-foreground">{t("workspaceSftp.disconnected")}</div>
-        <div className="max-w-md text-xs">{t("workspaceSftp.disconnectedHint")}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div ref={panelRef} className="relative flex h-full min-h-0 flex-col bg-background">
-      <div className="flex min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="grid h-full min-h-0 min-w-[860px] flex-1 grid-cols-2 divide-x divide-border">
-          {panes.map(({ side, label, root, pane }) => {
-            const dropMode =
-              activeDragSource?.side === "local" && side === "remote"
-                ? "upload"
-                : activeDragSource?.side === "remote" && side === "local"
-                  ? "download"
-                  : null;
-            const dropActive = dropMode !== null && dropTarget?.side === side;
-            const DropIcon = dropMode === "download" ? Download : Upload;
-            const dropPath = dropActive ? dropTarget?.path || pane.path : pane.path;
-            const PaneFolderIcon = getFileTypeIcon(root || pane.path, "dir", { expanded: true });
-
-            return (
-              <div
-                key={side}
-                data-sftp-drop-side={side}
-                data-sftp-drop-path={pane.path}
-                className={cn(
-                  "relative flex min-h-0 min-w-0 flex-col overflow-hidden transition-colors",
-                  dropMode && "bg-muted/20",
-                  dropActive && "bg-emerald-500/5",
-                )}
-                onDragOver={(event) => handleDragOver(event, side, pane.path)}
-                onDragLeave={handleDragLeave}
-                onDrop={(event) => handleDrop(event, side, pane.path)}
-                onContextMenu={(event) =>
-                  openContextMenu(event, side, pane.path, "directory", false)
-                }
-              >
-                <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-background text-muted-foreground">
-                    <PaneFolderIcon className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold text-foreground">{label}</div>
-                    <div className="truncate font-mono text-[11px] text-muted-foreground">
-                      {root}
-                    </div>
-                  </div>
-                  {pane.selectedPaths.length ? (
-                    <button
-                      type="button"
-                      className="inline-flex h-7 max-w-[112px] shrink-0 items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-500/15 dark:text-emerald-300"
-                      title={t("workspaceSftp.clearSelection")}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        clearSelection(side);
-                      }}
-                    >
-                      <span className="truncate">
-                        {t("workspaceSftp.selectedCount").replace(
-                          "{count}",
-                          String(pane.selectedPaths.length),
-                        )}
-                      </span>
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-background hover:text-foreground"
-                    title={t("workspaceSftp.refresh")}
-                    onClick={() => refreshPane(side)}
-                  >
-                    <RefreshCw className={cn("h-4 w-4", pane.loading && "animate-spin")} />
-                  </button>
-                </div>
-
-                <PathNavigator
-                  side={side}
-                  path={pane.path}
-                  loading={pane.loading}
-                  client={client}
-                  sessionId={session.id}
-                  projectPathKey={projectPathKey}
-                  workdir={workdir}
-                  rootLabel={t("workspaceSftp.projectRoot")}
-                  onNavigate={(nextPath) => void loadPane(side, nextPath)}
-                  t={t}
-                />
-
-                {pane.error ? (
-                  <div className="m-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span className="min-w-0 break-words">{pane.error}</span>
-                  </div>
-                ) : null}
-
-                <div
-                  className="relative min-h-0 flex-1 overscroll-contain overflow-auto p-2"
-                  onClick={(event) => {
-                    const target = event.target;
-                    if (target instanceof HTMLElement && target.closest("[data-sftp-entry]"))
-                      return;
-                    clearSelection(side);
-                  }}
-                >
-                  {dropMode ? (
-                    <div
-                      className={cn(
-                        "pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg bg-background/80 text-center opacity-75 shadow-inner backdrop-blur-[1px] transition-all",
-                        dropActive && "bg-emerald-500/10 opacity-100",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "absolute left-0 top-0 h-14 w-14 rounded-tl-lg border-l-2 border-t-2",
-                          dropActive ? "border-emerald-600" : "border-foreground/65",
-                        )}
-                      />
-                      <span
-                        className={cn(
-                          "absolute right-0 top-0 h-14 w-14 rounded-tr-lg border-r-2 border-t-2",
-                          dropActive ? "border-emerald-600" : "border-foreground/65",
-                        )}
-                      />
-                      <span
-                        className={cn(
-                          "absolute bottom-0 left-0 h-14 w-14 rounded-bl-lg border-b-2 border-l-2",
-                          dropActive ? "border-emerald-600" : "border-foreground/65",
-                        )}
-                      />
-                      <span
-                        className={cn(
-                          "absolute bottom-0 right-0 h-14 w-14 rounded-br-lg border-b-2 border-r-2",
-                          dropActive ? "border-emerald-600" : "border-foreground/65",
-                        )}
-                      />
-                      <div className="flex max-w-[75%] flex-col items-center gap-3">
-                        <div
-                          className={cn(
-                            "flex h-14 w-14 items-center justify-center rounded-xl border-2 bg-background/90 shadow-sm",
-                            dropActive
-                              ? "border-emerald-600 text-emerald-700 dark:text-emerald-300"
-                              : "border-foreground/70 text-foreground",
-                          )}
-                        >
-                          <DropIcon className="h-7 w-7" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-foreground">
-                            {t("workspaceSftp.dropHere")}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {t(
-                              dropMode === "upload"
-                                ? "workspaceSftp.drop.upload"
-                                : "workspaceSftp.drop.download",
-                            )}
-                          </div>
-                          {dropPath ? (
-                            <div className="mx-auto mt-2 max-w-full truncate rounded bg-background/70 px-2 py-1 font-mono text-[11px] text-muted-foreground">
-                              {normalizePath(dropPath, side)}
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                  {pane.loading && pane.entries.length === 0 ? (
-                    <div className="flex h-full items-center justify-center gap-2 text-xs text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("workspaceSftp.loading")}
-                    </div>
-                  ) : pane.entries.length === 0 ? (
-                    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                      {t("workspaceSftp.empty")}
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      {pane.entries.map((entry) => {
-                        const isSelected = pane.selectedPaths.includes(entry.path);
-                        return (
-                          <button
-                            key={entry.path}
-                            type="button"
-                            draggable={false}
-                            data-sftp-entry="true"
-                            data-sftp-drop-side={entry.kind === "directory" ? side : undefined}
-                            data-sftp-drop-path={
-                              entry.kind === "directory" ? entry.path : undefined
-                            }
-                            aria-pressed={isSelected}
-                            className={cn(
-                              "grid w-full touch-none cursor-default grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-3 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted",
-                              isSelected &&
-                                "bg-emerald-500/10 text-foreground ring-1 ring-emerald-500/20",
-                              activeDragSource?.side === side &&
-                                dragItems(activeDragSource).some(
-                                  (item) => item.path === entry.path,
-                                ) &&
-                                "bg-muted text-muted-foreground opacity-70 ring-1 ring-border",
-                              dropTarget?.side === side &&
-                                dropTarget.path === entry.path &&
-                                entry.kind === "directory" &&
-                                "bg-emerald-500/10 text-foreground",
-                            )}
-                            onClick={(event) => {
-                              if (suppressNextClickRef.current) {
-                                suppressNextClickRef.current = false;
-                                event.preventDefault();
-                                event.stopPropagation();
-                                return;
-                              }
-                              selectEntry(side, entry.path, event.ctrlKey || event.metaKey);
-                            }}
-                            onDoubleClick={() => {
-                              if (entry.kind === "directory") void loadPane(side, entry.path);
-                            }}
-                            onDragOver={(event) => {
-                              if (entry.kind === "directory") {
-                                handleDragOver(event, side, entry.path);
-                              }
-                            }}
-                            onDragLeave={(event) => {
-                              if (entry.kind === "directory") {
-                                handleDragLeave(event);
-                              }
-                            }}
-                            onDrop={(event) => {
-                              if (entry.kind === "directory") {
-                                handleDrop(event, side, entry.path);
-                              }
-                            }}
-                            onDragStart={(event) => {
-                              const payload = createDragPayload(side, entry);
-                              nativeDragPayloadRef.current = payload;
-                              setActiveDragSource(payload);
-                              writeDragPayload(event.dataTransfer, payload);
-                            }}
-                            onPointerDown={(event) => {
-                              if (
-                                event.button === 0 &&
-                                event.isPrimary &&
-                                (event.ctrlKey || event.metaKey)
-                              ) {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                selectEntry(side, entry.path, true);
-                                suppressNextClickRef.current = true;
-                                suppressNextContextMenuRef.current = event.ctrlKey;
-                                window.setTimeout(() => {
-                                  suppressNextContextMenuRef.current = false;
-                                }, 250);
-                                return;
-                              }
-                              try {
-                                event.currentTarget.setPointerCapture(event.pointerId);
-                              } catch {
-                                // Some WebViews reject capture during synthetic pointer streams.
-                              }
-                              beginPointerDrag(event, createDragPayload(side, entry));
-                            }}
-                            onDragEnd={() => {
-                              nativeDragPayloadRef.current = null;
-                              setDropTarget(null);
-                              setActiveDragSource(null);
-                              setDragPreview(null);
-                            }}
-                            onContextMenu={(event) => {
-                              if (suppressNextContextMenuRef.current) {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                suppressNextContextMenuRef.current = false;
-                                return;
-                              }
-                              openContextMenu(event, side, entry.path, entry.kind, true);
-                            }}
-                          >
-                            <span className="flex min-w-0 items-center gap-2">
-                              {entryIcon(entry)}
-                              <span className="truncate">{entry.name}</span>
-                            </span>
-                            <span className="text-right font-mono text-[11px] text-muted-foreground">
-                              {entry.kind === "directory" ? "--" : formatBytes(entry.sizeBytes)}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="flex h-10 shrink-0 items-center gap-2 border-t border-border bg-muted/30 px-3 text-xs text-muted-foreground">
-        {busyMessage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-        <span className="min-w-0 flex-1 truncate">
-          {busyMessage || (transfer ? "" : t("workspaceSftp.transfer.idle"))}
-        </span>
-        {transfer ? (
-          <TransferToast
-            transfer={transfer}
-            queueCount={queueCount}
-            cancelLabel={t("workspaceSftp.cancel")}
-            filesLabel={t("workspaceSftp.transfer.files")}
-            statusLabel={t(`workspaceSftp.transfer.${transfer.status}`)}
-            onCancel={
-              transfer.id && transfer.status === "running"
-                ? () =>
-                    void client.cancelTransfer({ sessionId: session.id, transferId: transfer.id })
-                : undefined
-            }
-          />
-        ) : null}
-      </div>
-
-      {contextMenu ? (
-        <div
-          className="editor-context-menu absolute z-[80] w-[220px] select-none overflow-hidden rounded-xl border border-border/60 bg-popover/90 p-1 text-xs text-popover-foreground shadow-2xl ring-1 ring-black/[0.03] backdrop-blur-xl dark:ring-white/[0.06]"
-          role="menu"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onContextMenu={(event) => event.preventDefault()}
-        >
-          {contextMenu.items.length > 1 ? (
-            <div className="mb-1 flex items-center justify-between rounded-lg bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-              <span>
-                {t("workspaceSftp.selectedCount").replace(
+  const sftpContextMenuItems: ContextMenuOption[] = contextMenu
+    ? [
+        ...(contextMenu.items.length > 1
+          ? [
+              {
+                type: "section" as const,
+                title: t("workspaceSftp.selectedCount").replace(
                   "{count}",
                   String(contextMenu.items.length),
-                )}
-              </span>
-              <button
-                type="button"
-                className="rounded px-1 text-emerald-700/80 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300/80 dark:hover:text-emerald-200"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  clearSelection(contextMenu.side);
-                  setContextMenu(null);
-                }}
-              >
-                {t("workspaceSftp.clearSelection")}
-              </button>
-            </div>
-          ) : null}
-          <MenuItem
-            icon={<RefreshCw className="h-3.5 w-3.5" />}
-            label={t("workspaceSftp.refresh")}
-            onClick={() => {
-              setContextMenu(null);
-              refreshPane(contextMenu.side);
-            }}
-          />
-          <MenuItem
-            icon={<Plus className="h-3.5 w-3.5" />}
-            label={t("workspaceSftp.newFolder")}
-            onClick={() => {
-              setContextMenu(null);
-              openCreateFolderDialog(
-                contextMenu.side,
-                contextMenu.kind === "directory"
-                  ? contextMenu.path
-                  : parentPath(contextMenu.path, contextMenu.side),
-              );
-            }}
-          />
-          <MenuItem
-            icon={<Pencil className="h-3.5 w-3.5" />}
-            label={t("workspaceSftp.rename")}
-            disabled={
-              !contextMenu.isEntry ||
-              contextMenu.items.length !== 1 ||
-              contextMenu.path === "" ||
-              contextMenu.path === "."
-            }
-            onClick={() => {
-              setContextMenu(null);
-              openRenameEntryDialog(contextMenu.side, contextMenu.path);
-            }}
-          />
-          <MenuItem
-            icon={<Trash2 className="h-3.5 w-3.5" />}
-            label={t("workspaceSftp.delete")}
-            disabled={!contextMenu.isEntry || contextMenu.items.length === 0}
-            destructive
-            onClick={() => {
-              setContextMenu(null);
-              void deleteEntries(contextMenu.side, contextMenu.items);
-            }}
-          />
-          <div className="my-1 h-px bg-border/70" />
-          {contextMenu.side === "local" ? (
-            <MenuItem
-              icon={<Upload className="h-3.5 w-3.5" />}
-              label={t("workspaceSftp.uploadToRemote")}
-              disabled={!contextMenu.isEntry || contextMenu.items.length === 0}
-              onClick={() => {
-                setContextMenu(null);
+                ),
+                items: [
+                  {
+                    label: t("workspaceSftp.clearSelection"),
+                    onClick: () => clearSelection(contextMenu.side),
+                  },
+                ],
+              },
+            ]
+          : []),
+        {
+          label: t("workspaceSftp.refresh"),
+          icon: <RefreshCw />,
+          onClick: () => refreshPane(contextMenu.side),
+        },
+        {
+          label: t("workspaceSftp.newFolder"),
+          icon: <Plus />,
+          onClick: () =>
+            openCreateFolderDialog(
+              contextMenu.side,
+              contextMenu.kind === "directory"
+                ? contextMenu.path
+                : parentPath(contextMenu.path, contextMenu.side),
+            ),
+        },
+        {
+          label: t("workspaceSftp.rename"),
+          icon: <Pencil />,
+          isDisabled:
+            !contextMenu.isEntry ||
+            contextMenu.items.length !== 1 ||
+            contextMenu.path === "" ||
+            contextMenu.path === ".",
+          onClick: () => openRenameEntryDialog(contextMenu.side, contextMenu.path),
+        },
+        {
+          label: t("workspaceSftp.delete"),
+          icon: <Trash2 />,
+          isDisabled: !contextMenu.isEntry || contextMenu.items.length === 0,
+          variant: "destructive",
+          onClick: () => {
+            void deleteEntries(contextMenu.side, contextMenu.items);
+          },
+        },
+        { type: "divider" },
+        contextMenu.side === "local"
+          ? {
+              label: t("workspaceSftp.uploadToRemote"),
+              icon: <Upload />,
+              isDisabled: !contextMenu.isEntry || contextMenu.items.length === 0,
+              onClick: () => {
                 void transferItem(
                   {
                     side: "local",
@@ -1805,15 +1507,13 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
                   "remote",
                   remotePane.path,
                 );
-              }}
-            />
-          ) : (
-            <MenuItem
-              icon={<Download className="h-3.5 w-3.5" />}
-              label={t("workspaceSftp.downloadToLocal")}
-              disabled={!contextMenu.isEntry || contextMenu.items.length === 0}
-              onClick={() => {
-                setContextMenu(null);
+              },
+            }
+          : {
+              label: t("workspaceSftp.downloadToLocal"),
+              icon: <Download />,
+              isDisabled: !contextMenu.isEntry || contextMenu.items.length === 0,
+              onClick: () => {
                 void transferItem(
                   {
                     side: "remote",
@@ -1824,74 +1524,489 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
                   "local",
                   localPane.path,
                 );
-              }}
-            />
-          )}
-          <MenuItem
-            icon={<Copy className="h-3.5 w-3.5" />}
-            label={t("workspaceSftp.copyPath")}
-            onClick={() => {
-              setContextMenu(null);
-              void copyPaths(
-                contextMenu.side,
-                contextMenu.items.length
-                  ? contextMenu.items
-                  : [{ path: contextMenu.path, kind: contextMenu.kind }],
+              },
+            },
+        {
+          label: t("workspaceSftp.copyPath"),
+          icon: <Copy />,
+          onClick: () => {
+            void copyPaths(
+              contextMenu.side,
+              contextMenu.items.length
+                ? contextMenu.items
+                : [{ path: contextMenu.path, kind: contextMenu.kind }],
+            );
+          },
+        },
+      ]
+    : [];
+
+  if (!connected) {
+    return (
+      <AstryxView
+        layout="flex"
+        direction="vertical"
+        className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground"
+      >
+        <AlertTriangle className="h-8 w-8 text-amber-500" />
+        <AstryxView layout="block" direction="horizontal" className="font-medium text-foreground">
+          {t("workspaceSftp.disconnected")}
+        </AstryxView>
+        <AstryxView layout="block" direction="horizontal" className="max-w-md text-xs">
+          {t("workspaceSftp.disconnectedHint")}
+        </AstryxView>
+      </AstryxView>
+    );
+  }
+
+  return (
+    <ContextMenu
+      items={sftpContextMenuItems}
+      label={t("workspaceSftp.copyPath")}
+      menuWidth="var(--xagent-sftp-context-menu-width)"
+      size="sm"
+      onOpenChange={(isOpen) => {
+        if (!isOpen) setContextMenu(null);
+      }}
+    >
+      <AstryxView
+        layout="flex"
+        direction="vertical"
+        ref={panelRef}
+        className="relative flex h-full min-h-0 flex-col bg-background"
+      >
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
+        >
+          <AstryxView
+            layout="grid"
+            direction="horizontal"
+            className="grid h-full min-h-0 min-w-[860px] flex-1 grid-cols-2 divide-x divide-border"
+          >
+            {panes.map(({ side, label, root, pane }) => {
+              const dropMode =
+                activeDragSource?.side === "local" && side === "remote"
+                  ? "upload"
+                  : activeDragSource?.side === "remote" && side === "local"
+                    ? "download"
+                    : null;
+              const dropActive = dropMode !== null && dropTarget?.side === side;
+              const DropIcon = dropMode === "download" ? Download : Upload;
+              const dropPath = dropActive ? dropTarget?.path || pane.path : pane.path;
+              const PaneFolderIcon = getFileTypeIcon(root || pane.path, "dir", { expanded: true });
+
+              return (
+                <AstryxView
+                  layout="flex"
+                  direction="vertical"
+                  key={side}
+                  data-sftp-drop-side={side}
+                  data-sftp-drop-path={pane.path}
+                  className={cn(
+                    "relative flex min-h-0 min-w-0 flex-col overflow-hidden transition-colors",
+                    dropMode && "bg-muted/20",
+                    dropActive && "bg-emerald-500/5",
+                  )}
+                  onDragOver={(event) => handleDragOver(event, side, pane.path)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(event) => handleDrop(event, side, pane.path)}
+                  onContextMenu={(event) =>
+                    openContextMenu(event, side, pane.path, "directory", false)
+                  }
+                >
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3"
+                  >
+                    <AstryxView
+                      layout="flex"
+                      direction="horizontal"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-background text-muted-foreground"
+                    >
+                      <PaneFolderIcon className="h-4 w-4" />
+                    </AstryxView>
+                    <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="truncate text-sm font-semibold text-foreground"
+                      >
+                        {label}
+                      </AstryxView>
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="truncate font-mono text-[11px] text-muted-foreground"
+                      >
+                        {root}
+                      </AstryxView>
+                    </AstryxView>
+                    {pane.selectedPaths.length ? (
+                      <AstryxButton
+                        type="button"
+                        className="inline-flex h-7 max-w-[112px] shrink-0 items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-500/15 dark:text-emerald-300"
+                        title={t("workspaceSftp.clearSelection")}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          clearSelection(side);
+                        }}
+                      >
+                        <AstryxInline className="truncate">
+                          {t("workspaceSftp.selectedCount").replace(
+                            "{count}",
+                            String(pane.selectedPaths.length),
+                          )}
+                        </AstryxInline>
+                      </AstryxButton>
+                    ) : null}
+                    <AstryxButton
+                      type="button"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-background hover:text-foreground"
+                      title={t("workspaceSftp.refresh")}
+                      onClick={() => refreshPane(side)}
+                    >
+                      <RefreshCw className={cn("h-4 w-4", pane.loading && "animate-spin")} />
+                    </AstryxButton>
+                  </AstryxView>
+
+                  <PathNavigator
+                    side={side}
+                    path={pane.path}
+                    loading={pane.loading}
+                    client={client}
+                    sessionId={session.id}
+                    projectPathKey={projectPathKey}
+                    workdir={workdir}
+                    rootLabel={t("workspaceSftp.projectRoot")}
+                    onNavigate={(nextPath) => void loadPane(side, nextPath)}
+                    t={t}
+                  />
+
+                  {pane.error ? (
+                    <AstryxView
+                      layout="flex"
+                      direction="horizontal"
+                      className="m-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                    >
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <AstryxInline className="min-w-0 break-words">{pane.error}</AstryxInline>
+                    </AstryxView>
+                  ) : null}
+
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="relative min-h-0 flex-1 overscroll-contain overflow-auto p-2"
+                    onClick={(event) => {
+                      const target = event.target;
+                      if (target instanceof HTMLElement && target.closest("[data-sftp-entry]"))
+                        return;
+                      clearSelection(side);
+                    }}
+                  >
+                    {dropMode ? (
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
+                        className={cn(
+                          "pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg bg-background/80 text-center opacity-75 shadow-inner backdrop-blur-[1px] transition-all",
+                          dropActive && "bg-emerald-500/10 opacity-100",
+                        )}
+                      >
+                        <AstryxInline
+                          className={cn(
+                            "absolute left-0 top-0 h-14 w-14 rounded-tl-lg border-l-2 border-t-2",
+                            dropActive ? "border-emerald-600" : "border-foreground/65",
+                          )}
+                        />
+                        <AstryxInline
+                          className={cn(
+                            "absolute right-0 top-0 h-14 w-14 rounded-tr-lg border-r-2 border-t-2",
+                            dropActive ? "border-emerald-600" : "border-foreground/65",
+                          )}
+                        />
+                        <AstryxInline
+                          className={cn(
+                            "absolute bottom-0 left-0 h-14 w-14 rounded-bl-lg border-b-2 border-l-2",
+                            dropActive ? "border-emerald-600" : "border-foreground/65",
+                          )}
+                        />
+                        <AstryxInline
+                          className={cn(
+                            "absolute bottom-0 right-0 h-14 w-14 rounded-br-lg border-b-2 border-r-2",
+                            dropActive ? "border-emerald-600" : "border-foreground/65",
+                          )}
+                        />
+                        <AstryxView
+                          layout="flex"
+                          direction="vertical"
+                          className="flex max-w-[75%] flex-col items-center gap-3"
+                        >
+                          <AstryxView
+                            layout="flex"
+                            direction="horizontal"
+                            className={cn(
+                              "flex h-14 w-14 items-center justify-center rounded-xl border-2 bg-background/90 shadow-sm",
+                              dropActive
+                                ? "border-emerald-600 text-emerald-700 dark:text-emerald-300"
+                                : "border-foreground/70 text-foreground",
+                            )}
+                          >
+                            <DropIcon className="h-7 w-7" />
+                          </AstryxView>
+                          <AstryxView layout="block" direction="horizontal">
+                            <AstryxView
+                              layout="block"
+                              direction="horizontal"
+                              className="text-sm font-semibold text-foreground"
+                            >
+                              {t("workspaceSftp.dropHere")}
+                            </AstryxView>
+                            <AstryxView
+                              layout="block"
+                              direction="horizontal"
+                              className="mt-1 text-xs text-muted-foreground"
+                            >
+                              {t(
+                                dropMode === "upload"
+                                  ? "workspaceSftp.drop.upload"
+                                  : "workspaceSftp.drop.download",
+                              )}
+                            </AstryxView>
+                            {dropPath ? (
+                              <AstryxView
+                                layout="block"
+                                direction="horizontal"
+                                className="mx-auto mt-2 max-w-full truncate rounded bg-background/70 px-2 py-1 font-mono text-[11px] text-muted-foreground"
+                              >
+                                {normalizePath(dropPath, side)}
+                              </AstryxView>
+                            ) : null}
+                          </AstryxView>
+                        </AstryxView>
+                      </AstryxView>
+                    ) : null}
+                    {pane.loading && pane.entries.length === 0 ? (
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
+                        className="flex h-full items-center justify-center gap-2 text-xs text-muted-foreground"
+                      >
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {t("workspaceSftp.loading")}
+                      </AstryxView>
+                    ) : pane.entries.length === 0 ? (
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
+                        className="flex h-full items-center justify-center text-xs text-muted-foreground"
+                      >
+                        {t("workspaceSftp.empty")}
+                      </AstryxView>
+                    ) : (
+                      <AstryxView layout="block" direction="horizontal" className="space-y-1">
+                        {pane.entries.map((entry) => {
+                          const isSelected = pane.selectedPaths.includes(entry.path);
+                          return (
+                            <AstryxButton
+                              key={entry.path}
+                              type="button"
+                              draggable={false}
+                              data-sftp-entry="true"
+                              data-sftp-drop-side={entry.kind === "directory" ? side : undefined}
+                              data-sftp-drop-path={
+                                entry.kind === "directory" ? entry.path : undefined
+                              }
+                              aria-pressed={isSelected}
+                              className={cn(
+                                "grid w-full touch-none cursor-default grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-3 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted",
+                                isSelected &&
+                                  "bg-emerald-500/10 text-foreground ring-1 ring-emerald-500/20",
+                                activeDragSource?.side === side &&
+                                  dragItems(activeDragSource).some(
+                                    (item) => item.path === entry.path,
+                                  ) &&
+                                  "bg-muted text-muted-foreground opacity-70 ring-1 ring-border",
+                                dropTarget?.side === side &&
+                                  dropTarget.path === entry.path &&
+                                  entry.kind === "directory" &&
+                                  "bg-emerald-500/10 text-foreground",
+                              )}
+                              onClick={(event) => {
+                                if (suppressNextClickRef.current) {
+                                  suppressNextClickRef.current = false;
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  return;
+                                }
+                                selectEntry(side, entry.path, event.ctrlKey || event.metaKey);
+                              }}
+                              onDoubleClick={() => {
+                                if (entry.kind === "directory") void loadPane(side, entry.path);
+                              }}
+                              onDragOver={(event) => {
+                                if (entry.kind === "directory") {
+                                  handleDragOver(event, side, entry.path);
+                                }
+                              }}
+                              onDragLeave={(event) => {
+                                if (entry.kind === "directory") {
+                                  handleDragLeave(event);
+                                }
+                              }}
+                              onDrop={(event) => {
+                                if (entry.kind === "directory") {
+                                  handleDrop(event, side, entry.path);
+                                }
+                              }}
+                              onDragStart={(event) => {
+                                const payload = createDragPayload(side, entry);
+                                nativeDragPayloadRef.current = payload;
+                                setActiveDragSource(payload);
+                                writeDragPayload(event.dataTransfer, payload);
+                              }}
+                              onPointerDown={(event) => {
+                                if (
+                                  event.button === 0 &&
+                                  event.isPrimary &&
+                                  (event.ctrlKey || event.metaKey)
+                                ) {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  selectEntry(side, entry.path, true);
+                                  suppressNextClickRef.current = true;
+                                  suppressNextContextMenuRef.current = event.ctrlKey;
+                                  window.setTimeout(() => {
+                                    suppressNextContextMenuRef.current = false;
+                                  }, 250);
+                                  return;
+                                }
+                                try {
+                                  event.currentTarget.setPointerCapture(event.pointerId);
+                                } catch {
+                                  // Some WebViews reject capture during synthetic pointer streams.
+                                }
+                                beginPointerDrag(event, createDragPayload(side, entry));
+                              }}
+                              onDragEnd={() => {
+                                nativeDragPayloadRef.current = null;
+                                setDropTarget(null);
+                                setActiveDragSource(null);
+                                setDragPreview(null);
+                              }}
+                              onContextMenu={(event) => {
+                                if (suppressNextContextMenuRef.current) {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  suppressNextContextMenuRef.current = false;
+                                  return;
+                                }
+                                openContextMenu(event, side, entry.path, entry.kind, true);
+                              }}
+                            >
+                              <AstryxView
+                                as="span"
+                                layout="flex"
+                                direction="horizontal"
+                                className="flex min-w-0 items-center gap-2"
+                              >
+                                {entryIcon(entry)}
+                                <AstryxInline className="truncate">{entry.name}</AstryxInline>
+                              </AstryxView>
+                              <AstryxInline className="text-right font-mono text-[11px] text-muted-foreground">
+                                {entry.kind === "directory" ? "--" : formatBytes(entry.sizeBytes)}
+                              </AstryxInline>
+                            </AstryxButton>
+                          );
+                        })}
+                      </AstryxView>
+                    )}
+                  </AstryxView>
+                </AstryxView>
               );
-            }}
+            })}
+          </AstryxView>
+        </AstryxView>
+
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex h-10 shrink-0 items-center gap-2 border-t border-border bg-muted/30 px-3 text-xs text-muted-foreground"
+        >
+          {busyMessage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+          <AstryxInline className="min-w-0 flex-1 truncate">
+            {busyMessage || (transfer ? "" : t("workspaceSftp.transfer.idle"))}
+          </AstryxInline>
+          {transfer ? (
+            <TransferToast
+              transfer={transfer}
+              queueCount={queueCount}
+              cancelLabel={t("workspaceSftp.cancel")}
+              filesLabel={t("workspaceSftp.transfer.files")}
+              statusLabel={t(`workspaceSftp.transfer.${transfer.status}`)}
+              onCancel={
+                transfer.id && transfer.status === "running"
+                  ? () =>
+                      void client.cancelTransfer({ sessionId: session.id, transferId: transfer.id })
+                  : undefined
+              }
+            />
+          ) : null}
+        </AstryxView>
+
+        {dragPreview ? (
+          <DragPreview
+            entry={findEntry(dragPreview.source)}
+            fallback={dragPreview.source}
+            x={dragPreview.x}
+            y={dragPreview.y}
+            typeLabel={(entry) => entryTypeLabel(entry, t)}
           />
-        </div>
-      ) : null}
-      {dragPreview ? (
-        <DragPreview
-          entry={findEntry(dragPreview.source)}
-          fallback={dragPreview.source}
-          x={dragPreview.x}
-          y={dragPreview.y}
-          typeLabel={(entry) => entryTypeLabel(entry, t)}
-        />
-      ) : null}
-      {createFolderDialog ? (
-        <CreateFolderDialog
-          title={t("workspaceSftp.newFolder")}
-          prompt={t("workspaceSftp.newFolderPrompt")}
-          confirmLabel={t("workspaceSftp.newFolder")}
-          cancelLabel={t("workspaceSftp.cancel")}
-          path={normalizePath(createFolderDialog.basePath, createFolderDialog.side)}
-          value={createFolderName}
-          submitting={creatingFolder}
-          onChange={setCreateFolderName}
-          onCancel={closeCreateFolderDialog}
-          onSubmit={() => void submitCreateFolder()}
-        />
-      ) : null}
-      {renameEntryDialog ? (
-        <RenameEntryDialog
-          title={t("workspaceSftp.rename")}
-          prompt={t("workspaceSftp.renamePrompt")}
-          confirmLabel={t("workspaceSftp.rename")}
-          cancelLabel={t("workspaceSftp.cancel")}
-          path={normalizePath(renameEntryDialog.path, renameEntryDialog.side)}
-          originalName={renameEntryDialog.currentName}
-          value={renameEntryName}
-          submitting={renamingEntry}
-          onChange={setRenameEntryName}
-          onCancel={closeRenameEntryDialog}
-          onSubmit={() => void submitRenameEntry()}
-        />
-      ) : null}
-      {copyPathDialog ? (
-        <CopyPathDialog
-          title={t("workspaceSftp.copyPath")}
-          prompt={t("workspaceSftp.copyPathFallback")}
-          closeLabel={t("workspaceSftp.cancel")}
-          text={copyPathDialog}
-          onClose={() => setCopyPathDialog(null)}
-        />
-      ) : null}
-      {copyToastVisible ? <CopyPathToast message={t("workspaceSftp.copyPathCopied")} /> : null}
-      {dialog}
-    </div>
+        ) : null}
+        {createFolderDialog ? (
+          <CreateFolderDialog
+            title={t("workspaceSftp.newFolder")}
+            prompt={t("workspaceSftp.newFolderPrompt")}
+            confirmLabel={t("workspaceSftp.newFolder")}
+            cancelLabel={t("workspaceSftp.cancel")}
+            path={normalizePath(createFolderDialog.basePath, createFolderDialog.side)}
+            value={createFolderName}
+            submitting={creatingFolder}
+            onChange={setCreateFolderName}
+            onCancel={closeCreateFolderDialog}
+            onSubmit={() => void submitCreateFolder()}
+          />
+        ) : null}
+        {renameEntryDialog ? (
+          <RenameEntryDialog
+            title={t("workspaceSftp.rename")}
+            prompt={t("workspaceSftp.renamePrompt")}
+            confirmLabel={t("workspaceSftp.rename")}
+            cancelLabel={t("workspaceSftp.cancel")}
+            path={normalizePath(renameEntryDialog.path, renameEntryDialog.side)}
+            originalName={renameEntryDialog.currentName}
+            value={renameEntryName}
+            submitting={renamingEntry}
+            onChange={setRenameEntryName}
+            onCancel={closeRenameEntryDialog}
+            onSubmit={() => void submitRenameEntry()}
+          />
+        ) : null}
+        {copyPathDialog ? (
+          <CopyPathDialog
+            title={t("workspaceSftp.copyPath")}
+            prompt={t("workspaceSftp.copyPathFallback")}
+            closeLabel={t("workspaceSftp.cancel")}
+            text={copyPathDialog}
+            onClose={() => setCopyPathDialog(null)}
+          />
+        ) : null}
+        {dialog}
+      </AstryxView>
+    </ContextMenu>
   );
 }
 
@@ -1921,82 +2036,53 @@ function CreateFolderDialog(props: {
   } = props;
   const canSubmit = value.trim().length > 0 && !submitting;
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onCancel();
+  return (
+    <AdaptiveDialog
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onCancel();
+      }}
+      title={title}
+      subtitle={path || undefined}
+      purpose="form"
+      width="var(--xagent-dialog-width-sm)"
+      touchPresentation="bottom-sheet"
+      bottomSheetHeight="hug"
+      footer={
+        <HStack gap={2} hAlign="end" wrap="wrap">
+          <XdsButton
+            label={cancelLabel}
+            variant="secondary"
+            isDisabled={submitting}
+            onClick={onCancel}
+          />
+          <XdsButton
+            label={confirmLabel}
+            variant="primary"
+            isDisabled={!canSubmit}
+            isLoading={submitting}
+            onClick={onSubmit}
+          />
+        </HStack>
       }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onCancel]);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
     >
-      <button
-        type="button"
-        tabIndex={-1}
-        className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-sm"
-        onClick={onCancel}
-        aria-hidden="true"
-      />
-      <form
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border/70 bg-background shadow-2xl"
+      <AstryxView
+        as="form"
         onSubmit={(event) => {
           event.preventDefault();
-          if (canSubmit) {
-            onSubmit();
-          }
+          if (canSubmit) onSubmit();
         }}
       >
-        <div className="border-b border-border/60 px-5 py-4">
-          <div className="text-base font-semibold text-foreground">{title}</div>
-          {path ? (
-            <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{path}</div>
-          ) : null}
-        </div>
-        <div className="space-y-2 px-5 py-5">
-          <label
-            className="block text-xs font-medium text-muted-foreground"
-            htmlFor="workspace-sftp-new-folder-name"
-          >
-            {prompt}
-          </label>
-          <input
-            id="workspace-sftp-new-folder-name"
-            value={value}
-            disabled={submitting}
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-60"
-            onChange={(event) => onChange(event.currentTarget.value)}
-          />
-        </div>
-        <div className="flex flex-col-reverse gap-2 border-t border-border/60 bg-muted/20 px-5 py-4 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            className="inline-flex h-9 items-center justify-center rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50 sm:w-auto"
-            disabled={submitting}
-            onClick={onCancel}
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="submit"
-            className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 sm:w-auto"
-            disabled={!canSubmit}
-          >
-            {submitting ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
-            {confirmLabel}
-          </button>
-        </div>
-      </form>
-    </div>,
-    document.body,
+        <TextInput
+          label={prompt}
+          value={value}
+          onChange={onChange}
+          isDisabled={submitting}
+          hasAutoFocus
+          width="100%"
+        />
+      </AstryxView>
+    </AdaptiveDialog>
   );
 }
 
@@ -2009,67 +2095,34 @@ function CopyPathDialog(props: {
 }) {
   const { title, prompt, closeLabel, text, onClose } = props;
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-    >
-      <button
-        type="button"
-        tabIndex={-1}
-        className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border/70 bg-background shadow-2xl">
-        <div className="border-b border-border/60 px-5 py-4">
-          <div className="text-base font-semibold text-foreground">{title}</div>
-          <div className="mt-1 text-xs text-muted-foreground">{prompt}</div>
-        </div>
-        <div className="px-5 py-5">
-          <textarea
-            value={text}
-            readOnly
-            className="min-h-28 w-full resize-none rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs text-foreground outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/20"
-            onFocus={(event) => event.currentTarget.select()}
-          />
-        </div>
-        <div className="flex justify-end border-t border-border/60 bg-muted/20 px-5 py-4">
-          <button
-            type="button"
-            className="inline-flex h-9 items-center justify-center rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-            onClick={onClose}
-          >
-            {closeLabel}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
-function CopyPathToast(props: { message: string }) {
   return (
-    <div className="pointer-events-none absolute bottom-14 right-4 z-[90]">
-      <div className="notify-toast-enter flex min-w-56 items-center gap-2 rounded-lg border border-emerald-500/25 bg-background/95 px-3 py-2 text-sm font-medium text-foreground shadow-2xl backdrop-blur-xl">
-        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300" />
-        <span>{props.message}</span>
-      </div>
-    </div>
+    <AdaptiveDialog
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
+      title={title}
+      subtitle={prompt}
+      purpose="info"
+      width="var(--xagent-dialog-width-sm)"
+      touchPresentation="bottom-sheet"
+      bottomSheetHeight="hug"
+      footer={
+        <HStack hAlign="end">
+          <XdsButton label={closeLabel} variant="secondary" onClick={onClose} />
+        </HStack>
+      }
+    >
+      <TextArea
+        label={prompt}
+        isLabelHidden
+        value={text}
+        isReadOnly
+        rows={5}
+        width="100%"
+        onFocus={(event) => event.currentTarget.select()}
+      />
+    </AdaptiveDialog>
   );
 }
 
@@ -2102,82 +2155,53 @@ function RenameEntryDialog(props: {
   const trimmedValue = value.trim();
   const canSubmit = trimmedValue.length > 0 && trimmedValue !== originalName && !submitting;
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onCancel();
+  return (
+    <AdaptiveDialog
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onCancel();
+      }}
+      title={title}
+      subtitle={path || undefined}
+      purpose="form"
+      width="var(--xagent-dialog-width-sm)"
+      touchPresentation="bottom-sheet"
+      bottomSheetHeight="hug"
+      footer={
+        <HStack gap={2} hAlign="end" wrap="wrap">
+          <XdsButton
+            label={cancelLabel}
+            variant="secondary"
+            isDisabled={submitting}
+            onClick={onCancel}
+          />
+          <XdsButton
+            label={confirmLabel}
+            variant="primary"
+            isDisabled={!canSubmit}
+            isLoading={submitting}
+            onClick={onSubmit}
+          />
+        </HStack>
       }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onCancel]);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
     >
-      <button
-        type="button"
-        tabIndex={-1}
-        className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-sm"
-        onClick={onCancel}
-        aria-hidden="true"
-      />
-      <form
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border/70 bg-background shadow-2xl"
+      <AstryxView
+        as="form"
         onSubmit={(event) => {
           event.preventDefault();
-          if (canSubmit) {
-            onSubmit();
-          }
+          if (canSubmit) onSubmit();
         }}
       >
-        <div className="border-b border-border/60 px-5 py-4">
-          <div className="text-base font-semibold text-foreground">{title}</div>
-          {path ? (
-            <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{path}</div>
-          ) : null}
-        </div>
-        <div className="space-y-2 px-5 py-5">
-          <label
-            className="block text-xs font-medium text-muted-foreground"
-            htmlFor="workspace-sftp-rename-entry-name"
-          >
-            {prompt}
-          </label>
-          <input
-            id="workspace-sftp-rename-entry-name"
-            value={value}
-            disabled={submitting}
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-60"
-            onChange={(event) => onChange(event.currentTarget.value)}
-          />
-        </div>
-        <div className="flex flex-col-reverse gap-2 border-t border-border/60 bg-muted/20 px-5 py-4 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            className="inline-flex h-9 items-center justify-center rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50 sm:w-auto"
-            disabled={submitting}
-            onClick={onCancel}
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="submit"
-            className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 sm:w-auto"
-            disabled={!canSubmit}
-          >
-            {submitting ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
-            {confirmLabel}
-          </button>
-        </div>
-      </form>
-    </div>,
-    document.body,
+        <TextInput
+          label={prompt}
+          value={value}
+          onChange={onChange}
+          isDisabled={submitting}
+          hasAutoFocus
+          width="100%"
+        />
+      </AstryxView>
+    </AdaptiveDialog>
   );
 }
 
@@ -2204,56 +2228,78 @@ function TransferToast(props: {
       : "text-sky-600 dark:text-sky-300";
 
   return (
-    <div className="pointer-events-auto relative ml-auto flex h-full w-[340px] max-w-[50%] shrink-0 items-center gap-2 pl-3 text-foreground before:absolute before:bottom-2 before:left-0 before:top-2 before:w-px before:bg-border/60">
-      <div className="flex h-4 w-4 shrink-0 items-center justify-center">
+    <AstryxView
+      layout="flex"
+      direction="horizontal"
+      className="pointer-events-auto relative ml-auto flex h-full w-[340px] max-w-[50%] shrink-0 items-center gap-2 pl-3 text-foreground before:absolute before:bottom-2 before:left-0 before:top-2 before:w-px before:bg-border/60"
+    >
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="flex h-4 w-4 shrink-0 items-center justify-center"
+      >
         <StatusIcon className={cn("h-3.5 w-3.5", iconClass, isRunning && "animate-spin")} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="shrink-0 text-[11px] font-medium leading-none text-foreground">
+      </AstryxView>
+      <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+        <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-1.5">
+          <AstryxInline className="shrink-0 text-[11px] font-medium leading-none text-foreground">
             {statusLabel}
-          </span>
-          <span className="min-w-0 flex-1 truncate font-mono text-[11px] leading-none text-muted-foreground/90">
+          </AstryxInline>
+          <AstryxInline className="min-w-0 flex-1 truncate font-mono text-[11px] leading-none text-muted-foreground/90">
             {currentPath}
-          </span>
-          <span className="shrink-0 font-mono text-[10px] leading-none text-muted-foreground">
+          </AstryxInline>
+          <AstryxInline className="shrink-0 font-mono text-[10px] leading-none text-muted-foreground">
             {progress}%
-          </span>
-        </div>
+          </AstryxInline>
+        </AstryxView>
         {transfer.error ? (
-          <div className="mt-1.5 truncate text-[11px] leading-none text-destructive">
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="mt-1.5 truncate text-[11px] leading-none text-destructive"
+          >
             {transfer.error}
-          </div>
+          </AstryxView>
         ) : (
-          <div className="mt-1.5 flex items-center gap-1.5">
-            <div className="h-1 min-w-16 flex-1 overflow-hidden rounded-full bg-border/60">
-              <div
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="mt-1.5 flex items-center gap-1.5"
+          >
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="h-1 min-w-16 flex-1 overflow-hidden rounded-full bg-border/60"
+            >
+              <AstryxView
+                layout="block"
+                direction="horizontal"
                 className={cn(
                   "h-full rounded-full transition-all duration-300",
                   transferTone(transfer),
                 )}
                 style={{ width: `${progress}%` }}
               />
-            </div>
-            <span className="shrink-0 text-[10px] leading-none text-muted-foreground">
+            </AstryxView>
+            <AstryxInline className="shrink-0 text-[10px] leading-none text-muted-foreground">
               {transfer.filesDone}/{transfer.filesTotal || queueCount || 1} {filesLabel}
-            </span>
-            <span className="shrink-0 font-mono text-[10px] leading-none text-muted-foreground">
+            </AstryxInline>
+            <AstryxInline className="shrink-0 font-mono text-[10px] leading-none text-muted-foreground">
               {formatBytes(transfer.bytesDone)} / {formatBytes(transfer.bytesTotal)}
-            </span>
-          </div>
+            </AstryxInline>
+          </AstryxView>
         )}
-      </div>
+      </AstryxView>
       {onCancel ? (
-        <button
+        <AstryxButton
           type="button"
           className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-destructive hover:bg-destructive/10"
           onClick={onCancel}
         >
           {cancelLabel}
-        </button>
+        </AstryxButton>
       ) : null}
-    </div>
+    </AstryxView>
   );
 }
 
@@ -2275,7 +2321,9 @@ function DragPreview(props: {
   const count = dragItems(fallback).length;
 
   return (
-    <div
+    <AstryxView
+      layout="flex"
+      direction="horizontal"
       className="pointer-events-none fixed z-[120] flex w-[260px] max-w-[calc(100vw-32px)] items-center gap-2 rounded-md bg-sky-500/90 px-2.5 py-2 text-xs text-white shadow-xl ring-1 ring-sky-200/50 backdrop-blur-sm"
       style={{
         left: x + 18,
@@ -2283,59 +2331,33 @@ function DragPreview(props: {
         transform: "translateY(-50%)",
       }}
     >
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-white/15 text-white">
+      <AstryxView
+        as="span"
+        layout="flex"
+        direction="horizontal"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-white/15 text-white"
+      >
         {entryIcon(previewEntry, "h-4 w-4 text-white")}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium leading-4">
+      </AstryxView>
+      <AstryxInline className="min-w-0 flex-1">
+        <AstryxInline className="block truncate font-medium leading-4">
           {previewEntry.name}
           {count > 1 ? ` +${count - 1}` : ""}
-        </span>
-        <span className="block truncate text-[10px] leading-3 text-white/75">
+        </AstryxInline>
+        <AstryxInline className="block truncate text-[10px] leading-3 text-white/75">
           {typeLabel(previewEntry)}
           {previewEntry.kind === "directory" ? "" : ` · ${formatBytes(previewEntry.sizeBytes)}`}
-        </span>
-      </span>
+        </AstryxInline>
+      </AstryxInline>
       {count > 1 ? (
-        <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-white/90">
+        <AstryxInline className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-white/90">
           {count}
-        </span>
+        </AstryxInline>
       ) : previewEntry.kind === "directory" ? null : (
-        <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-white/90">
+        <AstryxInline className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-white/90">
           {formatBytes(previewEntry.sizeBytes)}
-        </span>
+        </AstryxInline>
       )}
-    </div>
-  );
-}
-
-function MenuItem(props: {
-  icon: React.ReactNode;
-  label: string;
-  destructive?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  const { icon, label, destructive = false, disabled = false, onClick } = props;
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      disabled={disabled}
-      className={cn(
-        "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors",
-        destructive
-          ? "text-destructive hover:bg-destructive/10"
-          : "text-popover-foreground hover:bg-accent hover:text-accent-foreground",
-        disabled && "pointer-events-none opacity-45",
-      )}
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
-    >
-      {icon}
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-    </button>
+    </AstryxView>
   );
 }

@@ -19,6 +19,8 @@ import type {
   DisplayImageResultDetails,
 } from "../../../../lib/tools/builtinTypes";
 import { getBuiltinResultKind } from "./assistantBubbleUtils";
+import { View as AstryxView } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 export function getToolResultImages(result?: ToolResultMessage) {
   if (!result) return [];
@@ -226,7 +228,9 @@ function ToolImageStatusCard(props: {
   const Icon = isError ? ImageOff : Loader2;
 
   return (
-    <div
+    <AstryxView
+      layout="flex"
+      direction="vertical"
       className={cn(
         "relative flex min-h-28 w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-[8px] border border-dashed px-4 py-5 text-center",
         isError
@@ -235,7 +239,9 @@ function ToolImageStatusCard(props: {
         className,
       )}
     >
-      <div
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
         className={cn(
           "flex h-9 w-9 items-center justify-center rounded-[8px] border bg-white/80 shadow-sm dark:bg-black/20",
           isError ? "border-red-500/20" : "border-black/[0.06] dark:border-white/[0.08]",
@@ -247,18 +253,22 @@ function ToolImageStatusCard(props: {
             !isError && "animate-spin text-primary motion-reduce:animate-none",
           )}
         />
-      </div>
-      <div className="max-w-full space-y-1">
-        <div
+      </AstryxView>
+      <AstryxView layout="block" direction="horizontal" className="max-w-full space-y-1">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
           className={cn(
             "text-[calc(12px*var(--zone-font-scale,1))] font-medium",
             !isError && "shimmer",
           )}
         >
           {title ?? (isError ? t("chat.image.unavailable") : t("chat.image.loading"))}
-        </div>
+        </AstryxView>
         {detail ? (
-          <div
+          <AstryxView
+            layout="block"
+            direction="horizontal"
             className={cn(
               "max-w-full truncate text-[calc(11px*var(--zone-font-scale,1))]",
               isError ? "text-red-700/75 dark:text-red-200/75" : "text-muted-foreground",
@@ -266,10 +276,10 @@ function ToolImageStatusCard(props: {
             title={detail}
           >
             {detail}
-          </div>
+          </AstryxView>
         ) : null}
-      </div>
-    </div>
+      </AstryxView>
+    </AstryxView>
   );
 }
 
@@ -313,7 +323,7 @@ export function ToolResultImagePreview(props: {
 
   return (
     <>
-      <button
+      <AstryxButton
         type="button"
         className={cn(
           "relative block w-full overflow-hidden rounded-[8px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 disabled:opacity-100",
@@ -328,7 +338,11 @@ export function ToolResultImagePreview(props: {
           canPreview ? `${t("chat.image.preview")} ${alt}` : `${t("chat.image.loading")} ${alt}`
         }
       >
-        <div className={cn("relative w-full", imageStatus !== "loaded" && "min-h-32")}>
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className={cn("relative w-full", imageStatus !== "loaded" && "min-h-32")}
+        >
           {imageStatus !== "loaded" ? (
             <ToolImageStatusCard
               status={imageStatus === "error" ? "error" : "loading"}
@@ -356,8 +370,8 @@ export function ToolResultImagePreview(props: {
               onError={() => setImageStatus("error")}
             />
           ) : null}
-        </div>
-      </button>
+        </AstryxView>
+      </AstryxButton>
       {previewOpen ? (
         <ImagePreview open={previewOpen} slides={slides} onClose={() => setPreviewOpen(false)} />
       ) : null}
@@ -435,7 +449,7 @@ function NativeDisplayImageTile(props: {
         : t("chat.image.loading");
 
   return (
-    <button
+    <AstryxButton
       type="button"
       className={cn(
         "relative flex max-w-full items-center justify-center overflow-hidden rounded-[10px] text-left shadow-sm transition-[filter,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 disabled:opacity-100",
@@ -484,7 +498,7 @@ function NativeDisplayImageTile(props: {
           )}
         />
       ) : null}
-    </button>
+    </AstryxButton>
   );
 }
 
@@ -514,7 +528,11 @@ export function NativeDisplayImageBlock(props: {
 
   return (
     <>
-      <div className={getNativeImageGridClass(payload.entries.length)}>
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        className={getNativeImageGridClass(payload.entries.length)}
+      >
         {payload.entries.map((entry, index) => {
           const id = entry.image
             ? `${entry.image.mimeType}-${entry.image.data.length}-${index}`
@@ -534,7 +552,7 @@ export function NativeDisplayImageBlock(props: {
             />
           );
         })}
-      </div>
+      </AstryxView>
       {previewIndex !== null ? (
         <ImagePreview
           open={previewIndex !== null}

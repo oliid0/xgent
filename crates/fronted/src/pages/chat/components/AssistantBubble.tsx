@@ -1,3 +1,5 @@
+import { ChatMessage } from "@astryxdesign/core/Chat";
+import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { memo, useMemo } from "react";
 
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
@@ -8,7 +10,6 @@ import { collectChangedFiles } from "../../../lib/chat/messages/changedFiles";
 import { collectCloudArtifacts } from "../../../lib/chat/messages/cloudArtifacts";
 import type { UiRound } from "../../../lib/chat/messages/uiMessages";
 import { normalizeLiveToolStatus, VIBING_STATUS } from "../../../lib/chat/page/chatPageHelpers";
-import { cn } from "../../../lib/shared/utils";
 import type { AssistantUnitRow } from "../transcript/rowModel";
 
 import { AssistantAvatar } from "./assistant-bubble/AssistantAvatar";
@@ -80,9 +81,8 @@ export const AssistantBubble = memo(function AssistantBubble(props: {
   );
 
   return (
-    <div className="flex w-full max-w-full items-start gap-3">
-      <AssistantAvatar />
-      <div className="min-w-0 flex-1 space-y-2 pt-0.5">
+    <ChatMessage sender="assistant" density="compact" avatar={<AssistantAvatar />}>
+      <VStack gap={2} width="100%" paddingBlockStart={0.5}>
         {rounds.map((round, idx) => (
           <RoundContent
             key={round.key}
@@ -104,8 +104,8 @@ export const AssistantBubble = memo(function AssistantBubble(props: {
         ))}
         {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
         {cloudArtifacts.length > 0 ? <CloudArtifactsCard artifacts={cloudArtifacts} /> : null}
-      </div>
-    </div>
+      </VStack>
+    </ChatMessage>
   );
 });
 
@@ -138,28 +138,44 @@ export const AssistantBubbleUnit = memo(function AssistantBubbleUnit(props: {
   const status =
     unit.kind === "status" && row.live ? (
       isCompactionRunning ? (
-        <CompactingText className="w-full" />
+        <CompactingText />
       ) : normalizedStatus === VIBING_STATUS || !normalizedStatus ? (
-        <VibingText className="w-full" />
+        <VibingText />
       ) : (
-        <AssistantStatus className="w-full">{normalizedStatus}</AssistantStatus>
+        <AssistantStatus>{normalizedStatus}</AssistantStatus>
       )
     ) : null;
 
   return (
-    <div className="flex w-full max-w-full items-start gap-3">
-      {row.showAvatar ? (
-        <AssistantAvatar />
-      ) : (
-        <div aria-hidden="true" className="h-7 w-7 shrink-0" />
-      )}
-      <div
-        className={cn(
-          "min-w-0 flex-1 space-y-2",
-          unit.kind === "status" && isAgentMode ? "pt-1" : row.showAvatar ? "pt-0.5" : "",
-        )}
+    <ChatMessage
+      sender="assistant"
+      density="compact"
+      avatar={
+        row.showAvatar ? (
+          <AssistantAvatar />
+        ) : (
+          <HStack
+            aria-hidden="true"
+            width="var(--xagent-assistant-avatar-size)"
+            height="var(--xagent-assistant-avatar-size)"
+          />
+        )
+      }
+    >
+      <VStack
+        gap={2}
+        width="100%"
+        paddingBlockStart={unit.kind === "status" && isAgentMode ? 1 : row.showAvatar ? 0.5 : 0}
       >
-        {status ? <div className="min-w-0 max-w-full overflow-hidden py-1.5">{status}</div> : null}
+        {status ? (
+          <VStack
+            width="100%"
+            paddingBlock={1.5}
+            style={{ overflow: "hidden" }}
+          >
+            {status}
+          </VStack>
+        ) : null}
         {row.mutable && retryAttempts?.length ? (
           <RetryDetailsBlock attempts={retryAttempts} />
         ) : null}
@@ -178,7 +194,7 @@ export const AssistantBubbleUnit = memo(function AssistantBubbleUnit(props: {
         {unit.kind === "block" && unit.isRoundTail && showUsage ? (
           <UsagePanel usage={unit.roundMeta?.usage} contextWindow={usageContextWindow} />
         ) : null}
-      </div>
-    </div>
+      </VStack>
+    </ChatMessage>
   );
 });

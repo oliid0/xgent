@@ -56,6 +56,8 @@ import {
   type SyncForm,
 } from "./backupSyncForm";
 import type { SettingsSectionProps } from "./types";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 type Status = { kind: "ok" | "error"; text: string } | null;
 
@@ -95,15 +97,17 @@ function describeSource(manifest: BackupManifest, t: (key: string) => string) {
     [t("settings.backupSourceVersion"), manifest.appVersion],
   ];
   return (
-    <div className="space-y-1">
+    <AstryxView layout="block" direction="horizontal" className="space-y-1">
       {rows.map(([label, value]) => (
-        <div key={label} className="flex gap-2">
-          <span className="shrink-0 opacity-70">{label}</span>
-          <span className="break-all font-medium">{value}</span>
-        </div>
+        <AstryxView layout="flex" direction="horizontal" key={label} className="flex gap-2">
+          <AstryxInline className="shrink-0 opacity-70">{label}</AstryxInline>
+          <AstryxInline className="break-all font-medium">{value}</AstryxInline>
+        </AstryxView>
       ))}
-      <div className="pt-1">{summarizeDomains(manifest.domains, t)}</div>
-    </div>
+      <AstryxView layout="block" direction="horizontal" className="pt-1">
+        {summarizeDomains(manifest.domains, t)}
+      </AstryxView>
+    </AstryxView>
   );
 }
 
@@ -404,17 +408,24 @@ export function BackupSyncSection(props: SettingsSectionProps) {
   }, [confirm, syncStateAfterRestore, t]);
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-3 rounded-2xl border border-border/60 bg-card p-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+    <AstryxView layout="block" direction="horizontal" className="space-y-6">
+      <AstryxView
+        as="section"
+        className="space-y-3 rounded-2xl border border-border/60 bg-card p-4"
+      >
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex items-center gap-2 text-sm font-medium text-foreground"
+        >
           <Archive className="h-4 w-4 text-muted-foreground" />
           {t("settings.backupLocalTitle")}
-        </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        </AstryxView>
+        <AstryxParagraph className="text-xs leading-relaxed text-muted-foreground">
           {t("settings.backupLocalDesc")}
-        </p>
+        </AstryxParagraph>
 
-        <div className="flex flex-wrap gap-2">
+        <AstryxView layout="flex" direction="horizontal" className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -441,35 +452,48 @@ export function BackupSyncSection(props: SettingsSectionProps) {
             )}
             {t("settings.backupImport")}
           </Button>
-        </div>
+        </AstryxView>
 
-        <div className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"
+        >
           <ArchiveRestore className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>{t("settings.backupAutoBackupHint")}</span>
-        </div>
+          <AstryxInline>{t("settings.backupAutoBackupHint")}</AstryxInline>
+        </AstryxView>
 
         {status ? (
-          <div
+          <AstryxView
+            layout="block"
+            direction="horizontal"
             className={`break-all text-xs font-medium ${
               status.kind === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
             }`}
           >
             {status.text}
-          </div>
+          </AstryxView>
         ) : null}
-      </section>
+      </AstryxView>
 
-      <section className="space-y-3 rounded-2xl border border-border/60 bg-card p-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+      <AstryxView
+        as="section"
+        className="space-y-3 rounded-2xl border border-border/60 bg-card p-4"
+      >
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex items-center gap-2 text-sm font-medium text-foreground"
+        >
           <Cloud className="h-4 w-4 text-muted-foreground" />
           {t("settings.backupSyncTitle")}
-        </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        </AstryxView>
+        <AstryxParagraph className="text-xs leading-relaxed text-muted-foreground">
           {t("settings.backupSyncDesc")}
-        </p>
+        </AstryxParagraph>
 
-        <div className="space-y-3">
-          <div className="space-y-1.5">
+        <AstryxView layout="block" direction="horizontal" className="space-y-3">
+          <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
             <Label className="text-xs">{t("settings.backupSyncPreset")}</Label>
             <Select value={preset} onValueChange={handlePresetChange} disabled={syncLocked}>
               <SelectTrigger className="h-9">
@@ -484,9 +508,9 @@ export function BackupSyncSection(props: SettingsSectionProps) {
                 <SelectItem value="custom">{t("settings.backupSyncPreset_custom")}</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </AstryxView>
 
-          <div className="space-y-1.5">
+          <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
             <Label className="text-xs">{t("settings.backupSyncUrl")}</Label>
             <Input
               value={form.url}
@@ -494,10 +518,10 @@ export function BackupSyncSection(props: SettingsSectionProps) {
               placeholder="https://dav.example.com/dav/"
               onChange={(event) => patchForm({ url: event.target.value })}
             />
-          </div>
+          </AstryxView>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
+          <AstryxView layout="grid" direction="horizontal" className="grid gap-3 sm:grid-cols-2">
+            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
               <Label className="text-xs">{t("settings.backupSyncUsername")}</Label>
               <Input
                 value={form.username}
@@ -505,8 +529,8 @@ export function BackupSyncSection(props: SettingsSectionProps) {
                 autoComplete="off"
                 onChange={(event) => patchForm({ username: event.target.value })}
               />
-            </div>
-            <div className="space-y-1.5">
+            </AstryxView>
+            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
               <Label className="text-xs">{t("settings.backupSyncPassword")}</Label>
               <Input
                 type="password"
@@ -529,11 +553,11 @@ export function BackupSyncSection(props: SettingsSectionProps) {
                   patchForm({ password, passwordTouched: password.length > 0 });
                 }}
               />
-            </div>
-          </div>
+            </AstryxView>
+          </AstryxView>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
+          <AstryxView layout="grid" direction="horizontal" className="grid gap-3 sm:grid-cols-2">
+            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
               <Label className="text-xs">{t("settings.backupSyncRemoteDir")}</Label>
               <Input
                 value={form.remoteDir}
@@ -541,8 +565,8 @@ export function BackupSyncSection(props: SettingsSectionProps) {
                 placeholder="xagent"
                 onChange={(event) => patchForm({ remoteDir: event.target.value })}
               />
-            </div>
-            <div className="space-y-1.5">
+            </AstryxView>
+            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
               <Label className="text-xs">{t("settings.backupSyncProfile")}</Label>
               <Input
                 value={form.profile}
@@ -550,21 +574,29 @@ export function BackupSyncSection(props: SettingsSectionProps) {
                 placeholder="default"
                 onChange={(event) => patchForm({ profile: event.target.value })}
               />
-            </div>
-          </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">
+            </AstryxView>
+          </AstryxView>
+          <AstryxParagraph className="text-xs leading-relaxed text-muted-foreground">
             {t("settings.backupSyncProfileHint")}
-          </p>
+          </AstryxParagraph>
 
-          <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 px-3.5 py-3">
-            <div className="min-w-0 space-y-1">
-              <div className="text-xs font-medium text-foreground">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex items-start justify-between gap-3 rounded-xl border border-border/60 px-3.5 py-3"
+          >
+            <AstryxView layout="block" direction="horizontal" className="min-w-0 space-y-1">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="text-xs font-medium text-foreground"
+              >
                 {t("settings.backupSyncAuto")}
-              </div>
-              <p className="text-xs leading-relaxed text-muted-foreground">
+              </AstryxView>
+              <AstryxParagraph className="text-xs leading-relaxed text-muted-foreground">
                 {t("settings.backupSyncAutoHint")}
-              </p>
-            </div>
+              </AstryxParagraph>
+            </AstryxView>
             <Switch
               checked={form.autoSync}
               disabled={syncLocked}
@@ -572,10 +604,10 @@ export function BackupSyncSection(props: SettingsSectionProps) {
               aria-label={t("settings.backupSyncAuto")}
               onCheckedChange={(checked) => void handleAutoSyncChange(checked)}
             />
-          </div>
-        </div>
+          </AstryxView>
+        </AstryxView>
 
-        <div className="flex flex-wrap gap-2">
+        <AstryxView layout="flex" direction="horizontal" className="flex flex-wrap gap-2">
           <Button size="sm" disabled={syncLocked} onClick={() => void handleSaveSync()}>
             {syncBusy === "save" ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -623,19 +655,19 @@ export function BackupSyncSection(props: SettingsSectionProps) {
             )}
             {t("settings.backupSyncDownload")}
           </Button>
-        </div>
+        </AstryxView>
 
         {dirty && !syncLocked ? (
-          <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+          <AstryxParagraph className="text-xs font-medium text-amber-700 dark:text-amber-300">
             {t("settings.backupSyncDirtyHint")}
-          </p>
+          </AstryxParagraph>
         ) : null}
 
         {syncView?.lastSyncAt ? (
-          <p className="text-xs text-muted-foreground">
+          <AstryxParagraph className="text-xs text-muted-foreground">
             {t("settings.backupSyncLastAt")}
             {formatTimestamp(syncView.lastSyncAt)}
-          </p>
+          </AstryxParagraph>
         ) : null}
 
         {/*
@@ -644,21 +676,31 @@ export function BackupSyncSection(props: SettingsSectionProps) {
           每次进设置页都还在。用户不会在后台同步失败时正好盯着这个页面。
         */}
         {syncView?.lastError ? (
-          <div className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-3.5 py-3">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-3.5 py-3"
+          >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-            <div className="min-w-0 space-y-1">
-              <div className="text-xs font-medium text-destructive">
+            <AstryxView layout="block" direction="horizontal" className="min-w-0 space-y-1">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="text-xs font-medium text-destructive"
+              >
                 {t("settings.backupSyncAutoErrorTitle")}
-              </div>
-              <p className="break-all text-xs leading-relaxed text-destructive/90">
+              </AstryxView>
+              <AstryxParagraph className="break-all text-xs leading-relaxed text-destructive/90">
                 {syncView.lastError}
-              </p>
-            </div>
-          </div>
+              </AstryxParagraph>
+            </AstryxView>
+          </AstryxView>
         ) : null}
 
         {syncStatus ? (
-          <div
+          <AstryxView
+            layout="block"
+            direction="horizontal"
             className={`break-all text-xs font-medium ${
               syncStatus.kind === "ok"
                 ? "text-emerald-600 dark:text-emerald-400"
@@ -666,21 +708,28 @@ export function BackupSyncSection(props: SettingsSectionProps) {
             }`}
           >
             {syncStatus.text}
-          </div>
+          </AstryxView>
         ) : null}
-      </section>
+      </AstryxView>
 
-      <section className="space-y-2 rounded-2xl border border-border/60 bg-card p-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+      <AstryxView
+        as="section"
+        className="space-y-2 rounded-2xl border border-border/60 bg-card p-4"
+      >
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex items-center gap-2 text-sm font-medium text-foreground"
+        >
           <Shield className="h-4 w-4 text-muted-foreground" />
           {t("settings.backupScopeTitle")}
-        </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        </AstryxView>
+        <AstryxParagraph className="text-xs leading-relaxed text-muted-foreground">
           {t("settings.backupScopeDesc")}
-        </p>
-      </section>
+        </AstryxParagraph>
+      </AstryxView>
 
       {dialog}
-    </div>
+    </AstryxView>
   );
 }

@@ -1,4 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Section } from "@astryxdesign/core/Section";
+import { Text } from "@astryxdesign/core/Text";
+import { Token } from "@astryxdesign/core/Token";
 import { useLocale } from "../../i18n";
 import type {
   PendingToolApprovalSummary,
@@ -55,79 +64,97 @@ export function ToolApprovalBar(props: {
   };
 
   return (
-    <section className="mx-auto mb-[-1px] w-[calc(100%-1.5rem)] max-w-[720px] overflow-hidden rounded-t-2xl border border-b-0 border-amber-500/35 bg-background/92 px-3 py-2.5 shadow-lg backdrop-blur-2xl">
-      <header className="flex items-center gap-2">
-        <Shield className="h-4 w-4 shrink-0 text-amber-500" />
-        <span className="min-w-0 flex-1 text-xs font-semibold">
-          {t("chat.toolApproval.title").replace("{count}", String(props.pending.length))}
-        </span>
-        <span className="text-[10px] tabular-nums text-muted-foreground">
-          {formatCountdown(remainingMs)}
-        </span>
-      </header>
-      {props.pending.length > 1 ? (
-        <div className="mt-2 flex gap-2">
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={() => void guarded(() => props.onDecideAll("approve"))}
-            className="rounded-lg bg-emerald-500 px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-40"
-          >
-            {t("chat.toolApproval.approveAll")}
-          </button>
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={() => void guarded(() => props.onDecideAll("deny"))}
-            className="rounded-lg bg-red-500/10 px-2.5 py-1 text-[11px] font-medium text-red-600 disabled:opacity-40"
-          >
-            {t("chat.toolApproval.denyAll")}
-          </button>
-        </div>
-      ) : null}
-      <ul className="mt-2 space-y-1.5">
-        {props.pending.map((item) => (
-          <li key={item.toolCallId} className="rounded-xl border border-border/60 bg-muted/25 p-2">
-            <div className="flex items-center gap-1.5">
-              <code className="min-w-0 flex-1 truncate text-[11px] font-semibold">
-                {item.toolName}
-              </code>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => void guarded(() => props.onDecide(item.toolCallId, "approve"))}
-                className="rounded-md px-1.5 py-1 text-[10px] text-emerald-600 hover:bg-emerald-500/10 disabled:opacity-40"
-              >
-                {t("chat.toolApproval.approve")}
-              </button>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() =>
-                  void guarded(() => props.onDecide(item.toolCallId, "approve_session"))
-                }
-                className="rounded-md px-1.5 py-1 text-[10px] text-foreground/70 hover:bg-muted disabled:opacity-40"
-              >
-                {t("chat.toolApproval.approveSession")}
-              </button>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => void guarded(() => props.onDecide(item.toolCallId, "deny"))}
-                className="rounded-md px-1.5 py-1 text-[10px] text-red-600 hover:bg-red-500/10 disabled:opacity-40"
-              >
-                {t("chat.toolApproval.deny")}
-              </button>
-            </div>
-            {item.summary ? (
-              <pre className="mt-1.5 max-h-24 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-foreground/[0.04] p-2 font-mono text-[10px] leading-4 text-foreground/70">
-                {item.summary}
-              </pre>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-      {error ? <p className="mt-2 text-[11px] text-red-500">{error}</p> : null}
-    </section>
+    <Section
+      padding={3}
+      width="calc(100% - var(--spacing-6))"
+      maxWidth="var(--xagent-content-width-lg)"
+      dividers={["top", "start", "end"]}
+      className="mx-auto overflow-hidden backdrop-blur-2xl"
+    >
+      <VStack gap={2}>
+        <HStack gap={2} vAlign="center">
+          <Shield />
+          <StackItem size="fill">
+            <Text type="label" maxLines={1}>
+              {t("chat.toolApproval.title").replace("{count}", String(props.pending.length))}
+            </Text>
+          </StackItem>
+          <Badge label={String(props.pending.length)} variant="warning" />
+          <Token label={formatCountdown(remainingMs)} color="orange" size="sm" />
+        </HStack>
+        {props.pending.length > 1 ? (
+          <HStack gap={2} wrap="wrap">
+            <Button
+              type="button"
+              label={t("chat.toolApproval.approveAll")}
+              variant="primary"
+              size="sm"
+              isDisabled={submitting}
+              onClick={() => void guarded(() => props.onDecideAll("approve"))}
+            />
+            <Button
+              type="button"
+              label={t("chat.toolApproval.denyAll")}
+              variant="destructive"
+              size="sm"
+              isDisabled={submitting}
+              onClick={() => void guarded(() => props.onDecideAll("deny"))}
+            />
+          </HStack>
+        ) : null}
+        <List density="compact" hasDividers>
+          {props.pending.map((item) => (
+            <ListItem
+              key={item.toolCallId}
+              label={item.toolName}
+              description={
+                item.summary ? (
+                  <CodeBlock
+                    code={item.summary}
+                    language="plaintext"
+                    size="sm"
+                    maxHeight="var(--xagent-approval-summary-max-height)"
+                    width="100%"
+                    isWrapped
+                    container="section"
+                  />
+                ) : undefined
+              }
+              endContent={
+                <HStack gap={1} wrap="wrap" hAlign="end">
+                  <Button
+                    type="button"
+                    label={t("chat.toolApproval.approve")}
+                    variant="primary"
+                    size="sm"
+                    isDisabled={submitting}
+                    onClick={() => void guarded(() => props.onDecide(item.toolCallId, "approve"))}
+                  />
+                  <Button
+                    type="button"
+                    label={t("chat.toolApproval.approveSession")}
+                    variant="secondary"
+                    size="sm"
+                    isDisabled={submitting}
+                    onClick={() =>
+                      void guarded(() => props.onDecide(item.toolCallId, "approve_session"))
+                    }
+                  />
+                  <Button
+                    type="button"
+                    label={t("chat.toolApproval.deny")}
+                    variant="destructive"
+                    size="sm"
+                    isDisabled={submitting}
+                    onClick={() => void guarded(() => props.onDecide(item.toolCallId, "deny"))}
+                  />
+                </HStack>
+              }
+            />
+          ))}
+        </List>
+        {error ? <Banner status="error" title={error} collapsible={false} /> : null}
+      </VStack>
+    </Section>
   );
 }

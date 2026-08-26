@@ -17,6 +17,8 @@ import {
   classifyWorkspaceMarkdownTarget,
   workspaceMarkdownHeadingSlug,
 } from "./workspaceMarkdownAssets";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 type WorkspaceMarkdownPreviewContextValue = {
   workdir: string;
@@ -80,13 +82,13 @@ function MarkdownImageUnavailable(props: { alt?: string; title?: string }) {
   const reason = t("workspaceFilePreview.imageUnavailable");
   const label = alt?.trim() || title?.trim() || "";
   return (
-    <span
+    <AstryxInline
       className="text-xs italic text-muted-foreground"
       data-xagent-markdown-image="text-fallback"
       title={label ? reason : undefined}
     >
       {label || reason}
-    </span>
+    </AstryxInline>
   );
 }
 
@@ -119,7 +121,7 @@ function WorkspacePreviewImage(props: {
   const state = useWorkspaceImageObjectUrl(workdir, path);
   if (state.status === "loading") {
     return (
-      <span
+      <AstryxInline
         className="inline-block h-4 w-20 animate-pulse rounded bg-muted align-middle"
         data-xagent-markdown-image="loading"
       />
@@ -169,9 +171,12 @@ const previewLinkClassName =
 function InertMarkdownLink(props: { children: ReactNode; label?: string }) {
   const { children, label } = props;
   return (
-    <span className="text-primary underline decoration-primary/35 underline-offset-4" title={label}>
+    <AstryxInline
+      className="text-primary underline decoration-primary/35 underline-offset-4"
+      title={label}
+    >
       {children}
-    </span>
+    </AstryxInline>
   );
 }
 
@@ -207,14 +212,14 @@ function WorkspaceMarkdownPreviewLink(props: MarkdownPreviewLinkProps) {
   if (target.kind === "external") {
     return (
       <>
-        <button
+        <AstryxButton
           type="button"
           className={previewLinkClassName}
           title={titleText ?? target.url}
           onClick={() => setConfirmingUrl(target.url)}
         >
           {children}
-        </button>
+        </AstryxButton>
         <ExternalLinkModal
           isOpen={confirmingUrl !== null}
           url={confirmingUrl ?? ""}
@@ -230,28 +235,28 @@ function WorkspaceMarkdownPreviewLink(props: MarkdownPreviewLinkProps) {
 
   if (target.kind === "hash") {
     return (
-      <button
+      <AstryxButton
         type="button"
         className={previewLinkClassName}
         title={titleText}
         onClick={(event) => scrollToMarkdownHeading(event, target.fragment)}
       >
         {children}
-      </button>
+      </AstryxButton>
     );
   }
 
   if (target.kind === "workspace" && context?.onOpenWorkspacePath) {
     const openWorkspacePath = context.onOpenWorkspacePath;
     return (
-      <button
+      <AstryxButton
         type="button"
         className={previewLinkClassName}
         title={titleText ?? target.path}
         onClick={() => openWorkspacePath(target.path)}
       >
         {children}
-      </button>
+      </AstryxButton>
     );
   }
 
@@ -282,7 +287,7 @@ export const WorkspaceMarkdownPreview = memo(function WorkspaceMarkdownPreview(
     [markdownPath, onOpenWorkspacePath, workdir],
   );
   return (
-    <div data-workspace-markdown-preview="">
+    <AstryxView layout="block" direction="horizontal" data-workspace-markdown-preview="">
       <WorkspaceMarkdownPreviewContext.Provider value={contextValue}>
         <Markdown
           content={content}
@@ -292,6 +297,6 @@ export const WorkspaceMarkdownPreview = memo(function WorkspaceMarkdownPreview(
           preserveRelativeUrls
         />
       </WorkspaceMarkdownPreviewContext.Provider>
-    </div>
+    </AstryxView>
   );
 });

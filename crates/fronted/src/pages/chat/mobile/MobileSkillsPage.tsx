@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  ArrowLeft,
-  ChevronRight,
-  Loader2,
-  MoreHorizontal,
-  RefreshCw,
-  SkillIcon,
-} from "../../../components/icons";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { ClickableCard } from "@astryxdesign/core/ClickableCard";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { ArrowLeft, MoreHorizontal, RefreshCw, SkillIcon } from "../../../components/icons";
 import { Markdown } from "../../../components/Markdown";
 import { useLocale } from "../../../i18n";
 import { type AppSettings, updateSkills } from "../../../lib/settings";
@@ -17,7 +19,7 @@ import {
   readSkillText,
   type SkillSummary,
 } from "../../../lib/skills";
-import { MobileHubHeader, MobileHubSearch, MobileToggle } from "./MobileHubChrome";
+import { MobileHubHeader, MobileHubSearch } from "./MobileHubChrome";
 
 type MobileSkillsPageProps = {
   settings: AppSettings;
@@ -120,133 +122,156 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
 
   if (selected) {
     return (
-      <section className="flex h-full min-h-0 flex-1 flex-col bg-background">
-        <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-border/40 px-3 pt-[env(safe-area-inset-top,0px)]">
-          <button
-            type="button"
+      <VStack as="section" gap={0} height="100%" minHeight={0}>
+        <HStack
+          as="header"
+          gap={3}
+          vAlign="center"
+          paddingInline={3}
+          minHeight="var(--xagent-mobile-header-height)"
+          className="shrink-0 border-b border-border/40 pt-[env(safe-area-inset-top,0)]"
+        >
+          <IconButton
+            label={t("settings.close")}
+            tooltip={t("settings.close")}
+            icon={<ArrowLeft />}
+            variant="ghost"
+            size="lg"
             onClick={() => setSelected(null)}
-            className="flex h-11 w-11 items-center justify-center rounded-full active:bg-muted"
-            aria-label={t("settings.close")}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[18px] font-semibold">{selected.name}</h1>
-            <p className="truncate text-[11px] text-muted-foreground">{selected.skillFile}</p>
-          </div>
-          <MobileToggle
-            checked={isSelected(selected)}
-            disabled={!isUserSelectableSkill(selected)}
-            label={isSelected(selected) ? t("settings.disable") : t("settings.enable")}
-            onChange={(checked) => toggle(selected, checked)}
           />
-        </header>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-5">
-          {selected.description ? (
-            <p className="mb-5 text-[14px] leading-6 text-muted-foreground">
-              {selected.description}
-            </p>
-          ) : null}
-          {preview.loading ? (
-            <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              {t("settings.skillsScanning")}
-            </div>
-          ) : null}
-          {preview.error ? (
-            <div className="mb-4 rounded-2xl bg-destructive/8 px-4 py-3 text-[12px] text-destructive">
-              {preview.error}
-            </div>
-          ) : null}
-          {preview.content ? <Markdown content={preview.content} /> : null}
-        </div>
-      </section>
+          <StackItem size="fill">
+            <VStack gap={0.5}>
+              <Heading level={2} maxLines={1}>
+                {selected.name}
+              </Heading>
+              <Text type="supporting" color="secondary" maxLines={1}>
+                {selected.skillFile}
+              </Text>
+            </VStack>
+          </StackItem>
+          <Switch
+            value={isSelected(selected)}
+            isDisabled={!isUserSelectableSkill(selected)}
+            label={isSelected(selected) ? t("settings.disable") : t("settings.enable")}
+            isLabelHidden
+            onChange={(checked) => toggle(selected, checked)}
+            size="md"
+          />
+        </HStack>
+        <StackItem size="fill" isScrollable>
+          <VStack gap={4} padding={5}>
+            {selected.description ? (
+              <Text type="body" color="secondary">
+                {selected.description}
+              </Text>
+            ) : null}
+            {preview.loading ? (
+              <Spinner label={t("settings.skillsScanning")} size="md" />
+            ) : null}
+            {preview.error ? (
+              <Banner status="error" title={preview.error} collapsible={false} />
+            ) : null}
+            {preview.content ? <Markdown content={preview.content} /> : null}
+          </VStack>
+        </StackItem>
+      </VStack>
     );
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-1 flex-col bg-background">
+    <VStack as="section" gap={0} height="100%" minHeight={0}>
       <MobileHubHeader
         title="Skills"
         onOpenSidebar={props.onOpenSidebar}
         trailing={
-          <button
-            type="button"
+          <IconButton
+            label={t("settings.skillsRescan")}
+            tooltip={t("settings.skillsRescan")}
+            icon={<RefreshCw />}
+            variant="ghost"
+            size="lg"
+            isLoading={refreshing}
+            isDisabled={refreshing}
             onClick={() => void refresh()}
-            className="flex h-10 w-10 items-center justify-center rounded-full active:bg-muted"
-            aria-label={t("settings.skillsRescan")}
-          >
-            <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
-          </button>
+          />
         }
       />
       <MobileHubSearch value={query} onChange={setQuery} placeholder="Search Skills" />
 
-      <div className="mx-5 mt-4 flex min-h-14 items-center gap-3 rounded-2xl border border-border/50 px-4">
-        <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-semibold">{t("settings.skillsEnable")}</div>
-          <div className="truncate text-[11px] text-muted-foreground">
-            {props.settings.skills.enabled
-              ? t("settings.skillsHubEnabled")
-              : t("settings.skillsHubDisabled")}
-          </div>
-        </div>
-        <MobileToggle
-          checked={props.settings.skills.enabled}
+      <HStack paddingInline={5} paddingBlockStart={4}>
+        <Switch
+          value={props.settings.skills.enabled}
           label={t("settings.skillsEnable")}
+          description={
+            props.settings.skills.enabled
+              ? t("settings.skillsHubEnabled")
+              : t("settings.skillsHubDisabled")
+          }
+          labelPosition="start"
+          labelSpacing="spread"
+          width="100%"
           onChange={(enabled) => props.setSettings((prev) => updateSkills(prev, { enabled }))}
         />
-      </div>
+      </HStack>
       {refreshError ? (
-        <div className="mx-5 mt-3 rounded-2xl bg-destructive/8 px-4 py-3 text-[12px] text-destructive">
-          {refreshError}
-        </div>
+        <HStack paddingInline={5} paddingBlockStart={3}>
+          <Banner status="error" title={refreshError} collapsible={false} />
+        </HStack>
       ) : null}
 
-      <div className="mt-6 flex items-center justify-between px-5">
-        <h2 className="text-[18px] font-semibold">{t("settings.skillsHubInstalledTab")}</h2>
-        <span className="text-[12px] tabular-nums text-muted-foreground">
-          {visibleSkills.length}
-        </span>
-      </div>
+      <HStack gap={2} hAlign="between" vAlign="center" paddingInline={5} paddingBlockStart={5}>
+        <Heading level={2}>{t("settings.skillsHubInstalledTab")}</Heading>
+        <Badge label={String(visibleSkills.length)} />
+      </HStack>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-4">
-        {visibleSkills.map((skill) => (
-          <article
-            key={`${skill.baseDir}:${skill.name}`}
-            className="flex min-h-[76px] items-center gap-3 rounded-[1.35rem] px-2 py-2 active:bg-muted/65"
-          >
-            <button
-              type="button"
-              onClick={() => setSelected(skill)}
-              className="flex min-w-0 flex-1 items-center gap-3 text-left"
-            >
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-border/45 bg-background shadow-sm">
-                <SkillIcon className="h-7 w-7" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[16px] font-semibold">{skill.name}</span>
-                <span className="mt-0.5 block truncate text-[13px] text-muted-foreground">
-                  {skill.description}
-                </span>
-              </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
-            </button>
-            <MobileToggle
-              checked={isSelected(skill)}
-              disabled={!isUserSelectableSkill(skill)}
-              label={isSelected(skill) ? t("settings.disable") : t("settings.enable")}
-              onChange={(checked) => toggle(skill, checked)}
-            />
-          </article>
-        ))}
-        {!refreshing && visibleSkills.length === 0 ? (
-          <div className="flex flex-col items-center px-8 py-20 text-center text-muted-foreground">
-            <MoreHorizontal className="mb-3 h-7 w-7" />
-            <p className="text-sm">{t("settings.skillsNotFound")}</p>
-          </div>
-        ) : null}
-      </div>
-    </section>
+      <StackItem size="fill" isScrollable>
+        <VStack gap={3} padding={3}>
+          {visibleSkills.length > 0 ? (
+            <VStack gap={2}>
+              {visibleSkills.map((skill) => (
+                <ClickableCard
+                  key={`${skill.baseDir}:${skill.name}`}
+                  label={skill.name}
+                  onClick={() => setSelected(skill)}
+                  padding={3}
+                  width="100%"
+                >
+                  <HStack gap={3} vAlign="center">
+                    <SkillIcon />
+                    <StackItem size="fill">
+                      <VStack gap={1}>
+                        <Text type="body" weight="medium" maxLines={1}>
+                          {skill.name}
+                        </Text>
+                        <Text type="supporting" color="secondary" maxLines={2}>
+                          {skill.description}
+                        </Text>
+                      </VStack>
+                    </StackItem>
+                    <Switch
+                      value={isSelected(skill)}
+                      isDisabled={!isUserSelectableSkill(skill)}
+                      disabledMessage={
+                        !isUserSelectableSkill(skill)
+                          ? t("settings.skillsAlwaysEnabled")
+                          : undefined
+                      }
+                      label={isSelected(skill) ? t("settings.disable") : t("settings.enable")}
+                      isLabelHidden
+                      onChange={(checked) => toggle(skill, checked)}
+                      size="md"
+                    />
+                  </HStack>
+                </ClickableCard>
+              ))}
+            </VStack>
+          ) : !refreshing ? (
+            <EmptyState icon={<MoreHorizontal />} title={t("settings.skillsNotFound")} isCompact />
+          ) : (
+            <Spinner label={t("settings.skillsScanning")} size="md" />
+          )}
+        </VStack>
+      </StackItem>
+    </VStack>
   );
 }

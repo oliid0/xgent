@@ -1,16 +1,6 @@
 import { openUrl } from "@xagent/runtime";
-import {
-  type FocusEvent,
-  type MouseEvent,
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
+import { HoverCard } from "@astryxdesign/core/HoverCard";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { getFileTypeIcon } from "../../../components/chat/fileTypeIcons";
 import { mentionChipClassName } from "../../../components/chat/mentionChipStyles";
 import { SkillIcon } from "../../../components/icons";
@@ -36,6 +26,8 @@ import {
   type PendingUploadedFile,
   parsePastedTextDisplayReferences,
 } from "./uploadedFiles";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 const COMMON_SKILL_MENTION_ENV_VARS = new Set([
   "PATH",
@@ -532,30 +524,8 @@ function commitStatLabel(template: string, count: string) {
   return template.replace("{count}", count);
 }
 
-function CommitReferenceTooltip({
-  commit,
-  rect,
-  onMouseEnter,
-  onMouseLeave,
-}: {
-  commit: CommitDisplayReference;
-  rect: DOMRect;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
-}) {
+function CommitReferenceCard({ commit }: { commit: CommitDisplayReference }) {
   const { locale, t } = useLocale();
-  const maxWidth = Math.min(440, window.innerWidth - 16);
-  const minWidth = Math.min(200, maxWidth);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const [tooltipWidth, setTooltipWidth] = useState(minWidth);
-  const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - tooltipWidth - 8));
-  const availableAbove = rect.top - 16;
-  const availableBelow = window.innerHeight - rect.bottom - 16;
-  const placeAbove = availableAbove > 260 || availableAbove > availableBelow;
-  const maxHeight = Math.max(120, Math.min(520, placeAbove ? availableAbove : availableBelow));
-  const top = placeAbove
-    ? Math.max(8, rect.top - 8)
-    : Math.min(window.innerHeight - 8, rect.bottom + 8);
   const shortSha = commit.shortSha || commit.sha.slice(0, 7);
   const subject = commit.subject.trim() || shortSha;
   const body = commit.body?.trim() ?? "";
@@ -581,85 +551,110 @@ function CommitReferenceTooltip({
     formatPastedTextCount(deletions),
   );
 
-  useLayoutEffect(() => {
-    const node = tooltipRef.current;
-    if (!node) return;
-    const measuredWidth = Math.ceil(node.getBoundingClientRect().width);
-    setTooltipWidth(Math.min(maxWidth, Math.max(minWidth, measuredWidth)));
-  }, [commit, maxWidth, minWidth]);
-
-  return createPortal(
-    <div
-      ref={tooltipRef}
-      className="fixed z-[10000] overflow-y-auto rounded-xl border border-border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-xl"
+  return (
+    <AstryxView
+      layout="block"
+      direction="horizontal"
+      className="overflow-y-auto"
       style={{
-        left,
-        top,
-        width: "fit-content",
-        minWidth,
-        maxWidth,
-        maxHeight,
-        transform: placeAbove ? "translateY(-100%)" : "none",
+        minWidth: "var(--xagent-hover-card-min-width)",
+        maxWidth: "var(--xagent-hover-card-width)",
+        maxHeight: "var(--xagent-hover-card-height)",
       }}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
     >
-      <div className="flex items-start gap-2">
+      <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-2">
         <GitHubMarkIcon className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
-        <div className="min-w-0">
+        <AstryxView layout="block" direction="horizontal" className="min-w-0">
           {detailed ? (
             <>
-              <div className="break-words font-medium leading-tight">{authorLabel}</div>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="break-words font-medium leading-tight"
+              >
+                {authorLabel}
+              </AstryxView>
               {date ? (
-                <div className="mt-0.5 text-[11px] leading-tight text-muted-foreground">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="mt-0.5 text-[11px] leading-tight text-muted-foreground"
+                >
                   {date.relative} ({date.absolute})
-                </div>
+                </AstryxView>
               ) : null}
             </>
           ) : (
-            <div className="font-mono text-[11px] leading-tight text-muted-foreground">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="font-mono text-[11px] leading-tight text-muted-foreground"
+            >
               {shortSha}
-            </div>
+            </AstryxView>
           )}
-        </div>
-      </div>
-      <div className="mt-2 whitespace-pre-wrap break-words font-medium leading-snug">{subject}</div>
+        </AstryxView>
+      </AstryxView>
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        className="mt-2 whitespace-pre-wrap break-words font-medium leading-snug"
+      >
+        {subject}
+      </AstryxView>
       {body ? (
-        <div className="mt-1.5 whitespace-pre-wrap break-words leading-snug text-muted-foreground">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="mt-1.5 whitespace-pre-wrap break-words leading-snug text-muted-foreground"
+        >
           {body}
-        </div>
+        </AstryxView>
       ) : null}
       {detailed ? (
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-tight">
-          <span className="text-muted-foreground">{filesChangedLabel}</span>
-          <span className="font-medium text-emerald-600 dark:text-emerald-400">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-tight"
+        >
+          <AstryxInline className="text-muted-foreground">{filesChangedLabel}</AstryxInline>
+          <AstryxInline className="font-medium text-emerald-600 dark:text-emerald-400">
             {insertionsLabel}
-          </span>
-          <span className="font-medium text-rose-600 dark:text-rose-400">{deletionsLabel}</span>
-        </div>
+          </AstryxInline>
+          <AstryxInline className="font-medium text-rose-600 dark:text-rose-400">
+            {deletionsLabel}
+          </AstryxInline>
+        </AstryxView>
       ) : null}
       {commit.githubUrl ? (
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/70 pt-1.5 text-[11px] leading-tight text-muted-foreground">
-          <span className="font-mono text-foreground">{shortSha}</span>
-          {commit.remoteName ? <span>{commit.remoteName}</span> : null}
-          <span className="text-border">|</span>
-          <button
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/70 pt-1.5 text-[11px] leading-tight text-muted-foreground"
+        >
+          <AstryxInline className="font-mono text-foreground">{shortSha}</AstryxInline>
+          {commit.remoteName ? <AstryxInline>{commit.remoteName}</AstryxInline> : null}
+          <AstryxInline className="text-border">|</AstryxInline>
+          <AstryxButton
             type="button"
             className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-primary hover:bg-primary/10"
             onClick={() => void openUrl(commit.githubUrl!)}
           >
             <GitHubMarkIcon className="h-3 w-3" />
             {t("chat.composer.commitTooltipOpenGithub")}
-          </button>
-        </div>
+          </AstryxButton>
+        </AstryxView>
       ) : detailed ? (
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/70 pt-1.5 text-[11px] leading-tight text-muted-foreground">
-          <span className="font-mono text-foreground">{shortSha}</span>
-          {commit.remoteName ? <span>{commit.remoteName}</span> : null}
-        </div>
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/70 pt-1.5 text-[11px] leading-tight text-muted-foreground"
+        >
+          <AstryxInline className="font-mono text-foreground">{shortSha}</AstryxInline>
+          {commit.remoteName ? <AstryxInline>{commit.remoteName}</AstryxInline> : null}
+        </AstryxView>
       ) : null}
-    </div>,
-    document.body,
+    </AstryxView>
   );
 }
 
@@ -682,23 +677,23 @@ function PastedTextChip({
   const Icon = getFileTypeIcon(file.relativePath || "pasted.txt", "file");
 
   return (
-    <span title={file.relativePath} className={mentionChipClassName("pastedText")}>
+    <AstryxInline title={file.relativePath} className={mentionChipClassName("pastedText")}>
       <Icon className="h-3 w-3 shrink-0 self-center" />
       {chipText}
-    </span>
+    </AstryxInline>
   );
 }
 
 function MentionChip({ reference }: { reference: FileMentionReference }) {
   const Icon = getFileTypeIcon(reference.path, reference.kind);
   return (
-    <span
+    <AstryxInline
       title={fileMentionTitle(reference)}
       className={mentionChipClassName(reference.kind === "dir" ? "dir" : "file")}
     >
       <Icon className="h-3 w-3 shrink-0 self-center" />
       {fileMentionDisplayName(reference)}
-    </span>
+    </AstryxInline>
   );
 }
 
@@ -706,10 +701,10 @@ function CodeRefMentionChip({ reference }: { reference: CodeMentionReference }) 
   const Icon = getFileTypeIcon(reference.path, "file");
   const lineLabel = codeMentionLineLabel(reference);
   return (
-    <span title={codeMentionTitle(reference)} className={mentionChipClassName("codeRef")}>
+    <AstryxInline title={codeMentionTitle(reference)} className={mentionChipClassName("codeRef")}>
       <Icon className="h-3 w-3 shrink-0 self-center" />
-      <span>{`${codeMentionDisplayName(reference)}：${lineLabel}`}</span>
-    </span>
+      <AstryxInline>{`${codeMentionDisplayName(reference)}：${lineLabel}`}</AstryxInline>
+    </AstryxInline>
   );
 }
 
@@ -742,7 +737,7 @@ function GitFileMentionChip({ file }: { file: GitFileDisplayReference }) {
   }, [normalized.githubUrl]);
 
   return (
-    <span
+    <AstryxInline
       title={title}
       role={normalized.githubUrl ? "button" : undefined}
       tabIndex={normalized.githubUrl ? 0 : undefined}
@@ -755,18 +750,20 @@ function GitFileMentionChip({ file }: { file: GitFileDisplayReference }) {
       }}
     >
       <Icon className="h-3 w-3 shrink-0 self-center" />
-      <span>{fileName}</span>
-      <span className="max-w-[8rem] truncate text-[10px] opacity-70">@{refLabel}</span>
-    </span>
+      <AstryxInline>{fileName}</AstryxInline>
+      <AstryxInline className="max-w-[8rem] truncate text-[10px] opacity-70">
+        @{refLabel}
+      </AstryxInline>
+    </AstryxInline>
   );
 }
 
 function SkillMentionChip({ name }: { name: string }) {
   return (
-    <span title={`Skill: ${name}`} className={mentionChipClassName("skill")}>
+    <AstryxInline title={`Skill: ${name}`} className={mentionChipClassName("skill")}>
       <SkillIcon className="h-3 w-3 shrink-0 self-center" />
       {name}
-    </span>
+    </AstryxInline>
   );
 }
 
@@ -781,20 +778,12 @@ function CommitMentionChip({
     normalizeCommitDisplayReference(commit),
   );
   const [detailsState, setDetailsState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
-  const [tooltipRect, setTooltipRect] = useState<DOMRect | null>(null);
-  const closeTimerRef = useRef<number | null>(null);
   const label = resolvedCommit.shortSha || resolvedCommit.sha.slice(0, 7);
 
   useEffect(() => {
     setResolvedCommit(normalizeCommitDisplayReference(commit));
     setDetailsState("idle");
   }, [commit.githubUrl, commit.sha, commit.shortSha, commit.subject]);
-
-  const clearCloseTimer = useCallback(() => {
-    if (closeTimerRef.current === null) return;
-    window.clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = null;
-  }, []);
 
   const maybeLoadCommitDetails = useCallback(() => {
     if (!loadCommitDetails || detailsState !== "idle") return;
@@ -819,71 +808,40 @@ function CommitMentionChip({
       });
   }, [detailsState, loadCommitDetails, resolvedCommit]);
 
-  const showTooltip = useCallback(
-    (target: HTMLElement) => {
-      clearCloseTimer();
-      setTooltipRect(target.getBoundingClientRect());
-      maybeLoadCommitDetails();
-    },
-    [clearCloseTimer, maybeLoadCommitDetails],
-  );
-
-  const scheduleClose = useCallback(() => {
-    clearCloseTimer();
-    closeTimerRef.current = window.setTimeout(() => {
-      closeTimerRef.current = null;
-      setTooltipRect(null);
-    }, 120);
-  }, [clearCloseTimer]);
-
   const openCommit = useCallback(() => {
     if (resolvedCommit.githubUrl) {
       void openUrl(resolvedCommit.githubUrl);
     }
   }, [resolvedCommit.githubUrl]);
 
-  const handleMouseEnter = useCallback(
-    (event: MouseEvent<HTMLSpanElement>) => showTooltip(event.currentTarget),
-    [showTooltip],
-  );
-  const handleFocus = useCallback(
-    (event: FocusEvent<HTMLSpanElement>) => showTooltip(event.currentTarget),
-    [showTooltip],
-  );
-
-  useEffect(() => clearCloseTimer, [clearCloseTimer]);
-
   return (
-    <>
-      <span
+    <HoverCard
+      content={<CommitReferenceCard commit={resolvedCommit} />}
+      placement="above"
+      alignment="start"
+      label={resolvedCommit.subject || label}
+      hasHoverIndication={false}
+      onOpenChange={(isOpen) => {
+        if (isOpen) maybeLoadCommitDetails();
+      }}
+    >
+      <AstryxInline
         role={resolvedCommit.githubUrl ? "button" : undefined}
         tabIndex={resolvedCommit.githubUrl ? 0 : undefined}
         className={mentionChipClassName("commit", {
           interactive: Boolean(resolvedCommit.githubUrl),
         })}
         onClick={openCommit}
-        onFocus={handleFocus}
-        onBlur={scheduleClose}
         onKeyDown={(event) => {
           if (!resolvedCommit.githubUrl || (event.key !== "Enter" && event.key !== " ")) return;
           event.preventDefault();
           openCommit();
         }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={scheduleClose}
       >
         <GitHubMarkIcon className="h-3 w-3 shrink-0 self-center" />
         {label}
-      </span>
-      {tooltipRect ? (
-        <CommitReferenceTooltip
-          commit={resolvedCommit}
-          rect={tooltipRect}
-          onMouseEnter={clearCloseTimer}
-          onMouseLeave={scheduleClose}
-        />
-      ) : null}
-    </>
+      </AstryxInline>
+    </HoverCard>
   );
 }
 
@@ -938,7 +896,7 @@ export const UserMessageContent = memo(function UserMessageContent({
         if (part.type === "pastedText") {
           return <PastedTextChip key={key} reference={part.reference} file={part.file} />;
         }
-        return <span key={key}>{part.value}</span>;
+        return <AstryxInline key={key}>{part.value}</AstryxInline>;
       })}
     </>
   );

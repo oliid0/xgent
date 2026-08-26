@@ -26,6 +26,10 @@ import { type CronTaskFormData, CronTaskModal } from "./CronTaskModal";
 import { CronTaskViewModal } from "./CronTaskViewModal";
 import { AgentActivationSwitch, ConfirmDeletePopover } from "./shared";
 import type { SettingsSectionProps } from "./types";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
+import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 const TASK_TYPE_ICON: Record<CronTaskType, typeof Terminal> = {
   bash: Terminal,
@@ -139,31 +143,62 @@ export function CronSection(props: SettingsSectionProps) {
   const enabledCount = tasks.filter((task) => task.enabled).length;
 
   return (
-    <div className="settings-cron-section space-y-5">
+    <AstryxView layout="block" direction="horizontal" className="settings-cron-section space-y-5">
       {/* Header */}
-      <div className="settings-section-heading-row flex items-center justify-between gap-4">
-        <div className="settings-section-title-group flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10">
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="settings-section-heading-row flex items-center justify-between gap-4"
+      >
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="settings-section-title-group flex items-center gap-3"
+        >
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10"
+          >
             <Clock3 className="h-[18px] w-[18px] text-amber-500" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold">{t("settings.cronTitle")}</h3>
-            <p className="text-xs text-muted-foreground">{t("settings.cronDesc")}</p>
-          </div>
-        </div>
+          </AstryxView>
+          <AstryxView layout="block" direction="horizontal">
+            <AstryxHeading level={3} className="text-sm font-semibold">
+              {t("settings.cronTitle")}
+            </AstryxHeading>
+            <AstryxParagraph className="text-xs text-muted-foreground">
+              {t("settings.cronDesc")}
+            </AstryxParagraph>
+          </AstryxView>
+        </AstryxView>
 
-        <div className="settings-section-actions flex items-center gap-2">
-          <div className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs text-muted-foreground">
-            <span className="tabular-nums font-medium text-foreground">{tasks.length}</span>
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="settings-section-actions flex items-center gap-2"
+        >
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs text-muted-foreground"
+          >
+            <AstryxInline className="tabular-nums font-medium text-foreground">
+              {tasks.length}
+            </AstryxInline>
             {t("settings.cronCount")}
-            <span className="text-border">|</span>
-            <span className="flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span className="tabular-nums font-medium text-emerald-600 dark:text-emerald-400">
+            <AstryxInline className="text-border">|</AstryxInline>
+            <AstryxView
+              as="span"
+              layout="flex"
+              direction="horizontal"
+              className="flex items-center gap-1"
+            >
+              <AstryxInline className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <AstryxInline className="tabular-nums font-medium text-emerald-600 dark:text-emerald-400">
                 {enabledCount}
-              </span>
-            </span>
-          </div>
+              </AstryxInline>
+            </AstryxView>
+          </AstryxView>
 
           <Button
             variant="outline"
@@ -174,33 +209,47 @@ export function CronSection(props: SettingsSectionProps) {
             <Plus className="h-3.5 w-3.5" />
             {t("settings.cronAdd")}
           </Button>
-        </div>
-      </div>
+        </AstryxView>
+      </AstryxView>
 
       {!autoPromptSupported ? (
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-4 py-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-4 py-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300"
+        >
           {t("settings.cronPromptAgentModeOnlyHint")}
-        </div>
+        </AstryxView>
       ) : null}
 
       {actionError ? (
-        <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive"
+        >
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0 flex-1 truncate">{actionError}</span>
-        </div>
+          <AstryxInline className="min-w-0 flex-1 truncate">{actionError}</AstryxInline>
+        </AstryxView>
       ) : null}
 
       {/* Task List */}
       {tasks.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 py-12 text-center">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="rounded-2xl border border-dashed border-border/60 bg-muted/20 py-12 text-center"
+        >
           <Clock3 className="mx-auto h-8 w-8 text-muted-foreground/30" />
-          <p className="mt-3 text-sm font-medium text-muted-foreground">
+          <AstryxParagraph className="mt-3 text-sm font-medium text-muted-foreground">
             {t("settings.cronEmpty")}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground/70">{t("settings.cronEmptyDesc")}</p>
-        </div>
+          </AstryxParagraph>
+          <AstryxParagraph className="mt-1 text-xs text-muted-foreground/70">
+            {t("settings.cronEmptyDesc")}
+          </AstryxParagraph>
+        </AstryxView>
       ) : (
-        <div className="space-y-2">
+        <AstryxView layout="block" direction="horizontal" className="space-y-2">
           {tasks.map((task) => {
             const tone = TASK_TYPE_TONE[task.type];
             const Icon = TASK_TYPE_ICON[task.type];
@@ -212,7 +261,9 @@ export function CronSection(props: SettingsSectionProps) {
                 : t("settings.cronEnable");
 
             return (
-              <div
+              <AstryxView
+                layout="block"
+                direction="horizontal"
                 key={task.id}
                 className={`settings-cron-card group rounded-xl border transition-[border-color,background-color,box-shadow,opacity] ${
                   task.enabled
@@ -220,44 +271,70 @@ export function CronSection(props: SettingsSectionProps) {
                     : "border-border/40 bg-muted/20 opacity-60 hover:opacity-80"
                 }`}
               >
-                <div className="settings-card-row settings-cron-card-row flex items-center gap-3 px-4 py-3">
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="settings-card-row settings-cron-card-row flex items-center gap-3 px-4 py-3"
+                >
                   {/* Icon */}
-                  <div
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tone.bg} ${tone.text}`}
                   >
                     <Icon className="h-4 w-4" />
-                  </div>
+                  </AstryxView>
 
                   {/* Content */}
-                  <div className="settings-cron-card-main min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium text-foreground">
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="settings-cron-card-main min-w-0 flex-1"
+                  >
+                    <AstryxView
+                      layout="flex"
+                      direction="horizontal"
+                      className="flex items-center gap-2"
+                    >
+                      <AstryxInline className="truncate text-sm font-medium text-foreground">
                         {task.name}
-                      </span>
-                      <span
+                      </AstryxInline>
+                      <AstryxInline
                         className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none ${tone.bg} ${tone.text}`}
                       >
                         {t(tone.label)}
-                      </span>
+                      </AstryxInline>
                       {task.lastError ? (
-                        <span
+                        <AstryxView
+                          as="span"
+                          layout="flex"
+                          direction="horizontal"
                           title={task.lastError}
                           className="flex shrink-0 items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-red-600 dark:text-red-400"
                         >
                           <AlertTriangle className="h-2.5 w-2.5" />
                           {t("settings.cronScheduleError")}
-                        </span>
+                        </AstryxView>
                       ) : null}
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    </AstryxView>
+                    <AstryxParagraph className="mt-0.5 truncate text-xs text-muted-foreground">
                       {task.description}
-                    </p>
-                    <div className="settings-cron-mobile-meta mt-2 hidden flex-wrap items-center gap-1.5">
-                      <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 font-mono text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                    </AstryxParagraph>
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="settings-cron-mobile-meta mt-2 hidden flex-wrap items-center gap-1.5"
+                    >
+                      <AstryxView
+                        as="span"
+                        layout="inline-flex"
+                        direction="horizontal"
+                        className="inline-flex min-h-7 items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 font-mono text-[11px] font-medium text-amber-600 dark:text-amber-400"
+                      >
                         <Clock3 className="h-3 w-3 shrink-0" />
                         {task.cron}
-                      </span>
-                      <span
+                      </AstryxView>
+                      <AstryxInline
                         className={`inline-flex min-h-7 items-center rounded-full px-2.5 text-[11px] font-medium ${
                           exhausted
                             ? "bg-red-500/10 text-red-600 dark:text-red-400"
@@ -267,16 +344,22 @@ export function CronSection(props: SettingsSectionProps) {
                         }`}
                       >
                         {formatRemainingExecutionsLabel(t, task)}
-                      </span>
-                    </div>
-                  </div>
+                      </AstryxInline>
+                    </AstryxView>
+                  </AstryxView>
 
                   {/* Cron Expression - fixed width for alignment */}
-                  <div className="hidden w-[140px] shrink-0 items-center justify-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-600 dark:text-amber-400 md:flex">
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="hidden w-[140px] shrink-0 items-center justify-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-600 dark:text-amber-400 md:flex"
+                  >
                     <Clock3 className="h-3 w-3 shrink-0" />
-                    <span className="font-mono">{task.cron}</span>
-                  </div>
-                  <div
+                    <AstryxInline className="font-mono">{task.cron}</AstryxInline>
+                  </AstryxView>
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
                     className={`hidden w-[74px] shrink-0 items-center justify-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium md:flex ${
                       exhausted
                         ? "bg-red-500/10 text-red-600 dark:text-red-400"
@@ -286,60 +369,70 @@ export function CronSection(props: SettingsSectionProps) {
                     }`}
                     title={formatRemainingExecutionsLabel(t, task)}
                   >
-                    <span className="tabular-nums">
+                    <AstryxInline className="tabular-nums">
                       {task.remainingExecutions == null ? "∞" : task.remainingExecutions}
-                    </span>
+                    </AstryxInline>
                     {task.remainingExecutions == null ? null : (
-                      <span>{t("settings.cronRemainingExecutionsUnitShort")}</span>
+                      <AstryxInline>{t("settings.cronRemainingExecutionsUnitShort")}</AstryxInline>
                     )}
-                  </div>
+                  </AstryxView>
 
                   {/* Actions */}
-                  <div className="settings-hover-actions settings-cron-card-actions flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                    <button
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="settings-hover-actions settings-cron-card-actions flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+                  >
+                    <AstryxButton
                       type="button"
                       onClick={() => setModal({ open: true, mode: "view", taskId: task.id })}
                       className="settings-cron-action flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                       title={t("settings.cronView")}
                     >
                       <Eye className="h-3.5 w-3.5" />
-                    </button>
-                    <button
+                    </AstryxButton>
+                    <AstryxButton
                       type="button"
                       onClick={() => setModal({ open: true, mode: "edit", task })}
                       className="settings-cron-action flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                       title={t("settings.cronEdit")}
                     >
                       <Pencil className="h-3.5 w-3.5" />
-                    </button>
+                    </AstryxButton>
                     <ConfirmDeletePopover name={task.name} onConfirm={() => handleDelete(task.id)}>
                       {(open) => (
-                        <button
+                        <AstryxButton
                           type="button"
                           onClick={open}
                           className="settings-cron-action flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                           title={t("settings.cronDelete")}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        </AstryxButton>
                       )}
                     </ConfirmDeletePopover>
-                  </div>
+                  </AstryxView>
 
                   {/* Enable/Disable Switch */}
-                  <span className="inline-flex" title={switchTitle}>
+                  <AstryxView
+                    as="span"
+                    layout="inline-flex"
+                    direction="horizontal"
+                    className="inline-flex"
+                    title={switchTitle}
+                  >
                     <AgentActivationSwitch
                       checked={task.enabled}
                       disabled={exhausted}
                       title={switchTitle}
                       onToggle={() => handleToggle(task)}
                     />
-                  </span>
-                </div>
-              </div>
+                  </AstryxView>
+                </AstryxView>
+              </AstryxView>
             );
           })}
-        </div>
+        </AstryxView>
       )}
 
       {/* Edit/Add Modal */}
@@ -360,6 +453,6 @@ export function CronSection(props: SettingsSectionProps) {
       {modal.open && modal.mode === "view" ? (
         <CronTaskViewModal taskId={modal.taskId} onClose={() => setModal({ open: false })} />
       ) : null}
-    </div>
+    </AstryxView>
   );
 }

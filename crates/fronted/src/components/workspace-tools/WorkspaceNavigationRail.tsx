@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { DropdownMenu, type DropdownMenuOption } from "@astryxdesign/core/DropdownMenu";
+import { Icon } from "@astryxdesign/core/Icon";
+import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
+import { type ReactNode, useState } from "react";
+
 import { useLocale } from "../../i18n";
 import type { AppUpdateController } from "../../lib/appUpdates";
-import { cn } from "../../lib/shared/utils";
 import { useSoul } from "../../lib/soul";
 import { AppUpdateButton } from "../AppUpdateButton";
 import {
@@ -45,32 +48,6 @@ type RailItem = {
   icon: typeof MessageSquare;
   enabled?: boolean;
 };
-
-function RailButton(props: {
-  label: string;
-  active?: boolean;
-  disabled?: boolean;
-  icon: typeof MessageSquare;
-  onClick: () => void;
-}) {
-  const Icon = props.icon;
-  return (
-    <button
-      type="button"
-      title={props.label}
-      aria-label={props.label}
-      aria-pressed={props.active}
-      disabled={props.disabled}
-      onClick={props.onClick}
-      className={cn(
-        "flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-foreground/[0.07] hover:text-foreground disabled:pointer-events-none disabled:opacity-35",
-        props.active && "bg-foreground/[0.08] text-foreground",
-      )}
-    >
-      <Icon className="h-[18px] w-[18px]" />
-    </button>
-  );
-}
 
 export function WorkspaceNavigationRail(props: WorkspaceNavigationRailProps) {
   const { t } = useLocale();
@@ -118,134 +95,133 @@ export function WorkspaceNavigationRail(props: WorkspaceNavigationRailProps) {
     props.onSelect(target, shell);
   };
 
-  return (
-    <aside className="relative z-30 flex h-full w-[52px] shrink-0 flex-col items-center border-r border-border/55 bg-[hsl(var(--sidebar-bg))] px-1.5 pb-2">
-      <MacOsTitleBarSpacer className="w-full bg-transparent" />
-      <div className="flex min-h-0 flex-1 flex-col items-center gap-1.5 pt-2">
-        <RailButton
-          label={props.panelOpen ? t("sidebar.closeSidebar") : t("sidebar.openSidebar")}
-          icon={PanelLeft}
-          active={props.panelOpen}
-          onClick={props.onTogglePanel}
-        />
-        <RailButton
-          label={t("chat.newConversation")}
-          icon={SquarePen}
-          onClick={props.onNewConversation}
-        />
-        <div className="my-0.5 w-6 border-t border-border/55" />
-        <div className="flex min-h-0 flex-col items-center gap-1 overflow-y-auto py-0.5">
-          {items.map((item) => (
-            <RailButton
-              key={item.target}
-              label={item.label}
-              icon={item.icon}
-              active={props.panelOpen && props.activeTarget === item.target}
-              disabled={item.enabled === false}
-              onClick={() => props.onSelect(item.target)}
-            />
-          ))}
-        </div>
-      </div>
+  const soulMenuItems: DropdownMenuOption[] = [
+    {
+      type: "section",
+      title: t("sidebar.soulPresets"),
+      items: soul.presets.map((preset) => ({
+        id: preset.id,
+        label: preset.metadata.name || "XGent",
+        icon: <Icon icon={Sparkles} size="sm" color="inherit" />,
+        endContent:
+          preset.id === soul.activeId ? (
+            <Icon icon={Check} size="sm" color="success" />
+          ) : undefined,
+        onClick: () => {
+          void soul.select(preset.id).catch(() => undefined);
+        },
+      })),
+    },
+    {
+      label: t("sidebar.addSoul"),
+      icon: <Icon icon={Plus} size="sm" color="inherit" />,
+      onClick: props.onCreateSoul,
+    },
+    { type: "divider" },
+    {
+      label: t("sidebar.terminal"),
+      icon: <Icon icon={Terminal} size="sm" color="inherit" />,
+      isDisabled: !props.workspaceToolsAvailable,
+      onClick: () => selectFromSoulMenu("terminal"),
+    },
+    ...(
+      [
+        { target: "gitReview" as const, label: t("sidebar.gitReview"), icon: GitBranch },
+        {
+          target: "sshConnection" as const,
+          label: t("sidebar.sshConnection"),
+          icon: Key,
+        },
+        {
+          target: "backgroundTasks" as const,
+          label: t("sidebar.backgroundTasks"),
+          icon: Cpu,
+        },
+      ] satisfies Array<{
+        target: WorkspaceToolTarget;
+        label: string;
+        icon: typeof MessageSquare;
+      }>
+    ).map((item) => ({
+      label: item.label,
+      icon: <Icon icon={item.icon} size="sm" color="inherit" />,
+      isDisabled: !props.workspaceToolsAvailable,
+      onClick: () => selectFromSoulMenu(item.target),
+    })),
+    { type: "divider" },
+    {
+      label: t("tooltip.settings"),
+      icon: <Icon icon={Settings} size="sm" color="inherit" />,
+      onClick: props.onOpenSettings,
+    },
+  ];
 
-      <div className="relative mt-auto flex flex-col items-center gap-1.5">
-        {props.appUpdate?.showUpdateButton ? (
-          <AppUpdateButton appUpdate={props.appUpdate} iconOnly />
-        ) : null}
-        {soulMenuOpen ? (
-          <div className="absolute bottom-0 left-[46px] z-50 w-64 rounded-xl border border-border/60 bg-popover p-1.5 text-popover-foreground shadow-xl">
-            <div className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              {t("sidebar.soulPresets")}
-            </div>
-            <div className="max-h-40 overflow-y-auto">
-              {soul.presets.map((preset) => {
-                const active = preset.id === soul.activeId;
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => {
-                      void soul.select(preset.id).catch(() => undefined);
-                      setSoulMenuOpen(false);
-                    }}
-                    className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-sm hover:bg-foreground/[0.07]"
-                  >
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-500/10 text-violet-500">
-                      {active ? <Check className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">
-                      {preset.metadata.name || "XGent"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setSoulMenuOpen(false);
-                props.onCreateSoul();
-              }}
-              className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-sm hover:bg-foreground/[0.07]"
-            >
-              <Plus className="h-4 w-4 text-muted-foreground" />
-              {t("sidebar.addSoul")}
-            </button>
-            <div className="mx-1 my-1 border-t border-border/55" />
-            <button
-              type="button"
-              disabled={!props.workspaceToolsAvailable}
-              onClick={() => selectFromSoulMenu("terminal")}
-              className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-sm hover:bg-foreground/[0.07] disabled:opacity-40"
-            >
-              <Terminal className="h-4 w-4 text-muted-foreground" />
-              {t("sidebar.terminal")}
-            </button>
-            {[
-              { target: "gitReview" as const, label: t("sidebar.gitReview"), icon: GitBranch },
-              { target: "sshConnection" as const, label: t("sidebar.sshConnection"), icon: Key },
-              {
-                target: "backgroundTasks" as const,
-                label: t("sidebar.backgroundTasks"),
-                icon: Cpu,
-              },
-            ].map((item) => (
-              <button
-                key={item.target}
-                type="button"
-                disabled={!props.workspaceToolsAvailable}
-                onClick={() => selectFromSoulMenu(item.target)}
-                className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-sm hover:bg-foreground/[0.07] disabled:opacity-40"
-              >
-                <item.icon className="h-4 w-4 text-muted-foreground" />
-                {item.label}
-              </button>
-            ))}
-            <div className="mx-1 my-1 border-t border-border/55" />
-            <button
-              type="button"
-              onClick={() => {
-                setSoulMenuOpen(false);
-                props.onOpenSettings();
-              }}
-              className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-sm hover:bg-foreground/[0.07]"
-            >
-              <Settings className="h-4 w-4 text-muted-foreground" />
-              {t("tooltip.settings")}
-            </button>
-          </div>
-        ) : null}
-        <button
-          type="button"
-          title={t("sidebar.soulMenu")}
-          aria-label={t("sidebar.soulMenu")}
-          aria-expanded={soulMenuOpen}
-          onClick={() => setSoulMenuOpen((open) => !open)}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/25 via-sky-500/20 to-amber-500/25 text-violet-500 ring-1 ring-border/70 transition-transform hover:scale-[1.03]"
-        >
-          <Sparkles className="h-4 w-4" />
-        </button>
-      </div>
-    </aside>
+  const footerIcons: ReactNode = (
+    <>
+      {props.appUpdate?.showUpdateButton ? (
+        <AppUpdateButton appUpdate={props.appUpdate} iconOnly />
+      ) : null}
+      <DropdownMenu
+        button={{
+          label: t("sidebar.soulMenu"),
+          icon: <Icon icon={Sparkles} size="sm" color="accent" />,
+          isIconOnly: true,
+          variant: "ghost",
+          size: "sm",
+          tooltip: t("sidebar.soulMenu"),
+        }}
+        items={soulMenuItems}
+        isMenuOpen={soulMenuOpen}
+        onOpenChange={setSoulMenuOpen}
+        menuWidth="var(--xagent-soul-menu-width)"
+        placement="end"
+        alignment="end"
+        hasChevron={false}
+      />
+    </>
+  );
+
+  return (
+    <SideNav
+      header={<MacOsTitleBarSpacer />}
+      topContent={
+        <SideNavSection title={t("sidebar.navigation")} isHeaderHidden>
+          <SideNavItem
+            label={props.panelOpen ? t("sidebar.closeSidebar") : t("sidebar.openSidebar")}
+            icon={PanelLeft}
+            isSelected={props.panelOpen}
+            onClick={props.onTogglePanel}
+            size="sm"
+          />
+          <SideNavItem
+            label={t("chat.newConversation")}
+            icon={SquarePen}
+            onClick={props.onNewConversation}
+            size="sm"
+          />
+        </SideNavSection>
+      }
+      footerIcons={footerIcons}
+      collapsible={{ isCollapsed: true, onCollapsedChange: () => undefined, hasButton: false }}
+      style={{
+        height: "100%",
+        flexShrink: 0,
+        zIndex: "var(--xagent-z-workspace-navigation)",
+      }}
+    >
+      <SideNavSection title={t("sidebar.navigation")} isHeaderHidden>
+        {items.map((item) => (
+          <SideNavItem
+            key={item.target}
+            label={item.label}
+            icon={item.icon}
+            size="sm"
+            isSelected={props.panelOpen && props.activeTarget === item.target}
+            isDisabled={item.enabled === false}
+            onClick={() => props.onSelect(item.target)}
+          />
+        ))}
+      </SideNavSection>
+    </SideNav>
   );
 }

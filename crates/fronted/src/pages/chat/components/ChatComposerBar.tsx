@@ -1,4 +1,5 @@
-import { Tooltip } from "@base-ui/react";
+import { ChatComposer } from "@astryxdesign/core/Chat";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
 import {
   memo,
   type ReactNode,
@@ -72,6 +73,8 @@ import {
   startDesktopSttCapture,
 } from "../../../lib/stt/desktopAudioCapture";
 import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 const REASONING_I18N_KEYS: Record<ReasoningLevel, string> = {
   off: "settings.reasoning.off",
@@ -89,26 +92,15 @@ function isReasoningLevel(value: unknown): value is ReasoningLevel {
 
 function RuntimeControlTooltip(props: { label: string; children: ReactNode }) {
   return (
-    <Tooltip.Root>
-      <Tooltip.Trigger
-        delay={0}
-        closeOnClick
-        render={<span className="inline-flex shrink-0">{props.children}</span>}
-      />
-      <Tooltip.Portal>
-        <Tooltip.Positioner
-          side="top"
-          align="center"
-          sideOffset={6}
-          collisionPadding={8}
-          className="z-[9999]"
-        >
-          <Tooltip.Popup className="max-w-64 rounded-xl border border-border/60 bg-popover px-3 py-2 text-xs font-medium leading-4 text-popover-foreground shadow-lg outline-hidden data-[open]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:fade-in-0 data-[closed]:zoom-out-95 data-[open]:zoom-in-95">
-            {props.label}
-          </Tooltip.Popup>
-        </Tooltip.Positioner>
-      </Tooltip.Portal>
-    </Tooltip.Root>
+    <Tooltip
+      content={props.label}
+      placement="above"
+      alignment="center"
+      delay={0}
+      hasHoverIndication={false}
+    >
+      {props.children}
+    </Tooltip>
   );
 }
 
@@ -143,41 +135,53 @@ function ContextUsageIndicator(props: {
 
   const ratio = Math.min(1, Math.max(0, tokens / contextWindow));
   const percent = Math.round(ratio * 100);
-  const color = ratio >= 0.9 ? "#ef4444" : ratio >= 0.7 ? "#f59e0b" : "#10b981";
+  const color =
+    ratio >= 0.9
+      ? "var(--color-error)"
+      : ratio >= 0.7
+        ? "var(--color-warning)"
+        : "var(--color-success)";
   const usageLabel = `${t("chat.contextUsage")}: ${formatCompactTokens(tokens)} / ${formatCompactTokens(contextWindow)} tokens (${percent}%)`;
   const label = props.onManualCompact ? `${usageLabel} · ${t("chat.manualCompact")}` : usageLabel;
 
   const indicator = (
     <>
-      <span className="absolute inset-[3px] rounded-full bg-background/95" />
-      <span className="relative text-[9px] font-semibold tabular-nums text-foreground">
+      <AstryxInline className="absolute inset-[3px] rounded-full bg-background/95" />
+      <AstryxInline className="relative text-[9px] font-semibold tabular-nums text-foreground">
         {percent}
-      </span>
+      </AstryxInline>
     </>
   );
 
   return (
     <RuntimeControlTooltip label={label}>
       {props.onManualCompact ? (
-        <button
+        <AstryxButton
           type="button"
           disabled={props.manualCompactionDisabled}
           onClick={props.onManualCompact}
           aria-label={label}
           className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-          style={{ background: `conic-gradient(${color} ${percent}%, hsl(var(--muted)) 0)` }}
+          style={{
+            background: `conic-gradient(${color} ${percent}%, var(--color-background-muted) 0)`,
+          }}
         >
           {indicator}
-        </button>
+        </AstryxButton>
       ) : (
-        <span
+        <AstryxView
+          as="span"
+          layout="inline-flex"
+          direction="horizontal"
           role="status"
           aria-label={usageLabel}
           className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-          style={{ background: `conic-gradient(${color} ${percent}%, hsl(var(--muted)) 0)` }}
+          style={{
+            background: `conic-gradient(${color} ${percent}%, var(--color-background-muted) 0)`,
+          }}
         >
           {indicator}
-        </span>
+        </AstryxView>
       )}
     </RuntimeControlTooltip>
   );
@@ -696,7 +700,9 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   }, [onHeightChange]);
 
   return (
-    <div
+    <AstryxView
+      layout="flex"
+      direction="horizontal"
       ref={rootRef}
       data-file-upload-drop-zone=""
       data-file-upload-conversation-id={conversationId}
@@ -706,7 +712,9 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
         isComposerExpanded && "top-14",
       )}
     >
-      <div
+      <AstryxView
+        layout="flex"
+        direction="vertical"
         className={cn(
           "pointer-events-auto relative w-full max-w-[768px]",
           // justify-end：展开动画途中卡片被钳在中间高度时保持贴底，向上生长。
@@ -715,25 +723,43 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
       >
         {/* Pending uploaded files — above the composer card */}
         {pendingUploadedFiles.length > 0 && (
-          <div className="upload-file-list mb-2.5 flex gap-2 overflow-x-auto px-0.5 pb-1">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="upload-file-list mb-2.5 flex gap-2 overflow-x-auto px-0.5 pb-1"
+          >
             {pendingUploadedFiles.map((file) => (
-              <div
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
                 key={file.relativePath}
                 title={file.relativePath}
                 className="chat-upload-file group flex w-[calc(25%-6px)] min-w-[calc(25%-6px)] items-center gap-2 rounded-xl border border-white/45 bg-white/55 px-2.5 py-1.5 text-[calc(11px*var(--zone-font-scale,1))] shadow-[0_2px_8px_-2px_rgba(15,23,42,0.06)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,box-shadow,border-color] duration-150 hover:bg-white/75 hover:shadow-[0_4px_14px_-4px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.10]"
               >
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-sky-500/12 dark:bg-sky-400/15">
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-sky-500/12 dark:bg-sky-400/15"
+                >
                   <Paperclip className="h-3 w-3 text-sky-600 dark:text-sky-400" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[calc(12px*var(--zone-font-scale,1))] font-medium tracking-tight text-foreground/90">
+                </AstryxView>
+                <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="truncate text-[calc(12px*var(--zone-font-scale,1))] font-medium tracking-tight text-foreground/90"
+                  >
                     {file.fileName}
-                  </div>
-                  <div className="truncate text-[calc(10px*var(--zone-font-scale,1))] text-muted-foreground">
+                  </AstryxView>
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="truncate text-[calc(10px*var(--zone-font-scale,1))] text-muted-foreground"
+                  >
                     {formatUploadedFileSize(file.sizeBytes)}
-                  </div>
-                </div>
-                <button
+                  </AstryxView>
+                </AstryxView>
+                <AstryxButton
                   type="button"
                   disabled={isInputDisabled}
                   onClick={() => onRemovePendingUpload(file.relativePath)}
@@ -742,28 +768,37 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                   title={t("chat.upload.removeFile")}
                 >
                   <X className="h-3 w-3" />
-                </button>
-              </div>
+                </AstryxButton>
+              </AstryxView>
             ))}
-          </div>
+          </AstryxView>
         )}
 
         {queuedTurns.length > 0 ? (
-          <div
+          <AstryxView
+            layout="block"
+            direction="horizontal"
             ref={queuePanelRef}
             className="relative z-30 mx-auto mb-[-1px] w-[calc(100%-1.5rem)] max-w-[720px]"
           >
-            <div
+            <AstryxView
+              layout="grid"
+              direction="horizontal"
               aria-hidden={queueCollapsed}
               className={cn(
                 "grid transition-[grid-template-rows,opacity] duration-200 ease-out",
                 queueCollapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100",
               )}
             >
-              <div className="min-h-0 overflow-hidden">
-                <div className="rounded-t-lg border border-b-0 border-black/[0.055] bg-white/70 px-1 pb-1 pt-2 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.72)] backdrop-blur-2xl backdrop-saturate-[165%] dark:border-white/[0.10] dark:bg-white/[0.06] dark:shadow-[0_8px_24px_-18px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.08)]">
-                  <div className="relative min-h-0">
-                    <ul
+              <AstryxView layout="block" direction="horizontal" className="min-h-0 overflow-hidden">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="rounded-t-lg border border-b-0 border-black/[0.055] bg-white/70 px-1 pb-1 pt-2 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.72)] backdrop-blur-2xl backdrop-saturate-[165%] dark:border-white/[0.10] dark:bg-white/[0.06] dark:shadow-[0_8px_24px_-18px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.08)]"
+                >
+                  <AstryxView layout="block" direction="horizontal" className="relative min-h-0">
+                    <AstryxView
+                      as="ul"
                       ref={queueListRef}
                       data-scrollable={queuedTurns.length > 2 ? "true" : "false"}
                       className={cn(
@@ -775,13 +810,18 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                     >
                       {queuedTurns.map((item, index) => {
                         return (
-                          <li
+                          <AstryxView
+                            as="li"
                             key={item.id}
                             className="relative grid h-9 min-h-9 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-md border border-black/[0.035] bg-white/42 px-2 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.56)] backdrop-blur-xl backdrop-saturate-[150%] transition-[border-color,background-color] dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
                           >
-                            <div className="flex shrink-0 items-center gap-0.5">
+                            <AstryxView
+                              layout="flex"
+                              direction="horizontal"
+                              className="flex shrink-0 items-center gap-0.5"
+                            >
                               {index > 0 ? (
-                                <button
+                                <AstryxButton
                                   type="button"
                                   disabled={queueCollapsed}
                                   onClick={() => onMoveQueuedTurnUp(item.id)}
@@ -789,28 +829,36 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                                   className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground disabled:pointer-events-none disabled:opacity-35"
                                 >
                                   <ChevronUp className="h-3 w-3" />
-                                </button>
+                                </AstryxButton>
                               ) : (
-                                <span aria-hidden className="h-6 w-6" />
+                                <AstryxInline aria-hidden className="h-6 w-6" />
                               )}
                               <Clock3 className="h-3 w-3 shrink-0 text-muted-foreground/65" />
-                            </div>
-                            <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-                              <span className="block min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[calc(11px*var(--zone-font-scale,1))] leading-4 text-foreground/88">
+                            </AstryxView>
+                            <AstryxView
+                              layout="flex"
+                              direction="horizontal"
+                              className="flex min-w-0 items-center gap-1.5 overflow-hidden"
+                            >
+                              <AstryxInline className="block min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[calc(11px*var(--zone-font-scale,1))] leading-4 text-foreground/88">
                                 {item.previewText || t("chat.queue.emptyMessage")}
-                              </span>
+                              </AstryxInline>
                               {item.fileCount > 0 ? (
-                                <span className="max-w-[4.5rem] shrink-0 overflow-hidden text-ellipsis whitespace-nowrap text-[calc(9px*var(--zone-font-scale,1))] leading-4 text-muted-foreground">
+                                <AstryxInline className="max-w-[4.5rem] shrink-0 overflow-hidden text-ellipsis whitespace-nowrap text-[calc(9px*var(--zone-font-scale,1))] leading-4 text-muted-foreground">
                                   {t("chat.queue.fileCount").replace(
                                     "{count}",
                                     String(item.fileCount),
                                   )}
-                                </span>
+                                </AstryxInline>
                               ) : null}
-                            </div>
-                            <div className="flex shrink-0 items-center gap-0.5">
+                            </AstryxView>
+                            <AstryxView
+                              layout="flex"
+                              direction="horizontal"
+                              className="flex shrink-0 items-center gap-0.5"
+                            >
                               <RuntimeControlTooltip label={t("chat.queue.edit")}>
-                                <button
+                                <AstryxButton
                                   type="button"
                                   disabled={queueCollapsed}
                                   onClick={() => onEditQueuedTurn(item.id)}
@@ -818,10 +866,10 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                                   className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground"
                                 >
                                   <SquarePen className="h-3 w-3" />
-                                </button>
+                                </AstryxButton>
                               </RuntimeControlTooltip>
                               <RuntimeControlTooltip label={t("chat.queue.runNow")}>
-                                <button
+                                <AstryxButton
                                   type="button"
                                   disabled={queueCollapsed}
                                   onClick={() => onRunQueuedTurnNow(item.id)}
@@ -829,10 +877,10 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                                   className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground"
                                 >
                                   <Play className="h-3 w-3" />
-                                </button>
+                                </AstryxButton>
                               </RuntimeControlTooltip>
                               <RuntimeControlTooltip label={t("chat.queue.delete")}>
-                                <button
+                                <AstryxButton
                                   type="button"
                                   disabled={queueCollapsed}
                                   onClick={() => onRemoveQueuedTurn(item.id)}
@@ -840,15 +888,17 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                                   className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                                 >
                                   <Trash2 className="h-3 w-3" />
-                                </button>
+                                </AstryxButton>
                               </RuntimeControlTooltip>
-                            </div>
-                          </li>
+                            </AstryxView>
+                          </AstryxView>
                         );
                       })}
-                    </ul>
+                    </AstryxView>
                     {shouldShowQueueScrollbar ? (
-                      <div
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
                         ref={queueScrollbarTrackRef}
                         aria-hidden
                         className="chat-queue-scrollbar"
@@ -857,20 +907,22 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                         onPointerMove={handleQueueScrollbarPointerMove}
                         onPointerUp={handleQueueScrollbarPointerUp}
                       >
-                        <div
+                        <AstryxView
+                          layout="block"
+                          direction="horizontal"
                           className="chat-queue-scrollbar-thumb"
                           style={{
                             height: `${queueScrollbar.thumbHeight}px`,
                             transform: `translateY(${queueScrollbar.thumbTop}px)`,
                           }}
                         />
-                      </div>
+                      </AstryxView>
                     ) : null}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <button
+                  </AstryxView>
+                </AstryxView>
+              </AstryxView>
+            </AstryxView>
+            <AstryxButton
               type="button"
               onClick={toggleQueueCollapsed}
               title={toggleQueueTooltip}
@@ -883,16 +935,22 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
               ) : (
                 <ChevronUp className="h-3 w-3" />
               )}
-              <span className="text-[calc(10px*var(--zone-font-scale,1))] font-medium leading-none tabular-nums">
+              <AstryxInline className="text-[calc(10px*var(--zone-font-scale,1))] font-medium leading-none tabular-nums">
                 {queuedTurns.length}
-              </span>
-            </button>
-          </div>
+              </AstryxInline>
+            </AstryxButton>
+          </AstryxView>
         ) : null}
 
         {/* biome-ignore lint/a11y/noStaticElementInteractions: Escape 捕获仅在展开态生效，焦点始终在内部 textbox 上，包装层不参与 Tab 序。 */}
-        <div
+        <ChatComposer
           ref={glassCardRef}
+          onSubmit={() => handleComposerSend()}
+          onStop={onStop}
+          isStopShown={isSending && !canQueueDraftWhileSending}
+          isDisabled={isInputDisabled}
+          density="compact"
+          elevation="low"
           onKeyDown={
             isComposerExpanded
               ? (event) => {
@@ -908,353 +966,371 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
             // 展开态切换 flex-grow 时会被一并动画，导致卡片先跳顶再长满的闪动。
             // 常驻 flex-col：FLIP 动画把卡片钳在中间高度时，flex-1 的编辑器
             // 区吸收多余空间，工具栏才能始终贴住卡片底边。
-            "composer-glass-card relative z-10 flex flex-col overflow-hidden rounded-[24px] border border-black/[0.055] bg-white/70 shadow-[0_12px_40px_-14px_rgba(15,23,42,0.22),0_2px_6px_-2px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.74)] backdrop-blur-2xl backdrop-saturate-[165%] transition-[background-color,border-color,box-shadow] focus-within:border-black/[0.075] focus-within:bg-white/74 focus-within:shadow-[0_16px_46px_-14px_rgba(15,23,42,0.26),0_4px_12px_-4px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.78)] dark:border-white/[0.10] dark:bg-white/[0.06] dark:shadow-[0_12px_40px_-14px_rgba(0,0,0,0.72),0_2px_6px_-2px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.08)] dark:focus-within:border-white/[0.15] dark:focus-within:bg-white/[0.08]",
+            "composer-glass-card relative z-10 overflow-hidden",
             isComposerExpanded && "min-h-0 flex-1",
           )}
-        >
-          {/* macOS material rim-light */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-5 top-0 h-px rounded-full bg-gradient-to-r from-transparent via-white/85 to-transparent dark:via-white/15"
-          />
-          {/* subtle inner gloss gradient */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 rounded-[24px] bg-gradient-to-b from-white/18 to-transparent opacity-70 dark:from-white/[0.04] dark:opacity-100"
-          />
+          input={
+            <>
+              {!mobileExperience ? (
+                <AstryxButton
+                  type="button"
+                  onClick={toggleComposerExpanded}
+                  title={toggleComposerExpandTooltip}
+                  aria-label={toggleComposerExpandTooltip}
+                  aria-expanded={isComposerExpanded}
+                  className="absolute right-3 top-2 z-20 inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground/70 outline-hidden transition-[background-color,color,scale] hover:bg-muted/60 hover:text-foreground active:scale-90 focus-visible:bg-muted/60"
+                >
+                  {isComposerExpanded ? (
+                    <Minimize2 className="h-4 w-4" />
+                  ) : (
+                    <Maximize2 className="h-4 w-4" />
+                  )}
+                </AstryxButton>
+              ) : null}
 
-          {!mobileExperience ? (
-            <button
-              type="button"
-              onClick={toggleComposerExpanded}
-              title={toggleComposerExpandTooltip}
-              aria-label={toggleComposerExpandTooltip}
-              aria-expanded={isComposerExpanded}
-              className="absolute right-3 top-2 z-20 inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground/70 outline-hidden transition-[background-color,color,scale] hover:bg-muted/60 hover:text-foreground active:scale-90 focus-visible:bg-muted/60"
-            >
-              {isComposerExpanded ? (
-                <Minimize2 className="h-4 w-4" />
-              ) : (
-                <Maximize2 className="h-4 w-4" />
-              )}
-            </button>
-          ) : null}
-
-          {/* 常驻 flex-1：动画把卡片钳在中间高度时由本区吸收伸缩，工具栏才能
+              {/* 常驻 flex-1：动画把卡片钳在中间高度时由本区吸收伸缩，工具栏才能
               全程贴住卡片底边。min-h-0 只在展开态加——折叠态靠自动最小高度
               (= 编辑器钳制高) 撑起卡片的固有高度，加了会塌缩。 */}
-          <div className={cn("relative flex flex-1 px-4 pt-3.5", isComposerExpanded && "min-h-0")}>
-            <MentionComposer
-              ref={composerRef}
-              onSend={handleComposerSend}
-              onEmptyChange={setComposerIsEmpty}
-              onBusyChange={onComposerBusyChange}
-              onPasteFiles={onPasteFiles}
-              loadHistoryPrompts={loadHistoryPrompts}
-              placeholder={inputPlaceholder}
-              disabled={isInputDisabled}
-              workdir={workdir}
-              enabledSkills={enabledSkills}
-              preferNativeContextMenu={mobileExperience}
-              className={cn(
-                "px-0 py-0",
-                !mobileExperience && "pr-8",
-                isComposerExpanded && "h-full max-h-none",
-              )}
-            />
-          </div>
-
-          <div className="relative flex items-center justify-between gap-2 px-3 pb-2 pt-1">
-            <div className="flex min-w-0 flex-1 items-center gap-1">
-              <RuntimeControlTooltip label={uploadTooltip}>
-                <button
-                  type="button"
-                  disabled={uploadDisabled}
-                  onClick={onPickReadableFiles}
-                  aria-label={
-                    isUploadingFiles
-                      ? t("chat.upload.uploading")
-                      : !isAgentMode
-                        ? t("chat.upload.onlyInTools")
-                        : !workdir
-                          ? t("chat.upload.requireWorkdir")
-                          : t("chat.upload.selectFiles")
-                  }
-                  className={cn(
-                    "composer-toolbar-action relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
-                    "disabled:pointer-events-none disabled:opacity-40",
-                    pendingUploadedFiles.length > 0
-                      ? "text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200"
-                      : "text-muted-foreground hover:text-foreground dark:hover:text-white",
-                  )}
-                >
-                  {isUploadingFiles ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Paperclip className="h-4 w-4" />
-                  )}
-                  {pendingUploadedFiles.length > 0 ? (
-                    <span
-                      aria-hidden
-                      className="absolute -right-0.5 -top-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-sky-500 px-[3px] text-[calc(9px*var(--zone-font-scale,1))] font-semibold leading-none text-white shadow-[0_0_0_1.5px_rgba(255,255,255,0.95)] dark:bg-sky-400 dark:text-slate-900 dark:shadow-[0_0_0_1.5px_rgba(20,22,28,0.9)]"
-                    >
-                      {pendingUploadedFiles.length}
-                    </span>
-                  ) : null}
-                </button>
-              </RuntimeControlTooltip>
-
-              {voiceInputAvailable ? (
-                <RuntimeControlTooltip
-                  label={
-                    voiceInputError ??
-                    voiceInputPartial ??
-                    (voiceInputActive
-                      ? t("chat.composer.voiceListening")
-                      : t("chat.composer.voiceInput"))
-                  }
-                >
-                  <button
-                    type="button"
-                    disabled={isInputDisabled || (isNativeMobileRuntime() && voiceInputActive)}
-                    onClick={() => void startVoiceInput()}
-                    aria-label={
-                      voiceInputActive
-                        ? t("chat.composer.voiceListening")
-                        : t("chat.composer.voiceInput")
-                    }
-                    aria-pressed={voiceInputActive}
-                    className={cn(
-                      "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
-                      "disabled:pointer-events-none disabled:opacity-55",
-                      voiceInputActive
-                        ? "bg-rose-500/10 text-rose-600 dark:text-rose-300"
-                        : voiceInputError
-                          ? "text-amber-600 dark:text-amber-300"
-                          : "text-muted-foreground hover:text-foreground dark:hover:text-white",
-                    )}
-                  >
-                    {voiceInputActive ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Mic className="h-4 w-4" />
-                    )}
-                  </button>
-                </RuntimeControlTooltip>
-              ) : null}
-
-              <RuntimeControlTooltip label={webSearchTooltip}>
-                <button
-                  type="button"
-                  disabled={controlsDisabled}
-                  onClick={() =>
-                    onChatRuntimeControlsChange({
-                      nativeWebSearchEnabled: !chatRuntimeControls.nativeWebSearchEnabled,
-                    })
-                  }
-                  aria-label={
-                    chatRuntimeControls.nativeWebSearchEnabled
-                      ? t("chat.runtime.webSearchOn")
-                      : t("chat.runtime.webSearchOff")
-                  }
-                  className={cn(
-                    "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
-                    "disabled:pointer-events-none disabled:opacity-40",
-                    chatRuntimeControls.nativeWebSearchEnabled
-                      ? "text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200"
-                      : "text-muted-foreground hover:text-foreground dark:hover:text-white",
-                  )}
-                >
-                  {chatRuntimeControls.nativeWebSearchEnabled ? (
-                    <Globe className="h-4 w-4" />
-                  ) : (
-                    <GlobeOff className="h-4 w-4" />
-                  )}
-                </button>
-              </RuntimeControlTooltip>
-
-              {isAgentMode ? (
-                <RuntimeControlTooltip label={planModeTooltip}>
-                  <button
-                    type="button"
-                    disabled={controlsDisabled}
-                    onClick={() =>
-                      onChatRuntimeControlsChange({
-                        planModeEnabled: !chatRuntimeControls.planModeEnabled,
-                      })
-                    }
-                    aria-label={planModeTooltip}
-                    aria-pressed={chatRuntimeControls.planModeEnabled}
-                    className={cn(
-                      "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
-                      "disabled:pointer-events-none disabled:opacity-40",
-                      chatRuntimeControls.planModeEnabled
-                        ? "bg-violet-500/10 text-violet-600 hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200"
-                        : "text-muted-foreground hover:text-foreground dark:hover:text-white",
-                    )}
-                  >
-                    <FileText className="h-4 w-4" />
-                  </button>
-                </RuntimeControlTooltip>
-              ) : null}
-
-              <RuntimeControlTooltip label={thinkingTooltip}>
-                <button
-                  type="button"
-                  disabled={controlsDisabled || !thinkingSupported || thinkingAlwaysOn}
-                  onClick={() =>
-                    onChatRuntimeControlsChange({
-                      thinkingEnabled: !chatRuntimeControls.thinkingEnabled,
-                    })
-                  }
-                  aria-label={
-                    !thinkingSupported
-                      ? t("chat.runtime.thinkingUnavailable")
-                      : chatRuntimeControls.thinkingEnabled
-                        ? t("chat.runtime.thinkingOn")
-                        : t("chat.runtime.thinkingOff")
-                  }
-                  className={cn(
-                    "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
-                    "disabled:pointer-events-none disabled:opacity-40",
-                    chatRuntimeControls.thinkingEnabled && thinkingSupported
-                      ? "text-amber-600 hover:text-amber-700 dark:text-amber-300 dark:hover:text-amber-200"
-                      : "text-muted-foreground hover:text-foreground dark:hover:text-white",
-                  )}
-                >
-                  {chatRuntimeControls.thinkingEnabled && thinkingSupported ? (
-                    <Lightbulb className="h-4 w-4" />
-                  ) : (
-                    <LightbulbOff className="h-4 w-4" />
-                  )}
-                </button>
-              </RuntimeControlTooltip>
-
-              {reasoningOptions.length > 0 ? (
-                <div
-                  aria-hidden={!chatRuntimeControls.thinkingEnabled}
-                  className={cn(
-                    "shrink-0 overflow-hidden transition-[max-width,margin-left,opacity] duration-200 ease-out",
-                    chatRuntimeControls.thinkingEnabled
-                      ? "ml-0 max-w-40 opacity-100"
-                      : "pointer-events-none -ml-1 max-w-0 opacity-0",
-                  )}
-                >
-                  <Select
-                    value={selectedReasoning}
-                    onValueChange={(value) =>
-                      onChatRuntimeControlsChange({ reasoning: value as ReasoningLevel })
-                    }
-                    disabled={controlsDisabled || !chatRuntimeControls.thinkingEnabled}
-                  >
-                    <SelectTrigger
-                      className="composer-reasoning-trigger group/reasoning h-8 w-auto shrink-0 gap-0.5 rounded-full border-0 bg-violet-50/55 pl-2 pr-1.5 text-xs font-medium text-foreground shadow-none outline-hidden transition-all duration-200 ease-out hover:bg-violet-50/80 disabled:opacity-45 dark:bg-violet-400/[0.07] dark:text-foreground dark:hover:bg-violet-400/[0.13] [&_svg:last-child]:h-3 [&_svg:last-child]:w-3 [&_svg:last-child]:opacity-50 [&_svg:last-child]:transition-transform [&_svg:last-child]:duration-200 [&[data-popup-open]_svg:last-child]:rotate-180"
-                      aria-label={t("chat.runtime.reasoning")}
-                    >
-                      <span className="flex min-w-0 items-center gap-1">
-                        <Sparkle className="h-3.5 w-3.5 shrink-0 text-violet-500 transition-colors dark:text-violet-400" />
-                        <SelectValue>
-                          {(value) =>
-                            t(
-                              REASONING_I18N_KEYS[
-                                isReasoningLevel(value) ? value : selectedReasoning
-                              ],
-                            )
-                          }
-                        </SelectValue>
-                      </span>
-                    </SelectTrigger>
-                    <SelectContent className="sidebar-context-menu min-w-40 rounded-xl border-0">
-                      {reasoningOptions.map((value) => (
-                        <SelectItem
-                          key={value}
-                          value={value}
-                          className={cn(
-                            "mb-0.5 h-[30px] rounded-md py-0 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 transition-none last:mb-0 data-[highlighted]:bg-foreground/[0.05] data-[highlighted]:text-foreground",
-                            value === selectedReasoning &&
-                              "bg-foreground/[0.07] data-[highlighted]:bg-foreground/[0.09]",
-                          )}
-                        >
-                          {t(REASONING_I18N_KEYS[value])}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-
-              <GitBranchSelector
-                workdir={workdir}
-                gitClient={gitClient}
-                workspaceActivityClient={workspaceActivityClient}
-                disabled={controlsDisabled}
-                canWrite={gitWriteEnabled}
-                disabledMessage={gitDisabledMessage}
-              />
-            </div>
-
-            <div className="flex shrink-0 items-center gap-1">
-              {contextUsageTokensSource ? (
-                <ContextUsageIndicator
-                  source={contextUsageTokensSource}
-                  contextWindow={contextWindow}
-                  onManualCompact={onManualCompact}
-                  manualCompactionDisabled={manualCompactionDisabled}
-                />
-              ) : null}
-              <Button
-                disabled={isSending ? false : sendDisabled}
-                onClick={() => {
-                  if (canQueueDraftWhileSending) {
-                    handleComposerSend();
-                    return;
-                  }
-                  if (isSending) {
-                    onStop();
-                    return;
-                  }
-                  if (sendDisabled) return;
-                  handleComposerSend();
-                }}
-                size="sm"
-                title={primaryActionTitle}
-                aria-label={primaryActionTitle}
-                style={
-                  canQueueDraftWhileSending
-                    ? {
-                        backgroundColor: "hsl(160 84% 39%)",
-                        backgroundImage: "none",
-                        color: "white",
-                      }
-                    : isSending
-                      ? {
-                          backgroundColor: "hsl(var(--destructive))",
-                          backgroundImage: "none",
-                          color: "hsl(var(--destructive-foreground))",
-                        }
-                      : undefined
-                }
-                className={cn(
-                  "composer-primary-action h-8 w-8 shrink-0 rounded-full border-0 p-0 shadow-none transition-[color,background-color,filter,opacity,transform] duration-150",
-                  canQueueDraftWhileSending
-                    ? "hover:brightness-105 active:scale-95"
-                    : isSending
-                      ? "hover:opacity-90 active:scale-95"
-                      : "disabled:opacity-100 [&:not(:disabled)]:bg-foreground [&:not(:disabled)]:text-background [&:not(:disabled)]:hover:bg-foreground/85 [&:not(:disabled)]:active:scale-95 disabled:bg-muted/60 disabled:text-muted-foreground",
-                )}
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className={cn("relative flex flex-1 px-4 pt-3.5", isComposerExpanded && "min-h-0")}
               >
-                {canQueueDraftWhileSending ? (
-                  <Send className="h-4 w-4" />
-                ) : isSending ? (
-                  <Square className="h-3 w-3 fill-current" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+                <MentionComposer
+                  ref={composerRef}
+                  onSend={handleComposerSend}
+                  onEmptyChange={setComposerIsEmpty}
+                  onBusyChange={onComposerBusyChange}
+                  onPasteFiles={onPasteFiles}
+                  loadHistoryPrompts={loadHistoryPrompts}
+                  placeholder={inputPlaceholder}
+                  disabled={isInputDisabled}
+                  workdir={workdir}
+                  enabledSkills={enabledSkills}
+                  preferNativeContextMenu={mobileExperience}
+                  className={cn(
+                    "px-0 py-0",
+                    !mobileExperience && "pr-8",
+                    isComposerExpanded && "h-full max-h-none",
+                  )}
+                />
+              </AstryxView>
+
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="relative flex items-center justify-between gap-2 px-3 pb-2 pt-1"
+              >
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex min-w-0 flex-1 items-center gap-1"
+                >
+                  <RuntimeControlTooltip label={uploadTooltip}>
+                    <AstryxButton
+                      type="button"
+                      disabled={uploadDisabled}
+                      onClick={onPickReadableFiles}
+                      aria-label={
+                        isUploadingFiles
+                          ? t("chat.upload.uploading")
+                          : !isAgentMode
+                            ? t("chat.upload.onlyInTools")
+                            : !workdir
+                              ? t("chat.upload.requireWorkdir")
+                              : t("chat.upload.selectFiles")
+                      }
+                      className={cn(
+                        "composer-toolbar-action relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
+                        "disabled:pointer-events-none disabled:opacity-40",
+                        pendingUploadedFiles.length > 0
+                          ? "text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200"
+                          : "text-muted-foreground hover:text-foreground dark:hover:text-white",
+                      )}
+                    >
+                      {isUploadingFiles ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Paperclip className="h-4 w-4" />
+                      )}
+                      {pendingUploadedFiles.length > 0 ? (
+                        <AstryxView
+                          as="span"
+                          layout="flex"
+                          direction="horizontal"
+                          aria-hidden
+                          className="absolute -right-0.5 -top-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-sky-500 px-[3px] text-[calc(9px*var(--zone-font-scale,1))] font-semibold leading-none text-white shadow-[0_0_0_1.5px_rgba(255,255,255,0.95)] dark:bg-sky-400 dark:text-slate-900 dark:shadow-[0_0_0_1.5px_rgba(20,22,28,0.9)]"
+                        >
+                          {pendingUploadedFiles.length}
+                        </AstryxView>
+                      ) : null}
+                    </AstryxButton>
+                  </RuntimeControlTooltip>
+
+                  {voiceInputAvailable ? (
+                    <RuntimeControlTooltip
+                      label={
+                        voiceInputError ??
+                        voiceInputPartial ??
+                        (voiceInputActive
+                          ? t("chat.composer.voiceListening")
+                          : t("chat.composer.voiceInput"))
+                      }
+                    >
+                      <AstryxButton
+                        type="button"
+                        disabled={isInputDisabled || (isNativeMobileRuntime() && voiceInputActive)}
+                        onClick={() => void startVoiceInput()}
+                        aria-label={
+                          voiceInputActive
+                            ? t("chat.composer.voiceListening")
+                            : t("chat.composer.voiceInput")
+                        }
+                        aria-pressed={voiceInputActive}
+                        className={cn(
+                          "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
+                          "disabled:pointer-events-none disabled:opacity-55",
+                          voiceInputActive
+                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-300"
+                            : voiceInputError
+                              ? "text-amber-600 dark:text-amber-300"
+                              : "text-muted-foreground hover:text-foreground dark:hover:text-white",
+                        )}
+                      >
+                        {voiceInputActive ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Mic className="h-4 w-4" />
+                        )}
+                      </AstryxButton>
+                    </RuntimeControlTooltip>
+                  ) : null}
+
+                  <RuntimeControlTooltip label={webSearchTooltip}>
+                    <AstryxButton
+                      type="button"
+                      disabled={controlsDisabled}
+                      onClick={() =>
+                        onChatRuntimeControlsChange({
+                          nativeWebSearchEnabled: !chatRuntimeControls.nativeWebSearchEnabled,
+                        })
+                      }
+                      aria-label={
+                        chatRuntimeControls.nativeWebSearchEnabled
+                          ? t("chat.runtime.webSearchOn")
+                          : t("chat.runtime.webSearchOff")
+                      }
+                      className={cn(
+                        "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
+                        "disabled:pointer-events-none disabled:opacity-40",
+                        chatRuntimeControls.nativeWebSearchEnabled
+                          ? "text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200"
+                          : "text-muted-foreground hover:text-foreground dark:hover:text-white",
+                      )}
+                    >
+                      {chatRuntimeControls.nativeWebSearchEnabled ? (
+                        <Globe className="h-4 w-4" />
+                      ) : (
+                        <GlobeOff className="h-4 w-4" />
+                      )}
+                    </AstryxButton>
+                  </RuntimeControlTooltip>
+
+                  {isAgentMode ? (
+                    <RuntimeControlTooltip label={planModeTooltip}>
+                      <AstryxButton
+                        type="button"
+                        disabled={controlsDisabled}
+                        onClick={() =>
+                          onChatRuntimeControlsChange({
+                            planModeEnabled: !chatRuntimeControls.planModeEnabled,
+                          })
+                        }
+                        aria-label={planModeTooltip}
+                        aria-pressed={chatRuntimeControls.planModeEnabled}
+                        className={cn(
+                          "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
+                          "disabled:pointer-events-none disabled:opacity-40",
+                          chatRuntimeControls.planModeEnabled
+                            ? "bg-violet-500/10 text-violet-600 hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200"
+                            : "text-muted-foreground hover:text-foreground dark:hover:text-white",
+                        )}
+                      >
+                        <FileText className="h-4 w-4" />
+                      </AstryxButton>
+                    </RuntimeControlTooltip>
+                  ) : null}
+
+                  <RuntimeControlTooltip label={thinkingTooltip}>
+                    <AstryxButton
+                      type="button"
+                      disabled={controlsDisabled || !thinkingSupported || thinkingAlwaysOn}
+                      onClick={() =>
+                        onChatRuntimeControlsChange({
+                          thinkingEnabled: !chatRuntimeControls.thinkingEnabled,
+                        })
+                      }
+                      aria-label={
+                        !thinkingSupported
+                          ? t("chat.runtime.thinkingUnavailable")
+                          : chatRuntimeControls.thinkingEnabled
+                            ? t("chat.runtime.thinkingOn")
+                            : t("chat.runtime.thinkingOff")
+                      }
+                      className={cn(
+                        "composer-toolbar-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
+                        "disabled:pointer-events-none disabled:opacity-40",
+                        chatRuntimeControls.thinkingEnabled && thinkingSupported
+                          ? "text-amber-600 hover:text-amber-700 dark:text-amber-300 dark:hover:text-amber-200"
+                          : "text-muted-foreground hover:text-foreground dark:hover:text-white",
+                      )}
+                    >
+                      {chatRuntimeControls.thinkingEnabled && thinkingSupported ? (
+                        <Lightbulb className="h-4 w-4" />
+                      ) : (
+                        <LightbulbOff className="h-4 w-4" />
+                      )}
+                    </AstryxButton>
+                  </RuntimeControlTooltip>
+
+                  {reasoningOptions.length > 0 ? (
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      aria-hidden={!chatRuntimeControls.thinkingEnabled}
+                      className={cn(
+                        "shrink-0 overflow-hidden transition-[max-width,margin-left,opacity] duration-200 ease-out",
+                        chatRuntimeControls.thinkingEnabled
+                          ? "ml-0 max-w-40 opacity-100"
+                          : "pointer-events-none -ml-1 max-w-0 opacity-0",
+                      )}
+                    >
+                      <Select
+                        value={selectedReasoning}
+                        onValueChange={(value) =>
+                          onChatRuntimeControlsChange({ reasoning: value as ReasoningLevel })
+                        }
+                        disabled={controlsDisabled || !chatRuntimeControls.thinkingEnabled}
+                      >
+                        <SelectTrigger
+                          className="composer-reasoning-trigger group/reasoning h-8 w-auto shrink-0 gap-0.5 rounded-full border-0 bg-violet-50/55 pl-2 pr-1.5 text-xs font-medium text-foreground shadow-none outline-hidden transition-all duration-200 ease-out hover:bg-violet-50/80 disabled:opacity-45 dark:bg-violet-400/[0.07] dark:text-foreground dark:hover:bg-violet-400/[0.13] [&_svg:last-child]:h-3 [&_svg:last-child]:w-3 [&_svg:last-child]:opacity-50 [&_svg:last-child]:transition-transform [&_svg:last-child]:duration-200 [&[data-popup-open]_svg:last-child]:rotate-180"
+                          aria-label={t("chat.runtime.reasoning")}
+                        >
+                          <AstryxView
+                            as="span"
+                            layout="flex"
+                            direction="horizontal"
+                            className="flex min-w-0 items-center gap-1"
+                          >
+                            <Sparkle className="h-3.5 w-3.5 shrink-0 text-violet-500 transition-colors dark:text-violet-400" />
+                            <SelectValue>
+                              {(value) =>
+                                t(
+                                  REASONING_I18N_KEYS[
+                                    isReasoningLevel(value) ? value : selectedReasoning
+                                  ],
+                                )
+                              }
+                            </SelectValue>
+                          </AstryxView>
+                        </SelectTrigger>
+                        <SelectContent className="sidebar-context-menu min-w-40 rounded-xl border-0">
+                          {reasoningOptions.map((value) => (
+                            <SelectItem
+                              key={value}
+                              value={value}
+                              className={cn(
+                                "mb-0.5 h-[30px] rounded-md py-0 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 transition-none last:mb-0 data-[highlighted]:bg-foreground/[0.05] data-[highlighted]:text-foreground",
+                                value === selectedReasoning &&
+                                  "bg-foreground/[0.07] data-[highlighted]:bg-foreground/[0.09]",
+                              )}
+                            >
+                              {t(REASONING_I18N_KEYS[value])}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </AstryxView>
+                  ) : null}
+
+                  <GitBranchSelector
+                    workdir={workdir}
+                    gitClient={gitClient}
+                    workspaceActivityClient={workspaceActivityClient}
+                    disabled={controlsDisabled}
+                    canWrite={gitWriteEnabled}
+                    disabledMessage={gitDisabledMessage}
+                  />
+                </AstryxView>
+
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex shrink-0 items-center gap-1"
+                >
+                  {contextUsageTokensSource ? (
+                    <ContextUsageIndicator
+                      source={contextUsageTokensSource}
+                      contextWindow={contextWindow}
+                      onManualCompact={onManualCompact}
+                      manualCompactionDisabled={manualCompactionDisabled}
+                    />
+                  ) : null}
+                  <Button
+                    disabled={isSending ? false : sendDisabled}
+                    onClick={() => {
+                      if (canQueueDraftWhileSending) {
+                        handleComposerSend();
+                        return;
+                      }
+                      if (isSending) {
+                        onStop();
+                        return;
+                      }
+                      if (sendDisabled) return;
+                      handleComposerSend();
+                    }}
+                    size="sm"
+                    title={primaryActionTitle}
+                    aria-label={primaryActionTitle}
+                    style={
+                      canQueueDraftWhileSending
+                        ? {
+                            backgroundColor: "var(--color-success)",
+                            backgroundImage: "none",
+                            color: "var(--color-on-success)",
+                          }
+                        : isSending
+                          ? {
+                              backgroundColor: "var(--color-error)",
+                              backgroundImage: "none",
+                              color: "var(--color-on-error)",
+                            }
+                          : undefined
+                    }
+                    className={cn(
+                      "composer-primary-action h-8 w-8 shrink-0 rounded-full border-0 p-0 shadow-none transition-[color,background-color,filter,opacity,transform] duration-150",
+                      canQueueDraftWhileSending
+                        ? "hover:brightness-105 active:scale-95"
+                        : isSending
+                          ? "hover:opacity-90 active:scale-95"
+                          : "disabled:opacity-100 [&:not(:disabled)]:bg-foreground [&:not(:disabled)]:text-background [&:not(:disabled)]:hover:bg-foreground/85 [&:not(:disabled)]:active:scale-95 disabled:bg-muted/60 disabled:text-muted-foreground",
+                    )}
+                  >
+                    {canQueueDraftWhileSending ? (
+                      <Send className="h-4 w-4" />
+                    ) : isSending ? (
+                      <Square className="h-3 w-3 fill-current" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </AstryxView>
+              </AstryxView>
+            </>
+          }
+        />
+      </AstryxView>
+    </AstryxView>
   );
 });

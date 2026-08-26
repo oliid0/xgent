@@ -1,12 +1,16 @@
+import { Center } from "@astryxdesign/core/Center";
 import iconSimpleUrl from "../../../../../src-tauri/icons/icon-simple.png";
 import { cn } from "../../../../lib/shared/utils";
 
 export function AssistantAvatar(props: { className?: string }) {
   const { className } = props;
   return (
-    <div
+    <Center
+      isInline
+      width="var(--xagent-assistant-avatar-size)"
+      height="var(--xagent-assistant-avatar-size)"
       className={cn(
-        "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/80 shadow-none dark:bg-background/70",
+        "mt-0.5 shrink-0 rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/80",
         className,
       )}
     >
@@ -15,8 +19,8 @@ export function AssistantAvatar(props: { className?: string }) {
         alt=""
         aria-hidden="true"
         draggable={false}
-        className="h-6 w-6 select-none object-contain"
+        className="size-[var(--spacing-6)] select-none object-contain"
       />
-    </div>
+    </Center>
   );
 }

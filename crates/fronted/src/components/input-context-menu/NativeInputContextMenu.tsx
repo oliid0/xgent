@@ -1,20 +1,14 @@
 import {
   type MouseEvent as ReactMouseEvent,
-  type ReactNode,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
 import { useLocale } from "../../i18n";
-import { useMenuExitPresence } from "../../lib/shared/menuMotion";
-import { cn } from "../../lib/shared/utils";
 import { readClipboardText } from "../../lib/system/clipboardText";
 import { ClipboardPaste, Copy, ScanText, Scissors } from "../icons";
 import {
-  clampMenuPosition,
   computeMenuItems,
   type InputMenuSnapshot,
   isMenuEligibleTarget,
@@ -31,11 +25,6 @@ function resolveMenuTarget(target: EventTarget | null): MenuTarget | null {
   if (target.closest(".monaco-editor, .xterm")) return null;
   return target;
 }
-
-const MENU_ITEM_CLASS = cn(
-  "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/90 transition-colors hover:bg-accent hover:text-accent-foreground",
-  "disabled:pointer-events-none disabled:opacity-45",
-);
 
 function writeTextToClipboard(text: string) {
   if (!text) return;
@@ -88,16 +77,11 @@ function setNativeValue(el: MenuTarget, value: string, caret: number) {
  * custom context menu keep it (stopPropagation / preventDefault upstream),
  * everything else keeps the historical suppressed-menu behavior.
  */
-export function useNativeInputContextMenu(options: { enabled?: boolean } = {}): {
-  onRootContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
-  onRootMouseDownCapture: (event: ReactMouseEvent<HTMLElement>) => void;
-  menu: ReactNode;
-} {
+export function useNativeInputContextMenu(options: { enabled?: boolean } = {}) {
   const enabled = options.enabled ?? true;
   const { t } = useLocale();
   const [snapshot, setSnapshot] = useState<InputMenuSnapshot | null>(null);
   const targetRef = useRef<MenuTarget | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
   // Selection captured on right-mousedown, before WebKit's context-menu
   // preparation mutates it (see onRootMouseDownCapture).
   const preClickRef = useRef<{
@@ -156,11 +140,15 @@ export function useNativeInputContextMenu(options: { enabled?: boolean } = {}): 
       if (!enabled) return;
       // A surface that already owns a custom menu may preventDefault without
       // stopPropagation (e.g. the composer) — leave it alone.
-      if (event.defaultPrevented) return;
-      event.preventDefault();
+      if (event.defaultPrevented) {
+        event.stopPropagation();
+        return;
+      }
 
       const target = resolveMenuTarget(event.target);
       if (!target) {
+        event.preventDefault();
+        event.stopPropagation();
         closeMenu();
         return;
       }
@@ -232,67 +220,6 @@ export function useNativeInputContextMenu(options: { enabled?: boolean } = {}): 
     },
     [closeMenu, enabled],
   );
-
-  // Clamp against the measured size after render (no hard-coded dimensions —
-  // labels vary by locale); useLayoutEffect runs before paint, so an
-  // out-of-bounds menu never flashes at the raw pointer position.
-  useLayoutEffect(() => {
-    if (!snapshot) return;
-    const rect = menuRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const next = clampMenuPosition(
-      snapshot.x,
-      snapshot.y,
-      rect.width,
-      rect.height,
-      window.innerWidth,
-      window.innerHeight,
-    );
-    if (next.left !== snapshot.x || next.top !== snapshot.y) {
-      setSnapshot({ ...snapshot, x: next.left, y: next.top });
-    }
-  }, [snapshot]);
-
-  useEffect(() => {
-    if (!snapshot) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Node && menuRef.current?.contains(target)) {
-        return;
-      }
-      closeMenu();
-    };
-
-    // Focus stays in the input while the menu is open, so any keystroke would
-    // invalidate the captured selection snapshot — close on every key. Escape
-    // is consumed so it only dismisses the menu, never a host dialog.
-    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-      closeMenu();
-    };
-
-    const handleClose = () => {
-      closeMenu();
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown, true);
-    window.addEventListener("keydown", handleKeyDown, true);
-    window.addEventListener("scroll", handleClose, true);
-    window.addEventListener("resize", handleClose);
-    window.addEventListener("blur", handleClose);
-
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown, true);
-      window.removeEventListener("keydown", handleKeyDown, true);
-      window.removeEventListener("scroll", handleClose, true);
-      window.removeEventListener("resize", handleClose);
-      window.removeEventListener("blur", handleClose);
-    };
-  }, [closeMenu, snapshot]);
 
   // Refocuses the input and restores the selection captured at open time so
   // execCommand acts on the range the user right-clicked.
@@ -398,77 +325,50 @@ export function useNativeInputContextMenu(options: { enabled?: boolean } = {}): 
     closeMenu();
   }, [closeMenu]);
 
-  // Clearing the snapshot starts the exit animation; the retained snapshot
-  // keeps the menu rendered (inert) until the fade-out completes.
-  const { rendered: renderedSnapshot, isExiting } = useMenuExitPresence(snapshot);
-  const items = renderedSnapshot ? computeMenuItems(renderedSnapshot) : null;
+  const itemState = snapshot
+    ? computeMenuItems(snapshot)
+    : { canCut: false, canCopy: false, canPaste: false, canSelectAll: false };
+  const contextMenuItems: ContextMenuOption[] = [
+    {
+      label: t("inputContextMenu.cut"),
+      icon: <Scissors className="h-3.5 w-3.5" />,
+      isDisabled: !itemState.canCut,
+      onClick: handleCut,
+    },
+    {
+      label: t("inputContextMenu.copy"),
+      icon: <Copy className="h-3.5 w-3.5" />,
+      isDisabled: !itemState.canCopy,
+      onClick: handleCopy,
+    },
+    {
+      label: t("inputContextMenu.paste"),
+      icon: <ClipboardPaste className="h-3.5 w-3.5" />,
+      isDisabled: !itemState.canPaste,
+      onClick: () => void handlePaste(),
+    },
+    { type: "divider" },
+    {
+      label: t("inputContextMenu.selectAll"),
+      icon: <ScanText className="h-3.5 w-3.5" />,
+      isDisabled: !itemState.canSelectAll,
+      onClick: handleSelectAll,
+    },
+  ];
 
-  const menu =
-    renderedSnapshot && items
-      ? createPortal(
-          <div
-            ref={menuRef}
-            role="menu"
-            className={cn(
-              "editor-context-menu fixed z-[10000] w-max min-w-[9.5rem] max-w-[calc(100vw-1.5rem)] select-none overflow-hidden rounded-lg border border-border/70 bg-popover p-1.5 text-popover-foreground shadow-[0_20px_60px_-20px_rgba(15,23,42,0.35)]",
-              isExiting && "editor-context-menu-exit",
-            )}
-            style={{ left: renderedSnapshot.x, top: renderedSnapshot.y }}
-            onContextMenu={(event) => {
-              event.preventDefault();
-            }}
-          >
-            <button
-              type="button"
-              role="menuitem"
-              disabled={!items.canCut}
-              className={MENU_ITEM_CLASS}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={handleCut}
-            >
-              <Scissors className="h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">{t("inputContextMenu.cut")}</span>
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              disabled={!items.canCopy}
-              className={MENU_ITEM_CLASS}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={handleCopy}
-            >
-              <Copy className="h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">{t("inputContextMenu.copy")}</span>
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              disabled={!items.canPaste}
-              className={MENU_ITEM_CLASS}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                void handlePaste();
-              }}
-            >
-              <ClipboardPaste className="h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">{t("inputContextMenu.paste")}</span>
-            </button>
-            <div className="my-1 h-px bg-border/70" />
-            <button
-              type="button"
-              role="menuitem"
-              disabled={!items.canSelectAll}
-              className={MENU_ITEM_CLASS}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={handleSelectAll}
-            >
-              <ScanText className="h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">{t("inputContextMenu.selectAll")}</span>
-            </button>
-          </div>,
-          document.body,
-        )
-      : null;
-
-  return { onRootContextMenu, onRootMouseDownCapture, menu };
+  return {
+    onRootContextMenu,
+    onRootMouseDownCapture,
+    contextMenuProps: {
+      label: t("inputContextMenu.copy"),
+      size: "sm" as const,
+      menuWidth: "var(--xagent-context-menu-width)",
+      isDisabled: !enabled,
+      onOpenChange: (isOpen: boolean) => {
+        if (!isOpen) closeMenu();
+      },
+      items: contextMenuItems,
+    },
+  };
 }
+import type { ContextMenuOption } from "@astryxdesign/core/ContextMenu";

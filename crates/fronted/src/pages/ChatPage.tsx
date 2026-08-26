@@ -1,4 +1,5 @@
 import type { Context, Message, UserMessage } from "@earendil-works/pi-ai";
+import { ResizeHandle, useResizable } from "@astryxdesign/core/Resizable";
 import { invoke, listen, listenFileDrop, revealItemInDir } from "@xagent/runtime";
 import {
   type CSSProperties,
@@ -313,6 +314,8 @@ import { ConversationTrajectorySurface } from "./chat/trajectory/ConversationTra
 import { McpHubPage } from "./mcp-hub/McpHubPage";
 import type { SectionId, SettingsOpenOptions } from "./settings/types";
 import { SkillsHubPage } from "./skills-hub/SkillsHubPage";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
 
 const WorkspaceCodeEditorOverlay = lazy(async () => {
   await preparePreferredMonacoNlsLocale();
@@ -682,6 +685,18 @@ export function ChatPage(props: ChatPageProps) {
   setPreferredMonacoNlsLocale(settings.locale);
   const effectiveTheme = resolveEffectiveTheme(settings.theme);
   const { t, locale } = useLocale();
+  const conversationSidebarResize = useResizable({
+    defaultSize: 360,
+    minSizePx: 280,
+    maxSizePx: 560,
+    autoSaveId: "xagent-chat-sidebar-width",
+  });
+  const workspacePanelResize = useResizable({
+    defaultSize: 420,
+    minSizePx: 320,
+    maxSizePx: 720,
+    autoSaveId: "xagent-workspace-panel-width",
+  });
   const initialConversationRef = useRef(createConversationIdentity());
   const initialConversationStateRef = useRef(createConversationStateFromContext(context));
 
@@ -1964,24 +1979,37 @@ export function ChatPage(props: ChatPageProps) {
           title: t("chat.exitConfirmTitle"),
           subtitle: t("chat.exitConfirmSubtitle"),
           description: (
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+            <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-3">
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+              >
                 <Terminal className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-foreground">
+              </AstryxView>
+              <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex min-w-0 flex-wrap items-center gap-2"
+                >
+                  <AstryxInline className="text-sm font-semibold text-foreground">
                     {t("chat.exitConfirmRunningLabel")}
-                  </span>
-                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/15 px-1.5 text-[calc(11px*var(--zone-font-scale,1))] font-semibold text-amber-700 dark:text-amber-300">
+                  </AstryxInline>
+                  <AstryxView
+                    as="span"
+                    layout="inline-flex"
+                    direction="horizontal"
+                    className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/15 px-1.5 text-[calc(11px*var(--zone-font-scale,1))] font-semibold text-amber-700 dark:text-amber-300"
+                  >
                     {runningCount}
-                  </span>
-                </div>
-                <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                  </AstryxView>
+                </AstryxView>
+                <AstryxParagraph className="mt-1.5 text-xs leading-5 text-muted-foreground">
                   {t("chat.exitConfirmDescription")}
-                </p>
-              </div>
-            </div>
+                </AstryxParagraph>
+              </AstryxView>
+            </AstryxView>
           ),
           detail: t("chat.exitConfirmNote"),
           confirmLabel: t("chat.exitConfirmContinue"),
@@ -2753,24 +2781,37 @@ export function ChatPage(props: ChatPageProps) {
               title: t("chat.workspaceRemoveConfirm").replace("{name}", project.name),
               subtitle: t("chat.workspaceRemoveDescription"),
               description: (
-                <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-3">
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                  >
                     <Terminal className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-foreground">
+                  </AstryxView>
+                  <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+                    <AstryxView
+                      layout="flex"
+                      direction="horizontal"
+                      className="flex min-w-0 flex-wrap items-center gap-2"
+                    >
+                      <AstryxInline className="text-sm font-semibold text-foreground">
                         {t("chat.exitConfirmRunningLabel")}
-                      </span>
-                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/15 px-1.5 text-[calc(11px*var(--zone-font-scale,1))] font-semibold text-amber-700 dark:text-amber-300">
+                      </AstryxInline>
+                      <AstryxView
+                        as="span"
+                        layout="inline-flex"
+                        direction="horizontal"
+                        className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/15 px-1.5 text-[calc(11px*var(--zone-font-scale,1))] font-semibold text-amber-700 dark:text-amber-300"
+                      >
                         {runningTerminalCount}
-                      </span>
-                    </div>
-                    <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                      </AstryxView>
+                    </AstryxView>
+                    <AstryxParagraph className="mt-1.5 text-xs leading-5 text-muted-foreground">
                       {t("chat.workspaceRemoveTerminalDescription")}
-                    </p>
-                  </div>
-                </div>
+                    </AstryxParagraph>
+                  </AstryxView>
+                </AstryxView>
               ),
               confirmLabel: t("chat.workspaceRemoveConfirmContinue"),
               cancelLabel: t("chat.cancel"),
@@ -5271,8 +5312,16 @@ export function ChatPage(props: ChatPageProps) {
   );
 
   return (
-    <div className="flex h-full min-h-0 w-full overflow-hidden">
-      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+    <AstryxView
+      layout="flex"
+      direction="horizontal"
+      className="flex h-full min-h-0 w-full overflow-hidden"
+    >
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden"
+      >
         {!mobileExperience ? (
           <WorkspaceNavigationRail
             activeTarget={desktopNavigationTarget}
@@ -5301,6 +5350,7 @@ export function ChatPage(props: ChatPageProps) {
           store={sidebarStore}
           currentConversationId={currentConversationId}
           isOpen={sidebarOpen && (mobileExperience || desktopNavigationTarget === "conversations")}
+          desktopWidth={conversationSidebarResize.size}
           fontScale={settings.customSettings.fontScale.sidebar}
           activeView={activeView}
           showProjects={isAgentMode}
@@ -5399,6 +5449,18 @@ export function ChatPage(props: ChatPageProps) {
           onOpenWorkspaceTool={handleOpenWorkspaceTool}
         />
 
+        {!mobileExperience &&
+        sidebarOpen &&
+        desktopNavigationTarget === "conversations" ? (
+          <ResizeHandle
+            direction="horizontal"
+            hasDivider
+            pillPlacement="center"
+            resizable={conversationSidebarResize.props}
+            label={t("chat.resizeSidebarWidth")}
+          />
+        ) : null}
+
         {confirmDialog}
 
         {activeView === "chat" &&
@@ -5409,6 +5471,7 @@ export function ChatPage(props: ChatPageProps) {
           workspaceToolLaunchRequest.target === "skills" ||
           workspaceToolLaunchRequest.target === "mcp") ? (
           <WorkspaceSidePanel
+            width={workspacePanelResize.size}
             target={workspaceToolLaunchRequest.target}
             shell={workspaceToolLaunchRequest.shell}
             requestNonce={workspaceToolLaunchRequest.nonce}
@@ -5449,10 +5512,29 @@ export function ChatPage(props: ChatPageProps) {
           />
         ) : null}
 
+        {activeView === "chat" &&
+        sidebarOpen &&
+        workspaceToolsOpen &&
+        workspaceToolLaunchRequest &&
+        !mobileExperience &&
+        (desktopCommandHostAvailable ||
+          workspaceToolLaunchRequest.target === "skills" ||
+          workspaceToolLaunchRequest.target === "mcp") ? (
+          <ResizeHandle
+            direction="horizontal"
+            hasDivider
+            pillPlacement="center"
+            resizable={workspacePanelResize.props}
+            label={t("projectTools.resizePanelWidth")}
+          />
+        ) : null}
+
         {/* ---- Main content ----
             字体缩放仅作用于聊天视图：Skills/MCP Hub 页面存在大量未迁移的固定
             像素字号，整列缩放会造成混排（聊天区设置也只应影响聊天区）。 */}
-        <div
+        <AstryxView
+          layout="flex"
+          direction="vertical"
           className={cn(
             "chat-workspace-main relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background",
             activeView === "chat" && "zone-font-scale",
@@ -5502,7 +5584,7 @@ export function ChatPage(props: ChatPageProps) {
             />
           ) : (
             <>
-              <div className="relative z-20">
+              <AstryxView layout="block" direction="horizontal" className="relative z-20">
                 <ChatHeader
                   settings={settings}
                   onSelectExecutionMode={(mode) =>
@@ -5618,7 +5700,7 @@ export function ChatPage(props: ChatPageProps) {
                   }
                 />
                 <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
-              </div>
+              </AstryxView>
 
               {chatSurface === "trajectory" ? (
                 <ConversationTrajectorySurface conversationId={currentConversationId} />
@@ -5775,25 +5857,33 @@ export function ChatPage(props: ChatPageProps) {
                 />
               ) : null}
               {chatSurface === "conversation" && isFileDropActive ? (
-                <div
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
                   className="file-drop-overlay pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-4 sm:p-6 bg-white/30 backdrop-blur-md dark:bg-black/30"
                   aria-hidden="true"
                 >
-                  <div
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
                     className={`file-drop-overlay-zone absolute inset-3 sm:inset-4 rounded-2xl border border-dashed ${
                       canDropUpload
                         ? "border-foreground/20 bg-foreground/[0.015] dark:border-white/15 dark:bg-white/[0.015]"
                         : "border-destructive/35 bg-destructive/[0.03]"
                     }`}
                   />
-                  <div
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
                     className={`file-drop-overlay-card relative flex w-full max-w-[380px] flex-col items-center gap-5 rounded-2xl border bg-white/70 px-8 py-7 text-center shadow-[0_24px_60px_-20px_rgba(0,0,0,0.25),0_8px_20px_-12px_rgba(0,0,0,0.15)] backdrop-blur-2xl dark:bg-zinc-900/70 dark:shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7),0_8px_20px_-12px_rgba(0,0,0,0.5)] ${
                       canDropUpload
                         ? "border-black/[0.06] ring-1 ring-inset ring-white/40 dark:border-white/10 dark:ring-white/[0.04]"
                         : "border-destructive/20 ring-1 ring-inset ring-destructive/10 dark:border-destructive/30"
                     }`}
                   >
-                    <div
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
                       className={`flex h-14 w-14 items-center justify-center rounded-2xl ring-1 ring-inset ${
                         canDropUpload
                           ? "bg-foreground/[0.04] text-foreground/85 ring-foreground/10 dark:bg-white/[0.06] dark:text-white/90 dark:ring-white/10"
@@ -5805,43 +5895,59 @@ export function ChatPage(props: ChatPageProps) {
                       ) : (
                         <Ban className="h-6 w-6" strokeWidth={1.75} />
                       )}
-                    </div>
+                    </AstryxView>
 
-                    <div className="flex flex-col items-center gap-1.5">
-                      <div className="text-[calc(15px*var(--zone-font-scale,1))] font-semibold leading-tight tracking-tight text-foreground">
+                    <AstryxView
+                      layout="flex"
+                      direction="vertical"
+                      className="flex flex-col items-center gap-1.5"
+                    >
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="text-[calc(15px*var(--zone-font-scale,1))] font-semibold leading-tight tracking-tight text-foreground"
+                      >
                         {fileDropTitle}
-                      </div>
-                      <div className="max-w-[280px] text-xs leading-5 text-muted-foreground">
+                      </AstryxView>
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="max-w-[280px] text-xs leading-5 text-muted-foreground"
+                      >
                         {fileDropDescription}
-                      </div>
-                    </div>
+                      </AstryxView>
+                    </AstryxView>
 
-                    <div
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
                       className="h-px w-12 bg-foreground/10 dark:bg-white/10"
                       aria-hidden="true"
                     />
 
-                    <div
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
                       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[calc(11px*var(--zone-font-scale,1))] font-medium ${
                         canDropUpload
                           ? "border-foreground/[0.08] bg-foreground/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
                           : "border-destructive/20 bg-destructive/[0.05] text-destructive/80"
                       }`}
                     >
-                      <span
+                      <AstryxInline
                         aria-hidden="true"
                         className={`inline-flex h-1.5 w-1.5 rounded-full ${
                           canDropUpload ? "bg-foreground/35 dark:bg-white/50" : "bg-destructive/55"
                         }`}
                       />
                       {fileDropLimitHint}
-                    </div>
-                  </div>
-                </div>
+                    </AstryxView>
+                  </AstryxView>
+                </AstryxView>
               ) : null}
             </>
           )}
-        </div>
+        </AstryxView>
 
         <BrowserPanel />
         {mobileExperience ? (
@@ -5932,12 +6038,20 @@ export function ChatPage(props: ChatPageProps) {
         {workspaceEditorMounted ? (
           <Suspense
             fallback={
-              <div className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl">
+              <AstryxView
+                layout="flex"
+                direction="vertical"
+                className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
+              >
                 <MacOsTitleBarSpacer className="bg-muted/45" />
-                <div className="flex min-h-0 flex-1 items-center justify-center">
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex min-h-0 flex-1 items-center justify-center"
+                >
                   {t("workspaceEditor.loading")}
-                </div>
-              </div>
+                </AstryxView>
+              </AstryxView>
             }
           >
             <WorkspaceCodeEditorOverlay
@@ -5962,12 +6076,20 @@ export function ChatPage(props: ChatPageProps) {
         {workspaceFilePreviewMounted ? (
           <Suspense
             fallback={
-              <div className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl">
+              <AstryxView
+                layout="flex"
+                direction="vertical"
+                className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
+              >
                 <MacOsTitleBarSpacer className="bg-muted/45" />
-                <div className="flex min-h-0 flex-1 items-center justify-center">
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex min-h-0 flex-1 items-center justify-center"
+                >
                   {t("workspaceFilePreview.loading")}
-                </div>
-              </div>
+                </AstryxView>
+              </AstryxView>
             }
           >
             <WorkspaceFilePreviewOverlay
@@ -5982,12 +6104,20 @@ export function ChatPage(props: ChatPageProps) {
         {desktopBridgeEnabled && workspaceSshTerminalMounted ? (
           <Suspense
             fallback={
-              <div className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl">
+              <AstryxView
+                layout="flex"
+                direction="vertical"
+                className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
+              >
                 <MacOsTitleBarSpacer className="bg-muted/45" />
-                <div className="flex min-h-0 flex-1 items-center justify-center">
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex min-h-0 flex-1 items-center justify-center"
+                >
                   {t("workspaceSshTerminal.loading")}
-                </div>
-              </div>
+                </AstryxView>
+              </AstryxView>
             }
           >
             <WorkspaceSshTerminalOverlay
@@ -6003,7 +6133,7 @@ export function ChatPage(props: ChatPageProps) {
             />
           </Suspense>
         ) : null}
-      </div>
-    </div>
+      </AstryxView>
+    </AstryxView>
   );
 }

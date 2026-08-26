@@ -1,3 +1,5 @@
+import { ChatMessage } from "@astryxdesign/core/Chat";
+import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { memo, useMemo } from "react";
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
 import { CloudArtifactsCard } from "../../../components/chat/CloudArtifactsCard";
@@ -7,7 +9,6 @@ import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTran
 import { collectChangedFiles } from "../../../lib/chat/messages/changedFiles";
 import { collectCloudArtifacts } from "../../../lib/chat/messages/cloudArtifacts";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
-import { cn } from "../../../lib/shared/utils";
 import { AssistantAvatar, AssistantBubbleUnit } from "../components/AssistantBubble";
 import { AssistantRowFooter } from "./RowActions";
 import type { AssistantFooterRenderUnit, AssistantUnitRow } from "./rowModel";
@@ -46,24 +47,28 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
   const hasCards = Boolean(changedFiles) || cloudArtifacts.length > 0;
 
   return (
-    <div className={cn("group/assistant w-full max-w-full", compacted && "opacity-70")}>
-      {hasCards ? (
-        <div className="flex w-full max-w-full items-start gap-3">
-          {showAvatar ? (
-            <AssistantAvatar />
-          ) : (
-            <div aria-hidden="true" className="h-7 w-7 shrink-0" />
-          )}
-          <div className={cn("min-w-0 flex-1 space-y-2", showAvatar ? "pt-0.5" : "")}>
-            {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
-            {cloudArtifacts.length > 0 ? <CloudArtifactsCard artifacts={cloudArtifacts} /> : null}
-          </div>
-        </div>
-      ) : showAvatar ? (
-        <div className="flex w-full max-w-full items-start gap-3">
+    <ChatMessage
+      sender="assistant"
+      density="compact"
+      avatar={
+        showAvatar ? (
           <AssistantAvatar />
-          <div className="min-w-0 flex-1" />
-        </div>
+        ) : (
+          <HStack
+            aria-hidden="true"
+            width="var(--xagent-assistant-avatar-size)"
+            height="var(--xagent-assistant-avatar-size)"
+          />
+        )
+      }
+      className="group/assistant"
+      style={compacted ? { opacity: "var(--xagent-opacity-compacted)" } : undefined}
+    >
+      {hasCards ? (
+        <VStack gap={2} width="100%" paddingBlockStart={showAvatar ? 0.5 : 0}>
+          {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
+          {cloudArtifacts.length > 0 ? <CloudArtifactsCard artifacts={cloudArtifacts} /> : null}
+        </VStack>
       ) : null}
       <AssistantRowFooter
         timestamp={unit.timestamp}
@@ -72,7 +77,7 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
         onResendFromEdit={onResendFromEdit}
         onBranchConversation={onBranchConversation}
       />
-    </div>
+    </ChatMessage>
   );
 });
 
@@ -106,7 +111,11 @@ export const AssistantRenderUnit = memo(function AssistantRenderUnit(
   }
 
   return (
-    <div className={cn("group/assistant w-full max-w-full", row.compacted && "opacity-70")}>
+    <VStack
+      width="100%"
+      className="group/assistant"
+      style={row.compacted ? { opacity: "var(--xagent-opacity-compacted)" } : undefined}
+    >
       <AssistantBubbleUnit
         row={row}
         showUsage={showUsage}
@@ -118,6 +127,6 @@ export const AssistantRenderUnit = memo(function AssistantRenderUnit(
         workdir={workdir}
         onOpenFileLink={onOpenFileLink}
       />
-    </div>
+    </VStack>
   );
 });

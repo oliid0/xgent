@@ -32,9 +32,12 @@ import {
   useAutomation,
 } from "../../lib/automation";
 import { useCompactViewport } from "../../lib/responsive/compactViewport";
-import { useModalMotion } from "../../lib/shared/modalMotion";
 import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmActionPopover } from "./shared";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
+import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 type CronTaskViewModalProps = {
   taskId: string;
@@ -95,17 +98,25 @@ function stringifyBody(body?: unknown) {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+    <AstryxView
+      layout="block"
+      direction="horizontal"
+      className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70"
+    >
       {children}
-    </div>
+    </AstryxView>
   );
 }
 
 function EmptyConfig({ t }: { t: (key: string) => string }) {
   return (
-    <div className="rounded-xl border border-dashed border-border/50 bg-muted/10 py-6 text-center text-xs text-muted-foreground/60">
+    <AstryxView
+      layout="block"
+      direction="horizontal"
+      className="rounded-xl border border-dashed border-border/50 bg-muted/10 py-6 text-center text-xs text-muted-foreground/60"
+    >
       {t("settings.cronViewNoConfig")}
-    </div>
+    </AstryxView>
   );
 }
 
@@ -135,22 +146,44 @@ function LeftPanel({
   return (
     <>
       {/* ── Fixed hero header ── */}
-      <div className="relative shrink-0 overflow-hidden">
-        <div className={`absolute inset-0 ${cfg.accentBg} opacity-40`} />
-        <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br from-white/10 to-transparent blur-2xl" />
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        className="relative shrink-0 overflow-hidden"
+      >
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className={`absolute inset-0 ${cfg.accentBg} opacity-40`}
+        />
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br from-white/10 to-transparent blur-2xl"
+        />
 
-        <div className="relative px-5 pb-4 pt-5">
+        <AstryxView layout="block" direction="horizontal" className="relative px-5 pb-4 pt-5">
           {/* Type badge + run-now button on the hero's top row, kept out of
               the meta/content area so pill wrapping never moves the button */}
-          <div className="flex items-center justify-between gap-2">
-            <div
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex items-center justify-between gap-2"
+          >
+            <AstryxView
+              layout="block"
+              direction="horizontal"
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${cfg.accent} ${cfg.accentBg} ${cfg.accentBorder}`}
             >
               <TypeIcon className="h-3 w-3" />
               {t(cfg.label)}
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <button
+            </AstryxView>
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex shrink-0 items-center gap-1.5"
+            >
+              <AstryxButton
                 type="button"
                 onClick={onRunNow}
                 disabled={isRunningNow}
@@ -167,11 +200,11 @@ function LeftPanel({
                 ) : (
                   <Play className="h-3.5 w-3.5" />
                 )}
-              </button>
+              </AstryxButton>
               {/* Desktop keeps the close button in the logs header. The compact
                   mobile layout places this copy beside run-now and hides the
                   logs-header copy. */}
-              <button
+              <AstryxButton
                 type="button"
                 onClick={onClose}
                 title={t("settings.cronViewClose")}
@@ -179,39 +212,56 @@ function LeftPanel({
                 className="settings-cron-view-hero-close hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
               >
                 <X size={14} />
-              </button>
-            </div>
-          </div>
+              </AstryxButton>
+            </AstryxView>
+          </AstryxView>
 
           {/* Name */}
-          <h2 className="mt-3 text-base font-bold leading-tight text-foreground">{task.name}</h2>
+          <AstryxHeading
+            level={2}
+            className="mt-3 text-base font-bold leading-tight text-foreground"
+          >
+            {task.name}
+          </AstryxHeading>
 
           {/* Description */}
-          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+          <AstryxParagraph className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
             {task.description || t("settings.cronViewNoDesc")}
-          </p>
+          </AstryxParagraph>
 
           {/* Meta pills */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="mt-3 flex flex-wrap items-center gap-2"
+          >
+            <AstryxView
+              layout="inline-flex"
+              direction="horizontal"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-600 dark:text-amber-400"
+            >
               <Clock3 className="h-3 w-3" />
-              <span className="font-mono">{task.cron}</span>
-            </div>
-            <div
+              <AstryxInline className="font-mono">{task.cron}</AstryxInline>
+            </AstryxView>
+            <AstryxView
+              layout="block"
+              direction="horizontal"
               className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium ${
                 task.enabled
                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                   : "bg-muted text-muted-foreground"
               }`}
             >
-              <span
+              <AstryxInline
                 className={`h-1.5 w-1.5 rounded-full ${task.enabled ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
               />
               {task.enabled
                 ? t("settings.cronViewStatusEnabled")
                 : t("settings.cronViewStatusDisabled")}
-            </div>
-            <div
+            </AstryxView>
+            <AstryxView
+              layout="block"
+              direction="horizontal"
               className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium ${
                 task.remainingExecutions === 0
                   ? "bg-red-500/10 text-red-600 dark:text-red-400"
@@ -225,71 +275,95 @@ function LeftPanel({
                   : `${task.remainingExecutions} ${t("settings.cronRemainingExecutionsUnit")}`
               }
             >
-              <span className="tabular-nums">
+              <AstryxInline className="tabular-nums">
                 {task.remainingExecutions == null ? "∞" : task.remainingExecutions}
-              </span>
+              </AstryxInline>
               {task.remainingExecutions == null ? null : (
-                <span>{t("settings.cronRemainingExecutionsUnitShort")}</span>
+                <AstryxInline>{t("settings.cronRemainingExecutionsUnitShort")}</AstryxInline>
               )}
-            </div>
-            <div
+            </AstryxView>
+            <AstryxView
+              layout="inline-flex"
+              direction="horizontal"
               className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground"
               title={t("settings.cronTimeoutSeconds")}
             >
               <Timer className="h-3 w-3" />
-              <span className="tabular-nums">
+              <AstryxInline className="tabular-nums">
                 {task.timeoutSeconds ?? DEFAULT_CRON_TIMEOUT_SECONDS}
                 {t("settings.cronTimeoutSecondsUnitShort")}
-              </span>
-            </div>
+              </AstryxInline>
+            </AstryxView>
             {task.workdir ? (
-              <div
+              <AstryxView
+                layout="inline-flex"
+                direction="horizontal"
                 className="inline-flex max-w-56 items-center gap-1.5 rounded-lg bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground"
                 title={task.workdir}
               >
                 <Folder className="h-3 w-3 shrink-0" />
-                <span className="truncate">{task.workdir}</span>
-              </div>
+                <AstryxInline className="truncate">{task.workdir}</AstryxInline>
+              </AstryxView>
             ) : null}
-          </div>
+          </AstryxView>
 
           {runNowError ? (
-            <div className="mt-3 flex items-start gap-1.5 rounded-lg border border-red-500/20 bg-red-500/[0.04] px-2.5 py-2 text-[11px] leading-relaxed text-red-700 dark:text-red-300">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="mt-3 flex items-start gap-1.5 rounded-lg border border-red-500/20 bg-red-500/[0.04] px-2.5 py-2 text-[11px] leading-relaxed text-red-700 dark:text-red-300"
+            >
               <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-              <span className="min-w-0 break-all">
+              <AstryxInline className="min-w-0 break-all">
                 {t("settings.cronViewRunNowFailed")}: {runNowError}
-              </span>
-            </div>
+              </AstryxInline>
+            </AstryxView>
           ) : null}
 
           {task.lastError ? (
-            <div className="mt-3 flex items-start gap-1.5 rounded-lg border border-red-500/20 bg-red-500/[0.04] px-2.5 py-2 text-[11px] leading-relaxed text-red-700 dark:text-red-300">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="mt-3 flex items-start gap-1.5 rounded-lg border border-red-500/20 bg-red-500/[0.04] px-2.5 py-2 text-[11px] leading-relaxed text-red-700 dark:text-red-300"
+            >
               <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-              <span className="min-w-0 break-all">{task.lastError}</span>
-            </div>
+              <AstryxInline className="min-w-0 break-all">{task.lastError}</AstryxInline>
+            </AstryxView>
           ) : null}
-        </div>
-      </div>
+        </AstryxView>
+      </AstryxView>
 
       {/* ── Scrollable config ── */}
-      <div className="min-h-0 flex-1 overflow-y-auto border-t border-border/30 px-5 py-4">
-        <div className="space-y-2.5">
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        className="min-h-0 flex-1 overflow-y-auto border-t border-border/30 px-5 py-4"
+      >
+        <AstryxView layout="block" direction="horizontal" className="space-y-2.5">
           <SectionLabel>{t("settings.cronViewConfig")}</SectionLabel>
 
           {/* Bash */}
           {task.type === "bash" ? (
             script ? (
-              <div className="overflow-hidden rounded-xl border border-border/60 bg-muted/30">
-                <div className="flex items-center gap-1.5 border-b border-border/30 px-3 py-2">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="overflow-hidden rounded-xl border border-border/60 bg-muted/30"
+              >
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex items-center gap-1.5 border-b border-border/30 px-3 py-2"
+                >
                   <Terminal className="h-3 w-3 text-muted-foreground/60" />
-                  <span className="text-[11px] font-medium text-muted-foreground/60">
+                  <AstryxInline className="text-[11px] font-medium text-muted-foreground/60">
                     {scriptLineCount} {t("settings.cronCommandsCount")}
-                  </span>
-                </div>
+                  </AstryxInline>
+                </AstryxView>
                 <pre className="whitespace-pre-wrap break-all px-3 py-2.5 font-mono text-xs leading-relaxed text-foreground/80">
                   {script}
                 </pre>
-              </div>
+              </AstryxView>
             ) : (
               <EmptyConfig t={t} />
             )
@@ -298,56 +372,87 @@ function LeftPanel({
           {/* HTTP */}
           {task.type === "http" ? (
             (task.requests ?? []).length > 0 ? (
-              <div className="space-y-2.5">
+              <AstryxView layout="block" direction="horizontal" className="space-y-2.5">
                 {(task.requests ?? []).map((req, i) => {
                   const headersText = stringifyHeaders(req.headers);
                   const bodyText = stringifyBody(req.body);
                   const hasHeaders = headersText.trim().length > 0;
                   const hasBody = bodyText.trim().length > 0;
                   return (
-                    <div
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
                       key={req.id}
                       className="overflow-hidden rounded-xl border border-border/60 bg-muted/30"
                     >
-                      <div className="flex items-center gap-2 border-b border-border/30 px-3 py-2.5">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
+                        className="flex items-center gap-2 border-b border-border/30 px-3 py-2.5"
+                      >
+                        <AstryxView
+                          as="span"
+                          layout="flex"
+                          direction="horizontal"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-[10px] font-bold text-emerald-600 dark:text-emerald-400"
+                        >
                           {i + 1}
-                        </span>
-                        <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                        </AstryxView>
+                        <AstryxInline className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
                           {req.method}
-                        </span>
+                        </AstryxInline>
                         <code className="min-w-0 flex-1 truncate font-mono text-xs text-foreground/80">
                           {req.url || "—"}
                         </code>
-                      </div>
+                      </AstryxView>
                       {hasHeaders || hasBody ? (
-                        <div className="space-y-px bg-border/10">
+                        <AstryxView
+                          layout="block"
+                          direction="horizontal"
+                          className="space-y-px bg-border/10"
+                        >
                           {hasHeaders ? (
-                            <div className="bg-background/60 p-2.5">
-                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                            <AstryxView
+                              layout="block"
+                              direction="horizontal"
+                              className="bg-background/60 p-2.5"
+                            >
+                              <AstryxView
+                                layout="block"
+                                direction="horizontal"
+                                className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60"
+                              >
                                 {t("settings.cronViewHttpHeaders")}
-                              </div>
+                              </AstryxView>
                               <pre className="whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-foreground/70">
                                 {headersText}
                               </pre>
-                            </div>
+                            </AstryxView>
                           ) : null}
                           {hasBody ? (
-                            <div className="bg-background/60 p-2.5">
-                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                            <AstryxView
+                              layout="block"
+                              direction="horizontal"
+                              className="bg-background/60 p-2.5"
+                            >
+                              <AstryxView
+                                layout="block"
+                                direction="horizontal"
+                                className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60"
+                              >
                                 {t("settings.cronViewHttpBody")}
-                              </div>
+                              </AstryxView>
                               <pre className="whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-foreground/70">
                                 {bodyText}
                               </pre>
-                            </div>
+                            </AstryxView>
                           ) : null}
-                        </div>
+                        </AstryxView>
                       ) : null}
-                    </div>
+                    </AstryxView>
                   );
                 })}
-              </div>
+              </AstryxView>
             ) : (
               <EmptyConfig t={t} />
             )
@@ -355,47 +460,71 @@ function LeftPanel({
 
           {/* Prompt */}
           {task.type === "prompt" ? (
-            <div className="space-y-2.5">
+            <AstryxView layout="block" direction="horizontal" className="space-y-2.5">
               {task.selectedModel ? (
-                <div className="overflow-hidden rounded-xl border border-border/60 bg-muted/30">
-                  <div className="flex items-center gap-1.5 border-b border-border/30 px-3 py-2">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="overflow-hidden rounded-xl border border-border/60 bg-muted/30"
+                >
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="flex items-center gap-1.5 border-b border-border/30 px-3 py-2"
+                  >
                     <MessageSquare className="h-3 w-3 text-muted-foreground/60" />
-                    <span className="text-[11px] font-medium text-muted-foreground/60">
+                    <AstryxInline className="text-[11px] font-medium text-muted-foreground/60">
                       {t("settings.cronPromptModelLabel")}
-                    </span>
-                  </div>
-                  <div className="px-3.5 py-3">
-                    <div className="text-xs font-medium text-foreground/85">
+                    </AstryxInline>
+                  </AstryxView>
+                  <AstryxView layout="block" direction="horizontal" className="px-3.5 py-3">
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="text-xs font-medium text-foreground/85"
+                    >
                       {task.selectedModel.model}
-                    </div>
-                    <div className="mt-1 text-[11px] text-muted-foreground/70">
+                    </AstryxView>
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="mt-1 text-[11px] text-muted-foreground/70"
+                    >
                       {task.selectedModel.customProviderId}
-                    </div>
-                  </div>
-                </div>
+                    </AstryxView>
+                  </AstryxView>
+                </AstryxView>
               ) : null}
 
               {task.prompt?.trim() ? (
-                <div className="overflow-hidden rounded-xl border border-border/60 bg-muted/30">
-                  <div className="flex items-center gap-1.5 border-b border-border/30 px-3 py-2">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="overflow-hidden rounded-xl border border-border/60 bg-muted/30"
+                >
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="flex items-center gap-1.5 border-b border-border/30 px-3 py-2"
+                  >
                     <MessageSquare className="h-3 w-3 text-muted-foreground/60" />
-                    <span className="text-[11px] font-medium text-muted-foreground/60">
+                    <AstryxInline className="text-[11px] font-medium text-muted-foreground/60">
                       {t("settings.cronPromptLabel")}
-                    </span>
-                  </div>
-                  <div className="px-3.5 py-3">
-                    <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/80">
+                    </AstryxInline>
+                  </AstryxView>
+                  <AstryxView layout="block" direction="horizontal" className="px-3.5 py-3">
+                    <AstryxParagraph className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/80">
                       {task.prompt}
-                    </p>
-                  </div>
-                </div>
+                    </AstryxParagraph>
+                  </AstryxView>
+                </AstryxView>
               ) : (
                 <EmptyConfig t={t} />
               )}
-            </div>
+            </AstryxView>
           ) : null}
-        </div>
-      </div>
+        </AstryxView>
+      </AstryxView>
     </>
   );
 }
@@ -481,16 +610,26 @@ function RightPanel({
   return (
     <>
       {/* ── Fixed header ── */}
-      <div className="settings-cron-logs-header flex shrink-0 items-center gap-2 border-b border-border/30 px-5 py-3.5">
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="settings-cron-logs-header flex shrink-0 items-center gap-2 border-b border-border/30 px-5 py-3.5"
+      >
         <ScrollText className="h-4 w-4 text-muted-foreground/50" />
-        <span className="text-sm font-semibold text-foreground">{t("settings.cronViewLogs")}</span>
-        <div className="ml-auto flex items-center gap-2">
+        <AstryxInline className="text-sm font-semibold text-foreground">
+          {t("settings.cronViewLogs")}
+        </AstryxInline>
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="ml-auto flex items-center gap-2"
+        >
           <ConfirmActionPopover
             title={t("settings.cronViewClearLogsConfirm")}
             description={
               <>
                 {t("settings.cronViewClearLogsConfirmDescBefore")}{" "}
-                <span className="font-medium text-foreground">{task.name}</span>
+                <AstryxInline className="font-medium text-foreground">{task.name}</AstryxInline>
                 {t("settings.cronViewClearLogsConfirmDescAfter")}
               </>
             }
@@ -500,7 +639,7 @@ function RightPanel({
             }}
           >
             {(open) => (
-              <button
+              <AstryxButton
                 type="button"
                 onClick={open}
                 disabled={clearableCount === 0 || isClearing}
@@ -513,30 +652,45 @@ function RightPanel({
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <BrushCleaning className="h-3.5 w-3.5" />
-              </button>
+              </AstryxButton>
             )}
           </ConfirmActionPopover>
           {logs.length > 0 ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-emerald-600 dark:text-emerald-400">
+            <AstryxView
+              as="span"
+              layout="inline-flex"
+              direction="horizontal"
+              className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-emerald-600 dark:text-emerald-400"
+            >
               <CheckCircle2 className="h-2.5 w-2.5" />
               {successCount}
-            </span>
+            </AstryxView>
           ) : null}
           {logs.length > 0 && failCount > 0 ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-red-600 dark:text-red-400">
+            <AstryxView
+              as="span"
+              layout="inline-flex"
+              direction="horizontal"
+              className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-red-600 dark:text-red-400"
+            >
               <XCircle className="h-2.5 w-2.5" />
               {failCount}
-            </span>
+            </AstryxView>
           ) : null}
           {runningCount > 0 ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-sky-600 dark:text-sky-400">
+            <AstryxView
+              as="span"
+              layout="inline-flex"
+              direction="horizontal"
+              className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-sky-600 dark:text-sky-400"
+            >
               <Loader2 className="h-2.5 w-2.5 animate-spin" />
               {runningCount}
-            </span>
+            </AstryxView>
           ) : null}
-        </div>
+        </AstryxView>
         {!hideClose ? (
-          <button
+          <AstryxButton
             type="button"
             onClick={onClose}
             title={t("settings.cronViewClose")}
@@ -544,34 +698,48 @@ function RightPanel({
             className="settings-cron-logs-close flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
           >
             <X size={14} />
-          </button>
+          </AstryxButton>
         ) : null}
-      </div>
+      </AstryxView>
 
       {/* ── Scrollable log list ── */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <AstryxView
+        layout="block"
+        direction="horizontal"
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
+      >
         {loadError ? (
-          <div className="mb-3 flex items-start gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="mb-3 flex items-start gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300"
+          >
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-            <span className="min-w-0 break-all">
+            <AstryxInline className="min-w-0 break-all">
               {t("settings.cronViewLogsLoadFailed")}: {loadError}
-            </span>
-          </div>
+            </AstryxInline>
+          </AstryxView>
         ) : null}
         {clearError ? (
-          <div className="mb-3 rounded-lg border border-red-500/20 bg-red-500/[0.03] px-3 py-2 text-[11px] text-red-700 dark:text-red-300">
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="mb-3 rounded-lg border border-red-500/20 bg-red-500/[0.03] px-3 py-2 text-[11px] text-red-700 dark:text-red-300"
+          >
             {clearError}
-          </div>
+          </AstryxView>
         ) : null}
         {logs.length > 0 ? (
-          <div className="space-y-2">
+          <AstryxView layout="block" direction="horizontal" className="space-y-2">
             {logs.map((log) => {
               const isExpanded = expandedLogId === log.id;
               const isExpired = log.state === "expired";
               const isRunning = log.state === "pending" || log.state === "leased";
 
               return (
-                <div
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
                   key={log.id}
                   className={`overflow-hidden rounded-xl border transition-colors ${
                     isRunning
@@ -582,7 +750,7 @@ function RightPanel({
                   }`}
                 >
                   {/* Summary — fixed-width columns for vertical alignment */}
-                  <button
+                  <AstryxButton
                     type="button"
                     onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
                     className="settings-log-row flex w-full items-center gap-2 px-3 py-2.5 text-left"
@@ -596,11 +764,11 @@ function RightPanel({
                       <XCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
                     )}
                     {/* Timestamp — fixed width */}
-                    <span className="w-[130px] shrink-0 font-mono text-[11px] text-foreground/70">
+                    <AstryxInline className="w-[130px] shrink-0 font-mono text-[11px] text-foreground/70">
                       {formatTimestamp(log.startedAt)}
-                    </span>
+                    </AstryxInline>
                     {/* Status tag — fixed width for alignment */}
-                    <span
+                    <AstryxInline
                       className={`w-[36px] shrink-0 text-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
                         isRunning
                           ? "bg-sky-500/10 text-sky-600 dark:text-sky-400"
@@ -616,33 +784,41 @@ function RightPanel({
                           : isExpired
                             ? t("settings.cronViewLogExpired")
                             : t("settings.cronViewLogFailed")}
-                    </span>
+                    </AstryxInline>
                     {/* Duration — right-aligned fixed width */}
-                    <span className="ml-auto w-[48px] shrink-0 text-right text-[11px] tabular-nums text-muted-foreground/50">
+                    <AstryxInline className="ml-auto w-[48px] shrink-0 text-right text-[11px] tabular-nums text-muted-foreground/50">
                       {isRunning ? "—" : formatDuration(log.durationMs)}
-                    </span>
+                    </AstryxInline>
                     {/* Chevron */}
                     <ChevronDown
                       className={`h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform ${
                         isExpanded ? "rotate-0" : "-rotate-90"
                       }`}
                     />
-                  </button>
+                  </AstryxButton>
 
                   {/* Detail */}
                   {isExpanded ? (
-                    <div className="space-y-2 border-t border-border/30 bg-muted/10 px-3 py-2.5">
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
-                        <span className="text-muted-foreground/60">
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="space-y-2 border-t border-border/30 bg-muted/10 px-3 py-2.5"
+                    >
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
+                        className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]"
+                      >
+                        <AstryxInline className="text-muted-foreground/60">
                           {t("settings.cronViewLogDuration")}:{" "}
-                          <span className="font-medium text-foreground/70">
+                          <AstryxInline className="font-medium text-foreground/70">
                             {formatDuration(log.durationMs)}
-                          </span>
-                        </span>
+                          </AstryxInline>
+                        </AstryxInline>
                         {log.exitCode !== undefined && log.exitCode !== null ? (
-                          <span className="text-muted-foreground/60">
+                          <AstryxInline className="text-muted-foreground/60">
                             {t("settings.cronViewLogExit")}:{" "}
-                            <span
+                            <AstryxInline
                               className={`font-mono font-medium ${
                                 log.exitCode === 0
                                   ? "text-emerald-600 dark:text-emerald-400"
@@ -650,17 +826,21 @@ function RightPanel({
                               }`}
                             >
                               {log.exitCode}
-                            </span>
-                          </span>
+                            </AstryxInline>
+                          </AstryxInline>
                         ) : null}
-                      </div>
+                      </AstryxView>
                       {log.output ? (
-                        <div className="space-y-1">
-                          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                        <AstryxView layout="block" direction="horizontal" className="space-y-1">
+                          <AstryxView
+                            layout="block"
+                            direction="horizontal"
+                            className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50"
+                          >
                             {task.type === "prompt"
                               ? t("settings.cronViewLogConclusion")
                               : t("settings.cronViewLogOutput")}
-                          </div>
+                          </AstryxView>
                           <pre
                             className={`whitespace-pre-wrap break-all rounded-lg border px-2.5 py-2 font-mono text-[11px] leading-relaxed ${
                               log.success
@@ -670,26 +850,30 @@ function RightPanel({
                           >
                             {log.output}
                           </pre>
-                        </div>
+                        </AstryxView>
                       ) : null}
-                    </div>
+                    </AstryxView>
                   ) : null}
-                </div>
+                </AstryxView>
               );
             })}
-          </div>
+          </AstryxView>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center text-center">
+          <AstryxView
+            layout="flex"
+            direction="vertical"
+            className="flex h-full flex-col items-center justify-center text-center"
+          >
             <ScrollText className="h-8 w-8 text-muted-foreground/15" />
-            <p className="mt-3 text-xs font-medium text-muted-foreground/50">
+            <AstryxParagraph className="mt-3 text-xs font-medium text-muted-foreground/50">
               {t("settings.cronViewLogsEmpty")}
-            </p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground/35">
+            </AstryxParagraph>
+            <AstryxParagraph className="mt-0.5 text-[11px] text-muted-foreground/35">
               {t("settings.cronViewLogsEmptyHint")}
-            </p>
-          </div>
+            </AstryxParagraph>
+          </AstryxView>
         )}
-      </div>
+      </AstryxView>
     </>
   );
 }
@@ -699,7 +883,6 @@ function RightPanel({
 export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
   const { t } = useLocale();
   const compactViewport = useCompactViewport();
-  const { modalState, requestClose } = useModalMotion(onClose);
   // Live subscription: enable/disable toggles, executor decrements and
   // scheduler errors show up while the modal is open.
   const { cron } = useAutomation();
@@ -718,9 +901,9 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
 
   useEffect(() => {
     if (!task) {
-      requestClose();
+      onClose();
     }
-  }, [task, requestClose]);
+  }, [task, onClose]);
 
   useEffect(() => {
     if (manualRunStartedAt == null) return;
@@ -790,23 +973,29 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
 
   return (
     <SettingsModalShell
-      onClose={requestClose}
-      state={modalState}
+      onClose={onClose}
       ariaLabel={task.name}
       panelClassName="settings-cron-view-panel h-[80vh] max-w-4xl !flex-row max-sm:h-full max-sm:!flex-col"
     >
       {compactViewport ? (
-        <header className="flex min-h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top,0px)]">
-          <button
+        <AstryxView
+          as="header"
+          className="flex min-h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top,0px)]"
+        >
+          <AstryxButton
             type="button"
-            onClick={requestClose}
+            onClick={onClose}
             className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted"
             aria-label={t("settings.cronViewClose")}
           >
             <X className="h-4 w-4" />
-          </button>
-          <div className="grid min-w-0 flex-1 grid-cols-2 rounded-lg bg-muted p-0.5">
-            <button
+          </AstryxButton>
+          <AstryxView
+            layout="grid"
+            direction="horizontal"
+            className="grid min-w-0 flex-1 grid-cols-2 rounded-lg bg-muted p-0.5"
+          >
+            <AstryxButton
               type="button"
               onClick={() => setCompactTab("details")}
               className={`h-8 rounded-md text-xs font-medium transition-colors ${
@@ -816,8 +1005,8 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
               }`}
             >
               {t("settings.cronViewConfig")}
-            </button>
-            <button
+            </AstryxButton>
+            <AstryxButton
               type="button"
               onClick={() => setCompactTab("logs")}
               className={`h-8 rounded-md text-xs font-medium transition-colors ${
@@ -827,13 +1016,17 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
               }`}
             >
               {t("settings.cronViewLogs")}
-            </button>
-          </div>
-        </header>
+            </AstryxButton>
+          </AstryxView>
+        </AstryxView>
       ) : null}
       {/* ── Left: task detail ── */}
       {!compactViewport || compactTab === "details" ? (
-        <div className="settings-cron-view-left flex w-[380px] shrink-0 flex-col border-r border-border/40 bg-background max-sm:min-h-0 max-sm:w-full max-sm:flex-1 max-sm:border-r-0">
+        <AstryxView
+          layout="flex"
+          direction="vertical"
+          className="settings-cron-view-left flex w-[380px] shrink-0 flex-col border-r border-border/40 bg-background max-sm:min-h-0 max-sm:w-full max-sm:flex-1 max-sm:border-r-0"
+        >
           <LeftPanel
             task={task}
             t={t}
@@ -843,16 +1036,20 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
             onRunNow={() => {
               void handleRunNow(task.id);
             }}
-            onClose={requestClose}
+            onClose={onClose}
           />
-        </div>
+        </AstryxView>
       ) : null}
 
       {/* ── Right: logs ── */}
       {!compactViewport || compactTab === "logs" ? (
-        <div className="settings-cron-view-right flex min-w-0 flex-1 flex-col bg-background">
-          <RightPanel task={task} t={t} onClose={requestClose} hideClose={compactViewport} />
-        </div>
+        <AstryxView
+          layout="flex"
+          direction="vertical"
+          className="settings-cron-view-right flex min-w-0 flex-1 flex-col bg-background"
+        >
+          <RightPanel task={task} t={t} onClose={onClose} hideClose={compactViewport} />
+        </AstryxView>
       ) : null}
     </SettingsModalShell>
   );

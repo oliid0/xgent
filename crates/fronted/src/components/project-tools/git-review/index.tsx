@@ -5,6 +5,7 @@
 // Shared by every frontend runtime; only relative or @xagent/runtime imports
 // are allowed here.
 
+import { VStack } from "@astryxdesign/core/Layout";
 import { memo, useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useLocale } from "../../../i18n";
 import { GitReviewHistoryView } from "./HistoryView";
@@ -113,7 +114,12 @@ export const GitReviewPanel = memo(function GitReviewPanel(props: GitReviewPanel
   );
 
   return (
-    <div ref={panelRef} className="relative flex h-full min-h-0 flex-col bg-background">
+    <VStack
+      ref={panelRef}
+      height="100%"
+      minHeight={0}
+      style={{ position: "relative" }}
+    >
       <GitRemoteSetupModal
         open={data.remoteSetupOpen}
         action={data.remoteSetupAction}
@@ -165,6 +171,6 @@ export const GitReviewPanel = memo(function GitReviewPanel(props: GitReviewPanel
           writeDisabled={writeDisabled}
         />
       )}
-    </div>
+    </VStack>
   );
 });

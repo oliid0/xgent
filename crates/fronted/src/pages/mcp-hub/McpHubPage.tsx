@@ -13,6 +13,7 @@ import { cn } from "../../lib/shared/utils";
 import { McpImportView } from "./McpImportView";
 import { McpRegistryBrowser } from "./McpRegistryBrowser";
 import { McpServerEditModal, McpServersForm } from "./McpServersForm";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
 
 type McpHubPageProps = {
   settings: AppSettings;
@@ -64,7 +65,9 @@ export function McpHubPage(props: McpHubPageProps) {
   }
 
   return (
-    <div
+    <AstryxView
+      layout="flex"
+      direction="vertical"
       data-hub-embedded={embedded ? "true" : undefined}
       className={cn(
         "hub-page hub-page-enter relative flex h-full min-h-0 flex-1 flex-col overflow-hidden",
@@ -73,7 +76,11 @@ export function McpHubPage(props: McpHubPageProps) {
     >
       <HubBackdrop tone="violet" />
 
-      <div className="relative z-10 flex h-full min-h-0 flex-col overflow-hidden">
+      <AstryxView
+        layout="flex"
+        direction="vertical"
+        className="relative z-10 flex h-full min-h-0 flex-col overflow-hidden"
+      >
         {!embedded ? (
           <HubHeader
             icon={<Cable className="h-5 w-5" />}
@@ -86,18 +93,38 @@ export function McpHubPage(props: McpHubPageProps) {
           />
         ) : null}
 
-        <div className="hub-scroll min-h-0 flex-1 overflow-hidden px-5 pb-6 pt-2 sm:px-6 lg:px-8 xl:px-10">
-          <div className="hub-content-stage mx-auto flex h-full min-h-0 w-full max-w-[1320px] flex-col gap-4">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="hub-scroll min-h-0 flex-1 overflow-hidden px-5 pb-6 pt-2 sm:px-6 lg:px-8 xl:px-10"
+        >
+          <AstryxView
+            layout="flex"
+            direction="vertical"
+            className="hub-content-stage mx-auto flex h-full min-h-0 w-full max-w-[1320px] flex-col gap-4"
+          >
             {/* Status banner */}
-            <div
+            <AstryxView
+              layout="block"
+              direction="horizontal"
               className={cn(
                 "hub-status-panel hub-panel-enter relative overflow-hidden rounded-xl border bg-card",
                 ready ? "border-border shadow-sm" : "border-border",
               )}
             >
-              <div className="flex items-center gap-3 px-4 py-3.5 sm:gap-x-5 sm:px-5">
-                <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-3.5">
-                  <div
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex items-center gap-3 px-4 py-3.5 sm:gap-x-5 sm:px-5"
+              >
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex min-w-0 flex-1 items-center gap-3 sm:gap-3.5"
+                >
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
                     className={cn(
                       "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors",
                       ready
@@ -107,16 +134,27 @@ export function McpHubPage(props: McpHubPageProps) {
                   >
                     <Plug className="h-5 w-5" />
                     {ready && enabledCount > 0 ? (
-                      <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-background" />
+                      <AstryxInline className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-background" />
                     ) : null}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                      <div className="text-[13.5px] font-semibold tracking-tight text-foreground">
+                  </AstryxView>
+                  <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+                    <AstryxView
+                      layout="flex"
+                      direction="horizontal"
+                      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
+                    >
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="text-[13.5px] font-semibold tracking-tight text-foreground"
+                      >
                         {ready ? t("mcpHub.statusReady") : t("mcpHub.statusEmpty")}
-                      </div>
+                      </AstryxView>
                       {ready ? (
-                        <span
+                        <AstryxView
+                          as="span"
+                          layout="inline-flex"
+                          direction="horizontal"
                           className={cn(
                             "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium tabular-nums ring-1",
                             enabledCount > 0
@@ -124,20 +162,26 @@ export function McpHubPage(props: McpHubPageProps) {
                               : "bg-muted text-muted-foreground ring-border",
                           )}
                         >
-                          <span className="font-semibold">{enabledCount}</span>
-                          <span className="opacity-50">/</span>
-                          <span className="opacity-80">{serverCount}</span>
-                          <span className="ml-0.5 opacity-70">{t("mcpHub.enabled")}</span>
-                        </span>
+                          <AstryxInline className="font-semibold">{enabledCount}</AstryxInline>
+                          <AstryxInline className="opacity-50">/</AstryxInline>
+                          <AstryxInline className="opacity-80">{serverCount}</AstryxInline>
+                          <AstryxInline className="ml-0.5 opacity-70">
+                            {t("mcpHub.enabled")}
+                          </AstryxInline>
+                        </AstryxView>
                       ) : null}
-                    </div>
+                    </AstryxView>
                     {statusHint ? (
-                      <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="mt-0.5 truncate text-[11.5px] text-muted-foreground"
+                      >
                         {statusHint}
-                      </div>
+                      </AstryxView>
                     ) : null}
-                  </div>
-                </div>
+                  </AstryxView>
+                </AstryxView>
 
                 <Button
                   variant="outline"
@@ -147,13 +191,19 @@ export function McpHubPage(props: McpHubPageProps) {
                   title={t("mcpHub.add")}
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  <span className="hidden whitespace-nowrap sm:inline">{t("mcpHub.add")}</span>
+                  <AstryxInline className="hidden whitespace-nowrap sm:inline">
+                    {t("mcpHub.add")}
+                  </AstryxInline>
                 </Button>
-              </div>
-            </div>
+              </AstryxView>
+            </AstryxView>
 
             {/* Tab bar */}
-            <div className="hub-tab-row hub-panel-enter flex items-center justify-between gap-3">
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="hub-tab-row hub-panel-enter flex items-center justify-between gap-3"
+            >
               <HubSegmentedControl className="shrink-0">
                 {[
                   {
@@ -185,9 +235,12 @@ export function McpHubPage(props: McpHubPageProps) {
                       className="px-4"
                     >
                       <Icon className="h-3.5 w-3.5" />
-                      <span>{item.label}</span>
+                      <AstryxInline>{item.label}</AstryxInline>
                       {item.count !== null && item.count > 0 ? (
-                        <span
+                        <AstryxView
+                          as="span"
+                          layout="inline-flex"
+                          direction="horizontal"
                           className={cn(
                             "ml-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums",
                             active
@@ -196,7 +249,7 @@ export function McpHubPage(props: McpHubPageProps) {
                           )}
                         >
                           {item.count}
-                        </span>
+                        </AstryxView>
                       ) : null}
                     </HubSegmentedButton>
                   );
@@ -204,15 +257,23 @@ export function McpHubPage(props: McpHubPageProps) {
               </HubSegmentedControl>
 
               {view === "store" ? (
-                <div className="hidden text-[11.5px] text-muted-foreground sm:flex items-center gap-1.5">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="hidden text-[11.5px] text-muted-foreground sm:flex items-center gap-1.5"
+                >
                   <Sparkles className="h-3.5 w-3.5 text-foreground/55" />
-                  <span>{t("mcpHub.storeSubtitle")}</span>
-                </div>
+                  <AstryxInline>{t("mcpHub.storeSubtitle")}</AstryxInline>
+                </AstryxView>
               ) : null}
-            </div>
+            </AstryxView>
 
             {/* Content */}
-            <div className="hub-view-stage min-h-0 flex-1 overflow-hidden">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="hub-view-stage min-h-0 flex-1 overflow-hidden"
+            >
               {view === "installed" ? (
                 <McpServersForm
                   settings={settings}
@@ -233,10 +294,10 @@ export function McpHubPage(props: McpHubPageProps) {
                   allowStdio={props.allowStdio}
                 />
               )}
-            </div>
-          </div>
-        </div>
-      </div>
+            </AstryxView>
+          </AstryxView>
+        </AstryxView>
+      </AstryxView>
 
       {editing ? (
         <McpServerEditModal
@@ -248,6 +309,6 @@ export function McpHubPage(props: McpHubPageProps) {
           onSave={handleModalSave}
         />
       ) : null}
-    </div>
+    </AstryxView>
   );
 }

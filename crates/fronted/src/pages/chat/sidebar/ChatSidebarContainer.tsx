@@ -25,11 +25,13 @@ import type { SidebarSnapshot, SidebarStore } from "../../../lib/sidebar/store";
 import type { SidebarConversation } from "../../../lib/sidebar/types";
 import { useSidebarSelector } from "../../../lib/sidebar/useSidebarSelector";
 import { sortWorkspaceProjectsByActivity } from "../../../lib/workspaceProjects";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 type ChatSidebarContainerProps = {
   store: SidebarStore;
   currentConversationId: string;
   isOpen: boolean;
+  desktopWidth?: number;
   fontScale?: number;
   activeView: "chat" | "skills-hub" | "mcp-hub";
   showProjects: boolean;
@@ -260,7 +262,7 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
 
   return (
     <Fragment>
-      <button
+      <AstryxButton
         type="button"
         aria-label={t("sidebar.closeSidebar")}
         onClick={props.onCloseSidebar}
@@ -290,6 +292,7 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         renamingId={renamingId}
         renameDraft={renameDraft}
         isOpen={props.isOpen}
+        desktopWidth={props.desktopWidth}
         fontScale={props.fontScale}
         activeView={props.activeView}
         showProjects={props.showProjects}

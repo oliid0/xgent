@@ -1,22 +1,71 @@
-import * as React from "react";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { forwardRef, type TextareaHTMLAttributes } from "react";
 
-import { cn } from "../../lib/shared/utils";
+export type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  label?: string;
+};
 
-type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>;
+function getAccessibleLabel(props: TextareaProps): string {
+  const ariaLabel = props["aria-label"];
+  if (typeof ariaLabel === "string" && ariaLabel) return ariaLabel;
+  if (props.label) return props.label;
+  if (props.placeholder) return props.placeholder;
+  if (props.name) return props.name;
+  if (props.id) return props.id;
+  return "Text area";
+}
 
-export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, ...props }, ref) => {
+/** Astryx-native compatibility boundary for legacy textarea call sites. */
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
+  function Textarea(props, ref) {
+    const {
+      label: explicitLabel,
+      value,
+      onChange,
+      disabled,
+      readOnly,
+      required,
+      autoFocus,
+      name,
+      className,
+      style,
+      placeholder,
+      rows,
+      maxLength,
+      spellCheck,
+      onPaste,
+      onFocus,
+      onBlur,
+      color: _color,
+      ...rest
+    } = props;
+
     return (
-      <textarea
-        className={cn(
-          "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:border-input focus-visible:outline-hidden focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50",
-          className,
-        )}
+      <TextArea
+        {...rest}
         ref={ref}
-        {...props}
+        label={getAccessibleLabel({ ...props, label: explicitLabel })}
+        isLabelHidden
+        value={value == null ? "" : String(value)}
+        onChange={(_nextValue, event) => onChange?.(event)}
+        isDisabled={disabled}
+        isReadOnly={readOnly}
+        isRequired={required}
+        hasAutoFocus={autoFocus}
+        htmlName={name}
+        className={className}
+        style={style}
+        placeholder={placeholder}
+        rows={rows}
+        maxLength={maxLength}
+        hasSpellCheck={
+          spellCheck == null ? undefined : spellCheck === true || spellCheck === "true"
+        }
+        onPaste={onPaste}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        width="100%"
       />
     );
   },
 );
-
-Textarea.displayName = "Textarea";

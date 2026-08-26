@@ -7,7 +7,11 @@
 // runtime boundary, never in this modal.
 
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import {
   formatMemoryError,
   type MemoryOrganizeRunStatus,
@@ -46,16 +50,10 @@ import {
   organizerTriggerLabel,
   rejectionBucketEntries,
 } from "./panelModel";
-import {
-  AlertTriangle,
-  BrushCleaning,
-  Button,
-  Check,
-  DrawerSelect,
-  RefreshCw,
-  X,
-} from "./platform";
+import { BrushCleaning, Button, Check, DrawerSelect, RefreshCw } from "./platform";
 import { useOrganizeRunHistory } from "./useMemoryPanelData";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 
 export function OrganizerHistoryModal(props: {
   t: (key: string) => string;
@@ -222,41 +220,51 @@ export function OrganizerHistoryModal(props: {
     }
   }
 
-  return createPortal(
-    <>
-      <div
-        className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="memory-organizer-history-title"
-      >
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative z-10 flex h-[min(760px,calc(100vh-2rem))] w-full max-w-6xl flex-col overflow-hidden rounded-xl border bg-background shadow-2xl">
-          <div className="flex items-center justify-between gap-3 border-b border-border/50 px-5 py-4">
-            <div className="min-w-0">
-              <div id="memory-organizer-history-title" className="text-sm font-semibold">
-                {t("settings.memoryOrganizerHistory")}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {t("settings.memoryOrganizerHistoryDescription")}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
-              title={t("settings.memorySettingsClose")}
-              aria-label={t("settings.memorySettingsClose")}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+  const isCompact = useMediaQuery("(max-width: 640px)");
 
-          <div className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)]">
-            <aside className="flex min-h-0 flex-col border-r border-border/50">
-              <div className="space-y-2 border-b border-border/40 p-3">
-                <div className="flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
+  return (
+    <>
+      <Dialog
+        isOpen
+        onOpenChange={(isOpen) => {
+          if (!isOpen) onClose();
+        }}
+        purpose="info"
+        variant={isCompact ? "fullscreen" : "standard"}
+        width={isCompact ? "100dvw" : "var(--xagent-dialog-width-xl)"}
+        maxHeight={isCompact ? "var(--xagent-viewport-height)" : "var(--xagent-dialog-height-xl)"}
+        padding={0}
+      >
+        <AstryxView
+          layout="flex"
+          direction="vertical"
+          className="flex h-full min-h-0 w-full flex-col overflow-hidden"
+        >
+          <DialogHeader
+            title={t("settings.memoryOrganizerHistory")}
+            subtitle={t("settings.memoryOrganizerHistoryDescription")}
+            onOpenChange={(isOpen) => {
+              if (!isOpen) onClose();
+            }}
+          />
+
+          <AstryxView
+            layout="grid"
+            direction="horizontal"
+            className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)]"
+          >
+            <AstryxView as="aside" className="flex min-h-0 flex-col border-r border-border/50">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="space-y-2 border-b border-border/40 p-3"
+              >
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex items-center gap-2"
+                >
+                  <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
                     <DrawerSelect
                       value={statusFilter}
                       onValueChange={(next) =>
@@ -271,7 +279,7 @@ export function OrganizerHistoryModal(props: {
                         { value: "running", label: t("settings.memoryOrganizerStatusRunning") },
                       ]}
                     />
-                  </div>
+                  </AstryxView>
                   <Button
                     type="button"
                     variant="outline"
@@ -284,7 +292,7 @@ export function OrganizerHistoryModal(props: {
                   >
                     <BrushCleaning className="h-3.5 w-3.5" />
                   </Button>
-                </div>
+                </AstryxView>
                 <Button
                   type="button"
                   variant="outline"
@@ -296,18 +304,26 @@ export function OrganizerHistoryModal(props: {
                   <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
                   {t("settings.memoryRefresh")}
                 </Button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-auto p-2">
+              </AstryxView>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="min-h-0 flex-1 overflow-auto p-2"
+              >
                 {runs.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/60 px-3 py-8 text-center text-xs text-muted-foreground">
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="rounded-lg border border-dashed border-border/60 px-3 py-8 text-center text-xs text-muted-foreground"
+                  >
                     {t("settings.memoryOrganizerHistoryEmpty")}
-                  </div>
+                  </AstryxView>
                 ) : (
-                  <div className="space-y-1.5">
+                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                     {runs.map((run) => {
                       const active = selectedRun?.runId === run.runId;
                       return (
-                        <button
+                        <AstryxButton
                           key={run.runId}
                           type="button"
                           onClick={() => reload(run.runId)}
@@ -317,91 +333,143 @@ export function OrganizerHistoryModal(props: {
                               : "border-border/50 bg-background/70 hover:bg-muted/35"
                           }`}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <span
+                          <AstryxView
+                            layout="flex"
+                            direction="horizontal"
+                            className="flex items-center justify-between gap-2"
+                          >
+                            <AstryxInline
                               className={`rounded border px-1.5 py-0.5 text-[10px] ${organizerStatusClass(run.status)}`}
                             >
                               {organizerStatusLabel(run.status, t)}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
+                            </AstryxInline>
+                            <AstryxInline className="text-[10px] text-muted-foreground">
                               {organizerTriggerLabel(run.trigger, t)}
-                            </span>
-                          </div>
-                          <div className="mt-1 truncate text-xs font-medium">
+                            </AstryxInline>
+                          </AstryxView>
+                          <AstryxView
+                            layout="block"
+                            direction="horizontal"
+                            className="mt-1 truncate text-xs font-medium"
+                          >
                             {run.finalSummary ||
                               run.error ||
                               t("settings.memoryOrganizerHistoryPending")}
-                          </div>
-                          <div className="mt-1 truncate text-[11px] text-muted-foreground">
+                          </AstryxView>
+                          <AstryxView
+                            layout="block"
+                            direction="horizontal"
+                            className="mt-1 truncate text-[11px] text-muted-foreground"
+                          >
                             {formatTime(run.startedAt || run.createdAt)} · {modelNameFromRun(run)}
-                          </div>
-                        </button>
+                          </AstryxView>
+                        </AstryxButton>
                       );
                     })}
-                  </div>
+                  </AstryxView>
                 )}
-              </div>
-            </aside>
+              </AstryxView>
+            </AstryxView>
 
-            <section className="min-h-0 overflow-auto p-5">
+            <AstryxView as="section" className="min-h-0 overflow-auto p-5">
               {error ? (
-                <div className="mb-4 whitespace-pre-wrap rounded-lg border border-destructive/20 bg-destructive/[0.05] px-3 py-2 text-xs text-destructive">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="mb-4 whitespace-pre-wrap rounded-lg border border-destructive/20 bg-destructive/[0.05] px-3 py-2 text-xs text-destructive"
+                >
                   {error}
-                </div>
+                </AstryxView>
               ) : null}
               {historyFeedback ? (
-                <div className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.05] px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.05] px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300"
+                >
                   {historyFeedback}
-                </div>
+                </AstryxView>
               ) : null}
               {selectedRun ? (
-                <div className="space-y-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
+                <AstryxView layout="block" direction="horizontal" className="space-y-4">
+                  <AstryxView
+                    layout="flex"
+                    direction="horizontal"
+                    className="flex flex-wrap items-start justify-between gap-3"
+                  >
+                    <AstryxView layout="block" direction="horizontal" className="min-w-0 space-y-1">
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
+                        className="flex flex-wrap items-center gap-2"
+                      >
+                        <AstryxInline
                           className={`rounded border px-2 py-1 text-xs ${organizerStatusClass(selectedRun.status)}`}
                         >
                           {organizerStatusLabel(selectedRun.status, t)}
-                        </span>
-                        <span className="rounded border border-border/60 px-2 py-1 text-xs text-muted-foreground">
+                        </AstryxInline>
+                        <AstryxInline className="rounded border border-border/60 px-2 py-1 text-xs text-muted-foreground">
                           {organizerTriggerLabel(selectedRun.trigger, t)}
-                        </span>
-                        <span className="rounded border border-border/60 px-2 py-1 text-xs text-muted-foreground">
+                        </AstryxInline>
+                        <AstryxInline className="rounded border border-border/60 px-2 py-1 text-xs text-muted-foreground">
                           {selectedRun.scope} / {selectedRun.mode}
-                        </span>
-                      </div>
-                      <div className="font-mono text-[11px] text-muted-foreground">
+                        </AstryxInline>
+                      </AstryxView>
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="font-mono text-[11px] text-muted-foreground"
+                      >
                         {selectedRun.runId}
-                      </div>
-                    </div>
-                    <div className="grid shrink-0 grid-cols-[auto_minmax(9rem,auto)] gap-x-2 gap-y-1 rounded-md border border-border/50 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
-                      <span className="whitespace-nowrap">
+                      </AstryxView>
+                    </AstryxView>
+                    <AstryxView
+                      layout="grid"
+                      direction="horizontal"
+                      className="grid shrink-0 grid-cols-[auto_minmax(9rem,auto)] gap-x-2 gap-y-1 rounded-md border border-border/50 bg-background/70 px-3 py-2 text-xs text-muted-foreground"
+                    >
+                      <AstryxInline className="whitespace-nowrap">
                         {t("settings.memoryOrganizerStarted")}
-                      </span>
-                      <span className="whitespace-nowrap text-right font-mono text-foreground/80">
+                      </AstryxInline>
+                      <AstryxInline className="whitespace-nowrap text-right font-mono text-foreground/80">
                         {formatTime(selectedRun.startedAt || selectedRun.createdAt)}
-                      </span>
-                      <span className="whitespace-nowrap">
+                      </AstryxInline>
+                      <AstryxInline className="whitespace-nowrap">
                         {t("settings.memoryOrganizerFinished")}
-                      </span>
-                      <span className="whitespace-nowrap text-right font-mono text-foreground/80">
+                      </AstryxInline>
+                      <AstryxInline className="whitespace-nowrap text-right font-mono text-foreground/80">
                         {selectedRun.finishedAt ? formatTime(selectedRun.finishedAt) : "-"}
-                      </span>
-                    </div>
-                  </div>
+                      </AstryxInline>
+                    </AstryxView>
+                  </AstryxView>
 
-                  <div className="rounded-lg border border-border/60 bg-muted/15 p-4">
-                    <div className="mb-2 text-xs font-semibold text-muted-foreground">
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="rounded-lg border border-border/60 bg-muted/15 p-4"
+                  >
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="mb-2 text-xs font-semibold text-muted-foreground"
+                    >
                       {t("settings.memoryOrganizerFinalSummary")}
-                    </div>
-                    <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                    </AstryxView>
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="whitespace-pre-wrap text-sm leading-relaxed"
+                    >
                       {displayedFinalSummary(selectedRun, manualApplyDisplay) ||
                         t("settings.memoryOrganizerHistoryPending")}
-                    </div>
-                  </div>
+                    </AstryxView>
+                  </AstryxView>
 
-                  <div className="grid gap-2 sm:grid-cols-4">
+                  <AstryxView
+                    layout="grid"
+                    direction="horizontal"
+                    className="grid gap-2 sm:grid-cols-4"
+                  >
                     {[
                       ["settings.memoryOrganizerInputCount", selectedRun.inputCount],
                       ["settings.memoryOrganizerClusterCount", selectedRun.clusterCount],
@@ -412,24 +480,54 @@ export function OrganizerHistoryModal(props: {
                       ["settings.memoryOrganizerDeletedCount", selectedRun.deletedCount],
                       ["settings.memoryOrganizerParseFailures", selectedRun.parseFailures],
                     ].map(([key, value]) => (
-                      <div
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
                         key={key}
                         className="rounded-lg border border-border/50 bg-background/70 p-3"
                       >
-                        <div className="text-[11px] text-muted-foreground">{t(String(key))}</div>
-                        <div className="mt-1 text-lg font-semibold">{value}</div>
-                      </div>
+                        <AstryxView
+                          layout="block"
+                          direction="horizontal"
+                          className="text-[11px] text-muted-foreground"
+                        >
+                          {t(String(key))}
+                        </AstryxView>
+                        <AstryxView
+                          layout="block"
+                          direction="horizontal"
+                          className="mt-1 text-lg font-semibold"
+                        >
+                          {value}
+                        </AstryxView>
+                      </AstryxView>
                     ))}
-                  </div>
+                  </AstryxView>
 
                   {safeDecisions.length > 0 ? (
-                    <div className="rounded-lg border border-border/60 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="text-xs font-semibold text-muted-foreground">
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="rounded-lg border border-border/60 p-4"
+                    >
+                      <AstryxView
+                        layout="flex"
+                        direction="horizontal"
+                        className="flex flex-wrap items-center justify-between gap-3"
+                      >
+                        <AstryxView layout="block" direction="horizontal">
+                          <AstryxView
+                            layout="block"
+                            direction="horizontal"
+                            className="text-xs font-semibold text-muted-foreground"
+                          >
                             {t("settings.memoryOrganizerManualPreview")}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
+                          </AstryxView>
+                          <AstryxView
+                            layout="block"
+                            direction="horizontal"
+                            className="mt-1 text-xs text-muted-foreground"
+                          >
                             {manualApplyDisplay.status === "applied"
                               ? t("settings.memoryOrganizerApplied")
                               : manualApplyDisplay.status === "partial"
@@ -437,8 +535,8 @@ export function OrganizerHistoryModal(props: {
                                 : manualApplyDisplay.status === "failed"
                                   ? t("settings.memoryOrganizerApplyFailed")
                                   : t("settings.memoryOrganizerManualPreviewDescription")}
-                          </div>
-                        </div>
+                          </AstryxView>
+                        </AstryxView>
                         {canApplyManualPreview ? (
                           <Button
                             type="button"
@@ -450,8 +548,8 @@ export function OrganizerHistoryModal(props: {
                             {t("settings.memoryOrganizerApplySelected")}
                           </Button>
                         ) : null}
-                      </div>
-                      <div className="mt-3 space-y-2">
+                      </AstryxView>
+                      <AstryxView layout="block" direction="horizontal" className="mt-3 space-y-2">
                         {safeDecisions.map((decision, index) => {
                           const key = organizerDecisionKey(decision, index);
                           const checked =
@@ -461,217 +559,249 @@ export function OrganizerHistoryModal(props: {
                                 : manualApplyDisplay.appliedDecisionKeys.has(key)
                               : selectedDecisionKeys.has(key);
                           return (
-                            <label
+                            <AstryxView
+                              layout="flex"
+                              direction="horizontal"
                               key={key}
                               className="flex gap-3 rounded-md border border-border/50 bg-background/70 p-3 text-xs"
                             >
-                              <input
-                                type="checkbox"
-                                className="mt-0.5 h-4 w-4 shrink-0"
-                                checked={checked}
-                                disabled={!canApplyManualPreview || applyingPreview}
+                              <CheckboxInput
+                                label={decision.slug}
+                                isLabelHidden
+                                value={checked}
+                                isDisabled={!canApplyManualPreview || applyingPreview}
                                 onChange={() => togglePreviewDecision(key)}
+                                size="sm"
                               />
-                              <span className="min-w-0 flex-1">
-                                <span className="flex flex-wrap items-center gap-2">
-                                  <span className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+                              <AstryxInline className="min-w-0 flex-1">
+                                <AstryxView
+                                  as="span"
+                                  layout="flex"
+                                  direction="horizontal"
+                                  className="flex flex-wrap items-center gap-2"
+                                >
+                                  <AstryxInline className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
                                     {decision.op === "delete"
                                       ? t("settings.memoryOrganizerDecisionDelete")
                                       : t("settings.memoryOrganizerDecisionUpsert")}
-                                  </span>
-                                  <span className="font-mono text-[11px]">{decision.slug}</span>
+                                  </AstryxInline>
+                                  <AstryxInline className="font-mono text-[11px]">
+                                    {decision.slug}
+                                  </AstryxInline>
                                   {decision.scope ? (
-                                    <span className="text-[11px] text-muted-foreground">
+                                    <AstryxInline className="text-[11px] text-muted-foreground">
                                       {decision.scope}
                                       {decision.workdirHash ? `:${decision.workdirHash}` : ""}
-                                    </span>
+                                    </AstryxInline>
                                   ) : null}
-                                  <span
+                                  <AstryxInline
                                     className={`rounded border px-1.5 py-0.5 text-[10px] ${organizerRiskClass(decision.riskLevel)}`}
                                   >
                                     {organizerRiskLabel(decision.riskLevel, t)}
-                                  </span>
+                                  </AstryxInline>
                                   {decision.confidence != null ? (
-                                    <span className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                    <AstryxInline className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
                                       {t("settings.memoryOrganizerConfidence")}{" "}
                                       {decision.confidence.toFixed(2)}
-                                    </span>
+                                    </AstryxInline>
                                   ) : null}
                                   {decision.requiresUserAck ? (
-                                    <span className="rounded border border-amber-500/30 bg-amber-500/[0.06] px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
+                                    <AstryxInline className="rounded border border-amber-500/30 bg-amber-500/[0.06] px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
                                       {t("settings.memoryOrganizerRequiresAck")}
-                                    </span>
+                                    </AstryxInline>
                                   ) : null}
                                   {decision.applyStatus ? (
-                                    <span
+                                    <AstryxInline
                                       className={`rounded border px-1.5 py-0.5 text-[10px] ${organizerApplyStatusClass(decision.applyStatus)}`}
                                     >
                                       {organizerApplyStatusLabel(decision.applyStatus, t)}
-                                    </span>
+                                    </AstryxInline>
                                   ) : null}
-                                </span>
-                                <span className="mt-1 block break-words text-muted-foreground">
+                                </AstryxView>
+                                <AstryxInline className="mt-1 block break-words text-muted-foreground">
                                   {decision.reason || decision.description || "-"}
-                                </span>
+                                </AstryxInline>
                                 {decision.applyError?.message ? (
-                                  <span className="mt-1 block break-words text-destructive">
+                                  <AstryxInline className="mt-1 block break-words text-destructive">
                                     {decision.applyError.message}
-                                  </span>
+                                  </AstryxInline>
                                 ) : null}
                                 {decision.sourceSlugs?.length ? (
-                                  <span className="mt-1 block break-words font-mono text-[10px] text-muted-foreground">
+                                  <AstryxInline className="mt-1 block break-words font-mono text-[10px] text-muted-foreground">
                                     {t("settings.memoryOrganizerSources")}{" "}
                                     {decision.sourceSlugs.join(", ")}
-                                  </span>
+                                  </AstryxInline>
                                 ) : null}
-                              </span>
-                            </label>
+                              </AstryxInline>
+                            </AstryxView>
                           );
                         })}
-                      </div>
-                    </div>
+                      </AstryxView>
+                    </AstryxView>
                   ) : null}
 
                   {rejectionBuckets.length > 0 ? (
-                    <div className="rounded-lg border border-border/60 p-4">
-                      <div className="mb-3 text-xs font-semibold text-muted-foreground">
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="rounded-lg border border-border/60 p-4"
+                    >
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="mb-3 text-xs font-semibold text-muted-foreground"
+                      >
                         {t("settings.memoryOrganizerRejectionBuckets")}
-                      </div>
-                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      </AstryxView>
+                      <AstryxView
+                        layout="grid"
+                        direction="horizontal"
+                        className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+                      >
                         {rejectionBuckets.map(([key, count]) => (
-                          <div
+                          <AstryxView
+                            layout="block"
+                            direction="horizontal"
                             key={key}
                             className="rounded-md border border-border/50 bg-background/70 px-3 py-2"
                           >
-                            <div className="text-[11px] text-muted-foreground">{t(key)}</div>
-                            <div className="mt-1 text-sm font-semibold">{count}</div>
-                          </div>
+                            <AstryxView
+                              layout="block"
+                              direction="horizontal"
+                              className="text-[11px] text-muted-foreground"
+                            >
+                              {t(key)}
+                            </AstryxView>
+                            <AstryxView
+                              layout="block"
+                              direction="horizontal"
+                              className="mt-1 text-sm font-semibold"
+                            >
+                              {count}
+                            </AstryxView>
+                          </AstryxView>
                         ))}
-                      </div>
-                    </div>
+                      </AstryxView>
+                    </AstryxView>
                   ) : null}
 
                   {reviewItems.length > 0 ? (
-                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-4">
-                      <div className="mb-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-4"
+                    >
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="mb-2 text-xs font-semibold text-amber-700 dark:text-amber-300"
+                      >
                         {t("settings.memoryOrganizerReviewNotes")}
-                      </div>
-                      <ul className="space-y-2 text-xs text-muted-foreground">
+                      </AstryxView>
+                      <AstryxView as="ul" className="space-y-2 text-xs text-muted-foreground">
                         {reviewItems.map((item, index) => (
-                          <li
+                          <AstryxView
+                            as="li"
                             key={`${index}:${item.phase}:${item.slug || ""}:${item.message}`}
                             className="rounded-md border border-border/50 bg-background/70 px-3 py-2"
                           >
-                            <div className="mb-1 flex flex-wrap items-center gap-2">
-                              <span
+                            <AstryxView
+                              layout="flex"
+                              direction="horizontal"
+                              className="mb-1 flex flex-wrap items-center gap-2"
+                            >
+                              <AstryxInline
                                 className={`rounded border px-1.5 py-0.5 text-[10px] ${organizerReviewItemClass(item)}`}
                               >
                                 {organizerReviewItemLabel(item, t)}
-                              </span>
+                              </AstryxInline>
                               {item.code ? (
-                                <span className="font-mono text-[10px] text-muted-foreground">
+                                <AstryxInline className="font-mono text-[10px] text-muted-foreground">
                                   {item.code}
-                                </span>
+                                </AstryxInline>
                               ) : null}
                               {item.slug ? (
-                                <span className="font-mono text-[10px] text-muted-foreground">
+                                <AstryxInline className="font-mono text-[10px] text-muted-foreground">
                                   {item.slug}
-                                </span>
+                                </AstryxInline>
                               ) : null}
-                            </div>
-                            <div className="break-words">{item.message}</div>
-                          </li>
+                            </AstryxView>
+                            <AstryxView
+                              layout="block"
+                              direction="horizontal"
+                              className="break-words"
+                            >
+                              {item.message}
+                            </AstryxView>
+                          </AstryxView>
                         ))}
-                      </ul>
-                    </div>
+                      </AstryxView>
+                    </AstryxView>
                   ) : null}
 
                   {clusterSummaries.length > 0 ? (
-                    <div className="rounded-lg border border-border/60 p-4">
-                      <div className="mb-2 text-xs font-semibold text-muted-foreground">
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="rounded-lg border border-border/60 p-4"
+                    >
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="mb-2 text-xs font-semibold text-muted-foreground"
+                      >
                         {t("settings.memoryOrganizerClusterSummaries")}
-                      </div>
-                      <div className="space-y-2">
+                      </AstryxView>
+                      <AstryxView layout="block" direction="horizontal" className="space-y-2">
                         {clusterSummaries.map((summary, index) => (
-                          <div
+                          <AstryxView
+                            layout="block"
+                            direction="horizontal"
                             key={`${index}:${summary}`}
                             className="rounded bg-muted/30 px-3 py-2 text-xs"
                           >
                             {summary}
-                          </div>
+                          </AstryxView>
                         ))}
-                      </div>
-                    </div>
+                      </AstryxView>
+                    </AstryxView>
                   ) : null}
 
                   {rawBlocks.length > 0 ? (
-                    <details className="rounded-lg border border-border/60 p-4">
-                      <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">
-                        {t("settings.memoryOrganizerTrimmedProtocol")}
-                      </summary>
+                    <Collapsible
+                      trigger={t("settings.memoryOrganizerTrimmedProtocol")}
+                      defaultIsOpen={false}
+                    >
                       <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/30 p-3 text-[11px]">
                         {JSON.stringify(rawBlocks, null, 2)}
                       </pre>
-                    </details>
+                    </Collapsible>
                   ) : null}
-                </div>
+                </AstryxView>
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                <AstryxView
+                  layout="flex"
+                  direction="horizontal"
+                  className="flex h-full items-center justify-center text-sm text-muted-foreground"
+                >
                   {t("settings.memoryOrganizerHistoryEmpty")}
-                </div>
+                </AstryxView>
               )}
-            </section>
-          </div>
-        </div>
-      </div>
-      {clearConfirmOpen ? (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="memory-organizer-clear-history-title"
-        >
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setClearConfirmOpen(false)}
-          />
-          <div className="relative z-10 w-full max-w-md overflow-hidden rounded-xl border bg-background shadow-2xl">
-            <div className="flex items-start gap-3 border-b px-5 py-4">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div id="memory-organizer-clear-history-title" className="text-sm font-semibold">
-                  {t("settings.memoryOrganizerClearHistoryConfirmTitle")}
-                </div>
-                <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  {t("settings.memoryOrganizerClearHistoryConfirmDescription")}
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setClearConfirmOpen(false)}
-                disabled={clearingHistory}
-              >
-                {t("settings.memoryCancel")}
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={clearHistory}
-                disabled={clearingHistory}
-              >
-                <BrushCleaning className="h-3.5 w-3.5" />
-                {t("settings.memoryOrganizerClearHistory")}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </>,
-    document.body,
+            </AstryxView>
+          </AstryxView>
+        </AstryxView>
+      </Dialog>
+      <AlertDialog
+        isOpen={clearConfirmOpen}
+        onOpenChange={setClearConfirmOpen}
+        title={t("settings.memoryOrganizerClearHistoryConfirmTitle")}
+        description={t("settings.memoryOrganizerClearHistoryConfirmDescription")}
+        actionLabel={t("settings.memoryOrganizerClearHistory")}
+        cancelLabel={t("settings.memoryCancel")}
+        actionVariant="destructive"
+        isActionLoading={clearingHistory}
+        onAction={clearHistory}
+      />
+    </>
   );
 }

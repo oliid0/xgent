@@ -1,6 +1,20 @@
 import { invoke, isBrowserRuntime } from "@xagent/runtime";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Grid } from "@astryxdesign/core/Grid";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { Section } from "@astryxdesign/core/Section";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { Token } from "@astryxdesign/core/Token";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, FolderOpen, RefreshCw, Terminal, Trash2, X } from "../../components/icons";
+import { FolderOpen, RefreshCw, Terminal, Trash2, X } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   cancelMobileExecution,
@@ -15,7 +29,6 @@ import {
 } from "../../lib/mobileExecution";
 import { normalizeRuntimePlatform, type RuntimePlatform } from "../../lib/runtimePlatform";
 import type { AppSettings } from "../../lib/settings";
-import { AgentActivationSwitch } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 function updateAccess(
@@ -204,98 +217,106 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
   }
 
   return (
-    <section className="settings-mobile-execution-card space-y-4 rounded-xl border border-border/60 bg-card p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2">
-          <Terminal className="mt-0.5 h-4 w-4 text-muted-foreground" />
-          <div className="min-w-0">
-            <div className="text-sm font-medium">{t("settings.accessMobileExecution")}</div>
-            <p className="break-words text-xs leading-relaxed text-muted-foreground">
-              {platform === "android"
-                ? t("settings.accessAndroidProotHint")
-                : platform === "ios"
-                  ? t("settings.accessIosAShellHint")
-                  : t("settings.mobileNativeOnly")}
-            </p>
-          </div>
-        </div>
-        {isNativeMobile ? (
-          <AgentActivationSwitch
-            checked={enabled}
-            title={t("settings.mobileEnable")}
-            disabled={!status?.available || busy !== ""}
-            onToggle={toggleEnabled}
+    <Section padding={5} width="100%" className="settings-mobile-execution-card">
+      <VStack gap={4}>
+        <HStack gap={3} hAlign="between" vAlign="start">
+          <Terminal />
+          <StackItem size="fill">
+            <VStack gap={1}>
+              <Heading level={3}>{t("settings.accessMobileExecution")}</Heading>
+              <Text type="supporting" color="secondary" wordBreak="break-word">
+                {platform === "android"
+                  ? t("settings.accessAndroidProotHint")
+                  : platform === "ios"
+                    ? t("settings.accessIosAShellHint")
+                    : t("settings.mobileNativeOnly")}
+              </Text>
+            </VStack>
+          </StackItem>
+          {isNativeMobile ? (
+            <Switch
+              value={enabled}
+              label={t("settings.mobileEnable")}
+              isLabelHidden
+              isDisabled={!status?.available || busy !== ""}
+              disabledMessage={!status?.available ? t("settings.mobileNativeOnly") : undefined}
+              onChange={toggleEnabled}
+            />
+          ) : null}
+        </HStack>
+
+        {!isNativeMobile ? (
+          <Banner
+            status="info"
+            title={t("settings.mobileNativeOnly")}
+            collapsible={false}
           />
-        ) : null}
-      </div>
+        ) : (
+          <VStack gap={4}>
+            <MetadataList>
+              <MetadataListItem label={t("settings.mobileBackend")}>
+                <Text type="body">{status?.backend ?? "—"}</Text>
+              </MetadataListItem>
+              <MetadataListItem label={t("settings.mobileEnvironment")}>
+                <Text type="body">
+                  {status?.environmentVersion ??
+                    (status?.installed
+                      ? t("settings.mobileReady")
+                      : t("settings.mobileNotInstalled"))}
+                </Text>
+              </MetadataListItem>
+              <MetadataListItem label={t("settings.mobileDiskUsage")}>
+                <Text type="body" hasTabularNumbers>
+                  {formatBytes(status?.diskUsageBytes)}
+                </Text>
+              </MetadataListItem>
+            </MetadataList>
 
-      {!isNativeMobile ? (
-        <div className="rounded-lg bg-muted/30 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
-          {t("settings.mobileNativeOnly")}
-        </div>
-      ) : (
-        <>
-          <div className="grid gap-3 text-xs sm:grid-cols-3">
-            <div className="rounded-lg bg-muted/30 px-3 py-2.5">
-              <div className="text-muted-foreground">{t("settings.mobileBackend")}</div>
-              <div className="mt-1 font-medium">{status?.backend ?? "—"}</div>
-            </div>
-            <div className="rounded-lg bg-muted/30 px-3 py-2.5">
-              <div className="text-muted-foreground">{t("settings.mobileEnvironment")}</div>
-              <div className="mt-1 font-medium">
-                {status?.environmentVersion ??
-                  (status?.installed
-                    ? t("settings.mobileReady")
-                    : t("settings.mobileNotInstalled"))}
-              </div>
-            </div>
-            <div className="rounded-lg bg-muted/30 px-3 py-2.5">
-              <div className="text-muted-foreground">{t("settings.mobileDiskUsage")}</div>
-              <div className="mt-1 font-medium">{formatBytes(status?.diskUsageBytes)}</div>
-            </div>
-          </div>
-
-          {status?.detail ? <p className="text-xs text-muted-foreground">{status.detail}</p> : null}
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy !== ""}
-              onClick={() => void refresh()}
-              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted/50 disabled:opacity-40"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              {t("settings.mobileRefresh")}
-            </button>
-            {status && !status.installed ? (
-              <button
-                type="button"
-                disabled={!status.available || busy !== ""}
-                onClick={() => void installEnvironment()}
-                className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
-              >
-                {busy === "environment"
-                  ? t("settings.mobileInstalling")
-                  : t("settings.mobileInstallEnvironment")}
-              </button>
+            {status?.detail ? (
+              <Text type="supporting" color="secondary">
+                {status.detail}
+              </Text>
             ) : null}
-          </div>
 
-          {status?.installed && status.toolchains.length > 0 ? (
-            <div className="space-y-3">
-              <div className="text-xs font-medium">{t("settings.mobileCapabilityPacks")}</div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {status.toolchains.map((toolchain) => {
-                  const checked = toolchain.installed || selected.includes(toolchain.id);
-                  return (
-                    <label
-                      key={toolchain.id}
-                      className="flex items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 text-xs"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={toolchain.installed || !toolchain.installable || busy !== ""}
+            <HStack gap={2} wrap="wrap">
+              <Button
+                type="button"
+                label={t("settings.mobileRefresh")}
+                icon={<RefreshCw />}
+                variant="secondary"
+                isLoading={busy === "status"}
+                isDisabled={busy !== ""}
+                onClick={() => void refresh()}
+              />
+              {status && !status.installed ? (
+                <Button
+                  type="button"
+                  label={
+                    busy === "environment"
+                      ? t("settings.mobileInstalling")
+                      : t("settings.mobileInstallEnvironment")
+                  }
+                  variant="primary"
+                  isLoading={busy === "environment"}
+                  isDisabled={!status.available || busy !== ""}
+                  onClick={() => void installEnvironment()}
+                />
+              ) : null}
+            </HStack>
+
+            {status?.installed && status.toolchains.length > 0 ? (
+              <VStack gap={3}>
+                <Heading level={4}>{t("settings.mobileCapabilityPacks")}</Heading>
+                <Grid columns={{ minWidth: 240, max: 2, repeat: "fit" }} gap={2} width="100%">
+                  {status.toolchains.map((toolchain) => {
+                    const checked = toolchain.installed || selected.includes(toolchain.id);
+                    return (
+                      <CheckboxInput
+                        key={toolchain.id}
+                        label={toolchain.label}
+                        description={toolchain.detail || undefined}
+                        value={checked}
+                        isDisabled={toolchain.installed || !toolchain.installable || busy !== ""}
                         onChange={() =>
                           setSelected((current) =>
                             current.includes(toolchain.id)
@@ -303,136 +324,127 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
                               : [...current, toolchain.id],
                           )
                         }
+                        size="sm"
                       />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate">{toolchain.label}</span>
-                        {toolchain.detail ? (
-                          <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
-                            {toolchain.detail}
-                          </span>
-                        ) : null}
-                      </span>
-                      {toolchain.installed ? (
-                        <Check className="h-3.5 w-3.5 text-emerald-500" />
-                      ) : null}
-                    </label>
-                  );
-                })}
-              </div>
-              {pendingToolchains.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={selected.length === 0 || busy !== ""}
-                    onClick={() => void installSelected()}
-                    className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
-                  >
-                    {busy === "toolchains" || busy === "cancel"
-                      ? t("settings.mobileInstalling")
-                      : t("settings.mobileInstallSelected")}
-                  </button>
-                  {activeRunId ? (
-                    <button
+                    );
+                  })}
+                </Grid>
+                {pendingToolchains.length > 0 ? (
+                  <HStack gap={2} wrap="wrap">
+                    <Button
                       type="button"
-                      disabled={busy === "cancel"}
-                      onClick={() => void cancelInstall()}
-                      className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted/50 disabled:opacity-40"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                      {t("settings.mobileCancel")}
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {status?.capabilities.userSelectedWorkspaces ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs font-medium">
-                    {t("settings.mobileExternalWorkspaces")}
-                  </div>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {t("settings.mobileExternalWorkspacesHint")}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={busy !== ""}
-                  onClick={() => void chooseExternalWorkspace()}
-                  className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium active:bg-muted disabled:opacity-40"
-                >
-                  <FolderOpen className="h-3.5 w-3.5" />
-                  {t("settings.mobileMountFolder")}
-                </button>
-              </div>
-              {externalWorkspaces.length > 0 ? (
-                <div className="overflow-hidden rounded-xl border border-border/50">
-                  {externalWorkspaces.map((workspace, index) => (
-                    <div
-                      key={workspace.id}
-                      className={`flex min-h-14 items-center gap-3 px-3 py-2 ${
-                        index > 0 ? "border-t border-border/40" : ""
-                      }`}
-                    >
-                      <FolderOpen className="h-4 w-4 shrink-0 text-blue-500" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <span
-                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                              workspace.active ? "bg-emerald-500" : "bg-amber-500"
-                            }`}
-                            aria-hidden="true"
-                          />
-                          <div className="truncate text-xs font-medium">{workspace.name}</div>
-                        </div>
-                        <div className="truncate font-mono text-[10px] text-muted-foreground">
-                          {workspace.path}
-                        </div>
-                        {workspace.detail ? (
-                          <div
-                            className={`mt-0.5 text-[10px] ${
-                              workspace.active ? "text-muted-foreground" : "text-amber-600"
-                            }`}
-                          >
-                            {workspace.detail}
-                          </div>
-                        ) : null}
-                      </div>
-                      <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">
-                        {workspace.writable
-                          ? t("settings.mobileReadWrite")
-                          : t("settings.mobileReadOnly")}
-                      </span>
-                      <button
+                      label={
+                        busy === "toolchains" || busy === "cancel"
+                          ? t("settings.mobileInstalling")
+                          : t("settings.mobileInstallSelected")
+                      }
+                      variant="primary"
+                      isLoading={busy === "toolchains"}
+                      isDisabled={selected.length === 0 || busy !== ""}
+                      onClick={() => void installSelected()}
+                    />
+                    {activeRunId ? (
+                      <Button
                         type="button"
-                        disabled={busy !== ""}
-                        onClick={() => void removeExternalWorkspace(workspace.id)}
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground active:bg-destructive/10 active:text-destructive disabled:opacity-40"
-                        aria-label={t("settings.delete")}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-xl bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-                  {t("settings.mobileNoExternalWorkspaces")}
-                </div>
-              )}
-            </div>
-          ) : null}
-        </>
-      )}
+                        label={t("settings.mobileCancel")}
+                        icon={<X />}
+                        variant="secondary"
+                        isLoading={busy === "cancel"}
+                        isDisabled={busy === "cancel"}
+                        onClick={() => void cancelInstall()}
+                      />
+                    ) : null}
+                  </HStack>
+                ) : null}
+              </VStack>
+            ) : null}
 
-      {error ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-          {error}
-        </div>
-      ) : null}
-    </section>
+            {status?.capabilities.userSelectedWorkspaces ? (
+              <VStack gap={3}>
+                <HStack gap={3} hAlign="between" vAlign="center">
+                  <StackItem size="fill">
+                    <VStack gap={1}>
+                      <Heading level={4}>{t("settings.mobileExternalWorkspaces")}</Heading>
+                      <Text type="supporting" color="secondary">
+                        {t("settings.mobileExternalWorkspacesHint")}
+                      </Text>
+                    </VStack>
+                  </StackItem>
+                  <Button
+                    type="button"
+                    label={t("settings.mobileMountFolder")}
+                    icon={<FolderOpen />}
+                    variant="secondary"
+                    isDisabled={busy !== ""}
+                    onClick={() => void chooseExternalWorkspace()}
+                  />
+                </HStack>
+                {externalWorkspaces.length > 0 ? (
+                  <List density="balanced" hasDividers>
+                    {externalWorkspaces.map((workspace) => (
+                      <ListItem
+                        key={workspace.id}
+                        label={workspace.name}
+                        startContent={<FolderOpen />}
+                        description={
+                          <VStack gap={0.5}>
+                            <Text type="code" color="secondary" maxLines={1}>
+                              {workspace.path}
+                            </Text>
+                            {workspace.detail ? (
+                              <Text type="supporting" color="secondary" maxLines={2}>
+                                {workspace.detail}
+                              </Text>
+                            ) : null}
+                          </VStack>
+                        }
+                        endContent={
+                          <HStack gap={2} vAlign="center">
+                            <StatusDot
+                              label={
+                                workspace.active
+                                  ? t("settings.mobileReady")
+                                  : t("settings.mobileNotInstalled")
+                              }
+                              variant={workspace.active ? "success" : "warning"}
+                            />
+                            <Token
+                              label={
+                                workspace.writable
+                                  ? t("settings.mobileReadWrite")
+                                  : t("settings.mobileReadOnly")
+                              }
+                              color="gray"
+                              size="sm"
+                            />
+                            <IconButton
+                              label={t("settings.delete")}
+                              tooltip={t("settings.delete")}
+                              icon={<Trash2 />}
+                              variant="destructive"
+                              size="sm"
+                              isDisabled={busy !== ""}
+                              onClick={() => void removeExternalWorkspace(workspace.id)}
+                            />
+                          </HStack>
+                        }
+                      />
+                    ))}
+                  </List>
+                ) : (
+                  <EmptyState
+                    icon={<FolderOpen />}
+                    title={t("settings.mobileNoExternalWorkspaces")}
+                    isCompact
+                  />
+                )}
+              </VStack>
+            ) : null}
+          </VStack>
+        )}
+
+        {error ? <Banner status="error" title={error} collapsible={false} /> : null}
+      </VStack>
+    </Section>
   );
 }

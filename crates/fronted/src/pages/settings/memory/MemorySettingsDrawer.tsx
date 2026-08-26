@@ -4,8 +4,9 @@
 // Shared by every frontend runtime. Platform differences belong in the
 // runtime boundary, never in this drawer.
 
+import { Dialog } from "@astryxdesign/core/Dialog";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   formatMemoryError,
   type MemoryQuotaSummaryResponse,
@@ -47,6 +48,10 @@ import {
   toModelValue,
   X,
 } from "./platform";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
 
 const MEMORY_ORGANIZER_TIME_DEBOUNCE_MS = 400;
 
@@ -172,7 +177,6 @@ export function MemorySettingsDrawer(props: {
         placeholder={noneLabel}
         noneLabel={noneLabel}
         ariaLabel={ariaLabel}
-        triggerClassName="h-9 rounded-lg border-foreground/[0.08] bg-white/55 text-[13px] hover:border-foreground/[0.14] hover:bg-white/75 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
       />
     );
   }
@@ -279,32 +283,52 @@ export function MemorySettingsDrawer(props: {
     }
   }
 
-  return createPortal(
-    <div
-      className="skills-drawer-backdrop fixed inset-0 z-50 flex justify-end bg-black/35 max-sm:bg-transparent"
-      role="dialog"
-      aria-modal="true"
+  const isCompact = useMediaQuery("(max-width: 640px)");
+
+  return (
+    <Dialog
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
       aria-labelledby="memory-settings-drawer-title"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
+      purpose="form"
+      variant={isCompact ? "fullscreen" : "standard"}
+      width={isCompact ? "100dvw" : "min(var(--xagent-drawer-width-compact), 40dvw)"}
+      padding={0}
+      className="ml-auto mr-0"
+      style={{
+        blockSize: "var(--xagent-viewport-height)",
+        maxBlockSize: "var(--xagent-viewport-height)",
+        ...(isCompact
+          ? {}
+          : { borderRadius: "var(--radius-container) 0 0 var(--radius-container)" }),
       }}
     >
-      <aside className="skills-drawer-panel relative flex h-full w-full flex-col overflow-hidden border-l border-border bg-background shadow-[-24px_0_55px_-32px_rgba(15,23,42,0.35)] sm:max-w-[420px] max-sm:border-l-0">
-        <div className="relative flex items-center gap-3 border-b border-foreground/[0.06] px-6 py-[18px]">
-          <div className="min-w-0 flex-1">
-            <div
+      <AstryxView as="aside" className="relative flex h-full w-full flex-col overflow-hidden">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="relative flex items-center gap-3 border-b border-foreground/[0.06] px-6 py-[18px]"
+        >
+          <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+            <AstryxView
+              layout="block"
+              direction="horizontal"
               id="memory-settings-drawer-title"
               className="text-[15px] font-semibold leading-tight tracking-tight text-foreground/95"
             >
               {t("settings.memorySettingsTitle")}
-            </div>
-            <div className="mt-1 text-[11.5px] leading-snug text-muted-foreground/80">
+            </AstryxView>
+            <AstryxView
+              layout="block"
+              direction="horizontal"
+              className="mt-1 text-[11.5px] leading-snug text-muted-foreground/80"
+            >
               {t("settings.memorySettingsLocalOnly")}
-            </div>
-          </div>
-          <button
+            </AstryxView>
+          </AstryxView>
+          <AstryxButton
             type="button"
             onClick={onClose}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-foreground/[0.05] text-muted-foreground/80 transition-colors hover:bg-foreground/[0.1] hover:text-foreground"
@@ -312,15 +336,21 @@ export function MemorySettingsDrawer(props: {
             aria-label={t("settings.memorySettingsClose")}
           >
             <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+          </AstryxButton>
+        </AstryxView>
 
-        <div className="relative min-h-0 flex-1 overflow-y-auto px-5 py-5">
-          <div className="space-y-6">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="relative min-h-0 flex-1 overflow-y-auto px-5 py-5"
+        >
+          <AstryxView layout="block" direction="horizontal" className="space-y-6">
             {quotaLadder.level !== "normal" &&
             quotaLadder.bannerKey &&
             quotaLadder.tightestScope ? (
-              <div
+              <AstryxView
+                layout="block"
+                direction="horizontal"
                 className={`flex items-start gap-2 rounded-2xl border px-4 py-3 text-[11.5px] leading-relaxed ${
                   quotaLadder.level === "critical" || quotaLadder.level === "exhausted"
                     ? "border-red-500/25 bg-red-500/[0.06] text-red-700 dark:text-red-300"
@@ -328,70 +358,102 @@ export function MemorySettingsDrawer(props: {
                 }`}
               >
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>
+                <AstryxInline>
                   {t(quotaLadder.bannerKey)
                     .replace("{scope}", memoryScopeLabel(quotaLadder.tightestScope.scope, t))
                     .replace("{used}", String(quotaLadder.tightestScope.used))
                     .replace("{limit}", String(quotaLadder.tightestScope.limit))}
-                </span>
-              </div>
+                </AstryxInline>
+              </AstryxView>
             ) : null}
 
-            <section className="space-y-2">
-              <div className="px-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground/65">
+            <AstryxView as="section" className="space-y-2">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="px-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground/65"
+              >
                 {t("settings.memoryDriverModels")}
-              </div>
-              <div className="rounded-xl border border-border bg-muted/25 p-4">
-                <label className="block space-y-1.5">
-                  <span className="text-[11.5px] text-muted-foreground/90">
+              </AstryxView>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="rounded-xl border border-border bg-muted/25 p-4"
+              >
+                <AstryxLabel className="block space-y-1.5">
+                  <AstryxInline className="text-[11.5px] text-muted-foreground/90">
                     {t("settings.memoryOrganizerModel")}
-                  </span>
+                  </AstryxInline>
                   {renderModelSelect(
                     memoryOrganizerModel,
                     handleOrganizerModelChange,
                     t("settings.memoryOrganizerModel"),
                     t("settings.memoryModelNone"),
                   )}
-                </label>
-                <div className="my-3 h-px bg-foreground/[0.05]" />
-                <label className="block space-y-1.5">
-                  <span className="text-[11.5px] text-muted-foreground/90">
+                </AstryxLabel>
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="my-3 h-px bg-foreground/[0.05]"
+                />
+                <AstryxLabel className="block space-y-1.5">
+                  <AstryxInline className="text-[11.5px] text-muted-foreground/90">
                     {t("settings.memorySummaryModel")}
-                  </span>
+                  </AstryxInline>
                   {renderModelSelect(
                     conversationSummaryModel,
                     handleSummaryModelChange,
                     t("settings.memorySummaryModel"),
                     t("settings.memorySummaryModelFollow"),
                   )}
-                </label>
+                </AstryxLabel>
                 {modelOptions.length === 0 ? (
-                  <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2 text-[11.5px] text-amber-700 dark:text-amber-300">
+                  <AstryxView
+                    layout="block"
+                    direction="horizontal"
+                    className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2 text-[11.5px] text-amber-700 dark:text-amber-300"
+                  >
                     {t("settings.memoryModelEmpty")}
-                  </div>
+                  </AstryxView>
                 ) : null}
-              </div>
-            </section>
+              </AstryxView>
+            </AstryxView>
 
-            <section className="space-y-2">
-              <div className="flex items-center justify-between gap-2 px-1">
-                <div className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground/65">
+            <AstryxView as="section" className="space-y-2">
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex items-center justify-between gap-2 px-1"
+              >
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground/65"
+                >
                   {t("settings.memoryOrganizerTitle")}
-                </div>
+                </AstryxView>
                 <AgentActivationSwitch
                   checked={settings.memory.organizerEnabled}
                   title={t("settings.memoryOrganizerToggle")}
                   disabled={!canEnableOrganizer}
                   onToggle={handleOrganizerToggle}
                 />
-              </div>
-              <div className="rounded-xl border border-border bg-muted/25 p-4">
-                <div className="space-y-3">
-                  <div className="grid grid-cols-[1fr_108px] gap-2.5">
-                    <label className="block space-y-1.5">
-                      <span className="text-[11.5px] text-muted-foreground/90">
+              </AstryxView>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="rounded-xl border border-border bg-muted/25 p-4"
+              >
+                <AstryxView layout="block" direction="horizontal" className="space-y-3">
+                  <AstryxView
+                    layout="grid"
+                    direction="horizontal"
+                    className="grid grid-cols-[1fr_108px] gap-2.5"
+                  >
+                    <AstryxLabel className="block space-y-1.5">
+                      <AstryxInline className="text-[11.5px] text-muted-foreground/90">
                         {t("settings.memoryOrganizerSchedule")}
-                      </span>
+                      </AstryxInline>
                       <DrawerSelect
                         value={settings.memory.organizerSchedule.frequency}
                         disabled={!canEnableOrganizer}
@@ -406,12 +468,12 @@ export function MemorySettingsDrawer(props: {
                           label: t(item.labelKey),
                         }))}
                       />
-                    </label>
-                    <label className="block space-y-1.5">
-                      <span className="text-[11.5px] text-muted-foreground/90">
+                    </AstryxLabel>
+                    <AstryxLabel className="block space-y-1.5">
+                      <AstryxInline className="text-[11.5px] text-muted-foreground/90">
                         {t("settings.memoryOrganizerTime")}
-                      </span>
-                      <input
+                      </AstryxInline>
+                      <AstryxInput
                         type="time"
                         aria-label={t("settings.memoryOrganizerTime")}
                         value={timeLocalDraft}
@@ -426,13 +488,13 @@ export function MemorySettingsDrawer(props: {
                           "dark:bg-white/[0.04] dark:focus:bg-white/[0.08]",
                         ].join(" ")}
                       />
-                    </label>
-                  </div>
+                    </AstryxLabel>
+                  </AstryxView>
                   {settings.memory.organizerSchedule.frequency === "weekly" ? (
-                    <label className="block space-y-1.5">
-                      <span className="text-[11.5px] text-muted-foreground/90">
+                    <AstryxLabel className="block space-y-1.5">
+                      <AstryxInline className="text-[11.5px] text-muted-foreground/90">
                         {t("settings.memoryOrganizerWeekday")}
-                      </span>
+                      </AstryxInline>
                       <DrawerSelect
                         value={String(settings.memory.organizerSchedule.weekday ?? 1)}
                         disabled={organizerTimingDisabled}
@@ -443,13 +505,17 @@ export function MemorySettingsDrawer(props: {
                           label: t(key),
                         }))}
                       />
-                    </label>
+                    </AstryxLabel>
                   ) : null}
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <label className="block space-y-1.5">
-                      <span className="text-[11.5px] text-muted-foreground/90">
+                  <AstryxView
+                    layout="grid"
+                    direction="horizontal"
+                    className="grid grid-cols-2 gap-2.5"
+                  >
+                    <AstryxLabel className="block space-y-1.5">
+                      <AstryxInline className="text-[11.5px] text-muted-foreground/90">
                         {t("settings.memoryOrganizerScope")}
-                      </span>
+                      </AstryxInline>
                       <DrawerSelect
                         value={settings.memory.organizerScope}
                         onValueChange={(next) => {
@@ -462,11 +528,11 @@ export function MemorySettingsDrawer(props: {
                           label: t(item.labelKey),
                         }))}
                       />
-                    </label>
-                    <label className="block space-y-1.5">
-                      <span className="text-[11.5px] text-muted-foreground/90">
+                    </AstryxLabel>
+                    <AstryxLabel className="block space-y-1.5">
+                      <AstryxInline className="text-[11.5px] text-muted-foreground/90">
                         {t("settings.memoryOrganizerMode")}
-                      </span>
+                      </AstryxInline>
                       <DrawerSelect
                         value={settings.memory.organizerMode}
                         onValueChange={(next) => {
@@ -479,30 +545,43 @@ export function MemorySettingsDrawer(props: {
                           label: t(item.labelKey),
                         }))}
                       />
-                    </label>
-                  </div>
+                    </AstryxLabel>
+                  </AstryxView>
                   {settings.memory.organizerEnabled && settings.memory.organizerNextRunAt ? (
-                    <div className="flex items-center gap-2 rounded-xl border border-foreground/[0.05] bg-foreground/[0.025] px-3 py-2 text-[11.5px] text-muted-foreground">
-                      <span className="relative inline-flex h-1.5 w-1.5 shrink-0">
-                        <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/40" />
-                        <span className="relative inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      </span>
-                      <span className="font-medium text-foreground/75">
+                    <AstryxView
+                      layout="flex"
+                      direction="horizontal"
+                      className="flex items-center gap-2 rounded-xl border border-foreground/[0.05] bg-foreground/[0.025] px-3 py-2 text-[11.5px] text-muted-foreground"
+                    >
+                      <AstryxView
+                        as="span"
+                        layout="inline-flex"
+                        direction="horizontal"
+                        className="relative inline-flex h-1.5 w-1.5 shrink-0"
+                      >
+                        <AstryxInline className="absolute inset-0 animate-ping rounded-full bg-emerald-500/40" />
+                        <AstryxInline className="relative inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      </AstryxView>
+                      <AstryxInline className="font-medium text-foreground/75">
                         {t("settings.memoryOrganizerNextRun")}
-                      </span>
-                      <span className="ml-auto font-mono text-foreground/70">
+                      </AstryxInline>
+                      <AstryxInline className="ml-auto font-mono text-foreground/70">
                         {formatTime(settings.memory.organizerNextRunAt)}
-                      </span>
-                    </div>
+                      </AstryxInline>
+                    </AstryxView>
                   ) : null}
                   {organizerFeedback ? (
-                    <div className="whitespace-pre-wrap rounded-xl border border-foreground/[0.05] bg-foreground/[0.025] px-3 py-2 text-[11.5px] text-muted-foreground">
+                    <AstryxView
+                      layout="block"
+                      direction="horizontal"
+                      className="whitespace-pre-wrap rounded-xl border border-foreground/[0.05] bg-foreground/[0.025] px-3 py-2 text-[11.5px] text-muted-foreground"
+                    >
                       {organizerFeedback}
-                    </div>
+                    </AstryxView>
                   ) : null}
-                </div>
-              </div>
-              <div className="flex gap-2 px-0.5 pt-1">
+                </AstryxView>
+              </AstryxView>
+              <AstryxView layout="flex" direction="horizontal" className="flex gap-2 px-0.5 pt-1">
                 <Button
                   type="button"
                   variant="ghost"
@@ -525,18 +604,30 @@ export function MemorySettingsDrawer(props: {
                   />
                   {t("settings.memoryOrganizerRunNow")}
                 </Button>
-              </div>
-            </section>
+              </AstryxView>
+            </AstryxView>
 
-            <section className="space-y-2">
-              <div className="flex items-center gap-1.5 px-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-destructive/75">
+            <AstryxView as="section" className="space-y-2">
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex items-center gap-1.5 px-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-destructive/75"
+              >
                 <AlertTriangle className="h-3 w-3" />
                 {t("settings.memorySettingsDangerZone")}
-              </div>
-              <div className="rounded-xl border border-destructive/20 bg-destructive/[0.04] p-4">
-                <div className="text-[11.5px] leading-relaxed text-muted-foreground">
+              </AstryxView>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="rounded-xl border border-destructive/20 bg-destructive/[0.04] p-4"
+              >
+                <AstryxView
+                  layout="block"
+                  direction="horizontal"
+                  className="text-[11.5px] leading-relaxed text-muted-foreground"
+                >
                   {t("settings.memorySettingsWipeDescription")}
-                </div>
+                </AstryxView>
                 <Button
                   variant="destructive"
                   size="sm"
@@ -547,11 +638,11 @@ export function MemorySettingsDrawer(props: {
                   <Trash2 className="h-3.5 w-3.5" />
                   {t("settings.memoryWipeAll")}
                 </Button>
-              </div>
-            </section>
-          </div>
-        </div>
-      </aside>
+              </AstryxView>
+            </AstryxView>
+          </AstryxView>
+        </AstryxView>
+      </AstryxView>
       {historyOpen ? (
         <OrganizerHistoryModal
           t={t}
@@ -565,22 +656,42 @@ export function MemorySettingsDrawer(props: {
           onClose={() => setDrawerWipeConfirmOpen(false)}
           ariaLabel={t("settings.memoryWipeConfirmTitle")}
           panelClassName="max-w-md"
-          showScrim={false}
         >
-          <div className="flex items-start gap-3 border-b px-5 py-4">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex items-start gap-3 border-b px-5 py-4"
+          >
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10"
+            >
               <AlertTriangle className="h-4 w-4 text-destructive" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div id="memory-drawer-wipe-confirm-title" className="text-sm font-semibold">
+            </AstryxView>
+            <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                id="memory-drawer-wipe-confirm-title"
+                className="text-sm font-semibold"
+              >
                 {t("settings.memoryWipeConfirmTitle")}
-              </div>
-              <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              </AstryxView>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="mt-1 text-xs leading-relaxed text-muted-foreground"
+              >
                 {t("settings.memoryWipeConfirmDescription")}
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 px-5 py-4">
+              </AstryxView>
+            </AstryxView>
+          </AstryxView>
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex justify-end gap-2 px-5 py-4"
+          >
             <Button
               variant="outline"
               size="sm"
@@ -600,10 +711,9 @@ export function MemorySettingsDrawer(props: {
             >
               {t("settings.memoryWipeAll")}
             </Button>
-          </div>
+          </AstryxView>
         </SettingsModalShell>
       ) : null}
-    </div>,
-    document.body,
+    </Dialog>
   );
 }

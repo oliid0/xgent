@@ -1,9 +1,18 @@
 import { invoke } from "@xagent/runtime";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Code, CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Token } from "@astryxdesign/core/Token";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   GitBranch,
   Key,
-  Loader2,
   Send,
   Square,
   Terminal,
@@ -294,131 +303,186 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   };
 
   return (
-    <MobileFullscreenPanel open label={panelTitle} className="bg-zinc-950 text-zinc-100">
-      <header className="mobile-panel-header mobile-terminal-header flex min-h-14 shrink-0 items-center gap-3 border-b border-white/10 bg-zinc-950/92 px-3 backdrop-blur-xl">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
-          <PanelIcon className="h-4 w-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-[15px] font-semibold">{panelTitle}</h2>
-          <p className="truncate font-mono text-[10px] text-zinc-400">
-            {sessionCwd ? `${workdir.replace(/[\\/]+$/, "")}/${sessionCwd}` : workdir}
-          </p>
-        </div>
+    <MobileFullscreenPanel open label={panelTitle}>
+      <HStack
+        as="header"
+        gap={2}
+        vAlign="center"
+        paddingInline={3}
+        className="mobile-panel-header min-h-[var(--xagent-mobile-header-height)] shrink-0 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/90 backdrop-blur-xl"
+      >
+        <PanelIcon />
+        <StackItem size="fill">
+          <VStack gap={0}>
+            <Heading level={2} maxLines={1}>
+              {panelTitle}
+            </Heading>
+            <Text type="supporting" color="secondary" maxLines={1}>
+              {sessionCwd ? `${workdir.replace(/[\\/]+$/, "")}/${sessionCwd}` : workdir}
+            </Text>
+          </VStack>
+        </StackItem>
         {entries.length > 0 && !activeRunId ? (
-          <button
-            type="button"
+          <IconButton
+            label={t("chat.mobileTerminal.clear")}
+            tooltip={t("chat.mobileTerminal.clear")}
+            icon={<Trash2 />}
+            variant="ghost"
             onClick={() => setEntries([])}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 active:bg-white/10 active:text-white"
-            aria-label={t("chat.mobileTerminal.clear")}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          />
         ) : null}
-        <button
-          type="button"
+        <IconButton
+          label={t("chat.mobileTerminal.close")}
+          tooltip={t("chat.mobileTerminal.close")}
+          icon={<X />}
+          variant="ghost"
           onClick={onClose}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 active:bg-white/10 active:text-white"
-          aria-label={t("chat.mobileTerminal.close")}
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </header>
+        />
+      </HStack>
 
       {presets.length > 0 ? (
-        <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-white/10 px-3 py-2.5">
+        <HStack
+          gap={2}
+          padding={2}
+          className="shrink-0 overflow-x-auto border-b border-[var(--color-border-subtle)]"
+        >
           {presets.map((preset) => (
-            <button
+            <Button
               key={preset.id}
-              type="button"
-              disabled={Boolean(activeRunId)}
+              label={preset.label}
+              size="sm"
+              isDisabled={Boolean(activeRunId)}
               onClick={() => {
                 if (preset.runImmediately) void runCommand(preset.command);
                 else setCommand(preset.command);
               }}
-              className="shrink-0 rounded-full border border-white/10 bg-white/[0.055] px-3 py-1.5 text-[11px] font-medium text-zinc-200 active:bg-white/10 disabled:opacity-45"
-            >
-              {preset.label}
-            </button>
+            />
           ))}
-        </div>
+        </HStack>
       ) : null}
 
-      <div
-        ref={scrollRef}
-        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 py-4 font-mono text-[12px] leading-5"
-      >
+      <StackItem size="fill">
+        <VStack
+          ref={scrollRef}
+          gap={4}
+          padding={3}
+          className="h-full overflow-y-auto overscroll-contain"
+        >
         {entries.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-zinc-400">
-            <div className="text-zinc-200">
-              {mode === "git"
+          <EmptyState
+            icon={<PanelIcon />}
+            title={
+              mode === "git"
                 ? t("chat.mobileGit.ready")
                 : mode === "ssh"
                   ? t("chat.mobileSsh.ready")
-                  : t("chat.mobileTerminal.ready")}
-            </div>
-            <div className="mt-1 text-[11px] leading-5">
-              {mode === "git"
+                  : t("chat.mobileTerminal.ready")
+            }
+            description={
+              mode === "git"
                 ? t("chat.mobileGit.hint")
                 : mode === "ssh"
                   ? t("chat.mobileSsh.hint")
-                  : t("chat.mobileTerminal.workspaceHint")}
-            </div>
-          </div>
-        ) : null}
-        {entries.map((entry) => {
-          const response = entry.response;
-          const exitCode = response?.exitCode ?? response?.exit_code;
-          return (
-            <article key={entry.id}>
-              <div className="flex gap-2 text-emerald-400">
-                <span>$</span>
-                <span className="min-w-0 break-all text-zinc-100">{entry.command}</span>
-              </div>
-              {entry.id === activeRunId ? (
-                <div className="mt-2 flex items-center gap-2 text-zinc-400">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {t("chat.mobileTerminal.running")}
-                </div>
-              ) : null}
-              {response?.stdout ? (
-                <pre className="mt-2 whitespace-pre-wrap break-words text-zinc-200">
-                  {response.stdout}
-                </pre>
-              ) : null}
-              {response?.stderr ? (
-                <pre className="mt-2 whitespace-pre-wrap break-words text-amber-300">
-                  {response.stderr}
-                </pre>
-              ) : null}
-              {entry.error ? (
-                <pre className="mt-2 whitespace-pre-wrap break-words text-red-300">
-                  {entry.error}
-                </pre>
-              ) : null}
-              {exitCode !== undefined ? (
-                <div className="mt-1 text-[10px] text-zinc-500">
-                  {t("chat.mobileTerminal.exitCode").replace("{code}", String(exitCode))}
-                </div>
-              ) : null}
-            </article>
-          );
-        })}
-      </div>
+                  : t("chat.mobileTerminal.workspaceHint")
+            }
+            isCompact
+          />
+        ) : (
+          <VStack gap={4}>
+            {entries.map((entry) => {
+              const response = entry.response;
+              const exitCode = response?.exitCode ?? response?.exit_code;
+              return (
+                <Card key={entry.id} padding={3} width="100%">
+                  <VStack gap={3}>
+                    <Text type="body" weight="medium">
+                      <Code>{`$ ${entry.command}`}</Code>
+                    </Text>
+                    {entry.id === activeRunId ? (
+                      <HStack gap={2} vAlign="center">
+                        <Spinner accessibleLabel={t("chat.mobileTerminal.running")} size="sm" />
+                        <Text type="supporting" color="secondary">
+                          {t("chat.mobileTerminal.running")}
+                        </Text>
+                      </HStack>
+                    ) : null}
+                    {response?.stdout ? (
+                      <CodeBlock
+                        code={response.stdout}
+                        language="plaintext"
+                        title="stdout"
+                        size="sm"
+                        width="100%"
+                        maxHeight="var(--xagent-terminal-output-max-height)"
+                        isWrapped
+                        container="section"
+                      />
+                    ) : null}
+                    {response?.stderr ? (
+                      <CodeBlock
+                        code={response.stderr}
+                        language="plaintext"
+                        title="stderr"
+                        size="sm"
+                        width="100%"
+                        maxHeight="var(--xagent-terminal-output-max-height)"
+                        isWrapped
+                        container="section"
+                      />
+                    ) : null}
+                    {entry.error ? (
+                      <CodeBlock
+                        code={entry.error}
+                        language="plaintext"
+                        title="error"
+                        size="sm"
+                        width="100%"
+                        maxHeight="var(--xagent-terminal-output-max-height)"
+                        isWrapped
+                        container="section"
+                      />
+                    ) : null}
+                    {exitCode !== undefined ? (
+                      <Token
+                        label={t("chat.mobileTerminal.exitCode").replace(
+                          "{code}",
+                          String(exitCode),
+                        )}
+                        color={exitCode === 0 ? "green" : "red"}
+                        size="sm"
+                      />
+                    ) : null}
+                  </VStack>
+                </Card>
+              );
+            })}
+          </VStack>
+        )}
+        </VStack>
+      </StackItem>
 
-      <form
+      <HStack
+        as="form"
+        gap={2}
+        vAlign="end"
+        padding={3}
         onSubmit={(event) => void submit(event)}
-        className="flex shrink-0 items-end gap-2 border-t border-white/10 bg-zinc-950 px-3 pb-3 pt-3"
+        className="shrink-0 border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)] pb-[calc(var(--spacing-3)+env(safe-area-inset-bottom,0px))]"
       >
-        <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-2xl border border-white/12 bg-white/[0.055] px-3">
-          <span className="font-mono text-emerald-400">$</span>
-          <input
+        <StackItem size="fill">
+          <TextInput
+            label={
+              workdir
+                ? mode === "ssh"
+                  ? t("chat.mobileSsh.placeholder")
+                  : t("chat.mobileTerminal.placeholder")
+                : t("chat.mobileTerminal.noWorkspace")
+            }
+            isLabelHidden
             value={command}
-            onChange={(event) => setCommand(event.currentTarget.value)}
-            disabled={Boolean(activeRunId) || !workdir}
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
+            onChange={setCommand}
+            isDisabled={Boolean(activeRunId) || !workdir}
+            disabledMessage={!workdir ? t("chat.mobileTerminal.noWorkspace") : undefined}
             placeholder={
               workdir
                 ? mode === "ssh"
@@ -426,19 +490,21 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
                   : t("chat.mobileTerminal.placeholder")
                 : t("chat.mobileTerminal.noWorkspace")
             }
-            className="h-10 min-w-0 flex-1 bg-transparent font-mono text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600"
+            size="lg"
+            width="100%"
           />
-        </label>
-        <button
+        </StackItem>
+        <IconButton
           type={activeRunId ? "button" : "submit"}
+          label={activeRunId ? t("chat.mobileTerminal.stop") : t("chat.mobileTerminal.run")}
+          tooltip={activeRunId ? t("chat.mobileTerminal.stop") : t("chat.mobileTerminal.run")}
+          icon={activeRunId ? <Square /> : <Send />}
+          variant={activeRunId ? "destructive" : "primary"}
+          size="lg"
           onClick={activeRunId ? () => void cancel() : undefined}
-          disabled={!activeRunId && (!command.trim() || !workdir)}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-zinc-950 disabled:bg-zinc-800 disabled:text-zinc-600"
-          aria-label={activeRunId ? t("chat.mobileTerminal.stop") : t("chat.mobileTerminal.run")}
-        >
-          {activeRunId ? <Square className="h-4 w-4 fill-current" /> : <Send className="h-4 w-4" />}
-        </button>
-      </form>
+          isDisabled={!activeRunId && (!command.trim() || !workdir)}
+        />
+      </HStack>
     </MobileFullscreenPanel>
   );
 }

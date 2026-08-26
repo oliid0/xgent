@@ -1,3 +1,5 @@
+import { HStack } from "@astryxdesign/core/Layout";
+import { Text } from "@astryxdesign/core/Text";
 import { cn } from "../../lib/shared/utils";
 import { OdometerNumber } from "./OdometerNumber";
 
@@ -13,22 +15,25 @@ export function FileChangeBadge({
 }) {
   if (added === undefined && removed === undefined) return null;
   return (
-    <span
+    <HStack
+      as="span"
+      gap={1.5}
+      vAlign="center"
       className={cn(
-        "flex shrink-0 items-center gap-1.5 font-mono text-[calc(11px*var(--zone-font-scale,1))] tabular-nums",
+        "shrink-0 font-mono text-[calc(var(--text-supporting-size)*var(--zone-font-scale,1))] tabular-nums",
         className,
       )}
     >
       {added !== undefined ? (
-        <span className="flex items-center text-[hsl(var(--chat-success))]">
+        <Text type="code" color="inherit" className="text-success">
           +<OdometerNumber value={added} />
-        </span>
+        </Text>
       ) : null}
       {removed !== undefined ? (
-        <span className="flex items-center text-[hsl(var(--chat-error))]">
+        <Text type="code" color="inherit" className="text-error">
           -<OdometerNumber value={removed} />
-        </span>
+        </Text>
       ) : null}
-    </span>
+    </HStack>
   );
 }

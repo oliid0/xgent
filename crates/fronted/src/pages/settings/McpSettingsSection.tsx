@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Button } from "@astryxdesign/core/Button";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { Heading, Text } from "@astryxdesign/core/Text";
 import { Cable, Plus } from "../../components/icons";
-import { Button } from "../../components/ui/button";
 import { useLocale } from "../../i18n";
 import { type McpServerConfig, updateMcp } from "../../lib/settings";
 import { McpServerEditModal, McpServersForm } from "../mcp-hub/McpServersForm";
@@ -26,35 +28,36 @@ export function McpSettingsSection(props: SettingsSectionProps & { allowStdio: b
   };
 
   return (
-    <div className="settings-mcp-section flex min-h-0 flex-1 flex-col gap-4">
-      <div className="settings-mcp-header flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted">
-            <Cable className="h-4 w-4" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold">MCP</h2>
-            <p className="text-xs text-muted-foreground">{t("mcpHub.subtitle")}</p>
-          </div>
-        </div>
+    <VStack gap={4} className="settings-mcp-section min-h-0 flex-1">
+      <HStack gap={3} hAlign="between" vAlign="start" className="settings-mcp-header">
+        <HStack gap={3} vAlign="center">
+          <Cable />
+          <VStack gap={0}>
+            <Heading level={2}>
+              MCP
+            </Heading>
+            <Text type="supporting" color="secondary">
+              {t("mcpHub.subtitle")}
+            </Text>
+          </VStack>
+        </HStack>
         <Button
           type="button"
           size="sm"
+          label={t("mcpHub.add")}
+          icon={<Plus />}
           className="settings-section-action"
           onClick={() => setEditing({ mode: "add" })}
-        >
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          {t("mcpHub.add")}
-        </Button>
-      </div>
-      <div className="min-h-0 flex-1">
+        />
+      </HStack>
+      <StackItem size="fill">
         <McpServersForm
           settings={props.settings}
           setSettings={props.setSettings}
           onAddServer={() => setEditing({ mode: "add" })}
           onEditServer={(server, index) => setEditing({ mode: "edit", server, index })}
         />
-      </div>
+      </StackItem>
       {editing ? (
         <McpServerEditModal
           mode={editing.mode}
@@ -65,6 +68,6 @@ export function McpSettingsSection(props: SettingsSectionProps & { allowStdio: b
           onSave={saveServer}
         />
       ) : null}
-    </div>
+    </VStack>
   );
 }

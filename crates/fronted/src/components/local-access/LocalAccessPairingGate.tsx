@@ -1,4 +1,13 @@
 import { isBrowserRuntime } from "@xagent/runtime";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Center } from "@astryxdesign/core/Center";
+import { FormLayout } from "@astryxdesign/core/FormLayout";
+import { VStack } from "@astryxdesign/core/Layout";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
 import { LOCAL_ACCESS_CSRF_KEY, LOCAL_ACCESS_SESSION_CHANGED_EVENT } from "../../runtime/browser";
 
@@ -81,52 +90,59 @@ export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
   if (!browser || state === "ready") return children;
   if (state === "checking") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background text-foreground">
-        正在验证设备…
-      </main>
+      <Center minHeight="100vh" width="100%">
+        <VStack gap={3} hAlign="center">
+          <Spinner accessibleLabel="正在验证设备" />
+          <Text type="body" color="secondary">
+            正在验证设备…
+          </Text>
+        </VStack>
+      </Center>
     );
   }
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
-      <form
-        onSubmit={pair}
-        className="w-full max-w-sm space-y-4 rounded-2xl border border-border bg-card p-6 shadow-xl"
-      >
-        <div>
-          <h1 className="text-lg font-semibold">连接到 XAgent</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            输入电脑端“本地与局域网访问”设置中显示的六位配对码。
-          </p>
-        </div>
-        <label className="block space-y-1.5 text-sm">
-          <span>设备名称</span>
-          <input
-            value={deviceName}
-            maxLength={64}
-            onChange={(event) => setDeviceName(event.currentTarget.value)}
-            className="h-10 w-full rounded-lg border border-border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/40"
+    <Center minHeight="100vh" width="100%" padding={6}>
+      <Card width="100%" maxWidth="var(--xagent-content-width-sm)" padding={6} elevation="high">
+        <VStack as="form" gap={4} onSubmit={pair}>
+          <VStack gap={1}>
+            <Heading level={1}>
+            连接到 XAgent
+            </Heading>
+            <Text type="body" color="secondary">
+              输入电脑端“本地与局域网访问”设置中显示的六位配对码。
+            </Text>
+          </VStack>
+          <FormLayout>
+            <TextInput
+              label="设备名称"
+              value={deviceName}
+              maxLength={64}
+              onChange={setDeviceName}
+              width="100%"
+              isRequired
+            />
+            <TextInput
+              label="配对码"
+              value={code}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              onChange={(value) => setCode(value.replace(/\D/g, ""))}
+              width="100%"
+              isRequired
+            />
+          </FormLayout>
+          {error ? <Banner status="error" title={error} collapsible={false} /> : null}
+          <Button
+            type="submit"
+            label={busy ? "正在连接…" : "连接"}
+            variant="primary"
+            width="100%"
+            isLoading={busy}
+            isDisabled={busy || code.length !== 6 || !deviceName.trim()}
           />
-        </label>
-        <label className="block space-y-1.5 text-sm">
-          <span>配对码</span>
-          <input
-            value={code}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            onChange={(event) => setCode(event.currentTarget.value.replace(/\D/g, ""))}
-            className="h-12 w-full rounded-lg border border-border bg-background px-3 text-center text-2xl tracking-[0.35em] outline-none focus:ring-2 focus:ring-primary/40"
-          />
-        </label>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <button
-          type="submit"
-          disabled={busy || code.length !== 6 || !deviceName.trim()}
-          className="h-10 w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-50"
-        >
-          {busy ? "正在连接…" : "连接"}
-        </button>
-      </form>
-    </main>
+        </VStack>
+      </Card>
+    </Center>
   );
 }

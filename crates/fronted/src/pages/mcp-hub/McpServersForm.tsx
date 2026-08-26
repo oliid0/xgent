@@ -34,10 +34,14 @@ import {
   updateMcp,
   updateSystem,
 } from "../../lib/settings";
-import { useModalMotion } from "../../lib/shared/modalMotion";
 import { cn } from "../../lib/shared/utils";
 import { toolGroupPolicyKey, toolServerPolicyKey } from "../../lib/tools/toolPolicy";
 import { SettingsModalShell } from "../settings/SettingsModalShell";
+import { View as AstryxView, Inline as AstryxInline } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
+import { Paragraph as AstryxParagraph } from "@xagent/ui/components/ui/view";
+import { Heading as AstryxHeading } from "@xagent/ui/components/ui/view";
 
 type SetMcpSettingsFn = (updater: (prev: AppSettings) => AppSettings) => void;
 
@@ -221,10 +225,17 @@ function transportMeta(transport: string) {
 
 function CounterPill(props: { label: string; count: number }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-muted/55 px-2 py-0.5 text-[10px] text-muted-foreground ring-1 ring-border/40">
-      <span className="font-semibold text-foreground/85 tabular-nums">{props.count}</span>
-      <span className="opacity-70">{props.label}</span>
-    </span>
+    <AstryxView
+      as="span"
+      layout="inline-flex"
+      direction="horizontal"
+      className="inline-flex items-center gap-1 rounded-full bg-muted/55 px-2 py-0.5 text-[10px] text-muted-foreground ring-1 ring-border/40"
+    >
+      <AstryxInline className="font-semibold text-foreground/85 tabular-nums">
+        {props.count}
+      </AstryxInline>
+      <AstryxInline className="opacity-70">{props.label}</AstryxInline>
+    </AstryxView>
   );
 }
 
@@ -267,7 +278,9 @@ const McpServerCard = memo(function McpServerCard(props: {
       : t("mcpHub.urlSse");
 
   return (
-    <div
+    <AstryxView
+      layout="block"
+      direction="horizontal"
       className={cn(
         "mcp-server-card skill-card-enter group rounded-2xl border backdrop-blur-xl transition-[border-color,background-color,box-shadow] duration-150",
         enabled
@@ -275,9 +288,13 @@ const McpServerCard = memo(function McpServerCard(props: {
           : "border-border/40 bg-background/55 hover:border-border/55 hover:bg-background/70 dark:border-white/[0.05] dark:bg-white/[0.03] dark:hover:border-white/[0.10] dark:hover:bg-white/[0.06]",
       )}
     >
-      <div className="mcp-server-card-row flex items-center gap-3 px-4 py-3">
+      <AstryxView
+        layout="flex"
+        direction="horizontal"
+        className="mcp-server-card-row flex items-center gap-3 px-4 py-3"
+      >
         {/* Toggle */}
-        <button
+        <AstryxButton
           type="button"
           title={enabled ? t("settings.disable") : t("settings.enable")}
           onClick={() => patchServer({ enabled: !enabled })}
@@ -289,22 +306,24 @@ const McpServerCard = memo(function McpServerCard(props: {
               : "bg-muted-foreground/25 ring-border/40",
           )}
         >
-          <span
+          <AstryxInline
             className={cn(
               "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
               enabled ? "translate-x-[1.05rem]" : "translate-x-[0.125rem]",
             )}
           />
-        </button>
+        </AstryxButton>
 
         {/* Clickable body */}
-        <button
+        <AstryxButton
           type="button"
           onClick={onEdit}
           title={t("settings.edit")}
           className="mcp-server-body flex min-w-0 flex-1 items-center gap-3 text-left outline-hidden"
         >
-          <div
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
             className={cn(
               "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-all",
               enabled
@@ -313,43 +332,67 @@ const McpServerCard = memo(function McpServerCard(props: {
             )}
           >
             <MetaIcon className="h-[18px] w-[18px]" />
-          </div>
+          </AstryxView>
 
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <div className="flex min-w-0 items-center gap-2">
-              <span
+          <AstryxView
+            layout="flex"
+            direction="vertical"
+            className="flex min-w-0 flex-1 flex-col gap-0.5"
+          >
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="flex min-w-0 items-center gap-2"
+            >
+              <AstryxInline
                 className={cn(
                   "truncate text-[13px] font-semibold leading-tight",
                   enabled ? "text-foreground" : "text-muted-foreground",
                 )}
               >
                 {serverConfig.id || `Server ${idx + 1}`}
-              </span>
-              <span
+              </AstryxInline>
+              <AstryxView
+                as="span"
+                layout="inline-flex"
+                direction="horizontal"
                 className={cn(
                   "inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1",
                   meta.tone,
                 )}
               >
                 {meta.label}
-              </span>
-            </div>
+              </AstryxView>
+            </AstryxView>
             {previewLine ? (
-              <div className="truncate text-[11px] text-muted-foreground/85" title={previewLine}>
-                <span className="text-muted-foreground/55">{previewLabel}:</span>{" "}
-                <span className="font-mono">{previewLine}</span>
-              </div>
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="truncate text-[11px] text-muted-foreground/85"
+                title={previewLine}
+              >
+                <AstryxInline className="text-muted-foreground/55">{previewLabel}:</AstryxInline>{" "}
+                <AstryxInline className="font-mono">{previewLine}</AstryxInline>
+              </AstryxView>
             ) : (
-              <div className="truncate text-[11px] italic text-muted-foreground/55">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="truncate text-[11px] italic text-muted-foreground/55"
+              >
                 {isStdio ? "未配置启动命令" : "未配置 URL"}
-              </div>
+              </AstryxView>
             )}
-          </div>
-        </button>
+          </AstryxView>
+        </AstryxButton>
 
         {/* Counters (≥md) */}
         {argsCount > 0 || envCount > 0 || headerCount > 0 ? (
-          <div className="hidden shrink-0 items-center gap-1 md:flex">
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="hidden shrink-0 items-center gap-1 md:flex"
+          >
             {argsCount > 0 ? (
               <CounterPill label={t("mcpHub.previewArgs")} count={argsCount} />
             ) : null}
@@ -357,10 +400,14 @@ const McpServerCard = memo(function McpServerCard(props: {
             {headerCount > 0 ? (
               <CounterPill label={t("mcpHub.previewHeaders")} count={headerCount} />
             ) : null}
-          </div>
+          </AstryxView>
         ) : null}
 
-        <div className="mcp-server-actions flex shrink-0 items-center gap-1">
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="mcp-server-actions flex shrink-0 items-center gap-1"
+        >
           <ToolPolicyToggle
             value={policy}
             size="sm"
@@ -376,14 +423,14 @@ const McpServerCard = memo(function McpServerCard(props: {
               )
             }
           />
-          <button
+          <AstryxButton
             type="button"
             onClick={onEdit}
             title={t("settings.edit")}
             className="mcp-server-action rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
           >
             <Pencil className="h-3.5 w-3.5" />
-          </button>
+          </AstryxButton>
           <ConfirmDeletePopover
             name={serverConfig.id || `Server ${idx + 1}`}
             onConfirm={() =>
@@ -398,19 +445,19 @@ const McpServerCard = memo(function McpServerCard(props: {
             }
           >
             {(open) => (
-              <button
+              <AstryxButton
                 type="button"
                 onClick={open}
                 className="mcp-server-action rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 title={t("settings.delete")}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              </AstryxButton>
             )}
           </ConfirmDeletePopover>
-        </div>
-      </div>
-    </div>
+        </AstryxView>
+      </AstryxView>
+    </AstryxView>
   );
 });
 
@@ -425,7 +472,6 @@ export function McpServerEditModal(props: {
   const { mode, initialServer, existingServers, allowStdio = true, onClose, onSave } = props;
   const { t } = useLocale();
   const browser = isBrowserRuntime();
-  const { modalState, requestClose } = useModalMotion(onClose);
 
   const existingIdsExcludingCurrent = useMemo(() => {
     return existingServers
@@ -453,7 +499,7 @@ export function McpServerEditModal(props: {
     setDraft((prev) => ({ ...prev, ...patch }));
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLElement>) {
     event.preventDefault();
     try {
       if (!allowStdio && draft.transport === "stdio") {
@@ -461,7 +507,7 @@ export function McpServerEditModal(props: {
       }
       const server = buildServerFromDraft(draft, initialServer, existingIdsExcludingCurrent, t);
       onSave(server);
-      requestClose();
+      onClose();
     } catch (error) {
       setFormError(error instanceof Error ? error.message : String(error));
     }
@@ -477,33 +523,58 @@ export function McpServerEditModal(props: {
   const submitLabel = mode === "add" ? t("mcpHub.modalAdd") : t("mcpHub.modalSave");
 
   return (
-    <SettingsModalShell onClose={requestClose} state={modalState} ariaLabel={title}>
-      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]">
+    <SettingsModalShell onClose={onClose} purpose="form" ariaLabel={title}>
+      <AstryxView
+        as="form"
+        onSubmit={handleSubmit}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4"
+        >
+          <AstryxView
+            layout="flex"
+            direction="horizontal"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
+          >
             <Plug className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base font-semibold">{title}</h2>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground" title={subtitleRaw}>
+          </AstryxView>
+          <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+            <AstryxHeading level={2} className="text-base font-semibold">
+              {title}
+            </AstryxHeading>
+            <AstryxParagraph
+              className="mt-0.5 truncate text-xs text-muted-foreground"
+              title={subtitleRaw}
+            >
               {subtitleRaw}
-            </p>
-          </div>
-          <button
+            </AstryxParagraph>
+          </AstryxView>
+          <AstryxButton
             type="button"
-            onClick={requestClose}
+            onClick={onClose}
             title={t("settings.cancel")}
             aria-label={t("settings.cancel")}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
           >
             <X className="h-4 w-4" />
-          </button>
-        </div>
+          </AstryxButton>
+        </AstryxView>
 
-        <div className="settings-modal-body flex-1 overflow-y-auto px-6 py-5">
-          <div className="space-y-5">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="space-y-1.5 sm:col-span-1">
+        <AstryxView
+          layout="block"
+          direction="horizontal"
+          className="settings-modal-body flex-1 overflow-y-auto px-6 py-5"
+        >
+          <AstryxView layout="block" direction="horizontal" className="space-y-5">
+            <AstryxView layout="grid" direction="horizontal" className="grid gap-3 sm:grid-cols-3">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="space-y-1.5 sm:col-span-1"
+              >
                 <Label htmlFor="mcp-edit-id" className="text-xs text-muted-foreground">
                   {t("mcpHub.serverName")}
                 </Label>
@@ -513,11 +584,11 @@ export function McpServerEditModal(props: {
                   placeholder={t("mcpHub.serverNamePlaceholder")}
                   onChange={(event) => updateDraft({ id: event.currentTarget.value })}
                 />
-                <p className="text-[10.5px] text-muted-foreground/70">
+                <AstryxParagraph className="text-[10.5px] text-muted-foreground/70">
                   {t("mcpHub.serverNameHint")}
-                </p>
-              </div>
-              <div className="space-y-1.5">
+                </AstryxParagraph>
+              </AstryxView>
+              <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                 <Label htmlFor="mcp-edit-transport" className="text-xs text-muted-foreground">
                   {t("mcpHub.transport")}
                 </Label>
@@ -540,12 +611,12 @@ export function McpServerEditModal(props: {
                   </SelectContent>
                 </Select>
                 {!allowStdio ? (
-                  <p className="text-[10.5px] leading-4 text-amber-600 dark:text-amber-300">
+                  <AstryxParagraph className="text-[10.5px] leading-4 text-amber-600 dark:text-amber-300">
                     {t("mcpHub.mobileNetworkOnly")}
-                  </p>
+                  </AstryxParagraph>
                 ) : null}
-              </div>
-              <div className="space-y-1.5">
+              </AstryxView>
+              <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                 <Label htmlFor="mcp-edit-timeout" className="text-xs text-muted-foreground">
                   {t("mcpHub.timeout")}
                 </Label>
@@ -556,13 +627,21 @@ export function McpServerEditModal(props: {
                   placeholder="60000"
                   onChange={(event) => updateDraft({ timeoutMs: event.currentTarget.value })}
                 />
-              </div>
-            </div>
+              </AstryxView>
+            </AstryxView>
 
             {isStdio ? (
-              <div className="space-y-3 rounded-xl border border-border/45 bg-muted/20 p-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="space-y-3 rounded-xl border border-border/45 bg-muted/20 p-4"
+              >
+                <AstryxView
+                  layout="grid"
+                  direction="horizontal"
+                  className="grid gap-3 sm:grid-cols-2"
+                >
+                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                     <Label htmlFor="mcp-edit-command" className="text-xs text-muted-foreground">
                       {t("mcpHub.command")}
                     </Label>
@@ -573,8 +652,8 @@ export function McpServerEditModal(props: {
                       className="font-mono text-[12.5px]"
                       onChange={(event) => updateDraft({ command: event.currentTarget.value })}
                     />
-                  </div>
-                  <div className="space-y-1.5">
+                  </AstryxView>
+                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                     <Label htmlFor="mcp-edit-cwd" className="text-xs text-muted-foreground">
                       {t("mcpHub.cwd")}
                     </Label>
@@ -585,9 +664,9 @@ export function McpServerEditModal(props: {
                       className="font-mono text-[12.5px]"
                       onChange={(event) => updateDraft({ cwd: event.currentTarget.value })}
                     />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
+                  </AstryxView>
+                </AstryxView>
+                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                   <Label htmlFor="mcp-edit-args" className="text-xs text-muted-foreground">
                     {t("mcpHub.args")}
                   </Label>
@@ -598,8 +677,8 @@ export function McpServerEditModal(props: {
                     className="min-h-[92px] font-mono text-[12.5px]"
                     onChange={(event) => updateDraft({ argsText: event.currentTarget.value })}
                   />
-                </div>
-                <div className="space-y-1.5">
+                </AstryxView>
+                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                   <Label htmlFor="mcp-edit-env" className="text-xs text-muted-foreground">
                     {t("mcpHub.env")}
                   </Label>
@@ -611,11 +690,15 @@ export function McpServerEditModal(props: {
                     className="min-h-[92px] font-mono text-[12.5px]"
                     onChange={(event) => updateDraft({ envText: event.currentTarget.value })}
                   />
-                </div>
-              </div>
+                </AstryxView>
+              </AstryxView>
             ) : (
-              <div className="space-y-3 rounded-xl border border-border/45 bg-muted/20 p-4">
-                <div className="space-y-1.5">
+              <AstryxView
+                layout="block"
+                direction="horizontal"
+                className="space-y-3 rounded-xl border border-border/45 bg-muted/20 p-4"
+              >
+                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                   <Label htmlFor="mcp-edit-url" className="text-xs text-muted-foreground">
                     {draft.transport === "http" ? t("mcpHub.urlHttp") : t("mcpHub.urlSse")}
                   </Label>
@@ -630,9 +713,9 @@ export function McpServerEditModal(props: {
                     className="font-mono text-[12.5px]"
                     onChange={(event) => updateDraft({ url: event.currentTarget.value })}
                   />
-                </div>
+                </AstryxView>
                 {isSse ? (
-                  <div className="space-y-1.5">
+                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                     <Label htmlFor="mcp-edit-message-url" className="text-xs text-muted-foreground">
                       {t("mcpHub.messageUrl")}
                     </Label>
@@ -643,9 +726,9 @@ export function McpServerEditModal(props: {
                       className="font-mono text-[12.5px]"
                       onChange={(event) => updateDraft({ messageUrl: event.currentTarget.value })}
                     />
-                  </div>
+                  </AstryxView>
                 ) : null}
-                <div className="space-y-1.5">
+                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
                   <Label htmlFor="mcp-edit-headers" className="text-xs text-muted-foreground">
                     {t("mcpHub.headers")}
                   </Label>
@@ -657,29 +740,37 @@ export function McpServerEditModal(props: {
                     className="min-h-[92px] font-mono text-[12.5px]"
                     onChange={(event) => updateDraft({ headersText: event.currentTarget.value })}
                   />
-                </div>
-              </div>
+                </AstryxView>
+              </AstryxView>
             )}
 
             {formError ? (
-              <div className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/[0.06] px-3 py-2.5 text-xs text-destructive">
+              <AstryxView
+                layout="flex"
+                direction="horizontal"
+                className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/[0.06] px-3 py-2.5 text-xs text-destructive"
+              >
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
+                <AstryxInline>{formError}</AstryxInline>
+              </AstryxView>
             ) : null}
-          </div>
-        </div>
+          </AstryxView>
+        </AstryxView>
 
-        <div className="settings-modal-footer settings-modal-footer-row flex items-center justify-end gap-2 border-t border-border/40 px-6 py-4">
-          <Button type="button" variant="outline" onClick={requestClose}>
+        <AstryxView
+          layout="flex"
+          direction="horizontal"
+          className="settings-modal-footer settings-modal-footer-row flex items-center justify-end gap-2 border-t border-border/40 px-6 py-4"
+        >
+          <Button type="button" variant="outline" onClick={onClose}>
             {t("settings.cancel")}
           </Button>
           <Button type="submit" className="gap-1.5">
             {mode === "add" ? <Plus className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
             {submitLabel}
           </Button>
-        </div>
-      </form>
+        </AstryxView>
+      </AstryxView>
     </SettingsModalShell>
   );
 }
@@ -709,28 +800,48 @@ export function McpServersForm(props: McpServersFormProps) {
   const showFilter = serverCount > 4;
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto px-1 pb-4 pt-2">
-      <div className="flex flex-col gap-4">
+    <AstryxView
+      layout="block"
+      direction="horizontal"
+      className="h-full min-h-0 overflow-y-auto px-1 pb-4 pt-2"
+    >
+      <AstryxView layout="flex" direction="vertical" className="flex flex-col gap-4">
         {showFilter ? (
-          <div className="hub-panel-enter relative max-w-md">
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="hub-panel-enter relative max-w-md"
+          >
             <Search className="absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
+            <AstryxInput
               type="text"
               value={filter}
               onChange={(e) => setFilter(e.currentTarget.value)}
               placeholder={t("mcpHub.searchInstalled")}
               className="h-10 w-full rounded-xl border border-border/40 bg-background/60 pl-10 pr-3 text-[13px] outline-hidden backdrop-blur-xl transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground/60 focus:border-border/60 focus:bg-background/85 focus:ring-2 focus:ring-foreground/10"
             />
-          </div>
+          </AstryxView>
         ) : null}
 
         {serverCount === 0 ? (
-          <div className="hub-panel-enter rounded-2xl border border-dashed border-border/45 bg-background/40 px-6 py-12 text-center backdrop-blur-xl">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]">
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="hub-panel-enter rounded-2xl border border-dashed border-border/45 bg-background/40 px-6 py-12 text-center backdrop-blur-xl"
+          >
+            <AstryxView
+              layout="flex"
+              direction="horizontal"
+              className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
+            >
               <Server className="h-6 w-6" />
-            </div>
-            <p className="mt-4 text-sm font-medium text-foreground">{t("mcpHub.noServers")}</p>
-            <p className="mt-1 text-xs text-muted-foreground/80">{t("mcpHub.noServersHint")}</p>
+            </AstryxView>
+            <AstryxParagraph className="mt-4 text-sm font-medium text-foreground">
+              {t("mcpHub.noServers")}
+            </AstryxParagraph>
+            <AstryxParagraph className="mt-1 text-xs text-muted-foreground/80">
+              {t("mcpHub.noServersHint")}
+            </AstryxParagraph>
             {onAddServer ? (
               <Button
                 variant="outline"
@@ -742,18 +853,24 @@ export function McpServersForm(props: McpServersFormProps) {
                 {t("mcpHub.add")}
               </Button>
             ) : null}
-          </div>
+          </AstryxView>
         ) : null}
 
         {filter.trim() && filtered.length === 0 && serverCount > 0 ? (
-          <div className="hub-panel-enter rounded-2xl border border-border/40 bg-background/55 px-6 py-8 text-center backdrop-blur-xl">
+          <AstryxView
+            layout="block"
+            direction="horizontal"
+            className="hub-panel-enter rounded-2xl border border-border/40 bg-background/55 px-6 py-8 text-center backdrop-blur-xl"
+          >
             <Plug className="mx-auto h-5 w-5 text-muted-foreground" />
-            <p className="mt-3 text-sm text-muted-foreground">{t("mcpHub.noMatchInstalled")}</p>
-          </div>
+            <AstryxParagraph className="mt-3 text-sm text-muted-foreground">
+              {t("mcpHub.noMatchInstalled")}
+            </AstryxParagraph>
+          </AstryxView>
         ) : null}
 
         {filtered.length > 0 ? (
-          <div className="flex flex-col gap-2.5">
+          <AstryxView layout="flex" direction="vertical" className="flex flex-col gap-2.5">
             {filtered.map(({ server, idx }) => (
               <McpServerCard
                 key={idx}
@@ -766,9 +883,9 @@ export function McpServersForm(props: McpServersFormProps) {
                 onEdit={() => onEditServer?.(server, idx)}
               />
             ))}
-          </div>
+          </AstryxView>
         ) : null}
-      </div>
-    </div>
+      </AstryxView>
+    </AstryxView>
   );
 }

@@ -1,5 +1,6 @@
 import { generateDiffFile } from "@git-diff-view/file";
 import { DiffModeEnum, DiffView } from "@git-diff-view/react";
+import { Card } from "@astryxdesign/core/Card";
 import { useMemo, useSyncExternalStore } from "react";
 import "@git-diff-view/react/styles/diff-view.css";
 
@@ -103,7 +104,12 @@ export function EditDiffView(props: { beforeText: string; afterText: string; fil
   if (!diffFile) return null;
 
   return (
-    <div className="edit-tool-diff-view tool-text-scroll overflow-x-auto overflow-y-hidden rounded-[10px] border border-black/[0.06] bg-white/[0.58] shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-none">
+    <Card
+      width="100%"
+      padding={0}
+      elevation="low"
+      className="edit-tool-diff-view tool-text-scroll overflow-x-auto overflow-y-hidden"
+    >
       <DiffView
         diffFile={diffFile}
         diffViewMode={DiffModeEnum.Unified}
@@ -113,6 +119,6 @@ export function EditDiffView(props: { beforeText: string; afterText: string; fil
         diffViewWrap={false}
         diffViewFontSize={12}
       />
-    </div>
+    </Card>
   );
 }

@@ -1,147 +1,309 @@
-import { Menu } from "@base-ui/react";
-import * as React from "react";
-import { cn } from "../../lib/shared/utils";
-import { Check } from "../icons";
+import {
+  DropdownMenu as AstryxDropdownMenu,
+  DropdownMenuCheckboxItem as AstryxDropdownMenuCheckboxItem,
+  DropdownMenuDivider as AstryxDropdownMenuDivider,
+  DropdownMenuItem as AstryxDropdownMenuItem,
+  DropdownMenuSubMenu as AstryxDropdownMenuSubMenu,
+  type DropdownMenuButtonProps,
+} from "@astryxdesign/core/DropdownMenu";
+import { Text } from "@astryxdesign/core/Text";
+import {
+  Children,
+  isValidElement,
+  type CSSProperties,
+  type ElementType,
+  type ReactElement,
+  type ReactNode,
+  type MouseEventHandler,
+} from "react";
 
-export const DropdownMenu = Menu.Root;
-export const DropdownMenuTrigger = Menu.Trigger;
-export const DropdownMenuSub = Menu.SubmenuRoot;
+type LegacyRootProps = {
+  children?: ReactNode;
+  open?: boolean;
+  onOpenChange?: (isOpen: boolean) => void;
+};
 
-type DropdownMenuContentProps = React.ComponentPropsWithoutRef<typeof Menu.Popup> &
-  Pick<
-    React.ComponentPropsWithoutRef<typeof Menu.Positioner>,
-    "side" | "align" | "sideOffset" | "collisionPadding"
-  >;
+type LegacyTriggerProps = {
+  children?: ReactNode;
+  render?: ReactElement;
+  className?: string;
+  style?: CSSProperties;
+  disabled?: boolean;
+  title?: string;
+  "aria-label"?: string;
+  type?: "button" | "submit" | "reset";
+};
 
-export const DropdownMenuContent = React.forwardRef<HTMLDivElement, DropdownMenuContentProps>(
-  ({ className, side, align, sideOffset = 4, collisionPadding, ...props }, ref) => (
-    <Menu.Portal>
-      <Menu.Positioner
-        side={side}
-        align={align}
-        sideOffset={sideOffset}
-        collisionPadding={collisionPadding}
-        className="z-[9999]"
-      >
-        <Menu.Popup
-          ref={ref}
-          className={cn(
-            "min-w-48 max-h-[min(var(--available-height),66vh)] overflow-x-hidden overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[open]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:fade-in-0 data-[closed]:zoom-out-95 data-[open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-            className,
-          )}
-          {...props}
-        />
-      </Menu.Positioner>
-    </Menu.Portal>
-  ),
-);
-DropdownMenuContent.displayName = "DropdownMenuContent";
+type LegacyContentProps = {
+  children?: ReactNode;
+  className?: string;
+  side?: "top" | "bottom" | "left" | "right";
+  align?: "start" | "center" | "end";
+  sideOffset?: number;
+  collisionPadding?: number;
+};
 
-export const DropdownMenuLabel = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("px-2 py-1.5 text-sm font-semibold", className)} {...props} />
-));
-DropdownMenuLabel.displayName = "DropdownMenuLabel";
+type LegacyItemProps = {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  disabled?: boolean;
+  onSelect?: () => void;
+  onClick?: () => void;
+  onContextMenu?: MouseEventHandler<HTMLElement>;
+  title?: string;
+  "aria-label"?: string;
+  closeOnClick?: boolean;
+};
 
-export const DropdownMenuSeparator = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentPropsWithoutRef<typeof Menu.Separator>
->(({ className, ...props }, ref) => (
-  <Menu.Separator ref={ref} className={cn("-mx-1 my-1 h-px bg-muted", className)} {...props} />
-));
-DropdownMenuSeparator.displayName = "DropdownMenuSeparator";
+type LegacyCheckboxItemProps = LegacyItemProps & {
+  checked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+};
 
-export const DropdownMenuCheckboxItem = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentPropsWithoutRef<typeof Menu.CheckboxItem>
->(({ className, children, ...props }, ref) => (
-  <Menu.CheckboxItem
-    ref={ref}
-    className={cn(
-      "relative flex cursor-default select-none items-center rounded-xs py-1.5 pl-8 pr-2 text-sm outline-hidden transition-colors data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className,
-    )}
-    {...props}
-  >
-    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-      <Menu.CheckboxItemIndicator>
-        <Check className="h-4 w-4" />
-      </Menu.CheckboxItemIndicator>
-    </span>
-    {children}
-  </Menu.CheckboxItem>
-));
-DropdownMenuCheckboxItem.displayName = "DropdownMenuCheckboxItem";
+type LegacySubProps = {
+  children?: ReactNode;
+  open?: boolean;
+  onOpenChange?: (isOpen: boolean) => void;
+};
 
-type DropdownMenuSubTriggerProps = React.ComponentPropsWithoutRef<typeof Menu.SubmenuTrigger> & {
-  // Menu-button style trigger (e.g. an icon "⋯" button): disables hover-open,
-  // which flips Base UI's click handling from open-only to an open/close
-  // toggle so a second click dismisses the submenu.
+type LegacySubTriggerProps = LegacyItemProps & {
   clickToggle?: boolean;
 };
 
-export const DropdownMenuSubTrigger = React.forwardRef<HTMLElement, DropdownMenuSubTriggerProps>(
-  ({ className, clickToggle, ...props }, ref) => (
-    <Menu.SubmenuTrigger
-      ref={ref}
-      openOnHover={clickToggle ? false : undefined}
-      className={cn(
-        "relative flex cursor-default select-none items-center rounded-xs px-2 py-1.5 text-sm outline-hidden transition-colors data-[disabled]:pointer-events-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[popup-open]:bg-accent data-[popup-open]:text-accent-foreground data-[disabled]:opacity-50",
-        className,
-      )}
-      {...props}
-    />
-  ),
-);
-DropdownMenuSubTrigger.displayName = "DropdownMenuSubTrigger";
+function getNodeText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(getNodeText).join(" ").trim();
+  if (isValidElement<{ children?: ReactNode }>(node)) return getNodeText(node.props.children);
+  return "";
+}
 
-export const DropdownMenuSubContent = React.forwardRef<HTMLDivElement, DropdownMenuContentProps>(
-  (
-    { className, side = "right", align = "start", sideOffset = 6, collisionPadding, ...props },
-    ref,
-  ) => (
-    <Menu.Portal>
-      <Menu.Positioner
-        side={side}
-        align={align}
-        sideOffset={sideOffset}
-        collisionPadding={collisionPadding}
-        className="z-[9999]"
-      >
-        <Menu.Popup
-          ref={ref}
-          className={cn(
-            "min-w-48 max-h-[min(var(--available-height),66vh)] overflow-x-hidden overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[open]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:fade-in-0 data-[closed]:zoom-out-95 data-[open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-            className,
-          )}
-          {...props}
-        />
-      </Menu.Positioner>
-    </Menu.Portal>
-  ),
-);
-DropdownMenuSubContent.displayName = "DropdownMenuSubContent";
+function findElement(node: ReactNode, type: ElementType): ReactElement | undefined {
+  let match: ReactElement | undefined;
+  Children.forEach(node, (child) => {
+    if (match || !isValidElement(child)) return;
+    if (child.type === type) {
+      match = child;
+      return;
+    }
+    match = findElement((child.props as { children?: ReactNode }).children, type);
+  });
+  return match;
+}
 
-type DropdownMenuItemProps = React.ComponentPropsWithoutRef<typeof Menu.Item> & {
-  onSelect?: () => void;
+const BUTTON_VARIANTS: Record<string, DropdownMenuButtonProps["variant"]> = {
+  default: "primary",
+  secondary: "secondary",
+  destructive: "destructive",
+  outline: "secondary",
+  ghost: "ghost",
+  link: "ghost",
 };
 
-export const DropdownMenuItem = React.forwardRef<HTMLDivElement, DropdownMenuItemProps>(
-  ({ className, onSelect, onClick, ...props }, ref) => (
-    <Menu.Item
-      ref={ref}
-      className={cn(
-        "relative flex cursor-default select-none items-center rounded-xs px-2 py-1.5 text-sm outline-hidden transition-colors data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        className,
-      )}
-      onClick={(e) => {
-        onSelect?.();
-        onClick?.(e);
-      }}
-      {...props}
-    />
-  ),
-);
-DropdownMenuItem.displayName = "DropdownMenuItem";
+function parseButton(trigger?: ReactElement): {
+  button: DropdownMenuButtonProps;
+  onClick?: () => void;
+  hasChevron: boolean;
+} {
+  const triggerProps = (trigger?.props ?? {}) as LegacyTriggerProps;
+  const renderedProps = (triggerProps.render?.props ?? {}) as Record<string, unknown>;
+  const content = triggerProps.children ?? (renderedProps.children as ReactNode);
+  const title = (renderedProps.title as string | undefined) ?? triggerProps.title;
+  const ariaLabel =
+    (renderedProps["aria-label"] as string | undefined) ?? triggerProps["aria-label"];
+  const text = getNodeText(content);
+  const label = (ariaLabel ?? title ?? text) || "Menu";
+  const legacySize = renderedProps.size as string | undefined;
+  const isIconOnly = legacySize === "icon" || text.length === 0;
+  const legacyVariant = (renderedProps.variant as string | undefined) ?? "ghost";
+  const size = legacySize === "sm" || legacySize === "lg" ? legacySize : "md";
+
+  return {
+    button: {
+      label,
+      tooltip: title,
+      variant: BUTTON_VARIANTS[legacyVariant] ?? "ghost",
+      size,
+      isDisabled: Boolean(renderedProps.disabled) || Boolean(triggerProps.disabled),
+      isIconOnly,
+      icon: isIconOnly ? content : undefined,
+      children: isIconOnly ? undefined : content,
+      className: (renderedProps.className as string | undefined) ?? triggerProps.className,
+      style: (renderedProps.style as CSSProperties | undefined) ?? triggerProps.style,
+    },
+    onClick: renderedProps.onClick as (() => void) | undefined,
+    hasChevron: !isIconOnly,
+  };
+}
+
+function parseMenuWidth(className?: string): number | string | undefined {
+  if (!className) return undefined;
+  const widths: Array<[string, number]> = [
+    ["min-w-96", 384],
+    ["min-w-80", 320],
+    ["min-w-72", 288],
+    ["min-w-64", 256],
+    ["min-w-52", 208],
+    ["min-w-48", 192],
+    ["min-w-44", 176],
+    ["min-w-40", 160],
+  ];
+  return widths.find(([name]) => className.includes(name))?.[1];
+}
+
+function convertSubMenu(element: ReactElement, key: string | number): ReactNode {
+  const props = element.props as LegacySubProps;
+  const trigger = findElement(props.children, DropdownMenuSubTrigger);
+  const content = findElement(props.children, DropdownMenuSubContent);
+  const triggerProps = (trigger?.props ?? {}) as LegacySubTriggerProps;
+  const contentProps = (content?.props ?? {}) as LegacyContentProps;
+  const label = getNodeText(triggerProps.children) || "More";
+
+  return (
+    <AstryxDropdownMenuSubMenu
+      key={key}
+      label={label}
+      isDisabled={triggerProps.disabled}
+      menuWidth={parseMenuWidth(contentProps.className)}
+      onOpenChange={props.onOpenChange}
+      className={triggerProps.className}
+      style={triggerProps.style}
+    >
+      {convertMenuNodes(contentProps.children)}
+    </AstryxDropdownMenuSubMenu>
+  );
+}
+
+function convertMenuNodes(node: ReactNode): ReactNode[] {
+  const result: ReactNode[] = [];
+  Children.forEach(node, (child, index) => {
+    if (!isValidElement(child)) return;
+    const key = child.key ?? index;
+    if (child.type === DropdownMenuItem) {
+      const props = child.props as LegacyItemProps;
+      result.push(
+        <AstryxDropdownMenuItem
+          key={key}
+          label={props.children}
+          onClick={() => {
+            props.onSelect?.();
+            props.onClick?.();
+          }}
+          isDisabled={props.disabled}
+          variant={props.className?.includes("destructive") ? "destructive" : "default"}
+          className={props.className}
+          style={props.style}
+        />,
+      );
+      return;
+    }
+    if (child.type === DropdownMenuCheckboxItem) {
+      const props = child.props as LegacyCheckboxItemProps;
+      result.push(
+        <AstryxDropdownMenuCheckboxItem
+          key={key}
+          label={props.children}
+          value={Boolean(props.checked)}
+          onChange={props.onCheckedChange}
+          isDisabled={props.disabled}
+          className={props.className}
+          style={props.style}
+        />,
+      );
+      return;
+    }
+    if (child.type === DropdownMenuSeparator) {
+      result.push(<AstryxDropdownMenuDivider key={key} />);
+      return;
+    }
+    if (child.type === DropdownMenuLabel) {
+      const props = child.props as LegacyItemProps;
+      result.push(
+        <Text
+          key={key}
+          as="div"
+          type="supporting"
+          color="secondary"
+          weight="semibold"
+          className={props.className}
+          style={props.style}
+        >
+          {props.children}
+        </Text>,
+      );
+      return;
+    }
+    if (child.type === DropdownMenuSub) {
+      result.push(convertSubMenu(child, key));
+      return;
+    }
+    if (child.type === DropdownMenuTrigger || child.type === DropdownMenuContent) {
+      result.push(...convertMenuNodes((child.props as { children?: ReactNode }).children));
+      return;
+    }
+    result.push(...convertMenuNodes((child.props as { children?: ReactNode }).children));
+  });
+  return result;
+}
+
+/** Converts the former compound tree into native Astryx menu primitives. */
+export function DropdownMenu({ children, open, onOpenChange }: LegacyRootProps) {
+  const trigger = findElement(children, DropdownMenuTrigger);
+  const content = findElement(children, DropdownMenuContent);
+  const contentProps = (content?.props ?? {}) as LegacyContentProps;
+  const parsedButton = parseButton(trigger);
+  const side = contentProps.side ?? "bottom";
+
+  return (
+    <AstryxDropdownMenu
+      button={parsedButton.button}
+      isMenuOpen={open}
+      onOpenChange={onOpenChange}
+      onClick={parsedButton.onClick}
+      hasChevron={parsedButton.hasChevron}
+      menuWidth={parseMenuWidth(contentProps.className)}
+      placement={
+        side === "top" ? "above" : side === "left" ? "start" : side === "right" ? "end" : "below"
+      }
+      alignment={contentProps.align ?? "start"}
+    >
+      {convertMenuNodes(contentProps.children)}
+    </AstryxDropdownMenu>
+  );
+}
+
+export function DropdownMenuTrigger(_props: LegacyTriggerProps): ReactElement | null {
+  return null;
+}
+
+export function DropdownMenuContent(_props: LegacyContentProps): ReactElement | null {
+  return null;
+}
+
+export function DropdownMenuItem(_props: LegacyItemProps): ReactElement | null {
+  return null;
+}
+
+export function DropdownMenuCheckboxItem(_props: LegacyCheckboxItemProps): ReactElement | null {
+  return null;
+}
+
+export function DropdownMenuLabel(_props: LegacyItemProps): ReactElement | null {
+  return null;
+}
+
+export function DropdownMenuSeparator(_props: LegacyItemProps): ReactElement | null {
+  return null;
+}
+
+export function DropdownMenuSub(_props: LegacySubProps): ReactElement | null {
+  return null;
+}
+
+export function DropdownMenuSubTrigger(_props: LegacySubTriggerProps): ReactElement | null {
+  return null;
+}
+
+export function DropdownMenuSubContent(_props: LegacyContentProps): ReactElement | null {
+  return null;
+}
