@@ -71,7 +71,7 @@ function AppChrome(props: { children: ReactNode; nativeMobile?: boolean }) {
     <ContextMenu {...contextMenuProps}>
       <VStack
         data-native-mobile={props.nativeMobile ? "true" : undefined}
-        height="100%"
+        height="var(--xagent-viewport-height)"
         width="100%"
         gap={0}
         className="app-safe-area app-chrome"
@@ -589,7 +589,7 @@ export default function App() {
                 onOpenChange={(isOpen) => {
                   if (!isOpen) closeSettings();
                 }}
-                purpose="info"
+                purpose="form"
                 variant={compactSettingsDialog ? "fullscreen" : "standard"}
                 width="var(--xagent-dialog-width-xl)"
                 maxHeight={compactSettingsDialog ? "100dvh" : "var(--xagent-dialog-height-xl)"}

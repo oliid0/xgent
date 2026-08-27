@@ -87,7 +87,6 @@ export type AssistantUnitRow = {
   mutable: boolean;
   renderMode: "streaming" | "static";
   compacted: boolean;
-  showAvatar: boolean;
   unit: AssistantRenderUnit;
 };
 
@@ -249,7 +248,6 @@ function canReuseLiveUnit(previous: AssistantUnitRow, next: AssistantUnitRow) {
     previous.live !== next.live ||
     previous.renderMode !== next.renderMode ||
     previous.compacted !== next.compacted ||
-    previous.showAvatar !== next.showAvatar ||
     previous.unit.kind !== "block" ||
     next.unit.kind !== "block"
   ) {
@@ -349,7 +347,6 @@ function buildAssistantUnits(input: BuildAssistantUnitsInput): AssistantUnitRow[
         mutable: false,
         renderMode,
         compacted,
-        showAvatar: rows.length === 0,
         unit: {
           kind: "block",
           block,
@@ -386,7 +383,6 @@ function buildAssistantUnits(input: BuildAssistantUnitsInput): AssistantUnitRow[
       mutable: true,
       renderMode,
       compacted,
-      showAvatar: rows.length === 0,
       unit: { kind: "status" },
     });
   } else {
@@ -411,7 +407,6 @@ function buildAssistantUnits(input: BuildAssistantUnitsInput): AssistantUnitRow[
       mutable: false,
       renderMode,
       compacted,
-      showAvatar: rows.length === 0 && rounds.length > 0,
       unit: {
         kind: "footer",
         timestamp,

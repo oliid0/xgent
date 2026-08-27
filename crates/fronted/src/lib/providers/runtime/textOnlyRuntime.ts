@@ -38,6 +38,7 @@ import {
   buildTextModeToolResultsForAssistant,
   normalizeTextModeToolResultHistory,
 } from "./textModeToolRecovery";
+import { captureTransportSnapshot, type TransportSnapshot } from "./transportSnapshot";
 import type { ProviderRuntimeConfig, StreamOptionsEx } from "./types";
 
 function buildTextOnlySystemSuffix(allowJsonOutput = false) {
@@ -79,7 +80,14 @@ function buildTextOnlyStreamOptions(params: {
   cacheRetention?: CacheRetention;
   nativeWebSearch?: boolean;
   debugLogger?: StreamDebugLogger;
-  onRetryStatus?: (attempt: number, maxAttempts: number, errorMessage: string) => void;
+  providerLabel?: string;
+  onRetryStatus?: (
+    attempt: number,
+    maxAttempts: number,
+    errorMessage: string,
+    plannedDelayMs?: number,
+    providerLabel?: string,
+  ) => void;
   onRetryRecovered?: () => void;
 }): StreamOptionsEx {
   const sessionId = normalizeSessionId(params.sessionId);
@@ -119,7 +127,16 @@ function buildTextOnlyStreamOptions(params: {
     // hosted by the upstream provider, so it can stay on auto when explicitly enabled.
     toolChoice: usesOpenAIChatNativeWebSearch ? undefined : nativeWebSearch ? "auto" : "none",
     streamRetry: {
-      onRetry: params.onRetryStatus,
+      onRetry: params.onRetryStatus
+        ? (attempt, maxAttempts, errorMessage, plannedDelayMs) =>
+            params.onRetryStatus?.(
+              attempt,
+              maxAttempts,
+              errorMessage,
+              plannedDelayMs,
+              params.providerLabel,
+            )
+        : undefined,
       onRetryRecovered: params.onRetryRecovered,
     },
   };
@@ -157,7 +174,12 @@ export type TextStreamFailoverParams = {
   /** Fired when an attempt commits on a different target than the previous ones. */
   onSwitched?: (event: { target: TextStreamFailoverTarget | null; errorMessage: string }) => void;
   /** Fired before each switch, including a skip of an open-breaker primary. */
-  onFailover?: (event: { fromLabel: string; toLabel: string; errorMessage: string }) => void;
+  onFailover?: (event: {
+    fromLabel: string;
+    toLabel: string;
+    targetIndex: number;
+    errorMessage: string;
+  }) => void;
 };
 
 export async function streamAssistantMessage(params: {
@@ -174,8 +196,15 @@ export async function streamAssistantMessage(params: {
   allowJsonOutput?: boolean;
   nativeWebSearch?: boolean;
   onHostedSearch?: (block: HostedSearchBlock) => void;
-  onRetryStatus?: (attempt: number, maxAttempts: number, errorMessage: string) => void;
+  onRetryStatus?: (
+    attempt: number,
+    maxAttempts: number,
+    errorMessage: string,
+    plannedDelayMs?: number,
+    providerLabel?: string,
+  ) => void;
   onRetryRecovered?: () => void;
+  onTransportAttempt?: (snapshot: TransportSnapshot & { providerLabel: string }) => void;
   /** Exact provider boundary after the mandatory text-only suffix is appended. */
   onRequestStart?: (info: { context: Context; systemSuffix: string }) => void;
   failover?: TextStreamFailoverParams;
@@ -243,6 +272,7 @@ export async function streamAssistantMessage(params: {
     cacheRetention: params.cacheRetention,
     nativeWebSearch: params.nativeWebSearch,
     debugLogger: params.debugLogger,
+    providerLabel: params.failover?.primary.label ?? `${params.providerId} · ${modelId}`,
     onRetryStatus: params.onRetryStatus,
     onRetryRecovered: params.onRetryRecovered,
   });
@@ -311,6 +341,7 @@ export async function streamAssistantMessage(params: {
           cacheRetention: params.cacheRetention,
           nativeWebSearch: params.nativeWebSearch,
           debugLogger: params.debugLogger,
+          providerLabel: fallback.label,
           onRetryStatus: params.onRetryStatus,
           onRetryRecovered: params.onRetryRecovered,
         }),
@@ -345,8 +376,24 @@ export async function streamAssistantMessage(params: {
   let activeFailoverTargetIndex = 0;
   let lastFailoverErrorMessage = "";
 
+  const notifyTransportAttempt = (
+    runtime: ProviderRuntimeConfig,
+    providerLabel: string,
+    streamOptions: StreamOptionsEx,
+  ) => {
+    try {
+      params.onTransportAttempt?.({
+        ...captureTransportSnapshot(streamOptions.headers, runtime.isFullUrl),
+        providerLabel,
+      });
+    } catch (error) {
+      console.warn("text-only transport observer failed; request is unaffected", error);
+    }
+  };
+
   const startAttemptStream = (activeContext: Context) => {
     if (!failover || failover.fallbacks.length === 0) {
+      notifyTransportAttempt(params.runtime, primaryFailoverLabel, options);
       return streamSimpleByApi(m, activeContext, options);
     }
     // Candidate order: sticky active target first, then the rest in
@@ -376,9 +423,11 @@ export async function streamAssistantMessage(params: {
             : fallbackTargetIdentity(targetIndex),
         start: async () => {
           if (targetIndex === 0 || !fallback) {
+            notifyTransportAttempt(params.runtime, primaryFailoverLabel, options);
             return streamSimpleByApi(m, activeContext, options);
           }
           const prepared = await prepareFallbackTarget(targetIndex);
+          notifyTransportAttempt(fallback.runtime, fallback.label, prepared.options);
           params.debugLogger?.logRequest(
             buildStreamRequestDebugPayload({
               runtime: fallback.runtime,
@@ -398,6 +447,7 @@ export async function streamAssistantMessage(params: {
         failover.onFailover?.({
           fromLabel: event.fromLabel,
           toLabel: event.toLabel,
+          targetIndex: targetOrder[event.toIndex] ?? event.toIndex,
           errorMessage: event.errorMessage,
         });
       },

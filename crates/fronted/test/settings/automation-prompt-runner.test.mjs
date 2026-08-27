@@ -163,9 +163,10 @@ test("Auto Prompt run prefers the queue-time workdir with a global fallback", ()
 
 test("Cron workspace pin stays wired in the unified frontend", () => {
   for (const source of [guiCronModalSource]) {
-    // Radix SelectItem rejects empty-string values, so "follow active" must
-    // go through the sentinel and map back to "" on save; the custom-path
-    // mode keeps arbitrary (tool-pinned) paths visible and editable.
+    // The Astryx Selector needs stable non-empty option values, so "follow
+    // active" goes through a sentinel and maps back to ""; custom mode keeps
+    // arbitrary (tool-pinned) paths visible and editable.
+    assert.match(source, /import \{ Selector \} from "@astryxdesign\/core\/Selector"/);
     assert.match(
       source,
       /const FOLLOW_ACTIVE_WORKSPACE_VALUE = "__follow-active-workspace__"/,
@@ -192,7 +193,11 @@ test("Cron workspace pin stays wired in the unified frontend", () => {
       source,
       /Boolean\(initialWorkdir && !findWorkspaceOptionByPath\(workspaceOptions, initialWorkdir\)\)/,
     );
-    assert.match(source, /: findWorkspaceOptionByPath\(workspaceOptions, workdir\)/);
+    assert.match(source, /<Selector[\s\S]*value=\{[\s\S]*customWorkdir[\s\S]*CUSTOM_WORKDIR_VALUE/);
+    assert.match(source, /\.\.\.workspaceOptions\.map\(\(option\) => \(\{[\s\S]*value: option\.path/);
+    assert.match(source, /if \(value === FOLLOW_ACTIVE_WORKSPACE_VALUE\) \{[\s\S]*setWorkdir\(""\)/);
+    assert.match(source, /else if \(value === CUSTOM_WORKDIR_VALUE\) \{[\s\S]*setCustomWorkdir\(true\)/);
+    assert.match(source, /else \{[\s\S]*setCustomWorkdir\(false\);[\s\S]*setWorkdir\(value\)/);
   }
   for (const source of [guiCronViewSource]) {
     assert.match(source, /\{task\.workdir \? \(/);

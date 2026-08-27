@@ -1,15 +1,9 @@
+import { Selector } from "@astryxdesign/core/Selector";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import { Paragraph as AstryxParagraph, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { ChevronDown, Globe, Trash2 } from "../../components/icons";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
 import { Textarea } from "../../components/ui/textarea";
 import { useLocale } from "../../i18n";
 import {
@@ -172,27 +166,21 @@ export function HttpRequestListEditor({
                 {index + 1}
               </AstryxView>
 
-              <Select
+              <Selector
+                label={t("settings.cronHttpMethod")}
+                isLabelHidden
                 value={request.method}
-                onValueChange={(value) => {
+                width="var(--xagent-http-method-width)"
+                size="sm"
+                options={HTTP_METHODS.map((method) => ({ value: method, label: method }))}
+                onChange={(value) => {
                   onDirty();
                   updateRequest(request.id, {
                     method: value as HttpMethod,
                     bodyText: canHttpMethodHaveBody(value as HttpMethod) ? request.bodyText : "",
                   });
                 }}
-              >
-                <SelectTrigger className="h-8 w-[100px] text-xs font-semibold">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {HTTP_METHODS.map((method) => (
-                    <SelectItem key={method} value={method}>
-                      {method}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
 
               <Input
                 value={request.url}

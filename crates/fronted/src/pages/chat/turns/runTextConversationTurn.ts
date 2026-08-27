@@ -372,11 +372,13 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
                 onSwitched: ({ target, errorMessage }) => {
                   failover.onSwitched?.({ target, round: textRound, errorMessage });
                 },
-                onFailover: ({ fromLabel, toLabel, errorMessage }) => {
+                onFailover: ({ fromLabel, toLabel, targetIndex, errorMessage }) => {
                   failoverAttempt += 1;
-                  trajectory.noteRetry(textRound, {
+                  trajectory.noteFailover(textRound, {
                     attempt: failoverAttempt,
-                    maxRetries: failover.fallbacks.length,
+                    fromLabel,
+                    toLabel,
+                    targetIndex,
                     ...(errorMessage ? { error: errorMessage } : {}),
                   });
                   failoverStatusVisible = true;
@@ -390,6 +392,17 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
           workdir: conversationCwd,
           sessionId,
           nativeWebSearch: nativeWebSearchEnabled,
+          onTransportAttempt: (snapshot) => {
+            trajectory.noteTransport(textRound, {
+              provider: snapshot.providerLabel,
+              ...(snapshot.upstreamOrigin === undefined
+                ? {}
+                : { upstreamOrigin: snapshot.upstreamOrigin }),
+              useSystemProxy: snapshot.useSystemProxy,
+              fullUrl: snapshot.fullUrl,
+              headerNames: snapshot.headerNames,
+            });
+          },
           onRequestStart: ({ context, systemSuffix }) => {
             recordTextRequestStart(context, systemSuffix);
           },
@@ -434,11 +447,24 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
           },
           signal: scope.controller.signal,
           debugLogger: streamAttempt === 0 ? conversationDebugLogger : recoveryDebugLogger,
-          onRetryStatus: (attempt, maxAttempts, errorMessage) => {
+          onRetryStatus: (attempt, maxAttempts, errorMessage, plannedDelayMs, providerLabel) => {
+            trajectory.noteRetry(textRound, {
+              attempt,
+              maxRetries: maxAttempts,
+              ...(plannedDelayMs === undefined ? {} : { delayMs: plannedDelayMs }),
+              ...(errorMessage === "" ? {} : { error: errorMessage }),
+              ...(providerLabel === undefined ? {} : { provider: providerLabel }),
+            });
             updateConversationEventToolStatus(
               `连接已断开，正在重试 (${attempt}/${maxAttempts})...`,
             );
-            retryAttemptsForAttempt.push({ attempt, maxAttempts, errorMessage });
+            retryAttemptsForAttempt.push({
+              attempt,
+              maxAttempts,
+              errorMessage,
+              ...(plannedDelayMs === undefined ? {} : { plannedDelayMs }),
+              ...(providerLabel === undefined ? {} : { providerLabel }),
+            });
             updateRetryAttempts(retryAttemptsForAttempt.slice(), transcriptStore);
           },
           onRetryRecovered: () => {

@@ -316,3 +316,14 @@ test("fs tool descriptions keep Image as the only display path for images", () =
     /Always use this instead of Bash, ManagedProcess, shell scripts, or deletion-oriented CLIs such as rm\/rmdir\/unlink\/find -delete\/git rm\/git clean\/PowerShell Remove-Item\/cmd del, erase, or rd\./,
   );
 });
+
+test("AskUserQuestion is reserved for genuinely blocking user-owned decisions", () => {
+  const suffix = agentRunnerModule.buildToolsSuffix("/workspace", [
+    "AskUserQuestion",
+    "Read",
+    "Write",
+  ]);
+  assert.match(suffix, /exceptional blocking tool, not a required step in every task/);
+  assert.match(suffix, /Prefer a reasonable reversible assumption and continue/);
+  assert.doesNotMatch(suffix, /ask proactively instead of guessing/);
+});

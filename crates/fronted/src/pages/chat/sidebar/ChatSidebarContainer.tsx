@@ -54,6 +54,7 @@ type ChatSidebarContainerProps = {
   onMoveProjectToGroup: (projectPath: string, groupId: string | null) => void;
   onToggleWorkspaceGroupCollapsed: (groupId: string) => void;
   onSelectProject: (project: WorkspaceProject) => void;
+  onOpenWorkspaceSettings?: (project: WorkspaceProject) => void;
   onNewConversationForProject: (project: WorkspaceProject) => void;
   onBrowseProjectInFileTree?: (project: WorkspaceProject) => void;
   onBrowseProjectInSystemFileManager?: (project: WorkspaceProject) => void;
@@ -68,6 +69,7 @@ type ChatSidebarContainerProps = {
   archivedProjectPathKeys?: ReadonlySet<string>;
   onNewConversation: () => void;
   onSelectConversation: (id: string) => void;
+  onOpenConversationInSplit?: (id: string) => void;
   // Invoked after the store confirmed a deletion; ChatPage cleans artifacts
   // and replaces the current conversation when needed.
   onConversationDeleted: (id: string) => void;
@@ -314,6 +316,7 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         onMoveProjectToGroup={props.onMoveProjectToGroup}
         onToggleWorkspaceGroupCollapsed={props.onToggleWorkspaceGroupCollapsed}
         onSelectProject={props.onSelectProject}
+        onOpenWorkspaceSettings={props.onOpenWorkspaceSettings}
         onNewConversationForProject={props.onNewConversationForProject}
         onBrowseProjectInFileTree={props.onBrowseProjectInFileTree}
         onBrowseProjectInSystemFileManager={props.onBrowseProjectInSystemFileManager}
@@ -328,6 +331,7 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         archivedProjectPathKeys={props.archivedProjectPathKeys}
         onNewConversation={props.onNewConversation}
         onSelectConversation={props.onSelectConversation}
+        onOpenConversationInSplit={props.onOpenConversationInSplit}
         onStartRenaming={handleStartRenaming}
         onRenameDraftChange={setRenameDraft}
         onCommitRename={handleCommitRename}

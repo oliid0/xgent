@@ -36,9 +36,9 @@ export function AssistantRowFooter(props: AssistantRowFooterProps) {
   const { timestamp, replyText, retryTarget, onResendFromEdit, onBranchConversation } = props;
   const { t } = useLocale();
   const { copied, markCopied } = useCopiedFlag();
-  const { isSending, branchPendingMessageId } = useRowInteraction();
+  const { isSending, isReadOnly, branchPendingMessageId } = useRowInteraction();
   const retryMessageRef = retryTarget?.messageRef;
-  const retryDisabled = isSending || !retryMessageRef;
+  const retryDisabled = isSending || isReadOnly || !retryMessageRef;
   const retryTitle = retryMessageRef ? t("chat.retry") : "旧历史缺少稳定消息标识，无法重试";
   const branchPending = branchPendingMessageId != null;
   const isRowBranchPending =
@@ -47,11 +47,11 @@ export function AssistantRowFooter(props: AssistantRowFooterProps) {
     branchPendingMessageId === retryMessageRef?.messageId;
 
   return (
-    <HStack gap={1.5} vAlign="center" className="mt-1 pl-10">
+    <HStack gap={1.5} vAlign="center" paddingBlockStart={1}>
       <MessageTimestamp value={timestamp} />
       <HStack
         gap={0.5}
-        className={`transition-opacity group-focus-within/assistant:opacity-100 group-hover/assistant:opacity-100 ${
+        className={`chat-message-actions transition-opacity group-focus-within/assistant:opacity-100 group-hover/assistant:opacity-100 ${
           isRowBranchPending ? "opacity-100" : "opacity-0"
         }`}
       >
@@ -108,7 +108,13 @@ export function AssistantRowFooter(props: AssistantRowFooterProps) {
               variant="ghost"
               size="sm"
               isLoading={isRowBranchPending}
-              isDisabled={isSending || !retryMessageRef || !onBranchConversation || branchPending}
+              isDisabled={
+                isSending ||
+                isReadOnly ||
+                !retryMessageRef ||
+                !onBranchConversation ||
+                branchPending
+              }
             />
           )}
         </ConfirmActionPopover>
@@ -130,16 +136,19 @@ export function UserRowFooter(props: UserRowFooterProps) {
   const { itemKey, text, timestamp, hasStableRef, messageId, onStartEdit } = props;
   const { t } = useLocale();
   const { copied, markCopied } = useCopiedFlag();
-  const { isSending } = useRowInteraction();
+  const { isSending, isReadOnly } = useRowInteraction();
   const checkpointRewind = useCheckpointRewind();
   const [rewindError, setRewindError] = useState<string | null>(null);
-  const editDisabled = isSending || !hasStableRef;
+  const editDisabled = isSending || isReadOnly || !hasStableRef;
   const editTitle = hasStableRef ? t("chat.edit") : "旧历史缺少稳定消息标识，无法编辑重发";
   const isRewinding = checkpointRewind?.busyTurnId === messageId;
 
   return (
-    <HStack gap={1.5} vAlign="center" hAlign="end" className="mt-1">
-      <HStack gap={0.5} className="opacity-0 transition-opacity group-hover:opacity-100">
+    <HStack gap={1.5} vAlign="center" hAlign="end" paddingBlockStart={1}>
+      <HStack
+        gap={0.5}
+        className="chat-message-actions opacity-0 transition-opacity group-hover:opacity-100"
+      >
         <IconButton
           label={t("chat.copy")}
           tooltip={t("chat.copy")}

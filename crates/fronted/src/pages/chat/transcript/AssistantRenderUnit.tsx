@@ -1,5 +1,5 @@
 import { ChatMessage } from "@astryxdesign/core/Chat";
-import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { VStack } from "@astryxdesign/core/Layout";
 import { memo, useMemo } from "react";
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
 import { CloudArtifactsCard } from "../../../components/chat/CloudArtifactsCard";
@@ -9,7 +9,7 @@ import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTran
 import { collectChangedFiles } from "../../../lib/chat/messages/changedFiles";
 import { collectCloudArtifacts } from "../../../lib/chat/messages/cloudArtifacts";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
-import { AssistantAvatar, AssistantBubbleUnit } from "../components/AssistantBubble";
+import { AssistantBubbleUnit } from "../components/AssistantBubble";
 import { AssistantRowFooter } from "./RowActions";
 import type { AssistantFooterRenderUnit, AssistantUnitRow } from "./rowModel";
 
@@ -33,12 +33,11 @@ export type AssistantRenderUnitProps = {
 
 const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
   unit: AssistantFooterRenderUnit;
-  showAvatar: boolean;
   compacted: boolean;
   onResendFromEdit: AssistantRenderUnitProps["onResendFromEdit"];
   onBranchConversation?: AssistantRenderUnitProps["onBranchConversation"];
 }) {
-  const { unit, showAvatar, compacted, onResendFromEdit, onBranchConversation } = props;
+  const { unit, compacted, onResendFromEdit, onBranchConversation } = props;
   const changedFiles = useMemo(
     () => (unit.hasChangedFilesCandidate ? collectChangedFiles(unit.rounds) : null),
     [unit.hasChangedFilesCandidate, unit.rounds],
@@ -50,22 +49,11 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
     <ChatMessage
       sender="assistant"
       density="compact"
-      avatar={
-        showAvatar ? (
-          <AssistantAvatar />
-        ) : (
-          <HStack
-            aria-hidden="true"
-            width="var(--xagent-assistant-avatar-size)"
-            height="var(--xagent-assistant-avatar-size)"
-          />
-        )
-      }
       className="group/assistant"
       style={compacted ? { opacity: "var(--xagent-opacity-compacted)" } : undefined}
     >
       {hasCards ? (
-        <VStack gap={2} width="100%" paddingBlockStart={showAvatar ? 0.5 : 0}>
+        <VStack gap={2} width="100%">
           {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
           {cloudArtifacts.length > 0 ? <CloudArtifactsCard artifacts={cloudArtifacts} /> : null}
         </VStack>
@@ -102,7 +90,6 @@ export const AssistantRenderUnit = memo(function AssistantRenderUnit(
     return (
       <AssistantFooterUnit
         unit={row.unit}
-        showAvatar={row.showAvatar}
         compacted={row.compacted}
         onResendFromEdit={onResendFromEdit}
         onBranchConversation={onBranchConversation}

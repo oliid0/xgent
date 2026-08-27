@@ -7,6 +7,7 @@ import { createContext, useContext, useLayoutEffect, useRef, useSyncExternalStor
 
 export type RowInteractionState = {
   isSending: boolean;
+  isReadOnly: boolean;
   branchPendingMessageId: string | null;
 };
 
@@ -15,7 +16,11 @@ export type RowInteractionStore = {
   subscribe: (listener: () => void) => () => void;
 };
 
-const IDLE_STATE: RowInteractionState = { isSending: false, branchPendingMessageId: null };
+const IDLE_STATE: RowInteractionState = {
+  isSending: false,
+  isReadOnly: false,
+  branchPendingMessageId: null,
+};
 
 const IDLE_STORE: RowInteractionStore = {
   getSnapshot: () => IDLE_STATE,
@@ -46,6 +51,7 @@ export function useRowInteractionStore(state: RowInteractionState): RowInteracti
     const previous = stateRef.current;
     if (
       previous.isSending === state.isSending &&
+      previous.isReadOnly === state.isReadOnly &&
       previous.branchPendingMessageId === state.branchPendingMessageId
     ) {
       return;

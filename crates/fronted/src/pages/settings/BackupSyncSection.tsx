@@ -1,3 +1,4 @@
+import { Selector } from "@astryxdesign/core/Selector";
 import { listen } from "@xagent/runtime";
 import {
   Inline as AstryxInline,
@@ -22,13 +23,6 @@ import { Button } from "../../components/ui/button";
 import { useConfirmDialog } from "../../components/ui/confirm-dialog";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
 import { Switch } from "../../components/ui/switch";
 import { useLocale } from "../../i18n";
 import {
@@ -497,20 +491,20 @@ export function BackupSyncSection(props: SettingsSectionProps) {
 
         <AstryxView layout="block" direction="horizontal" className="space-y-3">
           <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-            <Label className="text-xs">{t("settings.backupSyncPreset")}</Label>
-            <Select value={preset} onValueChange={handlePresetChange} disabled={syncLocked}>
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SYNC_PRESETS.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {t(`settings.backupSyncPreset_${item.id}`)}
-                  </SelectItem>
-                ))}
-                <SelectItem value="custom">{t("settings.backupSyncPreset_custom")}</SelectItem>
-              </SelectContent>
-            </Select>
+            <Selector
+              label={t("settings.backupSyncPreset")}
+              value={preset}
+              width="100%"
+              isDisabled={syncLocked}
+              options={[
+                ...SYNC_PRESETS.map((item) => ({
+                  value: item.id,
+                  label: t(`settings.backupSyncPreset_${item.id}`),
+                })),
+                { value: "custom", label: t("settings.backupSyncPreset_custom") },
+              ]}
+              onChange={handlePresetChange}
+            />
           </AstryxView>
 
           <AstryxView layout="block" direction="horizontal" className="space-y-1.5">

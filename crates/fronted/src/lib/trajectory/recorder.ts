@@ -72,7 +72,33 @@ export type TrajectoryRecorder = {
   stepEnd: (step: number, info: TrajectoryStepEndInfo) => void;
   noteRetry: (
     step: number,
-    info: { attempt: number; maxRetries?: number; delayMs?: number; error?: string },
+    info: {
+      attempt: number;
+      maxRetries?: number;
+      delayMs?: number;
+      error?: string;
+      provider?: string;
+    },
+  ) => void;
+  noteFailover: (
+    step: number,
+    info: {
+      attempt: number;
+      fromLabel?: string;
+      toLabel?: string;
+      targetIndex?: number;
+      error?: string;
+    },
+  ) => void;
+  noteTransport: (
+    step: number,
+    info: {
+      provider?: string;
+      upstreamOrigin?: string;
+      useSystemProxy?: boolean;
+      fullUrl?: boolean;
+      headerNames?: readonly string[];
+    },
   ) => void;
   toolStart: (step: number, toolCall: { id: string; name: string; arguments?: unknown }) => void;
   toolEnd: (
@@ -124,6 +150,8 @@ export const NOOP_TRAJECTORY_RECORDER: TrajectoryRecorder = {
   firstToken: () => {},
   stepEnd: () => {},
   noteRetry: () => {},
+  noteFailover: () => {},
+  noteTransport: () => {},
   toolStart: () => {},
   toolEnd: () => {},
   compactionStart: () => {},
@@ -298,6 +326,35 @@ export function createTrajectoryRecorder(params: {
         ...(info.maxRetries === undefined ? {} : { max: info.maxRetries }),
         ...(info.delayMs === undefined ? {} : { delay: info.delayMs }),
         ...(info.error === undefined ? {} : { err: info.error }),
+        ...(info.provider === undefined ? {} : { p: info.provider }),
+      });
+    },
+    noteFailover: (step, info) => {
+      emit({
+        k: "failover",
+        t: currentTurn,
+        s: step,
+        at: Date.now(),
+        n: info.attempt,
+        ...(info.fromLabel === undefined ? {} : { from: info.fromLabel }),
+        ...(info.toLabel === undefined ? {} : { to: info.toLabel }),
+        ...(info.targetIndex === undefined ? {} : { ti: info.targetIndex }),
+        ...(info.error === undefined ? {} : { err: info.error }),
+      });
+    },
+    noteTransport: (step, info) => {
+      emit({
+        k: "transport",
+        t: currentTurn,
+        s: step,
+        at: Date.now(),
+        ...(info.provider === undefined ? {} : { p: info.provider }),
+        ...(info.upstreamOrigin === undefined ? {} : { o: info.upstreamOrigin }),
+        ...(info.useSystemProxy === undefined ? {} : { sp: info.useSystemProxy }),
+        ...(info.fullUrl === undefined ? {} : { fu: info.fullUrl }),
+        ...(info.headerNames === undefined || info.headerNames.length === 0
+          ? {}
+          : { hn: [...info.headerNames] }),
       });
     },
     toolStart: (step, toolCall) => {

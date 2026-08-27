@@ -40,6 +40,7 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
     usageContextWindow,
     liveTranscriptStore,
     isCompactionRunning,
+    isReadOnly = false,
     bottomReservePx = 0,
     onOpenFileLink,
     onResendFromEdit,
@@ -48,17 +49,19 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
     onOpenSettings,
     onSuggestionSelect,
     suggestionsDisabled = false,
+    emptyStateComposer,
   } = props;
   const { locale } = useLocale();
   const showNoModelsState = !hasModels;
   const showStartChatState = hasModels && historyItems.length === 0 && !isSending;
   const shouldReserveTranscriptBottomSpace = !(showNoModelsState || showStartChatState);
-  // The reserve minimum doubles as the scroll-follow reattach zone: stopping
-  // anywhere inside the reserve looks like "the bottom" to the user, so the
-  // zone must stay >= this minimum for scroll-back-to-bottom to re-stick.
-  const transcriptBottomReservePx = shouldReserveTranscriptBottomSpace
-    ? Math.max(BOTTOM_REATTACH_ZONE_PX, Math.ceil(bottomReservePx) + 12)
-    : 0;
+  // A reserve is only needed when a caller deliberately overlays the composer.
+  // The normal chat frame keeps the composer in layout flow, so a zero reserve
+  // must remain zero instead of manufacturing a blank strip below the reply.
+  const transcriptBottomReservePx =
+    shouldReserveTranscriptBottomSpace && bottomReservePx > 0
+      ? Math.max(BOTTOM_REATTACH_ZONE_PX, Math.ceil(bottomReservePx) + 12)
+      : 0;
   // Keep the transcript on a native scrolling element. This avoids custom
   // ScrollArea geometry work on every WebKit scroll while retaining the same
   // content container and visual layout.
@@ -137,6 +140,7 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
   // row props, so settled rows stay memo-stable across run start/settle.
   const rowInteractionStore = useRowInteractionStore({
     isSending,
+    isReadOnly,
     branchPendingMessageId: branchPendingMessageId ?? null,
   });
 
@@ -171,43 +175,45 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
   const jumpToBottomLabel = locale === "en-US" ? "Scroll to bottom" : "回到底部";
 
   return (
-    <ContextMenu
-      label={copySelectedTextLabel}
-      size="sm"
-      items={[
-        {
-          label: copySelectedTextLabel,
-          icon: <Icon icon={Copy} size="sm" color="inherit" />,
-          isDisabled: !selectedTranscriptText,
-          onClick: () => writeTextToClipboard(selectedTranscriptText),
-        },
-      ]}
+    <VStack
+      ref={transcriptRootRef}
+      minHeight={0}
+      style={{ position: "relative", flex: 1 }}
+      onContextMenuCapture={() => {
+        setSelectedTranscriptText(resolveTranscriptSelectionText(transcriptRootRef.current));
+      }}
     >
       <VStack
-        ref={transcriptRootRef}
-        minHeight={0}
-        style={{ position: "relative", flex: 1 }}
-        onContextMenuCapture={() => {
-          setSelectedTranscriptText(resolveTranscriptSelectionText(transcriptRootRef.current));
-        }}
+        ref={(element) => setScrollViewport(element as HTMLDivElement | null)}
+        data-scroll-viewport
+        width="100%"
+        height="100%"
+        isScrollable
+        style={{ overflowAnchor: "none" }}
       >
-        <VStack
-          ref={(element) => setScrollViewport(element as HTMLDivElement | null)}
-          data-scroll-viewport
-          width="100%"
-          height="100%"
-          isScrollable
-          style={{ overflowAnchor: "none" }}
+        <ContextMenu
+          data-transcript-context-trigger=""
+          label={copySelectedTextLabel}
+          size="sm"
+          items={[
+            {
+              label: copySelectedTextLabel,
+              icon: <Icon icon={Copy} size="sm" color="inherit" />,
+              isDisabled: !selectedTranscriptText,
+              onClick: () => writeTextToClipboard(selectedTranscriptText),
+            },
+          ]}
         >
           <VStack
             width="100%"
+            minHeight="100%"
             maxWidth="var(--xagent-content-width-md)"
             paddingInline={5}
             paddingBlock={4}
             style={{ marginInline: "auto" }}
           >
             {showNoModelsState || showStartChatState ? (
-              <Center style={{ minHeight: "var(--xagent-chat-empty-stage-min-height)" }}>
+              <Center width="100%" style={{ flex: 1, minHeight: 0 }}>
                 {/* Keyed per conversation so the hero entrance replays when
                   switching between empty conversations, not just on mount. */}
                 <ChatEmptyState
@@ -216,6 +222,7 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
                   onOpenSettings={onOpenSettings}
                   onSuggestionSelect={onSuggestionSelect}
                   suggestionsDisabled={suggestionsDisabled}
+                  composer={emptyStateComposer}
                 />
               </Center>
             ) : null}
@@ -266,37 +273,37 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
 
             <VStack style={{ height: transcriptBottomReservePx }} />
           </VStack>
-        </VStack>
-        {!showNoModelsState && !showStartChatState && !isTranscriptSettling ? (
-          <FloorNavRail
-            conversationId={conversationId}
-            floors={floors}
-            activeRowKey={activeFloorKey}
-            bottomOffset={`${Math.ceil(transcriptBottomReservePx) + 8}px`}
-            scrollViewport={scrollViewport}
-            onJump={handleFloorJump}
-          />
-        ) : null}
-        {!following ? (
-          <IconButton
-            label={jumpToBottomLabel}
-            tooltip={jumpToBottomLabel}
-            icon={<Icon icon={ChevronDown} size="sm" color="inherit" />}
-            size="sm"
-            variant="secondary"
-            elevation="med"
-            onClick={() => scrollFollowHandle.jumpToBottom()}
-            className="chat-jump-to-bottom"
-            style={{
-              position: "absolute",
-              insetInlineStart: "50%",
-              zIndex: "var(--xagent-z-chat-floating-action)",
-              bottom: `calc(${Math.ceil(bottomReservePx)}px + var(--spacing-4))`,
-            }}
-          />
-        ) : null}
-        {isHistorySwitching || isTranscriptSettling ? <HistorySwitchLoadingOverlay /> : null}
+        </ContextMenu>
       </VStack>
-    </ContextMenu>
+      {!showNoModelsState && !showStartChatState && !isTranscriptSettling ? (
+        <FloorNavRail
+          conversationId={conversationId}
+          floors={floors}
+          activeRowKey={activeFloorKey}
+          bottomOffset={`${Math.ceil(transcriptBottomReservePx) + 8}px`}
+          scrollViewport={scrollViewport}
+          onJump={handleFloorJump}
+        />
+      ) : null}
+      {!following ? (
+        <IconButton
+          label={jumpToBottomLabel}
+          tooltip={jumpToBottomLabel}
+          icon={<Icon icon={ChevronDown} size="sm" color="inherit" />}
+          size="sm"
+          variant="secondary"
+          elevation="med"
+          onClick={() => scrollFollowHandle.jumpToBottom()}
+          className="chat-jump-to-bottom"
+          style={{
+            position: "absolute",
+            insetInlineStart: "50%",
+            zIndex: "var(--xagent-z-chat-floating-action)",
+            bottom: `calc(${Math.ceil(bottomReservePx)}px + var(--spacing-4))`,
+          }}
+        />
+      ) : null}
+      {isHistorySwitching || isTranscriptSettling ? <HistorySwitchLoadingOverlay /> : null}
+    </VStack>
   );
 });

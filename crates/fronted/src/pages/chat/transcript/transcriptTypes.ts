@@ -1,4 +1,4 @@
-import type { MutableRefObject } from "react";
+import type { MutableRefObject, ReactNode } from "react";
 import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type {
   HistoryMessageRef,
@@ -28,6 +28,8 @@ export type ChatTranscriptProps = {
   usageContextWindow?: number;
   liveTranscriptStore: LiveTranscriptStore;
   isCompactionRunning: boolean;
+  /** Keeps copy/navigation available while removing mutation actions. */
+  isReadOnly?: boolean;
   bottomReservePx?: number;
   onOpenFileLink?: (link: ChatFileLink) => void;
   onResendFromEdit: (
@@ -42,4 +44,6 @@ export type ChatTranscriptProps = {
   onOpenSettings: (section?: SectionId) => void;
   onSuggestionSelect?: (text: string) => void;
   suggestionsDisabled?: boolean;
+  /** The live composer moves into the empty-state hero without duplicating its state or handlers. */
+  emptyStateComposer?: ReactNode;
 };

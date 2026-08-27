@@ -34,7 +34,6 @@ import {
   Shield,
   Sparkles,
   Terminal,
-  Waypoints,
   Zap,
 } from "../components/icons";
 
@@ -49,11 +48,12 @@ import { HooksSection } from "./settings/HooksSection";
 import { McpSettingsSection } from "./settings/McpSettingsSection";
 import { MobileAssistantSection } from "./settings/MobileAssistantSection";
 import { MobileExecutionSection } from "./settings/MobileExecutionSection";
-import { ModelFailoverSection } from "./settings/ModelFailoverSection";
 import { MemoryPanel } from "./settings/memory/MemoryPanel";
 import { ProjectRootsSection } from "./settings/ProjectRootsSection";
-import { ProvidersSection } from "./settings/ProvidersSection";
-import { ProviderUsageSection } from "./settings/ProviderUsageSection";
+import {
+  type ProviderSettingsPanel,
+  ProviderSettingsSection,
+} from "./settings/ProviderSettingsSection";
 import { SkillsSettingsForm } from "./settings/SkillsSettingsForm";
 import { SoulSection } from "./settings/SoulSection";
 import { SshSettingsSection } from "./settings/SshSettingsSection";
@@ -160,11 +160,6 @@ const NAV_GROUPS: NavGroup[] = [
         descriptionKey: "settings.mobile.providersDescription",
       },
       {
-        id: "failover",
-        icon: Waypoints,
-        descriptionKey: "settings.failover.desc",
-      },
-      {
         id: "shortcuts",
         icon: Keyboard,
         descriptionKey: "settings.globalShortcutsDesc",
@@ -191,11 +186,6 @@ const NAV_GROUPS: NavGroup[] = [
         icon: Mic,
         descriptionKey: "settings.stt.desc",
         desktopOnly: true,
-      },
-      {
-        id: "usage",
-        icon: Cloud,
-        descriptionKey: "settings.usage.desc",
       },
     ],
   },
@@ -278,6 +268,14 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+function normalizeSettingsSection(value: SectionId): SectionId {
+  return value === "failover" || value === "usage" ? "providers" : value;
+}
+
+function providerPanelFromSection(value: SectionId): ProviderSettingsPanel {
+  return value === "failover" ? "failover" : value === "usage" ? "usage" : "configuration";
+}
+
 export function SettingsPage(props: SettingsPageProps) {
   const {
     settings,
@@ -294,7 +292,10 @@ export function SettingsPage(props: SettingsPageProps) {
   const { t } = useLocale();
   const compactViewport = useCompactViewport();
   const compactSettings = nativeMobile || compactViewport;
-  const [section, setSection] = useState<SectionId>(initialSection);
+  const [section, setSection] = useState<SectionId>(() => normalizeSettingsSection(initialSection));
+  const [providerPanel, setProviderPanel] = useState<ProviderSettingsPanel>(() =>
+    providerPanelFromSection(initialSection),
+  );
   const [mobileDetailOpen, setMobileDetailOpen] = useState(
     () => compactSettings && initialSection !== "system",
   );
@@ -362,8 +363,9 @@ export function SettingsPage(props: SettingsPageProps) {
   }, [navGroups, visibleDesktopNavItems]);
 
   useEffect(() => {
-    setSection(initialSection);
-    setMobileDetailOpen(compactSettings && initialSection !== "system");
+    setSection(normalizeSettingsSection(initialSection));
+    setProviderPanel(providerPanelFromSection(initialSection));
+    setMobileDetailOpen(compactSettings && normalizeSettingsSection(initialSection) !== "system");
   }, [compactSettings, initialSection]);
 
   useEffect(() => {
@@ -379,14 +381,16 @@ export function SettingsPage(props: SettingsPageProps) {
     switch (section) {
       case "providers":
         return (
-          <ProvidersSection
+          <ProviderSettingsSection
             settings={settings}
             setSettings={setSettings}
+            panel={providerPanel}
+            onPanelChange={setProviderPanel}
             thirdPartyImportEnabled={!nativeMobile}
           />
         );
       case "failover":
-        return <ModelFailoverSection settings={settings} setSettings={setSettings} />;
+        return null;
       case "soul":
         return <SoulSection createRequestId={soulCreateRequestId} />;
       case "system":
@@ -451,7 +455,7 @@ export function SettingsPage(props: SettingsPageProps) {
       case "voice":
         return <SttSettingsSection settings={settings} setSettings={setSettings} />;
       case "usage":
-        return <ProviderUsageSection settings={settings} setSettings={setSettings} />;
+        return null;
       case "about":
         return <AboutSection settings={settings} setSettings={setSettings} appUpdate={appUpdate} />;
       default: {
@@ -466,7 +470,7 @@ export function SettingsPage(props: SettingsPageProps) {
       <Layout
         height="fill"
         padding={0}
-        className="settings-page settings-page-compact bg-surface"
+        className="settings-page settings-page-compact"
         data-edge-swipe-ignore
         header={
           <DialogHeader
@@ -498,16 +502,24 @@ export function SettingsPage(props: SettingsPageProps) {
               className="settings-section-enter"
             >
               <VStack
+                width="100%"
+                maxWidth="var(--xagent-settings-content-max-width)"
                 height="100%"
                 minHeight={sectionManagesScroll ? 0 : "100%"}
                 className="settings-section-shell"
+                style={{ marginInline: "auto" }}
               >
                 {sectionContent}
               </VStack>
             </LayoutContent>
           ) : (
             <LayoutContent padding={4} label={t("settings.title")}>
-              <VStack width="100%" maxWidth={640} gap={4} className="mx-auto">
+              <VStack
+                width="100%"
+                maxWidth="var(--xagent-content-width-md)"
+                gap={4}
+                style={{ marginInline: "auto" }}
+              >
                 {navGroups.map((group) => (
                   <List
                     key={group.label}
@@ -518,7 +530,6 @@ export function SettingsPage(props: SettingsPageProps) {
                         {group.label}
                       </Text>
                     }
-                    className="settings-mobile-group"
                   >
                     {group.items.map((item) => (
                       <ListItem
@@ -547,12 +558,13 @@ export function SettingsPage(props: SettingsPageProps) {
     <Layout
       height="fill"
       padding={0}
-      className="settings-page settings-page-desktop bg-surface"
+      className="settings-page settings-page-desktop"
+      style={{ height: "var(--xagent-dialog-height-xl)" }}
       data-edge-swipe-ignore
       header={<DialogHeader title={t("settings.title")} onOpenChange={() => onBack()} hasDivider />}
       start={
         <LayoutPanel
-          width={230}
+          width="var(--xagent-settings-sidebar-width)"
           padding={4}
           hasDivider
           isScrollable={false}
@@ -612,9 +624,12 @@ export function SettingsPage(props: SettingsPageProps) {
           className="settings-section-enter"
         >
           <VStack
+            width="100%"
+            maxWidth="var(--xagent-settings-content-max-width)"
             height="100%"
             minHeight={sectionManagesScroll ? 0 : "100%"}
             className="settings-section-shell"
+            style={{ marginInline: "auto" }}
           >
             {sectionContent}
           </VStack>

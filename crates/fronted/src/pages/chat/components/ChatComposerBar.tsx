@@ -1,12 +1,17 @@
-import { ChatComposer } from "@astryxdesign/core/Chat";
+import { ChatComposer, ChatComposerDrawer, ChatSendButton } from "@astryxdesign/core/Chat";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
+import { Section } from "@astryxdesign/core/Section";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Text } from "@astryxdesign/core/Text";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
-import { Tooltip } from "@astryxdesign/core/Tooltip";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { Token } from "@astryxdesign/core/Token";
 import {
   memo,
-  type ReactNode,
-  type PointerEvent as ReactPointerEvent,
   type RefObject,
   useCallback,
   useEffect,
@@ -22,10 +27,8 @@ import {
 } from "../../../components/chat/MentionComposer";
 import { GitBranchSelector } from "../../../components/git/GitBranchSelector";
 import {
-  ChevronDown,
   ChevronUp,
   Clock3,
-  FileText,
   Globe,
   GlobeOff,
   Lightbulb,
@@ -36,26 +39,13 @@ import {
   Minimize2,
   Paperclip,
   Play,
-  Send,
+  Plus,
   Sparkle,
-  Square,
   SquarePen,
   Trash2,
-  X,
 } from "../../../components/icons";
-import { Button } from "../../../components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../../components/ui/select";
 import { useLocale } from "../../../i18n";
-import {
-  formatUploadedFileSize,
-  type PendingUploadedFile,
-} from "../../../lib/chat/messages/uploadedFiles";
+import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
 import type { GitClient } from "../../../lib/git/types";
 import {
   checkMobileAssistantPermissions,
@@ -63,11 +53,13 @@ import {
   requestMobileAssistantPermission,
   startMobileVoiceInput,
 } from "../../../lib/mobileAssistant";
+import type { ModelOption } from "../../../lib/providers/llm";
 import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
 import {
   type ChatRuntimeControls,
   DEFAULT_CHAT_RUNTIME_CONTROLS,
   type ReasoningLevel,
+  type SelectedModel,
   type SttSettings,
 } from "../../../lib/settings";
 import { cn } from "../../../lib/shared/utils";
@@ -76,6 +68,7 @@ import {
   startDesktopSttCapture,
 } from "../../../lib/stt/desktopAudioCapture";
 import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
+import { ChatModelSelector } from "./ChatModelSelector";
 
 const REASONING_I18N_KEYS: Record<ReasoningLevel, string> = {
   off: "settings.reasoning.off",
@@ -89,20 +82,6 @@ const REASONING_I18N_KEYS: Record<ReasoningLevel, string> = {
 
 function isReasoningLevel(value: unknown): value is ReasoningLevel {
   return typeof value === "string" && Object.hasOwn(REASONING_I18N_KEYS, value);
-}
-
-function RuntimeControlTooltip(props: { label: string; children: ReactNode }) {
-  return (
-    <Tooltip
-      content={props.label}
-      placement="above"
-      alignment="center"
-      delay={0}
-      hasHoverIndication={false}
-    >
-      {props.children}
-    </Tooltip>
-  );
 }
 
 export type ContextUsageTokensSource = {
@@ -136,55 +115,35 @@ function ContextUsageIndicator(props: {
 
   const ratio = Math.min(1, Math.max(0, tokens / contextWindow));
   const percent = Math.round(ratio * 100);
-  const color =
-    ratio >= 0.9
-      ? "var(--color-error)"
-      : ratio >= 0.7
-        ? "var(--color-warning)"
-        : "var(--color-success)";
+  const variant = ratio >= 0.9 ? "error" : ratio >= 0.7 ? "warning" : "success";
   const usageLabel = `${t("chat.contextUsage")}: ${formatCompactTokens(tokens)} / ${formatCompactTokens(contextWindow)} tokens (${percent}%)`;
   const label = props.onManualCompact ? `${usageLabel} · ${t("chat.manualCompact")}` : usageLabel;
 
-  const indicator = (
-    <>
-      <AstryxInline className="absolute inset-[3px] rounded-full bg-background/95" />
-      <AstryxInline className="relative text-[9px] font-semibold tabular-nums text-foreground">
-        {percent}
-      </AstryxInline>
-    </>
-  );
-
   return (
-    <RuntimeControlTooltip label={label}>
+    <HStack gap={1} vAlign="center" width="var(--xagent-context-progress-width)">
+      <VStack width="100%">
+        <ProgressBar
+          label={usageLabel}
+          value={tokens}
+          max={contextWindow}
+          variant={variant}
+          isLabelHidden
+          hasValueLabel
+          formatValueLabel={() => `${percent}%`}
+        />
+      </VStack>
       {props.onManualCompact ? (
-        <AstryxButton
-          type="button"
-          disabled={props.manualCompactionDisabled}
+        <IconButton
+          label={label}
+          tooltip={label}
+          icon={<Sparkle />}
+          variant="ghost"
+          size="sm"
+          isDisabled={props.manualCompactionDisabled}
           onClick={props.onManualCompact}
-          aria-label={label}
-          className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-          style={{
-            background: `conic-gradient(${color} ${percent}%, var(--color-background-muted) 0)`,
-          }}
-        >
-          {indicator}
-        </AstryxButton>
-      ) : (
-        <AstryxView
-          as="span"
-          layout="inline-flex"
-          direction="horizontal"
-          role="status"
-          aria-label={usageLabel}
-          className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-          style={{
-            background: `conic-gradient(${color} ${percent}%, var(--color-background-muted) 0)`,
-          }}
-        >
-          {indicator}
-        </AstryxView>
-      )}
-    </RuntimeControlTooltip>
+        />
+      ) : null}
+    </HStack>
   );
 }
 
@@ -192,19 +151,6 @@ export type ChatQueueTurnPreview = {
   id: string;
   previewText: string;
   fileCount: number;
-};
-
-type QueueScrollbarState = {
-  visible: boolean;
-  thumbHeight: number;
-  thumbTop: number;
-};
-
-const QUEUE_SCROLLBAR_MIN_THUMB_HEIGHT = 24;
-const DEFAULT_QUEUE_SCROLLBAR_STATE: QueueScrollbarState = {
-  visible: false,
-  thumbHeight: QUEUE_SCROLLBAR_MIN_THUMB_HEIGHT,
-  thumbTop: 0,
 };
 
 const COMPOSER_EXPAND_ANIMATION_MS = 280;
@@ -227,6 +173,10 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   workdir: string;
   enabledSkills: MentionComposerSkill[];
   isAgentMode: boolean;
+  hasModels: boolean;
+  currentModelLabel: string;
+  modelOptions: ModelOption[];
+  selectedValue?: string;
   chatRuntimeControls: ChatRuntimeControls;
   reasoningOptions: ReasoningLevel[];
   thinkingAlwaysOn: boolean;
@@ -242,6 +192,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   onSend: () => void;
   onStop: () => void;
   onComposerBusyChange: (isBusy: boolean) => void;
+  onSelectModel: (selection: SelectedModel) => void;
   onChatRuntimeControlsChange: (patch: Partial<ChatRuntimeControls>) => void;
   onPickReadableFiles: () => void;
   onPasteFiles: (files: File[]) => void;
@@ -267,6 +218,10 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     workdir,
     enabledSkills,
     isAgentMode,
+    hasModels,
+    currentModelLabel,
+    modelOptions,
+    selectedValue,
     chatRuntimeControls,
     reasoningOptions,
     thinkingAlwaysOn,
@@ -282,6 +237,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     onSend,
     onStop,
     onComposerBusyChange,
+    onSelectModel,
     onChatRuntimeControlsChange,
     onPickReadableFiles,
     onPasteFiles,
@@ -299,13 +255,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const { t } = useLocale();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const queuePanelRef = useRef<HTMLDivElement | null>(null);
-  const queueListRef = useRef<HTMLUListElement | null>(null);
-  const queueScrollbarTrackRef = useRef<HTMLDivElement | null>(null);
-  const queueScrollbarDragRef = useRef<{
-    pointerId: number;
-    startScrollTop: number;
-    startY: number;
-  } | null>(null);
   const queueHadTurnsRef = useRef(false);
   const [composerIsEmpty, setComposerIsEmpty] = useState(true);
   const [isComposerExpanded, setIsComposerExpanded] = useState(false);
@@ -316,9 +265,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const expandAnimationRef = useRef<Animation | null>(null);
   const scheduleHeightMeasureRef = useRef<(() => void) | null>(null);
   const [queueCollapsed, setQueueCollapsed] = useState(false);
-  const [queueScrollbar, setQueueScrollbar] = useState<QueueScrollbarState>(
-    DEFAULT_QUEUE_SCROLLBAR_STATE,
-  );
   const [voiceInputAvailable, setVoiceInputAvailable] = useState(false);
   const [voiceInputActive, setVoiceInputActive] = useState(false);
   const [voiceInputError, setVoiceInputError] = useState<string | null>(null);
@@ -330,11 +276,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const thinkingSupported = reasoningOptions.length > 0;
   const sendDisabled = isInputDisabled || isUploadingFiles || !hasSendableDraft;
   const canQueueDraftWhileSending = isSending && !sendDisabled;
-  const primaryActionTitle = canQueueDraftWhileSending
-    ? t("chat.queue.addToQueue")
-    : isSending
-      ? t("chat.stopGeneration")
-      : t("chat.sendMessage");
   const selectedReasoning = reasoningOptions.includes(chatRuntimeControls.reasoning)
     ? chatRuntimeControls.reasoning
     : DEFAULT_CHAT_RUNTIME_CONTROLS.reasoning;
@@ -345,13 +286,11 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
       : !workdir
         ? t("chat.upload.requireWorkdir")
         : t("chat.upload.button");
+  const addMenuTooltip = t("chat.upload.add");
   const thinkingTooltip = !thinkingSupported
     ? t("chat.runtime.thinkingUnavailable")
     : t("chat.runtime.thinkingTooltip");
   const webSearchTooltip = t("chat.runtime.webSearchTooltip");
-  const planModeTooltip = chatRuntimeControls.planModeEnabled
-    ? t("chat.planMode.on")
-    : t("chat.planMode.off");
 
   useEffect(() => {
     if (!isNativeMobileRuntime()) {
@@ -442,14 +381,9 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
       if (isNativeMobileRuntime()) setVoiceInputActive(false);
     }
   }, [composerRef, isInputDisabled, sttSettings, t, voiceInputActive]);
-  const toggleQueueTooltip = queueCollapsed ? t("chat.queue.expand") : t("chat.queue.collapse");
   const toggleComposerExpandTooltip = isComposerExpanded
     ? t("chat.composer.collapse")
     : t("chat.composer.expand");
-
-  const toggleQueueCollapsed = useCallback(() => {
-    setQueueCollapsed((current) => !current);
-  }, []);
 
   // ref 与 state 同步更新：高度上报的 RO/rAF 回调可能先于 effect 执行，
   // 必须在布局变化前就能读到最新展开态。切换前记录卡片当前高度，
@@ -508,107 +442,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     onSend();
   }, [onSend, setComposerExpanded]);
 
-  const shouldShowQueueScrollbar = !queueCollapsed && queuedTurns.length > 2;
-
-  const updateQueueScrollbar = useCallback(() => {
-    const list = queueListRef.current;
-    if (!list || !shouldShowQueueScrollbar) {
-      setQueueScrollbar((current) => (current.visible ? DEFAULT_QUEUE_SCROLLBAR_STATE : current));
-      return;
-    }
-
-    const { clientHeight, scrollHeight, scrollTop } = list;
-    const trackHeight = Math.max(clientHeight, QUEUE_SCROLLBAR_MIN_THUMB_HEIGHT);
-    const maxScrollTop = Math.max(0, scrollHeight - clientHeight);
-    const thumbHeight =
-      maxScrollTop <= 1
-        ? trackHeight
-        : Math.min(
-            trackHeight,
-            Math.max(
-              QUEUE_SCROLLBAR_MIN_THUMB_HEIGHT,
-              Math.round((clientHeight / scrollHeight) * trackHeight),
-            ),
-          );
-    const maxThumbTop = Math.max(0, trackHeight - thumbHeight);
-    const thumbTop = maxScrollTop <= 1 ? 0 : Math.round((scrollTop / maxScrollTop) * maxThumbTop);
-
-    setQueueScrollbar((current) => {
-      if (current.visible && current.thumbHeight === thumbHeight && current.thumbTop === thumbTop) {
-        return current;
-      }
-      return { visible: true, thumbHeight, thumbTop };
-    });
-  }, [shouldShowQueueScrollbar]);
-
-  const scrollQueueToThumbPosition = useCallback(
-    (clientY: number) => {
-      const list = queueListRef.current;
-      const track = queueScrollbarTrackRef.current;
-      if (!list || !track || !shouldShowQueueScrollbar) return;
-
-      const rect = track.getBoundingClientRect();
-      const maxThumbTop = Math.max(1, rect.height - queueScrollbar.thumbHeight);
-      const nextThumbTop = Math.min(
-        Math.max(clientY - rect.top - queueScrollbar.thumbHeight / 2, 0),
-        maxThumbTop,
-      );
-      const maxScrollTop = Math.max(0, list.scrollHeight - list.clientHeight);
-      list.scrollTop = (nextThumbTop / maxThumbTop) * maxScrollTop;
-      updateQueueScrollbar();
-    },
-    [queueScrollbar.thumbHeight, shouldShowQueueScrollbar, updateQueueScrollbar],
-  );
-
-  const handleQueueScrollbarPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (!shouldShowQueueScrollbar || event.button !== 0) return;
-      const list = queueListRef.current;
-      const track = queueScrollbarTrackRef.current;
-      if (!list || !track) return;
-
-      event.preventDefault();
-      const target = event.target as HTMLElement;
-      if (!target.closest(".chat-queue-scrollbar-thumb")) {
-        scrollQueueToThumbPosition(event.clientY);
-      }
-
-      queueScrollbarDragRef.current = {
-        pointerId: event.pointerId,
-        startScrollTop: list.scrollTop,
-        startY: event.clientY,
-      };
-      event.currentTarget.setPointerCapture(event.pointerId);
-    },
-    [shouldShowQueueScrollbar, scrollQueueToThumbPosition],
-  );
-
-  const handleQueueScrollbarPointerMove = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      const drag = queueScrollbarDragRef.current;
-      if (!drag || drag.pointerId !== event.pointerId) return;
-
-      const list = queueListRef.current;
-      const track = queueScrollbarTrackRef.current;
-      if (!list || !track) return;
-
-      const maxScrollTop = Math.max(0, list.scrollHeight - list.clientHeight);
-      const maxThumbTop = Math.max(1, track.clientHeight - queueScrollbar.thumbHeight);
-      list.scrollTop =
-        drag.startScrollTop + ((event.clientY - drag.startY) / maxThumbTop) * maxScrollTop;
-      updateQueueScrollbar();
-    },
-    [queueScrollbar.thumbHeight, updateQueueScrollbar],
-  );
-
-  const handleQueueScrollbarPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = queueScrollbarDragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-
-    queueScrollbarDragRef.current = null;
-    event.currentTarget.releasePointerCapture(event.pointerId);
-  }, []);
-
   useEffect(() => {
     const hasQueuedTurns = queuedTurns.length > 0;
     if (hasQueuedTurns && !queueHadTurnsRef.current) {
@@ -616,27 +449,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     }
     queueHadTurnsRef.current = hasQueuedTurns;
   }, [queuedTurns.length]);
-
-  useEffect(() => {
-    const list = queueListRef.current;
-    if (!list) {
-      updateQueueScrollbar();
-      return;
-    }
-
-    updateQueueScrollbar();
-    list.addEventListener("scroll", updateQueueScrollbar, { passive: true });
-    const resizeObserver =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateQueueScrollbar);
-    resizeObserver?.observe(list);
-    window.addEventListener("resize", updateQueueScrollbar);
-
-    return () => {
-      list.removeEventListener("scroll", updateQueueScrollbar);
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updateQueueScrollbar);
-    };
-  }, [updateQueueScrollbar]);
 
   useEffect(() => {
     const reasoningNeedsReset =
@@ -701,249 +513,122 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   }, [onHeightChange]);
 
   return (
-    <AstryxView
-      layout="flex"
-      direction="horizontal"
+    <VStack
       ref={rootRef}
       data-file-upload-drop-zone=""
       data-file-upload-conversation-id={conversationId}
+      width="100%"
+      gap={0}
+      hAlign="center"
       className={cn(
-        "chat-composer-layer pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-4",
+        "chat-composer-layer pointer-events-none relative z-20 shrink-0",
         // 展开态从头部下沿一路铺到底部，把整个聊天区让给输入框。
-        isComposerExpanded && "top-14",
+        isComposerExpanded && "absolute inset-x-0 bottom-0 top-14",
       )}
     >
-      <AstryxView
-        layout="flex"
-        direction="vertical"
+      <VStack
+        width="100%"
+        maxWidth="var(--xagent-composer-width)"
+        gap={0}
         className={cn(
-          "pointer-events-auto relative w-full max-w-[768px]",
+          "pointer-events-auto relative",
           // justify-end：展开动画途中卡片被钳在中间高度时保持贴底，向上生长。
           isComposerExpanded && "flex min-h-0 flex-col justify-end",
         )}
       >
-        {/* Pending uploaded files — above the composer card */}
-        {pendingUploadedFiles.length > 0 && (
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="upload-file-list mb-2.5 flex gap-2 overflow-x-auto px-0.5 pb-1"
-          >
-            {pendingUploadedFiles.map((file) => (
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                key={file.relativePath}
-                title={file.relativePath}
-                className="chat-upload-file group flex w-[calc(25%-6px)] min-w-[calc(25%-6px)] items-center gap-2 rounded-xl border border-white/45 bg-white/55 px-2.5 py-1.5 text-[calc(11px*var(--zone-font-scale,1))] shadow-[0_2px_8px_-2px_rgba(15,23,42,0.06)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,box-shadow,border-color] duration-150 hover:bg-white/75 hover:shadow-[0_4px_14px_-4px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.10]"
-              >
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-sky-500/12 dark:bg-sky-400/15"
-                >
-                  <Paperclip className="h-3 w-3 text-sky-600 dark:text-sky-400" />
-                </AstryxView>
-                <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="truncate text-[calc(12px*var(--zone-font-scale,1))] font-medium tracking-tight text-foreground/90"
-                  >
-                    {file.fileName}
-                  </AstryxView>
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="truncate text-[calc(10px*var(--zone-font-scale,1))] text-muted-foreground"
-                  >
-                    {formatUploadedFileSize(file.sizeBytes)}
-                  </AstryxView>
-                </AstryxView>
-                <AstryxButton
-                  type="button"
-                  disabled={isInputDisabled}
-                  onClick={() => onRemovePendingUpload(file.relativePath)}
-                  className="chat-upload-remove shrink-0 rounded-full p-1 text-muted-foreground/70 opacity-0 transition-[color,background-color,opacity,transform] duration-150 hover:bg-foreground/5 hover:text-foreground group-hover:opacity-100 active:scale-[0.97] disabled:pointer-events-none"
-                  aria-label={`${t("chat.upload.removeFile")} ${file.fileName}`}
-                  title={t("chat.upload.removeFile")}
-                >
-                  <X className="h-3 w-3" />
-                </AstryxButton>
-              </AstryxView>
-            ))}
-          </AstryxView>
-        )}
-
         {queuedTurns.length > 0 ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <VStack
             ref={queuePanelRef}
-            className="relative z-30 mx-auto mb-[-1px] w-[calc(100%-1.5rem)] max-w-[720px]"
+            width="calc(100% - (var(--spacing-3) * 2))"
+            maxWidth="var(--xagent-chat-queue-width)"
+            gap={0}
+            className="relative z-30"
           >
-            <AstryxView
-              layout="grid"
-              direction="horizontal"
-              aria-hidden={queueCollapsed}
-              className={cn(
-                "grid transition-[grid-template-rows,opacity] duration-200 ease-out",
-                queueCollapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100",
-              )}
-            >
-              <AstryxView layout="block" direction="horizontal" className="min-h-0 overflow-hidden">
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="rounded-t-lg border border-b-0 border-black/[0.055] bg-white/70 px-1 pb-1 pt-2 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.72)] backdrop-blur-2xl backdrop-saturate-[165%] dark:border-white/[0.10] dark:bg-white/[0.06] dark:shadow-[0_8px_24px_-18px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.08)]"
+            <Section variant="muted" width="100%" padding={0} dividers={["bottom"]}>
+              <Collapsible
+                isOpen={!queueCollapsed}
+                onOpenChange={(isOpen) => setQueueCollapsed(!isOpen)}
+                trigger={
+                  <HStack gap={2} vAlign="center" width="100%">
+                    <Clock3 size={16} />
+                    <Text type="supporting" weight="medium">
+                      {t("chat.queue.title").replace("{count}", String(queuedTurns.length))}
+                    </Text>
+                  </HStack>
+                }
+              >
+                <VStack
+                  width="100%"
+                  isScrollable
+                  padding={1}
+                  style={{ maxHeight: "var(--xagent-chat-queue-height)" }}
                 >
-                  <AstryxView layout="block" direction="horizontal" className="relative min-h-0">
-                    <AstryxView
-                      as="ul"
-                      ref={queueListRef}
-                      data-scrollable={queuedTurns.length > 2 ? "true" : "false"}
-                      className={cn(
-                        "chat-queue-scroll flex min-w-0 flex-col gap-1 overflow-x-hidden",
-                        queuedTurns.length > 2
-                          ? "h-[76px] overflow-y-scroll pr-3"
-                          : "max-h-[76px] overflow-y-hidden pr-1",
-                      )}
-                    >
-                      {queuedTurns.map((item, index) => {
-                        return (
-                          <AstryxView
-                            as="li"
-                            key={item.id}
-                            className="relative grid h-9 min-h-9 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-md border border-black/[0.035] bg-white/42 px-2 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.56)] backdrop-blur-xl backdrop-saturate-[150%] transition-[border-color,background-color] dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-                          >
-                            <AstryxView
-                              layout="flex"
-                              direction="horizontal"
-                              className="flex shrink-0 items-center gap-0.5"
-                            >
-                              {index > 0 ? (
-                                <AstryxButton
-                                  type="button"
-                                  disabled={queueCollapsed}
-                                  onClick={() => onMoveQueuedTurnUp(item.id)}
-                                  aria-label={t("chat.queue.moveUp")}
-                                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground disabled:pointer-events-none disabled:opacity-35"
-                                >
-                                  <ChevronUp className="h-3 w-3" />
-                                </AstryxButton>
-                              ) : (
-                                <AstryxInline aria-hidden className="h-6 w-6" />
-                              )}
-                              <Clock3 className="h-3 w-3 shrink-0 text-muted-foreground/65" />
-                            </AstryxView>
-                            <AstryxView
-                              layout="flex"
-                              direction="horizontal"
-                              className="flex min-w-0 items-center gap-1.5 overflow-hidden"
-                            >
-                              <AstryxInline className="block min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[calc(11px*var(--zone-font-scale,1))] leading-4 text-foreground/88">
-                                {item.previewText || t("chat.queue.emptyMessage")}
-                              </AstryxInline>
-                              {item.fileCount > 0 ? (
-                                <AstryxInline className="max-w-[4.5rem] shrink-0 overflow-hidden text-ellipsis whitespace-nowrap text-[calc(9px*var(--zone-font-scale,1))] leading-4 text-muted-foreground">
-                                  {t("chat.queue.fileCount").replace(
-                                    "{count}",
-                                    String(item.fileCount),
-                                  )}
-                                </AstryxInline>
-                              ) : null}
-                            </AstryxView>
-                            <AstryxView
-                              layout="flex"
-                              direction="horizontal"
-                              className="flex shrink-0 items-center gap-0.5"
-                            >
-                              <RuntimeControlTooltip label={t("chat.queue.edit")}>
-                                <AstryxButton
-                                  type="button"
-                                  disabled={queueCollapsed}
-                                  onClick={() => onEditQueuedTurn(item.id)}
-                                  aria-label={t("chat.queue.edit")}
-                                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground"
-                                >
-                                  <SquarePen className="h-3 w-3" />
-                                </AstryxButton>
-                              </RuntimeControlTooltip>
-                              <RuntimeControlTooltip label={t("chat.queue.runNow")}>
-                                <AstryxButton
-                                  type="button"
-                                  disabled={queueCollapsed}
-                                  onClick={() => onRunQueuedTurnNow(item.id)}
-                                  aria-label={t("chat.queue.runNow")}
-                                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground"
-                                >
-                                  <Play className="h-3 w-3" />
-                                </AstryxButton>
-                              </RuntimeControlTooltip>
-                              <RuntimeControlTooltip label={t("chat.queue.delete")}>
-                                <AstryxButton
-                                  type="button"
-                                  disabled={queueCollapsed}
-                                  onClick={() => onRemoveQueuedTurn(item.id)}
-                                  aria-label={t("chat.queue.delete")}
-                                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </AstryxButton>
-                              </RuntimeControlTooltip>
-                            </AstryxView>
-                          </AstryxView>
-                        );
-                      })}
-                    </AstryxView>
-                    {shouldShowQueueScrollbar ? (
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        ref={queueScrollbarTrackRef}
-                        aria-hidden
-                        className="chat-queue-scrollbar"
-                        onPointerCancel={handleQueueScrollbarPointerUp}
-                        onPointerDown={handleQueueScrollbarPointerDown}
-                        onPointerMove={handleQueueScrollbarPointerMove}
-                        onPointerUp={handleQueueScrollbarPointerUp}
-                      >
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="chat-queue-scrollbar-thumb"
-                          style={{
-                            height: `${queueScrollbar.thumbHeight}px`,
-                            transform: `translateY(${queueScrollbar.thumbTop}px)`,
-                          }}
-                        />
-                      </AstryxView>
-                    ) : null}
-                  </AstryxView>
-                </AstryxView>
-              </AstryxView>
-            </AstryxView>
-            <AstryxButton
-              type="button"
-              onClick={toggleQueueCollapsed}
-              title={toggleQueueTooltip}
-              aria-label={toggleQueueTooltip}
-              aria-expanded={!queueCollapsed}
-              className="absolute left-1/2 top-0 z-40 inline-flex h-[18px] -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full border border-black/[0.07] bg-white/90 pl-1.5 pr-2 text-muted-foreground shadow-[0_2px_10px_-4px_rgba(15,23,42,0.45),inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,color,scale] hover:bg-white hover:text-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring dark:border-white/[0.12] dark:bg-zinc-900/90 dark:shadow-[0_2px_10px_-4px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.10)] dark:hover:bg-zinc-900"
-            >
-              {queueCollapsed ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronUp className="h-3 w-3" />
-              )}
-              <AstryxInline className="text-[calc(10px*var(--zone-font-scale,1))] font-medium leading-none tabular-nums">
-                {queuedTurns.length}
-              </AstryxInline>
-            </AstryxButton>
-          </AstryxView>
+                  <List
+                    density="compact"
+                    hasDividers
+                    header={
+                      <Text type="label" color="secondary">
+                        {t("chat.queue.title").replace("{count}", String(queuedTurns.length))}
+                      </Text>
+                    }
+                  >
+                    {queuedTurns.map((item, index) => (
+                      <ListItem
+                        key={item.id}
+                        label={item.previewText || t("chat.queue.emptyMessage")}
+                        description={
+                          item.fileCount > 0
+                            ? t("chat.queue.fileCount").replace("{count}", String(item.fileCount))
+                            : undefined
+                        }
+                        startContent={<Clock3 size={16} />}
+                        endContent={
+                          <HStack gap={0.5} vAlign="center">
+                            {index > 0 ? (
+                              <IconButton
+                                label={t("chat.queue.moveUp")}
+                                tooltip={t("chat.queue.moveUp")}
+                                icon={<ChevronUp />}
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onMoveQueuedTurnUp(item.id)}
+                              />
+                            ) : null}
+                            <IconButton
+                              label={t("chat.queue.edit")}
+                              tooltip={t("chat.queue.edit")}
+                              icon={<SquarePen />}
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onEditQueuedTurn(item.id)}
+                            />
+                            <IconButton
+                              label={t("chat.queue.runNow")}
+                              tooltip={t("chat.queue.runNow")}
+                              icon={<Play />}
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onRunQueuedTurnNow(item.id)}
+                            />
+                            <IconButton
+                              label={t("chat.queue.delete")}
+                              tooltip={t("chat.queue.delete")}
+                              icon={<Trash2 />}
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => onRemoveQueuedTurn(item.id)}
+                            />
+                          </HStack>
+                        }
+                      />
+                    ))}
+                  </List>
+                </VStack>
+              </Collapsible>
+            </Section>
+          </VStack>
         ) : null}
 
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: Escape 捕获仅在展开态生效，焦点始终在内部 textbox 上，包装层不参与 Tab 序。 */}
         <ChatComposer
           ref={glassCardRef}
           onSubmit={() => handleComposerSend()}
@@ -967,318 +652,239 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
             // 展开态切换 flex-grow 时会被一并动画，导致卡片先跳顶再长满的闪动。
             // 常驻 flex-col：FLIP 动画把卡片钳在中间高度时，flex-1 的编辑器
             // 区吸收多余空间，工具栏才能始终贴住卡片底边。
-            "composer-glass-card relative z-10 overflow-hidden",
+            "relative z-10 overflow-hidden",
             isComposerExpanded && "min-h-0 flex-1",
           )}
+          drawer={
+            pendingUploadedFiles.length > 0 ? (
+              <ChatComposerDrawer
+                count={pendingUploadedFiles.length}
+                label={t("chat.upload.attachedFiles")}
+              >
+                <HStack gap={2} wrap="wrap">
+                  {pendingUploadedFiles.map((file) => (
+                    <Token
+                      key={file.relativePath}
+                      label={file.fileName}
+                      description={file.relativePath}
+                      icon={<Paperclip />}
+                      size="sm"
+                      isDisabled={isInputDisabled}
+                      onRemove={
+                        isInputDisabled ? undefined : () => onRemovePendingUpload(file.relativePath)
+                      }
+                    />
+                  ))}
+                </HStack>
+              </ChatComposerDrawer>
+            ) : undefined
+          }
+          headerContext={
+            contextUsageTokensSource || !mobileExperience ? (
+              <HStack gap={2} vAlign="center">
+                {contextUsageTokensSource ? (
+                  <ContextUsageIndicator
+                    source={contextUsageTokensSource}
+                    contextWindow={contextWindow}
+                    onManualCompact={onManualCompact}
+                    manualCompactionDisabled={manualCompactionDisabled}
+                  />
+                ) : null}
+                {!mobileExperience ? (
+                  <IconButton
+                    label={toggleComposerExpandTooltip}
+                    tooltip={toggleComposerExpandTooltip}
+                    variant="ghost"
+                    size="sm"
+                    icon={isComposerExpanded ? <Minimize2 /> : <Maximize2 />}
+                    onClick={toggleComposerExpanded}
+                  />
+                ) : null}
+              </HStack>
+            ) : undefined
+          }
           input={
-            <>
-              {!mobileExperience ? (
-                <AstryxButton
-                  type="button"
-                  onClick={toggleComposerExpanded}
-                  title={toggleComposerExpandTooltip}
-                  aria-label={toggleComposerExpandTooltip}
-                  aria-expanded={isComposerExpanded}
-                  className="absolute right-3 top-2 z-20 inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground/70 outline-hidden transition-[background-color,color,scale] hover:bg-muted/60 hover:text-foreground active:scale-90 focus-visible:bg-muted/60"
-                >
-                  {isComposerExpanded ? (
-                    <Minimize2 className="h-4 w-4" />
-                  ) : (
-                    <Maximize2 className="h-4 w-4" />
-                  )}
-                </AstryxButton>
+            <VStack
+              width="100%"
+              minHeight={isComposerExpanded ? 0 : undefined}
+              style={isComposerExpanded ? { flex: 1 } : undefined}
+            >
+              <MentionComposer
+                ref={composerRef}
+                onSend={handleComposerSend}
+                onEmptyChange={setComposerIsEmpty}
+                onBusyChange={onComposerBusyChange}
+                onPasteFiles={onPasteFiles}
+                loadHistoryPrompts={loadHistoryPrompts}
+                placeholder={inputPlaceholder}
+                disabled={isInputDisabled}
+                workdir={workdir}
+                enabledSkills={enabledSkills}
+                preferNativeContextMenu={mobileExperience}
+                className={cn("px-0 py-0", isComposerExpanded && "h-full max-h-none")}
+              />
+            </VStack>
+          }
+          footerActions={
+            <HStack gap={1} vAlign="center" wrap="wrap">
+              <DropdownMenu
+                button={{
+                  label: addMenuTooltip,
+                  tooltip: addMenuTooltip,
+                  variant: "ghost",
+                  size: "sm",
+                  icon: <Plus />,
+                  isIconOnly: true,
+                  isLoading: isUploadingFiles,
+                  isDisabled: controlsDisabled,
+                }}
+                hasChevron={false}
+                placement="above"
+                alignment="start"
+                menuWidth="var(--xagent-composer-add-menu-width)"
+                items={[
+                  {
+                    id: "files",
+                    label: t("chat.upload.filesAndPhotos"),
+                    description: uploadDisabled ? uploadTooltip : t("chat.upload.selectFiles"),
+                    icon: <Paperclip />,
+                    isDisabled: uploadDisabled,
+                    onClick: onPickReadableFiles,
+                  },
+                  { type: "divider" },
+                  {
+                    id: "mention",
+                    label: t("chat.composer.addMention"),
+                    description: t("chat.composer.addMentionDesc"),
+                    icon: <Sparkle />,
+                    onClick: () => {
+                      composerRef.current?.insertText("@");
+                      composerRef.current?.focus();
+                    },
+                  },
+                  {
+                    id: "command",
+                    label: t("chat.composer.addCommand"),
+                    description: t("chat.composer.addCommandDesc"),
+                    icon: <SquarePen />,
+                    onClick: () => {
+                      composerRef.current?.insertText("/");
+                      composerRef.current?.focus();
+                    },
+                  },
+                ]}
+              />
+
+              <ChatModelSelector
+                hasModels={hasModels}
+                currentModelLabel={currentModelLabel}
+                modelOptions={modelOptions}
+                selectedValue={selectedValue}
+                isDisabled={controlsDisabled}
+                onSelectModel={onSelectModel}
+              />
+
+              {voiceInputAvailable ? (
+                <ToggleButton
+                  label={
+                    voiceInputActive
+                      ? t("chat.composer.voiceListening")
+                      : t("chat.composer.voiceInput")
+                  }
+                  tooltip={
+                    voiceInputError ??
+                    voiceInputPartial ??
+                    (voiceInputActive
+                      ? t("chat.composer.voiceListening")
+                      : t("chat.composer.voiceInput"))
+                  }
+                  isIconOnly
+                  size="sm"
+                  isPressed={voiceInputActive}
+                  isDisabled={isInputDisabled || (isNativeMobileRuntime() && voiceInputActive)}
+                  icon={<Mic />}
+                  pressedIcon={<Loader2 />}
+                  onPressedChange={() => void startVoiceInput()}
+                />
               ) : null}
 
-              {/* 常驻 flex-1：动画把卡片钳在中间高度时由本区吸收伸缩，工具栏才能
-              全程贴住卡片底边。min-h-0 只在展开态加——折叠态靠自动最小高度
-              (= 编辑器钳制高) 撑起卡片的固有高度，加了会塌缩。 */}
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                className={cn("relative flex flex-1 px-4 pt-3.5", isComposerExpanded && "min-h-0")}
-              >
-                <MentionComposer
-                  ref={composerRef}
-                  onSend={handleComposerSend}
-                  onEmptyChange={setComposerIsEmpty}
-                  onBusyChange={onComposerBusyChange}
-                  onPasteFiles={onPasteFiles}
-                  loadHistoryPrompts={loadHistoryPrompts}
-                  placeholder={inputPlaceholder}
-                  disabled={isInputDisabled}
-                  workdir={workdir}
-                  enabledSkills={enabledSkills}
-                  preferNativeContextMenu={mobileExperience}
-                  className={cn(
-                    "px-0 py-0",
-                    !mobileExperience && "pr-8",
-                    isComposerExpanded && "h-full max-h-none",
-                  )}
+              <ToggleButton
+                label={webSearchTooltip}
+                tooltip={webSearchTooltip}
+                isIconOnly
+                size="sm"
+                isPressed={chatRuntimeControls.nativeWebSearchEnabled}
+                isDisabled={controlsDisabled}
+                icon={<GlobeOff />}
+                pressedIcon={<Globe />}
+                onPressedChange={(isPressed) =>
+                  onChatRuntimeControlsChange({ nativeWebSearchEnabled: isPressed })
+                }
+              />
+
+              <ToggleButton
+                label={
+                  !thinkingSupported
+                    ? t("chat.runtime.thinkingUnavailable")
+                    : chatRuntimeControls.thinkingEnabled
+                      ? t("chat.runtime.thinkingOn")
+                      : t("chat.runtime.thinkingOff")
+                }
+                tooltip={thinkingTooltip}
+                isIconOnly
+                size="sm"
+                isPressed={chatRuntimeControls.thinkingEnabled && thinkingSupported}
+                isDisabled={controlsDisabled || !thinkingSupported || thinkingAlwaysOn}
+                icon={<LightbulbOff />}
+                pressedIcon={<Lightbulb />}
+                onPressedChange={(isPressed) =>
+                  onChatRuntimeControlsChange({ thinkingEnabled: isPressed })
+                }
+              />
+
+              {reasoningOptions.length > 0 && chatRuntimeControls.thinkingEnabled ? (
+                <Selector
+                  label={t("chat.runtime.reasoning")}
+                  isLabelHidden
+                  options={reasoningOptions.map((value) => ({
+                    value,
+                    label: t(REASONING_I18N_KEYS[value]),
+                  }))}
+                  value={selectedReasoning}
+                  onChange={(value) =>
+                    onChatRuntimeControlsChange({
+                      reasoning: isReasoningLevel(value) ? value : selectedReasoning,
+                    })
+                  }
+                  variant="ghost"
+                  size="sm"
+                  startIcon={<Sparkle />}
+                  isDisabled={controlsDisabled}
+                  statusVariant="tooltip"
                 />
-              </AstryxView>
+              ) : null}
 
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                className="relative flex items-center justify-between gap-2 px-3 pb-2 pt-1"
-              >
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex min-w-0 flex-1 items-center gap-1"
-                >
-                  <RuntimeControlTooltip label={uploadTooltip}>
-                    <AstryxButton
-                      type="button"
-                      disabled={uploadDisabled}
-                      onClick={onPickReadableFiles}
-                      aria-label={
-                        isUploadingFiles
-                          ? t("chat.upload.uploading")
-                          : !isAgentMode
-                            ? t("chat.upload.onlyInTools")
-                            : !workdir
-                              ? t("chat.upload.requireWorkdir")
-                              : t("chat.upload.selectFiles")
-                      }
-                      className={cn(
-                        "composer-toolbar-action relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-hidden transition-colors hover:bg-muted/60 focus-visible:bg-muted/60",
-                        "disabled:pointer-events-none disabled:opacity-40",
-                        pendingUploadedFiles.length > 0
-                          ? "text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200"
-                          : "text-muted-foreground hover:text-foreground dark:hover:text-white",
-                      )}
-                    >
-                      {isUploadingFiles ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Paperclip className="h-4 w-4" />
-                      )}
-                      {pendingUploadedFiles.length > 0 ? (
-                        <AstryxView
-                          as="span"
-                          layout="flex"
-                          direction="horizontal"
-                          aria-hidden
-                          className="absolute -right-0.5 -top-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-sky-500 px-[3px] text-[calc(9px*var(--zone-font-scale,1))] font-semibold leading-none text-white shadow-[0_0_0_1.5px_rgba(255,255,255,0.95)] dark:bg-sky-400 dark:text-slate-900 dark:shadow-[0_0_0_1.5px_rgba(20,22,28,0.9)]"
-                        >
-                          {pendingUploadedFiles.length}
-                        </AstryxView>
-                      ) : null}
-                    </AstryxButton>
-                  </RuntimeControlTooltip>
-
-                  {voiceInputAvailable ? (
-                    <ToggleButton
-                      label={
-                        voiceInputActive
-                          ? t("chat.composer.voiceListening")
-                          : t("chat.composer.voiceInput")
-                      }
-                      tooltip={
-                        voiceInputError ??
-                        voiceInputPartial ??
-                        (voiceInputActive
-                          ? t("chat.composer.voiceListening")
-                          : t("chat.composer.voiceInput"))
-                      }
-                      isIconOnly
-                      size="sm"
-                      isPressed={voiceInputActive}
-                      isDisabled={isInputDisabled || (isNativeMobileRuntime() && voiceInputActive)}
-                      icon={<Mic className="h-4 w-4" />}
-                      pressedIcon={<Loader2 className="h-4 w-4 animate-spin" />}
-                      onPressedChange={() => void startVoiceInput()}
-                    />
-                  ) : null}
-
-                  <ToggleButton
-                    label={webSearchTooltip}
-                    tooltip={webSearchTooltip}
-                    isIconOnly
-                    size="sm"
-                    isPressed={chatRuntimeControls.nativeWebSearchEnabled}
-                    isDisabled={controlsDisabled}
-                    icon={<GlobeOff className="h-4 w-4" />}
-                    pressedIcon={<Globe className="h-4 w-4" />}
-                    onPressedChange={(isPressed) =>
-                      onChatRuntimeControlsChange({ nativeWebSearchEnabled: isPressed })
-                    }
-                  />
-
-                  {isAgentMode ? (
-                    <ToggleButton
-                      label={planModeTooltip}
-                      tooltip={planModeTooltip}
-                      isIconOnly
-                      size="sm"
-                      isPressed={chatRuntimeControls.planModeEnabled}
-                      isDisabled={controlsDisabled}
-                      icon={<FileText className="h-4 w-4" />}
-                      onPressedChange={(isPressed) =>
-                        onChatRuntimeControlsChange({ planModeEnabled: isPressed })
-                      }
-                    />
-                  ) : null}
-
-                  <ToggleButton
-                    label={
-                      !thinkingSupported
-                        ? t("chat.runtime.thinkingUnavailable")
-                        : chatRuntimeControls.thinkingEnabled
-                          ? t("chat.runtime.thinkingOn")
-                          : t("chat.runtime.thinkingOff")
-                    }
-                    tooltip={thinkingTooltip}
-                    isIconOnly
-                    size="sm"
-                    isPressed={chatRuntimeControls.thinkingEnabled && thinkingSupported}
-                    isDisabled={controlsDisabled || !thinkingSupported || thinkingAlwaysOn}
-                    icon={<LightbulbOff className="h-4 w-4" />}
-                    pressedIcon={<Lightbulb className="h-4 w-4" />}
-                    onPressedChange={(isPressed) =>
-                      onChatRuntimeControlsChange({ thinkingEnabled: isPressed })
-                    }
-                  />
-
-                  {reasoningOptions.length > 0 ? (
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      aria-hidden={!chatRuntimeControls.thinkingEnabled}
-                      className={cn(
-                        "shrink-0 overflow-hidden transition-[max-width,margin-left,opacity] duration-200 ease-out",
-                        chatRuntimeControls.thinkingEnabled
-                          ? "ml-0 max-w-40 opacity-100"
-                          : "pointer-events-none -ml-1 max-w-0 opacity-0",
-                      )}
-                    >
-                      <Select
-                        value={selectedReasoning}
-                        onValueChange={(value) =>
-                          onChatRuntimeControlsChange({ reasoning: value as ReasoningLevel })
-                        }
-                        disabled={controlsDisabled || !chatRuntimeControls.thinkingEnabled}
-                      >
-                        <SelectTrigger
-                          className="composer-reasoning-trigger group/reasoning h-8 w-auto shrink-0 gap-0.5 rounded-full border-0 bg-violet-50/55 pl-2 pr-1.5 text-xs font-medium text-foreground shadow-none outline-hidden transition-all duration-200 ease-out hover:bg-violet-50/80 disabled:opacity-45 dark:bg-violet-400/[0.07] dark:text-foreground dark:hover:bg-violet-400/[0.13] [&_svg:last-child]:h-3 [&_svg:last-child]:w-3 [&_svg:last-child]:opacity-50 [&_svg:last-child]:transition-transform [&_svg:last-child]:duration-200 [&[data-popup-open]_svg:last-child]:rotate-180"
-                          aria-label={t("chat.runtime.reasoning")}
-                        >
-                          <AstryxView
-                            as="span"
-                            layout="flex"
-                            direction="horizontal"
-                            className="flex min-w-0 items-center gap-1"
-                          >
-                            <Sparkle className="h-3.5 w-3.5 shrink-0 text-violet-500 transition-colors dark:text-violet-400" />
-                            <SelectValue>
-                              {(value) =>
-                                t(
-                                  REASONING_I18N_KEYS[
-                                    isReasoningLevel(value) ? value : selectedReasoning
-                                  ],
-                                )
-                              }
-                            </SelectValue>
-                          </AstryxView>
-                        </SelectTrigger>
-                        <SelectContent className="sidebar-context-menu min-w-40 rounded-xl border-0">
-                          {reasoningOptions.map((value) => (
-                            <SelectItem
-                              key={value}
-                              value={value}
-                              className={cn(
-                                "mb-0.5 h-[30px] rounded-md py-0 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 transition-none last:mb-0 data-[highlighted]:bg-foreground/[0.05] data-[highlighted]:text-foreground",
-                                value === selectedReasoning &&
-                                  "bg-foreground/[0.07] data-[highlighted]:bg-foreground/[0.09]",
-                              )}
-                            >
-                              {t(REASONING_I18N_KEYS[value])}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </AstryxView>
-                  ) : null}
-
-                  <GitBranchSelector
-                    workdir={workdir}
-                    gitClient={gitClient}
-                    workspaceActivityClient={workspaceActivityClient}
-                    disabled={controlsDisabled}
-                    canWrite={gitWriteEnabled}
-                    disabledMessage={gitDisabledMessage}
-                  />
-                </AstryxView>
-
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex shrink-0 items-center gap-1"
-                >
-                  {contextUsageTokensSource ? (
-                    <ContextUsageIndicator
-                      source={contextUsageTokensSource}
-                      contextWindow={contextWindow}
-                      onManualCompact={onManualCompact}
-                      manualCompactionDisabled={manualCompactionDisabled}
-                    />
-                  ) : null}
-                  <Button
-                    disabled={isSending ? false : sendDisabled}
-                    onClick={() => {
-                      if (canQueueDraftWhileSending) {
-                        handleComposerSend();
-                        return;
-                      }
-                      if (isSending) {
-                        onStop();
-                        return;
-                      }
-                      if (sendDisabled) return;
-                      handleComposerSend();
-                    }}
-                    size="sm"
-                    title={primaryActionTitle}
-                    aria-label={primaryActionTitle}
-                    style={
-                      canQueueDraftWhileSending
-                        ? {
-                            backgroundColor: "var(--color-success)",
-                            backgroundImage: "none",
-                            color: "var(--color-on-success)",
-                          }
-                        : isSending
-                          ? {
-                              backgroundColor: "var(--color-error)",
-                              backgroundImage: "none",
-                              color: "var(--color-on-error)",
-                            }
-                          : undefined
-                    }
-                    className={cn(
-                      "composer-primary-action h-8 w-8 shrink-0 rounded-full border-0 p-0 shadow-none transition-[color,background-color,filter,opacity,transform] duration-150",
-                      canQueueDraftWhileSending
-                        ? "hover:brightness-105 active:scale-95"
-                        : isSending
-                          ? "hover:opacity-90 active:scale-95"
-                          : "disabled:opacity-100 [&:not(:disabled)]:bg-foreground [&:not(:disabled)]:text-background [&:not(:disabled)]:hover:bg-foreground/85 [&:not(:disabled)]:active:scale-95 disabled:bg-muted/60 disabled:text-muted-foreground",
-                    )}
-                  >
-                    {canQueueDraftWhileSending ? (
-                      <Send className="h-4 w-4" />
-                    ) : isSending ? (
-                      <Square className="h-3 w-3 fill-current" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
-                </AstryxView>
-              </AstryxView>
-            </>
+              <GitBranchSelector
+                workdir={workdir}
+                gitClient={gitClient}
+                workspaceActivityClient={workspaceActivityClient}
+                disabled={controlsDisabled}
+                canWrite={gitWriteEnabled}
+                disabledMessage={gitDisabledMessage}
+              />
+            </HStack>
+          }
+          sendButton={
+            <ChatSendButton
+              size="sm"
+              isStopShown={isSending && !canQueueDraftWhileSending}
+              isDisabled={isSending ? false : sendDisabled}
+              onSend={handleComposerSend}
+              onStop={onStop}
+            />
           }
         />
-      </AstryxView>
-    </AstryxView>
+      </VStack>
+    </VStack>
   );
 });

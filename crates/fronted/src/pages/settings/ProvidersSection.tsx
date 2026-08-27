@@ -2,12 +2,14 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { Button as AstryxNativeButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Dialog } from "@astryxdesign/core/Dialog";
+import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { IconButton } from "@astryxdesign/core/IconButton";
-import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { List as AstryxList, ListItem } from "@astryxdesign/core/List";
 import { Popover } from "@astryxdesign/core/Popover";
+import { Selector } from "@astryxdesign/core/Selector";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -25,7 +27,6 @@ import ccswitchLogoUrl from "../../../src-tauri/icons/custom/ccswitch.png";
 import cherryStudioLogoUrl from "../../../src-tauri/icons/custom/cherrystudio.png";
 import {
   CheckCircle2,
-  ChevronDown,
   ClaudeIcon,
   Download,
   Eye,
@@ -47,23 +48,8 @@ import {
   Zap,
 } from "../../components/icons";
 import { Button } from "../../components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../../components/ui/dropdown-menu";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
 import { useLocale } from "../../i18n";
 import { buildModelOptions } from "../../lib/chat/page/chatPageHelpers";
 import {
@@ -1038,21 +1024,19 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                 {providerType === "codex" ? (
                   <AstryxView layout="block" direction="horizontal" className="mt-4 space-y-1.5">
                     <Label>{t("settings.requestFormat")}</Label>
-                    <Select
+                    <Selector
+                      label={t("settings.requestFormat")}
+                      isLabelHidden
                       value={requestFormat}
-                      onValueChange={(value) => setRequestFormat(value as CodexRequestFormat)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue>{CODEX_REQUEST_FORMAT_LABELS[requestFormat]}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(CODEX_REQUEST_FORMAT_LABELS).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      width="100%"
+                      options={Object.entries(CODEX_REQUEST_FORMAT_LABELS).map(
+                        ([value, label]) => ({
+                          value,
+                          label,
+                        }),
+                      )}
+                      onChange={(value) => setRequestFormat(value as CodexRequestFormat)}
+                    />
                   </AstryxView>
                 ) : null}
 
@@ -2597,26 +2581,14 @@ function ProviderList(props: {
   const thirdPartyImporting = cherryImporting;
 
   return (
-    <AstryxView
-      layout="flex"
-      direction="vertical"
-      className="provider-list flex h-full min-h-0 flex-col gap-4"
-    >
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="provider-list-header flex shrink-0 items-center justify-between gap-3"
-      >
+    <VStack width="100%" gap={4}>
+      <HStack width="100%" gap={3} vAlign="center" hAlign="between" wrap="wrap">
         <AstryxView layout="block" direction="horizontal" className="text-sm text-muted-foreground">
           {filtered.length === 0
             ? t("settings.noProviders")
             : `${filtered.length} ${t("settings.navProviders")}`}
         </AstryxView>
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="provider-list-actions flex items-center gap-2"
-        >
+        <HStack gap={2} vAlign="center">
           <AstryxNativeButton
             label={t("settings.addProvider")}
             variant="primary"
@@ -2625,141 +2597,51 @@ function ProviderList(props: {
             onClick={onAdd}
           />
           {thirdPartyImportEnabled ? (
-            <DropdownMenu open={syncMenuOpen} onOpenChange={handleSyncMenuOpenChange}>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    disabled={thirdPartyImporting}
-                  />
-                }
-              >
-                {thirdPartyImporting ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Download className="h-3.5 w-3.5" />
-                )}
-                从第三方同步
-                <ChevronDown
-                  className={cn(
-                    "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ease-out",
-                    syncMenuOpen && "rotate-180",
-                  )}
-                />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                sideOffset={8}
-                collisionPadding={8}
-                className="model-selector-dropdown w-80 overflow-hidden rounded-xl border-border/40 bg-popover/70 p-0 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.25)] ring-1 ring-white/10 backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-popover/55"
-              >
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex items-center justify-between gap-2 px-3 py-1.5"
-                >
-                  <DropdownMenuLabel className="p-0 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
-                    导入来源
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem
-                    closeOnClick={false}
-                    className="h-7 w-7 cursor-pointer justify-center rounded-md p-0 text-muted-foreground"
-                    disabled={thirdPartyLoading || thirdPartyImporting}
-                    onSelect={onRefreshThirdPartyProviders}
-                    aria-label="重新扫描本地配置"
-                    title="重新扫描本地配置"
-                  >
-                    <RefreshCw className={cn("h-3.5 w-3.5", thirdPartyLoading && "animate-spin")} />
-                  </DropdownMenuItem>
-                </AstryxView>
-                <DropdownMenuSeparator className="my-0 bg-border/40" />
-                <AstryxView layout="block" direction="horizontal" className="p-1.5">
-                  <DropdownMenuItem
-                    className="model-selector-item cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2.5"
-                    disabled={ccsLoading || !ccsAll.length}
-                    onSelect={onOpenCcsImport}
-                  >
-                    <CcsSourceLogo className="h-9 w-9" />
-                    <AstryxView
-                      as="span"
-                      layout="flex"
-                      direction="vertical"
-                      className="flex min-w-0 flex-1 flex-col gap-0.5"
-                    >
-                      <AstryxView
-                        as="span"
-                        layout="flex"
-                        direction="horizontal"
-                        className="flex items-center gap-1.5 text-sm font-medium"
-                      >
-                        CC Switch
-                        {ccsAll.length > 0 ? (
-                          <AstryxInline className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                            {ccsAll.length}
-                          </AstryxInline>
-                        ) : null}
-                      </AstryxView>
-                      <AstryxInline
-                        className="line-clamp-2 text-xs text-muted-foreground"
-                        title={ccsSubtitle}
-                      >
-                        {ccsSubtitle}
-                      </AstryxInline>
-                    </AstryxView>
-                    {ccsLoading ? (
-                      <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
-                    ) : null}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="model-selector-item cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2.5"
-                    disabled={cherryLoading || cherryImporting || !cherryAll.length}
-                    onSelect={onOpenCherryImport}
-                  >
-                    <CherrySourceLogo className="h-9 w-9" />
-                    <AstryxView
-                      as="span"
-                      layout="flex"
-                      direction="vertical"
-                      className="flex min-w-0 flex-1 flex-col gap-0.5"
-                    >
-                      <AstryxView
-                        as="span"
-                        layout="flex"
-                        direction="horizontal"
-                        className="flex items-center gap-1.5 text-sm font-medium"
-                      >
-                        Cherry Studio
-                        {cherryReady > 0 ? (
-                          <AstryxInline className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                            {cherryReady}
-                          </AstryxInline>
-                        ) : null}
-                      </AstryxView>
-                      <AstryxInline
-                        className="line-clamp-2 text-xs text-muted-foreground"
-                        title={cherrySubtitle}
-                      >
-                        {cherrySubtitle}
-                      </AstryxInline>
-                    </AstryxView>
-                    {cherryLoading || cherryImporting ? (
-                      <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
-                    ) : null}
-                  </DropdownMenuItem>
-                </AstryxView>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <DropdownMenu
+              button={{
+                label: t("settings.thirdPartySync"),
+                variant: "secondary",
+                size: "sm",
+                icon: <Download />,
+                isLoading: thirdPartyImporting,
+                isDisabled: thirdPartyImporting,
+              }}
+              isMenuOpen={syncMenuOpen}
+              onOpenChange={handleSyncMenuOpenChange}
+              alignment="end"
+              menuWidth="var(--xagent-provider-import-menu-width)"
+              items={[
+                {
+                  id: "refresh",
+                  label: t("settings.refreshLocalProviderConfigs"),
+                  icon: <RefreshCw />,
+                  isDisabled: thirdPartyLoading || thirdPartyImporting,
+                  onClick: onRefreshThirdPartyProviders,
+                },
+                { type: "divider" },
+                {
+                  id: "cc-switch",
+                  label: `CC Switch${ccsAll.length > 0 ? ` (${ccsAll.length})` : ""}`,
+                  description: ccsSubtitle,
+                  icon: <CcsSourceLogo />,
+                  isDisabled: ccsLoading || !ccsAll.length,
+                  onClick: onOpenCcsImport,
+                },
+                {
+                  id: "cherry-studio",
+                  label: `Cherry Studio${cherryReady > 0 ? ` (${cherryReady})` : ""}`,
+                  description: cherrySubtitle,
+                  icon: <CherrySourceLogo />,
+                  isDisabled: cherryLoading || cherryImporting || !cherryAll.length,
+                  onClick: onOpenCherryImport,
+                },
+              ]}
+            />
           ) : null}
-        </AstryxView>
-      </AstryxView>
+        </HStack>
+      </HStack>
 
-      <AstryxView
-        layout="block"
-        direction="horizontal"
-        className="provider-list-scroll min-h-0 flex-1 overflow-y-auto pr-1"
-      >
+      <VStack width="100%">
         {filtered.length === 0 ? (
           <EmptyState
             icon={<ProviderBrandIcon type={type} />}
@@ -2818,8 +2700,8 @@ function ProviderList(props: {
             ))}
           </AstryxList>
         )}
-      </AstryxView>
-    </AstryxView>
+      </VStack>
+    </VStack>
   );
 }
 
@@ -3222,67 +3104,65 @@ export function ProvidersSection(
 
   return (
     <>
-      <Toolbar
-        label={t("settings.navProviders")}
-        size="sm"
-        dividers={["bottom"]}
-        startContent={
-          <TabList
-            value={activeTab}
-            onChange={(value) => setActiveTab(value as ProviderId)}
-            size="sm"
-            overflow="scroll"
-            role="tablist"
-          >
-            {PROVIDER_TABS.map((tab) => (
-              <Tab
-                key={tab}
-                value={tab}
-                label={getProviderLabel(tab)}
-                icon={<ProviderBrandIcon type={tab} />}
-                panelId={`provider-panel-${tab}`}
-              />
-            ))}
-          </TabList>
-        }
-        endContent={
-          <IconButton
-            label={t("settings.openCustomSettings")}
-            tooltip={t("settings.openCustomSettings")}
-            variant="ghost"
-            size="sm"
-            icon={<Settings />}
-            onClick={() => setCustomSettingsOpen(true)}
-          />
-        }
-      />
-
-      <VStack
-        id={`provider-panel-${activeTab}`}
-        role="tabpanel"
-        aria-labelledby={undefined}
-        height="100%"
-      >
-        <ProviderList
-          type={activeTab}
-          isActive
-          providers={settings.customProviders}
-          onAdd={openAdd}
-          onEdit={openEdit}
-          onDelete={handleDelete}
-          ccsProviders={ccsProviders}
-          ccsLoading={ccsLoading}
-          ccsMessage={ccsMessage}
-          cherryProviders={cherryProviders}
-          cherryLoading={cherryLoading}
-          cherryImporting={cherryImporting}
-          cherryMessage={cherryMessage}
-          onEnsureThirdPartyScan={ensureThirdPartyScan}
-          onRefreshThirdPartyProviders={() => void refreshThirdPartyProviders()}
-          onOpenCcsImport={() => setCcsImportType(activeTab)}
-          onOpenCherryImport={() => setCherryImportType(activeTab)}
-          thirdPartyImportEnabled={thirdPartyImportEnabled}
+      <VStack height="100%" minHeight={0} gap={0}>
+        <Toolbar
+          label={t("settings.navProviders")}
+          size="sm"
+          dividers={["bottom"]}
+          startContent={
+            <TabList
+              value={activeTab}
+              onChange={(value) => setActiveTab(value as ProviderId)}
+              size="sm"
+              overflow="scroll"
+              role="tablist"
+            >
+              {PROVIDER_TABS.map((tab) => (
+                <Tab
+                  key={tab}
+                  value={tab}
+                  label={getProviderLabel(tab)}
+                  icon={<ProviderBrandIcon type={tab} />}
+                  panelId={`provider-panel-${tab}`}
+                />
+              ))}
+            </TabList>
+          }
+          endContent={
+            <IconButton
+              label={t("settings.openCustomSettings")}
+              tooltip={t("settings.openCustomSettings")}
+              variant="ghost"
+              size="sm"
+              icon={<Settings />}
+              onClick={() => setCustomSettingsOpen(true)}
+            />
+          }
         />
+        <StackItem size="fill" isScrollable>
+          <VStack id={`provider-panel-${activeTab}`} role="tabpanel" padding={4}>
+            <ProviderList
+              type={activeTab}
+              isActive
+              providers={settings.customProviders}
+              onAdd={openAdd}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+              ccsProviders={ccsProviders}
+              ccsLoading={ccsLoading}
+              ccsMessage={ccsMessage}
+              cherryProviders={cherryProviders}
+              cherryLoading={cherryLoading}
+              cherryImporting={cherryImporting}
+              cherryMessage={cherryMessage}
+              onEnsureThirdPartyScan={ensureThirdPartyScan}
+              onRefreshThirdPartyProviders={() => void refreshThirdPartyProviders()}
+              onOpenCcsImport={() => setCcsImportType(activeTab)}
+              onOpenCherryImport={() => setCherryImportType(activeTab)}
+              thirdPartyImportEnabled={thirdPartyImportEnabled}
+            />
+          </VStack>
+        </StackItem>
       </VStack>
 
       {modalOpen ? (

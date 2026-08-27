@@ -54,6 +54,10 @@ export function buildToolsSuffix(
     toolGroups.push(`resumable command waiting (${processWaitTools.join(" / ")})`);
   }
   if (has("ManagedProcess")) toolGroups.push("managed local processes (ManagedProcess)");
+  if (has("ReadTerminal")) toolGroups.push("terminal output inspection (ReadTerminal)");
+  if (has("SSHManager")) toolGroups.push("associated remote hosts (SSHManager)");
+  if (has("CloudTaskManager")) toolGroups.push("cloud execution (CloudTaskManager)");
+  if (has("browser_use")) toolGroups.push("embedded browser automation (browser_use)");
   if (taskTools.length > 0) {
     toolGroups.push(`durable task planning (${taskTools.join(" / ")})`);
   }
@@ -71,7 +75,7 @@ export function buildToolsSuffix(
           `Plan mode is ACTIVE. You have the read-only tools listed under **Available Tools**, plus ${EXIT_PLAN_MODE_TOOL_NAME}. Follow the <plan-mode> rules above: research, then submit the complete deliverable via ${EXIT_PLAN_MODE_TOOL_NAME} instead of plain assistant text.`,
           ...(has("AskUserQuestion")
             ? [
-                "Detail decisions that belong to the user (scope, approach trade-offs, target behavior) go through AskUserQuestion during research — ask proactively instead of guessing.",
+                "Use AskUserQuestion only when research cannot resolve a material user-owned choice and different answers would substantially change the plan. Do not ask for routine confirmation, preferences with a safe default, or information already present in the request; make a reasonable reversible assumption and continue.",
               ]
             : []),
         ].join("\n")
@@ -81,6 +85,17 @@ export function buildToolsSuffix(
           "In this mode you have access to the tools listed under **Available Tools** at the end of this section. Invoke them when the task requires reading, searching, modifying, or coordinating state (files, commands, agents, MCP services). For pure Q&A, explanation, or analysis that does not depend on current state, answer directly without invoking tools.",
         ].join("\n"),
   );
+
+  if (has("AskUserQuestion")) {
+    sections.push(
+      [
+        "## User Questions",
+        "- AskUserQuestion is an exceptional blocking tool, not a required step in every task.",
+        "- Call it only when a missing user-owned decision prevents safe, correct progress after inspecting the available context.",
+        "- Do not call it to restate the request, ask permission for ordinary in-scope work, choose between equivalent implementation details, or report progress. Prefer a reasonable reversible assumption and continue.",
+      ].join("\n"),
+    );
+  }
 
   sections.push(
     [
@@ -300,6 +315,52 @@ export function buildToolsSuffix(
         '- Use ManagedProcess(action="status") to inspect running processes, action="wait" to block until new log output or exit (not ProcessWait), action="read_log" to inspect recent output, and action="stop" to terminate the process tree.',
         "- ProcessWait/ProcessStop only accept Bash session_id values. A ManagedProcess process_id is a UUID and must stay on the ManagedProcess tool.",
         managedProcessPreference,
+      ].join("\n"),
+    );
+  }
+
+  if (has("ReadTerminal")) {
+    sections.push(
+      [
+        "## Terminal Output",
+        "- ReadTerminal is read-only. Use it to inspect recent output from terminal sessions already associated with the current project.",
+        "- Omit terminal_id to read the project terminal chosen by the host; pass a returned terminal_id only when a specific existing session matters.",
+        "- ReadTerminal cannot send input, restart a command, or create a terminal. Use Bash or ManagedProcess for work the agent itself must execute.",
+      ].join("\n"),
+    );
+  }
+
+  if (has("browser_use")) {
+    sections.push(
+      [
+        "## Embedded Browser",
+        "- browser_use operates Xgent's user-visible embedded browser on desktop, Android, and iOS. It is the same live tab the user can inspect, not a mock or a separate extension session.",
+        "- Start with open/navigate, then inspect with get_page_info, get_readable, find_elements, or get_backbone before clicking or typing. Prefer selectors returned by inspection instead of guessed coordinates.",
+        "- Reuse session_id for follow-up actions so navigation, cookies, and page state stay in the same tab. Use list_tabs/new_tab only when the task genuinely needs another tab.",
+        "- After navigation or an action that changes the page, use wait_for_dom_stable and inspect again before the next interaction. Use screenshot only when visual layout matters.",
+        "- Treat authenticated pages as acting on the user's behalf. Do not submit, purchase, publish, or delete unless that external side effect is clearly within the request.",
+      ].join("\n"),
+    );
+  }
+
+  if (has("SSHManager")) {
+    sections.push(
+      [
+        "## SSH",
+        "- SSHManager is limited to hosts explicitly associated with the current project. Call list_hosts/list_sessions first when the target or active session is unclear.",
+        "- Reuse saved credentials through SSHManager; never ask the user to paste passwords, private keys, or passphrases into chat. Missing credentials belong in Settings > SSH.",
+        "- Prefer exec for bounded remote commands and SFTP actions for remote files. Use an interactive session only for authentication or terminal workflows that actually require it.",
+      ].join("\n"),
+    );
+  }
+
+  if (has("CloudTaskManager")) {
+    sections.push(
+      [
+        "## Cloud Execution",
+        "- Use CloudTaskManager only when cloud execution is configured and local execution is unavailable or unsuitable, such as cross-platform packaging or media/document builds.",
+        "- Task inputs are committed to the configured public GitHub Actions workspace. Never include secrets or private user data in files or scripts.",
+        "- Put every deliverable in ../output, wait on the returned task_id until completion, inspect failure_log after failures, and download_artifact only after success.",
       ].join("\n"),
     );
   }

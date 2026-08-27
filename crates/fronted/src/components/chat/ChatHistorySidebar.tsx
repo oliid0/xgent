@@ -46,11 +46,13 @@ import {
   Loader2,
   MoreHorizontal,
   PanelLeftClose,
+  PanelRightOpen,
   Pin,
   PinOff,
   Plus,
   Search,
   Settings,
+  Settings2,
   Sparkles,
   Terminal,
   Trash2,
@@ -125,6 +127,7 @@ type ChatHistorySidebarProps = {
   onMoveProjectToGroup?: (projectPath: string, groupId: string | null) => void;
   onToggleWorkspaceGroupCollapsed?: (groupId: string) => void;
   onSelectProject?: (project: WorkspaceProject) => void;
+  onOpenWorkspaceSettings?: (project: WorkspaceProject) => void;
   onNewConversationForProject?: (project: WorkspaceProject) => void;
   onBrowseProjectInFileTree?: (project: WorkspaceProject) => void;
   onBrowseProjectInSystemFileManager?: (project: WorkspaceProject) => void;
@@ -141,6 +144,7 @@ type ChatHistorySidebarProps = {
   archivedProjectPathKeys?: ReadonlySet<string>;
   onNewConversation: () => void;
   onSelectConversation: (id: string) => void;
+  onOpenConversationInSplit?: (id: string) => void;
   onStartRenaming: (item: SidebarConversation) => void;
   onRenameDraftChange: (value: string) => void;
   onCommitRename: () => void;
@@ -286,6 +290,7 @@ const HistoryRow = memo(function HistoryRow(props: {
   isPendingDelete: boolean;
   renameDraft: string;
   onSelectConversation: (id: string) => void;
+  onOpenInSplit?: (id: string) => void;
   onStartRenaming: (item: SidebarConversation) => void;
   onRenameDraftChange: (value: string) => void;
   onCommitRename: () => void;
@@ -311,6 +316,7 @@ const HistoryRow = memo(function HistoryRow(props: {
     isPendingDelete,
     renameDraft,
     onSelectConversation,
+    onOpenInSplit,
     onStartRenaming,
     onRenameDraftChange,
     onCommitRename,
@@ -582,6 +588,16 @@ const HistoryRow = memo(function HistoryRow(props: {
                   <Edit3 className="h-3.5 w-3.5" />
                   {t("chat.conversationRename")}
                 </DropdownMenuItem>
+                {onOpenInSplit && !touchActions ? (
+                  <DropdownMenuItem
+                    disabled={item.isPending || isActive}
+                    onSelect={() => onOpenInSplit(item.id)}
+                    className="gap-2"
+                  >
+                    <PanelRightOpen className="h-3.5 w-3.5" />
+                    {t("chat.conversationOpenInSplit")}
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem
                   disabled={item.isPending || isRunning || isBusy}
                   onSelect={() => onEnterSelection(item.id)}
@@ -646,6 +662,7 @@ const ProjectRow = memo(function ProjectRow(props: {
   isPendingRemove: boolean;
   renameDraft: string;
   onSelectProject: (project: WorkspaceProject) => void;
+  onOpenWorkspaceSettings?: (project: WorkspaceProject) => void;
   onBrowseProjectInFileTree?: (project: WorkspaceProject) => void;
   onBrowseProjectInSystemFileManager?: (project: WorkspaceProject) => void;
   onStartRenamingProject: (project: WorkspaceProject) => void;
@@ -676,6 +693,7 @@ const ProjectRow = memo(function ProjectRow(props: {
     isPendingRemove,
     renameDraft,
     onSelectProject,
+    onOpenWorkspaceSettings,
     onBrowseProjectInFileTree,
     onBrowseProjectInSystemFileManager,
     onStartRenamingProject,
@@ -1008,6 +1026,15 @@ const ProjectRow = memo(function ProjectRow(props: {
                     collisionPadding={12}
                     className="sidebar-context-menu"
                   >
+                    {onOpenWorkspaceSettings ? (
+                      <DropdownMenuItem
+                        onSelect={() => onOpenWorkspaceSettings(project)}
+                        className="gap-2"
+                      >
+                        <Settings2 className="h-3.5 w-3.5" />
+                        {t("chat.workspaceSettings")}
+                      </DropdownMenuItem>
+                    ) : null}
                     {!isDefaultProject ? (
                       <>
                         <DropdownMenuItem
@@ -1282,6 +1309,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     onMoveProjectToGroup,
     onToggleWorkspaceGroupCollapsed,
     onSelectProject,
+    onOpenWorkspaceSettings,
     onBrowseProjectInFileTree,
     onBrowseProjectInSystemFileManager,
     onStartRenamingProject,
@@ -1295,6 +1323,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     archivedProjectPathKeys = EMPTY_PROJECT_PATH_KEYS,
     onNewConversation,
     onSelectConversation,
+    onOpenConversationInSplit,
     onStartRenaming,
     onRenameDraftChange,
     onCommitRename,
@@ -1374,6 +1403,9 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     suppressSoulClickRef.current = false;
   }, [isOpen]);
   const handleSelectConversation = useStableEvent(onSelectConversation);
+  const handleOpenConversationInSplit = useStableEvent((conversationId: string) => {
+    onOpenConversationInSplit?.(conversationId);
+  });
   const handleStartRenaming = useStableEvent(onStartRenaming);
   const handleRenameDraftChange = useStableEvent(onRenameDraftChange);
   const handleCommitRename = useStableEvent(onCommitRename);
@@ -1444,6 +1476,9 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   });
   const handleSelectProject = useStableEvent((project: WorkspaceProject) => {
     onSelectProject?.(project);
+  });
+  const handleOpenWorkspaceSettings = useStableEvent((project: WorkspaceProject) => {
+    onOpenWorkspaceSettings?.(project);
   });
   const handleBrowseProjectInFileTree = useStableEvent((project: WorkspaceProject) => {
     onBrowseProjectInFileTree?.(project);
@@ -1834,6 +1869,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
         isPendingRemove={pendingProjectRemoveId === project.id}
         renameDraft={projectRenameDraft}
         onSelectProject={handleSelectProject}
+        onOpenWorkspaceSettings={onOpenWorkspaceSettings ? handleOpenWorkspaceSettings : undefined}
         onBrowseProjectInFileTree={
           onBrowseProjectInFileTree ? handleBrowseProjectInFileTree : undefined
         }
@@ -1872,6 +1908,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
         isPendingDelete={pendingDeleteId === item.id}
         renameDraft={renamingId === item.id ? renameDraft : ""}
         onSelectConversation={handleSelectConversation}
+        onOpenInSplit={onOpenConversationInSplit ? handleOpenConversationInSplit : undefined}
         onStartRenaming={handleStartRenaming}
         onRenameDraftChange={handleRenameDraftChange}
         onCommitRename={handleCommitRename}
@@ -1896,6 +1933,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
       handleDeleteConversation,
       handleRenameDraftChange,
       handleSelectConversation,
+      handleOpenConversationInSplit,
       handleSetPinned,
       handleMoveToWorkspace,
       handleStartRenaming,
@@ -1909,6 +1947,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
       activeProjects,
       toggleConversationSelection,
       mobileExperience,
+      onOpenConversationInSplit,
     ],
   );
 

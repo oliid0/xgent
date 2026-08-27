@@ -1180,7 +1180,10 @@ export function normalizeChatRuntimeControls(input: unknown): ChatRuntimeControl
   return {
     thinkingEnabled: obj.thinkingEnabled !== false,
     nativeWebSearchEnabled: obj.nativeWebSearchEnabled !== false,
-    planModeEnabled: obj.planModeEnabled === true,
+    // Plan mode is not a user-facing execution path. Older builds persisted
+    // this flag globally, which made unrelated conversations inherit it and
+    // exposed AskUserQuestion in ordinary tasks. Always migrate it off.
+    planModeEnabled: false,
     reasoning,
     reasoningByProvider: normalizeChatRuntimeReasoningByProvider(
       obj.reasoningByProvider,

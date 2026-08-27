@@ -474,7 +474,7 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
   );
 
   return (
-    <AstryxView layout="block" direction="horizontal">
+    <AstryxView layout="block" direction="horizontal" className="min-w-0 w-full">
       <Streamdown
         className={cn(
           "chat-markdown max-w-none break-words",

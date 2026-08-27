@@ -84,7 +84,9 @@ import {
 import { createTurnCancellation } from "../lib/chat/conversation/turnCancellation";
 import {
   branchChatHistory,
+  type ChatHistoryRecord,
   deleteChatHistory,
+  getChatHistory,
   listChatHistory,
   setChatHistoryModel,
 } from "../lib/chat/history/chatHistory";
@@ -276,6 +278,7 @@ import {
 import { BrowserPanel } from "./chat/browser/BrowserPanel";
 import { CurrentTaskProgress } from "./chat/components/CurrentTaskProgress";
 import { DesktopCheckpointRewindProvider } from "./chat/components/DesktopCheckpointRewindProvider";
+import { SplitConversationPane } from "./chat/components/SplitConversationPane";
 import { WorkspaceCloneTaskOverlay } from "./chat/components/WorkspaceCloneTaskOverlay";
 import {
   isNativeDropInsideUploadZone,
@@ -703,6 +706,12 @@ export function ChatPage(props: ChatPageProps) {
     maxSizePx: 720,
     autoSaveId: "xagent-workspace-panel-width",
   });
+  const splitConversationResize = useResizable({
+    defaultSize: 520,
+    minSizePx: 360,
+    maxSizePx: 820,
+    autoSaveId: "xagent-split-conversation-width",
+  });
   const initialConversationRef = useRef(createConversationIdentity());
   const initialConversationStateRef = useRef(createConversationStateFromContext(context));
 
@@ -724,6 +733,13 @@ export function ChatPage(props: ChatPageProps) {
   const [currentConversationId, setCurrentConversationId] = useState<string>(
     () => initialConversationRef.current.conversationId,
   );
+  const [splitConversationId, setSplitConversationId] = useState<string | null>(null);
+  const [splitConversationRecord, setSplitConversationRecord] = useState<ChatHistoryRecord | null>(
+    null,
+  );
+  const [splitConversationLoading, setSplitConversationLoading] = useState(false);
+  const [splitConversationError, setSplitConversationError] = useState<string | null>(null);
+  const [splitConversationReload, setSplitConversationReload] = useState(0);
   const [currentConversationSessionId, setCurrentConversationSessionId] = useState<string>(
     () => initialConversationRef.current.sessionId,
   );
@@ -1049,6 +1065,22 @@ export function ChatPage(props: ChatPageProps) {
       }
     },
     [activateWorkspaceProject, checkWorkspaceProjectDirectory, compactViewport],
+  );
+
+  const handleOpenWorkspaceSettings = useCallback(
+    async (project: WorkspaceProject) => {
+      if (!(await checkWorkspaceProjectDirectory(project))) return;
+      activateWorkspaceProject(project);
+      if (mobileExperience) setSidebarOpen(false);
+      onOpenSettings(nativeMobile ? "mobileExecution" : "projectRoots");
+    },
+    [
+      activateWorkspaceProject,
+      checkWorkspaceProjectDirectory,
+      mobileExperience,
+      nativeMobile,
+      onOpenSettings,
+    ],
   );
 
   const handleNewConversationForProject = useCallback(
@@ -1510,6 +1542,15 @@ export function ChatPage(props: ChatPageProps) {
   }
 
   const isDraftConversation = !historyItems.some((item) => item.id === currentConversationId);
+  const canShowTrajectory =
+    isAgentMode &&
+    !isDraftConversation &&
+    (historyRenderItems.length > 0 || isSending || isConversationRunning(currentConversationId));
+  useEffect(() => {
+    if (!canShowTrajectory && chatSurface === "trajectory") {
+      setChatSurface("conversation");
+    }
+  }, [canShowTrajectory, chatSurface]);
   useSyncExternalStore(subscribeToolApprovals, getToolApprovalVersion, getToolApprovalVersion);
   const pendingToolApprovals = listPendingToolApprovalsForConversation(currentConversationId);
   const currentConversationPersistedCwd =
@@ -4478,7 +4519,7 @@ export function ChatPage(props: ChatPageProps) {
             getMcpSettings: getEffectiveMcpSettings,
             getToolPolicies,
             commandSafetyMode: settings.system.commandSafetyMode,
-            planModeEnabled: runtimeControls.planModeEnabled,
+            planModeEnabled: false,
             applyMcpOps: (ops) => {
               const removedIds = ops.filter((op) => op.kind === "remove").map((op) => op.serverId);
               setSettings((prev) =>
@@ -4796,6 +4837,68 @@ export function ChatPage(props: ChatPageProps) {
     [compactViewport, openController],
   );
 
+  useEffect(() => {
+    const conversationId = splitConversationId?.trim();
+    if (!conversationId || mobileExperience) {
+      setSplitConversationRecord(null);
+      setSplitConversationLoading(false);
+      setSplitConversationError(null);
+      return;
+    }
+
+    let active = true;
+    setSplitConversationLoading(true);
+    setSplitConversationError(null);
+    void getChatHistory(conversationId, context.systemPrompt)
+      .then((record) => {
+        if (active) setSplitConversationRecord(record);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setSplitConversationRecord(null);
+        setSplitConversationError(asErrorMessage(error, t("chat.split.loadFailed")));
+      })
+      .finally(() => {
+        if (active) setSplitConversationLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [context.systemPrompt, mobileExperience, splitConversationId, splitConversationReload, t]);
+
+  const handleOpenConversationInSplit = useCallback(
+    (conversationId: string) => {
+      const nextId = conversationId.trim();
+      if (!nextId || mobileExperience || nextId === currentConversationIdRef.current) return;
+      setSplitConversationRecord(null);
+      setSplitConversationError(null);
+      setSplitConversationId(nextId);
+    },
+    [currentConversationIdRef, mobileExperience],
+  );
+
+  const handleActivateSplitConversation = useCallback(() => {
+    const conversationId = splitConversationId?.trim();
+    if (!conversationId) return;
+    setSplitConversationId(null);
+    setSplitConversationRecord(null);
+    setSplitConversationError(null);
+    handleSelectConversation(conversationId);
+  }, [handleSelectConversation, splitConversationId]);
+
+  const handleCloseSplitConversation = useCallback(() => {
+    setSplitConversationId(null);
+    setSplitConversationRecord(null);
+    setSplitConversationError(null);
+  }, []);
+
+  useEffect(() => {
+    if (splitConversationId === currentConversationId) {
+      handleCloseSplitConversation();
+    }
+  }, [currentConversationId, handleCloseSplitConversation, splitConversationId]);
+
   const automationState = useAutomation();
   const trayPrefs = useTrayPrefs();
 
@@ -4931,9 +5034,15 @@ export function ChatPage(props: ChatPageProps) {
 
   // Called by the sidebar container after the store confirmed a deletion so
   // local runtime caches and the visible conversation stay consistent.
-  const handleConversationDeleted = useCallback((id: string) => {
-    cleanupDeletedConversationActionRef.current(id);
-  }, []);
+  const handleConversationDeleted = useCallback(
+    (id: string) => {
+      if (id === splitConversationId) {
+        handleCloseSplitConversation();
+      }
+      cleanupDeletedConversationActionRef.current(id);
+    },
+    [handleCloseSplitConversation, splitConversationId],
+  );
 
   const handleConversationCwdChanged = useCallback(
     (conversationId: string, cwd: string) => {
@@ -5319,6 +5428,53 @@ export function ChatPage(props: ChatPageProps) {
     ],
   );
 
+  const shouldEmbedComposerInLanding =
+    chatSurface === "conversation" && hasModels && historyRenderItems.length === 0 && !isSending;
+  const renderChatComposer = () => (
+    <ChatComposerBar
+      conversationId={currentConversationId}
+      composerRef={composerRef}
+      isSending={isSending}
+      isUploadingFiles={isUploadingFiles}
+      isInputDisabled={isComposerInputDisabled}
+      inputPlaceholder={composerPlaceholder}
+      workdir={displayedConversationWorkdir}
+      enabledSkills={enabledComposerSkills}
+      isAgentMode={isAgentMode}
+      hasModels={hasModels}
+      currentModelLabel={currentModelLabel}
+      modelOptions={modelOptions}
+      selectedValue={selectedValue}
+      chatRuntimeControls={chatRuntimeControlsForCurrentProvider}
+      reasoningOptions={chatRuntimeReasoningOptions}
+      thinkingAlwaysOn={chatRuntimeThinkingAlwaysOn}
+      contextUsageTokensSource={contextUsageTokensSource}
+      contextWindow={currentModelContextWindow}
+      sttSettings={desktopCommandHostAvailable ? settings.stt : undefined}
+      onManualCompact={handleManualCompaction}
+      manualCompactionDisabled={isSending || compactionStatus.phase === "running"}
+      gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
+      workspaceActivityClient={desktopCommandHostAvailable ? tauriWorkspaceActivityClient : null}
+      onSend={handleSend}
+      onStop={handleStopSending}
+      onComposerBusyChange={handleComposerBusyChange}
+      onSelectModel={handleSelectModel}
+      onChatRuntimeControlsChange={handleChatRuntimeControlsChange}
+      onPickReadableFiles={pickReadableFiles}
+      onPasteFiles={importReadableFiles}
+      loadHistoryPrompts={loadComposerHistoryPrompts}
+      pendingUploadedFiles={pendingUploadedFiles}
+      onRemovePendingUpload={removePendingUpload}
+      queuedTurns={queuedChatTurnsForCurrentConversation}
+      onRunQueuedTurnNow={runQueuedTurnNow}
+      onMoveQueuedTurnUp={moveQueuedTurnUp}
+      onEditQueuedTurn={editQueuedTurn}
+      onRemoveQueuedTurn={removeQueuedTurn}
+      onHeightChange={setComposerOverlayHeight}
+      mobileExperience={mobileExperience}
+    />
+  );
+
   return (
     <HStack height="100%" width="100%" gap={0} style={{ position: "relative", overflow: "hidden" }}>
       {!mobileExperience ? (
@@ -5372,6 +5528,7 @@ export function ChatPage(props: ChatPageProps) {
         onMoveProjectToGroup={handleMoveWorkspaceProjectToGroup}
         onToggleWorkspaceGroupCollapsed={handleToggleWorkspaceGroupCollapsed}
         onSelectProject={handleSelectWorkspaceProject}
+        onOpenWorkspaceSettings={handleOpenWorkspaceSettings}
         onNewConversationForProject={handleNewConversationForProject}
         onBrowseProjectInFileTree={
           desktopCommandHostAvailable ? handleBrowseWorkspaceProjectInFileTree : undefined
@@ -5399,6 +5556,7 @@ export function ChatPage(props: ChatPageProps) {
           setActiveView("chat");
           handleSelectConversation(id);
         }}
+        onOpenConversationInSplit={handleOpenConversationInSplit}
         onConversationDeleted={handleConversationDeleted}
         onConversationCwdChanged={handleConversationCwdChanged}
         onCloseSidebar={handleCloseSidebar}
@@ -5545,89 +5703,62 @@ export function ChatPage(props: ChatPageProps) {
             : { position: "relative", overflow: "hidden" }
         }
       >
-        <VStack height="100%" width="100%" gap={0}>
-          {activeView === "skills-hub" ? (
-            <SkillsHubPage
-              settings={settings}
-              setSettings={setSettings}
-              initialSkills={availableSkills}
-              initialRootDir={skillsRootDir}
-              isAgentMode={isAgentMode}
-              sidebarOpen={sidebarOpen}
-              onOpenSidebar={handleOpenSidebar}
-              onClose={
-                mobileExperience
-                  ? () => {
-                      setActiveView("chat");
-                      setSidebarOpen(false);
+        <HStack height="100%" width="100%" gap={0}>
+          <VStack height="100%" gap={0} style={{ flex: 1, minWidth: 0 }}>
+            {activeView === "skills-hub" ? (
+              <SkillsHubPage
+                settings={settings}
+                setSettings={setSettings}
+                initialSkills={availableSkills}
+                initialRootDir={skillsRootDir}
+                isAgentMode={isAgentMode}
+                sidebarOpen={sidebarOpen}
+                onOpenSidebar={handleOpenSidebar}
+                onClose={
+                  mobileExperience
+                    ? () => {
+                        setActiveView("chat");
+                        setSidebarOpen(false);
+                      }
+                    : undefined
+                }
+              />
+            ) : activeView === "mcp-hub" ? (
+              <McpHubPage
+                settings={settings}
+                setSettings={setSettings}
+                isAgentMode={isAgentMode}
+                sidebarOpen={sidebarOpen}
+                onOpenSidebar={handleOpenSidebar}
+                onClose={
+                  mobileExperience
+                    ? () => {
+                        setActiveView("chat");
+                        setSidebarOpen(false);
+                      }
+                    : undefined
+                }
+                allowStdio={!nativeMobile || lanPcCommandHostReady}
+              />
+            ) : (
+              <>
+                <AstryxView layout="block" direction="horizontal" className="relative z-20">
+                  <ChatHeader
+                    settings={settings}
+                    onSelectExecutionMode={(mode) =>
+                      setSettings((prev) =>
+                        prev.system.executionMode === mode
+                          ? prev
+                          : updateSystem(prev, { executionMode: mode }),
+                      )
                     }
-                  : undefined
-              }
-            />
-          ) : activeView === "mcp-hub" ? (
-            <McpHubPage
-              settings={settings}
-              setSettings={setSettings}
-              isAgentMode={isAgentMode}
-              sidebarOpen={sidebarOpen}
-              onOpenSidebar={handleOpenSidebar}
-              onClose={
-                mobileExperience
-                  ? () => {
-                      setActiveView("chat");
-                      setSidebarOpen(false);
-                    }
-                  : undefined
-              }
-              allowStdio={!nativeMobile || lanPcCommandHostReady}
-            />
-          ) : (
-            <>
-              <AstryxView layout="block" direction="horizontal" className="relative z-20">
-                <ChatHeader
-                  settings={settings}
-                  onSelectExecutionMode={(mode) =>
-                    setSettings((prev) =>
-                      prev.system.executionMode === mode
-                        ? prev
-                        : updateSystem(prev, { executionMode: mode }),
-                    )
-                  }
-                  hasModels={hasModels}
-                  currentModelLabel={currentModelLabel}
-                  modelOptions={modelOptions}
-                  selectedValue={selectedValue}
-                  sidebarOpen={sidebarOpen}
-                  onSelectModel={handleSelectModel}
-                  onOpenSettings={onOpenSettings}
-                  onToggleTheme={onToggleTheme}
-                  onOpenSidebar={handleOpenSidebar}
-                  mobileExperience={mobileExperience}
-                  preThemeActions={
-                    <ToggleButton
-                      label={
-                        chatSurface === "trajectory"
-                          ? t("chat.trajectory.backToChat")
-                          : t("chat.trajectory.open")
-                      }
-                      tooltip={
-                        chatSurface === "trajectory"
-                          ? t("chat.trajectory.backToChat")
-                          : t("chat.trajectory.open")
-                      }
-                      isIconOnly
-                      size="sm"
-                      isPressed={chatSurface === "trajectory"}
-                      icon={<Activity className="h-4 w-4" />}
-                      pressedIcon={<MessageSquare className="h-4 w-4" />}
-                      onPressedChange={(isPressed) =>
-                        setChatSurface(isPressed ? "trajectory" : "conversation")
-                      }
-                    />
-                  }
-                  trailingActions={
-                    mobileExperience ? (
-                      <>
+                    sidebarOpen={sidebarOpen}
+                    onOpenSettings={onOpenSettings}
+                    onToggleTheme={onToggleTheme}
+                    onOpenSidebar={handleOpenSidebar}
+                    mobileExperience={mobileExperience}
+                    preThemeActions={
+                      canShowTrajectory ? (
                         <ToggleButton
                           label={
                             chatSurface === "trajectory"
@@ -5640,7 +5771,7 @@ export function ChatPage(props: ChatPageProps) {
                               : t("chat.trajectory.open")
                           }
                           isIconOnly
-                          size="lg"
+                          size="sm"
                           isPressed={chatSurface === "trajectory"}
                           icon={<Activity className="h-4 w-4" />}
                           pressedIcon={<MessageSquare className="h-4 w-4" />}
@@ -5648,285 +5779,306 @@ export function ChatPage(props: ChatPageProps) {
                             setChatSurface(isPressed ? "trajectory" : "conversation")
                           }
                         />
-                        <MobileQuickActions
-                          onOpenTerminal={() => handleOpenWorkspaceTool("terminal")}
-                          onOpenRootfs={() => {
-                            setSidebarOpen(false);
-                            setMobileWorkspaceDestination(null);
-                            onOpenSettings(nativeMobile ? "mobileExecution" : "system");
-                          }}
-                          onOpenBrowser={handleOpenBrowser}
-                          onOpenBrowserSettings={() => {
-                            setSidebarOpen(false);
-                            setMobileWorkspaceDestination({ kind: "browser-settings" });
-                          }}
-                          onOpenGitReview={() => handleOpenWorkspaceTool("gitReview")}
-                          onOpenSsh={() => handleOpenWorkspaceTool("sshConnection")}
-                          onOpenBackgroundTasks={() => handleOpenWorkspaceTool("backgroundTasks")}
-                        />
-                      </>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleOpenBrowser}
-                        title={t("browser.open")}
-                        className="relative h-8 w-8 rounded-lg text-muted-foreground transition-[background-color,color,transform] duration-150 hover:text-foreground active:scale-95"
-                      >
-                        <Globe className="h-4 w-4" />
-                      </Button>
-                    )
-                  }
-                />
-                <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
-              </AstryxView>
-
-              {chatSurface === "trajectory" ? (
-                <ConversationTrajectorySurface conversationId={currentConversationId} />
-              ) : (
-                <DesktopCheckpointRewindProvider
-                  conversationId={currentConversationId}
-                  workspaceRoot={currentConversationWorkspaceRoot}
-                  project={
-                    workspaceProjects.find(
-                      (project) =>
-                        currentConversationWorkspaceRoot &&
-                        workspaceProjectPathKey(project.path) ===
-                          workspaceProjectPathKey(currentConversationWorkspaceRoot),
-                    ) ?? null
-                  }
-                  disabled={
-                    !desktopCommandHostAvailable ||
-                    !isAgentMode ||
-                    isSending ||
-                    isConversationRunning(currentConversationId)
-                  }
-                  onRewound={(info) => {
-                    const changed = info.result.restoredFiles + info.result.deletedFiles;
-                    const failed = info.result.conflicts.length + info.result.failed.length;
-                    addNotify(
-                      failed > 0 ? "warning" : "success",
-                      t("chat.checkpointRewind.done")
-                        .replace("{changed}", String(changed))
-                        .replace("{failed}", String(failed)),
-                    );
-                  }}
-                >
-                  <ChangedFilesActionsProvider value={changedFilesActions}>
-                    <ChatTranscript
-                      conversationId={currentConversationId}
-                      workspaceRoot={currentConversationWorkspaceRoot}
-                      gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
-                      followRef={scrollFollowRef}
-                      hasModels={hasModels}
-                      historyItems={historyRenderItems}
-                      hasMoreHistory={conversationState.transcript.hasMoreBefore}
-                      onLoadEarlierHistory={handleLoadEarlierHistory}
-                      isHistorySwitching={conversationOpenState.showOverlay}
-                      isSending={isSending}
-                      isAgentMode={isAgentMode}
-                      showUsage={isAgentDevExecutionMode}
-                      usageContextWindow={currentModelContextWindow}
-                      liveTranscriptStore={liveTranscriptStore}
-                      isCompactionRunning={isCompactionRunning}
-                      bottomReservePx={composerOverlayHeight}
-                      onOpenFileLink={
-                        desktopCommandHostAvailable ? handleOpenChatFileLink : undefined
-                      }
-                      onResendFromEdit={handleResendFromEdit}
-                      onBranchConversation={
-                        // 水合中/水合失败时 handler 只会静默 return——直接不传，
-                        // 让 AssistantRow 的 disabled 分支给出可见的禁用态。
-                        isConversationHydrating || isConversationHydrationFailed
-                          ? undefined
-                          : handleBranchConversation
-                      }
-                      branchPendingMessageId={branchPendingMessageId}
-                      onOpenSettings={onOpenSettings}
-                      onSuggestionSelect={handleEmptyStateSuggestion}
-                      suggestionsDisabled={isSuggestionTyping}
-                    />
-                  </ChangedFilesActionsProvider>
-                </DesktopCheckpointRewindProvider>
-              )}
-
-              {mobileExperience && chatSurface === "conversation" ? (
-                <MobileToolActivity
-                  store={liveTranscriptStore}
-                  open={mobileActivityOpen}
-                  onOpen={handleOpenMobileActivity}
-                  onOpenBrowser={handleOpenBrowser}
-                  onOpenTerminal={() => handleOpenMobileTerminal("terminal")}
-                  onClose={handleCloseMobileActivity}
-                  bottomOffsetPx={composerOverlayHeight}
-                />
-              ) : null}
-
-              {chatSurface === "conversation" ? (
-                <CurrentTaskProgress
-                  historyItems={historyRenderItems}
-                  liveTranscriptStore={liveTranscriptStore}
-                  isConversationRunning={
-                    isSending ||
-                    (currentConversationId ? isConversationRunning(currentConversationId) : false)
-                  }
-                  persistedState={conversationState.meta.taskList}
-                />
-              ) : null}
-
-              {chatSurface === "conversation" && pendingToolApprovals.length > 0 ? (
-                <ToolApprovalBar
-                  pending={pendingToolApprovals}
-                  onDecide={(toolCallId, decision) =>
-                    Promise.resolve(
-                      answerToolApproval(toolCallId, decision, {
-                        conversationId: currentConversationId,
-                      }),
-                    )
-                  }
-                  onDecideAll={async (decision) => {
-                    for (const item of pendingToolApprovals) {
-                      answerToolApproval(item.toolCallId, decision, {
-                        conversationId: currentConversationId,
-                      });
+                      ) : null
                     }
-                  }}
-                />
-              ) : null}
-
-              {chatSurface === "conversation" ? (
-                <ChatComposerBar
-                  conversationId={currentConversationId}
-                  composerRef={composerRef}
-                  isSending={isSending}
-                  isUploadingFiles={isUploadingFiles}
-                  isInputDisabled={isComposerInputDisabled}
-                  inputPlaceholder={composerPlaceholder}
-                  workdir={displayedConversationWorkdir}
-                  enabledSkills={enabledComposerSkills}
-                  isAgentMode={isAgentMode}
-                  chatRuntimeControls={chatRuntimeControlsForCurrentProvider}
-                  reasoningOptions={chatRuntimeReasoningOptions}
-                  thinkingAlwaysOn={chatRuntimeThinkingAlwaysOn}
-                  contextUsageTokensSource={contextUsageTokensSource}
-                  contextWindow={currentModelContextWindow}
-                  sttSettings={desktopCommandHostAvailable ? settings.stt : undefined}
-                  onManualCompact={handleManualCompaction}
-                  manualCompactionDisabled={isSending || compactionStatus.phase === "running"}
-                  gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
-                  workspaceActivityClient={
-                    desktopCommandHostAvailable ? tauriWorkspaceActivityClient : null
-                  }
-                  onSend={handleSend}
-                  onStop={handleStopSending}
-                  onComposerBusyChange={handleComposerBusyChange}
-                  onChatRuntimeControlsChange={handleChatRuntimeControlsChange}
-                  onPickReadableFiles={pickReadableFiles}
-                  onPasteFiles={importReadableFiles}
-                  loadHistoryPrompts={loadComposerHistoryPrompts}
-                  pendingUploadedFiles={pendingUploadedFiles}
-                  onRemovePendingUpload={removePendingUpload}
-                  queuedTurns={queuedChatTurnsForCurrentConversation}
-                  onRunQueuedTurnNow={runQueuedTurnNow}
-                  onMoveQueuedTurnUp={moveQueuedTurnUp}
-                  onEditQueuedTurn={editQueuedTurn}
-                  onRemoveQueuedTurn={removeQueuedTurn}
-                  onHeightChange={setComposerOverlayHeight}
-                  mobileExperience={mobileExperience}
-                />
-              ) : null}
-              {chatSurface === "conversation" && isFileDropActive ? (
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="file-drop-overlay pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-4 sm:p-6 bg-white/30 backdrop-blur-md dark:bg-black/30"
-                  aria-hidden="true"
-                >
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className={`file-drop-overlay-zone absolute inset-3 sm:inset-4 rounded-2xl border border-dashed ${
-                      canDropUpload
-                        ? "border-foreground/20 bg-foreground/[0.015] dark:border-white/15 dark:bg-white/[0.015]"
-                        : "border-destructive/35 bg-destructive/[0.03]"
-                    }`}
+                    trailingActions={
+                      mobileExperience ? (
+                        <>
+                          {canShowTrajectory ? (
+                            <ToggleButton
+                              label={
+                                chatSurface === "trajectory"
+                                  ? t("chat.trajectory.backToChat")
+                                  : t("chat.trajectory.open")
+                              }
+                              tooltip={
+                                chatSurface === "trajectory"
+                                  ? t("chat.trajectory.backToChat")
+                                  : t("chat.trajectory.open")
+                              }
+                              isIconOnly
+                              size="lg"
+                              isPressed={chatSurface === "trajectory"}
+                              icon={<Activity className="h-4 w-4" />}
+                              pressedIcon={<MessageSquare className="h-4 w-4" />}
+                              onPressedChange={(isPressed) =>
+                                setChatSurface(isPressed ? "trajectory" : "conversation")
+                              }
+                            />
+                          ) : null}
+                          <MobileQuickActions
+                            onOpenTerminal={() => handleOpenWorkspaceTool("terminal")}
+                            onOpenRootfs={() => {
+                              setSidebarOpen(false);
+                              setMobileWorkspaceDestination(null);
+                              onOpenSettings(nativeMobile ? "mobileExecution" : "system");
+                            }}
+                            onOpenBrowser={handleOpenBrowser}
+                            onOpenBrowserSettings={() => {
+                              setSidebarOpen(false);
+                              setMobileWorkspaceDestination({ kind: "browser-settings" });
+                            }}
+                            onOpenGitReview={() => handleOpenWorkspaceTool("gitReview")}
+                            onOpenSsh={() => handleOpenWorkspaceTool("sshConnection")}
+                            onOpenBackgroundTasks={() => handleOpenWorkspaceTool("backgroundTasks")}
+                          />
+                        </>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleOpenBrowser}
+                          title={t("browser.open")}
+                          className="relative h-8 w-8 rounded-lg text-muted-foreground transition-[background-color,color,transform] duration-150 hover:text-foreground active:scale-95"
+                        >
+                          <Globe className="h-4 w-4" />
+                        </Button>
+                      )
+                    }
                   />
+                  <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
+                </AstryxView>
+
+                {chatSurface === "trajectory" ? (
+                  <ConversationTrajectorySurface conversationId={currentConversationId} />
+                ) : (
+                  <DesktopCheckpointRewindProvider
+                    conversationId={currentConversationId}
+                    workspaceRoot={currentConversationWorkspaceRoot}
+                    project={
+                      workspaceProjects.find(
+                        (project) =>
+                          currentConversationWorkspaceRoot &&
+                          workspaceProjectPathKey(project.path) ===
+                            workspaceProjectPathKey(currentConversationWorkspaceRoot),
+                      ) ?? null
+                    }
+                    disabled={
+                      !desktopCommandHostAvailable ||
+                      !isAgentMode ||
+                      isSending ||
+                      isConversationRunning(currentConversationId)
+                    }
+                    onRewound={(info) => {
+                      const changed = info.result.restoredFiles + info.result.deletedFiles;
+                      const failed = info.result.conflicts.length + info.result.failed.length;
+                      addNotify(
+                        failed > 0 ? "warning" : "success",
+                        t("chat.checkpointRewind.done")
+                          .replace("{changed}", String(changed))
+                          .replace("{failed}", String(failed)),
+                      );
+                    }}
+                  >
+                    <ChangedFilesActionsProvider value={changedFilesActions}>
+                      <ChatTranscript
+                        conversationId={currentConversationId}
+                        workspaceRoot={currentConversationWorkspaceRoot}
+                        gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
+                        followRef={scrollFollowRef}
+                        hasModels={hasModels}
+                        historyItems={historyRenderItems}
+                        hasMoreHistory={conversationState.transcript.hasMoreBefore}
+                        onLoadEarlierHistory={handleLoadEarlierHistory}
+                        isHistorySwitching={conversationOpenState.showOverlay}
+                        isSending={isSending}
+                        isAgentMode={isAgentMode}
+                        showUsage={isAgentDevExecutionMode}
+                        usageContextWindow={currentModelContextWindow}
+                        liveTranscriptStore={liveTranscriptStore}
+                        isCompactionRunning={isCompactionRunning}
+                        bottomReservePx={0}
+                        onOpenFileLink={
+                          desktopCommandHostAvailable ? handleOpenChatFileLink : undefined
+                        }
+                        onResendFromEdit={handleResendFromEdit}
+                        onBranchConversation={
+                          // 水合中/水合失败时 handler 只会静默 return——直接不传，
+                          // 让 AssistantRow 的 disabled 分支给出可见的禁用态。
+                          isConversationHydrating || isConversationHydrationFailed
+                            ? undefined
+                            : handleBranchConversation
+                        }
+                        branchPendingMessageId={branchPendingMessageId}
+                        onOpenSettings={onOpenSettings}
+                        onSuggestionSelect={handleEmptyStateSuggestion}
+                        suggestionsDisabled={isSuggestionTyping}
+                        emptyStateComposer={
+                          shouldEmbedComposerInLanding ? renderChatComposer() : undefined
+                        }
+                      />
+                    </ChangedFilesActionsProvider>
+                  </DesktopCheckpointRewindProvider>
+                )}
+
+                {mobileExperience && chatSurface === "conversation" ? (
+                  <MobileToolActivity
+                    store={liveTranscriptStore}
+                    open={mobileActivityOpen}
+                    onOpen={handleOpenMobileActivity}
+                    onOpenBrowser={handleOpenBrowser}
+                    onOpenTerminal={() => handleOpenMobileTerminal("terminal")}
+                    onClose={handleCloseMobileActivity}
+                    bottomOffsetPx={composerOverlayHeight}
+                  />
+                ) : null}
+
+                {chatSurface === "conversation" ? (
+                  <CurrentTaskProgress
+                    historyItems={historyRenderItems}
+                    liveTranscriptStore={liveTranscriptStore}
+                    isConversationRunning={
+                      isSending ||
+                      (currentConversationId ? isConversationRunning(currentConversationId) : false)
+                    }
+                    persistedState={conversationState.meta.taskList}
+                  />
+                ) : null}
+
+                {chatSurface === "conversation" && pendingToolApprovals.length > 0 ? (
+                  <ToolApprovalBar
+                    pending={pendingToolApprovals}
+                    onDecide={(toolCallId, decision) =>
+                      Promise.resolve(
+                        answerToolApproval(toolCallId, decision, {
+                          conversationId: currentConversationId,
+                        }),
+                      )
+                    }
+                    onDecideAll={async (decision) => {
+                      for (const item of pendingToolApprovals) {
+                        answerToolApproval(item.toolCallId, decision, {
+                          conversationId: currentConversationId,
+                        });
+                      }
+                    }}
+                  />
+                ) : null}
+
+                {chatSurface === "conversation" && !shouldEmbedComposerInLanding
+                  ? renderChatComposer()
+                  : null}
+                {chatSurface === "conversation" && isFileDropActive ? (
                   <AstryxView
-                    layout="block"
+                    layout="flex"
                     direction="horizontal"
-                    className={`file-drop-overlay-card relative flex w-full max-w-[380px] flex-col items-center gap-5 rounded-2xl border bg-white/70 px-8 py-7 text-center shadow-[0_24px_60px_-20px_rgba(0,0,0,0.25),0_8px_20px_-12px_rgba(0,0,0,0.15)] backdrop-blur-2xl dark:bg-zinc-900/70 dark:shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7),0_8px_20px_-12px_rgba(0,0,0,0.5)] ${
-                      canDropUpload
-                        ? "border-black/[0.06] ring-1 ring-inset ring-white/40 dark:border-white/10 dark:ring-white/[0.04]"
-                        : "border-destructive/20 ring-1 ring-inset ring-destructive/10 dark:border-destructive/30"
-                    }`}
+                    className="file-drop-overlay pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-4 sm:p-6 bg-white/30 backdrop-blur-md dark:bg-black/30"
+                    aria-hidden="true"
                   >
                     <AstryxView
                       layout="block"
                       direction="horizontal"
-                      className={`flex h-14 w-14 items-center justify-center rounded-2xl ring-1 ring-inset ${
+                      className={`file-drop-overlay-zone absolute inset-3 sm:inset-4 rounded-2xl border border-dashed ${
                         canDropUpload
-                          ? "bg-foreground/[0.04] text-foreground/85 ring-foreground/10 dark:bg-white/[0.06] dark:text-white/90 dark:ring-white/10"
-                          : "bg-destructive/[0.08] text-destructive/90 ring-destructive/15"
+                          ? "border-foreground/20 bg-foreground/[0.015] dark:border-white/15 dark:bg-white/[0.015]"
+                          : "border-destructive/35 bg-destructive/[0.03]"
                       }`}
-                    >
-                      {canDropUpload ? (
-                        <Upload className="h-6 w-6" strokeWidth={1.75} />
-                      ) : (
-                        <Ban className="h-6 w-6" strokeWidth={1.75} />
-                      )}
-                    </AstryxView>
-
-                    <AstryxView
-                      layout="flex"
-                      direction="vertical"
-                      className="flex flex-col items-center gap-1.5"
-                    >
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="text-[calc(15px*var(--zone-font-scale,1))] font-semibold leading-tight tracking-tight text-foreground"
-                      >
-                        {fileDropTitle}
-                      </AstryxView>
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="max-w-[280px] text-xs leading-5 text-muted-foreground"
-                      >
-                        {fileDropDescription}
-                      </AstryxView>
-                    </AstryxView>
-
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="h-px w-12 bg-foreground/10 dark:bg-white/10"
-                      aria-hidden="true"
                     />
-
                     <AstryxView
                       layout="block"
                       direction="horizontal"
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[calc(11px*var(--zone-font-scale,1))] font-medium ${
+                      className={`file-drop-overlay-card relative flex w-full max-w-[380px] flex-col items-center gap-5 rounded-2xl border bg-white/70 px-8 py-7 text-center shadow-[0_24px_60px_-20px_rgba(0,0,0,0.25),0_8px_20px_-12px_rgba(0,0,0,0.15)] backdrop-blur-2xl dark:bg-zinc-900/70 dark:shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7),0_8px_20px_-12px_rgba(0,0,0,0.5)] ${
                         canDropUpload
-                          ? "border-foreground/[0.08] bg-foreground/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
-                          : "border-destructive/20 bg-destructive/[0.05] text-destructive/80"
+                          ? "border-black/[0.06] ring-1 ring-inset ring-white/40 dark:border-white/10 dark:ring-white/[0.04]"
+                          : "border-destructive/20 ring-1 ring-inset ring-destructive/10 dark:border-destructive/30"
                       }`}
                     >
-                      <AstryxInline
-                        aria-hidden="true"
-                        className={`inline-flex h-1.5 w-1.5 rounded-full ${
-                          canDropUpload ? "bg-foreground/35 dark:bg-white/50" : "bg-destructive/55"
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className={`flex h-14 w-14 items-center justify-center rounded-2xl ring-1 ring-inset ${
+                          canDropUpload
+                            ? "bg-foreground/[0.04] text-foreground/85 ring-foreground/10 dark:bg-white/[0.06] dark:text-white/90 dark:ring-white/10"
+                            : "bg-destructive/[0.08] text-destructive/90 ring-destructive/15"
                         }`}
+                      >
+                        {canDropUpload ? (
+                          <Upload className="h-6 w-6" strokeWidth={1.75} />
+                        ) : (
+                          <Ban className="h-6 w-6" strokeWidth={1.75} />
+                        )}
+                      </AstryxView>
+
+                      <AstryxView
+                        layout="flex"
+                        direction="vertical"
+                        className="flex flex-col items-center gap-1.5"
+                      >
+                        <AstryxView
+                          layout="block"
+                          direction="horizontal"
+                          className="text-[calc(15px*var(--zone-font-scale,1))] font-semibold leading-tight tracking-tight text-foreground"
+                        >
+                          {fileDropTitle}
+                        </AstryxView>
+                        <AstryxView
+                          layout="block"
+                          direction="horizontal"
+                          className="max-w-[280px] text-xs leading-5 text-muted-foreground"
+                        >
+                          {fileDropDescription}
+                        </AstryxView>
+                      </AstryxView>
+
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className="h-px w-12 bg-foreground/10 dark:bg-white/10"
+                        aria-hidden="true"
                       />
-                      {fileDropLimitHint}
+
+                      <AstryxView
+                        layout="block"
+                        direction="horizontal"
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[calc(11px*var(--zone-font-scale,1))] font-medium ${
+                          canDropUpload
+                            ? "border-foreground/[0.08] bg-foreground/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
+                            : "border-destructive/20 bg-destructive/[0.05] text-destructive/80"
+                        }`}
+                      >
+                        <AstryxInline
+                          aria-hidden="true"
+                          className={`inline-flex h-1.5 w-1.5 rounded-full ${
+                            canDropUpload
+                              ? "bg-foreground/35 dark:bg-white/50"
+                              : "bg-destructive/55"
+                          }`}
+                        />
+                        {fileDropLimitHint}
+                      </AstryxView>
                     </AstryxView>
                   </AstryxView>
-                </AstryxView>
-              ) : null}
+                ) : null}
+              </>
+            )}
+          </VStack>
+          {!mobileExperience && splitConversationId ? (
+            <>
+              <ResizeHandle
+                direction="horizontal"
+                isReversed
+                hasDivider
+                pillPlacement="center"
+                resizable={splitConversationResize.props}
+                label={t("chat.split.resize")}
+              />
+              <SplitConversationPane
+                width={splitConversationResize.size}
+                conversationId={splitConversationId}
+                record={splitConversationRecord}
+                loading={splitConversationLoading}
+                error={splitConversationError}
+                liveTranscriptStore={getConversationLiveTranscriptStore(splitConversationId)}
+                isRunning={isConversationRunning(splitConversationId)}
+                isAgentMode={isAgentMode}
+                showUsage={isAgentDevExecutionMode}
+                onActivate={handleActivateSplitConversation}
+                onRetry={() => setSplitConversationReload((value) => value + 1)}
+                onClose={handleCloseSplitConversation}
+              />
             </>
-          )}
-        </VStack>
+          ) : null}
+        </HStack>
       </StackItem>
 
       <BrowserPanel />

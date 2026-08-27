@@ -49,6 +49,7 @@ function statusVariant(
 ): "success" | "warning" | "error" | "accent" | "neutral" {
   if (event.err || event.st === "error") return "error";
   if (event.st === "aborted") return "warning";
+  if (event.k === "retry" || event.k === "failover") return "warning";
   if (event.st === "complete" || event.k === "tool_end" || event.k === "turn_end") {
     return "success";
   }
@@ -92,8 +93,31 @@ function eventDetails(event: TrajectoryEvent): string[] {
     const delay = numberField(event, "delay");
     details.push(
       attempt === undefined ? undefined : `${attempt}${max === undefined ? "" : ` / ${max}`}`,
+      textField(event, "p"),
       delay === undefined ? undefined : `${delay} ms`,
       textField(event, "err"),
+    );
+  }
+  if (event.k === "failover") {
+    const attempt = numberField(event, "n");
+    const from = textField(event, "from");
+    const to = textField(event, "to");
+    details.push(
+      attempt === undefined ? undefined : `#${attempt}`,
+      from || to ? `${from ?? "?"} → ${to ?? "?"}` : undefined,
+      textField(event, "err"),
+    );
+  }
+  if (event.k === "transport") {
+    const headers = Array.isArray(event.hn)
+      ? event.hn.filter((value): value is string => typeof value === "string").join(", ")
+      : undefined;
+    details.push(
+      textField(event, "p"),
+      textField(event, "o"),
+      event.sp === true ? "system proxy" : event.sp === false ? "direct" : undefined,
+      event.fu === true ? "full URL" : undefined,
+      headers,
     );
   }
   if (event.k === "tool_start") details.push(textField(event, "n"), textField(event, "a"));

@@ -10,6 +10,10 @@ const workflow = readFileSync(
   path.join(repoRoot, ".github/workflows/desktop-release.yml"),
   "utf8",
 ).replace(/\r\n?/g, "\n");
+const iosProjectTemplate = readFileSync(
+  path.join(repoRoot, "crates/fronted/src-tauri/ios.project.yml"),
+  "utf8",
+).replace(/\r\n?/g, "\n");
 
 function jobSource(name, nextName) {
   const start = workflow.indexOf(`  ${name}:\n`);
@@ -101,4 +105,9 @@ test("only the publish job receives repository write permission", () => {
   assert.match(publish, /-f target_commitish="\$RELEASE_SHA"/);
   assert.match(publish, /if \[ "\$SIGNED_RELEASE" = true \]; then/);
   assert.match(publish, /gh release delete-asset "\$RELEASE_TAG" latest\.json --yes/);
+});
+
+test("iOS project template preserves the pre-build script YAML boundary", () => {
+  assert.match(iosProjectTemplate, /preBuildScripts:\n\s+\{\{#each ios-pre-build-scripts\}\}/);
+  assert.doesNotMatch(iosProjectTemplate, /preBuildScripts:\n\s+\{\{~#each ios-pre-build-scripts\}\}/);
 });

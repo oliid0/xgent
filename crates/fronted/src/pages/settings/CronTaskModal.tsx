@@ -1,3 +1,4 @@
+import { Selector } from "@astryxdesign/core/Selector";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import {
   Heading as AstryxHeading,
@@ -22,13 +23,6 @@ import {
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
 import { Textarea } from "../../components/ui/textarea";
 import { useLocale } from "../../i18n";
 import {
@@ -210,10 +204,6 @@ export function CronTaskModal({
           },
         ]
       : modelOptions;
-
-  const selectedWorkspaceOption = customWorkdir
-    ? null
-    : findWorkspaceOptionByPath(workspaceOptions, workdir);
 
   const formReady =
     Boolean(name.trim()) &&
@@ -686,11 +676,28 @@ export function CronTaskModal({
               <Label className="text-xs font-medium text-muted-foreground">
                 {t("settings.cronWorkdirLabel")}
               </Label>
-              <Select
+              <Selector
+                label={t("settings.cronWorkdirLabel")}
+                isLabelHidden
+                width="100%"
+                startIcon={<Folder />}
                 value={
                   customWorkdir ? CUSTOM_WORKDIR_VALUE : workdir || FOLLOW_ACTIVE_WORKSPACE_VALUE
                 }
-                onValueChange={(value) => {
+                options={[
+                  {
+                    value: FOLLOW_ACTIVE_WORKSPACE_VALUE,
+                    label: t("settings.cronWorkdirFollowActive"),
+                  },
+                  { value: CUSTOM_WORKDIR_VALUE, label: t("settings.cronWorkdirCustom") },
+                  ...(workspaceOptions.length > 0 ? [{ type: "divider" as const }] : []),
+                  ...workspaceOptions.map((option) => ({
+                    value: option.path,
+                    label: option.name,
+                    description: option.path,
+                  })),
+                ]}
+                onChange={(value) => {
                   setFormError(null);
                   if (value === FOLLOW_ACTIVE_WORKSPACE_VALUE) {
                     setCustomWorkdir(false);
@@ -702,65 +709,7 @@ export function CronTaskModal({
                     setWorkdir(value);
                   }
                 }}
-              >
-                <SelectTrigger className="h-10">
-                  <AstryxView
-                    as="span"
-                    layout="flex"
-                    direction="horizontal"
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  >
-                    <AstryxInline
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors ${
-                        customWorkdir || workdir
-                          ? "bg-amber-500/10 text-amber-500"
-                          : "bg-muted/60 text-muted-foreground"
-                      }`}
-                    >
-                      <Folder className="h-3.5 w-3.5" />
-                    </AstryxInline>
-                    <SelectValue
-                      className="truncate"
-                      placeholder={t("settings.cronWorkdirFollowActive")}
-                    >
-                      {customWorkdir
-                        ? t("settings.cronWorkdirCustom")
-                        : selectedWorkspaceOption
-                          ? selectedWorkspaceOption.name
-                          : t("settings.cronWorkdirFollowActive")}
-                    </SelectValue>
-                  </AstryxView>
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  <SelectItem
-                    value={FOLLOW_ACTIVE_WORKSPACE_VALUE}
-                    className="py-2 text-muted-foreground focus:text-foreground data-[highlighted]:text-foreground"
-                  >
-                    {t("settings.cronWorkdirFollowActive")}
-                  </SelectItem>
-                  <SelectItem value={CUSTOM_WORKDIR_VALUE} className="py-2">
-                    {t("settings.cronWorkdirCustom")}
-                  </SelectItem>
-                  {workspaceOptions.length > 0 ? (
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="mx-2 my-1 h-px bg-border/60"
-                    />
-                  ) : null}
-                  {workspaceOptions.map((option) => (
-                    <SelectItem
-                      key={option.path}
-                      value={option.path}
-                      title={option.path}
-                      description={<AstryxInline className="font-mono">{option.path}</AstryxInline>}
-                      className="py-2"
-                    >
-                      {option.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
               {customWorkdir ? (
                 <AstryxView
                   layout="flex"
@@ -910,26 +859,22 @@ export function CronTaskModal({
                   <Label className="text-xs font-medium text-muted-foreground">
                     {t("settings.cronReasoningLabel")}
                   </Label>
-                  <Select
+                  <Selector
+                    label={t("settings.cronReasoningLabel")}
+                    isLabelHidden
                     value={reasoning}
-                    onValueChange={(value) => {
+                    width="100%"
+                    options={CRON_REASONING_LEVELS.map((level) => ({
+                      value: level,
+                      label: t(REASONING_LEVEL_I18N_KEYS[level]),
+                    }))}
+                    onChange={(value) => {
                       setFormError(null);
                       if (isCronReasoningLevel(value)) {
                         setReasoning(value);
                       }
                     }}
-                  >
-                    <SelectTrigger className="h-10">
-                      <SelectValue>{t(REASONING_LEVEL_I18N_KEYS[reasoning])}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      {CRON_REASONING_LEVELS.map((level) => (
-                        <SelectItem key={level} value={level}>
-                          {t(REASONING_LEVEL_I18N_KEYS[level])}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                 </AstryxView>
               </AstryxView>
               {promptModelOptions.length === 0 ? (

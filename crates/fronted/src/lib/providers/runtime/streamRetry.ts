@@ -19,9 +19,15 @@ export type StreamRetryConfig = {
   disabled?: boolean;
   /**
    * Retry ordinal (1..maxRetries) about to be attempted, invoked before the
-   * backoff sleep. `errorMessage` is the failure that triggered this retry.
+   * backoff sleep. `errorMessage` is the failure that triggered this retry;
+   * `plannedDelayMs` is the exact backoff that will be applied.
    */
-  onRetry?: (attempt: number, maxAttempts: number, errorMessage: string) => void;
+  onRetry?: (
+    attempt: number,
+    maxAttempts: number,
+    errorMessage: string,
+    plannedDelayMs?: number,
+  ) => void;
   /** Invoked once a retried attempt commits its first content-bearing event. */
   onRetryRecovered?: () => void;
 };
@@ -147,10 +153,11 @@ export function withStreamRetry(
         if (isRetryableAssistantError(terminalMessage(terminal))) {
           const errorMessage = terminalMessage(terminal)?.errorMessage || "Unknown error";
           attempt += 1;
-          options?.onRetry?.(attempt - 1, maxAttempts - 1, errorMessage);
+          const plannedDelayMs = Math.round(computeStreamRetryBackoffMs(attempt - 1));
+          options?.onRetry?.(attempt - 1, maxAttempts - 1, errorMessage, plannedDelayMs);
           hasRetried = true;
           try {
-            await sleepWithAbort(computeStreamRetryBackoffMs(attempt - 1), signal);
+            await sleepWithAbort(plannedDelayMs, signal);
             source = factory();
             continue;
           } catch {

@@ -617,7 +617,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     },
     todoState,
     taskStateStore,
-    askUserQuestionConversationId: conversationId,
+    askUserQuestionConversationId: planModeEnabled ? conversationId : undefined,
     planMode: planModeEnabled ? { conversationId } : undefined,
     toolSearch: { conversationId },
     skillsEnabled: effectiveSkillsEnabled,
@@ -1101,11 +1101,17 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           );
         },
         onHostedSearch: (hostedSearch, round) => {
+          trajectory.firstToken(round);
           updateHostedSearch(hostedSearch, round);
         },
         onToolCall: (toolCall, round) => {
+          trajectory.firstToken(round);
           sawToolCallInRound = true;
           discardPendingToolCallDelta(toolCall, round);
+          // AskUserQuestion only becomes interactive once the executor has
+          // installed its authoritative pending entry. Rendering it here can
+          // expose a card that cannot submit yet.
+          if (toolCall.name === ASK_USER_QUESTION_TOOL_NAME) return;
           if (!shouldShowToolEvent(toolCall)) return;
           conversationEvents.queueEvent({
             type: "tool_call",
@@ -1236,12 +1242,33 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           if (latest !== undefined) {
             trajectory.noteRetry(activeAgentRound, {
               attempt: latest.attempt,
-              // maxAttempts 含首次尝试，重试上限要减去它。
-              maxRetries: Math.max(0, latest.maxAttempts - 1),
+              maxRetries: latest.maxAttempts,
+              ...(latest.plannedDelayMs === undefined ? {} : { delayMs: latest.plannedDelayMs }),
               ...(latest.errorMessage === "" ? {} : { error: latest.errorMessage }),
+              ...(latest.providerLabel === undefined ? {} : { provider: latest.providerLabel }),
             });
           }
           updateRetryAttempts(attempts, transcriptStore);
+        },
+        onFailoverAttempt: (_round, event) => {
+          trajectory.noteFailover(activeAgentRound, {
+            attempt: event.attempt,
+            fromLabel: event.fromLabel,
+            toLabel: event.toLabel,
+            targetIndex: event.targetIndex,
+            ...(event.errorMessage === "" ? {} : { error: event.errorMessage }),
+          });
+        },
+        onTransportAttempt: (_round, snapshot) => {
+          trajectory.noteTransport(activeAgentRound, {
+            provider: snapshot.providerLabel,
+            ...(snapshot.upstreamOrigin === undefined
+              ? {}
+              : { upstreamOrigin: snapshot.upstreamOrigin }),
+            useSystemProxy: snapshot.useSystemProxy,
+            fullUrl: snapshot.fullUrl,
+            headerNames: snapshot.headerNames,
+          });
         },
         onBeforeNextTurn: async ({ round, assistant, toolResults, emittedMessages }) => {
           publishPersistableAgentProgress(round, assistant, toolResults);
@@ -1532,6 +1559,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
               key: `r${round}`,
               round,
               blocks: [],
+              meta: { contextRelevant: false },
               runningToolCallIds: [],
               thinkingOpen: false,
             },
@@ -1635,7 +1663,8 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           transcriptStore,
         );
       },
-      onAssistantMessage: commitAssistantRoundMeta,
+      onAssistantMessage: (assistant, round) =>
+        commitAssistantRoundMeta(assistant, round, { contextRelevant: false }),
       onToolStatus: (s) => {
         conversationEvents.queueToolStatus(s, false);
         updateToolStatus(s, transcriptStore);
@@ -1657,7 +1686,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     conversation_id: conversationId,
   });
   conversationEvents.close();
-  if (!showSilentMemoryExtraction && shouldRunMemoryExtraction) {
+  if (historyPersisted && !showSilentMemoryExtraction && shouldRunMemoryExtraction) {
     void runPostTurnMemoryExtraction();
   }
 }

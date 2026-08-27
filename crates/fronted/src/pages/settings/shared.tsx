@@ -16,22 +16,18 @@ export function SettingsRowGroup(props: {
   tone?: "default" | "danger";
 }) {
   return (
-    <VStack as="section" gap={2} className="settings-row-section mb-7">
+    <VStack as="section" gap={2} width="100%">
       <Heading
         level={3}
-        className={`px-1 uppercase tracking-wide ${
-          props.tone === "danger" ? "text-destructive" : "text-muted-foreground"
-        }`}
+        color="secondary"
+        style={props.tone === "danger" ? { color: "var(--color-error)" } : undefined}
       >
         {props.title}
       </Heading>
-      <Section
-        padding={0}
-        className={`settings-row-group divide-y overflow-hidden rounded-xl border text-sm ${
-          props.tone === "danger" ? "border-destructive/30" : "border-border/70"
-        }`}
-      >
-        {props.children}
+      <Section padding={0} variant="transparent" width="100%">
+        <VStack width="100%" gap={2}>
+          {props.children}
+        </VStack>
       </Section>
     </VStack>
   );
@@ -44,28 +40,31 @@ export function SettingsRow(props: {
   align?: "center" | "start";
 }) {
   return (
-    <HStack
-      gap={4}
-      padding={3}
-      vAlign={props.align === "start" ? "start" : "center"}
-      className="settings-row min-h-14"
-    >
-      <StackItem size="fill">
-        <VStack gap={0.5}>
-          <Text type="body" weight="medium">
-            {props.label}
-          </Text>
-          {props.description ? (
-            <Text type="supporting" color="secondary">
-              {props.description}
+    <Section variant="transparent" padding={0} dividers={["bottom"]} width="100%">
+      <HStack
+        width="100%"
+        gap={4}
+        padding={3}
+        wrap="wrap"
+        vAlign={props.align === "start" ? "start" : "center"}
+      >
+        <StackItem size="fill">
+          <VStack gap={0.5}>
+            <Text type="body" weight="medium" wordBreak="break-word">
+              {props.label}
             </Text>
-          ) : null}
-        </VStack>
-      </StackItem>
-      <HStack hAlign="end" vAlign="center" className="settings-row-control shrink-0">
-        {props.children}
+            {props.description ? (
+              <Text type="supporting" color="secondary" wordBreak="break-word">
+                {props.description}
+              </Text>
+            ) : null}
+          </VStack>
+        </StackItem>
+        <HStack hAlign="end" vAlign="center" wrap="wrap">
+          {props.children}
+        </HStack>
       </HStack>
-    </HStack>
+    </Section>
   );
 }
 

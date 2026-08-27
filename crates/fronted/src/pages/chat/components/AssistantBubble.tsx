@@ -1,5 +1,5 @@
 import { ChatMessage } from "@astryxdesign/core/Chat";
-import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { VStack } from "@astryxdesign/core/Layout";
 import { memo, useMemo } from "react";
 
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
@@ -12,7 +12,6 @@ import type { UiRound } from "../../../lib/chat/messages/uiMessages";
 import { normalizeLiveToolStatus, VIBING_STATUS } from "../../../lib/chat/page/chatPageHelpers";
 import type { AssistantUnitRow } from "../transcript/rowModel";
 
-import { AssistantAvatar } from "./assistant-bubble/AssistantAvatar";
 import {
   RetryDetailsBlock,
   RoundBlockContent,
@@ -21,7 +20,6 @@ import {
 import { AssistantStatus, CompactingText, VibingText } from "./assistant-bubble/StatusText";
 import { UsagePanel } from "./assistant-bubble/UsagePanel";
 
-export { AssistantAvatar } from "./assistant-bubble/AssistantAvatar";
 export { RetryDetailsBlock } from "./assistant-bubble/RoundContent";
 export { AssistantStatus, CompactingText, VibingText } from "./assistant-bubble/StatusText";
 
@@ -81,7 +79,7 @@ export const AssistantBubble = memo(function AssistantBubble(props: {
   );
 
   return (
-    <ChatMessage sender="assistant" density="compact" avatar={<AssistantAvatar />}>
+    <ChatMessage sender="assistant" density="compact">
       <VStack gap={2} width="100%" paddingBlockStart={0.5}>
         {rounds.map((round, idx) => (
           <RoundContent
@@ -147,25 +145,11 @@ export const AssistantBubbleUnit = memo(function AssistantBubbleUnit(props: {
     ) : null;
 
   return (
-    <ChatMessage
-      sender="assistant"
-      density="compact"
-      avatar={
-        row.showAvatar ? (
-          <AssistantAvatar />
-        ) : (
-          <HStack
-            aria-hidden="true"
-            width="var(--xagent-assistant-avatar-size)"
-            height="var(--xagent-assistant-avatar-size)"
-          />
-        )
-      }
-    >
+    <ChatMessage sender="assistant" density="compact">
       <VStack
         gap={2}
         width="100%"
-        paddingBlockStart={unit.kind === "status" && isAgentMode ? 1 : row.showAvatar ? 0.5 : 0}
+        paddingBlockStart={unit.kind === "status" && isAgentMode ? 1 : 0}
       >
         {status ? (
           <VStack width="100%" paddingBlock={1.5} style={{ overflow: "hidden" }}>
