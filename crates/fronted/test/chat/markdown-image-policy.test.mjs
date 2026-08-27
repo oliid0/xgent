@@ -317,13 +317,32 @@ test("fs tool descriptions keep Image as the only display path for images", () =
   );
 });
 
-test("AskUserQuestion is reserved for genuinely blocking user-owned decisions", () => {
-  const suffix = agentRunnerModule.buildToolsSuffix("/workspace", [
+test("AskUserQuestion follows the reference runtime without forcing ordinary tasks to ask", () => {
+  const ordinarySuffix = agentRunnerModule.buildToolsSuffix("/workspace", [
     "AskUserQuestion",
     "Read",
     "Write",
   ]);
-  assert.match(suffix, /exceptional blocking tool, not a required step in every task/);
-  assert.match(suffix, /Prefer a reasonable reversible assumption and continue/);
-  assert.doesNotMatch(suffix, /ask proactively instead of guessing/);
+  assert.match(ordinarySuffix, /user questions \(AskUserQuestion\)/);
+  assert.doesNotMatch(ordinarySuffix, /exceptional blocking tool/);
+  assert.doesNotMatch(ordinarySuffix, /ask proactively instead of guessing/);
+
+  const planSuffix = agentRunnerModule.buildToolsSuffix("/workspace", [
+    "AskUserQuestion",
+    "ExitPlanMode",
+    "Read",
+  ]);
+  assert.match(planSuffix, /ask proactively instead of guessing/);
+
+  const turnSource = fs.readFileSync(
+    fileURLToPath(
+      new URL("../../src/pages/chat/turns/runAgentConversationTurn.ts", import.meta.url),
+    ),
+    "utf8",
+  );
+  assert.match(turnSource, /askUserQuestionConversationId:\s*conversationId/);
+  assert.doesNotMatch(
+    turnSource,
+    /askUserQuestionConversationId:\s*planModeEnabled\s*\?\s*conversationId/,
+  );
 });

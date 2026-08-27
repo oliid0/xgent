@@ -1,14 +1,16 @@
+import { Carousel } from "@astryxdesign/core/Carousel";
 import { ChatComposer, ChatComposerDrawer, ChatSendButton } from "@astryxdesign/core/Chat";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
-import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
+import { Popover } from "@astryxdesign/core/Popover";
 import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { Section } from "@astryxdesign/core/Section";
 import { Selector } from "@astryxdesign/core/Selector";
+import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
-import { ToggleButton } from "@astryxdesign/core/ToggleButton";
+import { Thumbnail } from "@astryxdesign/core/Thumbnail";
 import { Token } from "@astryxdesign/core/Token";
 import {
   memo,
@@ -25,7 +27,6 @@ import {
   type MentionComposerHandle,
   type MentionComposerSkill,
 } from "../../../components/chat/MentionComposer";
-import { GitBranchSelector } from "../../../components/git/GitBranchSelector";
 import {
   ChevronUp,
   Clock3,
@@ -40,6 +41,7 @@ import {
   Paperclip,
   Play,
   Plus,
+  Shield,
   Sparkle,
   SquarePen,
   Trash2,
@@ -57,32 +59,20 @@ import type { ModelOption } from "../../../lib/providers/llm";
 import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
 import {
   type ChatRuntimeControls,
+  type CommandSafetyMode,
   DEFAULT_CHAT_RUNTIME_CONTROLS,
   type ReasoningLevel,
   type SelectedModel,
   type SttSettings,
 } from "../../../lib/settings";
-import { cn } from "../../../lib/shared/utils";
 import {
   type DesktopSttCapture,
   startDesktopSttCapture,
 } from "../../../lib/stt/desktopAudioCapture";
+import { invokeFs } from "../../../lib/tools/fsBackend";
 import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
 import { ChatModelSelector } from "./ChatModelSelector";
-
-const REASONING_I18N_KEYS: Record<ReasoningLevel, string> = {
-  off: "settings.reasoning.off",
-  minimal: "settings.reasoning.minimal",
-  low: "settings.reasoning.low",
-  medium: "settings.reasoning.medium",
-  high: "settings.reasoning.high",
-  xhigh: "settings.reasoning.xhigh",
-  max: "settings.reasoning.max",
-};
-
-function isReasoningLevel(value: unknown): value is ReasoningLevel {
-  return typeof value === "string" && Object.hasOwn(REASONING_I18N_KEYS, value);
-}
+import { ComposerGitRepositoryControl } from "./ComposerGitRepositoryControl";
 
 export type ContextUsageTokensSource = {
   subscribe: (listener: () => void) => () => void;
@@ -93,6 +83,61 @@ function formatCompactTokens(value: number) {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
   if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 100_000 ? 0 : 1)}K`;
   return String(value);
+}
+
+type ReadWorkspaceImageResponse = {
+  mimeType: string;
+  data: string;
+};
+
+function PendingImageThumbnail(props: {
+  file: PendingUploadedFile;
+  workdir: string;
+  isDisabled: boolean;
+  onRemove: () => void;
+}) {
+  const [source, setSource] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setSource("");
+    setIsLoading(true);
+    if (!props.workdir.trim()) {
+      setIsLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+    void invokeFs<ReadWorkspaceImageResponse>("fs_read_workspace_image", {
+      workdir: props.workdir,
+      path: props.file.relativePath,
+    })
+      .then((response) => {
+        if (active) setSource(`data:${response.mimeType};base64,${response.data}`);
+      })
+      .catch(() => {
+        if (active) setSource("");
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [props.file.relativePath, props.workdir]);
+
+  return (
+    <Thumbnail
+      src={source || undefined}
+      alt={props.file.fileName}
+      label={props.file.fileName}
+      isLoading={isLoading}
+      isDisabled={props.isDisabled}
+      showRemoveOn="always"
+      onRemove={props.isDisabled ? undefined : props.onRemove}
+    />
+  );
 }
 
 function ContextUsageIndicator(props: {
@@ -111,12 +156,13 @@ function ContextUsageIndicator(props: {
     typeof props.contextWindow === "number" && Number.isFinite(props.contextWindow)
       ? Math.max(0, Math.floor(props.contextWindow))
       : 0;
-  if (tokens === undefined || tokens <= 0 || contextWindow <= 0) return null;
+  if (contextWindow <= 0) return null;
 
-  const ratio = Math.min(1, Math.max(0, tokens / contextWindow));
+  const usedTokens = Math.max(0, tokens ?? 0);
+  const ratio = Math.min(1, usedTokens / contextWindow);
   const percent = Math.round(ratio * 100);
   const variant = ratio >= 0.9 ? "error" : ratio >= 0.7 ? "warning" : "success";
-  const usageLabel = `${t("chat.contextUsage")}: ${formatCompactTokens(tokens)} / ${formatCompactTokens(contextWindow)} tokens (${percent}%)`;
+  const usageLabel = `${t("chat.contextUsage")}: ${formatCompactTokens(usedTokens)} / ${formatCompactTokens(contextWindow)} tokens (${percent}%)`;
   const label = props.onManualCompact ? `${usageLabel} · ${t("chat.manualCompact")}` : usageLabel;
 
   return (
@@ -124,7 +170,7 @@ function ContextUsageIndicator(props: {
       <VStack width="100%">
         <ProgressBar
           label={usageLabel}
-          value={tokens}
+          value={usedTokens}
           max={contextWindow}
           variant={variant}
           isLabelHidden
@@ -178,6 +224,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   modelOptions: ModelOption[];
   selectedValue?: string;
   chatRuntimeControls: ChatRuntimeControls;
+  commandSafetyMode: CommandSafetyMode;
   reasoningOptions: ReasoningLevel[];
   thinkingAlwaysOn: boolean;
   contextUsageTokensSource?: ContextUsageTokensSource;
@@ -194,6 +241,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   onComposerBusyChange: (isBusy: boolean) => void;
   onSelectModel: (selection: SelectedModel) => void;
   onChatRuntimeControlsChange: (patch: Partial<ChatRuntimeControls>) => void;
+  onCommandSafetyModeChange: (mode: CommandSafetyMode) => void;
   onPickReadableFiles: () => void;
   onPasteFiles: (files: File[]) => void;
   /** Prompts previously sent in this conversation for ↑/↓ recall. */
@@ -223,6 +271,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     modelOptions,
     selectedValue,
     chatRuntimeControls,
+    commandSafetyMode,
     reasoningOptions,
     thinkingAlwaysOn,
     contextUsageTokensSource,
@@ -239,6 +288,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     onComposerBusyChange,
     onSelectModel,
     onChatRuntimeControlsChange,
+    onCommandSafetyModeChange,
     onPickReadableFiles,
     onPasteFiles,
     loadHistoryPrompts,
@@ -265,6 +315,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const expandAnimationRef = useRef<Animation | null>(null);
   const scheduleHeightMeasureRef = useRef<(() => void) | null>(null);
   const [queueCollapsed, setQueueCollapsed] = useState(false);
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [voiceInputAvailable, setVoiceInputAvailable] = useState(false);
   const [voiceInputActive, setVoiceInputActive] = useState(false);
   const [voiceInputError, setVoiceInputError] = useState<string | null>(null);
@@ -276,9 +327,8 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const thinkingSupported = reasoningOptions.length > 0;
   const sendDisabled = isInputDisabled || isUploadingFiles || !hasSendableDraft;
   const canQueueDraftWhileSending = isSending && !sendDisabled;
-  const selectedReasoning = reasoningOptions.includes(chatRuntimeControls.reasoning)
-    ? chatRuntimeControls.reasoning
-    : DEFAULT_CHAT_RUNTIME_CONTROLS.reasoning;
+  const imageUploads = pendingUploadedFiles.filter((file) => file.kind === "image");
+  const documentUploads = pendingUploadedFiles.filter((file) => file.kind !== "image");
   const uploadTooltip = isUploadingFiles
     ? t("chat.upload.uploading")
     : !isAgentMode
@@ -287,9 +337,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
         ? t("chat.upload.requireWorkdir")
         : t("chat.upload.button");
   const addMenuTooltip = t("chat.upload.add");
-  const thinkingTooltip = !thinkingSupported
-    ? t("chat.runtime.thinkingUnavailable")
-    : t("chat.runtime.thinkingTooltip");
   const webSearchTooltip = t("chat.runtime.webSearchTooltip");
 
   useEffect(() => {
@@ -520,21 +567,29 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
       width="100%"
       gap={0}
       hAlign="center"
-      className={cn(
-        "chat-composer-layer pointer-events-none relative z-20 shrink-0",
-        // 展开态从头部下沿一路铺到底部，把整个聊天区让给输入框。
-        isComposerExpanded && "absolute inset-x-0 bottom-0 top-14",
-      )}
+      className="chat-composer-layer"
+      style={{
+        pointerEvents: "none",
+        position: isComposerExpanded ? "absolute" : "relative",
+        insetInline: isComposerExpanded ? 0 : undefined,
+        insetBlockStart: isComposerExpanded ? "var(--xagent-mobile-header-height)" : undefined,
+        insetBlockEnd: isComposerExpanded ? 0 : undefined,
+        zIndex: "var(--xagent-z-chat-composer)",
+        flexShrink: 0,
+      }}
     >
       <VStack
         width="100%"
         maxWidth="var(--xagent-composer-width)"
         gap={0}
-        className={cn(
-          "pointer-events-auto relative",
-          // justify-end：展开动画途中卡片被钳在中间高度时保持贴底，向上生长。
-          isComposerExpanded && "flex min-h-0 flex-col justify-end",
-        )}
+        style={{
+          pointerEvents: "auto",
+          position: "relative",
+          display: isComposerExpanded ? "flex" : undefined,
+          minHeight: isComposerExpanded ? 0 : undefined,
+          flexDirection: isComposerExpanded ? "column" : undefined,
+          justifyContent: isComposerExpanded ? "flex-end" : undefined,
+        }}
       >
         {queuedTurns.length > 0 ? (
           <VStack
@@ -542,7 +597,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
             width="calc(100% - (var(--spacing-3) * 2))"
             maxWidth="var(--xagent-chat-queue-width)"
             gap={0}
-            className="relative z-30"
+            style={{ position: "relative", zIndex: "var(--xagent-z-chat-queue)" }}
           >
             <Section variant="muted" width="100%" padding={0} dividers={["bottom"]}>
               <Collapsible
@@ -647,60 +702,63 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 }
               : undefined
           }
-          className={cn(
-            // 过渡只针对 focus-within 的配色/阴影；不能用 transition-all——
-            // 展开态切换 flex-grow 时会被一并动画，导致卡片先跳顶再长满的闪动。
-            // 常驻 flex-col：FLIP 动画把卡片钳在中间高度时，flex-1 的编辑器
-            // 区吸收多余空间，工具栏才能始终贴住卡片底边。
-            "relative z-10 overflow-hidden",
-            isComposerExpanded && "min-h-0 flex-1",
-          )}
+          className="xagent-chat-composer"
+          style={isComposerExpanded ? { minHeight: 0, flex: 1 } : undefined}
           drawer={
             pendingUploadedFiles.length > 0 ? (
-              <ChatComposerDrawer
-                count={pendingUploadedFiles.length}
-                label={t("chat.upload.attachedFiles")}
-              >
-                <HStack gap={2} wrap="wrap">
-                  {pendingUploadedFiles.map((file) => (
-                    <Token
-                      key={file.relativePath}
-                      label={file.fileName}
-                      description={file.relativePath}
-                      icon={<Paperclip />}
-                      size="sm"
-                      isDisabled={isInputDisabled}
-                      onRemove={
-                        isInputDisabled ? undefined : () => onRemovePendingUpload(file.relativePath)
-                      }
-                    />
-                  ))}
-                </HStack>
+              <ChatComposerDrawer>
+                <VStack gap={2} width="100%">
+                  {imageUploads.length > 0 ? (
+                    <Carousel
+                      gap={1}
+                      hasButtons={imageUploads.length > 3}
+                      hasSnap
+                      aria-label={t("chat.upload.attachedFiles")}
+                    >
+                      {imageUploads.map((file) => (
+                        <PendingImageThumbnail
+                          key={file.relativePath}
+                          file={file}
+                          workdir={workdir}
+                          isDisabled={isInputDisabled}
+                          onRemove={() => onRemovePendingUpload(file.relativePath)}
+                        />
+                      ))}
+                    </Carousel>
+                  ) : null}
+                  {documentUploads.length > 0 ? (
+                    <HStack gap={1} wrap="wrap">
+                      {documentUploads.map((file) => (
+                        <Token
+                          key={file.relativePath}
+                          label={file.fileName}
+                          description={file.relativePath}
+                          icon={<Paperclip />}
+                          size="sm"
+                          isDisabled={isInputDisabled}
+                          onRemove={
+                            isInputDisabled
+                              ? undefined
+                              : () => onRemovePendingUpload(file.relativePath)
+                          }
+                        />
+                      ))}
+                    </HStack>
+                  ) : null}
+                </VStack>
               </ChatComposerDrawer>
             ) : undefined
           }
           headerContext={
-            contextUsageTokensSource || !mobileExperience ? (
-              <HStack gap={2} vAlign="center">
-                {contextUsageTokensSource ? (
-                  <ContextUsageIndicator
-                    source={contextUsageTokensSource}
-                    contextWindow={contextWindow}
-                    onManualCompact={onManualCompact}
-                    manualCompactionDisabled={manualCompactionDisabled}
-                  />
-                ) : null}
-                {!mobileExperience ? (
-                  <IconButton
-                    label={toggleComposerExpandTooltip}
-                    tooltip={toggleComposerExpandTooltip}
-                    variant="ghost"
-                    size="sm"
-                    icon={isComposerExpanded ? <Minimize2 /> : <Maximize2 />}
-                    onClick={toggleComposerExpanded}
-                  />
-                ) : null}
-              </HStack>
+            !mobileExperience && isAgentMode ? (
+              <IconButton
+                label={toggleComposerExpandTooltip}
+                tooltip={toggleComposerExpandTooltip}
+                variant="ghost"
+                size="sm"
+                icon={isComposerExpanded ? <Minimize2 /> : <Maximize2 />}
+                onClick={toggleComposerExpanded}
+              />
             ) : undefined
           }
           input={
@@ -721,156 +779,174 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 workdir={workdir}
                 enabledSkills={enabledSkills}
                 preferNativeContextMenu={mobileExperience}
-                className={cn("px-0 py-0", isComposerExpanded && "h-full max-h-none")}
+                className={
+                  isComposerExpanded
+                    ? "xagent-chat-mention-composer xagent-chat-mention-composer-expanded"
+                    : "xagent-chat-mention-composer"
+                }
               />
             </VStack>
           }
           footerActions={
-            <HStack gap={1} vAlign="center" wrap="wrap">
-              <DropdownMenu
-                button={{
-                  label: addMenuTooltip,
-                  tooltip: addMenuTooltip,
-                  variant: "ghost",
-                  size: "sm",
-                  icon: <Plus />,
-                  isIconOnly: true,
-                  isLoading: isUploadingFiles,
-                  isDisabled: controlsDisabled,
-                }}
-                hasChevron={false}
+            <HStack gap={1} vAlign="center" wrap={mobileExperience ? "wrap" : undefined}>
+              <Popover
                 placement="above"
                 alignment="start"
-                menuWidth="var(--xagent-composer-add-menu-width)"
-                items={[
-                  {
-                    id: "files",
-                    label: t("chat.upload.filesAndPhotos"),
-                    description: uploadDisabled ? uploadTooltip : t("chat.upload.selectFiles"),
-                    icon: <Paperclip />,
-                    isDisabled: uploadDisabled,
-                    onClick: onPickReadableFiles,
-                  },
-                  { type: "divider" },
-                  {
-                    id: "mention",
-                    label: t("chat.composer.addMention"),
-                    description: t("chat.composer.addMentionDesc"),
-                    icon: <Sparkle />,
-                    onClick: () => {
-                      composerRef.current?.insertText("@");
-                      composerRef.current?.focus();
-                    },
-                  },
-                  {
-                    id: "command",
-                    label: t("chat.composer.addCommand"),
-                    description: t("chat.composer.addCommandDesc"),
-                    icon: <SquarePen />,
-                    onClick: () => {
-                      composerRef.current?.insertText("/");
-                      composerRef.current?.focus();
-                    },
-                  },
-                ]}
-              />
+                width="var(--xagent-composer-add-menu-width)"
+                label={addMenuTooltip}
+                isOpen={isAddMenuOpen}
+                onOpenChange={setIsAddMenuOpen}
+                isEnabled={!controlsDisabled}
+                content={
+                  <VStack gap={3} padding={2} width="100%">
+                    <List density="compact" hasDividers>
+                      <ListItem
+                        label={t("chat.upload.filesAndPhotos")}
+                        description={uploadDisabled ? uploadTooltip : t("chat.upload.selectFiles")}
+                        startContent={<Paperclip />}
+                        isDisabled={uploadDisabled}
+                        onClick={() => {
+                          setIsAddMenuOpen(false);
+                          onPickReadableFiles();
+                        }}
+                      />
+                    </List>
+                    <VStack gap={2} width="100%">
+                      <Switch
+                        label={
+                          chatRuntimeControls.planModeEnabled
+                            ? t("chat.planMode.on")
+                            : t("chat.planMode.off")
+                        }
+                        value={chatRuntimeControls.planModeEnabled}
+                        onChange={(value) =>
+                          onChatRuntimeControlsChange({ planModeEnabled: value })
+                        }
+                        labelIcon={Sparkle}
+                        labelPosition="start"
+                        labelSpacing="spread"
+                        size="sm"
+                        width="100%"
+                        isDisabled={controlsDisabled || !isAgentMode}
+                      />
+                      <Switch
+                        label={webSearchTooltip}
+                        value={chatRuntimeControls.nativeWebSearchEnabled}
+                        onChange={(value) =>
+                          onChatRuntimeControlsChange({ nativeWebSearchEnabled: value })
+                        }
+                        labelIcon={chatRuntimeControls.nativeWebSearchEnabled ? Globe : GlobeOff}
+                        labelPosition="start"
+                        labelSpacing="spread"
+                        size="sm"
+                        width="100%"
+                        isDisabled={controlsDisabled}
+                      />
+                      <Switch
+                        label={
+                          !thinkingSupported
+                            ? t("chat.runtime.thinkingUnavailable")
+                            : chatRuntimeControls.thinkingEnabled
+                              ? t("chat.runtime.thinkingOn")
+                              : t("chat.runtime.thinkingOff")
+                        }
+                        value={chatRuntimeControls.thinkingEnabled && thinkingSupported}
+                        onChange={(value) =>
+                          onChatRuntimeControlsChange({ thinkingEnabled: value })
+                        }
+                        labelIcon={chatRuntimeControls.thinkingEnabled ? Lightbulb : LightbulbOff}
+                        labelPosition="start"
+                        labelSpacing="spread"
+                        size="sm"
+                        width="100%"
+                        isDisabled={controlsDisabled || !thinkingSupported || thinkingAlwaysOn}
+                        disabledMessage={
+                          !thinkingSupported ? t("chat.runtime.thinkingUnavailable") : undefined
+                        }
+                      />
+                      {voiceInputAvailable ? (
+                        <List density="compact">
+                          <ListItem
+                            label={
+                              voiceInputActive
+                                ? t("chat.composer.voiceListening")
+                                : t("chat.composer.voiceInput")
+                            }
+                            description={voiceInputError ?? voiceInputPartial ?? undefined}
+                            startContent={voiceInputActive ? <Loader2 /> : <Mic />}
+                            isDisabled={
+                              isInputDisabled || (isNativeMobileRuntime() && voiceInputActive)
+                            }
+                            onClick={() => void startVoiceInput()}
+                          />
+                        </List>
+                      ) : null}
+                    </VStack>
+                    {isAgentMode ? (
+                      <ComposerGitRepositoryControl
+                        workdir={workdir}
+                        gitClient={gitClient}
+                        workspaceActivityClient={workspaceActivityClient}
+                        isOpen={isAddMenuOpen}
+                        isDisabled={controlsDisabled}
+                        canWrite={gitWriteEnabled}
+                        disabledMessage={gitDisabledMessage}
+                      />
+                    ) : null}
+                  </VStack>
+                }
+              >
+                <IconButton
+                  label={addMenuTooltip}
+                  tooltip={addMenuTooltip}
+                  variant="ghost"
+                  size="sm"
+                  icon={<Plus />}
+                  isLoading={isUploadingFiles}
+                  isDisabled={controlsDisabled}
+                />
+              </Popover>
 
+              <Selector
+                label={t("settings.commandSafety.title")}
+                isLabelHidden
+                options={(["auto", "ask", "sandbox", "sandboxOffline"] as CommandSafetyMode[]).map(
+                  (mode) => ({
+                    value: mode,
+                    label: t(`settings.commandSafety.${mode}`),
+                    description: t(`settings.commandSafety.${mode}Desc`),
+                  }),
+                )}
+                value={commandSafetyMode}
+                onChange={(value) => onCommandSafetyModeChange(value as CommandSafetyMode)}
+                variant="ghost"
+                size="sm"
+                startIcon={<Shield />}
+                isDisabled={controlsDisabled || !isAgentMode}
+                statusVariant="tooltip"
+              />
+            </HStack>
+          }
+          sendActions={
+            <HStack gap={1} vAlign="center">
+              {contextUsageTokensSource ? (
+                <ContextUsageIndicator
+                  source={contextUsageTokensSource}
+                  contextWindow={contextWindow}
+                  onManualCompact={onManualCompact}
+                  manualCompactionDisabled={manualCompactionDisabled}
+                />
+              ) : null}
               <ChatModelSelector
                 hasModels={hasModels}
                 currentModelLabel={currentModelLabel}
                 modelOptions={modelOptions}
                 selectedValue={selectedValue}
+                chatRuntimeControls={chatRuntimeControls}
+                reasoningOptions={reasoningOptions}
                 isDisabled={controlsDisabled}
                 onSelectModel={onSelectModel}
-              />
-
-              {voiceInputAvailable ? (
-                <ToggleButton
-                  label={
-                    voiceInputActive
-                      ? t("chat.composer.voiceListening")
-                      : t("chat.composer.voiceInput")
-                  }
-                  tooltip={
-                    voiceInputError ??
-                    voiceInputPartial ??
-                    (voiceInputActive
-                      ? t("chat.composer.voiceListening")
-                      : t("chat.composer.voiceInput"))
-                  }
-                  isIconOnly
-                  size="sm"
-                  isPressed={voiceInputActive}
-                  isDisabled={isInputDisabled || (isNativeMobileRuntime() && voiceInputActive)}
-                  icon={<Mic />}
-                  pressedIcon={<Loader2 />}
-                  onPressedChange={() => void startVoiceInput()}
-                />
-              ) : null}
-
-              <ToggleButton
-                label={webSearchTooltip}
-                tooltip={webSearchTooltip}
-                isIconOnly
-                size="sm"
-                isPressed={chatRuntimeControls.nativeWebSearchEnabled}
-                isDisabled={controlsDisabled}
-                icon={<GlobeOff />}
-                pressedIcon={<Globe />}
-                onPressedChange={(isPressed) =>
-                  onChatRuntimeControlsChange({ nativeWebSearchEnabled: isPressed })
-                }
-              />
-
-              <ToggleButton
-                label={
-                  !thinkingSupported
-                    ? t("chat.runtime.thinkingUnavailable")
-                    : chatRuntimeControls.thinkingEnabled
-                      ? t("chat.runtime.thinkingOn")
-                      : t("chat.runtime.thinkingOff")
-                }
-                tooltip={thinkingTooltip}
-                isIconOnly
-                size="sm"
-                isPressed={chatRuntimeControls.thinkingEnabled && thinkingSupported}
-                isDisabled={controlsDisabled || !thinkingSupported || thinkingAlwaysOn}
-                icon={<LightbulbOff />}
-                pressedIcon={<Lightbulb />}
-                onPressedChange={(isPressed) =>
-                  onChatRuntimeControlsChange({ thinkingEnabled: isPressed })
-                }
-              />
-
-              {reasoningOptions.length > 0 && chatRuntimeControls.thinkingEnabled ? (
-                <Selector
-                  label={t("chat.runtime.reasoning")}
-                  isLabelHidden
-                  options={reasoningOptions.map((value) => ({
-                    value,
-                    label: t(REASONING_I18N_KEYS[value]),
-                  }))}
-                  value={selectedReasoning}
-                  onChange={(value) =>
-                    onChatRuntimeControlsChange({
-                      reasoning: isReasoningLevel(value) ? value : selectedReasoning,
-                    })
-                  }
-                  variant="ghost"
-                  size="sm"
-                  startIcon={<Sparkle />}
-                  isDisabled={controlsDisabled}
-                  statusVariant="tooltip"
-                />
-              ) : null}
-
-              <GitBranchSelector
-                workdir={workdir}
-                gitClient={gitClient}
-                workspaceActivityClient={workspaceActivityClient}
-                disabled={controlsDisabled}
-                canWrite={gitWriteEnabled}
-                disabledMessage={gitDisabledMessage}
+                onChatRuntimeControlsChange={onChatRuntimeControlsChange}
               />
             </HStack>
           }

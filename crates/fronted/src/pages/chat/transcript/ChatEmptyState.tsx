@@ -85,12 +85,14 @@ export function ChatEmptyState({
   }
 
   return (
-    <VStack width="100%" gap={5} hAlign="center">
-      <Heading level={1}>{t("chat.greetingSubtitle")}</Heading>
+    <VStack width="100%" gap={6} hAlign="center" className="chat-empty-state">
+      <Heading level={1} className="chat-empty-state-heading">
+        {t("chat.greetingSubtitle")}
+      </Heading>
       {composer}
       {onSuggestionSelect ? (
         <VStack width="100%" maxWidth="var(--xagent-chat-landing-suggestions-width)">
-          <List density="spacious">
+          <List density="balanced">
             {SUGGESTION_CARDS.map((card) => (
               <ListItem
                 key={card.key}

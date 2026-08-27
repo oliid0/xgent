@@ -3,6 +3,7 @@ import { Collapsible, CollapsibleGroup } from "@astryxdesign/core/Collapsible";
 import { ComplexSelector } from "@astryxdesign/core/ComplexSelector";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { List, ListItem } from "@astryxdesign/core/List";
+import { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -19,7 +20,28 @@ import {
 import { useLocale } from "../../../i18n";
 import { groupModelOptionsByProvider } from "../../../lib/chat/page/chatPageHelpers";
 import { type ModelOption, parseModelValue } from "../../../lib/providers/llm";
-import type { ProviderId, SelectedModel } from "../../../lib/settings";
+import type {
+  ChatRuntimeControls,
+  ProviderId,
+  ReasoningLevel,
+  SelectedModel,
+} from "../../../lib/settings";
+
+const REASONING_I18N_KEYS: Record<ReasoningLevel, string> = {
+  off: "settings.reasoning.off",
+  minimal: "settings.reasoning.minimal",
+  low: "settings.reasoning.low",
+  medium: "settings.reasoning.medium",
+  high: "settings.reasoning.high",
+  xhigh: "settings.reasoning.xhigh",
+  max: "settings.reasoning.max",
+};
+
+const COMPOSER_REASONING_ORDER: ReasoningLevel[] = ["minimal", "low", "medium", "high"];
+
+function isReasoningLevel(value: string): value is ReasoningLevel {
+  return Object.hasOwn(REASONING_I18N_KEYS, value);
+}
 
 function ProviderBrandIcon({ type }: { type: ProviderId }) {
   if (type === "claude_code") return <ClaudeIcon size={16} />;
@@ -30,6 +52,9 @@ function ProviderBrandIcon({ type }: { type: ProviderId }) {
 function ModelSelectorContent(props: {
   modelOptions: ModelOption[];
   selectedValue: string;
+  chatRuntimeControls: ChatRuntimeControls;
+  reasoningOptions: ReasoningLevel[];
+  onChatRuntimeControlsChange: (patch: Partial<ChatRuntimeControls>) => void;
   onChange: (value: string) => void;
   close: () => void;
 }) {
@@ -44,6 +69,12 @@ function ModelSelectorContent(props: {
   const selectedGroupId = props.modelOptions.find(
     (option) => option.value === props.selectedValue,
   )?.providerId;
+  const visibleReasoningOptions = COMPOSER_REASONING_ORDER.filter((value) =>
+    props.reasoningOptions.includes(value),
+  );
+  const selectedReasoning = visibleReasoningOptions.includes(props.chatRuntimeControls.reasoning)
+    ? props.chatRuntimeControls.reasoning
+    : (visibleReasoningOptions[0] ?? "minimal");
   const filteredGroups = useMemo(
     () =>
       normalizedSearch
@@ -73,6 +104,25 @@ function ModelSelectorContent(props: {
         startIcon={<Search size={16} />}
         onKeyDown={(event) => event.stopPropagation()}
       />
+      {visibleReasoningOptions.length > 0 ? (
+        <RadioList
+          label={t("chat.runtime.reasoning")}
+          value={selectedReasoning}
+          onChange={(value) => {
+            if (!isReasoningLevel(value)) return;
+            props.onChatRuntimeControlsChange({
+              reasoning: value,
+              thinkingEnabled: true,
+            });
+          }}
+          orientation="vertical"
+          size="sm"
+        >
+          {visibleReasoningOptions.map((value) => (
+            <RadioListItem key={value} value={value} label={t(REASONING_I18N_KEYS[value])} />
+          ))}
+        </RadioList>
+      ) : null}
       {filteredGroups.length === 0 ? (
         <EmptyState
           isCompact
@@ -142,12 +192,23 @@ export const ChatModelSelector = memo(function ChatModelSelector(props: {
   currentModelLabel: string;
   modelOptions: ModelOption[];
   selectedValue?: string;
+  chatRuntimeControls: ChatRuntimeControls;
+  reasoningOptions: ReasoningLevel[];
   isDisabled?: boolean;
   onSelectModel: (selection: SelectedModel) => void;
+  onChatRuntimeControlsChange: (patch: Partial<ChatRuntimeControls>) => void;
 }) {
   const { t } = useLocale();
   const selectedValue = props.selectedValue ?? "";
   const selectedOption = props.modelOptions.find((option) => option.value === selectedValue);
+  const selectedReasoningLabel =
+    props.chatRuntimeControls.thinkingEnabled &&
+    props.reasoningOptions.includes(props.chatRuntimeControls.reasoning)
+      ? t(REASONING_I18N_KEYS[props.chatRuntimeControls.reasoning])
+      : "";
+  const triggerLabel = [selectedOption?.model ?? props.currentModelLabel, selectedReasoningLabel]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <ComplexSelector<string>
@@ -157,7 +218,7 @@ export const ChatModelSelector = memo(function ChatModelSelector(props: {
         const parsed = parseModelValue(value);
         if (parsed) props.onSelectModel(parsed);
       }}
-      triggerLabel={selectedOption?.model ?? props.currentModelLabel}
+      triggerLabel={triggerLabel}
       startIcon={
         selectedOption ? <ProviderBrandIcon type={selectedOption.providerType} /> : <Sparkle />
       }
@@ -165,12 +226,15 @@ export const ChatModelSelector = memo(function ChatModelSelector(props: {
       variant="ghost"
       size="sm"
       placement="above"
-      alignment="start"
+      alignment="end"
     >
       {(value, onChange, close) => (
         <ModelSelectorContent
           modelOptions={props.modelOptions}
           selectedValue={value}
+          chatRuntimeControls={props.chatRuntimeControls}
+          reasoningOptions={props.reasoningOptions}
+          onChatRuntimeControlsChange={props.onChatRuntimeControlsChange}
           onChange={onChange}
           close={close}
         />

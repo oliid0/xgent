@@ -54,11 +54,13 @@ test("resolveExplicitSkillMentions only returns enabled skills and deduplicates 
   );
 });
 
-test("buildSkillsSystemPrompt marks explicit mentions without granting disabled skills", () => {
+test("skill inventory stays stable while explicit mentions render as a turn-local block", () => {
   const prompt = skills.buildSkillsSystemPrompt({
     rootDir: "/skills",
     selected: enabledSkills,
-    explicit: [
+  });
+  const explicit = skills.resolveExplicitSkillMentions({
+    structured: [
       enabledSkills[0],
       {
         name: "disabled",
@@ -67,12 +69,15 @@ test("buildSkillsSystemPrompt marks explicit mentions without granting disabled 
         baseDir: "disabled",
       },
     ],
+    enabledSkills,
   });
+  const block = skills.formatExplicitSkillMentions(explicit);
 
-  assert.match(prompt, /Explicitly mentioned this turn:/);
-  assert.match(prompt, /- code-review \(skillFile: code-review\/SKILL\.md, baseDir: code-review\)/);
-  assert.doesNotMatch(prompt, /disabled\/SKILL\.md/);
-  assert.ok(prompt.includes("`/` mentions never grant access to disabled Skills"));
+  assert.doesNotMatch(prompt, /Explicitly mentioned this turn:/);
+  assert.match(block, /<skill-mentions>/);
+  assert.match(block, /- code-review \(skillFile: code-review\/SKILL\.md, baseDir: code-review\)/);
+  assert.doesNotMatch(block, /disabled\/SKILL\.md/);
+  assert.ok(block.includes("`/` mentions never grant access to disabled Skills"));
   assert.match(prompt, /skill:\/\/<baseDir>\/\.\.\./);
   assert.doesNotMatch(prompt, /root=["']skills["']/);
   assert.doesNotMatch(prompt, /Read\(root=/);

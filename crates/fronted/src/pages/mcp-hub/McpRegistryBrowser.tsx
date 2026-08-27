@@ -1,10 +1,22 @@
+import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
-import { ClickableCard } from "@astryxdesign/core/ClickableCard";
 import { Dialog } from "@astryxdesign/core/Dialog";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, Layout, LayoutContent, VStack } from "@astryxdesign/core/Layout";
 import { Link } from "@astryxdesign/core/Link";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { Selector as AstryxSelector } from "@astryxdesign/core/Selector";
+import { Skeleton } from "@astryxdesign/core/Skeleton";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Token } from "@astryxdesign/core/Token";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
 import {
   Heading as AstryxHeading,
   Inline as AstryxInline,
@@ -58,6 +70,7 @@ import { cn } from "../../lib/shared/utils";
 import { SettingsModalShell } from "../settings/SettingsModalShell";
 
 const STORE_PAGE_LIMIT = 18;
+const STORE_SKELETON_IDS = ["one", "two", "three", "four", "five", "six"] as const;
 
 type McpRegistryBrowserProps = {
   settings: AppSettings;
@@ -89,16 +102,6 @@ type McpRegistryCardGroup = {
   id: string;
   cards: McpRegistryCard[];
 };
-
-function FrostSpinner() {
-  return (
-    <AstryxInline className="hub-frost-spinner shrink-0" aria-hidden="true">
-      {Array.from({ length: 12 }).map((_, i) => (
-        <i key={i} />
-      ))}
-    </AstryxInline>
-  );
-}
 
 function sourceTone(_source: McpRegistrySource) {
   // Source label is rendered as a neutral frosted-glass chip; the text alone communicates the source.
@@ -754,26 +757,18 @@ function ConfigChips({ card }: { card: McpRegistryCard }) {
   const inputs = configureDraftForCard(card)?.requiredConfig ?? [];
   if (inputs.length === 0) return null;
   return (
-    <AstryxView layout="flex" direction="horizontal" className="flex flex-wrap gap-1.5">
+    <HStack gap={1} wrap="wrap">
       {inputs.slice(0, 5).map((input) => (
-        <AstryxView
-          as="span"
-          layout="inline-flex"
-          direction="horizontal"
+        <Token
           key={`${input.target}:${input.name}`}
-          className="inline-flex max-w-full items-center gap-1 rounded-md bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground ring-1 ring-border/30"
-          title={input.description ?? input.name}
-        >
-          {input.secret ? <Key className="h-3 w-3 shrink-0" /> : null}
-          <AstryxInline className="truncate">{input.name}</AstryxInline>
-        </AstryxView>
+          label={input.name}
+          description={input.description ?? input.name}
+          size="sm"
+          icon={input.secret ? <Icon icon={Key} size="sm" color="inherit" /> : undefined}
+        />
       ))}
-      {inputs.length > 5 ? (
-        <AstryxInline className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground ring-1 ring-border/30">
-          +{inputs.length - 5}
-        </AstryxInline>
-      ) : null}
-    </AstryxView>
+      {inputs.length > 5 ? <Token label={`+${inputs.length - 5}`} size="sm" /> : null}
+    </HStack>
   );
 }
 
@@ -804,32 +799,79 @@ function RegistryCard(props: {
   const transports = configureDraft ? [configureDraft.server.transport] : card.transportHints;
   const link = primaryRegistryLink(card);
   const versionOptions = group.cards.map((item) => ({
-    id: item.id,
+    value: item.id,
     label: versionLabelForCard(item) ?? t("mcpHub.storeVersionLatest"),
   }));
   const hasVersionSelector = versionOptions.length > 1;
-  const headerPadding = hasVersionSelector ? (link ? "pr-36" : "pr-28") : link ? "pr-8" : undefined;
 
   return (
-    <ClickableCard
+    <ListItem
       label={card.displayName}
-      onClick={() => onPreview(card)}
-      padding={3}
-      width="100%"
-      height="100%"
-      variant={done ? "default" : "muted"}
-      elevation={done ? "low" : "none"}
-      className="skill-card-enter group relative min-h-[228px]"
-    >
-      {link || hasVersionSelector ? (
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="absolute right-2.5 top-2.5 z-10 flex items-center gap-1.5"
-          onClick={(event) => event.stopPropagation()}
-          onKeyDown={(event) => event.stopPropagation()}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
+      startContent={
+        <Icon
+          icon={card.remote ? Globe2 : Server}
+          size="md"
+          color={done ? "accent" : "secondary"}
+        />
+      }
+      description={
+        <VStack gap={1}>
+          <Text color="secondary">{card.description || t("mcpHub.storeNoDescription")}</Text>
+          <HStack gap={1} wrap="wrap">
+            <Token label={card.source} size="sm" />
+            {card.verified ? (
+              <Token
+                label={t("mcpHub.storePreviewVerified")}
+                color="green"
+                size="sm"
+                icon={<Icon icon={Shield} size="sm" color="inherit" />}
+              />
+            ) : null}
+            {transports.map((transport) => (
+              <Token key={transport} label={transport.toUpperCase()} color="blue" size="sm" />
+            ))}
+            {card.tags.slice(0, 3).map((tag) => (
+              <Token key={tag} label={tag} size="sm" />
+            ))}
+          </HStack>
+          {configureDraft?.commandPreview ? (
+            <Text type="code" color="secondary">
+              {configureDraft.commandPreview}
+            </Text>
+          ) : null}
+          <ConfigChips card={card} />
+          {done ? (
+            <HStack gap={1} vAlign="center">
+              <StatusDot variant="success" label={t("mcpHub.storeInstalled")} />
+              <Text type="supporting" color="secondary">
+                {`${t("mcpHub.storeInstalledAs")} ${installedId}`}
+              </Text>
+            </HStack>
+          ) : null}
+        </VStack>
+      }
+      endContent={
+        <HStack gap={1} vAlign="center" wrap="wrap">
+          {hasVersionSelector ? (
+            <AstryxSelector
+              label={t("mcpHub.storeVersion")}
+              isLabelHidden
+              value={card.id}
+              options={versionOptions}
+              variant="ghost"
+              size="sm"
+              width="var(--xagent-mcp-version-selector-width)"
+              onChange={setSelectedCardId}
+            />
+          ) : null}
+          <IconButton
+            label={t("mcpHub.storePreviewTitle")}
+            tooltip={t("mcpHub.storePreviewTitle")}
+            icon={<Icon icon={Search} size="sm" color="inherit" />}
+            variant="ghost"
+            size="sm"
+            onClick={() => onPreview(card)}
+          />
           {link ? (
             <AstryxCoreButton
               href={link}
@@ -837,185 +879,24 @@ function RegistryCard(props: {
               rel="noreferrer"
               label={t("mcpHub.storeOpenExternal")}
               tooltip={t("mcpHub.storeOpenExternal")}
-              icon={<ExternalLink className="h-3.5 w-3.5" />}
+              icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
               isIconOnly
               variant="ghost"
               size="sm"
             />
           ) : null}
-          {hasVersionSelector ? (
-            <Select value={card.id} onValueChange={setSelectedCardId}>
-              <SelectTrigger
-                className="h-7 w-[5.75rem] overflow-hidden rounded-lg border-border/40 bg-background/85 px-2 py-0 text-[10.5px] shadow-none backdrop-blur-md [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0"
-                title={versionLabelForCard(card) ?? t("mcpHub.storeVersionLatest")}
-                aria-label={t("mcpHub.storeVersion")}
-              >
-                <SelectValue
-                  className="min-w-0 flex-1 truncate text-left"
-                  placeholder={t("mcpHub.storeVersionLatest")}
-                />
-              </SelectTrigger>
-              <SelectContent className="z-[70] min-w-[5.75rem]">
-                {versionOptions.map((option) => (
-                  <SelectItem key={option.id} value={option.id} className="text-xs">
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-        </AstryxView>
-      ) : null}
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className={cn("flex min-w-0 items-start gap-3", headerPadding)}
-      >
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className={cn(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all",
-            done
-              ? "border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-              : "border-border/30 bg-muted/50 text-muted-foreground group-hover:border-border/50 group-hover:bg-background/70 group-hover:text-foreground/85",
-          )}
-        >
-          {card.remote ? (
-            <Globe2 className="h-[18px] w-[18px]" />
-          ) : (
-            <Server className="h-[18px] w-[18px]" />
-          )}
-        </AstryxView>
-        <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex min-w-0 items-start gap-1.5"
-          >
-            <AstryxInline className="truncate text-[13px] font-semibold leading-tight text-foreground">
-              {card.displayName}
-            </AstryxInline>
-            {card.verified ? <Shield className="h-3.5 w-3.5 shrink-0 text-foreground/65" /> : null}
-          </AstryxView>
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="mt-1.5 flex flex-wrap items-center gap-1.5"
-          >
-            <AstryxView
-              as="span"
-              layout="inline-flex"
-              direction="horizontal"
-              className={cn(
-                "inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
-                sourceTone(card.source),
-              )}
-            >
-              {card.source}
-            </AstryxView>
-            {transports.map((transport) => (
-              <AstryxView
-                as="span"
-                layout="inline-flex"
-                direction="horizontal"
-                key={transport}
-                className={cn(
-                  "inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase ring-1",
-                  transportTone(transport),
-                )}
-              >
-                {transport}
-              </AstryxView>
-            ))}
-          </AstryxView>
-        </AstryxView>
-      </AstryxView>
-
-      <AstryxParagraph className="mt-3 line-clamp-3 min-h-[48px] text-[11.5px] leading-[1.45] text-muted-foreground">
-        {card.description || t("mcpHub.storeNoDescription")}
-      </AstryxParagraph>
-
-      {card.tags.length > 0 ? (
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="mt-2.5 flex min-h-[22px] flex-wrap gap-1.5"
-        >
-          {card.tags.slice(0, 4).map((tag) => (
-            <AstryxInline
-              key={tag}
-              className="rounded-md bg-muted/55 px-1.5 py-0.5 text-[10px] text-muted-foreground ring-1 ring-border/30"
-            >
-              {tag}
-            </AstryxInline>
-          ))}
-        </AstryxView>
-      ) : null}
-
-      <AstryxView
-        layout="block"
-        direction="horizontal"
-        className={cn(
-          "mt-3 min-h-[40px] rounded-lg border border-border/30 px-2.5 py-2 transition-colors",
-          done ? "bg-background/65" : "bg-muted/40 group-hover:bg-background/60",
-        )}
-      >
-        {configureDraft?.commandPreview ? (
-          <code className="line-clamp-2 break-all text-[10.5px] leading-[1.45] text-muted-foreground/90">
-            {configureDraft.commandPreview}
-          </code>
-        ) : (
-          <AstryxInline className="text-[10.5px] text-muted-foreground/70">
-            {card.installUnavailableReason === "needs-manual-command"
-              ? t("mcpHub.storeNeedsCommand")
-              : t("mcpHub.storeManualOnly")}
-          </AstryxInline>
-        )}
-      </AstryxView>
-
-      <AstryxView layout="block" direction="horizontal" className="mt-2.5">
-        <ConfigChips card={card} />
-      </AstryxView>
-
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="mt-auto flex items-center justify-between gap-2 border-t border-border/30 pt-3"
-      >
-        <AstryxInline
-          className="min-w-0 truncate text-[10.5px] text-muted-foreground/80"
-          title={done ? `${t("mcpHub.storeInstalledAs")} ${installedId}` : card.name}
-        >
-          {done ? `${t("mcpHub.storeInstalledAs")} ${installedId}` : card.name}
-        </AstryxInline>
-        <Button
-          size="sm"
-          variant={
-            done ? "outline" : card.installDraft?.status === "needs_config" ? "outline" : "default"
-          }
-          className={cn(
-            "h-8 shrink-0 gap-1.5 rounded-lg",
-            done && "border-border/55 bg-background/75 text-foreground/85 backdrop-blur-md",
-          )}
-          disabled={done || installing}
-          onClick={(event) => {
-            event.stopPropagation();
-            onInstall(card);
-          }}
-          onKeyDown={(event) => event.stopPropagation()}
-        >
-          {installing ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : done ? (
-            <Check className="h-3.5 w-3.5" />
-          ) : (
-            <Sparkles className="h-3.5 w-3.5" />
-          )}
-          {done ? t("mcpHub.storeInstalled") : t(installLabelKey(card))}
-        </Button>
-      </AstryxView>
-    </ClickableCard>
+          <AstryxCoreButton
+            label={done ? t("mcpHub.storeInstalled") : t(installLabelKey(card))}
+            icon={<Icon icon={done ? Check : Sparkles} size="sm" color="inherit" />}
+            variant={done ? "secondary" : "primary"}
+            size="sm"
+            isDisabled={done || installing}
+            isLoading={installing}
+            onClick={() => onInstall(card)}
+          />
+        </HStack>
+      }
+    />
   );
 }
 
@@ -1609,14 +1490,14 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
     [nextCursor, query, source, t],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: source changes reset the registry; query changes run only on explicit submit.
   useEffect(() => {
-    // Clear immediately on source switch so the skeleton + hero render right away.
+    // Clear immediately on source switch so the skeleton + loading rows render right away.
     setItems([]);
     setNextCursor(undefined);
     setError(null);
     setPreviewCard(null);
     void runSearch("replace");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source]);
 
   function installedIdForCard(card: McpRegistryCard) {
@@ -1671,259 +1552,132 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
     MCP_REGISTRY_SOURCE_OPTIONS.find((option) => option.value === source)?.label ?? source;
 
   return (
-    <AstryxView
-      layout="flex"
-      direction="vertical"
-      className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-hidden"
-    >
-      <AstryxView
+    <VStack height="100%" minHeight={0} gap={4}>
+      <HStack
         as="form"
-        className="hub-panel-enter flex items-center gap-2"
+        width="100%"
+        gap={2}
         onSubmit={(event) => {
           event.preventDefault();
           void runSearch("replace");
         }}
       >
-        <AstryxView layout="block" direction="horizontal" className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <AstryxInput
-            type="text"
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-            placeholder={t("mcpHub.storeSearchPlaceholder")}
-            className="h-10 w-full rounded-xl border border-border/40 bg-background/60 pl-9 pr-3 text-[13px] outline-hidden backdrop-blur-xl transition-all placeholder:text-muted-foreground/60 focus:border-border/60 focus:bg-background/85 focus:ring-2 focus:ring-foreground/10"
-          />
-        </AstryxView>
-        <Button
-          size="sm"
+        <TextInput
+          label={t("mcpHub.storeSearchPlaceholder")}
+          isLabelHidden
+          startIcon={Search}
+          value={query}
+          onChange={setQuery}
+          placeholder={t("mcpHub.storeSearchPlaceholder")}
+          hasClear
+          width="100%"
+        />
+        <AstryxCoreButton
           type="submit"
-          className="h-10 w-10 shrink-0 rounded-xl px-0 sm:w-auto sm:gap-1.5 sm:px-4"
-          disabled={loading}
-          title={t("mcpHub.storeSearch")}
-          aria-label={t("mcpHub.storeSearch")}
-        >
-          {loading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Search className="h-3.5 w-3.5" />
-          )}
-          <AstryxInline className="hidden sm:inline">{t("mcpHub.storeSearch")}</AstryxInline>
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          type="button"
-          className="h-10 w-10 shrink-0 rounded-xl border-border/50 bg-background/70 px-0 backdrop-blur-md sm:w-auto sm:gap-1.5 sm:px-4"
-          disabled={loading || loadingMore}
+          label={t("mcpHub.storeSearch")}
+          icon={<Icon icon={Search} size="sm" color="inherit" />}
+          variant="primary"
+          isLoading={loading}
+          isDisabled={loading}
+        />
+        <IconButton
+          label={t("mcpHub.storeRefresh")}
+          tooltip={t("mcpHub.storeRefresh")}
+          icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+          variant="ghost"
+          isLoading={loading}
+          isDisabled={loading || loadingMore}
           onClick={() => void runSearch("replace")}
-          title={t("mcpHub.storeRefresh")}
-          aria-label={t("mcpHub.storeRefresh")}
-        >
-          <RefreshCw className={cn("h-3.5 w-3.5", loading ? "animate-spin" : "")} />
-          <AstryxInline className="hidden sm:inline">{t("mcpHub.storeRefresh")}</AstryxInline>
-        </Button>
-      </AstryxView>
+        />
+      </HStack>
 
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="hub-panel-enter flex max-w-full items-center gap-1 self-start overflow-x-auto rounded-xl border border-border/40 bg-background/60 p-1 backdrop-blur-xl shadow-[0_1px_0_rgba(255,255,255,0.5)_inset] dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      <SegmentedControl
+        label={t("mcpHub.tabStore")}
+        value={source}
+        size="sm"
+        onChange={(value) => setSource(value as McpRegistrySource)}
       >
-        {MCP_REGISTRY_SOURCE_OPTIONS.map((option) => {
-          const active = source === option.value;
-          return (
-            <AstryxButton
-              key={option.value}
-              type="button"
-              onClick={() => setSource(option.value)}
-              className={cn(
-                "h-8 shrink-0 whitespace-nowrap rounded-lg px-3 text-[11.5px] font-medium transition-all",
-                active
-                  ? "bg-background/85 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] ring-1 ring-border/45 dark:bg-white/[0.08] dark:ring-white/[0.09] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-                  : "text-muted-foreground hover:bg-background/80 hover:text-foreground",
-              )}
-            >
-              {option.label}
-            </AstryxButton>
-          );
-        })}
-      </AstryxView>
+        {MCP_REGISTRY_SOURCE_OPTIONS.map((option) => (
+          <SegmentedControlItem key={option.value} value={option.value} label={option.label} />
+        ))}
+      </SegmentedControl>
 
-      {error ? (
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="hub-panel-enter flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/[0.06] px-3 py-2.5 text-xs text-destructive backdrop-blur-md"
-        >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <AstryxInline className="break-words">{error}</AstryxInline>
-        </AstryxView>
-      ) : null}
+      {error ? <Banner status="error" title={error} collapsible={false} /> : null}
 
-      <AstryxView
-        layout="block"
-        direction="horizontal"
-        className="min-h-0 flex-1 overflow-y-auto px-1 pb-4 pt-2"
-      >
-        <AstryxView layout="flex" direction="vertical" className="flex flex-col gap-4">
-          {loading && items.length === 0 ? (
-            <>
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                key={source}
-                className="hub-frost-hero hub-panel-enter px-4 py-3.5"
-              >
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex items-center gap-3.5"
-                >
-                  <FrostSpinner />
-                  <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="text-[13px] font-medium tracking-tight text-foreground"
-                    >
-                      {t("mcpHub.storeLoadingTitle")}
-                    </AstryxView>
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="mt-0.5 truncate text-[11px] text-muted-foreground/80"
-                    >
+      <Layout
+        height="fill"
+        padding={0}
+        content={
+          <LayoutContent padding={0} isScrollable>
+            <VStack width="100%" gap={4} paddingBlock={2}>
+              {loading && items.length === 0 ? (
+                <VStack gap={4} aria-busy="true">
+                  <HStack gap={2} vAlign="center">
+                    <Spinner size="sm" aria-label={t("mcpHub.storeLoadingTitle")} />
+                    <Text color="secondary">
                       {t("mcpHub.storeLoadingDesc").replace("{source}", currentSourceLabel)}
-                    </AstryxView>
-                  </AstryxView>
-                </AstryxView>
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="hub-frost-track mt-3.5"
-                />
-              </AstryxView>
-
-              <AstryxView
-                layout="grid"
-                direction="horizontal"
-                key={`${source}-skeleton`}
-                className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
-              >
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    key={index}
-                    className="hub-frost-skeleton skill-card-enter h-[228px] p-3.5"
-                  >
-                    <AstryxView
-                      layout="flex"
-                      direction="horizontal"
-                      className="flex items-center gap-3"
-                    >
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="skills-skeleton-shimmer h-10 w-10 shrink-0 rounded-xl"
+                    </Text>
+                  </HStack>
+                  {STORE_SKELETON_IDS.map((id, index) => (
+                    <HStack key={id} width="100%" gap={3} vAlign="center">
+                      <Skeleton
+                        width="var(--spacing-10)"
+                        height="var(--spacing-10)"
+                        radius="rounded"
+                        index={index}
                       />
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="flex-1 space-y-2"
-                      >
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="skills-skeleton-shimmer h-3.5 w-28 rounded"
-                        />
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="skills-skeleton-shimmer h-3 w-full max-w-[12rem] rounded"
-                        />
-                      </AstryxView>
-                    </AstryxView>
-                    <AstryxView layout="block" direction="horizontal" className="mt-3 space-y-2">
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="skills-skeleton-shimmer h-3 w-full rounded"
-                      />
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="skills-skeleton-shimmer h-3 w-3/4 rounded"
-                      />
-                    </AstryxView>
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="skills-skeleton-shimmer mt-4 h-8 w-full rounded-lg"
+                      <VStack width="100%" gap={2}>
+                        <Skeleton width="35%" height="var(--spacing-4)" index={index} />
+                        <Skeleton width="80%" height="var(--spacing-3)" index={index} />
+                      </VStack>
+                    </HStack>
+                  ))}
+                </VStack>
+              ) : groupedItems.length > 0 ? (
+                <List density="balanced" hasDividers>
+                  {groupedItems.map((group) => (
+                    <RegistryCard
+                      key={group.id}
+                      group={group}
+                      installedIdForCard={installedIdForCard}
+                      installingId={installingId}
+                      onPreview={setPreviewCard}
+                      onInstall={(next) => void installCard(next)}
                     />
-                  </AstryxView>
-                ))}
-              </AstryxView>
-            </>
-          ) : groupedItems.length > 0 ? (
-            <AstryxView
-              layout="grid"
-              direction="horizontal"
-              className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
-            >
-              {groupedItems.map((group) => (
-                <RegistryCard
-                  key={group.id}
-                  group={group}
-                  installedIdForCard={installedIdForCard}
-                  installingId={installingId}
-                  onPreview={setPreviewCard}
-                  onInstall={(next) => void installCard(next)}
+                  ))}
+                </List>
+              ) : (
+                <EmptyState
+                  title={t("mcpHub.storeEmptyTitle")}
+                  description={t("mcpHub.storeEmptyDesc")}
+                  icon={<Icon icon={Terminal} size="lg" color="secondary" />}
+                  actions={
+                    <AstryxCoreButton
+                      label={t("mcpHub.storeRefresh")}
+                      variant="secondary"
+                      icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+                      onClick={() => void runSearch("replace")}
+                    />
+                  }
                 />
-              ))}
-            </AstryxView>
-          ) : (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="hub-panel-enter rounded-2xl border border-dashed border-border/45 bg-background/40 px-6 py-12 text-center backdrop-blur-xl"
-            >
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-              >
-                <Terminal className="h-6 w-6" />
-              </AstryxView>
-              <AstryxParagraph className="mt-4 text-sm font-medium text-foreground">
-                {t("mcpHub.storeEmptyTitle")}
-              </AstryxParagraph>
-              <AstryxParagraph className="mt-1 text-xs text-muted-foreground/80">
-                {t("mcpHub.storeEmptyDesc")}
-              </AstryxParagraph>
-            </AstryxView>
-          )}
+              )}
 
-          {nextCursor && items.length > 0 ? (
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="hub-panel-enter flex justify-center"
-            >
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 rounded-full border-border/50 bg-background/70 backdrop-blur-md"
-                disabled={loadingMore}
-                onClick={() => void runSearch("append")}
-              >
-                {loadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                {t("mcpHub.storeLoadMore")}
-              </Button>
-            </AstryxView>
-          ) : null}
-        </AstryxView>
-      </AstryxView>
+              {nextCursor && items.length > 0 ? (
+                <HStack width="100%" hAlign="center">
+                  <AstryxCoreButton
+                    label={t("mcpHub.storeLoadMore")}
+                    variant="secondary"
+                    size="sm"
+                    isLoading={loadingMore}
+                    isDisabled={loadingMore}
+                    onClick={() => void runSearch("append")}
+                  />
+                </HStack>
+              ) : null}
+            </VStack>
+          </LayoutContent>
+        }
+      />
       {previewCard ? (
         <McpRegistryPreviewDrawer
           card={previewCard}
@@ -1954,6 +1708,6 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
           }}
         />
       ) : null}
-    </AstryxView>
+    </VStack>
   );
 }

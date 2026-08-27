@@ -599,18 +599,9 @@ export async function cancelSkillInstallJob(jobId: string): Promise<SkillInstall
 export function buildSkillsSystemPrompt(params: {
   rootDir: string;
   selected: SkillSummary[];
-  explicit?: SkillSummary[];
 }): string {
   const { selected } = params;
   if (selected.length === 0) return "";
-  const explicit = resolveExplicitSkillMentions({
-    structured: params.explicit?.map((skill) => ({
-      name: skill.name,
-      skillFile: skill.skillFile,
-      baseDir: skill.baseDir,
-    })),
-    enabledSkills: selected,
-  });
 
   return [
     "The following Skills are enabled by the user. Skill files are exposed to file tools through skill://<baseDir>/... paths.",
@@ -628,18 +619,6 @@ export function buildSkillsSystemPrompt(params: {
     "- Do not guess a Skill's exact instructions or script paths before reading the Skill file.",
     "- Relative paths inside a Skill (scripts/, references/, assets/, and so on) are resolved relative to baseDir.",
     "- If a Skill contains the {baseDir} placeholder, interpret it as the baseDir value in the metadata below (relative to the Skills root directory).",
-    explicit.length > 0
-      ? [
-          "",
-          "Explicitly mentioned this turn:",
-          "- The user explicitly mentioned the following enabled Skills with `/skill-name` in this turn.",
-          "- Treat these mentions as user intent to prioritize those Skills. Read and follow the mentioned Skill instructions before acting when they are relevant.",
-          "- `/` mentions never grant access to disabled Skills; only the enabled Skills listed in this prompt are available.",
-          ...explicit.map(
-            (skill) => `- ${skill.name} (skillFile: ${skill.skillFile}, baseDir: ${skill.baseDir})`,
-          ),
-        ].join("\n")
-      : "",
     "",
     "Skills:",
     ...selected.map((s) =>
@@ -660,5 +639,23 @@ export function buildSkillsSystemPrompt(params: {
           : "",
       ].join("\n"),
     ),
+  ].join("\n");
+}
+
+const EXPLICIT_SKILL_MENTIONS_OPEN = "<skill-mentions>";
+const EXPLICIT_SKILL_MENTIONS_CLOSE = "</skill-mentions>";
+
+export function formatExplicitSkillMentions(explicit: SkillSummary[]): string {
+  if (explicit.length === 0) return "";
+
+  return [
+    EXPLICIT_SKILL_MENTIONS_OPEN,
+    "The user explicitly mentioned the following enabled Skills with `/skill-name` in this message.",
+    "Treat these mentions as user intent to prioritize those Skills. Read and follow the mentioned Skill instructions before acting when they are relevant.",
+    "`/` mentions never grant access to disabled Skills; only the enabled Skills listed in the system prompt are available.",
+    ...explicit.map(
+      (skill) => `- ${skill.name} (skillFile: ${skill.skillFile}, baseDir: ${skill.baseDir})`,
+    ),
+    EXPLICIT_SKILL_MENTIONS_CLOSE,
   ].join("\n");
 }

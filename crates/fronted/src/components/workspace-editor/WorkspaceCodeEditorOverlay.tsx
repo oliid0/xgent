@@ -1,6 +1,22 @@
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import {
+  HStack,
+  Layout,
+  LayoutContent,
+  LayoutFooter,
+  LayoutHeader,
+  StackItem,
+  VStack,
+} from "@astryxdesign/core/Layout";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { Token } from "@astryxdesign/core/Token";
+import { Toolbar } from "@astryxdesign/core/Toolbar";
 import * as monaco from "monaco-editor";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import CssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
@@ -9,7 +25,6 @@ import JsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
 import TsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
 import {
   type MouseEvent as ReactMouseEvent,
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -21,7 +36,6 @@ import {
   type CodeMentionReference,
   createCodeMentionReference,
 } from "../../lib/chat/messages/mentionReferences";
-import { cn } from "../../lib/shared/utils";
 import { invokeFs, isFsBackendError } from "../../lib/tools/fsBackend";
 import {
   AlertTriangle,
@@ -29,7 +43,6 @@ import {
   Copy,
   Eye,
   FilePenLine,
-  Loader2,
   MessageSquareText,
   Redo2,
   RefreshCw,
@@ -898,239 +911,241 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
   ];
 
   return (
-    <AstryxView
-      layout="flex"
-      direction="vertical"
+    <VStack
       ref={overlayRef}
-      className={cn(
-        "absolute inset-0 z-50 flex min-h-0 min-w-0 transform-gpu flex-col overflow-hidden border-r border-border bg-background transition-[opacity,transform,box-shadow] duration-200 ease-out motion-reduce:transition-none",
-        isVisible
-          ? "pointer-events-auto translate-x-0 opacity-100 shadow-2xl"
-          : "pointer-events-none -translate-x-2 opacity-0 shadow-lg",
-      )}
+      className="xagent-workspace-preview-overlay"
+      data-visible={isVisible ? "true" : "false"}
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: "var(--xagent-z-workspace-overlay)",
+        minWidth: 0,
+        minHeight: 0,
+        overflow: "hidden",
+        backgroundColor: "var(--color-background-body)",
+        borderInlineEnd: "var(--border-width) solid var(--color-border)",
+      }}
     >
-      <MacOsTitleBarSpacer className="bg-muted/45" />
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-muted/45 px-3"
-      >
-        <FilePenLine className="h-4 w-4 shrink-0 text-primary" />
-        <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="truncate text-sm font-semibold leading-tight"
-          >
-            {t("workspaceEditor.title")}
-          </AstryxView>
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="truncate text-[11px] text-muted-foreground"
-          >
-            {activeTab ? activeTab.path : t("workspaceEditor.empty")}
-          </AstryxView>
-        </AstryxView>
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex shrink-0 items-center gap-1"
-        >
-          <IconButton
-            label={t("workspaceEditor.save")}
-            disabled={
-              !activeTab ||
-              activeTab.content === activeTab.savedContent ||
-              activeTab.status === "saving" ||
-              activeTab.status === "conflict"
-            }
-            onClick={() => activeTab && void saveTab(activeTab.key)}
-          >
-            {activeTab?.status === "saving" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-          </IconButton>
-          <IconButton label={t("workspaceEditor.find")} disabled={!activeTab} onClick={showFind}>
-            <Search className="h-4 w-4" />
-          </IconButton>
-          <IconButton
-            label={t("workspaceEditor.replace")}
-            disabled={!activeTab}
-            onClick={showReplace}
-          >
-            <Replace className="h-4 w-4" />
-          </IconButton>
-          <IconButton
-            label={t("workspaceEditor.reload")}
-            disabled={!activeTab || isOpening}
-            onClick={() => activeTab && requestReloadTab(activeTab.key)}
-          >
-            <RefreshCw className={cn("h-4 w-4", isOpening && "animate-spin")} />
-          </IconButton>
-          {canPreviewActiveTab && activeTab ? (
-            <IconButton
-              label={t("workspaceEditor.preview")}
-              onClick={() =>
-                onPreviewFile({
-                  id: Date.now(),
-                  projectPathKey: activeTab.projectPathKey,
-                  workdir: activeTab.workdir,
-                  path: activeTab.path,
-                })
-              }
-            >
-              <Eye className="h-4 w-4" />
-            </IconButton>
-          ) : null}
-          <IconButton label={t("workspaceEditor.close")} onClick={hideOverlay}>
-            <X className="h-4 w-4" />
-          </IconButton>
-        </AstryxView>
-      </AstryxView>
-
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-border bg-background px-2 pt-1"
-      >
-        {tabs.map((tab) => {
-          const dirty = tab.content !== tab.savedContent;
-          return (
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              key={tab.key}
-              className={cn(
-                "group flex h-8 max-w-[14rem] shrink-0 items-center gap-1.5 rounded-t-md border border-b-0 px-2 text-xs transition-colors",
-                tab.key === activeKey
-                  ? "border-border bg-muted text-foreground"
-                  : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-              )}
-              title={tab.path}
-            >
-              <AstryxButton
-                type="button"
-                className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-                onClick={() => setActiveKey(tab.key)}
-              >
-                {tab.status === "conflict" ? (
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                ) : (
-                  <FilePenLine className="h-3.5 w-3.5 shrink-0" />
-                )}
-                <AstryxInline className="min-w-0 truncate">{basename(tab.path)}</AstryxInline>
-                {dirty ? (
-                  <AstryxInline className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                ) : null}
-              </AstryxButton>
-              <AstryxButton
-                type="button"
-                className="ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground/75 hover:bg-background hover:text-foreground"
-                title={t("workspaceEditor.closeTab")}
-                aria-label={t("workspaceEditor.closeTab")}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  requestCloseTab(tab.key);
-                }}
-              >
-                <X className="h-3 w-3" />
-              </AstryxButton>
-            </AstryxView>
-          );
-        })}
-      </AstryxView>
-
-      {globalError || activeTab?.error ? (
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex shrink-0 items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
-        >
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1 truncate">
-            {activeTab?.error ?? globalError}
-          </AstryxView>
-          {activeTab?.status === "conflict" ? (
-            <AstryxButton
-              type="button"
-              className="rounded border border-amber-500/30 px-2 py-1 text-[11px] font-medium hover:bg-amber-500/10"
-              onClick={() => requestReloadTab(activeTab.key)}
-            >
-              {t("workspaceEditor.reloadFromDisk")}
-            </AstryxButton>
-          ) : null}
-        </AstryxView>
-      ) : null}
-
-      <ContextMenu
-        items={editorContextMenuItems}
-        label={t("workspaceEditor.context.copy")}
-        menuWidth="var(--xagent-editor-context-menu-width)"
-        size="sm"
-        isDisabled={!activeTab || Boolean(pendingDialog)}
-      >
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="relative min-h-0 flex-1 bg-background"
-          onContextMenu={openEditorContextMenu}
-        >
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            ref={containerRef}
-            className={cn("absolute inset-0", !activeTab && "hidden")}
-          />
-          {!activeTab ? (
-            <AstryxView
-              layout="flex"
-              direction="vertical"
-              className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground"
-            >
-              {isOpening ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <FilePenLine className="h-6 w-6" />
-              )}
-              <AstryxView layout="block" direction="horizontal">
-                {isOpening ? t("workspaceEditor.opening") : t("workspaceEditor.emptyHint")}
-              </AstryxView>
-              {globalError ? (
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="max-w-md rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+      <MacOsTitleBarSpacer />
+      <Layout
+        height="fill"
+        header={
+          <LayoutHeader hasDivider padding={0}>
+            <VStack gap={0}>
+              <Toolbar
+                label={t("workspaceEditor.title")}
+                size="sm"
+                startContent={
+                  <HStack gap={2} vAlign="center">
+                    <Icon icon={FilePenLine} size="sm" color="accent" />
+                    <StackItem size="fill">
+                      <VStack gap={0.5}>
+                        <Heading level={4}>{t("workspaceEditor.title")}</Heading>
+                        <Text type="supporting" color="secondary" maxLines={1}>
+                          {activeTab ? activeTab.path : t("workspaceEditor.empty")}
+                        </Text>
+                      </VStack>
+                    </StackItem>
+                  </HStack>
+                }
+                endContent={
+                  <HStack gap={1} vAlign="center">
+                    <IconButton
+                      label={t("workspaceEditor.save")}
+                      tooltip={t("workspaceEditor.save")}
+                      icon={<Icon icon={Save} size="sm" color="inherit" />}
+                      variant="ghost"
+                      size="sm"
+                      isLoading={activeTab?.status === "saving"}
+                      isDisabled={
+                        !activeTab ||
+                        activeTab.content === activeTab.savedContent ||
+                        activeTab.status === "saving" ||
+                        activeTab.status === "conflict"
+                      }
+                      onClick={() => activeTab && void saveTab(activeTab.key)}
+                    />
+                    <IconButton
+                      label={t("workspaceEditor.find")}
+                      tooltip={t("workspaceEditor.find")}
+                      icon={<Icon icon={Search} size="sm" color="inherit" />}
+                      variant="ghost"
+                      size="sm"
+                      isDisabled={!activeTab}
+                      onClick={showFind}
+                    />
+                    <IconButton
+                      label={t("workspaceEditor.replace")}
+                      tooltip={t("workspaceEditor.replace")}
+                      icon={<Icon icon={Replace} size="sm" color="inherit" />}
+                      variant="ghost"
+                      size="sm"
+                      isDisabled={!activeTab}
+                      onClick={showReplace}
+                    />
+                    <IconButton
+                      label={t("workspaceEditor.reload")}
+                      tooltip={t("workspaceEditor.reload")}
+                      icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+                      variant="ghost"
+                      size="sm"
+                      isLoading={isOpening}
+                      isDisabled={!activeTab || isOpening}
+                      onClick={() => activeTab && requestReloadTab(activeTab.key)}
+                    />
+                    {canPreviewActiveTab && activeTab ? (
+                      <IconButton
+                        label={t("workspaceEditor.preview")}
+                        tooltip={t("workspaceEditor.preview")}
+                        icon={<Icon icon={Eye} size="sm" color="inherit" />}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          onPreviewFile({
+                            id: Date.now(),
+                            projectPathKey: activeTab.projectPathKey,
+                            workdir: activeTab.workdir,
+                            path: activeTab.path,
+                          })
+                        }
+                      />
+                    ) : null}
+                    <IconButton
+                      label={t("workspaceEditor.close")}
+                      tooltip={t("workspaceEditor.close")}
+                      icon={<Icon icon={X} size="sm" color="inherit" />}
+                      variant="ghost"
+                      size="sm"
+                      onClick={hideOverlay}
+                    />
+                  </HStack>
+                }
+              />
+              {tabs.length > 0 ? (
+                <HStack
+                  className="xagent-workspace-editor-tabs"
+                  gap={1}
+                  vAlign="center"
+                  role="tablist"
+                  aria-label={t("workspaceEditor.title")}
                 >
-                  {globalError}
-                </AstryxView>
+                  {tabs.map((tab) => {
+                    const dirty = tab.content !== tab.savedContent;
+                    return (
+                      <HStack key={tab.key} gap={0.5} vAlign="center">
+                        <Button
+                          label={basename(tab.path)}
+                          tooltip={tab.path}
+                          icon={
+                            <Icon
+                              icon={tab.status === "conflict" ? AlertTriangle : FilePenLine}
+                              size="sm"
+                              color={tab.status === "conflict" ? "warning" : "inherit"}
+                            />
+                          }
+                          endContent={
+                            dirty ? (
+                              <Token label={t("workspaceEditor.unsaved")} color="blue" size="sm" />
+                            ) : undefined
+                          }
+                          variant={tab.key === activeKey ? "secondary" : "ghost"}
+                          size="sm"
+                          aria-selected={tab.key === activeKey}
+                          role="tab"
+                          onClick={() => setActiveKey(tab.key)}
+                        />
+                        <IconButton
+                          label={t("workspaceEditor.closeTab")}
+                          tooltip={t("workspaceEditor.closeTab")}
+                          icon={<Icon icon={X} size="sm" color="inherit" />}
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => requestCloseTab(tab.key)}
+                        />
+                      </HStack>
+                    );
+                  })}
+                </HStack>
               ) : null}
-            </AstryxView>
-          ) : null}
-        </AstryxView>
-      </ContextMenu>
-
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="flex h-7 shrink-0 items-center gap-3 border-t border-border bg-muted/45 px-3 text-[11px] text-muted-foreground"
-      >
-        <AstryxInline className="truncate">
-          {activeTab ? dirname(activeTab.path) || "/" : t("workspaceEditor.noFile")}
-        </AstryxInline>
-        <AstryxInline className="ml-auto shrink-0">
-          {activeTab
-            ? `${activeTab.language} · ${activeTab.totalLines} ${t("workspaceEditor.lines")} · ${formatBytes(activeTab.sizeBytes)}`
-            : ""}
-        </AstryxInline>
-        {activeTab?.content !== activeTab?.savedContent ? (
-          <AstryxInline className="shrink-0 text-primary">
-            {t("workspaceEditor.unsaved")}
-          </AstryxInline>
-        ) : null}
-      </AstryxView>
+            </VStack>
+          </LayoutHeader>
+        }
+        content={
+          <VStack height="100%" gap={0}>
+            {globalError || activeTab?.error ? (
+              <Banner
+                status={activeTab?.status === "conflict" ? "warning" : "error"}
+                title={
+                  activeTab?.status === "conflict"
+                    ? t("workspaceEditor.conflictMessage")
+                    : t("workspaceEditor.openFailed")
+                }
+                description={activeTab?.error ?? globalError ?? undefined}
+                collapsible={false}
+                endContent={
+                  activeTab?.status === "conflict" ? (
+                    <Button
+                      label={t("workspaceEditor.reloadFromDisk")}
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => requestReloadTab(activeTab.key)}
+                    />
+                  ) : undefined
+                }
+              />
+            ) : null}
+            <StackItem size="fill">
+              <ContextMenu
+                items={editorContextMenuItems}
+                label={t("workspaceEditor.context.copy")}
+                menuWidth="var(--xagent-editor-context-menu-width)"
+                size="sm"
+                isDisabled={!activeTab || Boolean(pendingDialog)}
+              >
+                <LayoutContent
+                  ref={containerRef}
+                  className="xagent-workspace-editor-stage"
+                  padding={0}
+                  onContextMenu={openEditorContextMenu}
+                >
+                  {!activeTab ? (
+                    isOpening ? (
+                      <Spinner size="lg" label={t("workspaceEditor.opening")} />
+                    ) : (
+                      <EmptyState
+                        title={t("workspaceEditor.emptyHint")}
+                        icon={<Icon icon={FilePenLine} size="lg" color="secondary" />}
+                        isCompact
+                      />
+                    )
+                  ) : null}
+                </LayoutContent>
+              </ContextMenu>
+            </StackItem>
+          </VStack>
+        }
+        footer={
+          <LayoutFooter hasDivider padding={2}>
+            <HStack gap={2} vAlign="center" hAlign="between">
+              <StackItem size="fill">
+                <Text type="supporting" color="secondary" maxLines={1}>
+                  {activeTab ? dirname(activeTab.path) || "/" : t("workspaceEditor.noFile")}
+                </Text>
+              </StackItem>
+              {activeTab ? (
+                <Text type="supporting" color="secondary" hasTabularNumbers>
+                  {`${activeTab.language} · ${activeTab.totalLines} ${t("workspaceEditor.lines")} · ${formatBytes(activeTab.sizeBytes)}`}
+                </Text>
+              ) : null}
+              {activeTab?.content !== activeTab?.savedContent ? (
+                <Token label={t("workspaceEditor.unsaved")} color="blue" size="sm" />
+              ) : null}
+            </HStack>
+          </LayoutFooter>
+        }
+      />
 
       {pendingDialog ? (
         <AdaptiveDialog
@@ -1143,55 +1158,31 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
           width="var(--xagent-dialog-width-sm)"
           touchPresentation="bottom-sheet"
           footer={
-            <AstryxView layout="flex" direction="horizontal" className="flex justify-end gap-2">
-              <AstryxButton
-                type="button"
+            <HStack gap={2} hAlign="end">
+              <Button
+                label={t("workspaceEditor.cancel")}
                 variant="secondary"
                 onClick={() => setPendingDialog(null)}
-              >
-                {t("workspaceEditor.cancel")}
-              </AstryxButton>
-              <AstryxButton type="button" variant="secondary" onClick={discardDialogTarget}>
-                {t("workspaceEditor.discard")}
-              </AstryxButton>
-              <AstryxButton type="button" onClick={saveDialogTarget}>
-                {pendingDialog.kind === "closeOverlay"
-                  ? t("workspaceEditor.saveAll")
-                  : t("workspaceEditor.save")}
-              </AstryxButton>
-            </AstryxView>
+              />
+              <Button
+                label={t("workspaceEditor.discard")}
+                variant="secondary"
+                onClick={discardDialogTarget}
+              />
+              <Button
+                label={
+                  pendingDialog.kind === "closeOverlay"
+                    ? t("workspaceEditor.saveAll")
+                    : t("workspaceEditor.save")
+                }
+                onClick={saveDialogTarget}
+              />
+            </HStack>
           }
         >
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="text-sm leading-5 text-muted-foreground"
-          >
-            {dialogDescription}
-          </AstryxView>
+          <Text color="secondary">{dialogDescription}</Text>
         </AdaptiveDialog>
       ) : null}
-    </AstryxView>
-  );
-}
-
-function IconButton(props: {
-  label: string;
-  disabled?: boolean;
-  children: ReactNode;
-  onClick: () => void;
-}) {
-  const { label, disabled = false, children, onClick } = props;
-  return (
-    <AstryxButton
-      type="button"
-      className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-      title={label}
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {children}
-    </AstryxButton>
+    </VStack>
   );
 }

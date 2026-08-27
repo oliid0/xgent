@@ -1,5 +1,10 @@
+import { Icon } from "@astryxdesign/core/Icon";
+import { Section } from "@astryxdesign/core/Layout";
+import { Overlay } from "@astryxdesign/core/Overlay";
 import { ResizeHandle, useResizable } from "@astryxdesign/core/Resizable";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Text } from "@astryxdesign/core/Text";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import type { Context, Message, UserMessage } from "@earendil-works/pi-ai";
 import { invoke, isBrowserRuntime, listen, listenFileDrop, revealItemInDir } from "@xagent/runtime";
@@ -116,6 +121,7 @@ import {
   isAbortLikeError,
 } from "../lib/chat/page/chatPageHelpers";
 import type { AgentRunnerFailoverParams } from "../lib/chat/runner/agentRunner";
+import { skillMentionInjection } from "../lib/chat/skills/mentionInjection";
 import type { ScrollFollowHandle } from "../lib/chat-scroll/useScrollFollow";
 import { createStreamDebugLogger } from "../lib/debug/agentDebug";
 import { tauriGitClient } from "../lib/git/tauriGitClient";
@@ -191,6 +197,7 @@ import type { SidebarScope } from "../lib/sidebar/types";
 import { useSidebarSelector } from "../lib/sidebar/useSidebarSelector";
 import {
   buildSkillsSystemPrompt,
+  formatExplicitSkillMentions,
   mergeAlwaysEnabledSkillNames,
   resolveExplicitSkillMentions,
 } from "../lib/skills";
@@ -209,6 +216,7 @@ import { tauriSshLocalForwardClient } from "../lib/terminal/tauriSshLocalForward
 import { tauriTerminalClient } from "../lib/terminal/tauriTerminalClient";
 import type { TerminalSession, TerminalShellOption } from "../lib/terminal/types";
 import type { AdditionalProjectRoot } from "../lib/tools/additionalProjectRoots";
+import { cancelPendingAskUserQuestionsForConversation } from "../lib/tools/askUserQuestionTools";
 import { invokeFs } from "../lib/tools/fsBackend";
 import {
   answerPlanDecision,
@@ -225,6 +233,7 @@ import {
   listPendingToolApprovalsForConversation,
   subscribeToolApprovals,
 } from "../lib/tools/toolApproval";
+import { clearMcpToolActivation } from "../lib/tools/toolSearchTools";
 import {
   clearLocalTrajectory,
   invalidateDesktopTrajectory,
@@ -2265,8 +2274,12 @@ export function ChatPage(props: ChatPageProps) {
       locallySyncedHistoryUpdatedAtRef.current.delete(key);
       setPendingUploadsForConversation(key, []);
       memoryExtraction.dispose(key);
+      memoryTurnInjection.dispose(key);
+      skillMentionInjection.dispose(key);
       deleteConversationArtifacts(key);
+      cancelPendingAskUserQuestionsForConversation(key);
       cancelPendingToolApprovalsForConversation(key);
+      clearMcpToolActivation(key);
       setQueuedChatTurnsState((current) => removeQueuedChatTurnsForConversation(current, key));
     },
     [deleteConversationArtifacts, setPendingUploadsForConversation, setQueuedChatTurnsState],
@@ -3187,7 +3200,6 @@ export function ChatPage(props: ChatPageProps) {
           ? buildSkillsSystemPrompt({
               rootDir: skillsRootDir,
               selected: enabledComposerSkills,
-              explicit: [],
             })
           : "";
       let memoryPrompt = "";
@@ -4132,6 +4144,7 @@ export function ChatPage(props: ChatPageProps) {
     startRuntimeSnapshot();
     let skillsPrompt = "";
     let memoryPrompt = "";
+    let explicitSkillMentionBlock = "";
     let skillsRootDirForTools = skillsRootDir;
     let skillAccessPolicyForTools: SkillAccessPolicy | undefined = effectiveSkillsEnabled
       ? {
@@ -4146,7 +4159,11 @@ export function ChatPage(props: ChatPageProps) {
     function buildPreparedContext(
       state: ConversationViewState,
       tools?: Context["tools"],
-      options?: { includeAbortedMessages?: boolean; includeUploadedFilesMetadata?: boolean },
+      options?: {
+        includeAbortedMessages?: boolean;
+        includeUploadedFilesMetadata?: boolean;
+        includeMemoryTurnUpdates?: boolean;
+      },
     ): Context {
       return buildPreparedConversationContext({
         state,
@@ -4154,6 +4171,14 @@ export function ChatPage(props: ChatPageProps) {
         soulPrompt,
         skillsPrompt,
         memoryPrompt,
+        memoryTurnUpdates:
+          options?.includeMemoryTurnUpdates === false
+            ? null
+            : memoryTurnInjection.getMessageUpdates(conversationId),
+        skillMentionUpdates:
+          options?.includeMemoryTurnUpdates === false
+            ? null
+            : skillMentionInjection.getMessageUpdates(conversationId),
         captureSlots: trajectorySlotCapture(conversationId),
         includeAbortedMessages: options?.includeAbortedMessages,
         includeUploadedFilesMetadata: options?.includeUploadedFilesMetadata,
@@ -4173,6 +4198,8 @@ export function ChatPage(props: ChatPageProps) {
         soulPrompt,
         skillsPrompt,
         memoryPrompt,
+        memoryTurnUpdates: memoryTurnInjection.getMessageUpdates(conversationId),
+        skillMentionUpdates: skillMentionInjection.getMessageUpdates(conversationId),
         captureSlots: trajectorySlotCapture(conversationId),
         includeAbortedMessages: options?.includeAbortedMessages,
         includeUploadedFilesMetadata: options?.includeUploadedFilesMetadata,
@@ -4311,19 +4338,31 @@ export function ChatPage(props: ChatPageProps) {
         structured: composerDraft?.skillMentions ?? [],
         enabledSkills: selectedSkills,
       });
+      explicitSkillMentionBlock = formatExplicitSkillMentions(explicitSkills);
       skillsPrompt = buildSkillsSystemPrompt({
         rootDir,
         selected: selectedSkills,
-        explicit: explicitSkills,
       });
     }
 
+    let memoryOverview: string | null = null;
     try {
-      memoryPrompt = await buildMemoryOverviewSection(effectiveWorkdir);
+      memoryOverview = await buildMemoryOverviewSection(effectiveWorkdir);
     } catch (error) {
       console.warn("Failed to build memory overview prompt", error);
-      memoryPrompt = "";
+      memoryOverview = null;
     }
+    memoryPrompt = memoryTurnInjection.planTurn({
+      conversationId,
+      messageId: pendingUserMessage.id,
+      overview: memoryOverview,
+      workdir: effectiveWorkdir,
+    }).systemText;
+    skillMentionInjection.record({
+      conversationId,
+      messageId: pendingUserMessage.id,
+      block: explicitSkillMentionBlock,
+    });
 
     const hookScope = createHookRunScope({
       hooks: desktopCommandHostAvailable ? getAutomationState().hooks.hooks : [],
@@ -4519,7 +4558,7 @@ export function ChatPage(props: ChatPageProps) {
             getMcpSettings: getEffectiveMcpSettings,
             getToolPolicies,
             commandSafetyMode: settings.system.commandSafetyMode,
-            planModeEnabled: false,
+            planModeEnabled: runtimeControls.planModeEnabled,
             applyMcpOps: (ops) => {
               const removedIds = ops.filter((op) => op.kind === "remove").map((op) => op.serverId);
               setSettings((prev) =>
@@ -5446,6 +5485,7 @@ export function ChatPage(props: ChatPageProps) {
       modelOptions={modelOptions}
       selectedValue={selectedValue}
       chatRuntimeControls={chatRuntimeControlsForCurrentProvider}
+      commandSafetyMode={settings.system.commandSafetyMode}
       reasoningOptions={chatRuntimeReasoningOptions}
       thinkingAlwaysOn={chatRuntimeThinkingAlwaysOn}
       contextUsageTokensSource={contextUsageTokensSource}
@@ -5460,6 +5500,9 @@ export function ChatPage(props: ChatPageProps) {
       onComposerBusyChange={handleComposerBusyChange}
       onSelectModel={handleSelectModel}
       onChatRuntimeControlsChange={handleChatRuntimeControlsChange}
+      onCommandSafetyModeChange={(commandSafetyMode) =>
+        setSettings((previous) => updateSystem(previous, { commandSafetyMode }))
+      }
       onPickReadableFiles={pickReadableFiles}
       onPasteFiles={importReadableFiles}
       loadHistoryPrompts={loadComposerHistoryPrompts}
@@ -5959,95 +6002,56 @@ export function ChatPage(props: ChatPageProps) {
                   ? renderChatComposer()
                   : null}
                 {chatSurface === "conversation" && isFileDropActive ? (
-                  <AstryxView
-                    layout="flex"
-                    direction="horizontal"
-                    className="file-drop-overlay pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-4 sm:p-6 bg-white/30 backdrop-blur-md dark:bg-black/30"
+                  <Overlay
+                    isOpen
+                    showOn="always"
+                    scrim={canDropUpload ? "light" : "dark"}
+                    position="fill"
+                    align="center"
+                    className="file-drop-overlay"
                     aria-hidden="true"
+                    content={
+                      <Section
+                        variant={canDropUpload ? "section" : "muted"}
+                        width="fit-content"
+                        maxWidth="calc(100% - var(--spacing-8))"
+                        padding={6}
+                      >
+                        <VStack gap={3} hAlign="center">
+                          <Icon
+                            icon={canDropUpload ? Upload : Ban}
+                            size="lg"
+                            color={canDropUpload ? "primary" : "error"}
+                          />
+                          <VStack gap={1} hAlign="center">
+                            <Text type="large" justify="center">
+                              {fileDropTitle}
+                            </Text>
+                            <Text
+                              type="supporting"
+                              color="secondary"
+                              justify="center"
+                              textWrap="balance"
+                            >
+                              {fileDropDescription}
+                            </Text>
+                          </VStack>
+                          <HStack gap={1} vAlign="center">
+                            <StatusDot
+                              variant={canDropUpload ? "accent" : "error"}
+                              label={fileDropLimitHint}
+                              isPulsing={canDropUpload}
+                            />
+                            <Text type="supporting" color="secondary">
+                              {fileDropLimitHint}
+                            </Text>
+                          </HStack>
+                        </VStack>
+                      </Section>
+                    }
                   >
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className={`file-drop-overlay-zone absolute inset-3 sm:inset-4 rounded-2xl border border-dashed ${
-                        canDropUpload
-                          ? "border-foreground/20 bg-foreground/[0.015] dark:border-white/15 dark:bg-white/[0.015]"
-                          : "border-destructive/35 bg-destructive/[0.03]"
-                      }`}
-                    />
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className={`file-drop-overlay-card relative flex w-full max-w-[380px] flex-col items-center gap-5 rounded-2xl border bg-white/70 px-8 py-7 text-center shadow-[0_24px_60px_-20px_rgba(0,0,0,0.25),0_8px_20px_-12px_rgba(0,0,0,0.15)] backdrop-blur-2xl dark:bg-zinc-900/70 dark:shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7),0_8px_20px_-12px_rgba(0,0,0,0.5)] ${
-                        canDropUpload
-                          ? "border-black/[0.06] ring-1 ring-inset ring-white/40 dark:border-white/10 dark:ring-white/[0.04]"
-                          : "border-destructive/20 ring-1 ring-inset ring-destructive/10 dark:border-destructive/30"
-                      }`}
-                    >
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className={`flex h-14 w-14 items-center justify-center rounded-2xl ring-1 ring-inset ${
-                          canDropUpload
-                            ? "bg-foreground/[0.04] text-foreground/85 ring-foreground/10 dark:bg-white/[0.06] dark:text-white/90 dark:ring-white/10"
-                            : "bg-destructive/[0.08] text-destructive/90 ring-destructive/15"
-                        }`}
-                      >
-                        {canDropUpload ? (
-                          <Upload className="h-6 w-6" strokeWidth={1.75} />
-                        ) : (
-                          <Ban className="h-6 w-6" strokeWidth={1.75} />
-                        )}
-                      </AstryxView>
-
-                      <AstryxView
-                        layout="flex"
-                        direction="vertical"
-                        className="flex flex-col items-center gap-1.5"
-                      >
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="text-[calc(15px*var(--zone-font-scale,1))] font-semibold leading-tight tracking-tight text-foreground"
-                        >
-                          {fileDropTitle}
-                        </AstryxView>
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="max-w-[280px] text-xs leading-5 text-muted-foreground"
-                        >
-                          {fileDropDescription}
-                        </AstryxView>
-                      </AstryxView>
-
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="h-px w-12 bg-foreground/10 dark:bg-white/10"
-                        aria-hidden="true"
-                      />
-
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[calc(11px*var(--zone-font-scale,1))] font-medium ${
-                          canDropUpload
-                            ? "border-foreground/[0.08] bg-foreground/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
-                            : "border-destructive/20 bg-destructive/[0.05] text-destructive/80"
-                        }`}
-                      >
-                        <AstryxInline
-                          aria-hidden="true"
-                          className={`inline-flex h-1.5 w-1.5 rounded-full ${
-                            canDropUpload
-                              ? "bg-foreground/35 dark:bg-white/50"
-                              : "bg-destructive/55"
-                          }`}
-                        />
-                        {fileDropLimitHint}
-                      </AstryxView>
-                    </AstryxView>
-                  </AstryxView>
+                    <VStack width="100%" height="100%" />
+                  </Overlay>
                 ) : null}
               </>
             )}

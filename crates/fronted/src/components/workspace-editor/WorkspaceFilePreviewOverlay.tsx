@@ -1,3 +1,19 @@
+import { Banner } from "@astryxdesign/core/Banner";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import {
+  HStack,
+  Layout,
+  LayoutContent,
+  LayoutFooter,
+  LayoutHeader,
+  StackItem,
+  VStack,
+} from "@astryxdesign/core/Layout";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { renderAsync } from "docx-preview";
@@ -8,7 +24,6 @@ import { cn } from "../../lib/shared/utils";
 import { invokeFs } from "../../lib/tools/fsBackend";
 import { type FileTypeIconComponent, getFileTypeIcon } from "../chat/fileTypeIcons";
 import {
-  AlertTriangle,
   ChevronRight,
   ExternalLink,
   FilePenLine,
@@ -499,158 +514,152 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
   }, [activePath, activePreviewRequest, t]);
 
   return (
-    <AstryxView
-      layout="flex"
-      direction="vertical"
-      className={cn(
-        "workspace-file-preview-overlay absolute inset-0 z-50 flex min-h-0 min-w-0 transform-gpu flex-col overflow-hidden border-r border-border bg-background transition-[opacity,transform,box-shadow] duration-200 ease-out motion-reduce:transition-none",
-        isVisible
-          ? "pointer-events-auto translate-x-0 opacity-100 shadow-2xl"
-          : "pointer-events-none -translate-x-2 opacity-0 shadow-lg",
-      )}
+    <VStack
+      className="xagent-workspace-preview-overlay"
+      data-visible={isVisible ? "true" : "false"}
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: "var(--xagent-z-workspace-overlay)",
+        minWidth: 0,
+        minHeight: 0,
+        overflow: "hidden",
+        backgroundColor: "var(--color-background-body)",
+        borderInlineEnd: "var(--border-width) solid var(--color-border)",
+      }}
     >
-      <MacOsTitleBarSpacer className="bg-muted/45" />
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-muted/45 px-3"
-      >
-        <PreviewIcon className="h-4 w-4 shrink-0 text-primary" />
-        <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="truncate text-sm font-semibold leading-tight"
-          >
-            {t("workspaceFilePreview.title")}
-          </AstryxView>
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="truncate text-[11px] text-muted-foreground"
-          >
-            {activePath}
-          </AstryxView>
-        </AstryxView>
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex shrink-0 items-center gap-1"
-        >
-          {canOpenEditor && activePreviewRequest ? (
-            <AstryxButton
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              title={t("workspaceFilePreview.edit")}
-              aria-label={t("workspaceFilePreview.edit")}
-              onClick={() =>
-                onOpenEditor({
-                  ...activePreviewRequest,
-                  path: activePath || activePreviewRequest.path,
-                })
+      <MacOsTitleBarSpacer />
+      <Layout
+        height="fill"
+        header={
+          <LayoutHeader hasDivider padding={0}>
+            <Toolbar
+              label={t("workspaceFilePreview.title")}
+              size="sm"
+              startContent={
+                <HStack gap={2} vAlign="center">
+                  <Icon icon={PreviewIcon} size="sm" color="accent" />
+                  <StackItem size="fill">
+                    <VStack gap={0.5}>
+                      <Heading level={4}>{t("workspaceFilePreview.title")}</Heading>
+                      <Text type="supporting" color="secondary" maxLines={1}>
+                        {activePath}
+                      </Text>
+                    </VStack>
+                  </StackItem>
+                </HStack>
               }
-            >
-              <FilePenLine className="h-4 w-4" />
-            </AstryxButton>
-          ) : null}
-          {canOpenExternal ? (
-            <AstryxButton
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              title={t("workspaceFilePreview.openExternal")}
-              aria-label={t("workspaceFilePreview.openExternal")}
-              onClick={() => void openExternal()}
-            >
-              <ExternalLink className="h-4 w-4" />
-            </AstryxButton>
-          ) : null}
-          <AstryxButton
-            type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-45"
-            title={t("workspaceFilePreview.reload")}
-            aria-label={t("workspaceFilePreview.reload")}
-            disabled={!activePreviewRequest || loading}
-            onClick={() => activePreviewRequest && void loadPreview(activePreviewRequest, 0)}
-          >
-            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-          </AstryxButton>
-          <AstryxButton
-            type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            title={t("workspaceFilePreview.close")}
-            aria-label={t("workspaceFilePreview.close")}
-            onClick={onRequestClose}
-          >
-            <X className="h-4 w-4" />
-          </AstryxButton>
-        </AstryxView>
-      </AstryxView>
-
-      {error || renderError || spreadsheet?.error ? (
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex shrink-0 items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
-        >
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1 truncate">
-            {error ?? renderError ?? spreadsheet?.error}
-          </AstryxView>
-        </AstryxView>
-      ) : null}
-
-      <AstryxView
-        layout="block"
-        direction="horizontal"
-        className="min-h-0 flex-1 overflow-hidden bg-muted/25"
-      >
-        {preview ? (
-          <PreviewBody
-            preview={preview}
-            workdir={activePreviewRequest?.workdir ?? ""}
-            activePath={activePath}
-            imagePaths={imagePaths}
-            imageTransitionDirection={imageTransitionDirection}
-            isSwitchingImage={loading && preview.kind === "image"}
-            spreadsheet={spreadsheet}
-            activeSheetName={activeSheetName}
-            onOpenImagePath={openImagePath}
-            onActiveSheetNameChange={setActiveSheetName}
-            onRenderError={setRenderError}
-          />
-        ) : loading ? (
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex h-full items-center justify-center"
-          >
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </AstryxView>
-        ) : (
-          <AstryxView
-            layout="flex"
-            direction="vertical"
-            className="flex h-full flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground"
-          >
-            <FileText className="h-7 w-7" />
-            <AstryxInline>{t("workspaceFilePreview.empty")}</AstryxInline>
-          </AstryxView>
-        )}
-      </AstryxView>
-
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/35 px-3 text-[11px] text-muted-foreground"
-      >
-        <AstryxInline className="min-w-0 truncate">{activePath}</AstryxInline>
-        {preview ? (
-          <AstryxInline className="shrink-0">
-            {preview.mimeType} · {formatBytes(preview.sizeBytes)}
-          </AstryxInline>
-        ) : null}
-      </AstryxView>
-    </AstryxView>
+              endContent={
+                <HStack gap={1} vAlign="center">
+                  {canOpenEditor && activePreviewRequest ? (
+                    <IconButton
+                      label={t("workspaceFilePreview.edit")}
+                      tooltip={t("workspaceFilePreview.edit")}
+                      icon={<Icon icon={FilePenLine} size="sm" color="inherit" />}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        onOpenEditor({
+                          ...activePreviewRequest,
+                          path: activePath || activePreviewRequest.path,
+                        })
+                      }
+                    />
+                  ) : null}
+                  {canOpenExternal ? (
+                    <IconButton
+                      label={t("workspaceFilePreview.openExternal")}
+                      tooltip={t("workspaceFilePreview.openExternal")}
+                      icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void openExternal()}
+                    />
+                  ) : null}
+                  <IconButton
+                    label={t("workspaceFilePreview.reload")}
+                    tooltip={t("workspaceFilePreview.reload")}
+                    icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+                    variant="ghost"
+                    size="sm"
+                    isLoading={loading}
+                    isDisabled={!activePreviewRequest || loading}
+                    onClick={() =>
+                      activePreviewRequest && void loadPreview(activePreviewRequest, 0)
+                    }
+                  />
+                  <IconButton
+                    label={t("workspaceFilePreview.close")}
+                    tooltip={t("workspaceFilePreview.close")}
+                    icon={<Icon icon={X} size="sm" color="inherit" />}
+                    variant="ghost"
+                    size="sm"
+                    onClick={onRequestClose}
+                  />
+                </HStack>
+              }
+            />
+          </LayoutHeader>
+        }
+        content={
+          <VStack height="100%" gap={0}>
+            {error || renderError || spreadsheet?.error ? (
+              <Banner
+                status="error"
+                title={t("workspaceFilePreview.renderFailed")}
+                description={error ?? renderError ?? spreadsheet?.error ?? undefined}
+                collapsible={false}
+              />
+            ) : null}
+            <StackItem size="fill">
+              <LayoutContent padding={0} className="xagent-workspace-file-preview-stage">
+                {preview ? (
+                  <PreviewBody
+                    preview={preview}
+                    workdir={activePreviewRequest?.workdir ?? ""}
+                    activePath={activePath}
+                    imagePaths={imagePaths}
+                    imageTransitionDirection={imageTransitionDirection}
+                    isSwitchingImage={loading && preview.kind === "image"}
+                    spreadsheet={spreadsheet}
+                    activeSheetName={activeSheetName}
+                    onOpenImagePath={openImagePath}
+                    onActiveSheetNameChange={setActiveSheetName}
+                    onRenderError={setRenderError}
+                  />
+                ) : loading ? (
+                  <Spinner size="lg" label={t("workspaceFilePreview.loading")} />
+                ) : (
+                  <EmptyState
+                    title={t("workspaceFilePreview.empty")}
+                    icon={<Icon icon={FileText} size="lg" color="secondary" />}
+                    isCompact
+                  />
+                )}
+              </LayoutContent>
+            </StackItem>
+          </VStack>
+        }
+        footer={
+          <LayoutFooter hasDivider padding={2}>
+            <HStack gap={3} vAlign="center" hAlign="between">
+              <StackItem size="fill">
+                <Text type="supporting" color="secondary" maxLines={1}>
+                  {activePath}
+                </Text>
+              </StackItem>
+              {preview ? (
+                <Text type="supporting" color="secondary" hasTabularNumbers>
+                  {preview.mimeType} · {formatBytes(preview.sizeBytes)}
+                </Text>
+              ) : null}
+            </HStack>
+          </LayoutFooter>
+        }
+      />
+    </VStack>
   );
 }
 

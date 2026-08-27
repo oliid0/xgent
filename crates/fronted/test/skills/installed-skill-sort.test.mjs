@@ -94,10 +94,11 @@ for (const { label, loader, page } of implementations) {
 
     assert.match(source, /skillsHub\.installedSort/);
     assert.match(source, /sortInstalledSkillItems\(filtered, installedSort, selected/);
-    assert.match(source, /sortedFiltered\.map/);
-    assert.match(source, /sortedFiltered[\s\S]*handleBulkInstalledCardClick/);
+    assert.match(source, /entries=\{sortedFiltered\}/);
+    assert.match(source, /props\.entries\.map/);
+    assert.match(source, /props\.entries[\s\S]*props\.onEnterBulk/);
     assert.match(source, /ref=\{installedGridRef\}/);
-    assert.equal(source.match(/data-flip-key=\{key\}/g)?.length, 2);
+    assert.equal(source.match(/data-flip-key=\{flipKey\}/g)?.length, 1);
     assert.match(source, /prefers-reduced-motion: reduce/);
     assert.match(source, /import \{ Switch \} from "@astryxdesign\/core\/Switch"/);
     assert.match(source, /import \{ Tab, TabList \} from "@astryxdesign\/core\/TabList"/);
@@ -125,7 +126,7 @@ for (const { label, loader, page } of implementations) {
       /const followNames = changedNames\.filter\([\s\S]*restoreSet\.has\(name\) && !current\.has\(name\)/,
     );
     assert.match(source, /requestInstalledSkillFlip\("batch", changedNames, followNames\)/);
-    assert.match(source, /overflow-y-auto[^"]*\[overflow-anchor:none\]/);
+    assert.match(source, /isScrollable=\{view === "installed"\}/);
     assert.match(source, /requestInstalledFlip\("wave", \[\], followKey \? \[followKey\] : \[\]\)/);
     assert.match(source, /const FLIP_HERO_DURATION_MS = 380/);
     assert.match(source, /const FLIP_BATCH_HERO_DELAY_MS = 90/);
@@ -152,7 +153,7 @@ for (const { label, loader, page } of implementations) {
     assert.match(source, /<TextInput[\s\S]*startIcon=\{Search\}[\s\S]*hasClear/);
     assert.doesNotMatch(source, /role="switch"/);
     assert.doesNotMatch(source, /HubSegmentedControl/);
-    assert.match(source, /id=\{`skills-panel-\$\{view\}`\}/);
+    assert.match(source, /id=\{"skills-panel-" \+ view\}/);
     assert.match(source, /role="tabpanel"/);
     assert.match(source, /<Badge label=\{selectableSkills\.length\}/);
     assert.doesNotMatch(source, /AstryxInput/);

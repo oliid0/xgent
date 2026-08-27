@@ -210,10 +210,15 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
             maxWidth="var(--xagent-content-width-md)"
             paddingInline={5}
             paddingBlock={4}
+            className="chat-transcript-content"
             style={{ marginInline: "auto" }}
           >
             {showNoModelsState || showStartChatState ? (
-              <Center width="100%" style={{ flex: 1, minHeight: 0 }}>
+              <Center
+                width="100%"
+                className="chat-empty-state-stage"
+                style={{ flex: 1, minHeight: 0 }}
+              >
                 {/* Keyed per conversation so the hero entrance replays when
                   switching between empty conversations, not just on mount. */}
                 <ChatEmptyState

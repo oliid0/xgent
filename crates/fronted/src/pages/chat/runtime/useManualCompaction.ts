@@ -12,6 +12,7 @@ import { getActiveSegment } from "../../../lib/chat/conversation/conversationSta
 import type { LiveTranscriptStore } from "../../../lib/chat/conversation/liveTranscriptStore";
 import { createTurnCancellation } from "../../../lib/chat/conversation/turnCancellation";
 import { memoryTurnInjection } from "../../../lib/chat/memory/injectionController";
+import { skillMentionInjection } from "../../../lib/chat/skills/mentionInjection";
 import { createProviderRuntimeConfig } from "../../../lib/providers/llm";
 import type { AppSettings } from "../../../lib/settings";
 import {
@@ -201,6 +202,8 @@ export function useManualCompaction(params: {
         });
         const memoryPrompt =
           memoryTurnInjection.getSystemText(conversationId) ?? promptInputs.memoryPrompt;
+        const memoryTurnUpdates = memoryTurnInjection.getMessageUpdates(conversationId);
+        const skillMentionUpdates = skillMentionInjection.getMessageUpdates(conversationId);
 
         let failureMessage = "";
         const sinks: CompactionSinks = {
@@ -280,6 +283,8 @@ export function useManualCompaction(params: {
                 soulPrompt: promptInputs.soulPrompt,
                 skillsPrompt: promptInputs.skillsPrompt,
                 memoryPrompt,
+                memoryTurnUpdates,
+                skillMentionUpdates,
                 includeAbortedMessages: options?.includeAbortedMessages,
                 includeUploadedFilesMetadata: options?.includeUploadedFilesMetadata,
               }),
@@ -291,6 +296,8 @@ export function useManualCompaction(params: {
                 soulPrompt: promptInputs.soulPrompt,
                 skillsPrompt: promptInputs.skillsPrompt,
                 memoryPrompt,
+                memoryTurnUpdates,
+                skillMentionUpdates,
                 includeAbortedMessages: options?.includeAbortedMessages,
                 includeUploadedFilesMetadata: options?.includeUploadedFilesMetadata,
               }),

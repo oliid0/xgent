@@ -10,6 +10,11 @@ const modelSelectorSource = readFileSync(
   new URL("../../src/pages/chat/components/ChatModelSelector.tsx", import.meta.url),
   "utf8",
 );
+const composerSource = readFileSync(
+  new URL("../../src/pages/chat/components/ChatComposerBar.tsx", import.meta.url),
+  "utf8",
+);
+const chatPageSource = readFileSync(new URL("../../src/pages/ChatPage.tsx", import.meta.url), "utf8");
 
 const visibleExecutionModes = ["text", "tools"];
 
@@ -60,4 +65,31 @@ test("model pickers search models and providers", () => {
     /\w+\.providerName\.toLowerCase\(\)\.includes\(normalizedSearch\)/,
   );
   assert.match(modelSelectorSource, /t\("chat\.noModelFound"\)/);
+});
+
+test("composer exposes the requested controls through Astryx slots", () => {
+  assert.match(composerSource, /<Popover/);
+  assert.match(composerSource, /<ChatComposerDrawer>/);
+  assert.match(composerSource, /<Thumbnail/);
+  assert.match(composerSource, /planModeEnabled: value/);
+  assert.match(composerSource, /nativeWebSearchEnabled: value/);
+  assert.match(composerSource, /thinkingEnabled: value/);
+  assert.match(composerSource, /settings\.commandSafety/);
+  assert.match(composerSource, /sendActions=\{/);
+  assert.match(composerSource, /const usedTokens = Math\.max\(0, tokens \?\? 0\)/);
+  assert.doesNotMatch(composerSource, /chat\.composer\.addMention/);
+  assert.doesNotMatch(composerSource, /chat\.composer\.addCommand/);
+});
+
+test("model selector keeps reasoning depth above provider model groups", () => {
+  assert.match(modelSelectorSource, /import \{ RadioList, RadioListItem \}/);
+  assert.match(
+    modelSelectorSource,
+    /COMPOSER_REASONING_ORDER[^=]*= \["minimal", "low", "medium", "high"\]/,
+  );
+  assert.ok(modelSelectorSource.indexOf("<RadioList") < modelSelectorSource.indexOf("<CollapsibleGroup"));
+});
+
+test("agent turns receive the composer plan-mode state", () => {
+  assert.match(chatPageSource, /planModeEnabled: runtimeControls\.planModeEnabled/);
 });

@@ -9,13 +9,35 @@ export type TrajectoryUsage = {
   reasoning?: number;
 };
 
+export const TRAJECTORY_SECTION_SLOTS = [
+  "base",
+  "agent",
+  "skills",
+  "memory",
+  "toolsSuffix",
+  "toolCatalog",
+  "runtime",
+] as const;
+
+export type TrajectorySectionSlot = (typeof TRAJECTORY_SECTION_SLOTS)[number];
+
+export const TRAJECTORY_PROMPT_SECTION_SLOTS = [
+  "base",
+  "agent",
+  "skills",
+  "memory",
+  "runtime",
+  "toolsSuffix",
+] as const satisfies readonly TrajectorySectionSlot[];
+
 export type TrajectorySection = {
   sectionId: string;
-  slot: string;
+  slot: TrajectorySectionSlot;
   content: string;
 };
 
-export type TrajectorySectionRefs = Record<string, string>;
+/** Fixed wire order; new slots may only be appended for persisted compatibility. */
+export type TrajectorySectionRefs = readonly (string | null)[];
 
 export type TrajectoryEvent = {
   k: string;

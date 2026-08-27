@@ -81,35 +81,50 @@ export function cancelPendingAskUserQuestionsForConversation(conversationId: str
   }
 }
 
+const ASK_USER_QUESTION_TIMEOUT_MINUTES = Math.round(ASK_USER_QUESTION_TIMEOUT_MS / 60_000);
+
+const description = `Ask the user up to ${ASK_USER_QUESTION_MAX_QUESTIONS} multiple-choice questions and wait for their selections. Use this whenever you need a decision only the user can make: ambiguous requirements, mutually exclusive approaches, or trade-offs you cannot resolve from the conversation and the workspace.
+
+The questions render as an interactive card; execution pauses until the user answers every question, then the selections come back as the tool result. If the user does not answer within ${ASK_USER_QUESTION_TIMEOUT_MINUTES} minutes, the recommended (or first) option of every question is auto-selected and execution continues — the result text tells you which happened.
+
+Rules:
+- Ask 1-${ASK_USER_QUESTION_MAX_QUESTIONS} focused questions per call; each question needs ${ASK_USER_QUESTION_MIN_OPTIONS}-${ASK_USER_QUESTION_MAX_OPTIONS} options (3-4 is ideal), and every question in one call must have the SAME number of options.
+- Options must be short, concrete, and mutually exclusive. Set recommended=true on your suggested choice (at most one per question) — it is shown first and becomes the timeout fallback.
+- The UI automatically appends an "Other" free-text option to every question, so the user can always type their own answer. Do NOT add your own catch-all option (e.g. "Other", "Custom", "其他", "自定义"). When the user types an answer, the result marks it as user-typed and returns their exact words instead of a listed label — treat it as authoritative.
+- Give each question a short header (2-6 chars works best) — it becomes the tab label when several questions show at once.
+- Do not use this for questions answerable from the code or the conversation, and never ask for confirmation of work you can safely do.`;
+
 const parameters = Type.Object({
   questions: Type.Array(
     Type.Object({
-      id: Type.Optional(Type.String({ description: "Stable question id." })),
-      header: Type.Optional(Type.String({ description: "Short tab label." })),
-      prompt: Type.String({ description: "Question shown to the user." }),
+      id: Type.Optional(
+        Type.String({ description: "Stable question id (defaults to q1..qN by position)." }),
+      ),
+      header: Type.Optional(
+        Type.String({ description: "Short tab label shown when multiple questions render." }),
+      ),
+      prompt: Type.String({ description: "The question shown to the user." }),
       options: Type.Array(
         Type.Object({
-          label: Type.String({ description: "Concise option label." }),
-          description: Type.Optional(Type.String({ description: "One-line trade-off." })),
+          label: Type.String({ description: "Concise option label the user picks." }),
+          description: Type.Optional(
+            Type.String({ description: "One-line explanation of the trade-off." }),
+          ),
           recommended: Type.Optional(
-            Type.Boolean({ description: "Recommended choice and timeout fallback." }),
+            Type.Boolean({
+              description:
+                "Mark exactly one option per question as your recommendation; it is shown first and auto-selected on timeout.",
+            }),
           ),
         }),
         {
-          description: `${ASK_USER_QUESTION_MIN_OPTIONS}-${ASK_USER_QUESTION_MAX_OPTIONS} mutually exclusive options.`,
+          description: `${ASK_USER_QUESTION_MIN_OPTIONS}-${ASK_USER_QUESTION_MAX_OPTIONS} mutually exclusive options (3-4 is ideal). Every question in one call must have the same number of options.`,
         },
       ),
     }),
-    { description: `1-${ASK_USER_QUESTION_MAX_QUESTIONS} focused questions.` },
+    { description: `1-${ASK_USER_QUESTION_MAX_QUESTIONS} questions to ask in this card.` },
   ),
 });
-
-const description = `Ask the user one or more multiple-choice questions and wait for the answer.
-
-Use this only when a decision cannot be resolved from the conversation or workspace. The UI adds an
-Other field automatically, so do not add a catch-all option. Mark at most one option per question as
-recommended. If the user does not answer within three minutes, that option (or the first option) is
-selected automatically. Do not use this tool in place of inspecting available evidence.`;
 
 function errorResult(toolCall: ToolCall, text: string): ToolResultMessage {
   return {

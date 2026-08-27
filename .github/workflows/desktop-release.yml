@@ -681,7 +681,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios
+          targets: aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-ios-sim
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -702,6 +702,28 @@ jobs:
           bash scripts/mobile/prepare-ios-shell-resources.sh
           bash scripts/mobile/prepare-mobile-legal-notices.sh
 
+      - name: Install Tauri iOS host dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          for formula in xcodegen libimobiledevice cocoapods; do
+            if ! brew list --versions "$formula" >/dev/null 2>&1; then
+              brew install "$formula"
+            fi
+          done
+          brew link --overwrite --force xcodegen libimobiledevice cocoapods
+          export PATH="$(brew --prefix)/bin:$PATH"
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+          hash -r
+          command -v xcodegen
+          command -v idevicesyslog
+          command -v pod
+          xcodegen --version
+          pod --version
+          xcode-select -p
+          xcodebuild -version
+
       - name: Initialize Tauri iOS project
         working-directory: crates/fronted
         shell: bash
@@ -709,7 +731,7 @@ jobs:
           set -o pipefail
           log="$RUNNER_TEMP/ios-init.log"
           if ! pnpm tauri ios init --ci 2>&1 | tee "$log"; then
-            message="$(tail -n 200 "$log")"
+            message="$(tail -n 80 "$log")"
             message="${message//'%'/'%25'}"
             message="${message//$'\r'/'%0D'}"
             message="${message//$'\n'/'%0A'}"

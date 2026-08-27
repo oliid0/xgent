@@ -111,3 +111,20 @@ test("iOS project template preserves the pre-build script YAML boundary", () => 
   assert.match(iosProjectTemplate, /preBuildScripts:\n\s+\{\{#each ios-pre-build-scripts\}\}/);
   assert.doesNotMatch(iosProjectTemplate, /preBuildScripts:\n\s+\{\{~#each ios-pre-build-scripts\}\}/);
 });
+
+test("iOS release prepares host tools and every target before Tauri initialization", () => {
+  const ios = jobSource("ios", "publish");
+  assert.match(
+    ios,
+    /targets: aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-ios-sim/,
+  );
+  assert.match(ios, /for formula in xcodegen libimobiledevice cocoapods/);
+  assert.match(ios, /brew link --overwrite --force xcodegen libimobiledevice cocoapods/);
+  assert.match(ios, /command -v xcodegen/);
+  assert.match(ios, /command -v idevicesyslog/);
+  assert.match(ios, /command -v pod/);
+
+  const dependencyStep = ios.indexOf("Install Tauri iOS host dependencies");
+  const initStep = ios.indexOf("Initialize Tauri iOS project");
+  assert.ok(dependencyStep >= 0 && dependencyStep < initStep);
+});

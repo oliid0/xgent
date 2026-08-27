@@ -1,7 +1,16 @@
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
-import { Dialog } from "@astryxdesign/core/Dialog";
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { Icon } from "@astryxdesign/core/Icon";
+import { HStack, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Text } from "@astryxdesign/core/Text";
+import { Token } from "@astryxdesign/core/Token";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import {
@@ -12,28 +21,13 @@ import {
   useManagedProcesses,
 } from "../../lib/managed-process/store";
 import type { ManagedProcessLog, ManagedProcessRecord } from "../../lib/managed-process/types";
-import { cn } from "../../lib/shared/utils";
-import {
-  AlertTriangle,
-  Check,
-  Copy,
-  FileText,
-  Loader2,
-  RefreshCw,
-  Square,
-  Trash2,
-  X,
-} from "../icons";
-import { Button } from "../ui/button";
+import { AlertTriangle, Check, Copy, FileText, RefreshCw, Square, Trash2 } from "../icons";
 
 type BackgroundTasksPanelProps = {
   // Visibility contract from the workspace side panel: gates the per-second uptime
   // tick while the panel is hidden behind another tab.
   active?: boolean;
 };
-
-const ROW_ACTION_CLASS =
-  "h-6 gap-1 rounded-md px-1.5 text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground hover:text-foreground";
 
 function formatUptime(startedAt: number, now: number) {
   const totalSeconds = Math.max(0, Math.floor((now - startedAt) / 1000));
@@ -148,131 +142,87 @@ function BackgroundTaskLogDialog(props: {
       width="min(42rem, calc(100dvw - var(--spacing-8)))"
       maxHeight={isCompact ? "100dvh" : "80dvh"}
       padding={0}
-      className="flex flex-col overflow-hidden"
     >
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="flex shrink-0 items-center gap-2 border-b border-border/60 px-4 py-3"
-      >
-        <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="truncate text-sm font-medium text-foreground"
-          >
-            {processDisplayName(process)}
-          </AstryxView>
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="mt-0.5 truncate text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground"
-            title={log?.logPath ?? process.logPath}
-          >
-            {log?.logPath ?? process.logPath}
-            {log?.truncated ? ` ${t("projectTools.bgTaskLogTruncated")}` : ""}
-          </AstryxView>
-        </AstryxView>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={actionsDisabled || loading}
-          className="h-8 shrink-0 gap-1.5 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"
-          onClick={() => refresh(false)}
-        >
-          {loading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="h-3.5 w-3.5" />
-          )}
-          {t("projectTools.bgTaskRefreshLog")}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={onClose}
-          className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
-          title={t("projectTools.close")}
-          aria-label={t("projectTools.close")}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </AstryxView>
+      <VStack height="100%" minHeight={0} gap={0}>
+        <DialogHeader
+          title={processDisplayName(process)}
+          subtitle={`${log?.logPath ?? process.logPath}${
+            log?.truncated ? ` ${t("projectTools.bgTaskLogTruncated")}` : ""
+          }`}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) onClose();
+          }}
+          endContent={
+            <Button
+              label={t("projectTools.bgTaskRefreshLog")}
+              variant="ghost"
+              size="sm"
+              icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+              isDisabled={actionsDisabled}
+              isLoading={loading}
+              onClick={() => refresh(false)}
+            />
+          }
+        />
 
-      {error ? (
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="shrink-0 border-b border-destructive/20 bg-destructive/10 px-4 py-2 text-xs text-destructive"
-        >
-          {error}
-        </AstryxView>
-      ) : null}
+        {error ? <Banner status="error" title={error} collapsible={false} /> : null}
 
-      {/* select-text overrides the desktop app's global user-select:none;
-            right-click opens the custom copy menu below. Line numbers are
-            counter pseudo-content, so selections copy without them. */}
-      <ContextMenu
-        label={t("projectTools.bgTaskViewLog")}
-        size="sm"
-        items={[
-          {
-            label: t("projectTools.bgTaskLogCopy"),
-            isDisabled: !hasSelection,
-            onClick: handleCopySelection,
-          },
-          {
-            label: t("projectTools.bgTaskLogSelectAll"),
-            isDisabled: lines.length === 0,
-            onClick: handleSelectAll,
-          },
-          {
-            label: t("projectTools.bgTaskLogCopyAll"),
-            isDisabled: lines.length === 0,
-            onClick: handleCopyAll,
-          },
-        ]}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) return;
-          const selection = window.getSelection();
-          setHasSelection(
-            Boolean(selection && !selection.isCollapsed && selection.toString().length > 0),
-          );
-        }}
-      >
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          ref={logRef}
-          role="log"
-          className="min-h-0 flex-1 select-text overflow-auto overscroll-contain px-3 py-3 font-mono text-[calc(11px*var(--zone-font-scale,1))] leading-4 text-muted-foreground [counter-reset:log-line]"
-        >
-          {lines.length === 0 ? (
-            <AstryxView layout="block" direction="horizontal" className="select-none font-sans">
-              {loading && !log ? t("projectTools.loading") : t("projectTools.bgTaskLogEmpty")}
-            </AstryxView>
-          ) : (
-            lines.map((line, index) => (
-              <AstryxView
-                layout="grid"
-                direction="horizontal"
-                // Static tail render, replaced wholesale on refresh.
-                // biome-ignore lint/suspicious/noArrayIndexKey: lines have no identity
-                key={index}
-                className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-2 [counter-increment:log-line]"
-              >
-                <AstryxInline
-                  aria-hidden="true"
-                  className="select-none text-right text-muted-foreground/40 before:content-[counter(log-line)]"
+        <StackItem size="fill">
+          <ContextMenu
+            label={t("projectTools.bgTaskViewLog")}
+            size="sm"
+            items={[
+              {
+                label: t("projectTools.bgTaskLogCopy"),
+                isDisabled: !hasSelection,
+                onClick: handleCopySelection,
+              },
+              {
+                label: t("projectTools.bgTaskLogSelectAll"),
+                isDisabled: lines.length === 0,
+                onClick: handleSelectAll,
+              },
+              {
+                label: t("projectTools.bgTaskLogCopyAll"),
+                isDisabled: lines.length === 0,
+                onClick: handleCopyAll,
+              },
+            ]}
+            onOpenChange={(isOpen) => {
+              if (!isOpen) return;
+              const selection = window.getSelection();
+              setHasSelection(
+                Boolean(selection && !selection.isCollapsed && selection.toString().length > 0),
+              );
+            }}
+          >
+            <VStack ref={logRef} role="log" height="100%" minHeight={0} padding={3}>
+              {lines.length === 0 ? (
+                <EmptyState
+                  isCompact
+                  icon={<Icon icon={FileText} size="lg" color="secondary" />}
+                  title={
+                    loading && !log ? t("projectTools.loading") : t("projectTools.bgTaskLogEmpty")
+                  }
                 />
-                <AstryxInline className="whitespace-pre-wrap break-all">{line}</AstryxInline>
-              </AstryxView>
-            ))
-          )}
-        </AstryxView>
-      </ContextMenu>
+              ) : (
+                <CodeBlock
+                  code={log?.content ?? ""}
+                  language="plaintext"
+                  title={processDisplayName(process)}
+                  hasLineNumbers
+                  hasLanguageLabel={false}
+                  isWrapped
+                  maxHeight={isCompact ? "calc(100dvh - 8rem)" : "60dvh"}
+                  size="sm"
+                  width="100%"
+                  container="section"
+                />
+              )}
+            </VStack>
+          </ContextMenu>
+        </StackItem>
+      </VStack>
     </Dialog>
   );
 }
@@ -339,146 +289,100 @@ function BackgroundTaskRow(props: {
   }, [process, runAction]);
 
   return (
-    <AstryxView
-      layout="flex"
-      direction="vertical"
-      className="flex flex-col gap-1.5 rounded-lg border border-border/60 bg-background/60 px-2.5 py-2"
-    >
-      <AstryxView layout="flex" direction="horizontal" className="flex min-w-0 items-center gap-2">
-        <AstryxInline
-          aria-hidden="true"
-          className={cn(
-            "h-1.5 w-1.5 shrink-0 rounded-full",
-            process.running ? "bg-emerald-500" : "bg-muted-foreground/50",
-          )}
+    <ListItem
+      label={processDisplayName(process)}
+      startContent={
+        <StatusDot
+          variant={process.running ? "success" : "neutral"}
+          label={process.running ? t("projectTools.bgTaskRunning") : t("projectTools.bgTaskExited")}
+          isPulsing={process.running}
         />
-        <AstryxInline className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
-          {processDisplayName(process)}
-        </AstryxInline>
-        {process.isolated ? (
-          <AstryxInline className="shrink-0 rounded bg-amber-500/15 px-1 py-px text-[calc(10px*var(--zone-font-scale,1))] text-amber-600 dark:text-amber-400">
-            {t("projectTools.bgTaskIsolated")}
-          </AstryxInline>
-        ) : null}
-        {process.restored ? (
-          <AstryxInline className="shrink-0 rounded bg-sky-500/15 px-1 py-px text-[calc(10px*var(--zone-font-scale,1))] text-sky-600 dark:text-sky-400">
-            {t("projectTools.bgTaskRestored")}
-          </AstryxInline>
-        ) : null}
-      </AstryxView>
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground"
-      >
-        <AstryxInline className="shrink-0">PID {process.pid}</AstryxInline>
-        {process.running ? (
-          <AstryxInline className="shrink-0 tabular-nums">
-            {formatUptime(process.startedAt, now)}
-          </AstryxInline>
-        ) : (
-          <AstryxInline className="shrink-0">
-            {process.exitCode === null
-              ? t("projectTools.bgTaskExited")
-              : t("projectTools.bgTaskExitedWithCode").replace("{code}", String(process.exitCode))}
-          </AstryxInline>
-        )}
-        <AstryxInline className="min-w-0 truncate" title={process.command}>
-          {process.command}
-        </AstryxInline>
-      </AstryxView>
-      <AstryxView
-        layout="block"
-        direction="horizontal"
-        className="min-w-0 truncate text-[calc(10px*var(--zone-font-scale,1))] text-muted-foreground/70"
-        title={process.cwd}
-      >
-        {process.cwd}
-      </AstryxView>
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="flex flex-wrap items-center gap-1"
-      >
-        {process.running ? (
+      }
+      description={
+        <VStack gap={1}>
+          <HStack gap={1} vAlign="center" wrap="wrap">
+            <Text type="supporting" color="secondary" hasTabularNumbers>
+              PID {process.pid}
+            </Text>
+            <Text type="supporting" color="secondary" hasTabularNumbers>
+              {process.running
+                ? formatUptime(process.startedAt, now)
+                : process.exitCode === null
+                  ? t("projectTools.bgTaskExited")
+                  : t("projectTools.bgTaskExitedWithCode").replace(
+                      "{code}",
+                      String(process.exitCode),
+                    )}
+            </Text>
+            {process.isolated ? (
+              <Token label={t("projectTools.bgTaskIsolated")} color="yellow" size="sm" />
+            ) : null}
+            {process.restored ? (
+              <Token label={t("projectTools.bgTaskRestored")} color="blue" size="sm" />
+            ) : null}
+          </HStack>
+          <Text type="code" color="secondary" maxLines={1}>
+            {process.command}
+          </Text>
+          <Text type="supporting" color="secondary" maxLines={1}>
+            {process.cwd}
+          </Text>
+          {error ? <Token label={error} color="red" size="sm" /> : null}
+        </VStack>
+      }
+      endContent={
+        <HStack gap={1} vAlign="center" wrap="wrap">
+          {process.running ? (
+            <Button
+              label={
+                pendingStop ? t("projectTools.bgTaskStopConfirm") : t("projectTools.bgTaskStop")
+              }
+              variant={pendingStop ? "destructive" : "ghost"}
+              size="sm"
+              icon={<Icon icon={pendingStop ? Check : Square} size="sm" color="inherit" />}
+              isDisabled={actionsDisabled}
+              isLoading={stopping}
+              onClick={handleStop}
+            />
+          ) : (
+            <>
+              <Button
+                label={t("projectTools.bgTaskRetry")}
+                variant="ghost"
+                size="sm"
+                icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+                isDisabled={actionsDisabled}
+                isLoading={retrying}
+                onClick={handleRetry}
+              />
+              <Button
+                label={t("projectTools.bgTaskClear")}
+                variant="ghost"
+                size="sm"
+                icon={<Icon icon={Trash2} size="sm" color="inherit" />}
+                isDisabled={actionsDisabled || retrying}
+                onClick={handleClear}
+              />
+            </>
+          )}
           <Button
-            type="button"
+            label={t("projectTools.bgTaskViewLog")}
             variant="ghost"
             size="sm"
-            disabled={actionsDisabled || stopping}
-            className={cn(
-              ROW_ACTION_CLASS,
-              pendingStop && "bg-destructive/10 text-destructive hover:text-destructive",
-            )}
-            onClick={handleStop}
-          >
-            {stopping ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : pendingStop ? (
-              <Check className="h-3 w-3" />
-            ) : (
-              <Square className="h-3 w-3" />
-            )}
-            {pendingStop ? t("projectTools.bgTaskStopConfirm") : t("projectTools.bgTaskStop")}
-          </Button>
-        ) : (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={actionsDisabled || retrying}
-              className={ROW_ACTION_CLASS}
-              onClick={handleRetry}
-            >
-              <RefreshCw className={cn("h-3 w-3", retrying && "animate-spin")} />
-              {t("projectTools.bgTaskRetry")}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={actionsDisabled || retrying}
-              className={ROW_ACTION_CLASS}
-              onClick={handleClear}
-            >
-              <Trash2 className="h-3 w-3" />
-              {t("projectTools.bgTaskClear")}
-            </Button>
-          </>
-        )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={actionsDisabled}
-          className={ROW_ACTION_CLASS}
-          onClick={() => onViewLog(process)}
-        >
-          <FileText className="h-3 w-3" />
-          {t("projectTools.bgTaskViewLog")}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={ROW_ACTION_CLASS}
-          onClick={handleCopy}
-        >
-          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-          {copied ? t("projectTools.bgTaskCopied") : t("projectTools.bgTaskCopy")}
-        </Button>
-      </AstryxView>
-      {error ? (
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="text-[calc(11px*var(--zone-font-scale,1))] text-destructive"
-        >
-          {error}
-        </AstryxView>
-      ) : null}
-    </AstryxView>
+            icon={<Icon icon={FileText} size="sm" color="inherit" />}
+            isDisabled={actionsDisabled}
+            onClick={() => onViewLog(process)}
+          />
+          <Button
+            label={copied ? t("projectTools.bgTaskCopied") : t("projectTools.bgTaskCopy")}
+            variant="ghost"
+            size="sm"
+            icon={<Icon icon={copied ? Check : Copy} size="sm" color="inherit" />}
+            onClick={handleCopy}
+          />
+        </HStack>
+      }
+    />
   );
 }
 
@@ -516,71 +420,53 @@ export const BackgroundTasksPanel = memo(function BackgroundTasksPanel(
   }, []);
 
   return (
-    <AstryxView layout="flex" direction="vertical" className="flex h-full min-h-0 flex-col">
+    <VStack height="100%" minHeight={0} gap={0}>
       {actionsDisabled ? (
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/40 px-3 py-2 text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground"
-        >
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-          <AstryxInline className="min-w-0 flex-1">
-            {t("projectTools.bgTaskAgentOffline")}
-          </AstryxInline>
-        </AstryxView>
+        <Banner
+          status="warning"
+          title={t("projectTools.bgTaskAgentOffline")}
+          icon={<Icon icon={AlertTriangle} size="sm" color="inherit" />}
+          collapsible={false}
+        />
       ) : null}
-      {/* Fixed-height header with the clear button always mounted: its
-          appearance only fades opacity, so the list below never shifts. */}
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="flex h-9 shrink-0 items-center gap-2 px-3"
-      >
-        <AstryxInline className="min-w-0 flex-1 truncate text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground">
-          {t("projectTools.backgroundTasksTitle")}
-        </AstryxInline>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={actionsDisabled || !hasFinished}
-          aria-hidden={!hasFinished}
-          className={cn(
-            ROW_ACTION_CLASS,
-            "transition-opacity duration-150 motion-reduce:transition-none",
-            hasFinished ? "opacity-100" : "pointer-events-none opacity-0",
-          )}
-          onClick={handleClearFinished}
-        >
-          <Trash2 className="h-3 w-3" />
-          {t("projectTools.bgTaskClearFinished")}
-        </Button>
-      </AstryxView>
-      <AstryxView
-        layout="flex"
-        direction="vertical"
-        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pb-3 pt-1"
-      >
-        {state.processes.length === 0 ? (
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex flex-1 items-center justify-center text-xs text-muted-foreground"
-          >
-            {t("projectTools.bgTaskEmpty")}
-          </AstryxView>
-        ) : (
-          state.processes.map((process) => (
-            <BackgroundTaskRow
-              key={process.id}
-              process={process}
-              now={now}
-              actionsDisabled={actionsDisabled}
-              onViewLog={setLogProcess}
+      <Section variant="transparent" padding={2} dividers={["bottom"]}>
+        <HStack width="100%" gap={2} vAlign="center">
+          <StackItem size="fill">
+            <Text type="label">{t("projectTools.backgroundTasksTitle")}</Text>
+          </StackItem>
+          {hasFinished ? (
+            <Button
+              label={t("projectTools.bgTaskClearFinished")}
+              variant="ghost"
+              size="sm"
+              icon={<Icon icon={Trash2} size="sm" color="inherit" />}
+              isDisabled={actionsDisabled}
+              onClick={handleClearFinished}
             />
-          ))
+          ) : null}
+        </HStack>
+      </Section>
+      <StackItem size="fill" isScrollable>
+        {state.processes.length === 0 ? (
+          <EmptyState
+            isCompact
+            icon={<Icon icon={FileText} size="lg" color="secondary" />}
+            title={t("projectTools.bgTaskEmpty")}
+          />
+        ) : (
+          <List density="compact" hasDividers header={t("projectTools.backgroundTasksTitle")}>
+            {state.processes.map((process) => (
+              <BackgroundTaskRow
+                key={process.id}
+                process={process}
+                now={now}
+                actionsDisabled={actionsDisabled}
+                onViewLog={setLogProcess}
+              />
+            ))}
+          </List>
         )}
-      </AstryxView>
+      </StackItem>
       {liveLogProcess ? (
         <BackgroundTaskLogDialog
           process={liveLogProcess}
@@ -588,6 +474,6 @@ export const BackgroundTasksPanel = memo(function BackgroundTasksPanel(
           onClose={handleCloseLog}
         />
       ) : null}
-    </AstryxView>
+    </VStack>
   );
 });

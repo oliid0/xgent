@@ -6,13 +6,14 @@ import {
   HStack,
   Layout,
   LayoutContent,
+  LayoutHeader,
   LayoutPanel,
   StackItem,
   VStack,
 } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { StatusDot, type StatusDotVariant } from "@astryxdesign/core/StatusDot";
-import { Text } from "@astryxdesign/core/Text";
+import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -34,6 +35,7 @@ import {
   Shield,
   Sparkles,
   Terminal,
+  X,
   Zap,
 } from "../components/icons";
 
@@ -50,10 +52,7 @@ import { MobileAssistantSection } from "./settings/MobileAssistantSection";
 import { MobileExecutionSection } from "./settings/MobileExecutionSection";
 import { MemoryPanel } from "./settings/memory/MemoryPanel";
 import { ProjectRootsSection } from "./settings/ProjectRootsSection";
-import {
-  type ProviderSettingsPanel,
-  ProviderSettingsSection,
-} from "./settings/ProviderSettingsSection";
+import { ProviderSettingsSection } from "./settings/ProviderSettingsSection";
 import { SkillsSettingsForm } from "./settings/SkillsSettingsForm";
 import { SoulSection } from "./settings/SoulSection";
 import { SshSettingsSection } from "./settings/SshSettingsSection";
@@ -272,10 +271,6 @@ function normalizeSettingsSection(value: SectionId): SectionId {
   return value === "failover" || value === "usage" ? "providers" : value;
 }
 
-function providerPanelFromSection(value: SectionId): ProviderSettingsPanel {
-  return value === "failover" ? "failover" : value === "usage" ? "usage" : "configuration";
-}
-
 export function SettingsPage(props: SettingsPageProps) {
   const {
     settings,
@@ -293,9 +288,6 @@ export function SettingsPage(props: SettingsPageProps) {
   const compactViewport = useCompactViewport();
   const compactSettings = nativeMobile || compactViewport;
   const [section, setSection] = useState<SectionId>(() => normalizeSettingsSection(initialSection));
-  const [providerPanel, setProviderPanel] = useState<ProviderSettingsPanel>(() =>
-    providerPanelFromSection(initialSection),
-  );
   const [mobileDetailOpen, setMobileDetailOpen] = useState(
     () => compactSettings && initialSection !== "system",
   );
@@ -364,7 +356,6 @@ export function SettingsPage(props: SettingsPageProps) {
 
   useEffect(() => {
     setSection(normalizeSettingsSection(initialSection));
-    setProviderPanel(providerPanelFromSection(initialSection));
     setMobileDetailOpen(compactSettings && normalizeSettingsSection(initialSection) !== "system");
   }, [compactSettings, initialSection]);
 
@@ -384,8 +375,6 @@ export function SettingsPage(props: SettingsPageProps) {
           <ProviderSettingsSection
             settings={settings}
             setSettings={setSettings}
-            panel={providerPanel}
-            onPanelChange={setProviderPanel}
             thirdPartyImportEnabled={!nativeMobile}
           />
         );
@@ -561,7 +550,6 @@ export function SettingsPage(props: SettingsPageProps) {
       className="settings-page settings-page-desktop"
       style={{ height: "var(--xagent-dialog-height-xl)" }}
       data-edge-swipe-ignore
-      header={<DialogHeader title={t("settings.title")} onOpenChange={() => onBack()} hasDivider />}
       start={
         <LayoutPanel
           width="var(--xagent-settings-sidebar-width)"
@@ -572,6 +560,15 @@ export function SettingsPage(props: SettingsPageProps) {
           label={t("settings.title")}
         >
           <VStack height="100%" gap={3}>
+            <HStack width="100%" hAlign="start">
+              <IconButton
+                label={t("settings.backToChat")}
+                tooltip={t("settings.backToChat")}
+                icon={<Icon icon={X} size="sm" color="inherit" />}
+                variant="ghost"
+                onClick={onBack}
+              />
+            </HStack>
             <TextInput
               type="text"
               value={searchQuery}
@@ -616,24 +613,26 @@ export function SettingsPage(props: SettingsPageProps) {
         </LayoutPanel>
       }
       content={
-        <LayoutContent
-          key={section}
-          data-settings-section={section}
-          padding={5}
-          isScrollable={!sectionManagesScroll}
-          className="settings-section-enter"
-        >
-          <VStack
-            width="100%"
-            maxWidth="var(--xagent-settings-content-max-width)"
-            height="100%"
-            minHeight={sectionManagesScroll ? 0 : "100%"}
-            className="settings-section-shell"
-            style={{ marginInline: "auto" }}
-          >
-            {sectionContent}
-          </VStack>
-        </LayoutContent>
+        <VStack height="100%" minHeight={0} gap={0}>
+          <LayoutHeader hasDivider>
+            <Heading level={2}>{sectionLabels[section]}</Heading>
+          </LayoutHeader>
+          <StackItem size="fill" isScrollable={!sectionManagesScroll}>
+            <VStack
+              key={section}
+              data-settings-section={section}
+              width="100%"
+              maxWidth="var(--xagent-settings-content-max-width)"
+              height="100%"
+              minHeight={sectionManagesScroll ? 0 : "100%"}
+              padding={sectionManagesScroll ? 0 : 5}
+              className="settings-section-shell settings-section-enter"
+              style={{ marginInline: "auto" }}
+            >
+              {sectionContent}
+            </VStack>
+          </StackItem>
+        </VStack>
       }
     />
   );

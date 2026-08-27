@@ -461,35 +461,20 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
         children,
         isExpanded: expandedSet.has(node.path),
         isSelected: selectedPath === node.path,
-        onClick: (event) => {
+        onClick: () => {
           selectPath(node.path);
-          const keyboardActivation = event.detail === 0;
-          const alternateActivation = event.detail >= 2;
           if (node.kind === "dir") {
-            if (keyboardActivation || alternateActivation) {
-              toggleDirectory(node.path, expandedSet.has(node.path));
-            }
+            toggleDirectory(node.path, expandedSet.has(node.path));
             return;
           }
-          if (touchActions || keyboardActivation || alternateActivation) {
-            handleOpenFile(node.path);
-          }
+          handleOpenFile(node.path);
         },
       };
     };
 
     const root = buildItem(ROOT_PATH);
     return root ? [root] : [];
-  }, [
-    expandedSet,
-    handleOpenFile,
-    nodes,
-    selectPath,
-    selectedPath,
-    t,
-    toggleDirectory,
-    touchActions,
-  ]);
+  }, [expandedSet, handleOpenFile, nodes, selectPath, selectedPath, t, toggleDirectory]);
 
   if (!initialized) {
     return (

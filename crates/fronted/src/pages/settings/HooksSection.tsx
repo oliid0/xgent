@@ -1,14 +1,17 @@
 import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
-import {
-  Heading as AstryxHeading,
-  Inline as AstryxInline,
-  Paragraph as AstryxParagraph,
-  View as AstryxView,
-} from "@xagent/ui/components/ui/view";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { Token, type TokenColor } from "@astryxdesign/core/Token";
 import { type ReactNode, useState } from "react";
 import {
-  AlertTriangle,
   Bot,
   Globe,
   MessageSquare,
@@ -20,7 +23,6 @@ import {
   Wrench,
   Zap,
 } from "../../components/icons";
-import { Button } from "../../components/ui/button";
 import { useLocale } from "../../i18n";
 import {
   applyHookOps,
@@ -38,8 +40,7 @@ import type { SettingsSectionProps } from "./types";
 type LifecyclePhase = {
   key: "agent" | "turn" | "message" | "tool";
   label: string;
-  color: string;
-  bgColor: string;
+  tokenColor: TokenColor;
   icon: ReactNode;
 };
 
@@ -59,10 +60,8 @@ function getHookEventLabel(t: (key: string) => string, event: HookEvent) {
   return t(HOOK_EVENT_TRANSLATION_KEYS[event]);
 }
 
-function getHookTypeTone(type: HookType) {
-  return type === "command"
-    ? "bg-blue-500/10 text-blue-600 dark:text-blue-300"
-    : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300";
+function getHookTypeColor(type: HookType): TokenColor {
+  return type === "command" ? "blue" : "green";
 }
 
 export function HooksSection(_props: SettingsSectionProps) {
@@ -80,30 +79,26 @@ export function HooksSection(_props: SettingsSectionProps) {
     agent: {
       key: "agent",
       label: t("settings.hooksPhaseAgent"),
-      color: "text-violet-600 dark:text-violet-300",
-      bgColor: "bg-violet-500/10",
-      icon: <Bot className="h-3.5 w-3.5" />,
+      tokenColor: "purple",
+      icon: <Icon icon={Bot} size="sm" color="inherit" />,
     },
     turn: {
       key: "turn",
       label: t("settings.hooksPhaseTurn"),
-      color: "text-blue-600 dark:text-blue-300",
-      bgColor: "bg-blue-500/10",
-      icon: <RefreshCw className="h-3.5 w-3.5" />,
+      tokenColor: "blue",
+      icon: <Icon icon={RefreshCw} size="sm" color="inherit" />,
     },
     message: {
       key: "message",
       label: t("settings.hooksPhaseMessage"),
-      color: "text-emerald-600 dark:text-emerald-300",
-      bgColor: "bg-emerald-500/10",
-      icon: <MessageSquare className="h-3.5 w-3.5" />,
+      tokenColor: "green",
+      icon: <Icon icon={MessageSquare} size="sm" color="inherit" />,
     },
     tool: {
       key: "tool",
       label: t("settings.hooksPhaseTool"),
-      color: "text-amber-600 dark:text-amber-300",
-      bgColor: "bg-amber-500/10",
-      icon: <Wrench className="h-3.5 w-3.5" />,
+      tokenColor: "yellow",
+      icon: <Icon icon={Wrench} size="sm" color="inherit" />,
     },
   };
 
@@ -155,75 +150,42 @@ export function HooksSection(_props: SettingsSectionProps) {
   }
 
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
-      className="settings-hooks-section min-w-0 space-y-5"
-    >
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="settings-section-heading-row flex items-center justify-between gap-4"
-      >
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="settings-section-title-group flex min-w-0 items-center gap-3"
-        >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-300"
-          >
-            <Zap className="h-[18px] w-[18px]" />
-          </AstryxView>
-          <AstryxView layout="block" direction="horizontal" className="min-w-0">
-            <AstryxHeading level={2} className="text-sm font-semibold">
-              {t("settings.hooksTitle")}
-            </AstryxHeading>
-            <AstryxParagraph className="text-xs leading-relaxed text-muted-foreground">
-              {t("settings.hooksDesc")}
-            </AstryxParagraph>
-          </AstryxView>
-        </AstryxView>
+    <VStack width="100%" gap={4}>
+      <Section variant="transparent" padding={0}>
+        <HStack width="100%" gap={3} vAlign="center" wrap="wrap">
+          <Icon icon={Zap} size="md" color="secondary" />
+          <StackItem size="fill">
+            <VStack gap={0.5}>
+              <Heading level={2}>{t("settings.hooksTitle")}</Heading>
+              <Text type="supporting" color="secondary" wordBreak="break-word">
+                {t("settings.hooksDesc")}
+              </Text>
+            </VStack>
+          </StackItem>
+          <HStack gap={1} vAlign="center" wrap="wrap">
+            <Token
+              label={`${hooks.length} ${t("settings.hooksTotalHooks")}`}
+              color="gray"
+              size="sm"
+            />
+            <Token
+              label={`${enabledCount} ${t("settings.enable")}`}
+              color="green"
+              size="sm"
+              icon={<StatusDot variant="success" label={t("settings.enable")} />}
+            />
+            <Button
+              label={t("settings.hooksAdd")}
+              variant="secondary"
+              size="sm"
+              icon={<Icon icon={Plus} size="sm" color="inherit" />}
+              onClick={openAdd}
+            />
+          </HStack>
+        </HStack>
+      </Section>
 
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="settings-section-actions flex shrink-0 items-center gap-2"
-        >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="settings-hooks-count flex items-center gap-2 whitespace-nowrap rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs text-muted-foreground"
-          >
-            <AstryxInline className="tabular-nums font-semibold text-foreground">
-              {hooks.length}
-            </AstryxInline>
-            {t("settings.hooksTotalHooks")}
-            <AstryxInline className="text-border">|</AstryxInline>
-            <AstryxInline className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            <AstryxInline className="tabular-nums font-semibold text-emerald-600 dark:text-emerald-300">
-              {enabledCount}
-            </AstryxInline>
-          </AstryxView>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={openAdd}>
-            <Plus className="h-3.5 w-3.5" />
-            {t("settings.hooksAdd")}
-          </Button>
-        </AstryxView>
-      </AstryxView>
-
-      {actionError ? (
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive"
-        >
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          <AstryxInline className="min-w-0 flex-1 break-words">{actionError}</AstryxInline>
-        </AstryxView>
-      ) : null}
+      {actionError ? <Banner status="error" title={actionError} collapsible={false} /> : null}
 
       <TabList
         value={activeEvent}
@@ -250,146 +212,117 @@ export function HooksSection(_props: SettingsSectionProps) {
         })}
       </TabList>
 
-      <AstryxView
-        as="section"
-        id="settings-hooks-event-panel"
-        role="tabpanel"
-        className="settings-hooks-detail min-w-0 overflow-hidden rounded-2xl border border-border/60 bg-card"
-      >
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="settings-hooks-detail-header flex min-w-0 items-center gap-3 border-b border-border/45 px-4 py-3.5"
-        >
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${activePhase.bgColor} ${activePhase.color}`}
-          >
-            {activePhase.icon}
-          </AstryxView>
-          <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-            <AstryxHeading level={3} className="truncate text-sm font-semibold">
-              {getHookEventLabel(t, activeEvent)}
-            </AstryxHeading>
-            <AstryxParagraph className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              {t(HOOK_EVENT_DESCRIPTION_TRANSLATION_KEYS[activeEvent])}
-            </AstryxParagraph>
-          </AstryxView>
-        </AstryxView>
+      <Section variant="transparent" padding={0} id="settings-hooks-event-panel" role="tabpanel">
+        <Section variant="muted" padding={3} dividers={["bottom"]}>
+          <HStack width="100%" gap={3} vAlign="center">
+            <Token
+              label={activePhase.label}
+              color={activePhase.tokenColor}
+              icon={activePhase.icon}
+            />
+            <StackItem size="fill">
+              <VStack gap={0.5}>
+                <Heading level={3}>{getHookEventLabel(t, activeEvent)}</Heading>
+                <Text type="supporting" color="secondary" wordBreak="break-word">
+                  {t(HOOK_EVENT_DESCRIPTION_TRANSLATION_KEYS[activeEvent])}
+                </Text>
+              </VStack>
+            </StackItem>
+          </HStack>
+        </Section>
 
         {activeHooks.length === 0 ? (
-          <AstryxView layout="block" direction="horizontal" className="px-6 py-12 text-center">
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-muted/35"
-            >
-              <Zap className="h-5 w-5 text-muted-foreground/45" />
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal" className="mt-3 text-sm font-medium">
-              {t("settings.hooksEmptyTitle")}
-            </AstryxView>
-            <AstryxParagraph className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-              {t("settings.hooksEmptyDesc")}
-            </AstryxParagraph>
-            <Button className="mt-4 gap-1.5" size="sm" onClick={openAdd}>
-              <Plus className="h-3.5 w-3.5" />
-              {t("settings.hooksAdd")}
-            </Button>
-          </AstryxView>
+          <EmptyState
+            isCompact
+            icon={<Icon icon={Zap} size="lg" color="secondary" />}
+            title={t("settings.hooksEmptyTitle")}
+            description={t("settings.hooksEmptyDesc")}
+            actions={
+              <Button
+                label={t("settings.hooksAdd")}
+                variant="secondary"
+                size="sm"
+                icon={<Icon icon={Plus} size="sm" color="inherit" />}
+                onClick={openAdd}
+              />
+            }
+          />
         ) : (
-          <AstryxView layout="block" direction="horizontal" className="divide-y divide-border/45">
+          <List density="balanced" hasDividers>
             {activeHooks.map((hook) => {
               const stepCount =
                 hook.type === "command"
                   ? (hook.script ?? "").split(/\r?\n/).filter((line) => line.trim()).length
                   : (hook.requests?.length ?? 0);
+              const stepLabel =
+                hook.type === "command"
+                  ? t("settings.hooksScriptLinesCount")
+                  : t("settings.hooksRequestsCount");
               return (
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
+                <ListItem
                   key={hook.id}
-                  className={`settings-hooks-card settings-card-row flex min-w-0 items-start gap-3 px-4 py-3.5 transition-[background-color,opacity] duration-150 hover:bg-muted/20 ${
-                    hook.enabled ? "" : "opacity-55"
-                  }`}
-                >
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className={`settings-hooks-card-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${getHookTypeTone(hook.type)}`}
-                  >
-                    {hook.type === "command" ? (
-                      <Terminal className="h-4 w-4" />
-                    ) : (
-                      <Globe className="h-4 w-4" />
-                    )}
-                  </AstryxView>
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="settings-hooks-card-main min-w-0 flex-1"
-                  >
-                    <AstryxView
-                      layout="flex"
-                      direction="horizontal"
-                      className="flex min-w-0 flex-wrap items-center gap-2"
-                    >
-                      <AstryxInline className="max-w-full truncate text-sm font-semibold">
-                        {hook.name}
-                      </AstryxInline>
-                      <AstryxInline className="shrink-0 rounded-md bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
-                        {stepCount}{" "}
-                        {hook.type === "command"
-                          ? t("settings.hooksScriptLinesCount")
-                          : t("settings.hooksRequestsCount")}
-                      </AstryxInline>
-                    </AstryxView>
-                    <AstryxParagraph className="mt-1 break-words text-xs leading-relaxed text-muted-foreground">
-                      {hook.description || t("settings.hooksNoDescription")}
-                    </AstryxParagraph>
-                  </AstryxView>
-                  <AstryxView
-                    layout="flex"
-                    direction="horizontal"
-                    className="settings-card-actions settings-hooks-card-actions flex shrink-0 items-center gap-1"
-                  >
-                    <AgentActivationSwitch
-                      checked={hook.enabled}
-                      title={hook.enabled ? t("settings.disable") : t("settings.enable")}
-                      onToggle={() => toggleHook(hook)}
+                  label={hook.name}
+                  startContent={
+                    <Icon
+                      icon={hook.type === "command" ? Terminal : Globe}
+                      size="md"
+                      color={hook.enabled ? "primary" : "disabled"}
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                      title={t("settings.edit")}
-                      onClick={() => openEdit(hook)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <ConfirmDeletePopover name={hook.name} onConfirm={() => deleteHook(hook.id)}>
-                      {(open) => (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          title={t("settings.delete")}
-                          onClick={open}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </ConfirmDeletePopover>
-                  </AstryxView>
-                </AstryxView>
+                  }
+                  description={
+                    <VStack gap={1}>
+                      <Text type="supporting" color="secondary" wordBreak="break-word">
+                        {hook.description || t("settings.hooksNoDescription")}
+                      </Text>
+                      <HStack gap={1} wrap="wrap">
+                        <Token
+                          label={
+                            hook.type === "command"
+                              ? t("settings.hooksTypeCommand")
+                              : t("settings.hooksTypeHttp")
+                          }
+                          color={getHookTypeColor(hook.type)}
+                          size="sm"
+                        />
+                        <Token label={`${stepCount} ${stepLabel}`} color="gray" size="sm" />
+                      </HStack>
+                    </VStack>
+                  }
+                  endContent={
+                    <HStack gap={1} vAlign="center">
+                      <AgentActivationSwitch
+                        checked={hook.enabled}
+                        title={hook.enabled ? t("settings.disable") : t("settings.enable")}
+                        onToggle={() => toggleHook(hook)}
+                      />
+                      <IconButton
+                        label={t("settings.edit")}
+                        tooltip={t("settings.edit")}
+                        icon={<Icon icon={Pencil} size="sm" color="inherit" />}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEdit(hook)}
+                      />
+                      <ConfirmDeletePopover name={hook.name} onConfirm={() => deleteHook(hook.id)}>
+                        {(open) => (
+                          <IconButton
+                            label={t("settings.delete")}
+                            tooltip={t("settings.delete")}
+                            icon={<Icon icon={Trash2} size="sm" color="inherit" />}
+                            variant="ghost"
+                            size="sm"
+                            onClick={open}
+                          />
+                        )}
+                      </ConfirmDeletePopover>
+                    </HStack>
+                  }
+                />
               );
             })}
-          </AstryxView>
+          </List>
         )}
-      </AstryxView>
+      </Section>
 
       {modalOpen ? (
         <HookModal
@@ -399,6 +332,6 @@ export function HooksSection(_props: SettingsSectionProps) {
           onClose={closeModal}
         />
       ) : null}
-    </AstryxView>
+    </VStack>
   );
 }

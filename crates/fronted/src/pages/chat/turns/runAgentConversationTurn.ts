@@ -89,7 +89,6 @@ import { resolveShellSandboxSettings } from "../../../lib/tools/sandboxPolicy";
 import type { SkillAccessPolicy } from "../../../lib/tools/skillAccessPolicy";
 import type { SshManagerSessionChange } from "../../../lib/tools/sshManagerTools";
 import { formatTaskListRuntimeContext, type TaskStateStore } from "../../../lib/tools/taskTools";
-import { getOrCreateTodoToolState } from "../../../lib/tools/todoTools";
 import { isSessionApproved, requestToolApproval } from "../../../lib/tools/toolApproval";
 import { resolveToolPolicy } from "../../../lib/tools/toolPolicy";
 import {
@@ -593,7 +592,6 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       : context;
   };
   const fileState = createFileToolState();
-  const todoState = getOrCreateTodoToolState(conversationId);
   const subagentScheduler = createSubagentScheduler();
   const runtimePlatform = await resolveRuntimePlatform();
   const lanPcCommandHost = getLanPcCommandHostConfig();
@@ -615,9 +613,12 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       conversationId,
       turnId: checkpointTurnId?.trim() || crypto.randomUUID(),
     },
-    todoState,
     taskStateStore,
-    askUserQuestionConversationId: planModeEnabled ? conversationId : undefined,
+    // Keep the ordinary Agent tool surface identical to the reference runtime:
+    // AskUserQuestion is available for material user-owned decisions regardless
+    // of whether the hidden plan workflow is active. The model decides when it
+    // is warranted; registering the tool does not force a question.
+    askUserQuestionConversationId: conversationId,
     planMode: planModeEnabled ? { conversationId } : undefined,
     toolSearch: { conversationId },
     skillsEnabled: effectiveSkillsEnabled,

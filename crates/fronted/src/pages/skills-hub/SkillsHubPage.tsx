@@ -2,20 +2,26 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
-import { ClickableCard } from "@astryxdesign/core/ClickableCard";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
-import { HStack } from "@astryxdesign/core/Layout";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Link } from "@astryxdesign/core/Link";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
+import { Spinner } from "@astryxdesign/core/Spinner";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
+import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
+import { Token } from "@astryxdesign/core/Token";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { GlassPanel, HubBackdrop, HubHeader } from "../../components/hub/HubChrome";
+import { HubHeader } from "../../components/hub/HubChrome";
 import {
   Activity,
   AlertTriangle,
@@ -36,7 +42,6 @@ import {
   Loader2,
   Lock,
   MessageCircle,
-  MessageSquare,
   Package,
   Palette,
   Plug,
@@ -397,13 +402,170 @@ function stripInstalledSkillPreviewMetadata(content: string, skill: SkillSummary
   return content;
 }
 
-function FrostSpinner() {
+function InstalledSkillsList(props: {
+  entries: Array<{ skill: SkillSummary; categories: ClawHubCategorySlug[] }>;
+  rootDir: string;
+  selected: ReadonlySet<string>;
+  bulkSelection: ReadonlySet<string>;
+  bulkMode: boolean;
+  deletingSkillName: string | null;
+  onOpen: (skill: SkillSummary) => void;
+  onToggleSkill: (name: string, enabled: boolean) => void;
+  onEnterBulk: (name: string) => void;
+  onToggleBulk: (name: string) => void;
+  onDelete: (skill: SkillSummary) => void;
+  onSelectCategory: (category: StoreCategoryValue) => void;
+}) {
+  const { t } = useLocale();
+  const deleteDisabled = props.deletingSkillName !== null;
+
   return (
-    <AstryxInline className="hub-frost-spinner shrink-0" aria-hidden="true">
-      {Array.from({ length: 12 }).map((_, i) => (
-        <i key={i} />
-      ))}
-    </AstryxInline>
+    <VStack width="100%" gap={0}>
+      <List
+        density="balanced"
+        hasDividers
+        header={
+          <Text type="supporting" color="secondary">
+            {t("settings.skillsHubInstalledTab")}
+          </Text>
+        }
+      >
+        {props.entries.map(({ skill, categories }) => {
+          const alwaysEnabled = isAlwaysEnabledSkillName(skill.name);
+          const checked = alwaysEnabled || props.selected.has(skill.name);
+          const bulkSelected = props.bulkSelection.has(skill.name);
+          const deleting = props.deletingSkillName === skill.name;
+          const PrimaryCategoryIcon = STORE_CATEGORY_ICONS[categories[0] ?? "other"];
+          const flipKey = `${skill.name}-${props.rootDir}`;
+
+          return (
+            <ListItem
+              key={flipKey}
+              data-flip-key={flipKey}
+              isSelected={bulkSelected}
+              label={skill.name}
+              startContent={
+                <Icon
+                  icon={PrimaryCategoryIcon}
+                  size="md"
+                  color={checked ? "primary" : "secondary"}
+                />
+              }
+              description={
+                <VStack gap={1}>
+                  {skill.description ? (
+                    <Text type="supporting" color="secondary" maxLines={2}>
+                      {skill.description}
+                    </Text>
+                  ) : null}
+                  <HStack gap={1} wrap="wrap">
+                    {alwaysEnabled ? (
+                      <Token
+                        label={t("settings.skillsAlwaysOn")}
+                        color="purple"
+                        size="sm"
+                        icon={<Icon icon={Lock} size="sm" color="inherit" />}
+                      />
+                    ) : (
+                      categories
+                        .slice(0, 3)
+                        .map((category) => (
+                          <Token
+                            key={category}
+                            label={t(storeCategoryLabelKey(category))}
+                            color="gray"
+                            size="sm"
+                            onClick={() => props.onSelectCategory(category)}
+                          />
+                        ))
+                    )}
+                    <Token
+                      label={checked ? t("settings.skillsHubEnabledBadge") : skill.skillFile}
+                      color={checked ? "green" : "gray"}
+                      size="sm"
+                      icon={<Icon icon={FileText} size="sm" color="inherit" />}
+                    />
+                  </HStack>
+                </VStack>
+              }
+              endContent={
+                <HStack gap={1} vAlign="center" wrap="wrap">
+                  {props.bulkMode ? (
+                    alwaysEnabled ? (
+                      <IconButton
+                        label={t("settings.skillsBulkAlwaysOnDisabled")}
+                        tooltip={t("settings.skillsBulkAlwaysOnDisabled")}
+                        icon={<Icon icon={Lock} size="sm" color="inherit" />}
+                        variant="ghost"
+                        size="sm"
+                        isDisabled
+                      />
+                    ) : (
+                      <CheckboxInput
+                        label={`${t("settings.skillsHubBulkSelectLabel")}: ${skill.name}`}
+                        isLabelHidden
+                        value={bulkSelected}
+                        onChange={() => props.onToggleBulk(skill.name)}
+                        size="sm"
+                      />
+                    )
+                  ) : (
+                    <>
+                      {!alwaysEnabled ? (
+                        <IconButton
+                          label={t("settings.skillsHubBulkSelect")}
+                          tooltip={t("settings.skillsHubBulkSelect")}
+                          icon={<Icon icon={ListChecks} size="sm" color="inherit" />}
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => props.onEnterBulk(skill.name)}
+                        />
+                      ) : null}
+                      <Switch
+                        label={`${t("skills.select")}: ${skill.name}`}
+                        isLabelHidden
+                        value={checked}
+                        size="sm"
+                        isDisabled={alwaysEnabled}
+                        disabledMessage={alwaysEnabled ? t("settings.skillsAlwaysOn") : undefined}
+                        onChange={(next) => props.onToggleSkill(skill.name, next)}
+                      />
+                      <IconButton
+                        label={`${t("settings.skillsInstalledPreviewOpen")}: ${skill.name}`}
+                        tooltip={t("settings.skillsInstalledPreviewOpen")}
+                        icon={<Icon icon={FileText} size="sm" color="inherit" />}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => props.onOpen(skill)}
+                      />
+                      {!alwaysEnabled ? (
+                        <ConfirmDeletePopover
+                          name={skill.name}
+                          onConfirm={() => props.onDelete(skill)}
+                        >
+                          {(open) => (
+                            <IconButton
+                              label={t("settings.skillsHubDeleteSkill")}
+                              tooltip={t("settings.skillsHubDeleteSkill")}
+                              icon={<Icon icon={Trash2} size="sm" color="inherit" />}
+                              variant="ghost"
+                              size="sm"
+                              isDisabled={deleteDisabled}
+                              isLoading={deleting}
+                              onClick={open}
+                            />
+                          )}
+                        </ConfirmDeletePopover>
+                      ) : null}
+                    </>
+                  )}
+                </HStack>
+              }
+            />
+          );
+        })}
+      </List>
+    </VStack>
   );
 }
 
@@ -1563,26 +1725,6 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     [clearBulkUndoTimer],
   );
 
-  // 批量选择模式下点击卡片：只改 bulkSelection，不改启用状态、不打开预览。
-  function handleBulkInstalledCardClick(name: string, orderedNames: string[], shiftKey: boolean) {
-    if (isAlwaysEnabledSkillName(name)) return;
-    const currentlySelected = bulkSelection.has(name);
-    const target = !currentlySelected;
-
-    if (shiftKey && bulkAnchorRef.current && bulkAnchorRef.current !== name) {
-      const from = orderedNames.indexOf(bulkAnchorRef.current);
-      const to = orderedNames.indexOf(name);
-      if (from !== -1 && to !== -1) {
-        const [lo, hi] = from < to ? [from, to] : [to, from];
-        setBulkSelectionRange(orderedNames.slice(lo, hi + 1), target);
-        bulkAnchorRef.current = name;
-        return;
-      }
-    }
-
-    toggleBulkSelectionName(name);
-  }
-
   // 批量启用/禁用：作用于 bulkSelection，成功后清空选择并弹出 Undo。
   // 副作用（Undo 快照/定时器/清空选择）都放在 setSettings 之外：
   // 传给 setSettings 的 updater 必须是纯函数（StrictMode 会双调用）。
@@ -1767,15 +1909,6 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     view,
   ]);
 
-  const bulkSelectedVisibleCount = useMemo(
-    () =>
-      filteredSelectableInstalledNames.reduce(
-        (count, name) => count + (bulkSelection.has(name) ? 1 : 0),
-        0,
-      ),
-    [bulkSelection, filteredSelectableInstalledNames],
-  );
-  const bulkSelectedHiddenCount = Math.max(0, bulkSelection.size - bulkSelectedVisibleCount);
   const bulkEnableChangeCount = useMemo(() => {
     let count = 0;
     for (const name of bulkSelection) {
@@ -1822,54 +1955,48 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     : skillsEnabled
       ? null
       : null;
-
   return (
-    <AstryxView
-      layout="flex"
-      direction="vertical"
+    <VStack
       data-hub-embedded={embedded ? "true" : undefined}
-      className={cn(
-        "hub-page hub-page-enter relative flex h-full min-h-0 flex-1 flex-col overflow-hidden",
-        embedded && "hub-page-embedded",
-      )}
+      width="100%"
+      height="100%"
+      gap={0}
+      style={{ position: "relative", minHeight: 0, overflow: "hidden" }}
     >
-      <HubBackdrop tone="amber" />
+      {!embedded ? (
+        <HubHeader
+          icon={<Icon icon={Blend} size="md" color="accent" />}
+          title={t("settings.skillsHubTitle")}
+          subtitle={rootDir || t("settings.skillsHubSubtitle")}
+          tone="amber"
+          sidebarOpen={sidebarOpen}
+          onOpenSidebar={onOpenSidebar}
+          onClose={onClose}
+        />
+      ) : null}
 
-      <AstryxView
-        layout="flex"
-        direction="vertical"
-        className="relative z-10 flex h-full min-h-0 flex-col overflow-hidden"
-      >
-        {!embedded ? (
-          <HubHeader
-            icon={<Blend className="h-6 w-6" />}
-            title={t("settings.skillsHubTitle")}
-            subtitle={rootDir ? rootDir : t("settings.skillsHubSubtitle")}
-            tone="amber"
-            sidebarOpen={sidebarOpen}
-            onOpenSidebar={onOpenSidebar}
-            onClose={onClose}
-          />
-        ) : null}
-
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="hub-scroll min-h-0 flex-1 overflow-hidden px-5 pb-6 pt-2 sm:px-6 lg:px-8 xl:px-10"
+      <StackItem size="fill">
+        <Section
+          padding={embedded ? 2 : 4}
+          variant="transparent"
+          width="100%"
+          height="100%"
+          style={{ minHeight: 0, overflow: "hidden" }}
         >
-          <AstryxView
-            layout="flex"
-            direction="vertical"
-            className="hub-content-stage mx-auto flex h-full min-h-0 w-full max-w-[1320px] flex-col gap-4"
-          >
+          <VStack height="100%" gap={3}>
             <Banner
-              status={lockedByChatMode ? "warning" : skillsEnabled ? "success" : "info"}
+              status={skillsEnabled ? "success" : "info"}
               title={
                 skillsEnabled ? t("settings.skillsHubEnabled") : t("settings.skillsHubDisabled")
               }
               description={
                 skillsStatusHint ??
-                `${selectedCount} / ${selectableSkills.length} ${t("settings.skillsHubSelectedShort")}`
+                [
+                  selectedCount,
+                  "/",
+                  selectableSkills.length,
+                  t("settings.skillsHubSelectedShort"),
+                ].join(" ")
               }
               collapsible={false}
               endContent={
@@ -1882,7 +2009,6 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                     }
                     isLabelHidden
                     value={skillsEnabled}
-                    isDisabled={lockedByChatMode}
                     onChange={setSkillsEnabled}
                     size="sm"
                   />
@@ -1890,23 +2016,16 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                     label={loading ? t("settings.skillsScanning") : t("settings.skillsScan")}
                     icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
                     variant="secondary"
-                    size="md"
+                    size="sm"
                     isLoading={loading}
-                    isDisabled={loading || lockedByChatMode}
+                    isDisabled={loading}
                     onClick={() => void refresh()}
                   />
                 </HStack>
               }
             />
 
-            <HStack
-              width="100%"
-              gap={3}
-              vAlign="center"
-              hAlign="between"
-              wrap="wrap"
-              className="hub-tab-row hub-panel-enter skills-hub-toolbar"
-            >
+            <HStack width="100%" gap={2} vAlign="center" hAlign="between" wrap="wrap">
               <TabList
                 value={view}
                 onChange={(value) => setView(value as SkillsHubView)}
@@ -1939,92 +2058,80 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                 />
               </TabList>
 
-              {!lockedByChatMode ? (
-                <HStack
-                  gap={2}
-                  vAlign="center"
-                  hAlign="end"
-                  wrap="wrap"
-                  className="skills-hub-actions"
-                >
-                  {view !== "store" ? (
-                    <ToggleButton
-                      label={t("settings.skillsBulkSelect")}
-                      isPressed={bulkMode}
-                      size="md"
-                      icon={<Icon icon={ListChecks} size="sm" color="inherit" />}
-                      onPressedChange={(_nextPressed, event) => {
-                        event.preventDefault();
-                        if (bulkMode) exitBulkMode();
-                        else enterBulkMode();
-                      }}
-                      tooltip={
-                        view === "installed"
-                          ? t("settings.skillsBulkHint")
-                          : t("settings.skillsBulkImportHint")
-                      }
-                      className="skills-hub-bulk"
-                    >
-                      {bulkMode ? t("settings.skillsBulkDone") : t("settings.skillsBulkSelect")}
-                    </ToggleButton>
-                  ) : null}
-                  {view === "installed" ? (
-                    <Selector
-                      label={t("settings.skillsInstalledSortLabel")}
-                      isLabelHidden
-                      value={installedSort}
-                      onChange={(value) => {
-                        if (!isInstalledSkillSort(value) || value === installedSort) return;
-                        const followKey = captureInstalledFlipKey();
-                        requestInstalledFlip("wave", [], followKey ? [followKey] : []);
-                        setInstalledSort(value);
-                      }}
-                      options={INSTALLED_SORT_OPTIONS.map((option) => ({
-                        value: option.value,
-                        label: t(option.labelKey),
-                      }))}
-                      width="var(--xagent-hub-sort-control-width)"
-                      className="skills-hub-sort"
-                    />
-                  ) : null}
-                  <TextInput
-                    label={
-                      view === "installed"
-                        ? t("settings.skillsSearch")
-                        : view === "store"
-                          ? t("settings.skillsStoreSearch")
-                          : t("settings.skillsImportSearchPlaceholder")
-                    }
-                    isLabelHidden
-                    value={
-                      view === "installed" ? filter : view === "store" ? storeQuery : importQuery
-                    }
-                    onChange={(value) => {
-                      if (view === "installed") setFilter(value);
-                      else if (view === "store") setStoreQuery(value);
-                      else setImportQuery(value);
+              <HStack gap={2} vAlign="center" hAlign="end" wrap="wrap">
+                {view !== "store" ? (
+                  <ToggleButton
+                    label={t("settings.skillsBulkSelect")}
+                    isPressed={bulkMode}
+                    size="sm"
+                    icon={<Icon icon={ListChecks} size="sm" color="inherit" />}
+                    onPressedChange={() => {
+                      if (bulkMode) exitBulkMode();
+                      else enterBulkMode();
                     }}
-                    placeholder={
+                    tooltip={
                       view === "installed"
-                        ? t("settings.skillsSearch")
-                        : view === "store"
-                          ? t("settings.skillsStoreSearch")
-                          : t("settings.skillsImportSearchPlaceholder")
+                        ? t("settings.skillsBulkHint")
+                        : t("settings.skillsBulkImportHint")
                     }
-                    startIcon={Search}
-                    hasClear
-                    width="var(--xagent-hub-search-control-width)"
-                    className="skills-hub-search"
+                  >
+                    {bulkMode ? t("settings.skillsBulkDone") : t("settings.skillsBulkSelect")}
+                  </ToggleButton>
+                ) : null}
+                {view === "installed" ? (
+                  <Selector
+                    label={t("settings.skillsInstalledSortLabel")}
+                    isLabelHidden
+                    value={installedSort}
+                    onChange={(value) => {
+                      if (!isInstalledSkillSort(value) || value === installedSort) return;
+                      const followKey = captureInstalledFlipKey();
+                      requestInstalledFlip("wave", [], followKey ? [followKey] : []);
+                      setInstalledSort(value);
+                    }}
+                    options={INSTALLED_SORT_OPTIONS.map((option) => ({
+                      value: option.value,
+                      label: t(option.labelKey),
+                    }))}
+                    width="var(--xagent-hub-sort-control-width)"
                   />
-                </HStack>
-              ) : null}
+                ) : null}
+                <TextInput
+                  label={
+                    view === "installed"
+                      ? t("settings.skillsSearch")
+                      : view === "store"
+                        ? t("settings.skillsStoreSearch")
+                        : t("settings.skillsImportSearchPlaceholder")
+                  }
+                  isLabelHidden
+                  value={
+                    view === "installed" ? filter : view === "store" ? storeQuery : importQuery
+                  }
+                  onChange={(value) => {
+                    if (view === "installed") setFilter(value);
+                    else if (view === "store") setStoreQuery(value);
+                    else setImportQuery(value);
+                  }}
+                  placeholder={
+                    view === "installed"
+                      ? t("settings.skillsSearch")
+                      : view === "store"
+                        ? t("settings.skillsStoreSearch")
+                        : t("settings.skillsImportSearchPlaceholder")
+                  }
+                  startIcon={Search}
+                  hasClear
+                  width="var(--xagent-hub-search-control-width)"
+                />
+              </HStack>
             </HStack>
 
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              id={`skills-panel-${view}`}
+            <StackItem
+              id={"skills-panel-" + view}
               role="tabpanel"
+              size="fill"
+              isScrollable={view === "installed"}
               aria-label={
                 view === "installed"
                   ? t("settings.skillsHubInstalledTab")
@@ -2032,565 +2139,272 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                     ? t("settings.skillsHubStoreTab")
                     : t("settings.skillsHubImportTab")
               }
-              className="hub-view-stage min-h-0 flex-1 overflow-hidden"
             >
-              {lockedByChatMode ? (
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="h-full min-h-0 overflow-y-auto pb-4 pr-1"
-                >
-                  <GlassPanel tone="muted" className="hub-panel-enter">
-                    <AstryxView
-                      layout="flex"
-                      direction="horizontal"
-                      className="flex items-start gap-3"
-                    >
-                      <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                      <AstryxInline className="text-xs text-muted-foreground">
-                        {t("settings.skillsDisabledInChatMode")}
-                      </AstryxInline>
-                    </AstryxView>
-                  </GlassPanel>
-                </AstryxView>
+              {view === "installed" ? (
+                <VStack gap={3}>
+                  {skills.length > 0 ? (
+                    <StoreCategoryChips
+                      value={installedCategory}
+                      counts={installedCategoryCounts}
+                      onChange={setInstalledCategory}
+                    />
+                  ) : null}
+
+                  {bulkMode ? (
+                    <Banner
+                      status="info"
+                      title={t("settings.skillsBulkSelect")}
+                      description={t("settings.skillsBulkHint")}
+                      collapsible={false}
+                    />
+                  ) : null}
+
+                  {loadError ? (
+                    <Banner
+                      status="error"
+                      title={t("settings.skillsHubDetailLoadFailed")}
+                      description={loadError}
+                      collapsible={false}
+                    />
+                  ) : null}
+
+                  {!skillsEnabled ? (
+                    <Banner
+                      status="info"
+                      title={t("settings.skillsHubDisabled")}
+                      description={t("settings.skillsDisabledHint")}
+                      collapsible={false}
+                    />
+                  ) : null}
+
+                  {loading && skills.length === 0 ? (
+                    <Section padding={3} variant="transparent">
+                      <VStack gap={2}>
+                        <Spinner size="sm" label={t("settings.skillsScanning")} />
+                        <Skeleton
+                          width="100%"
+                          height="var(--spacing-10)"
+                          radius="rounded"
+                          index={0}
+                        />
+                        <Skeleton
+                          width="100%"
+                          height="var(--spacing-10)"
+                          radius="rounded"
+                          index={1}
+                        />
+                        <Skeleton
+                          width="100%"
+                          height="var(--spacing-10)"
+                          radius="rounded"
+                          index={2}
+                        />
+                      </VStack>
+                    </Section>
+                  ) : null}
+
+                  {!loading && skills.length === 0 && !loadError ? (
+                    <VStack gap={2} hAlign="center">
+                      <EmptyState
+                        title={t("settings.skillsNotFound")}
+                        description={t("settings.skillsNotFoundHint")}
+                        icon={<Icon icon={BookOpen} size="lg" color="secondary" />}
+                        isCompact
+                      />
+                      <AstryxCoreButton
+                        label={t("settings.skillsRescan")}
+                        icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void refresh()}
+                      />
+                    </VStack>
+                  ) : null}
+
+                  {sortedFiltered.length > 0 ? (
+                    <Section ref={installedGridRef} padding={0} variant="transparent">
+                      <InstalledSkillsList
+                        entries={sortedFiltered}
+                        rootDir={rootDir}
+                        selected={selected}
+                        bulkSelection={bulkSelection}
+                        bulkMode={bulkMode}
+                        deletingSkillName={deletingSkillName}
+                        onOpen={openInstalledSkillPreview}
+                        onToggleSkill={toggleSkill}
+                        onEnterBulk={enterBulkMode}
+                        onToggleBulk={toggleBulkSelectionName}
+                        onDelete={(skill) => void deleteSkill(skill)}
+                        onSelectCategory={setInstalledCategory}
+                      />
+                    </Section>
+                  ) : null}
+
+                  {(filter.trim() || installedCategory !== "all") &&
+                  sortedFiltered.length === 0 &&
+                  skills.length > 0 ? (
+                    <EmptyState
+                      title={
+                        filter.trim()
+                          ? t("settings.skillsNoMatch").replace("{filter}", filter)
+                          : t("settings.skillsStoreEmptyTitle")
+                      }
+                      icon={<Icon icon={Search} size="lg" color="secondary" />}
+                      isCompact
+                    />
+                  ) : null}
+                </VStack>
+              ) : view === "store" ? (
+                <SkillsStoreView
+                  items={storeItems}
+                  query={storeQuery}
+                  sort={storeSort}
+                  loading={storeLoading}
+                  loadingMore={storeLoadingMore}
+                  error={storeError}
+                  cursor={storeCursor}
+                  installedKeys={installedStoreKeys}
+                  installedSlugs={installedStoreSlugs}
+                  pendingInstallKeys={pendingInstallKeys}
+                  installingByStoreKey={installingByStoreKey}
+                  installJobs={installJobs}
+                  onSortChange={setStoreSort}
+                  onLoadMore={() => void loadMoreStore()}
+                  onInstall={(skill) => void installStoreSkill(skill)}
+                />
               ) : (
-                <>
-                  {view === "installed" ? (
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className={cn(
-                        "h-full min-h-0 overflow-y-auto px-0.5 pr-1 pt-1.5 [overflow-anchor:none]",
-                        bulkMode ? "pb-[calc(10rem+env(safe-area-inset-bottom))] sm:pb-24" : "pb-4",
-                      )}
-                    >
-                      <AstryxView
-                        layout="flex"
-                        direction="vertical"
-                        className="flex flex-col gap-5"
-                      >
-                        {skills.length > 0 ? (
-                          <StoreCategoryChips
-                            value={installedCategory}
-                            counts={installedCategoryCounts}
-                            onChange={setInstalledCategory}
-                          />
-                        ) : null}
-
-                        {bulkMode ? (
-                          <AstryxView
-                            layout="flex"
-                            direction="horizontal"
-                            className="hub-panel-enter flex items-center gap-2 text-[11px] text-muted-foreground/80"
-                          >
-                            <ListChecks className="h-3.5 w-3.5 shrink-0" />
-                            <AstryxInline>{t("settings.skillsBulkHint")}</AstryxInline>
-                          </AstryxView>
-                        ) : null}
-
-                        {loadError ? (
-                          <GlassPanel tone="error" className="hub-panel-enter">
-                            <AstryxView
-                              layout="flex"
-                              direction="horizontal"
-                              className="flex items-center gap-2"
-                            >
-                              <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-                              <AstryxInline className="text-xs text-destructive">
-                                {loadError}
-                              </AstryxInline>
-                            </AstryxView>
-                          </GlassPanel>
-                        ) : null}
-
-                        {!skillsEnabled ? (
-                          <GlassPanel tone="muted" className="hub-panel-enter">
-                            <AstryxView
-                              layout="flex"
-                              direction="horizontal"
-                              className="flex items-center gap-2"
-                            >
-                              <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-                              <AstryxInline className="text-xs text-muted-foreground">
-                                {t("settings.skillsDisabledHint")}
-                              </AstryxInline>
-                            </AstryxView>
-                          </GlassPanel>
-                        ) : null}
-
-                        {!loading && skills.length === 0 && !loadError ? (
-                          <GlassPanel className="hub-panel-enter">
-                            <AstryxView
-                              layout="flex"
-                              direction="vertical"
-                              className="flex flex-col items-center gap-3 py-8 text-center"
-                            >
-                              <AstryxView
-                                layout="flex"
-                                direction="horizontal"
-                                className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60"
-                              >
-                                <BookOpen className="h-5 w-5 text-muted-foreground" />
-                              </AstryxView>
-                              <AstryxView
-                                layout="block"
-                                direction="horizontal"
-                                className="space-y-1"
-                              >
-                                <AstryxParagraph className="text-sm font-medium text-muted-foreground">
-                                  {t("settings.skillsNotFound")}
-                                </AstryxParagraph>
-                                <AstryxParagraph className="text-xs text-muted-foreground/70">
-                                  {t("settings.skillsNotFoundHint")}
-                                </AstryxParagraph>
-                              </AstryxView>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="mt-1 gap-1.5 rounded-full"
-                                onClick={() => void refresh()}
-                              >
-                                <RefreshCw className="h-3.5 w-3.5" />
-                                {t("settings.skillsRescan")}
-                              </Button>
-                            </AstryxView>
-                          </GlassPanel>
-                        ) : null}
-
-                        {loading && skills.length === 0 ? (
-                          <>
-                            <AstryxView
-                              layout="block"
-                              direction="horizontal"
-                              className="hub-frost-hero hub-panel-enter px-4 py-3.5"
-                            >
-                              <AstryxView
-                                layout="flex"
-                                direction="horizontal"
-                                className="flex items-center gap-3.5"
-                              >
-                                <FrostSpinner />
-                                <AstryxView
-                                  layout="block"
-                                  direction="horizontal"
-                                  className="min-w-0 flex-1"
-                                >
-                                  <AstryxView
-                                    layout="block"
-                                    direction="horizontal"
-                                    className="text-[13px] font-medium tracking-tight text-foreground"
-                                  >
-                                    {t("settings.skillsScanning")}
-                                  </AstryxView>
-                                  <AstryxView
-                                    layout="block"
-                                    direction="horizontal"
-                                    className="mt-0.5 truncate text-[11px] text-muted-foreground/80"
-                                  >
-                                    {t("settings.skillsHubScanning")}
-                                  </AstryxView>
-                                </AstryxView>
-                              </AstryxView>
-                              <AstryxView
-                                layout="block"
-                                direction="horizontal"
-                                className="hub-frost-track mt-3.5"
-                              />
-                            </AstryxView>
-
-                            <AstryxView
-                              layout="grid"
-                              direction="horizontal"
-                              className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                            >
-                              {[1, 2, 3, 4, 5, 6].map((item) => (
-                                <AstryxView
-                                  layout="block"
-                                  direction="horizontal"
-                                  key={item}
-                                  className="hub-frost-skeleton skill-card-enter p-3.5"
-                                >
-                                  <AstryxView
-                                    layout="flex"
-                                    direction="horizontal"
-                                    className="flex items-center gap-3"
-                                  >
-                                    <AstryxView
-                                      layout="block"
-                                      direction="horizontal"
-                                      className="skills-skeleton-shimmer h-9 w-9 shrink-0 rounded-lg"
-                                    />
-                                    <AstryxView
-                                      layout="block"
-                                      direction="horizontal"
-                                      className="flex-1 space-y-2"
-                                    >
-                                      <AstryxView
-                                        layout="block"
-                                        direction="horizontal"
-                                        className="skills-skeleton-shimmer h-3.5 w-28 rounded"
-                                      />
-                                      <AstryxView
-                                        layout="block"
-                                        direction="horizontal"
-                                        className="skills-skeleton-shimmer h-3 w-full max-w-[12rem] rounded"
-                                      />
-                                    </AstryxView>
-                                  </AstryxView>
-                                </AstryxView>
-                              ))}
-                            </AstryxView>
-                          </>
-                        ) : null}
-
-                        {sortedFiltered.length > 0 ? (
-                          <AstryxView
-                            layout="grid"
-                            direction="horizontal"
-                            ref={installedGridRef}
-                            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                          >
-                            {sortedFiltered.map(({ skill, categories }) => {
-                              const alwaysEnabled = isAlwaysEnabledSkillName(skill.name);
-                              const checked = alwaysEnabled || selected.has(skill.name);
-                              const bulkSelected = bulkSelection.has(skill.name);
-                              const deleting = deletingSkillName === skill.name;
-                              const deleteDisabled = deletingSkillName !== null;
-                              const PrimaryCategoryIcon =
-                                STORE_CATEGORY_ICONS[categories[0] ?? "other"];
-                              const card = (
-                                <>
-                                  <AstryxView
-                                    layout="flex"
-                                    direction="horizontal"
-                                    className="flex items-start justify-between gap-2"
-                                  >
-                                    <AstryxView
-                                      layout="flex"
-                                      direction="horizontal"
-                                      className={cn(
-                                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all",
-                                        checked
-                                          ? "border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-                                          : "border-border/30 bg-muted/50 text-muted-foreground group-hover:border-border/50 group-hover:bg-background/70 group-hover:text-foreground/85",
-                                      )}
-                                    >
-                                      <PrimaryCategoryIcon className="h-5 w-5" />
-                                    </AstryxView>
-
-                                    {alwaysEnabled && !bulkMode ? (
-                                      <AstryxView
-                                        layout="inline-flex"
-                                        direction="horizontal"
-                                        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[10px] font-medium text-foreground/75 ring-1 ring-border/45"
-                                        title={t("settings.skillsAlwaysOn")}
-                                      >
-                                        <Lock className="h-2.5 w-2.5" />
-                                        <AstryxInline>{t("settings.skillsAlwaysOn")}</AstryxInline>
-                                      </AstryxView>
-                                    ) : bulkMode ? (
-                                      alwaysEnabled ? (
-                                        <AstryxView
-                                          layout="flex"
-                                          direction="horizontal"
-                                          className="flex shrink-0 items-center"
-                                          title={t("settings.skillsBulkAlwaysOnDisabled")}
-                                        >
-                                          <AstryxView
-                                            as="span"
-                                            layout="flex"
-                                            direction="horizontal"
-                                            aria-hidden="true"
-                                            className="pointer-events-none flex h-5 w-5 items-center justify-center rounded-full border border-border/50 bg-muted/40 text-muted-foreground/50 opacity-60"
-                                          >
-                                            <Lock className="h-2.5 w-2.5" />
-                                          </AstryxView>
-                                        </AstryxView>
-                                      ) : (
-                                        <AstryxView
-                                          layout="flex"
-                                          direction="horizontal"
-                                          className="flex shrink-0 items-center"
-                                          onClick={(event) => event.stopPropagation()}
-                                          onKeyDown={(event) => event.stopPropagation()}
-                                        >
-                                          <CheckboxInput
-                                            label={`${t("settings.skillsHubBulkSelectLabel")}: ${skill.name}`}
-                                            isLabelHidden
-                                            value={bulkSelection.has(skill.name)}
-                                            onChange={(_checked, event) => {
-                                              event.stopPropagation();
-                                              toggleBulkSelectionName(skill.name);
-                                            }}
-                                            size="sm"
-                                          />
-                                        </AstryxView>
-                                      )
-                                    ) : (
-                                      <AstryxView
-                                        layout="flex"
-                                        direction="horizontal"
-                                        className="flex shrink-0 items-center gap-1.5"
-                                        onClick={(event) => event.stopPropagation()}
-                                        onKeyDown={(event) => event.stopPropagation()}
-                                      >
-                                        <AstryxButton
-                                          type="button"
-                                          aria-label={`${t("settings.skillsHubBulkSelectLabel")}: ${skill.name}`}
-                                          title={t("settings.skillsHubBulkSelect")}
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            enterBulkMode(skill.name);
-                                          }}
-                                          className={cn(
-                                            // Google Photos-style bulk entry: hover-faint, touch semi-visible.
-                                            "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground shadow-sm transition-all hover:border-primary/50 hover:text-foreground",
-                                            "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-70",
-                                          )}
-                                        >
-                                          <AstryxInline className="h-2 w-2 rounded-full border border-current opacity-40" />
-                                        </AstryxButton>
-                                        <Switch
-                                          label={`${t("skills.select")}: ${skill.name}`}
-                                          isLabelHidden
-                                          value={checked}
-                                          size="sm"
-                                          onChange={(next, event) => {
-                                            event.stopPropagation();
-                                            toggleSkill(skill.name, next);
-                                          }}
-                                        />
-                                      </AstryxView>
-                                    )}
-                                  </AstryxView>
-
-                                  <AstryxView
-                                    layout="block"
-                                    direction="horizontal"
-                                    className="mt-2.5 min-w-0 flex-1"
-                                  >
-                                    <AstryxView
-                                      layout="flex"
-                                      direction="horizontal"
-                                      className="flex min-w-0 items-center gap-1.5"
-                                    >
-                                      <AstryxView
-                                        layout="block"
-                                        direction="horizontal"
-                                        className="truncate text-[13px] font-semibold leading-tight text-foreground"
-                                      >
-                                        {skill.name}
-                                      </AstryxView>
-                                      {checked ? (
-                                        <AstryxView
-                                          as="span"
-                                          layout="inline-flex"
-                                          direction="horizontal"
-                                          className="inline-flex shrink-0 items-center rounded-full bg-emerald-500/12 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-500/25 dark:bg-emerald-400/12 dark:text-emerald-300 dark:ring-emerald-400/25"
-                                        >
-                                          {t("settings.skillsHubEnabledBadge")}
-                                        </AstryxView>
-                                      ) : null}
-                                    </AstryxView>
-                                    {skill.description ? (
-                                      <AstryxParagraph className="mt-1 line-clamp-2 text-[11.5px] leading-[1.4] text-muted-foreground">
-                                        {skill.description}
-                                      </AstryxParagraph>
-                                    ) : null}
-                                    {!alwaysEnabled ? (
-                                      <AstryxView
-                                        layout="block"
-                                        direction="horizontal"
-                                        className="mt-2"
-                                      >
-                                        <SkillCategoryBadges
-                                          categories={categories}
-                                          onSelect={setInstalledCategory}
-                                        />
-                                      </AstryxView>
-                                    ) : null}
-                                  </AstryxView>
-
-                                  <AstryxView
-                                    layout="flex"
-                                    direction="horizontal"
-                                    className="mt-2.5 flex min-h-8 items-center gap-1 border-t border-border/30 pt-2 text-[10.5px] text-muted-foreground/70"
-                                  >
-                                    <FileText className="h-3 w-3 shrink-0" />
-                                    <AstryxInline className="truncate">
-                                      {skill.skillFile}
-                                    </AstryxInline>
-                                    {!alwaysEnabled && !bulkMode ? (
-                                      <AstryxView
-                                        layout="block"
-                                        direction="horizontal"
-                                        className="ml-auto shrink-0"
-                                        onClick={(event) => event.stopPropagation()}
-                                        onKeyDown={(event) => event.stopPropagation()}
-                                      >
-                                        <ConfirmDeletePopover
-                                          name={skill.name}
-                                          onConfirm={() => void deleteSkill(skill)}
-                                        >
-                                          {(open) => (
-                                            <AstryxButton
-                                              type="button"
-                                              disabled={deleteDisabled}
-                                              onClick={(event) => {
-                                                event.stopPropagation();
-                                                open();
-                                              }}
-                                              className={cn(
-                                                "flex h-6 w-6 items-center justify-center rounded-md border border-border/35 bg-background/65 text-muted-foreground transition-all",
-                                                "hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive",
-                                                "disabled:cursor-not-allowed",
-                                                // Hover-revealed on pointer devices; keyboard focus and
-                                                // touch (no hover — webui mobile) keep it reachable.
-                                                deleting
-                                                  ? "pointer-events-auto opacity-100"
-                                                  : cn(
-                                                      "pointer-events-none opacity-0 group-hover:pointer-events-auto focus-visible:pointer-events-auto [@media(hover:none)]:pointer-events-auto",
-                                                      deleteDisabled
-                                                        ? "group-hover:opacity-60 focus-visible:opacity-60 [@media(hover:none)]:opacity-60"
-                                                        : "group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-                                                    ),
-                                              )}
-                                              title={t("settings.skillsHubDeleteSkill")}
-                                            >
-                                              {deleting ? (
-                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                              ) : (
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                              )}
-                                            </AstryxButton>
-                                          )}
-                                        </ConfirmDeletePopover>
-                                      </AstryxView>
-                                    ) : null}
-                                  </AstryxView>
-                                </>
-                              );
-
-                              const key = `${skill.name}-${rootDir}`;
-                              if (alwaysEnabled) {
-                                return (
-                                  <ClickableCard
-                                    key={key}
-                                    data-flip-key={key}
-                                    label={`${t("settings.skillsInstalledPreviewOpen")}: ${skill.name}`}
-                                    onClick={() => openInstalledSkillPreview(skill)}
-                                    isDisabled={bulkMode}
-                                    padding={3}
-                                    width="100%"
-                                    height="100%"
-                                    elevation="low"
-                                    className="hub-skill-card skill-card-enter group"
-                                  >
-                                    {card}
-                                  </ClickableCard>
-                                );
-                              }
-
-                              return (
-                                <ClickableCard
-                                  key={key}
-                                  data-flip-key={key}
-                                  label={`${t("settings.skillsInstalledPreviewOpen")}: ${skill.name}`}
-                                  onClick={(event) => {
-                                    if (bulkMode) {
-                                      handleBulkInstalledCardClick(
-                                        skill.name,
-                                        sortedFiltered.map((entry) => entry.skill.name),
-                                        event.shiftKey,
-                                      );
-                                      return;
-                                    }
-                                    openInstalledSkillPreview(skill);
-                                  }}
-                                  padding={3}
-                                  width="100%"
-                                  height="100%"
-                                  variant={checked ? "green" : "muted"}
-                                  elevation={checked ? "low" : "none"}
-                                  className={cn(
-                                    "hub-skill-card skill-card-enter group relative",
-                                    bulkSelected
-                                      ? "ring-2 ring-primary/50 ring-offset-1 ring-offset-background"
-                                      : null,
-                                  )}
-                                >
-                                  {card}
-                                </ClickableCard>
-                              );
-                            })}
-                          </AstryxView>
-                        ) : null}
-
-                        {(filter.trim() || installedCategory !== "all") &&
-                        sortedFiltered.length === 0 &&
-                        skills.length > 0 ? (
-                          <GlassPanel tone="muted" className="hub-panel-enter">
-                            <AstryxParagraph className="py-2 text-center text-sm text-muted-foreground">
-                              {filter.trim()
-                                ? t("settings.skillsNoMatch").replace("{filter}", filter)
-                                : t("settings.skillsStoreEmptyTitle")}
-                            </AstryxParagraph>
-                          </GlassPanel>
-                        ) : null}
-                      </AstryxView>
-                    </AstryxView>
-                  ) : view === "store" ? (
-                    <SkillsStoreView
-                      items={storeItems}
-                      query={storeQuery}
-                      sort={storeSort}
-                      loading={storeLoading}
-                      loadingMore={storeLoadingMore}
-                      error={storeError}
-                      cursor={storeCursor}
-                      installedKeys={installedStoreKeys}
-                      installedSlugs={installedStoreSlugs}
-                      pendingInstallKeys={pendingInstallKeys}
-                      installingByStoreKey={installingByStoreKey}
-                      installJobs={installJobs}
-                      onSortChange={setStoreSort}
-                      onLoadMore={() => void loadMoreStore()}
-                      onInstall={(skill) => void installStoreSkill(skill)}
-                    />
-                  ) : (
-                    <SkillsImportView
-                      scans={externalScans ?? []}
-                      loading={externalLoading}
-                      error={externalError}
-                      query={importQuery}
-                      selected={selectedExternal}
-                      installedNames={installedSkillNames}
-                      importProgress={importProgress}
-                      importErrors={importErrors}
-                      importedCount={importedCount}
-                      localBundleImporting={localBundleImporting}
-                      importToast={importToast}
-                      onDismissImportToast={() => {
-                        if (importToastTimerRef.current !== null) {
-                          window.clearTimeout(importToastTimerRef.current);
-                          importToastTimerRef.current = null;
-                        }
-                        setImportToast(null);
-                      }}
-                      bulkMode={bulkMode}
-                      onToggle={toggleExternalSkill}
-                      onBatchToggle={batchToggleExternalSkills}
-                      onRescan={() => void rescanExternalSkills()}
-                      onImport={() => void importSelectedExternalSkills()}
-                      onImportLocalBundle={(files) => void importLocalSkillBundle(files)}
-                    />
-                  )}
-                </>
+                <SkillsImportView
+                  scans={externalScans ?? []}
+                  loading={externalLoading}
+                  error={externalError}
+                  query={importQuery}
+                  selected={selectedExternal}
+                  installedNames={installedSkillNames}
+                  importProgress={importProgress}
+                  importErrors={importErrors}
+                  importedCount={importedCount}
+                  localBundleImporting={localBundleImporting}
+                  importToast={importToast}
+                  onDismissImportToast={() => {
+                    if (importToastTimerRef.current !== null) {
+                      window.clearTimeout(importToastTimerRef.current);
+                      importToastTimerRef.current = null;
+                    }
+                    setImportToast(null);
+                  }}
+                  bulkMode={bulkMode}
+                  onToggle={toggleExternalSkill}
+                  onBatchToggle={batchToggleExternalSkills}
+                  onRescan={() => void rescanExternalSkills()}
+                  onImport={() => void importSelectedExternalSkills()}
+                  onImportLocalBundle={(files) => void importLocalSkillBundle(files)}
+                />
               )}
-            </AstryxView>
-          </AstryxView>
-        </AstryxView>
-      </AstryxView>
+            </StackItem>
+
+            {bulkMode && view === "installed" && (!bulkUndo || bulkSelection.size > 0) ? (
+              <Section variant="muted" padding={2}>
+                <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
+                  <Text type="supporting" color="secondary">
+                    {bulkSelection.size > 0
+                      ? t("settings.skillsBulkSelectedCount").replace(
+                          "{count}",
+                          String(bulkSelection.size),
+                        )
+                      : t("settings.skillsBulkClickToSelect")}
+                  </Text>
+                  <HStack gap={1} vAlign="center" wrap="wrap">
+                    <AstryxCoreButton
+                      label={t("settings.skillsBulkSelectAll")}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setBulkSelectionRange(filteredSelectableInstalledNames, true)}
+                    />
+                    <AstryxCoreButton
+                      label={t("settings.skillsBulkClear")}
+                      variant="ghost"
+                      size="sm"
+                      isDisabled={bulkSelection.size === 0}
+                      onClick={() => {
+                        setBulkSelection(new Set());
+                        bulkAnchorRef.current = null;
+                      }}
+                    />
+                    <AstryxCoreButton
+                      label={
+                        t("settings.skillsBulkEnable") +
+                        (bulkEnableChangeCount > 0 ? " (" + bulkEnableChangeCount + ")" : "")
+                      }
+                      variant="secondary"
+                      size="sm"
+                      isDisabled={bulkEnableChangeCount === 0}
+                      onClick={() => applyBulkEnableState(true)}
+                    />
+                    <AstryxCoreButton
+                      label={
+                        t("settings.skillsBulkDisable") +
+                        (bulkDisableChangeCount > 0 ? " (" + bulkDisableChangeCount + ")" : "")
+                      }
+                      variant="secondary"
+                      size="sm"
+                      isDisabled={bulkDisableChangeCount === 0}
+                      onClick={() => applyBulkEnableState(false)}
+                    />
+                    <ConfirmActionPopover
+                      title={t("settings.deleteConfirm")}
+                      description={
+                        t("settings.skillsHubBulkDeleteConfirm").replace(
+                          "{count}",
+                          String(bulkDeleteNames.length),
+                        ) + (bulkDeletePreview ? " " + bulkDeletePreview : "")
+                      }
+                      confirmLabel={t("settings.delete")}
+                      onConfirm={() => void deleteBulkSelectedInstalledSkills()}
+                    >
+                      {(open) => (
+                        <AstryxCoreButton
+                          label={
+                            t("settings.skillsHubBulkDelete") +
+                            (bulkDeleteNames.length > 0 ? " (" + bulkDeleteNames.length + ")" : "")
+                          }
+                          icon={<Icon icon={Trash2} size="sm" color="inherit" />}
+                          variant="destructive"
+                          size="sm"
+                          isDisabled={bulkDeleteNames.length === 0 || deletingSkillName !== null}
+                          onClick={open}
+                        />
+                      )}
+                    </ConfirmActionPopover>
+                    <AstryxCoreButton
+                      label={t("settings.skillsBulkDone")}
+                      icon={<Icon icon={X} size="sm" color="inherit" />}
+                      size="sm"
+                      onClick={exitBulkMode}
+                    />
+                  </HStack>
+                </HStack>
+              </Section>
+            ) : null}
+
+            {bulkUndo && bulkSelection.size === 0 ? (
+              <Banner
+                status="success"
+                title={t("settings.skillsBulkUpdated").replace("{count}", String(bulkUndo.count))}
+                collapsible={false}
+                endContent={
+                  <AstryxCoreButton
+                    label={t("settings.skillsBulkUndo")}
+                    variant="secondary"
+                    size="sm"
+                    onClick={undoBulkSelection}
+                  />
+                }
+              />
+            ) : null}
+          </VStack>
+        </Section>
+      </StackItem>
+
       {previewInstalledSkill ? (
         <InstalledSkillPreviewDrawer
           skill={previewInstalledSkill}
@@ -2603,147 +2417,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
           onClose={() => setPreviewInstalledSkill(null)}
         />
       ) : null}
-
-      {bulkMode &&
-      view === "installed" &&
-      !lockedByChatMode &&
-      (!bulkUndo || bulkSelection.size > 0) ? (
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-3 max-sm:bottom-[calc(1rem+env(safe-area-inset-bottom))]"
-        >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="hub-panel-enter pointer-events-auto flex max-w-full flex-wrap items-center gap-2 rounded-full border border-border/50 bg-background/95 py-2 pl-4 pr-2 text-[12.5px] shadow-[0_8px_24px_-12px_rgba(15,23,42,0.35)] max-sm:justify-center max-sm:rounded-3xl max-sm:whitespace-nowrap dark:border-white/[0.1] dark:bg-popover/95"
-          >
-            {bulkSelection.size > 0 ? (
-              <>
-                <AstryxInline className="whitespace-nowrap text-foreground/85">
-                  {t("settings.skillsBulkSelectedCount").replace(
-                    "{count}",
-                    String(bulkSelection.size),
-                  )}
-                  {bulkSelectedHiddenCount > 0
-                    ? ` ${t("settings.skillsBulkNotInFilter").replace("{count}", String(bulkSelectedHiddenCount))}`
-                    : ""}
-                </AstryxInline>
-                <AstryxInline
-                  className="hidden text-muted-foreground/50 sm:inline"
-                  aria-hidden="true"
-                >
-                  │
-                </AstryxInline>
-                <AstryxButton
-                  type="button"
-                  className="inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-foreground/[0.08]"
-                  onClick={() => setBulkSelectionRange(filteredSelectableInstalledNames, true)}
-                >
-                  {t("settings.skillsBulkSelectAll")}
-                </AstryxButton>
-                <AstryxButton
-                  type="button"
-                  className="inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-foreground/[0.08]"
-                  onClick={() => {
-                    setBulkSelection(new Set());
-                    bulkAnchorRef.current = null;
-                  }}
-                >
-                  {t("settings.skillsBulkClear")}
-                </AstryxButton>
-                <AstryxInline
-                  className="hidden text-muted-foreground/50 sm:inline"
-                  aria-hidden="true"
-                >
-                  │
-                </AstryxInline>
-                <AstryxButton
-                  type="button"
-                  disabled={bulkEnableChangeCount === 0}
-                  className="inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-foreground/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
-                  onClick={() => applyBulkEnableState(true)}
-                >
-                  {`${t("settings.skillsBulkEnable")}${bulkEnableChangeCount > 0 ? ` (${bulkEnableChangeCount})` : ""}`}
-                </AstryxButton>
-                <AstryxButton
-                  type="button"
-                  disabled={bulkDisableChangeCount === 0}
-                  className="inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-foreground/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
-                  onClick={() => applyBulkEnableState(false)}
-                >
-                  {`${t("settings.skillsBulkDisable")}${bulkDisableChangeCount > 0 ? ` (${bulkDisableChangeCount})` : ""}`}
-                </AstryxButton>
-                <ConfirmActionPopover
-                  title={t("settings.deleteConfirm")}
-                  description={`${t("settings.skillsHubBulkDeleteConfirm").replace("{count}", String(bulkDeleteNames.length))}${bulkDeletePreview ? ` ${bulkDeletePreview}` : ""}`}
-                  confirmLabel={t("settings.delete")}
-                  onConfirm={() => void deleteBulkSelectedInstalledSkills()}
-                >
-                  {(open) => (
-                    <AstryxButton
-                      type="button"
-                      disabled={bulkDeleteNames.length === 0 || deletingSkillName !== null}
-                      onClick={open}
-                      className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      {`${t("settings.skillsHubBulkDelete")}${bulkDeleteNames.length > 0 ? ` (${bulkDeleteNames.length})` : ""}`}
-                    </AstryxButton>
-                  )}
-                </ConfirmActionPopover>
-                <AstryxButton
-                  type="button"
-                  onClick={exitBulkMode}
-                  className="inline-flex h-7 items-center gap-1 rounded-full bg-foreground/[0.08] px-3 text-[12px] font-medium text-foreground transition-colors hover:bg-foreground/[0.14]"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  {t("settings.skillsBulkDone")}
-                </AstryxButton>
-              </>
-            ) : (
-              <>
-                <AstryxInline className="text-muted-foreground">
-                  {t("settings.skillsBulkClickToSelect")}
-                </AstryxInline>
-                <AstryxButton
-                  type="button"
-                  onClick={exitBulkMode}
-                  className="inline-flex h-7 items-center gap-1 rounded-full bg-foreground/[0.08] px-3 text-[12px] font-medium text-foreground transition-colors hover:bg-foreground/[0.14]"
-                >
-                  {t("settings.skillsBulkDone")}
-                </AstryxButton>
-              </>
-            )}
-          </AstryxView>
-        </AstryxView>
-      ) : null}
-
-      {bulkUndo && bulkSelection.size === 0 ? (
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-3 max-sm:bottom-[calc(1rem+env(safe-area-inset-bottom))]"
-        >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="hub-panel-enter pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-3 rounded-full border border-border/50 bg-background/95 py-2 pl-4 pr-2 text-[12.5px] shadow-[0_8px_24px_-12px_rgba(15,23,42,0.35)] dark:border-white/[0.1] dark:bg-popover/95"
-          >
-            <AstryxInline className="text-foreground/85">
-              {t("settings.skillsBulkUpdated").replace("{count}", String(bulkUndo.count))}
-            </AstryxInline>
-            <AstryxButton
-              type="button"
-              onClick={undoBulkSelection}
-              className="inline-flex h-7 items-center gap-1 rounded-full bg-foreground/[0.08] px-3 text-[12px] font-medium text-foreground transition-colors hover:bg-foreground/[0.14]"
-            >
-              {t("settings.skillsBulkUndo")}
-            </AstryxButton>
-          </AstryxView>
-        </AstryxView>
-      ) : null}
-    </AstryxView>
+    </VStack>
   );
 }
 
@@ -2855,463 +2529,323 @@ function SkillsImportView(props: {
     selectableVisibleBaseDirs.length > 0 &&
     selectedSelectableVisibleCount === selectableVisibleBaseDirs.length;
 
+  function toggleImportSkill(baseDir: string, shiftKey: boolean) {
+    if (!activeScan) return;
+    const skill = activeScan.skills.find((item) => item.baseDir === baseDir);
+    if (!skill || installedNames.has(skill.name) || importing) return;
+    const checked = selected.has(baseDir);
+    const orderedBaseDirs = activeScan.skills
+      .filter((item) => !installedNames.has(item.name))
+      .map((item) => item.baseDir);
+    if (bulkMode && shiftKey && bulkAnchorRef.current && bulkAnchorRef.current !== baseDir) {
+      const from = orderedBaseDirs.indexOf(bulkAnchorRef.current);
+      const to = orderedBaseDirs.indexOf(baseDir);
+      if (from !== -1 && to !== -1) {
+        const [lo, hi] = from < to ? [from, to] : [to, from];
+        onBatchToggle(orderedBaseDirs.slice(lo, hi + 1), !checked);
+        bulkAnchorRef.current = baseDir;
+        return;
+      }
+    }
+    onToggle(baseDir);
+    bulkAnchorRef.current = baseDir;
+  }
+
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
-      className={cn(
-        "relative h-full min-h-0 overflow-y-auto px-0.5 pr-1 pt-1.5",
-        bulkMode ? "pb-[calc(8rem+env(safe-area-inset-bottom))] sm:pb-24" : "pb-4",
-      )}
-    >
+    <VStack height="100%" gap={3}>
       {importToast ? (
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="pointer-events-none sticky top-2 z-[80] flex justify-end px-1"
-        >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="notify-toast-enter pointer-events-auto flex max-w-sm items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-50 px-3 py-2.5 text-sm shadow-lg dark:border-amber-500/25 dark:bg-amber-950"
-          >
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-            <AstryxParagraph className="min-w-0 flex-1 leading-relaxed text-amber-800 dark:text-amber-200">
-              {importToast}
-            </AstryxParagraph>
-            <AstryxButton
-              type="button"
+        <Banner
+          status="warning"
+          title={t("settings.skillsHubImportTab")}
+          description={importToast}
+          collapsible={false}
+          endContent={
+            <IconButton
+              label={t("settings.cancel")}
+              tooltip={t("settings.cancel")}
+              icon={<Icon icon={X} size="sm" color="inherit" />}
+              variant="ghost"
+              size="sm"
               onClick={onDismissImportToast}
-              className="mt-0.5 shrink-0 rounded p-0.5 opacity-50 transition-opacity hover:opacity-100"
-              aria-label={t("settings.cancel")}
-            >
-              <X className="h-3.5 w-3.5" />
-            </AstryxButton>
-          </AstryxView>
-        </AstryxView>
+            />
+          }
+        />
       ) : null}
-      <AstryxView layout="flex" direction="vertical" className="flex flex-col gap-4">
-        {error ? (
-          <GlassPanel tone="error" className="hub-panel-enter">
-            <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-              <AstryxInline className="text-xs text-destructive">
-                {t("settings.skillsImportScanFailed")}: {error}
-              </AstryxInline>
-            </AstryxView>
-          </GlassPanel>
-        ) : null}
 
-        {importErrors.length > 0 ? (
-          <GlassPanel tone="error" className="hub-panel-enter">
-            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-              <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-                <AstryxInline className="text-xs font-medium text-destructive">
-                  {t("settings.skillsImportFailed")}
-                </AstryxInline>
-              </AstryxView>
-              {importErrors.map((failure) => (
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  key={failure.baseDir}
-                  className="pl-6 text-[11px] text-destructive/90"
-                >
-                  {failure.name}: {failure.message}
-                </AstryxView>
-              ))}
-            </AstryxView>
-          </GlassPanel>
-        ) : null}
+      {error ? (
+        <Banner
+          status="error"
+          title={t("settings.skillsImportScanFailed")}
+          description={error}
+          collapsible={false}
+        />
+      ) : null}
 
-        {importedCount !== null && importedCount > 0 ? (
-          <GlassPanel tone="muted" className="hub-panel-enter">
-            <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
-              <Check className="h-4 w-4 shrink-0 text-success" />
-              <AstryxInline className="text-xs text-muted-foreground">
-                {t("settings.skillsImportDone")} ({importedCount})
-              </AstryxInline>
-            </AstryxView>
-          </GlassPanel>
-        ) : null}
+      {importErrors.length > 0 ? (
+        <Banner
+          status="error"
+          title={t("settings.skillsImportFailed")}
+          description={importErrors
+            .map((failure) => failure.name + ": " + failure.message)
+            .join("\n")}
+          collapsible={false}
+        />
+      ) : null}
 
-        {loading ? (
-          <GlassPanel className="hub-panel-enter">
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex items-center gap-3 py-4"
+      {importedCount !== null && importedCount > 0 ? (
+        <Banner
+          status="success"
+          title={t("settings.skillsImportDone")}
+          description={String(importedCount)}
+          collapsible={false}
+        />
+      ) : null}
+
+      {importProgress ? (
+        <ProgressBar
+          label={t("settings.skillsImportProgress")}
+          value={Math.min(importProgress.done + 1, importProgress.total)}
+          max={importProgress.total}
+          hasValueLabel
+          variant="accent"
+        />
+      ) : null}
+
+      {loading ? (
+        <Spinner size="md" label={t("settings.skillsImportScanning")} />
+      ) : (
+        <>
+          <HStack width="100%" gap={2} vAlign="center" hAlign="between" wrap="wrap">
+            <TabList
+              value={activeTool}
+              onChange={(value) => {
+                userChoseToolRef.current = true;
+                setActiveTool(String(value));
+              }}
+              role="tablist"
+              overflow="scroll"
             >
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              <AstryxInline className="text-xs text-muted-foreground">
-                {t("settings.skillsImportScanning")}
-              </AstryxInline>
-            </AstryxView>
-          </GlassPanel>
-        ) : (
-          <>
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="hub-panel-enter flex flex-wrap items-center justify-between gap-3"
-            >
-              <AstryxView
-                layout="inline-flex"
-                direction="horizontal"
-                className="inline-flex shrink-0 rounded-2xl border border-border/40 bg-background/60 p-1 backdrop-blur-xl shadow-[0_1px_0_rgba(255,255,255,0.5)_inset] dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]"
-              >
-                {filteredScans.map((scan) => {
-                  const toolLabel = EXTERNAL_TOOL_LABELS[scan.tool] ?? scan.tool;
-                  const active = scan.tool === activeTool;
-                  return (
-                    <AstryxButton
-                      key={scan.tool}
-                      type="button"
-                      onClick={() => {
-                        userChoseToolRef.current = true;
-                        setActiveTool(scan.tool);
-                      }}
-                      className={cn(
-                        "relative inline-flex h-9 items-center justify-center gap-2 rounded-xl px-4 text-[12.5px] font-medium transition-all",
-                        active
-                          ? "bg-background/85 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_4px_12px_-8px_rgba(15,23,42,0.18)] ring-1 ring-border/45 dark:bg-white/[0.08] dark:ring-white/[0.09] dark:shadow-[0_1px_0_rgba(255,255,255,0.07)_inset,0_4px_12px_-8px_rgba(0,0,0,0.55)]"
-                          : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
-                      )}
-                    >
-                      <Folder className="h-3.5 w-3.5" />
-                      <AstryxInline>{toolLabel}</AstryxInline>
-                      {scan.exists ? (
-                        <AstryxView
-                          as="span"
-                          layout="inline-flex"
-                          direction="horizontal"
-                          className={cn(
-                            "ml-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums",
-                            active
-                              ? "bg-foreground/[0.08] text-foreground/85"
-                              : "bg-muted/70 text-muted-foreground",
-                          )}
-                        >
-                          {scan.skills.length}
-                        </AstryxView>
-                      ) : (
-                        <AstryxInline className="ml-0.5 text-[10px] text-muted-foreground/70">
-                          {t("settings.skillsImportNotDetected")}
-                        </AstryxInline>
-                      )}
-                    </AstryxButton>
-                  );
-                })}
-              </AstryxView>
-
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                className="flex shrink-0 items-center gap-2"
-              >
-                <input
-                  ref={folderInputRef}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => {
-                    const files = Array.from(event.currentTarget.files ?? []);
-                    event.currentTarget.value = "";
-                    onImportLocalBundle(files);
-                  }}
+              {filteredScans.map((scan) => (
+                <Tab
+                  key={scan.tool}
+                  value={scan.tool}
+                  label={EXTERNAL_TOOL_LABELS[scan.tool] ?? scan.tool}
+                  panelId={"skills-import-" + scan.tool}
+                  icon={<Icon icon={Folder} size="sm" color="inherit" />}
+                  endContent={scan.exists ? <Badge label={scan.skills.length} /> : undefined}
                 />
-                <Button
-                  variant="outline"
+              ))}
+            </TabList>
+
+            <HStack gap={1} vAlign="center" wrap="wrap">
+              <input
+                ref={folderInputRef}
+                type="file"
+                multiple
+                aria-hidden="true"
+                tabIndex={-1}
+                style={{ display: "none" }}
+                onChange={(event) => {
+                  const files = Array.from(event.currentTarget.files ?? []);
+                  event.currentTarget.value = "";
+                  onImportLocalBundle(files);
+                }}
+              />
+              <AstryxCoreButton
+                label={t("settings.skillsLocalImport")}
+                icon={<Icon icon={Folder} size="sm" color="inherit" />}
+                variant="secondary"
+                size="sm"
+                isLoading={localBundleImporting}
+                isDisabled={loading || importing || localBundleImporting}
+                onClick={() => folderInputRef.current?.click()}
+              />
+              <AstryxCoreButton
+                label={t("settings.skillsImportRescan")}
+                icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+                variant="secondary"
+                size="sm"
+                isDisabled={loading || importing}
+                onClick={onRescan}
+              />
+              {!bulkMode ? (
+                <AstryxCoreButton
+                  label={
+                    t("settings.skillsImportButton") +
+                    (importableSelectedCount > 0 ? " (" + importableSelectedCount + ")" : "")
+                  }
+                  icon={<Icon icon={Download} size="sm" color="inherit" />}
                   size="sm"
-                  className="gap-1.5 rounded-full"
-                  disabled={loading || importing || localBundleImporting}
-                  onClick={() => folderInputRef.current?.click()}
-                >
-                  {localBundleImporting ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Folder className="h-3.5 w-3.5" />
-                  )}
-                  {t("settings.skillsLocalImport")}
-                </Button>
-                <Button
-                  variant="outline"
+                  isLoading={importing}
+                  isDisabled={selected.size === 0 || importing || loading}
+                  onClick={onImport}
+                />
+              ) : null}
+            </HStack>
+          </HStack>
+
+          {bulkMode ? (
+            <Banner
+              status="info"
+              title={t("settings.skillsBulkSelect")}
+              description={t("settings.skillsBulkImportHint")}
+              collapsible={false}
+            />
+          ) : null}
+
+          {activeScan ? (
+            <VStack
+              id={"skills-import-" + activeScan.tool}
+              role="tabpanel"
+              gap={2}
+              style={{ minHeight: 0 }}
+            >
+              <HStack gap={1} vAlign="center" wrap="wrap">
+                <Token
+                  label={activeScan.rootDir}
+                  color="gray"
                   size="sm"
-                  className="gap-1.5 rounded-full"
-                  disabled={loading || importing}
-                  onClick={onRescan}
-                >
-                  <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-                  {t("settings.skillsImportRescan")}
-                </Button>
-                {!bulkMode ? (
-                  <Button
-                    size="sm"
-                    className="gap-1.5 rounded-full"
-                    disabled={selected.size === 0 || importing || loading}
-                    onClick={onImport}
-                  >
-                    {importing ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Download className="h-3.5 w-3.5" />
-                    )}
-                    {importing && importProgress
-                      ? `${t("settings.skillsImportProgress")} ${importProgress.done + 1}/${importProgress.total}`
-                      : `${t("settings.skillsImportButton")}${importableSelectedCount > 0 ? ` (${importableSelectedCount})` : ""}`}
-                  </Button>
-                ) : null}
-              </AstryxView>
-            </AstryxView>
-
-            {bulkMode ? (
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                className="hub-panel-enter flex items-center gap-2 text-[11px] text-muted-foreground/80"
-              >
-                <ListChecks className="h-3.5 w-3.5 shrink-0" />
-                <AstryxInline>{t("settings.skillsBulkImportHint")}</AstryxInline>
-              </AstryxView>
-            ) : null}
-
-            {activeScan ? (
-              <AstryxView
-                layout="flex"
-                direction="vertical"
-                key={activeScan.tool}
-                className="hub-panel-enter flex flex-col gap-3"
-              >
-                <AstryxParagraph className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground/70">
-                  <AstryxInline className="font-mono">{activeScan.rootDir}</AstryxInline>
-                  {activeScan.tool === "codebuddy" && activeScan.exists ? (
-                    <>
-                      <AstryxInline aria-hidden="true">·</AstryxInline>
-                      <AstryxInline>{t("settings.skillsImportCodebuddyHint")}</AstryxInline>
-                    </>
-                  ) : null}
-                  {activeScan.errors.length > 0 ? (
-                    <>
-                      <AstryxInline aria-hidden="true">·</AstryxInline>
-                      <AstryxInline>
-                        {t("settings.skillsImportUnparsable").replace(
-                          "{count}",
-                          String(activeScan.errors.length),
-                        )}
-                      </AstryxInline>
-                    </>
-                  ) : null}
-                  {activeScan.exists && activeScan.skills.length > 0 ? (
-                    <>
-                      <AstryxInline aria-hidden="true">·</AstryxInline>
-                      <AstryxInline>{t("settings.skillsImportOverwriteHint")}</AstryxInline>
-                    </>
-                  ) : null}
-                </AstryxParagraph>
-
+                  icon={<Icon icon={Folder} size="sm" color="inherit" />}
+                />
                 {!activeScan.exists ? (
-                  <GlassPanel tone="muted">
-                    <AstryxParagraph className="py-2 text-center text-xs text-muted-foreground">
-                      {t("settings.skillsImportNotDetected")} · {activeScan.rootDir}
-                    </AstryxParagraph>
-                  </GlassPanel>
-                ) : activeScan.skills.length === 0 ? (
-                  <GlassPanel tone="muted">
-                    <AstryxParagraph className="py-2 text-center text-xs text-muted-foreground">
-                      {t("settings.skillsImportEmpty")}
-                    </AstryxParagraph>
-                  </GlassPanel>
-                ) : (
-                  <>
-                    <AstryxView
-                      layout="flex"
-                      direction="horizontal"
-                      className="flex flex-wrap items-center justify-between gap-2"
-                    >
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="text-xs text-muted-foreground"
-                      >
-                        {t("settings.skillsHubSelectedShort")} {selectedSelectableVisibleCount} /{" "}
-                        {selectableVisibleBaseDirs.length}
-                      </AstryxView>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 rounded-full"
-                        disabled={importing || selectableVisibleBaseDirs.length === 0}
-                        onClick={() =>
-                          onBatchToggle(selectableVisibleBaseDirs, !allVisibleSelected)
-                        }
-                      >
-                        <AstryxView
-                          as="span"
-                          layout="flex"
-                          direction="horizontal"
-                          className={cn(
-                            "flex h-3.5 w-3.5 items-center justify-center rounded border",
-                            allVisibleSelected
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border/70 bg-background",
-                          )}
-                          aria-hidden="true"
-                        >
-                          {allVisibleSelected ? <Check className="h-2.5 w-2.5" /> : null}
-                        </AstryxView>
-                        {allVisibleSelected
+                  <Token label={t("settings.skillsImportNotDetected")} color="orange" size="sm" />
+                ) : null}
+                {activeScan.errors.length > 0 ? (
+                  <Token
+                    label={t("settings.skillsImportUnparsable").replace(
+                      "{count}",
+                      String(activeScan.errors.length),
+                    )}
+                    color="orange"
+                    size="sm"
+                  />
+                ) : null}
+                {activeScan.tool === "codebuddy" && activeScan.exists ? (
+                  <Token label={t("settings.skillsImportCodebuddyHint")} color="blue" size="sm" />
+                ) : null}
+              </HStack>
+
+              {!activeScan.exists ? (
+                <EmptyState
+                  title={t("settings.skillsImportNotDetected")}
+                  description={activeScan.rootDir}
+                  icon={<Icon icon={Folder} size="lg" color="secondary" />}
+                  isCompact
+                />
+              ) : activeScan.skills.length === 0 ? (
+                <EmptyState
+                  title={t("settings.skillsImportEmpty")}
+                  icon={<Icon icon={Folder} size="lg" color="secondary" />}
+                  isCompact
+                />
+              ) : (
+                <>
+                  <HStack width="100%" gap={2} vAlign="center" hAlign="between" wrap="wrap">
+                    <Text type="supporting" color="secondary" hasTabularNumbers>
+                      {t("settings.skillsHubSelectedShort")} {selectedSelectableVisibleCount} /{" "}
+                      {selectableVisibleBaseDirs.length}
+                    </Text>
+                    <CheckboxInput
+                      label={
+                        allVisibleSelected
                           ? t("settings.skillsImportDeselectAll")
-                          : t("settings.skillsImportSelectAll")}
-                      </Button>
-                    </AstryxView>
-                    <AstryxView
-                      layout="grid"
-                      direction="horizontal"
-                      className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
-                    >
+                          : t("settings.skillsImportSelectAll")
+                      }
+                      value={allVisibleSelected}
+                      isDisabled={importing || selectableVisibleBaseDirs.length === 0}
+                      onChange={() => onBatchToggle(selectableVisibleBaseDirs, !allVisibleSelected)}
+                      size="sm"
+                    />
+                  </HStack>
+
+                  <StackItem size="fill" isScrollable>
+                    <List density="balanced" hasDividers>
                       {activeScan.skills.map((skill) => {
                         const alreadyInstalled = installedNames.has(skill.name);
                         const checked = !alreadyInstalled && selected.has(skill.baseDir);
-                        const locked = alreadyInstalled || importing;
                         return (
-                          <AstryxButton
+                          <ListItem
                             key={skill.baseDir}
-                            type="button"
-                            disabled={locked}
-                            onMouseDown={(event) => {
-                              if (bulkMode && event.shiftKey) event.preventDefault();
-                            }}
-                            onClick={(event) => {
-                              if (alreadyInstalled) return;
-                              const orderedBaseDirs = activeScan.skills
-                                .filter((item) => !installedNames.has(item.name))
-                                .map((item) => item.baseDir);
-                              if (
-                                bulkMode &&
-                                event.shiftKey &&
-                                bulkAnchorRef.current &&
-                                bulkAnchorRef.current !== skill.baseDir
-                              ) {
-                                const from = orderedBaseDirs.indexOf(bulkAnchorRef.current);
-                                const to = orderedBaseDirs.indexOf(skill.baseDir);
-                                if (from !== -1 && to !== -1) {
-                                  const [lo, hi] = from < to ? [from, to] : [to, from];
-                                  onBatchToggle(orderedBaseDirs.slice(lo, hi + 1), !checked);
-                                  bulkAnchorRef.current = skill.baseDir;
-                                  return;
-                                }
-                              }
-                              onToggle(skill.baseDir);
-                              bulkAnchorRef.current = skill.baseDir;
-                            }}
-                            className={cn(
-                              "group flex items-start gap-2.5 rounded-xl border p-3 text-left transition-all disabled:cursor-not-allowed",
-                              alreadyInstalled
-                                ? "border-border/50 bg-muted/30 opacity-90"
-                                : checked
-                                  ? "border-primary/60 bg-primary/5 shadow-sm shadow-primary/10"
-                                  : "border-border/40 bg-background/60 hover:border-border/70 hover:bg-background/85",
-                              importing && !alreadyInstalled ? "opacity-60" : null,
-                            )}
-                          >
-                            <AstryxView
-                              as="span"
-                              layout="flex"
-                              direction="horizontal"
-                              className={cn(
-                                "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-                                alreadyInstalled
-                                  ? "border-border/50 bg-muted/40 opacity-50"
-                                  : checked
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-border/70 bg-background",
-                              )}
-                            >
-                              {!alreadyInstalled && checked ? <Check className="h-3 w-3" /> : null}
-                            </AstryxView>
-                            <AstryxInline className="min-w-0 flex-1">
-                              <AstryxView
-                                as="span"
-                                layout="flex"
-                                direction="horizontal"
-                                className="flex items-center gap-1.5"
-                              >
-                                <AstryxInline className="truncate text-[13px] font-medium text-foreground">
-                                  {skill.name}
-                                </AstryxInline>
-                                {alreadyInstalled ? (
-                                  <AstryxInline className="shrink-0 rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                    {t("settings.skillsImportInstalledBadge")}
-                                  </AstryxInline>
-                                ) : null}
-                              </AstryxView>
-                              <AstryxInline className="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-muted-foreground">
-                                {skill.description}
-                              </AstryxInline>
-                            </AstryxInline>
-                          </AstryxButton>
+                            label={skill.name}
+                            startContent={
+                              <Icon
+                                icon={SkillIcon}
+                                size="md"
+                                color={checked ? "accent" : "secondary"}
+                              />
+                            }
+                            description={
+                              <VStack gap={1}>
+                                <Text type="supporting" color="secondary" maxLines={2}>
+                                  {skill.description}
+                                </Text>
+                                <Text type="code" color="secondary" maxLines={1}>
+                                  {skill.baseDir}
+                                </Text>
+                              </VStack>
+                            }
+                            endContent={
+                              alreadyInstalled ? (
+                                <Token
+                                  label={t("settings.skillsImportInstalledBadge")}
+                                  color="green"
+                                  size="sm"
+                                  icon={<Icon icon={Check} size="sm" color="inherit" />}
+                                />
+                              ) : (
+                                <CheckboxInput
+                                  label={skill.name}
+                                  isLabelHidden
+                                  value={checked}
+                                  isDisabled={importing}
+                                  onChange={(_value, event) => {
+                                    const nativeEvent = event.nativeEvent;
+                                    const shiftKey =
+                                      nativeEvent instanceof MouseEvent && nativeEvent.shiftKey;
+                                    toggleImportSkill(skill.baseDir, shiftKey);
+                                  }}
+                                  size="sm"
+                                />
+                              )
+                            }
+                          />
                         );
                       })}
-                    </AstryxView>
-                  </>
-                )}
-              </AstryxView>
-            ) : null}
-          </>
-        )}
-      </AstryxView>
+                    </List>
+                  </StackItem>
+                </>
+              )}
+            </VStack>
+          ) : null}
+        </>
+      )}
 
       {bulkMode ? (
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="pointer-events-none sticky bottom-3 z-20 flex justify-center px-1 pt-2 max-sm:bottom-[calc(0.75rem+env(safe-area-inset-bottom))]"
-        >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="hub-panel-enter pointer-events-auto flex max-w-full flex-wrap items-center gap-2 rounded-full border border-border/50 bg-background/95 py-2 pl-4 pr-2 text-[12.5px] shadow-[0_8px_24px_-12px_rgba(15,23,42,0.35)] max-sm:justify-center max-sm:rounded-3xl max-sm:whitespace-nowrap dark:border-white/[0.1] dark:bg-popover/95"
-          >
-            {importableSelectedCount > 0 || importing ? (
-              <>
-                <AstryxInline className="whitespace-nowrap text-foreground/85">
-                  {t("settings.skillsBulkSelectedCount").replace(
+        <Section variant="muted" padding={2}>
+          <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
+            <Text type="supporting" color="secondary">
+              {importableSelectedCount > 0
+                ? t("settings.skillsBulkSelectedCount").replace(
                     "{count}",
                     String(importableSelectedCount),
-                  )}
-                </AstryxInline>
-                <AstryxInline
-                  className="hidden text-muted-foreground/50 sm:inline"
-                  aria-hidden="true"
-                >
-                  │
-                </AstryxInline>
-                <AstryxButton
-                  type="button"
-                  disabled={importing || loading}
-                  className="inline-flex h-7 items-center rounded-full bg-foreground px-3 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-40"
-                  onClick={onImport}
-                >
-                  {importing && importProgress ? (
-                    <>
-                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                      {`${t("settings.skillsImportProgress")} ${importProgress.done + 1}/${importProgress.total}`}
-                    </>
-                  ) : (
-                    `${t("settings.skillsBulkImportAction")}${importableSelectedCount > 0 ? ` (${importableSelectedCount})` : ""}`
-                  )}
-                </AstryxButton>
-              </>
-            ) : (
-              <AstryxInline className="text-muted-foreground">
-                {t("settings.skillsBulkClickToSelect")}
-              </AstryxInline>
-            )}
-          </AstryxView>
-        </AstryxView>
+                  )
+                : t("settings.skillsBulkClickToSelect")}
+            </Text>
+            <AstryxCoreButton
+              label={
+                t("settings.skillsBulkImportAction") +
+                (importableSelectedCount > 0 ? " (" + importableSelectedCount + ")" : "")
+              }
+              icon={<Icon icon={Download} size="sm" color="inherit" />}
+              size="sm"
+              isLoading={importing}
+              isDisabled={importableSelectedCount === 0 || importing || loading}
+              onClick={onImport}
+            />
+          </HStack>
+        </Section>
       ) : null}
-    </AstryxView>
+    </VStack>
   );
 }
 
@@ -3751,48 +3285,28 @@ function StoreCategoryChips(props: {
 }) {
   const { t } = useLocale();
   return (
-    <AstryxView layout="block" direction="horizontal" className="hub-panel-enter">
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="flex max-w-full flex-wrap items-center gap-1 rounded-xl border border-border/40 bg-background/60 p-1 backdrop-blur-xl shadow-[0_1px_0_rgba(255,255,255,0.5)_inset] dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]"
-      >
-        {STORE_CATEGORY_OPTIONS.map((value) => {
-          const CategoryIcon = STORE_CATEGORY_ICONS[value];
-          const active = props.value === value;
-          const count = props.counts.get(value) ?? 0;
-          return (
-            <AstryxButton
-              key={value}
-              type="button"
-              onClick={() => props.onChange(value)}
-              className={cn(
-                "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-[11.5px] font-medium transition-all",
-                active
-                  ? "bg-background/85 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] ring-1 ring-border/45 dark:bg-white/[0.08] dark:ring-white/[0.09] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-                  : "text-muted-foreground hover:bg-background/80 hover:text-foreground",
-              )}
-            >
-              <CategoryIcon className="h-3.5 w-3.5" />
-              <AstryxInline>{t(storeCategoryLabelKey(value))}</AstryxInline>
-              <AstryxView
-                as="span"
-                layout="inline-flex"
-                direction="horizontal"
-                className={cn(
-                  "inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums",
-                  active
-                    ? "bg-foreground/[0.08] text-foreground/85"
-                    : "bg-muted/70 text-muted-foreground",
-                )}
-              >
-                {count}
-              </AstryxView>
-            </AstryxButton>
-          );
-        })}
-      </AstryxView>
-    </AstryxView>
+    <HStack gap={1} vAlign="center" wrap="wrap">
+      {STORE_CATEGORY_OPTIONS.map((value) => {
+        const CategoryIcon = STORE_CATEGORY_ICONS[value];
+        return (
+          <ToggleButton
+            key={value}
+            label={t(storeCategoryLabelKey(value))}
+            icon={<Icon icon={CategoryIcon} size="sm" color="inherit" />}
+            isPressed={props.value === value}
+            size="sm"
+            onPressedChange={() => props.onChange(value)}
+          >
+            <HStack gap={1} vAlign="center">
+              <Text type="inherit" color="inherit">
+                {t(storeCategoryLabelKey(value))}
+              </Text>
+              <Badge label={props.counts.get(value) ?? 0} />
+            </HStack>
+          </ToggleButton>
+        );
+      })}
+    </HStack>
   );
 }
 
@@ -3803,34 +3317,23 @@ function SkillCategoryBadges(props: {
 }) {
   const { t } = useLocale();
   return (
-    <AstryxView layout="flex" direction="horizontal" className="flex flex-wrap items-center gap-1">
+    <HStack gap={1} vAlign="center" wrap="wrap">
       {props.categories.map((category) => {
-        const BadgeIcon = STORE_CATEGORY_ICONS[category];
         return (
-          <AstryxButton
+          <Token
             key={category}
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onSelect(category);
-            }}
-            onKeyDown={(event) => event.stopPropagation()}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[10px] font-medium text-foreground/75 ring-1 ring-border/45 transition-colors hover:bg-foreground/[0.1]"
-          >
-            <BadgeIcon className="h-2.5 w-2.5" />
-            <AstryxInline>{t(storeCategoryLabelKey(category))}</AstryxInline>
-          </AstryxButton>
+            label={t(storeCategoryLabelKey(category))}
+            color="gray"
+            size="sm"
+            icon={<Icon icon={STORE_CATEGORY_ICONS[category]} size="sm" color="inherit" />}
+            onClick={() => props.onSelect(category)}
+          />
         );
       })}
       {(props.topics ?? []).slice(0, 3).map((topic) => (
-        <AstryxInline
-          key={topic}
-          className="shrink-0 rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] text-muted-foreground"
-        >
-          {topic}
-        </AstryxInline>
+        <Token key={topic} label={topic} color="gray" size="sm" />
       ))}
-    </AstryxView>
+    </HStack>
   );
 }
 
@@ -3980,467 +3483,239 @@ function SkillsStoreView(props: {
   }
 
   return (
-    <AstryxView
-      layout="flex"
-      direction="vertical"
-      className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-hidden"
-    >
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="hub-panel-enter flex items-center justify-start"
-      >
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex shrink-0 items-center gap-1.5"
-        >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex max-w-full shrink-0 items-center gap-1 overflow-x-auto rounded-xl border border-border/40 bg-background/60 p-1 backdrop-blur-xl shadow-[0_1px_0_rgba(255,255,255,0.5)_inset] dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]"
-          >
-            {STORE_SORT_OPTIONS.map((option) => {
-              const active = sort === option.value;
-              return (
-                <AstryxButton
-                  key={option.value}
-                  type="button"
-                  onClick={() => onSortChange(option.value)}
-                  disabled={searching}
-                  className={cn(
-                    "h-8 shrink-0 whitespace-nowrap rounded-lg px-2.5 text-[11.5px] font-medium transition-all",
-                    "disabled:cursor-not-allowed disabled:opacity-45",
-                    active
-                      ? "bg-background/85 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] ring-1 ring-border/45 dark:bg-white/[0.08] dark:ring-white/[0.09] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-                      : "text-muted-foreground hover:bg-background/80 hover:text-foreground",
-                  )}
-                >
-                  {t(option.labelKey)}
-                </AstryxButton>
-              );
-            })}
-          </AstryxView>
-          <Loader2
-            aria-hidden={!refreshing}
-            className={cn(
-              "h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground transition-opacity duration-200 motion-reduce:transition-none",
-              refreshing ? "opacity-100" : "opacity-0",
-            )}
+    <VStack height="100%" gap={3}>
+      <HStack width="100%" gap={2} vAlign="center" hAlign="between" wrap="wrap">
+        <StackItem size="fill">
+          <StoreCategoryChips
+            value={storeCategory}
+            counts={categoryCounts}
+            onChange={setStoreCategory}
           />
-        </AstryxView>
-      </AstryxView>
-
-      <StoreCategoryChips
-        value={storeCategory}
-        counts={categoryCounts}
-        onChange={setStoreCategory}
-      />
+        </StackItem>
+        <Selector
+          label={t("settings.skillsStoreSortLabel")}
+          isLabelHidden
+          value={sort}
+          options={STORE_SORT_OPTIONS.map((option) => ({
+            value: option.value,
+            label: t(option.labelKey),
+          }))}
+          width="var(--xagent-hub-sort-control-width)"
+          isDisabled={searching}
+          onChange={(value) => onSortChange(value as ClawHubSort)}
+        />
+        {refreshing ? <Spinner size="sm" label={t("settings.skillsStoreLoadingTitle")} /> : null}
+      </HStack>
 
       {error ? (
-        <GlassPanel tone="error" className="hub-panel-enter">
-          <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-            <AstryxInline className="text-xs text-destructive">{error}</AstryxInline>
-          </AstryxView>
-        </GlassPanel>
+        <Banner
+          status="error"
+          title={t("settings.skillsStoreEmptyTitle")}
+          description={error}
+          collapsible={false}
+        />
       ) : null}
 
-      <AstryxView
-        layout="block"
-        direction="horizontal"
-        className="min-h-0 flex-1 overflow-y-auto px-0.5 pb-4 pr-1 pt-1.5"
-      >
-        <AstryxView layout="flex" direction="vertical" className="flex flex-col gap-4">
+      <StackItem size="fill" isScrollable>
+        <VStack gap={2}>
           {loading && items.length === 0 ? (
-            <>
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="hub-frost-hero hub-panel-enter px-4 py-3.5"
-              >
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex items-center gap-3.5"
-                >
-                  <FrostSpinner />
-                  <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="text-[13px] font-medium tracking-tight text-foreground"
-                    >
-                      {t("settings.skillsStoreLoadingTitle")}
-                    </AstryxView>
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="mt-0.5 truncate text-[11px] text-muted-foreground/80"
-                    >
-                      {t("settings.skillsStoreLoadingDesc")}
-                    </AstryxView>
-                  </AstryxView>
-                </AstryxView>
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="hub-frost-track mt-3.5"
-                />
-              </AstryxView>
-
-              <AstryxView
-                layout="grid"
-                direction="horizontal"
-                className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-              >
-                {[1, 2, 3, 4, 5, 6].map((item) => (
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    key={item}
-                    className="hub-frost-skeleton skill-card-enter p-3.5"
-                  >
-                    <AstryxView layout="block" direction="horizontal" className="space-y-3">
-                      <AstryxView
-                        layout="flex"
-                        direction="horizontal"
-                        className="flex items-center gap-3"
-                      >
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="skills-skeleton-shimmer h-9 w-9 shrink-0 rounded-lg"
-                        />
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="flex-1 space-y-2"
-                        >
-                          <AstryxView
-                            layout="block"
-                            direction="horizontal"
-                            className="skills-skeleton-shimmer h-3.5 w-full max-w-[8rem] rounded"
-                          />
-                          <AstryxView
-                            layout="block"
-                            direction="horizontal"
-                            className="skills-skeleton-shimmer h-3 w-full max-w-[11rem] rounded"
-                          />
-                        </AstryxView>
-                      </AstryxView>
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="skills-skeleton-shimmer h-8 w-full rounded-xl"
-                      />
-                    </AstryxView>
-                  </AstryxView>
-                ))}
-              </AstryxView>
-            </>
+            <Section padding={3} variant="transparent">
+              <VStack gap={2}>
+                <Skeleton width="35%" height="var(--spacing-4)" radius="rounded" index={0} />
+                <Skeleton width="100%" height="var(--spacing-10)" radius="rounded" index={1} />
+                <Skeleton width="100%" height="var(--spacing-10)" radius="rounded" index={2} />
+                <Skeleton width="100%" height="var(--spacing-10)" radius="rounded" index={3} />
+              </VStack>
+            </Section>
           ) : null}
 
           {!loading && items.length === 0 && !error ? (
-            <GlassPanel className="hub-panel-enter">
-              <AstryxView
-                layout="flex"
-                direction="vertical"
-                className="flex flex-col items-center gap-3 py-8 text-center"
-              >
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60"
-                >
-                  <Cloud className="h-5 w-5 text-muted-foreground" />
-                </AstryxView>
-                <AstryxView layout="block" direction="horizontal" className="space-y-1">
-                  <AstryxParagraph className="text-sm font-medium text-muted-foreground">
-                    {t("settings.skillsStoreEmptyTitle")}
-                  </AstryxParagraph>
-                  <AstryxParagraph className="text-xs text-muted-foreground/70">
-                    {t("settings.skillsStoreEmptyDesc")}
-                  </AstryxParagraph>
-                </AstryxView>
-              </AstryxView>
-            </GlassPanel>
+            <EmptyState
+              title={t("settings.skillsStoreEmptyTitle")}
+              description={t("settings.skillsStoreEmptyDesc")}
+              icon={<Icon icon={Cloud} size="lg" color="secondary" />}
+              isCompact
+            />
           ) : null}
 
-          {items.length > 0 ? (
-            <AstryxView
-              layout="grid"
-              direction="horizontal"
-              className={cn(
-                "grid gap-3 transition-[opacity,filter] duration-300 ease-out motion-reduce:transition-none sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
-                refreshing && "pointer-events-none opacity-50 blur-[1px] saturate-50",
-              )}
+          {filteredItems.length > 0 ? (
+            <List
+              density="balanced"
+              hasDividers
+              header={
+                <HStack gap={1} vAlign="center">
+                  <Text type="supporting" color="secondary" hasTabularNumbers>
+                    {filteredItems.length}
+                  </Text>
+                  <Text type="supporting" color="secondary">
+                    {t("settings.skillsHubStoreTab")}
+                  </Text>
+                </HStack>
+              }
             >
               {filteredItems.map(({ skill, categories }) => {
                 const { done, installing, pending, job, progress } = getInstallState(skill);
                 const link = buildClawHubSkillUrl(skill);
                 const PrimaryCategoryIcon = STORE_CATEGORY_ICONS[categories[0] ?? "other"];
+                const installLabel = installing
+                  ? installPhaseLabel(pending ? undefined : job, t)
+                  : done
+                    ? t("settings.skillsStoreInstalled")
+                    : t("settings.skillsStoreInstall");
+                const stats = [
+                  formatCompactNumber(skill.downloads) +
+                    " " +
+                    t("settings.skillsStorePreviewDownloads"),
+                  formatCompactNumber(skill.stars) + " " + t("settings.skillsStorePreviewStars"),
+                  formatCompactNumber(skill.installsCurrent) +
+                    " " +
+                    t("settings.skillsStorePreviewInstalls"),
+                  skill.updatedAt ? formatStoreDate(skill.updatedAt) : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
 
                 return (
-                  <ClickableCard
+                  <ListItem
                     key={buildClawHubSkillKey(skill)}
                     label={skill.displayName}
-                    onClick={() => setPreviewSkill(skill)}
-                    padding={3}
-                    width="100%"
-                    height="100%"
-                    variant={done ? "default" : "muted"}
-                    elevation={done ? "low" : "none"}
-                    className="skill-card-enter group"
-                  >
-                    <AstryxView
-                      layout="flex"
-                      direction="vertical"
-                      className="flex h-full flex-col gap-3"
-                    >
-                      <AstryxView
-                        layout="flex"
-                        direction="horizontal"
-                        className="flex items-start gap-3"
-                      >
-                        <AstryxView
-                          layout="flex"
-                          direction="horizontal"
-                          className={cn(
-                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all",
-                            done
-                              ? "border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-                              : "border-border/30 bg-muted/50 text-muted-foreground group-hover:border-border/50 group-hover:bg-background/70 group-hover:text-foreground/85",
-                          )}
-                        >
-                          <PrimaryCategoryIcon className="h-5 w-5" />
-                        </AstryxView>
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="min-w-0 flex-1"
-                        >
-                          <AstryxView
-                            layout="flex"
-                            direction="horizontal"
-                            className="flex min-w-0 items-start gap-1.5"
-                          >
-                            <AstryxInline className="truncate text-[13px] font-semibold leading-tight text-foreground">
-                              {skill.displayName}
-                            </AstryxInline>
-                            {link ? (
-                              <AstryxCoreButton
-                                href={link}
-                                target="_blank"
-                                rel="noreferrer"
-                                label={t("settings.skillsStoreOpenInClawHub")}
-                                tooltip={t("settings.skillsStoreOpenInClawHub")}
-                                icon={<ExternalLink className="h-3.5 w-3.5" />}
-                                isIconOnly
-                                variant="ghost"
-                                size="sm"
-                                onClick={(event) => event.stopPropagation()}
-                              />
-                            ) : null}
-                          </AstryxView>
-                          <AstryxView
-                            layout="block"
-                            direction="horizontal"
-                            className="mt-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60"
-                          >
-                            v{skill.latestVersion ?? t("settings.skillsStoreVersionLatest")}
-                          </AstryxView>
-                        </AstryxView>
-                      </AstryxView>
-
-                      <SkillCategoryBadges
-                        categories={categories}
-                        topics={skill.topics}
-                        onSelect={setStoreCategory}
+                    startContent={
+                      <Icon
+                        icon={PrimaryCategoryIcon}
+                        size="md"
+                        color={done ? "success" : "secondary"}
                       />
-
-                      {skill.summary ? (
-                        <AstryxParagraph className="line-clamp-3 text-[11.5px] leading-[1.45] text-muted-foreground">
-                          {skill.summary}
-                        </AstryxParagraph>
-                      ) : null}
-
-                      <AstryxView
-                        layout="flex"
-                        direction="horizontal"
-                        className="flex flex-wrap items-center gap-x-2.5 gap-y-1 border-t border-border/30 pt-2 text-[10.5px] text-muted-foreground/75"
-                      >
-                        <AstryxView
-                          as="span"
-                          layout="inline-flex"
-                          direction="horizontal"
-                          className="inline-flex items-center gap-1"
-                          title={t("settings.skillsStorePreviewDownloads")}
-                        >
-                          <AstryxInline className="h-1 w-1 rounded-full bg-foreground/40" />
-                          {formatCompactNumber(skill.downloads)}
-                        </AstryxView>
-                        <AstryxView
-                          as="span"
-                          layout="inline-flex"
-                          direction="horizontal"
-                          className="inline-flex items-center gap-1"
-                          title={t("settings.skillsStorePreviewStars")}
-                        >
-                          <AstryxInline className="h-1 w-1 rounded-full bg-foreground/40" />
-                          {formatCompactNumber(skill.stars)}
-                        </AstryxView>
-                        <AstryxView
-                          as="span"
-                          layout="inline-flex"
-                          direction="horizontal"
-                          className="inline-flex items-center gap-1"
-                          title={t("settings.skillsStorePreviewInstalls")}
-                        >
-                          <AstryxInline className="h-1 w-1 rounded-full bg-foreground/40" />
-                          {formatCompactNumber(skill.installsCurrent)}
-                        </AstryxView>
-                        {skill.updatedAt ? (
-                          <AstryxInline className="ml-auto opacity-75">
-                            {formatStoreDate(skill.updatedAt)}
-                          </AstryxInline>
+                    }
+                    description={
+                      <VStack gap={1}>
+                        {skill.summary ? (
+                          <Text type="supporting" color="secondary" maxLines={2}>
+                            {skill.summary}
+                          </Text>
                         ) : null}
-                      </AstryxView>
-
-                      {installing && !done ? (
-                        <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                          <AstryxView
-                            layout="flex"
-                            direction="horizontal"
-                            className="flex items-center justify-between gap-3 text-[10.5px] text-muted-foreground"
-                          >
-                            <AstryxInline>
-                              {installPhaseLabel(pending ? undefined : job, t)}
-                            </AstryxInline>
-                            {job && !pending ? (
-                              <AstryxView
-                                as="span"
-                                layout="flex"
-                                direction="horizontal"
-                                className="flex items-center gap-1.5"
-                              >
-                                {formatInstallProgress(job)}
-                                <AstryxButton
-                                  type="button"
-                                  title={t("settings.cancel")}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void cancelSkillInstallJob(job.jobId).catch(() => undefined);
-                                  }}
-                                  onKeyDown={(event) => event.stopPropagation()}
-                                  className="text-muted-foreground/70 transition-colors hover:text-foreground"
-                                >
-                                  <X className="h-3 w-3" />
-                                </AstryxButton>
-                              </AstryxView>
-                            ) : null}
-                          </AstryxView>
-                          <AstryxView
-                            layout="block"
-                            direction="horizontal"
-                            className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]"
-                          >
-                            {progress === null ? (
-                              <AstryxView
-                                layout="block"
-                                direction="horizontal"
-                                className="hub-loading-progress h-full rounded-full bg-foreground/55"
-                              />
-                            ) : (
-                              <AstryxView
-                                layout="block"
-                                direction="horizontal"
-                                className="h-full rounded-full bg-foreground/65 transition-[width] duration-300"
-                                style={{ width: `${progress}%` }}
-                              />
-                            )}
-                          </AstryxView>
-                        </AstryxView>
-                      ) : null}
-
-                      {job?.phase === "error" && job.error && !done && !pending ? (
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-[11px] text-destructive"
-                        >
-                          {job.error}
-                        </AstryxView>
-                      ) : null}
-
-                      <Button
-                        type="button"
-                        variant={done ? "outline" : "default"}
-                        size="sm"
-                        className={cn(
-                          "mt-auto h-9 gap-1.5 rounded-xl",
-                          done &&
-                            "border-border/55 bg-background/75 text-foreground/85 backdrop-blur-md",
-                        )}
-                        disabled={done || installing}
-                        aria-busy={installing}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onInstall(skill);
-                        }}
-                        onKeyDown={(event) => event.stopPropagation()}
-                      >
-                        {installing ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : done ? (
-                          <Check className="h-3.5 w-3.5" />
-                        ) : (
-                          <Cloud className="h-3.5 w-3.5" />
-                        )}
-                        {installing
-                          ? installPhaseLabel(pending ? undefined : job, t)
-                          : done
-                            ? t("settings.skillsStoreInstalled")
-                            : t("settings.skillsStoreInstall")}
-                      </Button>
-                    </AstryxView>
-                  </ClickableCard>
+                        <SkillCategoryBadges
+                          categories={categories}
+                          topics={skill.topics}
+                          onSelect={setStoreCategory}
+                        />
+                        <Text type="supporting" color="secondary" hasTabularNumbers>
+                          {stats}
+                        </Text>
+                        {installing && !done ? (
+                          <ProgressBar
+                            label={installLabel}
+                            value={progress ?? 0}
+                            isIndeterminate={progress === null}
+                            hasValueLabel={progress !== null}
+                            variant="accent"
+                          />
+                        ) : null}
+                        {job?.phase === "error" && job.error && !done && !pending ? (
+                          <HStack gap={1} vAlign="center">
+                            <Token label={t("settings.skillsImportError")} color="red" size="sm" />
+                            <Text type="supporting" color="secondary" maxLines={2}>
+                              {job.error}
+                            </Text>
+                          </HStack>
+                        ) : null}
+                      </VStack>
+                    }
+                    endContent={
+                      <HStack gap={1} vAlign="center" wrap="wrap">
+                        <Token
+                          label={
+                            "v" + (skill.latestVersion ?? t("settings.skillsStoreVersionLatest"))
+                          }
+                          color="gray"
+                          size="sm"
+                        />
+                        {done ? (
+                          <Token
+                            label={t("settings.skillsStoreInstalled")}
+                            color="green"
+                            size="sm"
+                            icon={<Icon icon={Check} size="sm" color="inherit" />}
+                          />
+                        ) : null}
+                        {link ? (
+                          <IconButton
+                            href={link}
+                            target="_blank"
+                            rel="noreferrer"
+                            label={t("settings.skillsStoreOpenInClawHub")}
+                            tooltip={t("settings.skillsStoreOpenInClawHub")}
+                            icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
+                            variant="ghost"
+                            size="sm"
+                          />
+                        ) : null}
+                        <IconButton
+                          label={t("settings.skillsStorePreviewTitle")}
+                          tooltip={t("settings.skillsStorePreviewTitle")}
+                          icon={<Icon icon={FileText} size="sm" color="inherit" />}
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPreviewSkill(skill)}
+                        />
+                        {job && !pending && installing ? (
+                          <IconButton
+                            label={t("settings.cancel")}
+                            tooltip={t("settings.cancel")}
+                            icon={<Icon icon={X} size="sm" color="inherit" />}
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              void cancelSkillInstallJob(job.jobId).catch(() => undefined)
+                            }
+                          />
+                        ) : null}
+                        <AstryxCoreButton
+                          label={installLabel}
+                          icon={<Icon icon={done ? Check : Cloud} size="sm" color="inherit" />}
+                          variant={done ? "secondary" : "primary"}
+                          size="sm"
+                          isLoading={installing}
+                          isDisabled={done || installing}
+                          aria-busy={installing}
+                          onClick={() => onInstall(skill)}
+                        />
+                      </HStack>
+                    }
+                  />
                 );
               })}
-            </AstryxView>
+            </List>
           ) : null}
 
-          {items.length > 0 && filteredItems.length === 0 && !loading && !loadingMore && !cursor ? (
-            <GlassPanel tone="muted" className="hub-panel-enter">
-              <AstryxParagraph className="py-2 text-center text-sm text-muted-foreground">
-                {t("settings.skillsStoreEmptyTitle")}
-              </AstryxParagraph>
-            </GlassPanel>
+          {items.length > 0 && filteredItems.length === 0 && !loading ? (
+            <EmptyState
+              title={t("settings.skillsStoreEmptyTitle")}
+              description={t("settings.skillsStoreEmptyDesc")}
+              icon={<Icon icon={Search} size="lg" color="secondary" />}
+              isCompact
+            />
           ) : null}
 
           {cursor && !searching ? (
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="hub-panel-enter flex justify-center"
-            >
-              <Button
-                type="button"
-                variant="outline"
+            <HStack hAlign="center">
+              <AstryxCoreButton
+                label={
+                  loadingMore
+                    ? t("settings.skillsStoreLoadingMore")
+                    : t("settings.skillsStoreLoadMore")
+                }
+                icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+                variant="secondary"
                 size="sm"
-                className="gap-1.5 rounded-full border-border/50 bg-background/70 backdrop-blur-md"
-                disabled={loadingMore}
+                isLoading={loadingMore}
+                isDisabled={loadingMore}
                 onClick={onLoadMore}
-              >
-                <RefreshCw className={cn("h-3.5 w-3.5", loadingMore && "animate-spin")} />
-                {loadingMore
-                  ? t("settings.skillsStoreLoadingMore")
-                  : t("settings.skillsStoreLoadMore")}
-              </Button>
-            </AstryxView>
+              />
+            </HStack>
           ) : null}
-        </AstryxView>
-      </AstryxView>
+        </VStack>
+      </StackItem>
+
       {previewSkill ? (
         <SkillsStorePreviewDrawer
           skill={previewSkill}
@@ -4452,7 +3727,7 @@ function SkillsStoreView(props: {
           onInstall={() => onInstall(previewSkill)}
         />
       ) : null}
-    </AstryxView>
+    </VStack>
   );
 }
 

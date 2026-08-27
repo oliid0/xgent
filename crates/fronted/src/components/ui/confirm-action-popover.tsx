@@ -93,7 +93,7 @@ export function ConfirmDeletePopover(props: {
       title={t("settings.deleteConfirm")}
       description={
         <>
-          {t("settings.deleteConfirmYes")} {props.name}？{t("settings.deleteConfirmDesc")}
+          {t("settings.deleteConfirmYes")} {props.name} {t("settings.deleteConfirmDesc")}
         </>
       }
       confirmLabel={t("settings.delete")}

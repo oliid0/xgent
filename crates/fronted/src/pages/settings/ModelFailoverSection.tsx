@@ -26,8 +26,14 @@ const PROVIDER_LABELS: Record<ProviderId, string> = {
   deepseek: "DeepSeek",
 };
 
-export function ModelFailoverSection({ settings, setSettings }: SettingsSectionProps) {
+export function ModelFailoverSection({
+  settings,
+  setSettings,
+  providerType: selectedProviderType,
+  compact = false,
+}: SettingsSectionProps & { providerType?: ProviderId; compact?: boolean }) {
   const { t } = useLocale();
+  const providerTypes = selectedProviderType ? [selectedProviderType] : PROVIDER_TYPES;
 
   const updateProvider = (
     providerType: ProviderId,
@@ -63,21 +69,23 @@ export function ModelFailoverSection({ settings, setSettings }: SettingsSectionP
 
   return (
     <VStack gap={5}>
-      <Section padding={4} width="100%">
-        <HStack gap={3} vAlign="start">
-          <Icon icon={Waypoints} size="md" color="warning" />
-          <StackItem size="fill">
-            <VStack gap={1}>
-              <Heading level={2}>{t("settings.failover.title")}</Heading>
-              <Text type="supporting" color="secondary">
-                {t("settings.failover.desc")}
-              </Text>
-            </VStack>
-          </StackItem>
-        </HStack>
-      </Section>
+      {!compact ? (
+        <Section padding={4} width="100%">
+          <HStack gap={3} vAlign="start">
+            <Icon icon={Waypoints} size="md" color="warning" />
+            <StackItem size="fill">
+              <VStack gap={1}>
+                <Heading level={2}>{t("settings.failover.title")}</Heading>
+                <Text type="supporting" color="secondary">
+                  {t("settings.failover.desc")}
+                </Text>
+              </VStack>
+            </StackItem>
+          </HStack>
+        </Section>
+      ) : null}
 
-      {PROVIDER_TYPES.map((providerType) => {
+      {providerTypes.map((providerType) => {
         const config = settings.modelFailover[providerType];
         const providers = settings.customProviders.filter(
           (provider) => provider.type === providerType,
@@ -90,7 +98,12 @@ export function ModelFailoverSection({ settings, setSettings }: SettingsSectionP
         );
 
         return (
-          <Section key={providerType} padding={4} width="100%" dividers={["top"]}>
+          <Section
+            key={providerType}
+            padding={compact ? 3 : 4}
+            width="100%"
+            dividers={compact ? undefined : ["top"]}
+          >
             <VStack gap={4}>
               <HStack gap={4} vAlign="start">
                 <StackItem size="fill">

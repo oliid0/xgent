@@ -1,4 +1,5 @@
 import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxNativeButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Dialog } from "@astryxdesign/core/Dialog";
@@ -8,10 +9,12 @@ import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { List as AstryxList, ListItem } from "@astryxdesign/core/List";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Popover } from "@astryxdesign/core/Popover";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
+import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
@@ -43,11 +46,13 @@ import {
   Search,
   Settings,
   Trash2,
+  Wallet,
   Waypoints,
   X,
   Zap,
 } from "../../components/icons";
 import { Button } from "../../components/ui/button";
+import { ConfirmActionPopover } from "../../components/ui/confirm-action-popover";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { useLocale } from "../../i18n";
@@ -63,12 +68,22 @@ import {
 } from "../../lib/providers/customHeaders";
 import { parseModelValue, toModelValue } from "../../lib/providers/llm";
 import {
+  type ProviderUsageResult,
+  testProviderUsage,
+  useProviderUsage,
+} from "../../lib/providers/usageQuery";
+import {
   CODEX_REQUEST_FORMAT_LABELS,
   type CodexRequestFormat,
   type CustomProvider,
+  getDefaultUsageQueryConfig,
+  normalizeModelFailoverSettings,
+  normalizeUsageQueryConfig,
   type ProviderAuthMode,
   type ProviderId,
   type ProviderModelConfig,
+  type UsageQueryConfig,
+  type UsageQueryMode,
   updateCustomProviders,
   updateCustomSettings,
 } from "../../lib/settings";
@@ -80,6 +95,7 @@ import {
   CherryStudioImportModal,
 } from "./CherryStudioImportModal";
 import { CodexOAuthAccounts } from "./CodexOAuthAccounts";
+import { ModelFailoverSection } from "./ModelFailoverSection";
 import { ModelPicker } from "./modelPicker";
 import {
   buildProviderModelsFetchKey,
@@ -100,7 +116,15 @@ type ModalProps = {
   onClose: () => void;
 };
 
-type ProviderDialogPanel = "general" | "request";
+type ProviderDialogPanel = "general" | "request" | "usage";
+
+const USAGE_QUERY_MODES: UsageQueryMode[] = [
+  "coding-plan",
+  "balance",
+  "general",
+  "newapi",
+  "custom",
+];
 
 type ModelEditDraft = {
   model: ProviderModelConfig;
@@ -276,6 +300,14 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
   const [headerSuggestActive, setHeaderSuggestActive] = useState(0);
   const [showApiKey, setShowApiKey] = useState(false);
   const [saveAttempted, setSaveAttempted] = useState(false);
+  const [usageQuery, setUsageQuery] = useState<UsageQueryConfig>(() =>
+    normalizeUsageQueryConfig(initialData?.usageQuery ?? getDefaultUsageQueryConfig()),
+  );
+  const [usageTest, setUsageTest] = useState<{
+    loading: boolean;
+    result: ProviderUsageResult | null;
+    error: string | null;
+  }>({ loading: false, result: null, error: null });
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevFetchKey = useRef("");
@@ -373,6 +405,25 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
     }
     prevFetchKey.current = "";
     void doFetch(trimUrl, trimKey);
+  }
+
+  function patchUsageQuery(patch: Partial<UsageQueryConfig>) {
+    setUsageQuery((previous) => normalizeUsageQueryConfig({ ...previous, ...patch }));
+  }
+
+  async function runUsageQueryTest() {
+    if (!initialData?.id) return;
+    setUsageTest({ loading: true, result: null, error: null });
+    try {
+      const result = await testProviderUsage(initialData.id, usageQuery);
+      setUsageTest({ loading: false, result, error: result?.error ?? null });
+    } catch (error) {
+      setUsageTest({
+        loading: false,
+        result: null,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   function toggleModel(model: string) {
@@ -623,6 +674,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
           : undefined,
       nativeWebSearchEnabled: initialData?.nativeWebSearchEnabled ?? true,
       useSystemProxy,
+      usageQuery,
     });
   }
 
@@ -753,7 +805,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
             >
               <TabList
                 value={activePanel}
-                onChange={(value) => setActivePanel(value as "general" | "request")}
+                onChange={(value) => setActivePanel(value as ProviderDialogPanel)}
                 role="tablist"
                 layout="fill"
                 size="sm"
@@ -774,6 +826,12 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                       <Badge label={customHeaders.length} variant="neutral" />
                     ) : undefined
                   }
+                />
+                <Tab
+                  value="usage"
+                  label={t("settings.navUsage")}
+                  panelId="provider-settings-panel"
+                  icon={<Wallet className="h-4 w-4" />}
                 />
               </TabList>
             </AstryxView>
@@ -802,6 +860,12 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                   }
                   isSelected={activePanel === "request"}
                   onClick={() => setActivePanel("request")}
+                />
+                <ListItem
+                  label={t("settings.navUsage")}
+                  startContent={<Wallet className="h-4 w-4" />}
+                  isSelected={activePanel === "usage"}
+                  onClick={() => setActivePanel("usage")}
                 />
               </AstryxList>
             </AstryxView>
@@ -1395,7 +1459,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                   </AstryxView>
                 </AstryxView>
               </AstryxView>
-            ) : (
+            ) : activePanel === "request" ? (
               <AstryxView as="section" key="request" className="provider-panel-enter">
                 <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
                   {t("settings.providerDialogRequest")}
@@ -1788,6 +1852,169 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                   />
                 ) : null}
               </AstryxView>
+            ) : (
+              <VStack as="section" key="usage" className="provider-panel-enter" gap={4}>
+                <HStack gap={3} vAlign="center">
+                  <Wallet aria-hidden="true" />
+                  <StackItem size="fill">
+                    <VStack gap={0.5}>
+                      <AstryxParagraph className="text-sm font-semibold">
+                        {t("settings.usage.title")}
+                      </AstryxParagraph>
+                      <AstryxParagraph className="text-xs text-muted-foreground">
+                        {t("settings.usage.desc")}
+                      </AstryxParagraph>
+                    </VStack>
+                  </StackItem>
+                  <Switch
+                    label={t("settings.usage.title")}
+                    isLabelHidden
+                    size="sm"
+                    value={usageQuery.enabled}
+                    onChange={(enabled) => patchUsageQuery({ enabled })}
+                  />
+                </HStack>
+
+                <Selector
+                  label={t("settings.usage.mode")}
+                  value={usageQuery.mode}
+                  onChange={(mode) => patchUsageQuery({ mode: mode as UsageQueryMode })}
+                  options={USAGE_QUERY_MODES.map((mode) => ({
+                    value: mode,
+                    label: t(`settings.usage.mode.${mode}`),
+                  }))}
+                  width="100%"
+                />
+                <NumberInput
+                  label={t("settings.usage.timeout")}
+                  min={2}
+                  max={30}
+                  value={usageQuery.timeoutSecs ?? 10}
+                  isWheelEnabled={false}
+                  width="100%"
+                  onChange={(value) => patchUsageQuery({ timeoutSecs: value ?? 10 })}
+                />
+                <TextInput
+                  label={t("settings.usage.baseUrl")}
+                  value={usageQuery.baseUrl}
+                  placeholder={baseUrl}
+                  width="100%"
+                  onChange={(usageBaseUrl) => patchUsageQuery({ baseUrl: usageBaseUrl })}
+                />
+                <TextInput
+                  label="API Key"
+                  type="password"
+                  value={usageQuery.apiKey}
+                  placeholder={
+                    usageQuery.apiKeyConfigured
+                      ? t("settings.usage.secretSaved")
+                      : t("settings.usage.providerCredential")
+                  }
+                  width="100%"
+                  onChange={(usageApiKey) => patchUsageQuery({ apiKey: usageApiKey })}
+                />
+
+                {usageQuery.mode === "newapi" ? (
+                  <VStack gap={3}>
+                    <TextInput
+                      label="Access Token"
+                      type="password"
+                      value={usageQuery.accessToken}
+                      width="100%"
+                      onChange={(accessToken) => patchUsageQuery({ accessToken })}
+                    />
+                    <TextInput
+                      label="User ID"
+                      value={usageQuery.userId}
+                      width="100%"
+                      onChange={(userId) => patchUsageQuery({ userId })}
+                    />
+                  </VStack>
+                ) : null}
+
+                {usageQuery.mode === "coding-plan" ? (
+                  <VStack gap={3}>
+                    <TextInput
+                      label="Plan Provider"
+                      value={usageQuery.codingPlanProvider}
+                      placeholder="auto / zhipu_team / zenmux"
+                      width="100%"
+                      onChange={(codingPlanProvider) => patchUsageQuery({ codingPlanProvider })}
+                    />
+                    <TextInput
+                      label="Organization ID"
+                      value={usageQuery.teamOrganizationId}
+                      width="100%"
+                      onChange={(teamOrganizationId) => patchUsageQuery({ teamOrganizationId })}
+                    />
+                    <TextInput
+                      label="Project ID"
+                      value={usageQuery.teamProjectId}
+                      width="100%"
+                      onChange={(teamProjectId) => patchUsageQuery({ teamProjectId })}
+                    />
+                    <TextInput
+                      label="Access Key ID"
+                      value={usageQuery.accessKeyId}
+                      width="100%"
+                      onChange={(accessKeyId) => patchUsageQuery({ accessKeyId })}
+                    />
+                    <TextInput
+                      label="Secret Access Key"
+                      type="password"
+                      value={usageQuery.secretAccessKey}
+                      width="100%"
+                      onChange={(secretAccessKey) => patchUsageQuery({ secretAccessKey })}
+                    />
+                  </VStack>
+                ) : null}
+
+                {usageQuery.mode === "general" ||
+                usageQuery.mode === "newapi" ||
+                usageQuery.mode === "custom" ? (
+                  <TextArea
+                    label={t("settings.usage.script")}
+                    value={usageQuery.script}
+                    rows={8}
+                    width="100%"
+                    hasSpellCheck={false}
+                    placeholder={
+                      usageQuery.mode === "custom"
+                        ? t("settings.usage.scriptRequired")
+                        : t("settings.usage.scriptPreset")
+                    }
+                    onChange={(script) => patchUsageQuery({ script })}
+                  />
+                ) : null}
+
+                <HStack gap={2} wrap="wrap">
+                  <AstryxNativeButton
+                    label={t("settings.usage.test")}
+                    variant="secondary"
+                    icon={<RefreshCw />}
+                    isLoading={usageTest.loading}
+                    isDisabled={!initialData?.id || usageTest.loading}
+                    onClick={() => void runUsageQueryTest()}
+                  />
+                  {!initialData?.id ? (
+                    <AstryxParagraph className="text-xs text-muted-foreground">
+                      {t("settings.usage.saveBeforeTest")}
+                    </AstryxParagraph>
+                  ) : null}
+                </HStack>
+                {usageTest.error ? (
+                  <Banner status="error" title={usageTest.error} collapsible={false} />
+                ) : usageTest.result ? (
+                  <Banner
+                    status="success"
+                    title={t("settings.usage.testSuccess").replace(
+                      "{count}",
+                      String(usageTest.result.data.length),
+                    )}
+                    collapsible={false}
+                  />
+                ) : null}
+              </VStack>
             )}
           </AstryxView>
         </AstryxView>
@@ -1815,14 +2042,17 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
   );
 }
 
-function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => void }) {
-  const { settings, setSettings, onClose } = props;
+function CustomSettingsDrawer(
+  props: SettingsSectionProps & { providerType: ProviderId; onClose: () => void },
+) {
+  const { settings, setSettings, providerType, onClose } = props;
   const { t } = useLocale();
   const isCompact = useMediaQuery(
     "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
   );
   const modelOptions = useMemo(() => buildModelOptions(settings), [settings]);
   const conversationTitleModel = settings.customSettings.conversationTitleModel;
+  const commitMessageModel = settings.customSettings.commitMessageModel;
   const selectedValue = conversationTitleModel
     ? toModelValue(conversationTitleModel.customProviderId, conversationTitleModel.model)
     : "";
@@ -1839,14 +2069,42 @@ function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => voi
           },
         ]
       : modelOptions;
+  const commitSelectedValue = commitMessageModel
+    ? toModelValue(commitMessageModel.customProviderId, commitMessageModel.model)
+    : "";
+  const commitModelOptions =
+    commitMessageModel && !modelOptions.some((option) => option.value === commitSelectedValue)
+      ? [
+          ...modelOptions,
+          {
+            value: commitSelectedValue,
+            label: commitMessageModel.model,
+            providerName: commitMessageModel.customProviderId,
+          },
+        ]
+      : modelOptions;
 
-  function handleTitleModelChange(value: string) {
+  function handleModelChange(key: "conversationTitleModel" | "commitMessageModel", value: string) {
     // "" comes from the picker's follow-current entry and parses to undefined.
     setSettings((prev) =>
       updateCustomSettings(prev, {
-        conversationTitleModel: parseModelValue(value) ?? undefined,
+        [key]: parseModelValue(value) ?? undefined,
       }),
     );
+  }
+
+  function resetRuntimeConfiguration() {
+    setSettings((previous) => ({
+      ...previous,
+      modelFailover: normalizeModelFailoverSettings({}, previous.customProviders),
+      customProviders: updateCustomProviders(
+        previous,
+        previous.customProviders.map((provider) => ({
+          ...provider,
+          usageQuery: getDefaultUsageQueryConfig(),
+        })),
+      ).customProviders,
+    }));
   }
 
   return (
@@ -1933,10 +2191,21 @@ function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => voi
                 <ModelPicker
                   options={titleModelOptions}
                   value={selectedValue}
-                  onChange={handleTitleModelChange}
+                  onChange={(value) => handleModelChange("conversationTitleModel", value)}
                   placeholder={t("settings.conversationTitleModelFollowCurrent")}
                   noneLabel={t("settings.conversationTitleModelFollowCurrent")}
                   ariaLabel={t("settings.conversationTitleModel")}
+                />
+                <Label className="text-[12.5px] font-medium text-foreground/85">
+                  {t("settings.commitMessageModel")}
+                </Label>
+                <ModelPicker
+                  options={commitModelOptions}
+                  value={commitSelectedValue}
+                  onChange={(value) => handleModelChange("commitMessageModel", value)}
+                  placeholder={t("settings.conversationTitleModelFollowCurrent")}
+                  noneLabel={t("settings.conversationTitleModelFollowCurrent")}
+                  ariaLabel={t("settings.commitMessageModel")}
                 />
                 {modelOptions.length === 0 ? (
                   <AstryxView
@@ -1949,6 +2218,27 @@ function CustomSettingsDrawer(props: SettingsSectionProps & { onClose: () => voi
                 ) : null}
               </AstryxView>
             </AstryxView>
+            <ModelFailoverSection
+              settings={settings}
+              setSettings={setSettings}
+              providerType={providerType}
+              compact
+            />
+            <ConfirmActionPopover
+              title={t("settings.providerRuntimeResetTitle")}
+              description={t("settings.providerRuntimeResetDescription")}
+              confirmLabel={t("settings.providerRuntimeResetConfirm")}
+              onConfirm={resetRuntimeConfiguration}
+            >
+              {(open) => (
+                <AstryxNativeButton
+                  label={t("settings.providerRuntimeReset")}
+                  variant="secondary"
+                  onClick={open}
+                  width="100%"
+                />
+              )}
+            </ConfirmActionPopover>
           </AstryxView>
         </AstryxView>
       </AstryxView>
@@ -2515,6 +2805,7 @@ function ProviderList(props: {
   onOpenCcsImport: () => void;
   onOpenCherryImport: () => void;
   thirdPartyImportEnabled: boolean;
+  usage: ReturnType<typeof useProviderUsage>;
 }) {
   const { t } = useLocale();
   const {
@@ -2659,45 +2950,85 @@ function ProviderList(props: {
           />
         ) : (
           <AstryxList density="compact" hasDividers>
-            {filtered.map((provider) => (
-              <ListItem
-                key={provider.id}
-                label={provider.name}
-                description={`${provider.baseUrl || t("settings.noBaseUrl")} · ${provider.activeModels.length} ${t("settings.activeModels")}`}
-                startContent={<ProviderBrandIcon type={type} />}
-                endContent={
-                  <HStack gap={1} vAlign="center">
-                    {provider.useSystemProxy ? (
-                      <Waypoints title={t("settings.providerUseSystemProxy")} />
-                    ) : null}
-                    <IconButton
-                      label={t("settings.edit")}
-                      tooltip={t("settings.edit")}
-                      variant="ghost"
-                      size="sm"
-                      icon={<Pencil />}
-                      onClick={() => onEdit(provider)}
-                    />
-                    <ConfirmDeletePopover
-                      name={provider.name}
-                      onConfirm={() => onDelete(provider.id)}
-                    >
-                      {(open) => (
+            {filtered.map((provider) => {
+              const usageState = props.usage.getState(provider.id);
+              const usagePlan = usageState.result?.data[0];
+              const usageSummary = usageState.result?.error
+                ? usageState.result.error
+                : usagePlan
+                  ? [
+                      usagePlan.planName || usagePlan.extra,
+                      typeof usagePlan.remaining === "number"
+                        ? `${t("settings.usage.remaining")}: ${usagePlan.remaining.toLocaleString()}${usagePlan.unit ? ` ${usagePlan.unit}` : ""}`
+                        : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : undefined;
+              return (
+                <ListItem
+                  key={provider.id}
+                  label={provider.name}
+                  description={
+                    usageSummary ||
+                    `${provider.baseUrl || t("settings.noBaseUrl")} · ${provider.activeModels.length} ${t("settings.activeModels")}`
+                  }
+                  startContent={<ProviderBrandIcon type={type} />}
+                  endContent={
+                    <HStack gap={1} vAlign="center">
+                      {provider.usageQuery?.enabled ? (
                         <IconButton
-                          label={t("settings.delete")}
-                          tooltip={t("settings.delete")}
+                          label={t("settings.usage.refresh")}
+                          tooltip={t("settings.usage.refresh")}
                           variant="ghost"
                           size="sm"
-                          icon={<Trash2 />}
-                          onClick={open}
+                          icon={<RefreshCw />}
+                          isLoading={usageState.loading}
+                          isDisabled={usageState.loading}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void props.usage.refresh(provider.id);
+                          }}
                         />
-                      )}
-                    </ConfirmDeletePopover>
-                  </HStack>
-                }
-                onClick={() => onEdit(provider)}
-              />
-            ))}
+                      ) : null}
+                      {provider.useSystemProxy ? (
+                        <Waypoints title={t("settings.providerUseSystemProxy")} />
+                      ) : null}
+                      <IconButton
+                        label={t("settings.edit")}
+                        tooltip={t("settings.edit")}
+                        variant="ghost"
+                        size="sm"
+                        icon={<Pencil />}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onEdit(provider);
+                        }}
+                      />
+                      <ConfirmDeletePopover
+                        name={provider.name}
+                        onConfirm={() => onDelete(provider.id)}
+                      >
+                        {(open) => (
+                          <IconButton
+                            label={t("settings.delete")}
+                            tooltip={t("settings.delete")}
+                            variant="ghost"
+                            size="sm"
+                            icon={<Trash2 />}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              open();
+                            }}
+                          />
+                        )}
+                      </ConfirmDeletePopover>
+                    </HStack>
+                  }
+                  onClick={() => onEdit(provider)}
+                />
+              );
+            })}
           </AstryxList>
         )}
       </VStack>
@@ -2726,6 +3057,7 @@ export function ProvidersSection(
   const [cherryImporting, setCherryImporting] = useState(false);
   const [cherryMessage, setCherryMessage] = useState<string | null>(null);
   const [cherryDataPath, setCherryDataPath] = useState<string | null>(readCherryDataPath);
+  const usage = useProviderUsage(settings.customProviders);
 
   async function refreshThirdPartyProviders() {
     if (!thirdPartyImportEnabled) return;
@@ -3160,6 +3492,7 @@ export function ProvidersSection(
               onOpenCcsImport={() => setCcsImportType(activeTab)}
               onOpenCherryImport={() => setCherryImportType(activeTab)}
               thirdPartyImportEnabled={thirdPartyImportEnabled}
+              usage={usage}
             />
           </VStack>
         </StackItem>
@@ -3202,6 +3535,7 @@ export function ProvidersSection(
         <CustomSettingsDrawer
           settings={settings}
           setSettings={setSettings}
+          providerType={activeTab}
           onClose={() => setCustomSettingsOpen(false)}
         />
       ) : null}

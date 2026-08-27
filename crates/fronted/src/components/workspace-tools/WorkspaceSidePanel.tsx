@@ -1,9 +1,8 @@
+import { Button } from "@astryxdesign/core/Button";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Heading } from "@astryxdesign/core/Heading";
+import { HStack, LayoutPanel, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { openUrl } from "@xagent/runtime";
-import {
-  Heading as AstryxHeading,
-  Paragraph as AstryxParagraph,
-  View as AstryxView,
-} from "@xagent/ui/components/ui/view";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import type { GitClient } from "../../lib/git/types";
@@ -39,7 +38,6 @@ import {
   type WorkspacePanelTarget,
 } from "../project-tools/workspaceToolsModel";
 import { XTermViewport } from "../project-tools/XTermViewport";
-import { Button } from "../ui/button";
 import { BackgroundServicesPanel } from "./BackgroundServicesPanel";
 
 type WorkspaceSidePanelProps = {
@@ -269,31 +267,35 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
 
   return (
     <WorkspaceToolsContext.Provider value={context}>
-      <AstryxView
-        as="aside"
+      <LayoutPanel
+        role="complementary"
+        label={title}
         data-workspace-side-panel
         data-workspace-tool={props.target}
-        className="zone-font-scale workspace-side-panel relative flex h-full shrink-0 flex-col overflow-hidden border-r border-border bg-body"
+        className="zone-font-scale workspace-side-panel"
+        width={props.width}
+        hasDivider
+        padding={0}
+        isScrollable={false}
         style={
           {
             "--zone-font-scale": props.fontScale ?? 1,
-            width: props.width,
-            flexBasis: props.width,
           } as CSSProperties
         }
       >
-        <AstryxView
-          as="header"
-          className="flex h-12 shrink-0 items-center gap-2 border-b border-border/55 px-3"
-        >
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          <AstryxHeading level={2} className="min-w-0 flex-1 truncate text-sm font-semibold">
-            {title}
-          </AstryxHeading>
-        </AstryxView>
+        <Section variant="transparent" padding={3} dividers={["bottom"]}>
+          <HStack gap={2} vAlign="center">
+            <Icon />
+            <StackItem size="fill">
+              <Heading level={2} maxLines={1}>
+                {title}
+              </Heading>
+            </StackItem>
+          </HStack>
+        </Section>
 
         {props.target === "skills" ? (
-          <AstryxView layout="block" direction="horizontal" className="min-h-0 flex-1">
+          <StackItem size="fill">
             <SkillsHubPage
               settings={props.settings}
               setSettings={props.setSettings}
@@ -304,9 +306,9 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
               onOpenSidebar={() => undefined}
               embedded
             />
-          </AstryxView>
+          </StackItem>
         ) : props.target === "mcp" ? (
-          <AstryxView layout="block" direction="horizontal" className="min-h-0 flex-1">
+          <StackItem size="fill">
             <McpHubPage
               settings={props.settings}
               setSettings={props.setSettings}
@@ -316,25 +318,26 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
               allowStdio
               embedded
             />
-          </AstryxView>
+          </StackItem>
         ) : !projectReady && props.target !== "backgroundTasks" ? (
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground"
-          >
-            {props.disabledMessage ?? t("projectTools.noProjectSelected")}
-          </AstryxView>
+          <StackItem size="fill">
+            <EmptyState
+              isCompact
+              icon={<Icon />}
+              title={t("projectTools.noProjectSelected")}
+              description={props.disabledMessage ?? t("projectTools.noProjectSelected")}
+            />
+          </StackItem>
         ) : props.target === "fileTree" ? (
-          <AstryxView layout="block" direction="horizontal" className="min-h-0 flex-1">
+          <StackItem size="fill">
             <FileTreePanel active />
-          </AstryxView>
+          </StackItem>
         ) : props.target === "gitReview" ? (
-          <AstryxView layout="flex" direction="vertical" className="flex min-h-0 flex-1 flex-col">
+          <StackItem size="fill">
             <GitReviewPanel active />
-          </AstryxView>
+          </StackItem>
         ) : props.target === "sshConnection" ? (
-          <AstryxView layout="flex" direction="vertical" className="flex min-h-0 flex-1 flex-col">
+          <StackItem size="fill">
             <SshConnectionPanel
               active
               cwd={props.cwd}
@@ -349,19 +352,15 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
               onOpenSession={props.onOpenSshSession}
               onAssociatedHostIdsChange={props.onSshProjectHostIdsChange}
             />
-          </AstryxView>
+          </StackItem>
         ) : props.target === "backgroundTasks" ? (
-          <AstryxView layout="block" direction="horizontal" className="min-h-0 flex-1">
+          <StackItem size="fill">
             <BackgroundServicesPanel settings={props.settings} setSettings={props.setSettings} />
-          </AstryxView>
+          </StackItem>
         ) : (
-          <AstryxView
-            layout="flex"
-            direction="vertical"
-            className="flex min-h-0 flex-1 flex-col bg-zinc-950 text-zinc-100"
-          >
+          <StackItem size="fill">
             {activeLocalSession ? (
-              <AstryxView layout="block" direction="horizontal" className="relative min-h-0 flex-1">
+              <VStack height="100%" gap={0} className="workspace-terminal-surface">
                 <XTermViewport
                   client={props.client}
                   session={activeLocalSession}
@@ -374,30 +373,26 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
                   onError={(_sessionId, message) => sessions.setError(message)}
                   onInitialSnapshotConsumed={sessions.handleInitialTerminalSnapshotConsumed}
                 />
-              </AstryxView>
+              </VStack>
             ) : (
-              <AstryxView
-                layout="flex"
-                direction="vertical"
-                className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-5 text-center"
-              >
-                <Terminal className="h-7 w-7 text-zinc-500" />
-                <AstryxParagraph className="text-xs text-zinc-400">
-                  {t("projectTools.terminalDescription")}
-                </AstryxParagraph>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => sessions.createTerminal(props.shell)}
-                  disabled={sessions.creating}
-                >
-                  {t("projectTools.newTerminal")}
-                </Button>
-              </AstryxView>
+              <EmptyState
+                isCompact
+                icon={<Terminal />}
+                title={t("sidebar.terminal")}
+                description={t("projectTools.terminalDescription")}
+                actions={
+                  <Button
+                    label={t("projectTools.newTerminal")}
+                    size="sm"
+                    isLoading={sessions.creating}
+                    onClick={() => sessions.createTerminal(props.shell)}
+                  />
+                }
+              />
             )}
-          </AstryxView>
+          </StackItem>
         )}
-      </AstryxView>
+      </LayoutPanel>
     </WorkspaceToolsContext.Provider>
   );
 }

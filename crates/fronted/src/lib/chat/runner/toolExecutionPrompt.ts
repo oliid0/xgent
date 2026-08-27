@@ -75,7 +75,7 @@ export function buildToolsSuffix(
           `Plan mode is ACTIVE. You have the read-only tools listed under **Available Tools**, plus ${EXIT_PLAN_MODE_TOOL_NAME}. Follow the <plan-mode> rules above: research, then submit the complete deliverable via ${EXIT_PLAN_MODE_TOOL_NAME} instead of plain assistant text.`,
           ...(has("AskUserQuestion")
             ? [
-                "Use AskUserQuestion only when research cannot resolve a material user-owned choice and different answers would substantially change the plan. Do not ask for routine confirmation, preferences with a safe default, or information already present in the request; make a reasonable reversible assumption and continue.",
+                "Detail decisions that belong to the user (scope, approach trade-offs, target behavior) go through AskUserQuestion during research — ask proactively instead of guessing.",
               ]
             : []),
         ].join("\n")
@@ -85,17 +85,6 @@ export function buildToolsSuffix(
           "In this mode you have access to the tools listed under **Available Tools** at the end of this section. Invoke them when the task requires reading, searching, modifying, or coordinating state (files, commands, agents, MCP services). For pure Q&A, explanation, or analysis that does not depend on current state, answer directly without invoking tools.",
         ].join("\n"),
   );
-
-  if (has("AskUserQuestion")) {
-    sections.push(
-      [
-        "## User Questions",
-        "- AskUserQuestion is an exceptional blocking tool, not a required step in every task.",
-        "- Call it only when a missing user-owned decision prevents safe, correct progress after inspecting the available context.",
-        "- Do not call it to restate the request, ask permission for ordinary in-scope work, choose between equivalent implementation details, or report progress. Prefer a reasonable reversible assumption and continue.",
-      ].join("\n"),
-    );
-  }
 
   sections.push(
     [

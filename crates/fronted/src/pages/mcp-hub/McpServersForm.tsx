@@ -1,17 +1,22 @@
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { DialogHeader } from "@astryxdesign/core/Dialog";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { FormLayout } from "@astryxdesign/core/FormLayout";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, Layout, LayoutContent, LayoutFooter, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Selector } from "@astryxdesign/core/Selector";
 import { Switch } from "@astryxdesign/core/Switch";
+import { Text } from "@astryxdesign/core/Text";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Token } from "@astryxdesign/core/Token";
 import { isBrowserRuntime } from "@xagent/runtime";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
-import {
-  Heading as AstryxHeading,
-  Inline as AstryxInline,
-  Paragraph as AstryxParagraph,
-  View as AstryxView,
-} from "@xagent/ui/components/ui/view";
 import { type FormEvent, memo, useEffect, useMemo, useState } from "react";
 import { ToolPolicyToggle } from "../../components/hub/ToolPolicyToggle";
 import {
-  AlertTriangle,
   Globe2,
   Pencil,
   Plug,
@@ -21,20 +26,8 @@ import {
   Terminal,
   Trash2,
   Wifi,
-  X,
 } from "../../components/icons";
-import { Button } from "../../components/ui/button";
 import { ConfirmDeletePopover } from "../../components/ui/confirm-action-popover";
-import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
-import { Textarea } from "../../components/ui/textarea";
 import { useLocale } from "../../i18n";
 import {
   type AppSettings,
@@ -43,7 +36,6 @@ import {
   updateMcp,
   updateSystem,
 } from "../../lib/settings";
-import { cn } from "../../lib/shared/utils";
 import { toolGroupPolicyKey, toolServerPolicyKey } from "../../lib/tools/toolPolicy";
 import { SettingsModalShell } from "../settings/SettingsModalShell";
 
@@ -205,42 +197,13 @@ function buildServerFromDraft(
 }
 
 function transportMeta(transport: string) {
-  // Transport badges stay subtly differentiated; using neutral tints to keep the macOS frosted look.
   if (transport === "http") {
-    return {
-      label: "http",
-      tone: "bg-background/70 text-foreground/75 ring-border/45",
-      Icon: Globe2,
-    } as const;
+    return { label: "HTTP", color: "blue", Icon: Globe2 } as const;
   }
   if (transport === "sse") {
-    return {
-      label: "sse",
-      tone: "bg-background/70 text-foreground/75 ring-border/45",
-      Icon: Wifi,
-    } as const;
+    return { label: "SSE", color: "teal", Icon: Wifi } as const;
   }
-  return {
-    label: "stdio",
-    tone: "bg-background/70 text-foreground/75 ring-border/45",
-    Icon: Terminal,
-  } as const;
-}
-
-function CounterPill(props: { label: string; count: number }) {
-  return (
-    <AstryxView
-      as="span"
-      layout="inline-flex"
-      direction="horizontal"
-      className="inline-flex items-center gap-1 rounded-full bg-muted/55 px-2 py-0.5 text-[10px] text-muted-foreground ring-1 ring-border/40"
-    >
-      <AstryxInline className="font-semibold text-foreground/85 tabular-nums">
-        {props.count}
-      </AstryxInline>
-      <AstryxInline className="opacity-70">{props.label}</AstryxInline>
-    </AstryxView>
-  );
+  return { label: "STDIO", color: "gray", Icon: Terminal } as const;
 }
 
 const McpServerCard = memo(function McpServerCard(props: {
@@ -281,124 +244,42 @@ const McpServerCard = memo(function McpServerCard(props: {
       ? t("mcpHub.urlHttp")
       : t("mcpHub.urlSse");
 
+  const metadata = [
+    argsCount > 0 ? `${t("mcpHub.previewArgs")} ${argsCount}` : null,
+    envCount > 0 ? `${t("mcpHub.previewEnv")} ${envCount}` : null,
+    headerCount > 0 ? `${t("mcpHub.previewHeaders")} ${headerCount}` : null,
+  ].filter((value): value is string => Boolean(value));
+
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
-      className={cn(
-        "mcp-server-card skill-card-enter group rounded-2xl border backdrop-blur-xl transition-[border-color,background-color,box-shadow] duration-150",
-        enabled
-          ? "border-border/55 bg-background/80 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset,0_4px_18px_-12px_rgba(15,23,42,0.16)] dark:border-white/[0.10] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_4px_18px_-12px_rgba(0,0,0,0.5)]"
-          : "border-border/40 bg-background/55 hover:border-border/55 hover:bg-background/70 dark:border-white/[0.05] dark:bg-white/[0.03] dark:hover:border-white/[0.10] dark:hover:bg-white/[0.06]",
-      )}
-    >
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="mcp-server-card-row flex items-center gap-3 px-4 py-3"
-      >
-        <Switch
-          label={enabled ? t("settings.disable") : t("settings.enable")}
-          isLabelHidden
-          size="sm"
-          value={enabled}
-          onChange={(value) => patchServer({ enabled: value })}
-        />
-
-        {/* Clickable body */}
-        <AstryxButton
-          type="button"
-          onClick={onEdit}
-          title={t("settings.edit")}
-          className="mcp-server-body flex min-w-0 flex-1 items-center gap-3 text-left outline-hidden"
-        >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-all",
-              enabled
-                ? "border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-                : "border-border/40 bg-muted/45 text-muted-foreground group-hover:border-border/55 group-hover:bg-background/70 group-hover:text-foreground/85",
-            )}
-          >
-            <MetaIcon className="h-[18px] w-[18px]" />
-          </AstryxView>
-
-          <AstryxView
-            layout="flex"
-            direction="vertical"
-            className="flex min-w-0 flex-1 flex-col gap-0.5"
-          >
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex min-w-0 items-center gap-2"
-            >
-              <AstryxInline
-                className={cn(
-                  "truncate text-[13px] font-semibold leading-tight",
-                  enabled ? "text-foreground" : "text-muted-foreground",
-                )}
-              >
-                {serverConfig.id || `Server ${idx + 1}`}
-              </AstryxInline>
-              <AstryxView
-                as="span"
-                layout="inline-flex"
-                direction="horizontal"
-                className={cn(
-                  "inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1",
-                  meta.tone,
-                )}
-              >
-                {meta.label}
-              </AstryxView>
-            </AstryxView>
-            {previewLine ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="truncate text-[11px] text-muted-foreground/85"
-                title={previewLine}
-              >
-                <AstryxInline className="text-muted-foreground/55">{previewLabel}:</AstryxInline>{" "}
-                <AstryxInline className="font-mono">{previewLine}</AstryxInline>
-              </AstryxView>
-            ) : (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="truncate text-[11px] italic text-muted-foreground/55"
-              >
-                {isStdio ? "未配置启动命令" : "未配置 URL"}
-              </AstryxView>
-            )}
-          </AstryxView>
-        </AstryxButton>
-
-        {/* Counters (≥md) */}
-        {argsCount > 0 || envCount > 0 || headerCount > 0 ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="hidden shrink-0 items-center gap-1 md:flex"
-          >
-            {argsCount > 0 ? (
-              <CounterPill label={t("mcpHub.previewArgs")} count={argsCount} />
-            ) : null}
-            {envCount > 0 ? <CounterPill label={t("mcpHub.previewEnv")} count={envCount} /> : null}
-            {headerCount > 0 ? (
-              <CounterPill label={t("mcpHub.previewHeaders")} count={headerCount} />
-            ) : null}
-          </AstryxView>
-        ) : null}
-
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="mcp-server-actions flex shrink-0 items-center gap-1"
-        >
+    <ListItem
+      label={serverConfig.id || `Server ${idx + 1}`}
+      startContent={<Icon icon={MetaIcon} size="md" color={enabled ? "primary" : "disabled"} />}
+      description={
+        <VStack gap={1}>
+          <HStack gap={1} wrap="wrap">
+            <Token label={meta.label} color={meta.color} size="sm" />
+            {metadata.map((label) => (
+              <Token key={label} label={label} size="sm" />
+            ))}
+          </HStack>
+          <Text type="supporting" color="secondary">
+            {previewLine
+              ? `${previewLabel}: ${previewLine}`
+              : isStdio
+                ? t("mcpHub.invalidCommand")
+                : t("mcpHub.storeConfigureUrlRequired")}
+          </Text>
+        </VStack>
+      }
+      endContent={
+        <HStack gap={1} vAlign="center">
+          <Switch
+            label={enabled ? t("settings.disable") : t("settings.enable")}
+            isLabelHidden
+            size="sm"
+            value={enabled}
+            onChange={(value) => patchServer({ enabled: value })}
+          />
           <ToolPolicyToggle
             value={policy}
             size="sm"
@@ -414,14 +295,14 @@ const McpServerCard = memo(function McpServerCard(props: {
               )
             }
           />
-          <AstryxButton
-            type="button"
+          <IconButton
+            label={t("settings.edit")}
+            tooltip={t("settings.edit")}
+            icon={<Icon icon={Pencil} size="sm" color="inherit" />}
+            variant="ghost"
+            size="sm"
             onClick={onEdit}
-            title={t("settings.edit")}
-            className="mcp-server-action rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </AstryxButton>
+          />
           <ConfirmDeletePopover
             name={serverConfig.id || `Server ${idx + 1}`}
             onConfirm={() =>
@@ -436,19 +317,19 @@ const McpServerCard = memo(function McpServerCard(props: {
             }
           >
             {(open) => (
-              <AstryxButton
-                type="button"
+              <IconButton
+                label={t("settings.delete")}
+                tooltip={t("settings.delete")}
+                icon={<Icon icon={Trash2} size="sm" color="inherit" />}
+                variant="ghost"
+                size="sm"
                 onClick={open}
-                className="mcp-server-action rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                title={t("settings.delete")}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </AstryxButton>
+              />
             )}
           </ConfirmDeletePopover>
-        </AstryxView>
-      </AstryxView>
-    </AstryxView>
+        </HStack>
+      }
+    />
   );
 });
 
@@ -470,20 +351,19 @@ export function McpServerEditModal(props: {
       .map((server) => server.id);
   }, [existingServers, initialServer, mode]);
 
-  const createInitialDraft = () => {
+  const initialDraft = useMemo(() => {
     const next = initialServer
       ? draftFromServer(initialServer)
       : blankDraft(existingIdsExcludingCurrent);
     return !allowStdio && !initialServer ? { ...next, transport: "http" as const } : next;
-  };
-  const [draft, setDraft] = useState<ServerDraft>(createInitialDraft);
+  }, [allowStdio, existingIdsExcludingCurrent, initialServer]);
+  const [draft, setDraft] = useState<ServerDraft>(initialDraft);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    setDraft(createInitialDraft());
+    setDraft(initialDraft);
     setFormError(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allowStdio, initialServer]);
+  }, [initialDraft]);
 
   function updateDraft(patch: Partial<ServerDraft>) {
     setFormError(null);
@@ -515,253 +395,159 @@ export function McpServerEditModal(props: {
 
   return (
     <SettingsModalShell onClose={onClose} purpose="form" ariaLabel={title}>
-      <AstryxView
-        as="form"
-        onSubmit={handleSubmit}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-      >
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4"
-        >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-          >
-            <Plug className="h-5 w-5" />
-          </AstryxView>
-          <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-            <AstryxHeading level={2} className="text-base font-semibold">
-              {title}
-            </AstryxHeading>
-            <AstryxParagraph
-              className="mt-0.5 truncate text-xs text-muted-foreground"
-              title={subtitleRaw}
-            >
-              {subtitleRaw}
-            </AstryxParagraph>
-          </AstryxView>
-          <AstryxButton
-            type="button"
-            onClick={onClose}
-            title={t("settings.cancel")}
-            aria-label={t("settings.cancel")}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </AstryxButton>
-        </AstryxView>
-
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="settings-modal-body flex-1 overflow-y-auto px-6 py-5"
-        >
-          <AstryxView layout="block" direction="horizontal" className="space-y-5">
-            <AstryxView layout="grid" direction="horizontal" className="grid gap-3 sm:grid-cols-3">
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="space-y-1.5 sm:col-span-1"
-              >
-                <Label htmlFor="mcp-edit-id" className="text-xs text-muted-foreground">
-                  {t("mcpHub.serverName")}
-                </Label>
-                <Input
-                  id="mcp-edit-id"
-                  value={draft.id}
-                  placeholder={t("mcpHub.serverNamePlaceholder")}
-                  onChange={(event) => updateDraft({ id: event.currentTarget.value })}
-                />
-                <AstryxParagraph className="text-[10.5px] text-muted-foreground/70">
-                  {t("mcpHub.serverNameHint")}
-                </AstryxParagraph>
-              </AstryxView>
-              <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                <Label htmlFor="mcp-edit-transport" className="text-xs text-muted-foreground">
-                  {t("mcpHub.transport")}
-                </Label>
-                <Select
-                  value={draft.transport}
-                  onValueChange={(value) => {
-                    const transport = value === "http" ? "http" : value === "sse" ? "sse" : "stdio";
-                    updateDraft({ transport });
-                  }}
-                >
-                  <SelectTrigger id="mcp-edit-transport">
-                    <SelectValue placeholder={t("mcpHub.selectTransport")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="stdio" disabled={!allowStdio}>
-                      {t("mcpHub.stdio")}
-                    </SelectItem>
-                    <SelectItem value="http">{t("mcpHub.http")}</SelectItem>
-                    <SelectItem value="sse">{t("mcpHub.sse")}</SelectItem>
-                  </SelectContent>
-                </Select>
-                {!allowStdio ? (
-                  <AstryxParagraph className="text-[10.5px] leading-4 text-amber-600 dark:text-amber-300">
-                    {t("mcpHub.mobileNetworkOnly")}
-                  </AstryxParagraph>
-                ) : null}
-              </AstryxView>
-              <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                <Label htmlFor="mcp-edit-timeout" className="text-xs text-muted-foreground">
-                  {t("mcpHub.timeout")}
-                </Label>
-                <Input
-                  id="mcp-edit-timeout"
-                  type="number"
-                  value={draft.timeoutMs}
-                  placeholder="60000"
-                  onChange={(event) => updateDraft({ timeoutMs: event.currentTarget.value })}
-                />
-              </AstryxView>
-            </AstryxView>
-
-            {isStdio ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="space-y-3 rounded-xl border border-border/45 bg-muted/20 p-4"
-              >
-                <AstryxView
-                  layout="grid"
-                  direction="horizontal"
-                  className="grid gap-3 sm:grid-cols-2"
-                >
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                    <Label htmlFor="mcp-edit-command" className="text-xs text-muted-foreground">
-                      {t("mcpHub.command")}
-                    </Label>
-                    <Input
-                      id="mcp-edit-command"
-                      value={draft.command}
-                      placeholder="npx"
-                      className="font-mono text-[12.5px]"
-                      onChange={(event) => updateDraft({ command: event.currentTarget.value })}
-                    />
-                  </AstryxView>
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                    <Label htmlFor="mcp-edit-cwd" className="text-xs text-muted-foreground">
-                      {t("mcpHub.cwd")}
-                    </Label>
-                    <Input
-                      id="mcp-edit-cwd"
-                      value={draft.cwd}
-                      placeholder={t("mcpHub.cwdDefault")}
-                      className="font-mono text-[12.5px]"
-                      onChange={(event) => updateDraft({ cwd: event.currentTarget.value })}
-                    />
-                  </AstryxView>
-                </AstryxView>
-                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                  <Label htmlFor="mcp-edit-args" className="text-xs text-muted-foreground">
-                    {t("mcpHub.args")}
-                  </Label>
-                  <Textarea
-                    id="mcp-edit-args"
-                    value={draft.argsText}
-                    placeholder={"-y\n@modelcontextprotocol/server-time"}
-                    className="min-h-[92px] font-mono text-[12.5px]"
-                    onChange={(event) => updateDraft({ argsText: event.currentTarget.value })}
+      <VStack as="form" onSubmit={handleSubmit} height="100%" minHeight={0} gap={0}>
+        <DialogHeader
+          title={title}
+          subtitle={subtitleRaw}
+          startContent={<Icon icon={Plug} size="md" color="secondary" />}
+          onOpenChange={() => onClose()}
+        />
+        <Layout
+          height="fill"
+          padding={0}
+          content={
+            <LayoutContent padding={5} isScrollable>
+              <FormLayout direction="vertical">
+                <FormLayout direction="horizontal">
+                  <TextInput
+                    label={t("mcpHub.serverName")}
+                    description={t("mcpHub.serverNameHint")}
+                    value={draft.id}
+                    placeholder={t("mcpHub.serverNamePlaceholder")}
+                    width="100%"
+                    onChange={(value) => updateDraft({ id: value })}
                   />
-                </AstryxView>
-                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                  <Label htmlFor="mcp-edit-env" className="text-xs text-muted-foreground">
-                    {t("mcpHub.env")}
-                  </Label>
-                  <Textarea
-                    id="mcp-edit-env"
-                    value={draft.envText}
-                    disabled={browser}
-                    placeholder={"BRAVE_API_KEY=...\nHTTP_PROXY=..."}
-                    className="min-h-[92px] font-mono text-[12.5px]"
-                    onChange={(event) => updateDraft({ envText: event.currentTarget.value })}
-                  />
-                </AstryxView>
-              </AstryxView>
-            ) : (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="space-y-3 rounded-xl border border-border/45 bg-muted/20 p-4"
-              >
-                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                  <Label htmlFor="mcp-edit-url" className="text-xs text-muted-foreground">
-                    {draft.transport === "http" ? t("mcpHub.urlHttp") : t("mcpHub.urlSse")}
-                  </Label>
-                  <Input
-                    id="mcp-edit-url"
-                    value={draft.url}
-                    placeholder={
-                      draft.transport === "http"
-                        ? "http://127.0.0.1:3000/mcp"
-                        : "http://127.0.0.1:3000/sse"
+                  <Selector
+                    label={t("mcpHub.transport")}
+                    value={draft.transport}
+                    width="100%"
+                    options={[
+                      { value: "stdio", label: t("mcpHub.stdio"), disabled: !allowStdio },
+                      { value: "http", label: t("mcpHub.http") },
+                      { value: "sse", label: t("mcpHub.sse") },
+                    ]}
+                    onChange={(value) =>
+                      updateDraft({
+                        transport: value === "http" ? "http" : value === "sse" ? "sse" : "stdio",
+                      })
                     }
-                    className="font-mono text-[12.5px]"
-                    onChange={(event) => updateDraft({ url: event.currentTarget.value })}
                   />
-                </AstryxView>
-                {isSse ? (
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                    <Label htmlFor="mcp-edit-message-url" className="text-xs text-muted-foreground">
-                      {t("mcpHub.messageUrl")}
-                    </Label>
-                    <Input
-                      id="mcp-edit-message-url"
-                      value={draft.messageUrl}
-                      placeholder="http://127.0.0.1:3000/message"
-                      className="font-mono text-[12.5px]"
-                      onChange={(event) => updateDraft({ messageUrl: event.currentTarget.value })}
-                    />
-                  </AstryxView>
+                  <TextInput
+                    label={t("mcpHub.timeout")}
+                    value={draft.timeoutMs}
+                    placeholder="60000"
+                    width="100%"
+                    onChange={(value) => updateDraft({ timeoutMs: value })}
+                  />
+                </FormLayout>
+
+                {!allowStdio ? (
+                  <Banner
+                    status="warning"
+                    title={t("mcpHub.mobileNetworkOnly")}
+                    collapsible={false}
+                  />
                 ) : null}
-                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                  <Label htmlFor="mcp-edit-headers" className="text-xs text-muted-foreground">
-                    {t("mcpHub.headers")}
-                  </Label>
-                  <Textarea
-                    id="mcp-edit-headers"
-                    value={draft.headersText}
-                    disabled={browser}
-                    placeholder={"Authorization=Bearer ...\nX-API-Key=..."}
-                    className="min-h-[92px] font-mono text-[12.5px]"
-                    onChange={(event) => updateDraft({ headersText: event.currentTarget.value })}
-                  />
-                </AstryxView>
-              </AstryxView>
-            )}
 
-            {formError ? (
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/[0.06] px-3 py-2.5 text-xs text-destructive"
-              >
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <AstryxInline>{formError}</AstryxInline>
-              </AstryxView>
-            ) : null}
-          </AstryxView>
-        </AstryxView>
+                {isStdio ? (
+                  <FormLayout direction="vertical">
+                    <FormLayout direction="horizontal">
+                      <TextInput
+                        label={t("mcpHub.command")}
+                        value={draft.command}
+                        placeholder="npx"
+                        width="100%"
+                        onChange={(value) => updateDraft({ command: value })}
+                      />
+                      <TextInput
+                        label={t("mcpHub.cwd")}
+                        value={draft.cwd}
+                        placeholder={t("mcpHub.cwdDefault")}
+                        width="100%"
+                        onChange={(value) => updateDraft({ cwd: value })}
+                      />
+                    </FormLayout>
+                    <TextArea
+                      label={t("mcpHub.args")}
+                      value={draft.argsText}
+                      placeholder={"-y\n@modelcontextprotocol/server-time"}
+                      rows={4}
+                      width="100%"
+                      hasSpellCheck={false}
+                      onChange={(value) => updateDraft({ argsText: value })}
+                    />
+                    <TextArea
+                      label={t("mcpHub.env")}
+                      value={draft.envText}
+                      placeholder={"BRAVE_API_KEY=...\nHTTP_PROXY=..."}
+                      rows={4}
+                      width="100%"
+                      hasSpellCheck={false}
+                      isDisabled={browser}
+                      disabledMessage={browser ? t("mcpHub.mobileNetworkOnly") : undefined}
+                      onChange={(value) => updateDraft({ envText: value })}
+                    />
+                  </FormLayout>
+                ) : (
+                  <FormLayout direction="vertical">
+                    <TextInput
+                      label={draft.transport === "http" ? t("mcpHub.urlHttp") : t("mcpHub.urlSse")}
+                      value={draft.url}
+                      placeholder={
+                        draft.transport === "http"
+                          ? "http://127.0.0.1:3000/mcp"
+                          : "http://127.0.0.1:3000/sse"
+                      }
+                      width="100%"
+                      onChange={(value) => updateDraft({ url: value })}
+                    />
+                    {isSse ? (
+                      <TextInput
+                        label={t("mcpHub.messageUrl")}
+                        value={draft.messageUrl}
+                        placeholder="http://127.0.0.1:3000/message"
+                        width="100%"
+                        onChange={(value) => updateDraft({ messageUrl: value })}
+                      />
+                    ) : null}
+                    <TextArea
+                      label={t("mcpHub.headers")}
+                      value={draft.headersText}
+                      placeholder={"Authorization=Bearer ...\nX-API-Key=..."}
+                      rows={4}
+                      width="100%"
+                      hasSpellCheck={false}
+                      isDisabled={browser}
+                      disabledMessage={browser ? t("mcpHub.mobileNetworkOnly") : undefined}
+                      onChange={(value) => updateDraft({ headersText: value })}
+                    />
+                  </FormLayout>
+                )}
 
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="settings-modal-footer settings-modal-footer-row flex items-center justify-end gap-2 border-t border-border/40 px-6 py-4"
-        >
-          <Button type="button" variant="outline" onClick={onClose}>
-            {t("settings.cancel")}
-          </Button>
-          <Button type="submit" className="gap-1.5">
-            {mode === "add" ? <Plus className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-            {submitLabel}
-          </Button>
-        </AstryxView>
-      </AstryxView>
+                {formError ? <Banner status="error" title={formError} collapsible={false} /> : null}
+              </FormLayout>
+            </LayoutContent>
+          }
+          footer={
+            <LayoutFooter hasDivider>
+              <HStack width="100%" gap={2} hAlign="end">
+                <Button
+                  type="button"
+                  label={t("settings.cancel")}
+                  variant="secondary"
+                  onClick={onClose}
+                />
+                <Button
+                  type="submit"
+                  label={submitLabel}
+                  variant="primary"
+                  icon={<Icon icon={mode === "add" ? Plus : Pencil} size="sm" color="inherit" />}
+                />
+              </HStack>
+            </LayoutFooter>
+          }
+        />
+      </VStack>
     </SettingsModalShell>
   );
 }
@@ -791,92 +577,71 @@ export function McpServersForm(props: McpServersFormProps) {
   const showFilter = serverCount > 4;
 
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
-      className="h-full min-h-0 overflow-y-auto px-1 pb-4 pt-2"
-    >
-      <AstryxView layout="flex" direction="vertical" className="flex flex-col gap-4">
-        {showFilter ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="hub-panel-enter relative max-w-md"
-          >
-            <Search className="absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <AstryxInput
-              type="text"
-              value={filter}
-              onChange={(e) => setFilter(e.currentTarget.value)}
-              placeholder={t("mcpHub.searchInstalled")}
-              className="h-10 w-full rounded-xl border border-border/40 bg-background/60 pl-10 pr-3 text-[13px] outline-hidden backdrop-blur-xl transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground/60 focus:border-border/60 focus:bg-background/85 focus:ring-2 focus:ring-foreground/10"
-            />
-          </AstryxView>
-        ) : null}
-
-        {serverCount === 0 ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="hub-panel-enter rounded-2xl border border-dashed border-border/45 bg-background/40 px-6 py-12 text-center backdrop-blur-xl"
-          >
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-            >
-              <Server className="h-6 w-6" />
-            </AstryxView>
-            <AstryxParagraph className="mt-4 text-sm font-medium text-foreground">
-              {t("mcpHub.noServers")}
-            </AstryxParagraph>
-            <AstryxParagraph className="mt-1 text-xs text-muted-foreground/80">
-              {t("mcpHub.noServersHint")}
-            </AstryxParagraph>
-            {onAddServer ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 gap-1.5 rounded-full"
-                onClick={onAddServer}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {t("mcpHub.add")}
-              </Button>
-            ) : null}
-          </AstryxView>
-        ) : null}
-
-        {filter.trim() && filtered.length === 0 && serverCount > 0 ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="hub-panel-enter rounded-2xl border border-border/40 bg-background/55 px-6 py-8 text-center backdrop-blur-xl"
-          >
-            <Plug className="mx-auto h-5 w-5 text-muted-foreground" />
-            <AstryxParagraph className="mt-3 text-sm text-muted-foreground">
-              {t("mcpHub.noMatchInstalled")}
-            </AstryxParagraph>
-          </AstryxView>
-        ) : null}
-
-        {filtered.length > 0 ? (
-          <AstryxView layout="flex" direction="vertical" className="flex flex-col gap-2.5">
-            {filtered.map(({ server, idx }) => (
-              <McpServerCard
-                key={idx}
-                server={server}
-                idx={idx}
-                policy={
-                  settings.system.toolPolicies?.[toolServerPolicyKey(server.id)] ?? groupPolicy
-                }
-                setSettings={setSettings}
-                onEdit={() => onEditServer?.(server, idx)}
+    <Layout
+      height="fill"
+      padding={0}
+      content={
+        <LayoutContent padding={0} isScrollable>
+          <VStack width="100%" gap={4} paddingBlock={2}>
+            {showFilter ? (
+              <TextInput
+                label={t("mcpHub.searchInstalled")}
+                isLabelHidden
+                startIcon={Search}
+                type="text"
+                value={filter}
+                onChange={setFilter}
+                placeholder={t("mcpHub.searchInstalled")}
+                hasClear
+                width="100%"
               />
-            ))}
-          </AstryxView>
-        ) : null}
-      </AstryxView>
-    </AstryxView>
+            ) : null}
+
+            {serverCount === 0 ? (
+              <EmptyState
+                title={t("mcpHub.noServers")}
+                description={t("mcpHub.noServersHint")}
+                icon={<Icon icon={Server} size="lg" color="secondary" />}
+                actions={
+                  onAddServer ? (
+                    <Button
+                      label={t("mcpHub.add")}
+                      icon={<Icon icon={Plus} size="sm" color="inherit" />}
+                      variant="secondary"
+                      onClick={onAddServer}
+                    />
+                  ) : undefined
+                }
+              />
+            ) : null}
+
+            {filter.trim() && filtered.length === 0 && serverCount > 0 ? (
+              <EmptyState
+                title={t("mcpHub.noMatchInstalled")}
+                icon={<Icon icon={Plug} size="lg" color="secondary" />}
+                isCompact
+              />
+            ) : null}
+
+            {filtered.length > 0 ? (
+              <List density="balanced" hasDividers>
+                {filtered.map(({ server, idx }) => (
+                  <McpServerCard
+                    key={idx}
+                    server={server}
+                    idx={idx}
+                    policy={
+                      settings.system.toolPolicies?.[toolServerPolicyKey(server.id)] ?? groupPolicy
+                    }
+                    setSettings={setSettings}
+                    onEdit={() => onEditServer?.(server, idx)}
+                  />
+                ))}
+              </List>
+            ) : null}
+          </VStack>
+        </LayoutContent>
+      }
+    />
   );
 }
