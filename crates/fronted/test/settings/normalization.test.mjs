@@ -69,6 +69,27 @@ test("custom provider routing strips endpoint suffixes and filters inactive mode
   assert.deepEqual(provider.activeModels, ["gpt-a"]);
 });
 
+test("provider retry policy and retry-error settings normalize persisted input", () => {
+  const provider = settings.normalizeCustomProvider({
+    id: "retry-provider",
+    name: "Retry provider",
+    type: "codex",
+    retryPolicy: { mode: "custom", maxRetries: 99 },
+  });
+  assert.deepEqual(provider.retryPolicy, { mode: "custom", maxRetries: 10 });
+  assert.equal(
+    settings.normalizeCustomProvider({ ...provider, retryPolicy: { mode: "default" } }).retryPolicy,
+    undefined,
+  );
+
+  const retryErrors = settings.normalizeRetryErrorSettings({
+    presetStatusCodes: [520, 520, 524, 527, "bad"],
+    customPatterns: [" SSL handshake ", "ssl HANDSHAKE", "", "upstream reset"],
+  });
+  assert.deepEqual(retryErrors.presetStatusCodes, [520, 527]);
+  assert.deepEqual(retryErrors.customPatterns, ["ssl HANDSHAKE", "upstream reset"]);
+});
+
 test("MCP normalization preserves HTTP headers and bounds timeout defaults", () => {
   const mcp = settings.normalizeMcpSettings({
     servers: [

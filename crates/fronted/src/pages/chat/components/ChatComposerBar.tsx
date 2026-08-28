@@ -788,7 +788,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
             </VStack>
           }
           footerActions={
-            <HStack gap={1} vAlign="center" wrap={mobileExperience ? "wrap" : undefined}>
+            <HStack gap={1} vAlign="center" wrap="wrap">
               <Popover
                 placement="above"
                 alignment="start"
@@ -921,6 +921,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 onChange={(value) => onCommandSafetyModeChange(value as CommandSafetyMode)}
                 variant="ghost"
                 size="sm"
+                placement="above"
                 startIcon={<Shield />}
                 isDisabled={controlsDisabled || !isAgentMode}
                 statusVariant="tooltip"

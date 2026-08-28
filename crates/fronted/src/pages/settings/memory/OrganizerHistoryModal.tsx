@@ -9,8 +9,8 @@
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
-import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
-import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { DialogHeader } from "@astryxdesign/core/Dialog";
+import { VStack } from "@astryxdesign/core/Layout";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useEffect, useState } from "react";
@@ -52,7 +52,7 @@ import {
   organizerTriggerLabel,
   rejectionBucketEntries,
 } from "./panelModel";
-import { BrushCleaning, Button, Check, DrawerSelect, RefreshCw } from "./platform";
+import { ArrowLeft, BrushCleaning, Button, Check, DrawerSelect, RefreshCw } from "./platform";
 import { useOrganizeRunHistory } from "./useMemoryPanelData";
 
 export function OrganizerHistoryModal(props: {
@@ -220,23 +220,9 @@ export function OrganizerHistoryModal(props: {
     }
   }
 
-  const isCompact = useMediaQuery(
-    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
-  );
-
   return (
     <>
-      <Dialog
-        isOpen
-        onOpenChange={(isOpen) => {
-          if (!isOpen) onClose();
-        }}
-        purpose="info"
-        variant={isCompact ? "fullscreen" : "standard"}
-        width={isCompact ? "100dvw" : "var(--xagent-dialog-width-xl)"}
-        maxHeight={isCompact ? "var(--xagent-viewport-height)" : "var(--xagent-dialog-height-xl)"}
-        padding={0}
-      >
+      <VStack width="100%" height="100%" minHeight={0} gap={0} role="region">
         <AstryxView
           layout="flex"
           direction="vertical"
@@ -245,9 +231,16 @@ export function OrganizerHistoryModal(props: {
           <DialogHeader
             title={t("settings.memoryOrganizerHistory")}
             subtitle={t("settings.memoryOrganizerHistoryDescription")}
-            onOpenChange={(isOpen) => {
-              if (!isOpen) onClose();
-            }}
+            startContent={
+              <AstryxButton
+                type="button"
+                onClick={onClose}
+                aria-label={t("settings.memorySettingsClose")}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </AstryxButton>
+            }
           />
 
           <AstryxView
@@ -792,7 +785,7 @@ export function OrganizerHistoryModal(props: {
             </AstryxView>
           </AstryxView>
         </AstryxView>
-      </Dialog>
+      </VStack>
       <AlertDialog
         isOpen={clearConfirmOpen}
         onOpenChange={setClearConfirmOpen}

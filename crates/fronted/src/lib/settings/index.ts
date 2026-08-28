@@ -351,6 +351,68 @@ export type UsageQueryConfig = {
   timeoutSecs?: number;
 };
 
+export type ProviderRetryPolicy = { mode: "off" } | { mode: "custom"; maxRetries: number };
+
+export const PROVIDER_RETRY_MAX_RETRIES_LIMITS = {
+  min: 1,
+  max: 10,
+} as const;
+
+export const PROVIDER_RETRY_DEFAULT_MAX_RETRIES = 5;
+
+export const RETRYABLE_PRESET_HTTP_STATUS_CODES = [520, 521, 522, 523, 525, 526, 527] as const;
+
+export type RetryErrorSettings = {
+  presetStatusCodes: number[];
+  customPatterns: string[];
+};
+
+export const DEFAULT_RETRY_ERROR_SETTINGS: RetryErrorSettings = {
+  presetStatusCodes: [...RETRYABLE_PRESET_HTTP_STATUS_CODES],
+  customPatterns: [],
+};
+
+export function normalizeProviderRetryPolicy(input: unknown): ProviderRetryPolicy | undefined {
+  const value = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  if (value.mode === "off") return { mode: "off" };
+  if (value.mode !== "custom") return undefined;
+  return {
+    mode: "custom",
+    maxRetries: normalizeIntegerSetting(
+      value.maxRetries,
+      PROVIDER_RETRY_MAX_RETRIES_LIMITS.min,
+      PROVIDER_RETRY_MAX_RETRIES_LIMITS.max,
+      PROVIDER_RETRY_DEFAULT_MAX_RETRIES,
+    ),
+  };
+}
+
+export function normalizeRetryErrorSettings(input: unknown): RetryErrorSettings {
+  const value = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const allowedCodes = new Set<number>(RETRYABLE_PRESET_HTTP_STATUS_CODES);
+  const presetStatusCodes = Array.isArray(value.presetStatusCodes)
+    ? Array.from(
+        new Set(
+          value.presetStatusCodes
+            .map((code) => Number(code))
+            .filter((code) => Number.isInteger(code) && allowedCodes.has(code)),
+        ),
+      )
+    : [...DEFAULT_RETRY_ERROR_SETTINGS.presetStatusCodes];
+  const customPatterns = Array.isArray(value.customPatterns)
+    ? Array.from(
+        new Map(
+          value.customPatterns
+            .filter((pattern): pattern is string => typeof pattern === "string")
+            .map((pattern) => pattern.trim())
+            .filter(Boolean)
+            .map((pattern) => [pattern.toLocaleLowerCase(), pattern] as const),
+        ).values(),
+      )
+    : [];
+  return { presetStatusCodes, customPatterns };
+}
+
 export function getDefaultUsageQueryConfig(): UsageQueryConfig {
   return {
     enabled: false,
@@ -394,6 +456,8 @@ export type CustomProvider = {
   promptCacheRetention?: "short" | "long";
   nativeWebSearchEnabled: boolean;
   useSystemProxy: boolean;
+  /** Per-provider stream retry policy; undefined follows the runtime default. */
+  retryPolicy?: ProviderRetryPolicy;
   usageQuery?: UsageQueryConfig;
 };
 
@@ -478,6 +542,7 @@ export type AppSettings = {
   access: AccessSettings;
   stt: SttSettings;
   modelFailover: ModelFailoverSettings;
+  retryErrorSettings: RetryErrorSettings;
   memory: MemorySettings;
   customSettings: CustomSettings;
   updates: UpdateSettings;
@@ -1662,6 +1727,7 @@ export function normalizeCustomProvider(input: unknown): CustomProvider {
       : {}),
     nativeWebSearchEnabled: obj.nativeWebSearchEnabled !== false,
     useSystemProxy: obj.useSystemProxy === true,
+    retryPolicy: normalizeProviderRetryPolicy(obj.retryPolicy),
     usageQuery: normalizeUsageQueryConfig(obj.usageQuery),
   };
 }
@@ -2586,6 +2652,7 @@ export function getDefaultSettings(): AppSettings {
     access: normalizeAccessSettings({}),
     stt: normalizeSttSettings({}),
     modelFailover: normalizeModelFailoverSettings({}, customProviders),
+    retryErrorSettings: normalizeRetryErrorSettings({}),
     memory: normalizeMemorySettings({}, customProviders),
     customSettings: normalizeCustomSettings({}, customProviders),
     updates: normalizeUpdateSettings({}),
@@ -2623,6 +2690,9 @@ export function normalizeSettings(input?: Partial<AppSettings> | null): AppSetti
     modelFailover: normalizeModelFailoverSettings(
       obj.modelFailover ?? defaults.modelFailover,
       customProviders,
+    ),
+    retryErrorSettings: normalizeRetryErrorSettings(
+      obj.retryErrorSettings ?? defaults.retryErrorSettings,
     ),
     memory: normalizeMemorySettings(obj.memory ?? defaults.memory, customProviders),
     customSettings: normalizeCustomSettings(

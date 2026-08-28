@@ -105,7 +105,7 @@ targets:
       - sdk: {{this}}.framework{{/each}}{{/if}}
       - sdk: WebKit.framework
     preBuildScripts:
-      {{#each ios-pre-build-scripts}}{{#if this.path}}
+      {{~#each ios-pre-build-scripts}}{{#if this.path}}
       - path {{this.path}}{{/if}}{{#if this.script}}
       - script: {{this.script}}{{/if}}{{#if this.name}}
         name: {{this.name}}{{/if}}{{#if this.input-files}}
@@ -123,6 +123,7 @@ targets:
         basedOnDependencyAnalysis: {{this.based-on-dependency-analysis}}{{/if}}{{#if this.discovered-dependency-file}}
         discoveredDependencyFile: {{this.discovered-dependency-file}}{{/if}}
       {{~/each}}
+
       - script: {{ tauri-binary }} {{ tauri-binary-args-str }} -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
         name: Build Rust Code
         basedOnDependencyAnalysis: false

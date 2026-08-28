@@ -30,6 +30,7 @@ export type ProviderRuntimeConfig = {
   promptCachingEnabled?: boolean;
   promptCacheHintMode?: import("../../settings").PromptCacheHintMode;
   promptCacheRetention?: "short" | "long";
+  retryPolicy?: CustomProvider["retryPolicy"];
   nativeWebSearchEnabled?: boolean;
   useSystemProxy?: boolean;
   modelConfig?: ProviderModelConfig;

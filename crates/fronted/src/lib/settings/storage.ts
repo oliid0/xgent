@@ -12,6 +12,7 @@ import {
   normalizeFontFamily,
   normalizeFontScaleSettings,
   normalizeModelFailoverSettings,
+  normalizeRetryErrorSettings,
   normalizeSelectedModel,
   normalizeSettings,
   normalizeSkillsSettings,
@@ -50,6 +51,7 @@ type LocalUiSettings = {
   theme?: unknown;
   locale?: unknown;
   closeWindowBehavior?: unknown;
+  retryErrorSettings?: unknown;
 };
 
 export type SettingsSaveState =
@@ -77,6 +79,7 @@ function readLocalUiSettings(): {
   theme: Theme;
   locale: Locale;
   closeWindowBehavior: CloseWindowBehavior;
+  retryErrorSettings: AppSettings["retryErrorSettings"];
 } {
   const defaults = getDefaultSettings();
 
@@ -113,6 +116,7 @@ function readLocalUiSettings(): {
         theme: defaults.theme,
         locale: defaults.locale,
         closeWindowBehavior: defaults.closeWindowBehavior,
+        retryErrorSettings: defaults.retryErrorSettings,
       };
     }
 
@@ -132,6 +136,9 @@ function readLocalUiSettings(): {
       closeWindowBehavior: normalizeCloseWindowBehavior(
         parsed?.closeWindowBehavior ?? defaults.closeWindowBehavior,
       ),
+      retryErrorSettings: normalizeRetryErrorSettings(
+        parsed?.retryErrorSettings ?? defaults.retryErrorSettings,
+      ),
     };
   } catch {
     return {
@@ -143,6 +150,7 @@ function readLocalUiSettings(): {
       theme: defaults.theme,
       locale: defaults.locale,
       closeWindowBehavior: defaults.closeWindowBehavior,
+      retryErrorSettings: defaults.retryErrorSettings,
     };
   }
 }
@@ -158,6 +166,7 @@ function writeLocalUiSettings(
     | "theme"
     | "locale"
     | "closeWindowBehavior"
+    | "retryErrorSettings"
   >,
 ) {
   const payload = {
@@ -169,6 +178,7 @@ function writeLocalUiSettings(
     theme: settings.theme,
     locale: settings.locale,
     closeWindowBehavior: settings.closeWindowBehavior,
+    retryErrorSettings: settings.retryErrorSettings,
   };
   localStorage.setItem(LOCAL_UI_SETTINGS_STORAGE_KEY, JSON.stringify(payload));
 }
@@ -234,6 +244,7 @@ export async function loadPersistedSettingsWithDefaults(): Promise<PersistedSett
     theme: localUi.theme,
     locale: localUi.locale,
     closeWindowBehavior: localUi.closeWindowBehavior,
+    retryErrorSettings: localUi.retryErrorSettings,
   });
 
   return {
@@ -348,7 +359,8 @@ export async function persistSettings(
     hasChanged(prev.selectedModel ?? null, next.selectedModel ?? null) ||
     hasChanged(prev.theme, next.theme) ||
     hasChanged(prev.locale, next.locale) ||
-    hasChanged(prev.closeWindowBehavior, next.closeWindowBehavior)
+    hasChanged(prev.closeWindowBehavior, next.closeWindowBehavior) ||
+    hasChanged(prev.retryErrorSettings, next.retryErrorSettings)
   ) {
     writeLocalUiSettings({
       skills: next.skills,
@@ -359,6 +371,7 @@ export async function persistSettings(
       theme: next.theme,
       locale: next.locale,
       closeWindowBehavior: next.closeWindowBehavior,
+      retryErrorSettings: next.retryErrorSettings,
     });
   }
 

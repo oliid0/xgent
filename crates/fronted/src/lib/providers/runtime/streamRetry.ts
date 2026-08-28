@@ -5,11 +5,46 @@ import {
   createAssistantMessageEventStream,
   isRetryableAssistantError,
 } from "@earendil-works/pi-ai";
+import { RETRYABLE_PRESET_HTTP_STATUS_CODES } from "../../settings";
 
 export type { RetryAttemptRecord } from "@xagent/ui/lib/chat/retryAttempts";
 
 /** 6 total attempts = 5 retries after the initial try — matches codex's stream_max_retries=5. */
 export const DEFAULT_STREAM_RETRY_MAX_ATTEMPTS = 6;
+
+export type RetryErrorExtension = {
+  statusCodes?: number[];
+  patterns?: string[];
+};
+
+const DEFAULT_RETRY_ERROR_EXTENSION: RetryErrorExtension = {
+  statusCodes: [...RETRYABLE_PRESET_HTTP_STATUS_CODES],
+  patterns: [],
+};
+
+let currentRetryErrorExtension: RetryErrorExtension = DEFAULT_RETRY_ERROR_EXTENSION;
+
+export function setRetryErrorExtension(extension: RetryErrorExtension | null): void {
+  currentRetryErrorExtension = extension ?? DEFAULT_RETRY_ERROR_EXTENSION;
+}
+
+export function isExtensionRetryableError(
+  message: AssistantMessage | undefined,
+  extension: RetryErrorExtension = currentRetryErrorExtension,
+): boolean {
+  const errorMessage = message?.errorMessage ?? "";
+  if (!errorMessage) return false;
+  const codes = extension.statusCodes ?? [];
+  if (codes.length > 0) {
+    const statusPattern = new RegExp(`(?:^|\\D)(?:${codes.join("|")})(?:\\D|$)`);
+    if (statusPattern.test(errorMessage)) return true;
+  }
+  const normalizedMessage = errorMessage.toLocaleLowerCase();
+  return (extension.patterns ?? []).some((pattern) => {
+    const normalizedPattern = pattern.trim().toLocaleLowerCase();
+    return normalizedPattern.length > 0 && normalizedMessage.includes(normalizedPattern);
+  });
+}
 
 const STREAM_RETRY_BASE_DELAY_MS = 200;
 const STREAM_RETRY_BACKOFF_FACTOR = 2;
@@ -17,6 +52,7 @@ const STREAM_RETRY_BACKOFF_FACTOR = 2;
 export type StreamRetryConfig = {
   maxAttempts?: number;
   disabled?: boolean;
+  retryExtension?: RetryErrorExtension;
   /**
    * Retry ordinal (1..maxRetries) about to be attempted, invoked before the
    * backoff sleep. `errorMessage` is the failure that triggered this retry;
@@ -150,7 +186,10 @@ export function withStreamRetry(
       }
 
       if (terminal?.type === "error" && !committed && !disabled && attempt < maxAttempts) {
-        if (isRetryableAssistantError(terminalMessage(terminal))) {
+        if (
+          isRetryableAssistantError(terminalMessage(terminal)) ||
+          isExtensionRetryableError(terminalMessage(terminal), options?.retryExtension)
+        ) {
           const errorMessage = terminalMessage(terminal)?.errorMessage || "Unknown error";
           attempt += 1;
           const plannedDelayMs = Math.round(computeStreamRetryBackoffMs(attempt - 1));

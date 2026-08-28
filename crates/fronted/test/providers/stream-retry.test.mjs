@@ -3,8 +3,33 @@ import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 const loader = createTsModuleLoader();
-const { withStreamRetry, computeStreamRetryBackoffMs, DEFAULT_STREAM_RETRY_MAX_ATTEMPTS } =
-  loader.loadModule("src/lib/providers/runtime/streamRetry.ts");
+const {
+  withStreamRetry,
+  computeStreamRetryBackoffMs,
+  DEFAULT_STREAM_RETRY_MAX_ATTEMPTS,
+  isExtensionRetryableError,
+} = loader.loadModule("src/lib/providers/runtime/streamRetry.ts");
+
+test("retry extension recognizes configured status codes and keywords only", () => {
+  assert.equal(
+    isExtensionRetryableError(createAssistant(undefined, "error", { errorMessage: "HTTP 525" })),
+    true,
+  );
+  assert.equal(
+    isExtensionRetryableError(
+      createAssistant(undefined, "error", { errorMessage: "UPSTREAM socket reset" }),
+      { statusCodes: [], patterns: ["socket reset"] },
+    ),
+    true,
+  );
+  assert.equal(
+    isExtensionRetryableError(
+      createAssistant(undefined, "error", { errorMessage: "HTTP 5250" }),
+      { statusCodes: [525], patterns: [] },
+    ),
+    false,
+  );
+});
 
 function createUsage() {
   return {

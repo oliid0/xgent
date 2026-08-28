@@ -9,6 +9,7 @@ import {
 import { useState } from "react";
 import {
   AlertTriangle,
+  ArrowLeft,
   Check,
   CheckCircle2,
   Clock3,
@@ -18,7 +19,6 @@ import {
   MessageSquare,
   Plus,
   Terminal,
-  X,
 } from "../../components/icons";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -304,6 +304,15 @@ export function CronTaskModal({
         direction="horizontal"
         className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4"
       >
+        <AstryxButton
+          type="button"
+          onClick={onClose}
+          title={t("settings.cancel")}
+          aria-label={t("settings.cancel")}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </AstryxButton>
         <AstryxView
           layout="flex"
           direction="horizontal"
@@ -319,15 +328,6 @@ export function CronTaskModal({
             {t("settings.cronExpressionHint")}
           </AstryxParagraph>
         </AstryxView>
-        <AstryxButton
-          type="button"
-          onClick={onClose}
-          title={t("settings.cancel")}
-          aria-label={t("settings.cancel")}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-        >
-          <X className="h-4 w-4" />
-        </AstryxButton>
       </AstryxView>
 
       {/* Body */}

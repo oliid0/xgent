@@ -149,18 +149,25 @@ export function HooksSection(_props: SettingsSectionProps) {
     runOps(() => applyHookOps([{ op: "delete", id: hookId }]));
   }
 
+  if (modalOpen) {
+    return (
+      <HookModal
+        event={editingHook?.event ?? activeEvent}
+        initialData={editingHook ?? undefined}
+        onSave={handleSave}
+        onClose={closeModal}
+      />
+    );
+  }
+
   return (
     <VStack width="100%" gap={4}>
       <Section variant="transparent" padding={0}>
         <HStack width="100%" gap={3} vAlign="center" wrap="wrap">
-          <Icon icon={Zap} size="md" color="secondary" />
           <StackItem size="fill">
-            <VStack gap={0.5}>
-              <Heading level={2}>{t("settings.hooksTitle")}</Heading>
-              <Text type="supporting" color="secondary" wordBreak="break-word">
-                {t("settings.hooksDesc")}
-              </Text>
-            </VStack>
+            <Text type="supporting" color="secondary" wordBreak="break-word">
+              {t("settings.hooksDesc")}
+            </Text>
           </StackItem>
           <HStack gap={1} vAlign="center" wrap="wrap">
             <Token
@@ -323,15 +330,6 @@ export function HooksSection(_props: SettingsSectionProps) {
           </List>
         )}
       </Section>
-
-      {modalOpen ? (
-        <HookModal
-          event={editingHook?.event ?? activeEvent}
-          initialData={editingHook ?? undefined}
-          onSave={handleSave}
-          onClose={closeModal}
-        />
-      ) : null}
     </VStack>
   );
 }

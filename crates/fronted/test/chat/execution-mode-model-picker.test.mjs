@@ -15,6 +15,7 @@ const composerSource = readFileSync(
   "utf8",
 );
 const chatPageSource = readFileSync(new URL("../../src/pages/ChatPage.tsx", import.meta.url), "utf8");
+const appStyles = readFileSync(new URL("../../src/index.css", import.meta.url), "utf8");
 
 const visibleExecutionModes = ["text", "tools"];
 
@@ -25,6 +26,7 @@ test("model pickers use popover semantics instead of menu semantics", () => {
   );
   assert.match(modelSelectorSource, /<ComplexSelector<string>/);
   assert.match(modelSelectorSource, /label=\{t\("chat\.selectModel"\)\}/);
+  assert.match(modelSelectorSource, /label=\{t\("chat\.selectModel"\)\}\s+isLabelHidden/);
   assert.match(modelSelectorSource, /placement="above"/);
   assert.doesNotMatch(modelSelectorSource, /DropdownMenu/);
   assert.doesNotMatch(modelSelectorSource, /@base-ui\/react/);
@@ -75,10 +77,45 @@ test("composer exposes the requested controls through Astryx slots", () => {
   assert.match(composerSource, /nativeWebSearchEnabled: value/);
   assert.match(composerSource, /thinkingEnabled: value/);
   assert.match(composerSource, /settings\.commandSafety/);
+  assert.match(composerSource, /<Selector[\s\S]*?settings\.commandSafety[\s\S]*?placement="above"/);
   assert.match(composerSource, /sendActions=\{/);
   assert.match(composerSource, /const usedTokens = Math\.max\(0, tokens \?\? 0\)/);
   assert.doesNotMatch(composerSource, /chat\.composer\.addMention/);
   assert.doesNotMatch(composerSource, /chat\.composer\.addCommand/);
+});
+
+test("composer git repository uses an in-popover drill-in menu", () => {
+  const gitSource = readFileSync(
+    new URL("../../src/pages/chat/components/ComposerGitRepositoryControl.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(gitSource, /const \[showOperations, setShowOperations\]/);
+  assert.match(gitSource, /label=\{repositoryMenuLabel\}/);
+  assert.match(gitSource, /endContent=\{<ChevronRight \/>\}/);
+  assert.match(gitSource, /git\.branchSelector\.initRepository/);
+  assert.match(gitSource, /git\.branchSelector\.refresh/);
+  assert.doesNotMatch(gitSource, /<Popover/);
+});
+
+test("Skills and MCP side panels retain the Astryx resize handle width", () => {
+  const skillsHubSource = readFileSync(
+    new URL("../../src/pages/skills-hub/SkillsHubPage.tsx", import.meta.url),
+    "utf8",
+  );
+  const mcpHubSource = readFileSync(
+    new URL("../../src/pages/mcp-hub/McpHubPage.tsx", import.meta.url),
+    "utf8",
+  );
+  const hubPanelRule = appStyles.slice(
+    appStyles.indexOf('.workspace-side-panel[data-workspace-tool="skills"]'),
+    appStyles.indexOf(".hub-page-embedded"),
+  );
+  assert.match(chatPageSource, /resizable=\{workspacePanelResize\.props\}/);
+  assert.match(hubPanelRule, /min-width:\s*0/);
+  assert.doesNotMatch(hubPanelRule, /width:\s*min\(/);
+  assert.match(skillsHubSource, /className=\{embedded \? "hub-page-embedded" : undefined\}/);
+  assert.match(mcpHubSource, /className=\{embedded \? "hub-page-embedded" : undefined\}/);
+  assert.match(mcpHubSource, /padding=\{embedded \? 2 : 5\}/);
 });
 
 test("model selector keeps reasoning depth above provider model groups", () => {

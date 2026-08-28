@@ -19,14 +19,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Archive,
   ArrowLeft,
-  BookOpen,
   Brain,
-  Cable,
   ChevronRight,
   Clock3,
   Cloud,
   Cpu,
-  FolderTree,
   Info,
   Key,
   Keyboard,
@@ -133,137 +130,93 @@ function SaveStatus({ indicator }: SaveStatusProps) {
   );
 }
 
-type NavGroup = {
-  labelKey: string;
-  items: Array<{
-    id: SectionId;
-    icon: IconType;
-    descriptionKey: string;
-    mobileOnly?: boolean;
-    desktopOnly?: boolean;
-  }>;
+type NavDefinition = {
+  id: SectionId;
+  icon: IconType;
+  descriptionKey: string;
+  mobileOnly?: boolean;
+  desktopOnly?: boolean;
 };
 
-const NAV_GROUPS: NavGroup[] = [
+const NAV_ITEMS: NavDefinition[] = [
   {
-    labelKey: "settings.groupGeneral",
-    items: [
-      {
-        id: "system",
-        icon: Settings2,
-        descriptionKey: "settings.mobile.systemDescription",
-      },
-      {
-        id: "providers",
-        icon: Cpu,
-        descriptionKey: "settings.mobile.providersDescription",
-      },
-      {
-        id: "shortcuts",
-        icon: Keyboard,
-        descriptionKey: "settings.globalShortcutsDesc",
-        desktopOnly: true,
-      },
-      {
-        id: "backup",
-        icon: Archive,
-        descriptionKey: "settings.backupSyncDesc",
-      },
-      {
-        id: "toolPermissions",
-        icon: Shield,
-        descriptionKey: "settings.toolPermissionsDesc",
-      },
-      {
-        id: "projectRoots",
-        icon: FolderTree,
-        descriptionKey: "settings.projectRoots.desc",
-        desktopOnly: true,
-      },
-      {
-        id: "voice",
-        icon: Mic,
-        descriptionKey: "settings.stt.desc",
-        desktopOnly: true,
-      },
-    ],
+    id: "system",
+    icon: Settings2,
+    descriptionKey: "settings.mobile.systemDescription",
   },
   {
-    labelKey: "settings.groupIntelligence",
-    items: [
-      {
-        id: "soul",
-        icon: Sparkles,
-        descriptionKey: "settings.mobile.soulDescription",
-      },
-      {
-        id: "memory",
-        icon: Brain,
-        descriptionKey: "settings.mobile.memoryDescription",
-      },
-      {
-        id: "skills",
-        icon: BookOpen,
-        descriptionKey: "settings.mobile.skillsDescription",
-      },
-      {
-        id: "mcp",
-        icon: Cable,
-        descriptionKey: "settings.mobile.mcpDescription",
-      },
-    ],
+    id: "providers",
+    icon: Cpu,
+    descriptionKey: "settings.mobile.providersDescription",
   },
   {
-    labelKey: "settings.groupAutomation",
-    items: [
-      {
-        id: "hooks",
-        icon: Zap,
-        descriptionKey: "settings.mobile.hooksDescription",
-      },
-      {
-        id: "cron",
-        icon: Clock3,
-        descriptionKey: "settings.mobile.cronDescription",
-      },
-    ],
+    id: "shortcuts",
+    icon: Keyboard,
+    descriptionKey: "settings.globalShortcutsDesc",
+    desktopOnly: true,
   },
   {
-    labelKey: "settings.groupConnectivity",
-    items: [
-      {
-        id: "ssh",
-        icon: Key,
-        descriptionKey: "settings.mobile.sshDescription",
-      },
-      {
-        id: "access",
-        icon: Cloud,
-        descriptionKey: "settings.mobile.accessDescription",
-      },
-      {
-        id: "mobileAssistant",
-        icon: Mic,
-        descriptionKey: "settings.mobile.assistantDescription",
-        mobileOnly: true,
-      },
-      {
-        id: "mobileExecution",
-        icon: Terminal,
-        descriptionKey: "settings.mobile.executionDescription",
-        mobileOnly: true,
-      },
-    ],
+    id: "backup",
+    icon: Archive,
+    descriptionKey: "settings.backupSyncDesc",
   },
   {
-    labelKey: "settings.groupOther",
-    items: [
-      {
-        id: "about",
-        icon: Info,
-        descriptionKey: "settings.mobile.aboutDescription",
-      },
-    ],
+    id: "toolPermissions",
+    icon: Shield,
+    descriptionKey: "settings.toolPermissionsDesc",
+  },
+  {
+    id: "voice",
+    icon: Mic,
+    descriptionKey: "settings.stt.desc",
+    desktopOnly: true,
+  },
+  {
+    id: "soul",
+    icon: Sparkles,
+    descriptionKey: "settings.mobile.soulDescription",
+  },
+  {
+    id: "memory",
+    icon: Brain,
+    descriptionKey: "settings.mobile.memoryDescription",
+  },
+  {
+    id: "hooks",
+    icon: Zap,
+    descriptionKey: "settings.mobile.hooksDescription",
+  },
+  {
+    id: "cron",
+    icon: Clock3,
+    descriptionKey: "settings.mobile.cronDescription",
+  },
+  {
+    id: "ssh",
+    icon: Key,
+    descriptionKey: "settings.mobile.sshDescription",
+  },
+  {
+    id: "access",
+    icon: Cloud,
+    descriptionKey: "settings.mobile.accessDescription",
+  },
+  {
+    id: "mobileAssistant",
+    icon: Mic,
+    descriptionKey: "settings.mobile.assistantDescription",
+    mobileOnly: true,
+  },
+  {
+    id: "mobileExecution",
+    icon: Terminal,
+    descriptionKey: "settings.mobile.executionDescription",
+    mobileOnly: true,
+  },
+  {
+    id: "about",
+    icon: Info,
+    descriptionKey: "settings.mobile.aboutDescription",
   },
 ];
 
@@ -317,42 +270,27 @@ export function SettingsPage(props: SettingsPageProps) {
   };
 
   const hiddenSectionSet = useMemo(() => new Set(hiddenSections), [hiddenSections]);
-  const navGroups = useMemo(
+  const navItems = useMemo(
     () =>
-      NAV_GROUPS.map((group) => ({
-        label: t(group.labelKey),
-        items: group.items
-          .filter(
-            (item) =>
-              !hiddenSectionSet.has(item.id) &&
-              (!item.mobileOnly || nativeMobile) &&
-              (!item.desktopOnly || !nativeMobile),
-          )
-          .map((item) => ({
-            ...item,
-            label: sectionLabels[item.id],
-            description: t(item.descriptionKey),
-          })),
-      })).filter((group) => group.items.length > 0),
+      NAV_ITEMS.filter(
+        (item) =>
+          !hiddenSectionSet.has(item.id) &&
+          (!item.mobileOnly || nativeMobile) &&
+          (!item.desktopOnly || !nativeMobile),
+      ).map((item) => ({
+        ...item,
+        label: sectionLabels[item.id],
+        description: t(item.descriptionKey),
+      })),
     [hiddenSectionSet, nativeMobile, sectionLabels, t],
   );
-  const allNavItems = useMemo(() => navGroups.flatMap((g) => g.items), [navGroups]);
   const visibleDesktopNavItems = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
-    if (!query) return allNavItems;
-    return allNavItems.filter((item) =>
+    if (!query) return navItems;
+    return navItems.filter((item) =>
       `${item.label} ${item.description}`.toLocaleLowerCase().includes(query),
     );
-  }, [allNavItems, searchQuery]);
-  const desktopNavGroups = useMemo(() => {
-    const visibleIds = new Set(visibleDesktopNavItems.map((item) => item.id));
-    return navGroups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) => visibleIds.has(item.id)),
-      }))
-      .filter((group) => group.items.length > 0);
-  }, [navGroups, visibleDesktopNavItems]);
+  }, [navItems, searchQuery]);
 
   useEffect(() => {
     setSection(normalizeSettingsSection(initialSection));
@@ -360,11 +298,11 @@ export function SettingsPage(props: SettingsPageProps) {
   }, [compactSettings, initialSection]);
 
   useEffect(() => {
-    if (allNavItems.some((item) => item.id === section)) {
+    if (navItems.some((item) => item.id === section)) {
       return;
     }
-    setSection(allNavItems[0]?.id ?? "system");
-  }, [allNavItems, section]);
+    setSection(navItems[0]?.id ?? "system");
+  }, [navItems, section]);
 
   const saveIndicator = getSaveIndicator(saveState, t);
   const sectionManagesScroll = section === "providers" || section === "memory" || section === "mcp";
@@ -509,32 +447,21 @@ export function SettingsPage(props: SettingsPageProps) {
                 gap={4}
                 style={{ marginInline: "auto" }}
               >
-                {navGroups.map((group) => (
-                  <List
-                    key={group.label}
-                    density="spacious"
-                    hasDividers
-                    header={
-                      <Text type="label" color="secondary" weight="semibold">
-                        {group.label}
-                      </Text>
-                    }
-                  >
-                    {group.items.map((item) => (
-                      <ListItem
-                        key={item.id}
-                        label={item.label}
-                        description={item.description}
-                        startContent={<Icon icon={item.icon} size="md" color="secondary" />}
-                        endContent={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
-                        onClick={() => {
-                          setSection(item.id);
-                          setMobileDetailOpen(true);
-                        }}
-                      />
-                    ))}
-                  </List>
-                ))}
+                <List density="spacious" hasDividers>
+                  {navItems.map((item) => (
+                    <ListItem
+                      key={item.id}
+                      label={item.label}
+                      description={item.description}
+                      startContent={<Icon icon={item.icon} size="md" color="secondary" />}
+                      endContent={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
+                      onClick={() => {
+                        setSection(item.id);
+                        setMobileDetailOpen(true);
+                      }}
+                    />
+                  ))}
+                </List>
               </VStack>
             </LayoutContent>
           )
@@ -548,7 +475,7 @@ export function SettingsPage(props: SettingsPageProps) {
       height="fill"
       padding={0}
       className="settings-page settings-page-desktop"
-      style={{ height: "var(--xagent-dialog-height-xl)" }}
+      style={{ height: "var(--xagent-settings-dialog-height)" }}
       data-edge-swipe-ignore
       start={
         <LayoutPanel
@@ -581,28 +508,18 @@ export function SettingsPage(props: SettingsPageProps) {
               width="100%"
             />
             <StackItem size="fill" isScrollable>
-              <VStack gap={4}>
-                {desktopNavGroups.map((group) => (
-                  <List
-                    key={group.label}
-                    density="compact"
-                    header={
-                      <Text type="label" color="secondary" weight="semibold">
-                        {group.label}
-                      </Text>
-                    }
-                  >
-                    {group.items.map((item) => (
-                      <NavItem
-                        key={item.id}
-                        icon={item.icon}
-                        label={item.label}
-                        active={section === item.id}
-                        onClick={() => setSection(item.id)}
-                      />
-                    ))}
-                  </List>
-                ))}
+              <VStack gap={2}>
+                <List density="balanced">
+                  {visibleDesktopNavItems.map((item) => (
+                    <NavItem
+                      key={item.id}
+                      icon={item.icon}
+                      label={item.label}
+                      active={section === item.id}
+                      onClick={() => setSection(item.id)}
+                    />
+                  ))}
+                </List>
                 {visibleDesktopNavItems.length === 0 ? (
                   <EmptyState title={t("settings.searchEmpty")} isCompact />
                 ) : null}
@@ -614,7 +531,7 @@ export function SettingsPage(props: SettingsPageProps) {
       }
       content={
         <VStack height="100%" minHeight={0} gap={0}>
-          <LayoutHeader hasDivider>
+          <LayoutHeader hasDivider height="var(--xagent-settings-header-height)">
             <Heading level={2}>{sectionLabels[section]}</Heading>
           </LayoutHeader>
           <StackItem size="fill" isScrollable={!sectionManagesScroll}>

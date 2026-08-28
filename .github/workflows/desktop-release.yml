@@ -713,8 +713,9 @@ jobs:
             fi
           done
           brew link --overwrite --force xcodegen libimobiledevice cocoapods
-          export PATH="$(brew --prefix)/bin:$PATH"
-          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+          brew_prefix="$(brew --prefix)"
+          export PATH="$brew_prefix/bin:$PATH"
+          echo "$brew_prefix/bin" >> "$GITHUB_PATH"
           hash -r
           command -v xcodegen
           command -v idevicesyslog

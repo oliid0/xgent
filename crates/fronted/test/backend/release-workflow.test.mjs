@@ -108,8 +108,10 @@ test("only the publish job receives repository write permission", () => {
 });
 
 test("iOS project template preserves the pre-build script YAML boundary", () => {
-  assert.match(iosProjectTemplate, /preBuildScripts:\n\s+\{\{#each ios-pre-build-scripts\}\}/);
-  assert.doesNotMatch(iosProjectTemplate, /preBuildScripts:\n\s+\{\{~#each ios-pre-build-scripts\}\}/);
+  assert.match(
+    iosProjectTemplate,
+    /preBuildScripts:\n\s+\{\{~#each ios-pre-build-scripts\}\}[\s\S]*?\{\{~\/each\}\}\n\n\s+- script:/,
+  );
 });
 
 test("iOS release prepares host tools and every target before Tauri initialization", () => {

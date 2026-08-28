@@ -1,5 +1,5 @@
-import { Dialog, type DialogPurpose } from "@astryxdesign/core/Dialog";
-import { useMediaQuery } from "@astryxdesign/core/hooks";
+import type { DialogPurpose } from "@astryxdesign/core/Dialog";
+import { VStack } from "@astryxdesign/core/Layout";
 import type { ReactNode } from "react";
 
 type SettingsModalShellProps = {
@@ -10,33 +10,25 @@ type SettingsModalShellProps = {
   panelClassName?: string;
 };
 
-/** Shared Astryx dialog boundary for every nested settings workflow. */
+/** Shared Astryx content boundary for nested settings workflows. */
 export function SettingsModalShell({
   children,
-  onClose,
   purpose = "info",
   ariaLabel,
   panelClassName,
 }: SettingsModalShellProps) {
-  const isCompact = useMediaQuery(
-    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
-  );
-
   return (
-    <Dialog
-      isOpen
-      onOpenChange={(isOpen) => {
-        if (!isOpen) onClose();
-      }}
+    <VStack
+      width="100%"
+      height="100%"
+      minHeight={0}
+      gap={0}
+      role="region"
       aria-label={ariaLabel ?? "Settings"}
-      purpose={purpose}
-      variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "var(--xagent-content-width-md)"}
-      maxHeight={isCompact ? "var(--xagent-viewport-height)" : "var(--xagent-dialog-height-lg)"}
-      padding={0}
+      data-purpose={purpose}
       className={panelClassName}
     >
       {children}
-    </Dialog>
+    </VStack>
   );
 }

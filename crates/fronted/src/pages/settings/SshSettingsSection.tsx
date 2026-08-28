@@ -1,23 +1,24 @@
-import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
-import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { ToggleButton, ToggleButtonGroup } from "@astryxdesign/core/ToggleButton";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
+import { DialogHeader } from "@astryxdesign/core/Dialog";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Icon as AstryxIcon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, Section, VStack } from "@astryxdesign/core/Layout";
+import { List as AstryxList, ListItem } from "@astryxdesign/core/List";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Text } from "@astryxdesign/core/Text";
 import { invoke, isBrowserRuntime } from "@xagent/runtime";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import {
-  Heading as AstryxHeading,
-  Inline as AstryxInline,
-  Paragraph as AstryxParagraph,
-  View as AstryxView,
-} from "@xagent/ui/components/ui/view";
+import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import {
+  ArrowLeft,
   Check,
   ChevronDown,
   Eye,
   EyeOff,
   Key,
-  LayoutGrid,
-  List,
   Lock,
   Pencil,
   Plus,
@@ -45,10 +46,10 @@ import {
   type SshScanResult,
   scanSshImportCandidates,
 } from "../../lib/ssh/scan";
+import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmActionPopover, ConfirmDeletePopover, PromptTag } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
-type SshViewMode = "list" | "grid";
 type SshHostDraft = Omit<SshHostConfig, "id">;
 type SshKnownHostResetStatus = {
   hostId: string;
@@ -74,11 +75,6 @@ function normalizeOptionalPortInput(value: string) {
   if (!Number.isFinite(port)) return 0;
   const normalized = Math.floor(port);
   return normalized >= 1 && normalized <= 65535 ? normalized : 0;
-}
-
-function endpointLabel(host: SshHostConfig) {
-  const userPrefix = host.username.trim() ? `${host.username.trim()}@` : "";
-  return `${userPrefix}${host.host}:${host.port}`;
 }
 
 function authLabel(host: Pick<SshHostConfig, "authType">, t: (key: string) => string) {
@@ -152,9 +148,6 @@ function SshHostModal(props: {
   );
   const [proxyUsername, setProxyUsername] = useState(initialData?.proxy.username ?? "");
   const [proxyPassword, setProxyPassword] = useState(initialData?.proxy.password ?? "");
-  const isCompact = useMediaQuery(
-    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
-  );
   const isEditing = Boolean(initialData);
   const isPasswordAuth = authType === "password";
   const isPrivateKeyAuth = authType === "privateKey";
@@ -236,17 +229,7 @@ function SshHostModal(props: {
   }
 
   return (
-    <Dialog
-      isOpen
-      onOpenChange={(isOpen) => {
-        if (!isOpen) onClose();
-      }}
-      purpose="form"
-      variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "var(--xagent-content-width-md)"}
-      maxHeight={isCompact ? "var(--xagent-viewport-height)" : "var(--xagent-dialog-height-lg)"}
-      padding={0}
-    >
+    <SettingsModalShell onClose={onClose} purpose="form" ariaLabel={t("settings.sshAdd")}>
       <AstryxView
         layout="flex"
         direction="vertical"
@@ -255,10 +238,16 @@ function SshHostModal(props: {
         <DialogHeader
           title={isEditing ? t("settings.sshEdit") : t("settings.sshAdd")}
           subtitle={t("settings.sshDesc")}
-          startContent={<Key className="h-5 w-5" />}
-          onOpenChange={(isOpen) => {
-            if (!isOpen) onClose();
-          }}
+          startContent={
+            <AstryxButton
+              type="button"
+              onClick={onClose}
+              aria-label={t("settings.cancel")}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </AstryxButton>
+          }
         />
 
         <AstryxView
@@ -693,7 +682,7 @@ function SshHostModal(props: {
           </AstryxView>
         </AstryxView>
       </AstryxView>
-    </Dialog>
+    </SettingsModalShell>
   );
 }
 
@@ -707,9 +696,6 @@ function SshImportModal(props: {
   const [result, setResult] = useState<SshScanResult | null>(null);
   const [error, setError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
-  const isCompact = useMediaQuery(
-    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
-  );
 
   useEffect(() => {
     let cancelled = false;
@@ -745,17 +731,7 @@ function SshImportModal(props: {
   }
 
   return (
-    <Dialog
-      isOpen
-      onOpenChange={(isOpen) => {
-        if (!isOpen) onClose();
-      }}
-      purpose="info"
-      variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "var(--xagent-content-width-md)"}
-      maxHeight={isCompact ? "var(--xagent-viewport-height)" : "var(--xagent-dialog-height-lg)"}
-      padding={0}
-    >
+    <SettingsModalShell onClose={onClose} ariaLabel={t("settings.sshImport")}>
       <AstryxView
         layout="flex"
         direction="vertical"
@@ -764,10 +740,16 @@ function SshImportModal(props: {
         <DialogHeader
           title={t("settings.sshImport")}
           subtitle={t("settings.sshImportDesc")}
-          startContent={<Upload className="h-5 w-5" />}
-          onOpenChange={(isOpen) => {
-            if (!isOpen) onClose();
-          }}
+          startContent={
+            <AstryxButton
+              type="button"
+              onClick={onClose}
+              aria-label={t("settings.cancel")}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </AstryxButton>
+          }
         />
 
         <AstryxView
@@ -928,248 +910,13 @@ function SshImportModal(props: {
           </AstryxView>
         </AstryxView>
       </AstryxView>
-    </Dialog>
-  );
-}
-
-function SshHostCard(props: {
-  host: SshHostConfig;
-  viewMode: SshViewMode;
-  resetStatus?: SshKnownHostResetStatus;
-  resettingKnownHost: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
-  onResetKnownHost: () => void;
-}) {
-  const { host, viewMode, resetStatus, resettingKnownHost, onEdit, onDelete, onResetKnownHost } =
-    props;
-  const { t } = useLocale();
-  const showKeyPath = host.authType === "privateKey" && host.privateKeyPath.trim().length > 0;
-  const showKeyConfigured = host.authType === "privateKey" && host.privateKeyConfigured;
-  const showProxy =
-    host.proxy.url.trim().length > 0 || host.proxy.port > 0 || host.proxy.passwordConfigured;
-  const hasMeta = showKeyPath || showKeyConfigured;
-  const hasFooter = hasMeta || resetStatus;
-
-  const actions = (
-    <AstryxView
-      layout="flex"
-      direction="horizontal"
-      className="settings-hover-actions settings-ssh-host-actions flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
-    >
-      <ConfirmActionPopover
-        title={t("settings.sshKnownHostResetTitle")}
-        description={t("settings.sshKnownHostResetDesc")}
-        confirmLabel={t("settings.sshKnownHostResetConfirm")}
-        onConfirm={onResetKnownHost}
-      >
-        {(open) => (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="settings-ssh-host-action h-7 w-7 text-muted-foreground hover:text-foreground"
-            onClick={open}
-            title={t("settings.sshKnownHostReset")}
-            aria-label={t("settings.sshKnownHostReset")}
-            disabled={resettingKnownHost}
-          >
-            <Shield className="h-3.5 w-3.5" />
-          </Button>
-        )}
-      </ConfirmActionPopover>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="settings-ssh-host-action h-7 w-7 text-muted-foreground hover:text-foreground"
-        onClick={onEdit}
-        title={t("settings.edit")}
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </Button>
-      <ConfirmDeletePopover name={host.name} onConfirm={onDelete}>
-        {(open) => (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="settings-ssh-host-action h-7 w-7 text-muted-foreground hover:text-destructive"
-            onClick={open}
-            title={t("settings.delete")}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        )}
-      </ConfirmDeletePopover>
-    </AstryxView>
-  );
-
-  const metaTags = (
-    <AstryxView
-      layout="flex"
-      direction="horizontal"
-      className="flex flex-wrap items-center gap-1.5"
-    >
-      {showKeyPath ? <PromptTag label={host.privateKeyPath} muted /> : null}
-      {showKeyConfigured ? <PromptTag label={t("settings.sshPrivateKeyConfigured")} muted /> : null}
-    </AstryxView>
-  );
-
-  const resetStatusNode = resetStatus ? (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
-      className={`text-xs leading-relaxed ${
-        resetStatus.kind === "error" ? "text-destructive" : "text-muted-foreground"
-      }`}
-    >
-      {resetStatus.message}
-    </AstryxView>
-  ) : null;
-
-  if (viewMode === "grid") {
-    return (
-      <AstryxView
-        layout="flex"
-        direction="vertical"
-        className="settings-ssh-host-card group relative z-0 flex flex-col rounded-xl border border-border/60 bg-card p-4 transition-[border-color,box-shadow] duration-150 hover:z-10 hover:border-emerald-500/40 hover:shadow-md hover:shadow-emerald-500/10"
-      >
-        <AstryxView layout="block" direction="horizontal" className="absolute right-3 top-3">
-          {actions}
-        </AstryxView>
-        <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-3 pr-12">
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="settings-ssh-host-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500"
-          >
-            <Server className="h-[18px] w-[18px]" />
-          </AstryxView>
-          <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="truncate text-sm font-medium text-foreground"
-            >
-              {host.name}
-            </AstryxView>
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="mt-1 flex flex-wrap items-center gap-1.5"
-            >
-              <PromptTag label={authLabel(host, t)} />
-              {showProxy ? <PromptTag label={t("settings.sshAdvancedProxy")} muted /> : null}
-            </AstryxView>
-          </AstryxView>
-        </AstryxView>
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="mt-3 truncate font-mono text-xs text-muted-foreground"
-        >
-          {endpointLabel(host)}
-        </AstryxView>
-        {hasFooter ? (
-          <AstryxView layout="block" direction="horizontal" className="mt-auto space-y-2 pt-3">
-            {hasMeta ? metaTags : null}
-            {resetStatusNode}
-          </AstryxView>
-        ) : null}
-      </AstryxView>
-    );
-  }
-
-  return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
-      className="settings-ssh-host-card group relative z-0 rounded-xl border border-border/60 bg-card transition-[border-color,box-shadow] duration-150 hover:z-10 hover:border-emerald-500/40 hover:shadow-md hover:shadow-emerald-500/10"
-    >
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="settings-card-row flex items-center gap-3 px-4 py-3"
-      >
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="settings-ssh-host-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500"
-        >
-          <Server className="h-4 w-4" />
-        </AstryxView>
-        <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-          <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
-            <AstryxInline className="truncate text-sm font-medium text-foreground">
-              {host.name}
-            </AstryxInline>
-            <PromptTag label={authLabel(host, t)} />
-            {showProxy ? <PromptTag label={t("settings.sshAdvancedProxy")} muted /> : null}
-          </AstryxView>
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="mt-1 truncate font-mono text-xs text-muted-foreground"
-          >
-            {endpointLabel(host)}
-          </AstryxView>
-        </AstryxView>
-        {actions}
-      </AstryxView>
-      {hasFooter ? (
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="space-y-2 border-t border-border/40 px-4 py-2.5"
-        >
-          {hasMeta ? metaTags : null}
-          {resetStatusNode}
-        </AstryxView>
-      ) : null}
-    </AstryxView>
-  );
-}
-
-function SshViewModeToggle(props: { value: SshViewMode; onChange: (value: SshViewMode) => void }) {
-  const { value, onChange } = props;
-  const { t } = useLocale();
-  const groupLabel = `${t("settings.sshViewList")} / ${t("settings.sshViewGrid")}`;
-  const options = [
-    { value: "list" as const, label: t("settings.sshViewList"), icon: List },
-    { value: "grid" as const, label: t("settings.sshViewGrid"), icon: LayoutGrid },
-  ];
-
-  return (
-    <AstryxView layout="block" direction="horizontal" className="settings-ssh-view-toggle">
-      <ToggleButtonGroup
-        label={groupLabel}
-        type="single"
-        value={value}
-        onChange={(nextValue) => {
-          if (nextValue === "list" || nextValue === "grid") onChange(nextValue);
-        }}
-        size="sm"
-      >
-        {options.map((option) => {
-          const Icon = option.icon;
-          return (
-            <ToggleButton
-              key={option.value}
-              value={option.value}
-              label={option.label}
-              tooltip={option.label}
-              icon={<Icon className="h-3.5 w-3.5" />}
-              isIconOnly
-            />
-          );
-        })}
-      </ToggleButtonGroup>
-    </AstryxView>
+    </SettingsModalShell>
   );
 }
 
 export function SshSettingsSection(props: SettingsSectionProps) {
   const { settings, setSettings } = props;
   const { t } = useLocale();
-  const [viewMode, setViewMode] = useState<SshViewMode>("list");
   const [modalOpen, setModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editingHost, setEditingHost] = useState<SshHostConfig | null>(null);
@@ -1345,147 +1092,137 @@ export function SshSettingsSection(props: SettingsSectionProps) {
     );
   }
 
+  if (modalOpen) {
+    return (
+      <SshHostModal
+        initialData={editingHost ?? undefined}
+        onSave={handleSave}
+        onClose={closeModal}
+      />
+    );
+  }
+
+  if (importOpen) {
+    return (
+      <SshImportModal
+        existingHosts={hosts}
+        onImport={handleImport}
+        onClose={() => setImportOpen(false)}
+      />
+    );
+  }
+
   return (
-    <>
-      <AstryxView layout="block" direction="horizontal" className="settings-ssh-section space-y-5">
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="settings-section-heading-row flex items-center justify-between gap-4"
-        >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="settings-section-title-group flex items-center gap-3"
-          >
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10"
-            >
-              <Key className="h-[18px] w-[18px] text-emerald-500" />
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal">
-              <AstryxHeading level={3} className="text-sm font-semibold">
-                {t("settings.sshTitle")}
-              </AstryxHeading>
-              <AstryxParagraph className="text-xs text-muted-foreground">
-                {t("settings.sshDesc")}
-              </AstryxParagraph>
-            </AstryxView>
-          </AstryxView>
+    <VStack width="100%" gap={4}>
+      <Section variant="transparent" padding={0}>
+        <HStack width="100%" gap={2} vAlign="center" hAlign="end" wrap="wrap">
+          <Badge label={hosts.length} variant="neutral" />
+          <AstryxCoreButton
+            label={t("settings.sshImport")}
+            variant="secondary"
+            size="sm"
+            icon={<AstryxIcon icon={Upload} size="sm" color="inherit" />}
+            onClick={() => setImportOpen(true)}
+          />
+          <AstryxCoreButton
+            label={t("settings.sshAdd")}
+            variant="primary"
+            size="sm"
+            icon={<AstryxIcon icon={Plus} size="sm" color="inherit" />}
+            onClick={openAdd}
+          />
+        </HStack>
+      </Section>
 
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="settings-section-actions settings-ssh-actions flex items-center gap-2"
-          >
-            {hosts.length > 0 ? (
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                className="flex items-center gap-2 rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs text-muted-foreground"
-              >
-                <AstryxInline className="tabular-nums font-medium text-foreground">
-                  {hosts.length}
-                </AstryxInline>
-                {t("settings.sshCount")}
-              </AstryxView>
-            ) : null}
-            <SshViewModeToggle value={viewMode} onChange={setViewMode} />
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setImportOpen(true)}
-            >
-              <Upload className="h-3.5 w-3.5" />
-              {t("settings.sshImport")}
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={openAdd}>
-              <Plus className="h-3.5 w-3.5" />
-              {t("settings.sshAdd")}
-            </Button>
-          </AstryxView>
-        </AstryxView>
-
-        {hosts.length === 0 ? (
-          <AstryxView
-            layout="flex"
-            direction="vertical"
-            className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border/60 bg-muted/20 py-14 text-center"
-          >
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10"
-            >
-              <Key className="h-6 w-6 text-emerald-400" />
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-              <AstryxParagraph className="text-sm font-medium text-foreground">
-                {t("settings.sshNoHosts")}
-              </AstryxParagraph>
-              <AstryxParagraph className="mx-auto max-w-sm text-xs leading-relaxed text-muted-foreground">
-                {t("settings.sshNoHostsHint")}
-              </AstryxParagraph>
-            </AstryxView>
-            <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setImportOpen(true)}
-              >
-                <Upload className="h-3.5 w-3.5" />
-                {t("settings.sshImport")}
-              </Button>
-              <Button size="sm" className="gap-1.5" onClick={openAdd}>
-                <Plus className="h-3.5 w-3.5" />
-                {t("settings.sshAdd")}
-              </Button>
-            </AstryxView>
-          </AstryxView>
-        ) : (
-          <AstryxView
-            layout="grid"
-            direction="horizontal"
-            className={`settings-ssh-host-list ${
-              viewMode === "grid" ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : "space-y-2"
-            }`}
-          >
-            {hosts.map((host) => (
-              <SshHostCard
+      {hosts.length === 0 ? (
+        <EmptyState
+          isCompact
+          icon={<AstryxIcon icon={Key} size="lg" color="secondary" />}
+          title={t("settings.sshNoHosts")}
+          description={t("settings.sshNoHostsHint")}
+        />
+      ) : (
+        <AstryxList density="balanced" hasDividers>
+          {hosts.map((host) => {
+            const resetStatus =
+              knownHostResetStatus?.hostId === host.id ? knownHostResetStatus : undefined;
+            return (
+              <ListItem
                 key={host.id}
-                host={host}
-                viewMode={viewMode}
-                resetStatus={
-                  knownHostResetStatus?.hostId === host.id ? knownHostResetStatus : undefined
+                label={host.name}
+                startContent={<AstryxIcon icon={Server} size="md" color="secondary" />}
+                description={
+                  <VStack gap={1}>
+                    <Text type="supporting" color="secondary" wordBreak="break-word">
+                      {host.username ? `${host.username}@` : ""}
+                      {host.host}:{host.port}
+                    </Text>
+                    <HStack gap={2} vAlign="center" wrap="wrap">
+                      <Text type="supporting" color="secondary">
+                        {authLabel(host, t)}
+                      </Text>
+                      {resetStatus ? (
+                        <StatusDot
+                          variant={
+                            resetStatus.kind === "error"
+                              ? "error"
+                              : resetStatus.kind === "success"
+                                ? "success"
+                                : "neutral"
+                          }
+                          label={resetStatus.message}
+                        />
+                      ) : null}
+                    </HStack>
+                  </VStack>
                 }
-                resettingKnownHost={knownHostResettingId === host.id}
-                onEdit={() => openEdit(host)}
-                onDelete={() => handleDelete(host.id)}
-                onResetKnownHost={() => void handleResetKnownHost(host)}
+                endContent={
+                  <HStack gap={1} vAlign="center">
+                    <ConfirmActionPopover
+                      title={t("settings.sshKnownHostResetTitle")}
+                      description={t("settings.sshKnownHostResetDesc")}
+                      confirmLabel={t("settings.sshKnownHostResetConfirm")}
+                      onConfirm={() => void handleResetKnownHost(host)}
+                    >
+                      {(open) => (
+                        <IconButton
+                          label={t("settings.sshKnownHostResetTitle")}
+                          tooltip={t("settings.sshKnownHostResetTitle")}
+                          icon={<AstryxIcon icon={Shield} size="sm" color="inherit" />}
+                          variant="ghost"
+                          size="sm"
+                          isLoading={knownHostResettingId === host.id}
+                          onClick={open}
+                        />
+                      )}
+                    </ConfirmActionPopover>
+                    <IconButton
+                      label={t("settings.sshEdit")}
+                      tooltip={t("settings.sshEdit")}
+                      icon={<AstryxIcon icon={Pencil} size="sm" color="inherit" />}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEdit(host)}
+                    />
+                    <ConfirmDeletePopover name={host.name} onConfirm={() => handleDelete(host.id)}>
+                      {(open) => (
+                        <IconButton
+                          label={t("settings.delete")}
+                          tooltip={t("settings.delete")}
+                          icon={<AstryxIcon icon={Trash2} size="sm" color="inherit" />}
+                          variant="ghost"
+                          size="sm"
+                          onClick={open}
+                        />
+                      )}
+                    </ConfirmDeletePopover>
+                  </HStack>
+                }
               />
-            ))}
-          </AstryxView>
-        )}
-      </AstryxView>
-
-      {modalOpen ? (
-        <SshHostModal
-          initialData={editingHost ?? undefined}
-          onSave={handleSave}
-          onClose={closeModal}
-        />
-      ) : null}
-      {importOpen ? (
-        <SshImportModal
-          existingHosts={hosts}
-          onImport={handleImport}
-          onClose={() => setImportOpen(false)}
-        />
-      ) : null}
-    </>
+            );
+          })}
+        </AstryxList>
+      )}
+    </VStack>
   );
 }

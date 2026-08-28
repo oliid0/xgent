@@ -3,6 +3,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { FormLayout } from "@astryxdesign/core/FormLayout";
 import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import {
   HStack,
   Layout,
@@ -17,7 +18,7 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
 import { type FormEvent, useState } from "react";
-import { Globe, Plus, Terminal, Zap } from "../../components/icons";
+import { ArrowLeft, Globe, Plus, Terminal } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   HOOK_EVENT_TRANSLATION_KEYS,
@@ -122,8 +123,15 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
         <DialogHeader
           title={title}
           subtitle={t(HOOK_EVENT_TRANSLATION_KEYS[event])}
-          startContent={<Icon icon={Zap} size="md" color="secondary" />}
-          onOpenChange={() => onClose()}
+          startContent={
+            <IconButton
+              label={t("settings.cancel")}
+              tooltip={t("settings.cancel")}
+              icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
+              variant="ghost"
+              onClick={onClose}
+            />
+          }
         />
         <Layout
           height="fill"

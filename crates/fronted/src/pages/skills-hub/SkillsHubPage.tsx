@@ -1958,6 +1958,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   return (
     <VStack
       data-hub-embedded={embedded ? "true" : undefined}
+      className={embedded ? "hub-page-embedded" : undefined}
       width="100%"
       height="100%"
       gap={0}
@@ -2025,7 +2026,14 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
               }
             />
 
-            <HStack width="100%" gap={2} vAlign="center" hAlign="between" wrap="wrap">
+            <HStack
+              width="100%"
+              gap={2}
+              vAlign="center"
+              hAlign="between"
+              wrap="wrap"
+              className="hub-tab-row"
+            >
               <TabList
                 value={view}
                 onChange={(value) => setView(value as SkillsHubView)}

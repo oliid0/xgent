@@ -8,6 +8,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
+  ArrowLeft,
   BrushCleaning,
   CheckCircle2,
   ChevronDown,
@@ -995,7 +996,7 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
               className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted"
               aria-label={t("settings.cronViewClose")}
             >
-              <X className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" />
             </AstryxButton>
             <AstryxView
               layout="grid"

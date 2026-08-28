@@ -206,13 +206,17 @@ export const ChatModelSelector = memo(function ChatModelSelector(props: {
     props.reasoningOptions.includes(props.chatRuntimeControls.reasoning)
       ? t(REASONING_I18N_KEYS[props.chatRuntimeControls.reasoning])
       : "";
-  const triggerLabel = [selectedOption?.model ?? props.currentModelLabel, selectedReasoningLabel]
+  const triggerLabel = [
+    selectedOption?.model || props.currentModelLabel || t("chat.model"),
+    selectedReasoningLabel,
+  ]
     .filter(Boolean)
-    .join(" · ");
+    .join(" ");
 
   return (
     <ComplexSelector<string>
       label={t("chat.selectModel")}
+      isLabelHidden
       value={selectedValue}
       onChange={(value) => {
         const parsed = parseModelValue(value);

@@ -84,6 +84,7 @@ export function McpHubPage(props: McpHubPageProps) {
       <Layout
         height="fill"
         padding={0}
+        className={embedded ? "hub-page-embedded" : undefined}
         header={
           embedded ? undefined : (
             <HubHeader
@@ -99,7 +100,7 @@ export function McpHubPage(props: McpHubPageProps) {
         }
         content={
           <LayoutContent
-            padding={5}
+            padding={embedded ? 2 : 5}
             isScrollable={false}
             label="MCP Hub"
             className="mcp-hub-content"
@@ -109,7 +110,7 @@ export function McpHubPage(props: McpHubPageProps) {
               height="100%"
               minHeight={0}
               maxWidth="var(--xagent-hub-content-max-width)"
-              gap={4}
+              gap={embedded ? 3 : 4}
               style={{ marginInline: "auto" }}
             >
               <Banner

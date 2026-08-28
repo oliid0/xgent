@@ -25,6 +25,7 @@ import { WindowsTitleBar } from "./components/WindowsTitleBar";
 import { LocaleContext, t as translate } from "./i18n";
 import { useAppUpdateController } from "./lib/appUpdates";
 import { initAutomation } from "./lib/automation";
+import { setRetryErrorExtension } from "./lib/providers/runtime/streamRetry";
 import {
   inferRuntimePlatform,
   type RuntimePlatform,
@@ -150,6 +151,13 @@ export default function App() {
     () => resolveEffectiveTheme(settings.theme),
     [settings.theme, systemThemeVersion],
   );
+
+  useEffect(() => {
+    setRetryErrorExtension({
+      statusCodes: settings.retryErrorSettings.presetStatusCodes,
+      patterns: settings.retryErrorSettings.customPatterns,
+    });
+  }, [settings.retryErrorSettings]);
 
   useEffect(() => {
     let cancelled = false;
@@ -591,8 +599,10 @@ export default function App() {
                 }}
                 purpose="form"
                 variant={compactSettingsDialog ? "fullscreen" : "standard"}
-                width="var(--xagent-dialog-width-xl)"
-                maxHeight={compactSettingsDialog ? "100dvh" : "var(--xagent-dialog-height-xl)"}
+                width="var(--xagent-settings-dialog-width)"
+                maxHeight={
+                  compactSettingsDialog ? "100dvh" : "var(--xagent-settings-dialog-height)"
+                }
                 padding={0}
                 aria-label={translate("settings.title", settings.locale)}
               >

@@ -1,14 +1,13 @@
 import { Banner } from "@astryxdesign/core/Banner";
-import { Button } from "@astryxdesign/core/Button";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
 import { Selector } from "@astryxdesign/core/Selector";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
-import { Token } from "@astryxdesign/core/Token";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { GitBranch, RefreshCw } from "../../../components/icons";
+import { ArrowLeft, ChevronRight, GitBranch, RefreshCw } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import type {
   GitBranch as GitBranchInfo,
@@ -57,6 +56,7 @@ export function ComposerGitRepositoryControl(props: {
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState("");
+  const [showOperations, setShowOperations] = useState(false);
   const requestIdRef = useRef(0);
   const selectedRepositoryRef = useRef(selectedRepository);
   selectedRepositoryRef.current = selectedRepository;
@@ -129,6 +129,10 @@ export function ComposerGitRepositoryControl(props: {
     if (props.isOpen) void refresh();
   }, [props.isOpen, refresh]);
 
+  useEffect(() => {
+    if (!props.isOpen) setShowOperations(false);
+  }, [props.isOpen]);
+
   useWorkspaceInvalidation({
     client: props.gitClient ? props.workspaceActivityClient : null,
     workdir: props.workdir,
@@ -164,6 +168,12 @@ export function ComposerGitRepositoryControl(props: {
   const noRepository = repositoryState.status !== "ready";
   const isDisabled = props.isDisabled || !props.gitClient || !props.workdir.trim();
   const canWrite = props.canWrite ?? true;
+  const repositoryMenuLabel = noRepository
+    ? t("git.branchSelector.noRepoShort")
+    : selectedRepositoryLabel;
+  const repositoryMenuDescription = noRepository
+    ? t("git.branchSelector.initRepository")
+    : repositoryState.head || t("git.branchSelector.detached");
 
   const switchBranch = async (value: string) => {
     const branch = branches.find((candidate) => candidate.fullName === value);
@@ -198,29 +208,38 @@ export function ComposerGitRepositoryControl(props: {
     }
   };
 
+  if (!showOperations) {
+    return (
+      <List density="compact">
+        <ListItem
+          label={repositoryMenuLabel}
+          description={repositoryMenuDescription}
+          startContent={
+            <StatusDot
+              variant={error ? "error" : noRepository ? "warning" : "success"}
+              label={repositoryMenuDescription}
+            />
+          }
+          endContent={<ChevronRight />}
+          isDisabled={isDisabled}
+          onClick={() => setShowOperations(true)}
+        />
+      </List>
+    );
+  }
+
   return (
     <VStack gap={2} width="100%">
       <HStack gap={2} width="100%" vAlign="center">
-        <StatusDot
-          variant={error ? "error" : noRepository ? "warning" : "success"}
-          label={
-            noRepository
-              ? t("git.branchSelector.noRepoShort")
-              : repositoryState.head || t("git.branchSelector.detached")
-          }
-        />
-        <Text weight="semibold">Git</Text>
-        {selectedRepositoryLabel ? <Token label={selectedRepositoryLabel} size="sm" /> : null}
         <IconButton
-          label={t("git.branchSelector.refresh")}
-          tooltip={t("git.branchSelector.refresh")}
-          icon={<RefreshCw />}
+          label={t("git.branchSelector.back")}
+          tooltip={t("git.branchSelector.back")}
+          icon={<ArrowLeft />}
           size="sm"
           variant="ghost"
-          isLoading={isLoading}
-          isDisabled={isDisabled || isMutating}
-          onClick={() => void refresh()}
+          onClick={() => setShowOperations(false)}
         />
+        <Text weight="semibold">{repositoryMenuLabel}</Text>
       </HStack>
 
       {repositoryOptions.length > 1 ? (
@@ -258,18 +277,24 @@ export function ComposerGitRepositoryControl(props: {
         />
       ) : null}
 
-      {noRepository && !error ? (
-        <Button
-          label={t("git.branchSelector.initRepository")}
-          icon={<GitBranch />}
-          size="sm"
-          variant="secondary"
-          width="100%"
-          isLoading={isMutating}
-          isDisabled={isDisabled || !canWrite}
-          onClick={() => void initializeRepository()}
+      <List density="compact" hasDividers>
+        <ListItem
+          label={t("git.branchSelector.refresh")}
+          description={isLoading ? t("git.branchSelector.loading") : undefined}
+          startContent={<RefreshCw />}
+          isDisabled={isDisabled || isMutating}
+          onClick={() => void refresh()}
         />
-      ) : null}
+        {noRepository ? (
+          <ListItem
+            label={t("git.branchSelector.initRepository")}
+            description={!canWrite ? props.disabledMessage : undefined}
+            startContent={<GitBranch />}
+            isDisabled={isDisabled || !canWrite || isMutating}
+            onClick={() => void initializeRepository()}
+          />
+        ) : null}
+      </List>
 
       {error ? <Banner status="error" title={error} collapsible={false} /> : null}
     </VStack>

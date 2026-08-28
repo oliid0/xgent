@@ -5139,9 +5139,9 @@ export function ChatPage(props: ChatPageProps) {
   const hasModels = modelOptions.length > 0;
 
   const currentModelLabel = (() => {
-    if (!activeSelectedModel) return t("chat.selectModel");
+    if (!activeSelectedModel) return t("chat.model");
     const opt = modelOptions.find((o) => o.value === selectedValue);
-    if (opt) return `${opt.providerName} / ${opt.model}`;
+    if (opt) return opt.model;
     return activeSelectedModel.model;
   })();
 

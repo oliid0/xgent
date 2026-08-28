@@ -2,7 +2,7 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxNativeButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
-import { Dialog } from "@astryxdesign/core/Dialog";
+import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
@@ -11,9 +11,13 @@ import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { List as AstryxList, ListItem } from "@astryxdesign/core/List";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Popover } from "@astryxdesign/core/Popover";
+import { Section } from "@astryxdesign/core/Section";
 import { Selector } from "@astryxdesign/core/Selector";
+import { Stack } from "@astryxdesign/core/Stack";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
+import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
@@ -29,16 +33,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ccswitchLogoUrl from "../../../src-tauri/icons/custom/ccswitch.png";
 import cherryStudioLogoUrl from "../../../src-tauri/icons/custom/cherrystudio.png";
 import {
-  CheckCircle2,
+  ArrowLeft,
   ClaudeIcon,
   Download,
   Eye,
   EyeOff,
   GeminiIcon,
   Globe,
-  Key,
   List,
-  Loader2,
   OpenaiChatgptIcon,
   Pencil,
   Plus,
@@ -78,10 +80,14 @@ import {
   type CustomProvider,
   getDefaultUsageQueryConfig,
   normalizeModelFailoverSettings,
+  normalizeRetryErrorSettings,
   normalizeUsageQueryConfig,
+  PROVIDER_RETRY_DEFAULT_MAX_RETRIES,
+  PROVIDER_RETRY_MAX_RETRIES_LIMITS,
   type ProviderAuthMode,
   type ProviderId,
   type ProviderModelConfig,
+  type ProviderRetryPolicy,
   type UsageQueryConfig,
   type UsageQueryMode,
   updateCustomProviders,
@@ -106,6 +112,8 @@ import {
   normalizeFetchedModels,
   sortModelsBySelection,
 } from "./providerUtils";
+import { RetryErrorSection } from "./RetryErrorSection";
+import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmDeletePopover } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
@@ -117,6 +125,7 @@ type ModalProps = {
 };
 
 type ProviderDialogPanel = "general" | "request" | "usage";
+type ProviderSettingsView = "list" | "editor" | "advanced";
 
 const USAGE_QUERY_MODES: UsageQueryMode[] = [
   "coding-plan",
@@ -238,10 +247,13 @@ function DialogSwitch(props: {
 }
 function formatTokenCount(value: number): string {
   if (value < 1_000) return String(value);
-  return String(Math.round(value / 1_000)) + "K";
+  return `${String(Math.round(value / 1_000))}K`;
 }
-function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProps) {
+function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalProps) {
   const { t } = useLocale();
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
   const isBrowser = isBrowserRuntime();
   const initialApiKey = initialData?.apiKey ?? "";
   const initialUsesRedactedApiKey =
@@ -298,10 +310,17 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
   const [headerValidationSubmitted, setHeaderValidationSubmitted] = useState(false);
   const [headerSuggest, setHeaderSuggest] = useState<{ index: number } | null>(null);
   const [headerSuggestActive, setHeaderSuggestActive] = useState(0);
-  const [showApiKey, setShowApiKey] = useState(false);
   const [saveAttempted, setSaveAttempted] = useState(false);
   const [usageQuery, setUsageQuery] = useState<UsageQueryConfig>(() =>
     normalizeUsageQueryConfig(initialData?.usageQuery ?? getDefaultUsageQueryConfig()),
+  );
+  const [streamRetryMode, setStreamRetryMode] = useState<"default" | "off" | "custom">(
+    initialData?.retryPolicy?.mode ?? "default",
+  );
+  const [streamRetryCount, setStreamRetryCount] = useState(
+    initialData?.retryPolicy?.mode === "custom"
+      ? initialData.retryPolicy.maxRetries
+      : PROVIDER_RETRY_DEFAULT_MAX_RETRIES,
   );
   const [usageTest, setUsageTest] = useState<{
     loading: boolean;
@@ -409,6 +428,18 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
 
   function patchUsageQuery(patch: Partial<UsageQueryConfig>) {
     setUsageQuery((previous) => normalizeUsageQueryConfig({ ...previous, ...patch }));
+  }
+
+  function serializeRetryPolicy(): ProviderRetryPolicy | undefined {
+    if (streamRetryMode === "off") return { mode: "off" };
+    if (streamRetryMode !== "custom") return undefined;
+    return {
+      mode: "custom",
+      maxRetries: Math.min(
+        PROVIDER_RETRY_MAX_RETRIES_LIMITS.max,
+        Math.max(PROVIDER_RETRY_MAX_RETRIES_LIMITS.min, Math.round(streamRetryCount)),
+      ),
+    };
   }
 
   async function runUsageQueryTest() {
@@ -674,6 +705,7 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
           : undefined,
       nativeWebSearchEnabled: initialData?.nativeWebSearchEnabled ?? true,
       useSystemProxy,
+      retryPolicy: serializeRetryPolicy(),
       usageQuery,
     });
   }
@@ -726,76 +758,40 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
       : firstHeaderIssue === "invalid"
         ? t("settings.invalidCustomHeaderKey")
         : null;
-  const isCompact = useMediaQuery(
-    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
-  );
-
   return (
-    <Dialog
-      isOpen
-      onOpenChange={(isOpen) => {
-        if (!isOpen) onClose();
-      }}
-      purpose="form"
-      variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "var(--xagent-provider-dialog-width)"}
-      maxHeight={
-        isCompact ? "var(--xagent-viewport-height)" : "var(--xagent-provider-dialog-height)"
-      }
-      padding={0}
-    >
-      <AstryxView
-        layout="flex"
-        direction="vertical"
-        className="flex h-full min-h-0 w-full flex-col overflow-hidden"
-      >
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex shrink-0 items-center justify-between gap-4 border-b px-5 py-4 max-[720px]:px-3.5 max-[720px]:py-3"
-        >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex min-w-0 items-center gap-3"
-          >
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex h-9 w-9 shrink-0 items-center justify-center text-xl text-foreground"
-            >
-              <ProviderBrandIcon type={providerType} />
-            </AstryxView>
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex min-w-0 flex-wrap items-center gap-2"
-            >
-              <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
+    <VStack height="100%" minHeight={0} gap={0}>
+      <Toolbar
+        label={isEditing ? t("settings.editProvider") : t("settings.addProvider")}
+        size="md"
+        dividers={["bottom"]}
+        startContent={
+          <HStack gap={2} vAlign="center">
+            <IconButton
+              label={t("settings.providerDialogNavigation")}
+              tooltip={t("settings.providerDialogNavigation")}
+              variant="ghost"
+              icon={<ArrowLeft />}
+              onClick={onClose}
+            />
+            <ProviderBrandIcon type={providerType} />
+            <VStack gap={0.5}>
+              <Heading level={3}>
                 {isEditing ? t("settings.editProvider") : t("settings.addProvider")}
-              </AstryxView>
-              <AstryxInline className="rounded-full border bg-muted/60 px-2.5 py-0.5 text-[11px] text-muted-foreground">
+              </Heading>
+              <Text type="supporting" color="secondary">
                 {typeLabel} {t("settings.compatible")}
-              </AstryxInline>
-            </AstryxView>
-          </AstryxView>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={onClose}
-            title={t("settings.close")}
-            aria-label={t("settings.close")}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </AstryxView>
+              </Text>
+            </VStack>
+          </HStack>
+        }
+      />
 
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex min-h-0 flex-1 max-[720px]:flex-col"
+      <StackItem size="fill">
+        <Stack
+          direction={isCompact ? "vertical" : "horizontal"}
+          height="100%"
+          minHeight={0}
+          gap={0}
         >
           {isCompact ? (
             <AstryxView
@@ -972,42 +968,21 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                   </AstryxView>
 
                   {authMode !== "oauth-managed" ? (
-                    <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                      <Label htmlFor="modal-apikey">
-                        {authMode === "oauth-token" ? t("settings.providerOAuthToken") : "API Key"}
-                      </Label>
-                      <AstryxView layout="block" direction="horizontal" className="relative">
-                        <Input
-                          id="modal-apikey"
-                          type={showApiKey ? "text" : "password"}
-                          value={apiKey}
-                          disabled={isBrowser}
-                          className="pr-10"
-                          onChange={(event) => setApiKey(event.currentTarget.value)}
-                          onFocus={(event) => {
-                            if (apiKeyIsRedactedDisplay) event.currentTarget.select();
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-0 top-0 h-10 w-10 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                          onClick={() => setShowApiKey((prev) => !prev)}
-                          disabled={isBrowser}
-                          title={showApiKey ? t("settings.hideApiKey") : t("settings.showApiKey")}
-                          aria-label={
-                            showApiKey ? t("settings.hideApiKey") : t("settings.showApiKey")
-                          }
-                        >
-                          {showApiKey ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </AstryxView>
-                    </AstryxView>
+                    <TextInput
+                      type="password"
+                      label={
+                        authMode === "oauth-token" ? t("settings.providerOAuthToken") : "API Key"
+                      }
+                      value={apiKey}
+                      width="100%"
+                      isDisabled={isBrowser}
+                      onChange={setApiKey}
+                      onFocus={(event) => {
+                        if (apiKeyIsRedactedDisplay && event.target instanceof HTMLInputElement) {
+                          event.target.select();
+                        }
+                      }}
+                    />
                   ) : null}
                 </AstryxView>
 
@@ -1497,6 +1472,51 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
                     ariaLabel={t("settings.providerUseSystemProxy")}
                   />
                 </AstryxView>
+
+                <Section padding={4} width="100%" dividers={["top", "bottom"]}>
+                  <VStack gap={3}>
+                    <VStack gap={0.5}>
+                      <Heading level={4}>{t("settings.providerStreamRetry")}</Heading>
+                      <Text type="supporting" color="secondary">
+                        {t("settings.providerStreamRetryDesc")}
+                      </Text>
+                    </VStack>
+                    <Selector
+                      label={t("settings.providerStreamRetry")}
+                      isLabelHidden
+                      value={streamRetryMode}
+                      width="100%"
+                      options={[
+                        {
+                          value: "default",
+                          label: t("settings.providerStreamRetryDefault"),
+                        },
+                        { value: "off", label: t("settings.providerStreamRetryOff") },
+                        {
+                          value: "custom",
+                          label: t("settings.providerStreamRetryCustom"),
+                        },
+                      ]}
+                      onChange={(value) =>
+                        setStreamRetryMode(value as "default" | "off" | "custom")
+                      }
+                    />
+                    {streamRetryMode === "custom" ? (
+                      <NumberInput
+                        label={t("settings.providerStreamRetryMaxRetries")}
+                        description={t("settings.providerStreamRetryMaxRetriesDesc")}
+                        min={PROVIDER_RETRY_MAX_RETRIES_LIMITS.min}
+                        max={PROVIDER_RETRY_MAX_RETRIES_LIMITS.max}
+                        value={streamRetryCount}
+                        isWheelEnabled={false}
+                        width="100%"
+                        onChange={(value) =>
+                          setStreamRetryCount(value ?? PROVIDER_RETRY_DEFAULT_MAX_RETRIES)
+                        }
+                      />
+                    ) : null}
+                  </VStack>
+                </Section>
 
                 {providerType === "claude_code" || providerType === "codex" ? (
                   <AstryxView
@@ -2017,39 +2037,39 @@ function ProviderModal({ providerType, initialData, onSave, onClose }: ModalProp
               </VStack>
             )}
           </AstryxView>
-        </AstryxView>
+        </Stack>
+      </StackItem>
 
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex shrink-0 items-center justify-end gap-2 border-t bg-muted/20 px-5 py-3.5 max-[720px]:px-3.5 max-[720px]:pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-[720px]:pt-3"
-        >
-          <AstryxNativeButton
-            label={t("settings.cancel")}
-            variant="secondary"
-            onClick={onClose}
-            width={isCompact ? "100%" : undefined}
-          />
-          <AstryxNativeButton
-            label={t("settings.save")}
-            variant="primary"
-            onClick={handleSave}
-            width={isCompact ? "100%" : undefined}
-          />
-        </AstryxView>
-      </AstryxView>
-    </Dialog>
+      <Toolbar
+        label={t("settings.providerDialogNavigation")}
+        size="md"
+        dividers={["top"]}
+        endContent={
+          <HStack gap={2} width={isCompact ? "100%" : undefined}>
+            <AstryxNativeButton
+              label={t("settings.cancel")}
+              variant="secondary"
+              onClick={onClose}
+              width={isCompact ? "100%" : undefined}
+            />
+            <AstryxNativeButton
+              label={t("settings.save")}
+              variant="primary"
+              onClick={handleSave}
+              width={isCompact ? "100%" : undefined}
+            />
+          </HStack>
+        }
+      />
+    </VStack>
   );
 }
 
-function CustomSettingsDrawer(
+function ProviderAdvancedSettingsPanel(
   props: SettingsSectionProps & { providerType: ProviderId; onClose: () => void },
 ) {
   const { settings, setSettings, providerType, onClose } = props;
   const { t } = useLocale();
-  const isCompact = useMediaQuery(
-    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
-  );
   const modelOptions = useMemo(() => buildModelOptions(settings), [settings]);
   const conversationTitleModel = settings.customSettings.conversationTitleModel;
   const commitMessageModel = settings.customSettings.commitMessageModel;
@@ -2097,10 +2117,12 @@ function CustomSettingsDrawer(
     setSettings((previous) => ({
       ...previous,
       modelFailover: normalizeModelFailoverSettings({}, previous.customProviders),
+      retryErrorSettings: normalizeRetryErrorSettings({}),
       customProviders: updateCustomProviders(
         previous,
         previous.customProviders.map((provider) => ({
           ...provider,
+          retryPolicy: undefined,
           usageQuery: getDefaultUsageQueryConfig(),
         })),
       ).customProviders,
@@ -2108,141 +2130,99 @@ function CustomSettingsDrawer(
   }
 
   return (
-    <Dialog
-      isOpen
-      onOpenChange={(isOpen) => {
-        if (!isOpen) onClose();
-      }}
-      aria-labelledby="provider-custom-settings-title"
-      purpose="form"
-      variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "var(--xagent-drawer-width-compact)"}
-      maxHeight="var(--xagent-viewport-height)"
-      padding={0}
-      style={{
-        marginInlineStart: "auto",
-        marginInlineEnd: 0,
-        blockSize: "var(--xagent-viewport-height)",
-        ...(isCompact
-          ? {}
-          : { borderRadius: "var(--radius-container) 0 0 var(--radius-container)" }),
-      }}
-    >
-      <AstryxView as="aside" className="relative flex h-full w-full flex-col overflow-hidden">
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="relative flex items-start gap-3 px-6 pb-4 pt-[22px]"
-        >
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]"
-          >
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              id="provider-custom-settings-title"
-              className="text-[17px] font-semibold leading-tight tracking-tight text-foreground/95"
-            >
-              {t("settings.customSettings")}
-            </AstryxView>
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="mt-1 text-[12px] leading-relaxed text-muted-foreground/90"
-            >
-              {t("settings.conversationTitleModelHint")}
-            </AstryxView>
-          </AstryxView>
-          <AstryxButton
-            type="button"
-            onClick={onClose}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] text-muted-foreground/80 transition-colors hover:bg-foreground/[0.12] hover:text-foreground"
-            title={t("settings.closeCustomSettings")}
-            aria-label={t("settings.closeCustomSettings")}
-          >
-            <X className="h-3.5 w-3.5" />
-          </AstryxButton>
-        </AstryxView>
-
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          aria-hidden="true"
-          className="relative mx-6 h-px bg-gradient-to-r from-transparent via-foreground/[0.08] to-transparent"
-        />
-
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="relative min-h-0 flex-1 overflow-y-auto px-6 py-5"
-        >
-          <AstryxView as="section" className="space-y-3">
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="rounded-xl border border-border bg-muted/25 p-4"
-            >
-              <AstryxView layout="block" direction="horizontal" className="space-y-2">
-                <Label className="text-[12.5px] font-medium text-foreground/85">
-                  {t("settings.conversationTitleModel")}
-                </Label>
-                <ModelPicker
-                  options={titleModelOptions}
-                  value={selectedValue}
-                  onChange={(value) => handleModelChange("conversationTitleModel", value)}
-                  placeholder={t("settings.conversationTitleModelFollowCurrent")}
-                  noneLabel={t("settings.conversationTitleModelFollowCurrent")}
-                  ariaLabel={t("settings.conversationTitleModel")}
-                />
-                <Label className="text-[12.5px] font-medium text-foreground/85">
-                  {t("settings.commitMessageModel")}
-                </Label>
-                <ModelPicker
-                  options={commitModelOptions}
-                  value={commitSelectedValue}
-                  onChange={(value) => handleModelChange("commitMessageModel", value)}
-                  placeholder={t("settings.conversationTitleModelFollowCurrent")}
-                  noneLabel={t("settings.conversationTitleModelFollowCurrent")}
-                  ariaLabel={t("settings.commitMessageModel")}
-                />
-                {modelOptions.length === 0 ? (
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="mt-1 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2 text-[11.5px] leading-relaxed text-amber-700 dark:text-amber-300"
-                  >
-                    {t("settings.customSettingsModelEmpty")}
-                  </AstryxView>
-                ) : null}
-              </AstryxView>
-            </AstryxView>
-            <ModelFailoverSection
-              settings={settings}
-              setSettings={setSettings}
-              providerType={providerType}
-              compact
+    <VStack height="100%" minHeight={0} gap={0}>
+      <Toolbar
+        label={t("settings.customSettings")}
+        size="md"
+        dividers={["bottom"]}
+        startContent={
+          <HStack gap={2} vAlign="center">
+            <IconButton
+              label={t("settings.closeCustomSettings")}
+              tooltip={t("settings.closeCustomSettings")}
+              variant="ghost"
+              icon={<ArrowLeft />}
+              onClick={onClose}
             />
-            <ConfirmActionPopover
-              title={t("settings.providerRuntimeResetTitle")}
-              description={t("settings.providerRuntimeResetDescription")}
-              confirmLabel={t("settings.providerRuntimeResetConfirm")}
-              onConfirm={resetRuntimeConfiguration}
-            >
-              {(open) => (
-                <AstryxNativeButton
-                  label={t("settings.providerRuntimeReset")}
-                  variant="secondary"
-                  onClick={open}
-                  width="100%"
-                />
-              )}
-            </ConfirmActionPopover>
-          </AstryxView>
-        </AstryxView>
-      </AstryxView>
-    </Dialog>
+            <VStack gap={0.5}>
+              <Heading level={3}>{t("settings.customSettings")}</Heading>
+              <Text type="supporting" color="secondary">
+                {t("settings.conversationTitleModelHint")}
+              </Text>
+            </VStack>
+          </HStack>
+        }
+      />
+
+      <StackItem size="fill" isScrollable>
+        <VStack
+          width="100%"
+          maxWidth="var(--xagent-settings-content-max-width)"
+          gap={5}
+          padding={5}
+          style={{ marginInline: "auto" }}
+        >
+          <VStack gap={3}>
+            <VStack gap={0.5}>
+              <Heading level={4}>{t("settings.conversationTitleModel")}</Heading>
+              <Text type="supporting" color="secondary">
+                {t("settings.conversationTitleModelHint")}
+              </Text>
+            </VStack>
+            <ModelPicker
+              options={titleModelOptions}
+              value={selectedValue}
+              onChange={(value) => handleModelChange("conversationTitleModel", value)}
+              placeholder={t("settings.conversationTitleModelFollowCurrent")}
+              noneLabel={t("settings.conversationTitleModelFollowCurrent")}
+              ariaLabel={t("settings.conversationTitleModel")}
+            />
+            <VStack gap={0.5}>
+              <Heading level={4}>{t("settings.commitMessageModel")}</Heading>
+            </VStack>
+            <ModelPicker
+              options={commitModelOptions}
+              value={commitSelectedValue}
+              onChange={(value) => handleModelChange("commitMessageModel", value)}
+              placeholder={t("settings.conversationTitleModelFollowCurrent")}
+              noneLabel={t("settings.conversationTitleModelFollowCurrent")}
+              ariaLabel={t("settings.commitMessageModel")}
+            />
+            {modelOptions.length === 0 ? (
+              <Banner
+                status="info"
+                title={t("settings.customSettingsModelEmpty")}
+                collapsible={false}
+              />
+            ) : null}
+          </VStack>
+
+          <ModelFailoverSection
+            settings={settings}
+            setSettings={setSettings}
+            providerType={providerType}
+            compact
+          />
+
+          <RetryErrorSection settings={settings} setSettings={setSettings} />
+
+          <ConfirmActionPopover
+            title={t("settings.providerRuntimeResetTitle")}
+            description={t("settings.providerRuntimeResetDescription")}
+            confirmLabel={t("settings.providerRuntimeResetConfirm")}
+            onConfirm={resetRuntimeConfiguration}
+          >
+            {(open) => (
+              <AstryxNativeButton
+                label={t("settings.providerRuntimeReset")}
+                variant="secondary"
+                onClick={open}
+              />
+            )}
+          </ConfirmActionPopover>
+        </VStack>
+      </StackItem>
+    </VStack>
   );
 }
 
@@ -2417,14 +2397,71 @@ function CherrySourceLogo({ className }: { className?: string }) {
   );
 }
 
+function CcsProviderRow(props: {
+  item: CcsProviderImportItem;
+  exists: boolean;
+  transferable: boolean;
+  selectable: boolean;
+  isSelected: boolean;
+  submitting: boolean;
+  onChange: () => void;
+}) {
+  const { item, exists, transferable, selectable, isSelected, submitting, onChange } = props;
+  const checkboxRef = useRef<HTMLInputElement>(null);
+  const statusLabel = exists ? "已导入" : transferable ? "可以导入" : "无 API 或模型配置";
+
+  return (
+    <ListItem
+      label={item.name}
+      description={
+        <VStack gap={1}>
+          <Text type="supporting" color="secondary">
+            {item.baseUrl || "未配置 Base URL"}
+          </Text>
+          <HStack gap={2} vAlign="center" wrap="wrap">
+            <StatusDot
+              variant={exists ? "neutral" : transferable ? "success" : "warning"}
+              label={statusLabel}
+            />
+            <Text type="supporting" color="secondary">
+              {statusLabel}
+            </Text>
+            {item.apiKey.trim() ? (
+              <Text type="supporting" color="secondary">
+                已包含 API Key
+              </Text>
+            ) : null}
+          </HStack>
+        </VStack>
+      }
+      startContent={
+        <CheckboxInput
+          ref={checkboxRef}
+          label={item.name}
+          isLabelHidden
+          value={selectable && isSelected}
+          isDisabled={!selectable || submitting}
+          disabledMessage={!selectable ? statusLabel : undefined}
+          onChange={onChange}
+          size="sm"
+        />
+      }
+      interactiveRef={checkboxRef}
+      isDisabled={!selectable || submitting}
+    />
+  );
+}
+
 function CcsImportModal(props: {
   initialType: ProviderId;
   items: CcsProviderImportItem[];
   existingProviders: CustomProvider[];
+  message: string | null;
+  onRefresh: () => void;
   onImport: (items: CcsProviderImportItem[]) => Promise<string>;
   onClose: () => void;
 }) {
-  const { initialType, items, existingProviders, onImport, onClose } = props;
+  const { initialType, items, existingProviders, message, onRefresh, onImport, onClose } = props;
   const { t } = useLocale();
   const isCompact = useMediaQuery(
     "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
@@ -2459,8 +2496,13 @@ function CcsImportModal(props: {
       .filter((group) => group.rows.length > 0);
   }, [rows, initialType]);
 
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [result, setResult] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(rows.filter((row) => row.selectable).map((row) => row.key)),
+  );
+  const [result, setResult] = useState<{
+    status: "success" | "error";
+    message: string;
+  } | null>(null);
   // Import resolves as soon as the configs are written locally; this only
   // guards the brief await against double-submit.
   const [submitting, setSubmitting] = useState(false);
@@ -2477,6 +2519,10 @@ function CcsImportModal(props: {
   const activeSelectedCount = activeSelectableKeys.filter((key) => selected.has(key)).length;
   const activeAllSelected =
     activeSelectableKeys.length > 0 && activeSelectedCount === activeSelectableKeys.length;
+
+  useEffect(() => {
+    setSelected(new Set(rows.filter((row) => row.selectable).map((row) => row.key)));
+  }, [rows]);
 
   function toggleRow(key: string) {
     setSelected((prev) => {
@@ -2507,282 +2553,186 @@ function CcsImportModal(props: {
     setSubmitting(true);
     try {
       const summary = await onImport(chosen);
-      setResult(summary);
+      setResult({ status: "success", message: summary });
       setSelected(new Set());
     } catch (err) {
-      setResult(err instanceof Error ? err.message : String(err));
+      setResult({
+        status: "error",
+        message: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <Dialog
-      isOpen
-      onOpenChange={(isOpen) => {
-        if (!isOpen && !submitting) onClose();
-      }}
-      purpose="form"
-      variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "var(--xagent-dialog-width-lg)"}
-      maxHeight={isCompact ? "var(--xagent-viewport-height)" : "var(--xagent-dialog-height-md)"}
-      padding={0}
-    >
-      <AstryxView
-        layout="flex"
-        direction="vertical"
-        className="flex h-full min-h-0 w-full flex-col overflow-hidden"
-      >
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex items-center gap-3 border-b px-6 py-4"
-        >
-          <CcsSourceLogo className="h-9 w-9" />
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]"
-          >
-            <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
-              从 CC Switch 导入
-            </AstryxView>
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="mt-0.5 text-xs text-muted-foreground"
-            >
-              左侧选择供应商类型，右侧勾选要导入的配置，导入后自动获取并激活模型
-            </AstryxView>
-          </AstryxView>
-          <AstryxButton
-            type="button"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
-            onClick={onClose}
-            disabled={submitting}
-            title={t("settings.cancel")}
-            aria-label={t("settings.cancel")}
-          >
-            <X className="h-3.5 w-3.5" />
-          </AstryxButton>
-        </AstryxView>
-
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex min-h-0 flex-1 max-[720px]:flex-col"
-        >
-          {groups.length === 0 ? (
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex flex-1 items-center justify-center px-6 py-10 text-sm text-muted-foreground"
-            >
-              未发现可导入的供应商
-            </AstryxView>
-          ) : (
-            <>
-              <AstryxView
-                layout="flex"
-                direction="vertical"
-                className="flex w-44 shrink-0 flex-col gap-1 overflow-y-auto border-r bg-muted/30 p-2"
-              >
-                {groups.map((group) => {
-                  const groupSelectable = group.rows.filter((row) => row.selectable);
-                  const groupSelected = groupSelectable.filter((row) =>
-                    selected.has(row.key),
-                  ).length;
-                  const active = group.type === activeGroup?.type;
-                  return (
-                    <AstryxButton
-                      key={group.type}
-                      type="button"
-                      onClick={() => setActiveType(group.type)}
-                      className={cn(
-                        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors",
-                        active
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-                      )}
-                    >
-                      <AstryxView
-                        as="span"
-                        layout="flex"
-                        direction="horizontal"
-                        className="flex w-5 shrink-0 items-center justify-center text-base"
-                      >
-                        <ProviderBrandIcon type={group.type} />
-                      </AstryxView>
-                      <AstryxInline className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]">
-                        <AstryxInline className="block truncate text-sm font-medium">
-                          {getProviderLabel(group.type)}
-                        </AstryxInline>
-                        <AstryxInline className="block text-[11px] text-muted-foreground">
-                          {group.rows.length} 项配置
-                        </AstryxInline>
-                      </AstryxInline>
-                      {groupSelected > 0 ? (
-                        <AstryxInline className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                          {groupSelected}
-                        </AstryxInline>
-                      ) : null}
-                    </AstryxButton>
-                  );
-                })}
-              </AstryxView>
-
-              <AstryxView
-                layout="flex"
-                direction="vertical"
-                className="flex min-w-0 flex-1 flex-col"
-              >
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex items-center justify-between gap-2 border-b bg-muted/20 px-5 py-2"
-                >
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="text-xs text-muted-foreground"
-                  >
-                    已选 {activeSelectedCount} / {activeSelectableKeys.length} 个可导入
-                  </AstryxView>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={toggleAllActive}
-                    disabled={!activeSelectableKeys.length || submitting}
-                  >
-                    {activeAllSelected ? t("settings.deselectAll") : t("settings.selectAll")}
-                  </Button>
-                </AstryxView>
-
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="min-h-0 flex-1 divide-y overflow-y-auto"
-                >
-                  {activeRows.map(({ item, key, exists, transferable, selectable }) => {
-                    return (
-                      <AstryxView
-                        layout="flex"
-                        direction="horizontal"
-                        key={key}
-                        className={cn(
-                          "flex items-center gap-3 px-5 py-3 transition-colors",
-                          selectable ? "cursor-pointer hover:bg-accent/40" : "opacity-55",
-                        )}
-                      >
-                        <CheckboxInput
-                          label={item.name}
-                          isLabelHidden
-                          value={selectable && selected.has(key)}
-                          isDisabled={!selectable || submitting}
-                          onChange={() => toggleRow(key)}
-                          size="sm"
-                        />
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]"
-                        >
-                          <AstryxView
-                            layout="flex"
-                            direction="horizontal"
-                            className="flex items-center gap-2"
-                          >
-                            <AstryxInline className="truncate text-sm font-medium">
-                              {item.name}
-                            </AstryxInline>
-                            {exists ? (
-                              <AstryxInline className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                                已导入
-                              </AstryxInline>
-                            ) : !transferable ? (
-                              <AstryxInline className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-                                无 API 配置
-                              </AstryxInline>
-                            ) : null}
-                          </AstryxView>
-                          <AstryxView
-                            layout="block"
-                            direction="horizontal"
-                            className="mt-0.5 truncate text-xs text-muted-foreground"
-                          >
-                            {item.baseUrl || "未配置 Base URL"}
-                          </AstryxView>
-                        </AstryxView>
-                        {item.apiKey.trim() ? (
-                          <AstryxInline
-                            className="shrink-0 text-muted-foreground"
-                            title="已包含 API Key"
-                          >
-                            <Key className="h-3 w-3" />
-                          </AstryxInline>
-                        ) : null}
-                      </AstryxView>
-                    );
-                  })}
-                </AstryxView>
-              </AstryxView>
-            </>
-          )}
-        </AstryxView>
+    <SettingsModalShell onClose={onClose} purpose="form" ariaLabel="CC Switch">
+      <VStack width="100%" height="100%" minHeight={0} gap={0}>
+        <DialogHeader
+          title="从 CC Switch 导入"
+          subtitle="选择要导入的供应商配置；导入后会自动获取并激活模型。"
+          startContent={
+            <IconButton
+              label="返回"
+              tooltip="返回供应商配置"
+              variant="ghost"
+              size="sm"
+              icon={<ArrowLeft />}
+              isDisabled={submitting}
+              onClick={onClose}
+            />
+          }
+          endContent={<CcsSourceLogo className="h-7 w-7" />}
+        />
 
         {result ? (
-          <AstryxView layout="block" direction="horizontal" className="border-t px-6 py-3">
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300"
-            >
-              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <AstryxInline>{result}</AstryxInline>
-            </AstryxView>
-          </AstryxView>
+          <VStack padding={3}>
+            <Banner
+              status={result.status}
+              title={result.status === "success" ? "导入完成" : "导入失败"}
+              description={result.message}
+            />
+          </VStack>
         ) : null}
 
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex items-center justify-between gap-2 border-t px-6 py-4"
-        >
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="text-xs text-muted-foreground"
-          >
-            共已选 {selectedCount} / {selectableKeys.length} 个可导入
-          </AstryxView>
-          <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              disabled={submitting}
-              className="max-[720px]:h-10 max-[720px]:flex-1"
-            >
-              {result ? "关闭" : t("settings.cancel")}
-            </Button>
-            <Button
-              className="gap-1.5"
-              onClick={() => void handleImport()}
-              disabled={submitting || selectedCount === 0}
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  正在导入…
-                </>
-              ) : (
-                `导入 ${selectedCount} 个供应商`
+        <StackItem size="fill">
+          {groups.length === 0 ? (
+            <VStack width="100%" height="100%" hAlign="center" vAlign="center" padding={5}>
+              <EmptyState
+                title="未发现可导入的 CC Switch 配置"
+                description={message || "请确认 CC Switch 已配置供应商，然后重新扫描。"}
+                actions={
+                  <AstryxNativeButton
+                    label={t("settings.refreshLocalProviderConfigs")}
+                    variant="secondary"
+                    size="sm"
+                    icon={<RefreshCw />}
+                    onClick={onRefresh}
+                    isDisabled={submitting}
+                  />
+                }
+              />
+            </VStack>
+          ) : (
+            <HStack width="100%" height="100%" minHeight={0} gap={0}>
+              {isCompact ? null : (
+                <VStack width="30%" minHeight={0} padding={2}>
+                  <AstryxList density="compact">
+                    {groups.map((group) => {
+                      const groupSelected = group.rows.filter(
+                        (row) => row.selectable && selected.has(row.key),
+                      ).length;
+                      return (
+                        <ListItem
+                          key={group.type}
+                          label={getProviderLabel(group.type)}
+                          description={`${group.rows.length} 项配置`}
+                          startContent={<ProviderBrandIcon type={group.type} />}
+                          endContent={
+                            groupSelected > 0 ? (
+                              <Badge label={groupSelected} variant="neutral" />
+                            ) : undefined
+                          }
+                          isSelected={group.type === activeGroup?.type}
+                          onClick={() => setActiveType(group.type)}
+                        />
+                      );
+                    })}
+                  </AstryxList>
+                </VStack>
               )}
-            </Button>
-          </AstryxView>
-        </AstryxView>
-      </AstryxView>
-    </Dialog>
+
+              <StackItem size="fill">
+                <VStack width="100%" height="100%" minHeight={0} gap={0}>
+                  {isCompact ? (
+                    <TabList
+                      value={activeGroup?.type ?? groups[0].type}
+                      onChange={(value) => setActiveType(value as ProviderId)}
+                      role="tablist"
+                      overflow="scroll"
+                      size="sm"
+                    >
+                      {groups.map((group) => {
+                        const groupSelected = group.rows.filter(
+                          (row) => row.selectable && selected.has(row.key),
+                        ).length;
+                        return (
+                          <Tab
+                            key={group.type}
+                            value={group.type}
+                            label={getProviderLabel(group.type)}
+                            panelId="cc-switch-provider-import-panel"
+                            icon={<ProviderBrandIcon type={group.type} />}
+                            endContent={
+                              groupSelected > 0 ? (
+                                <Badge label={groupSelected} variant="neutral" />
+                              ) : undefined
+                            }
+                          />
+                        );
+                      })}
+                    </TabList>
+                  ) : null}
+
+                  <HStack width="100%" padding={3} hAlign="between" vAlign="center" gap={2}>
+                    <Text type="supporting" color="secondary">
+                      已选 {activeSelectedCount} / {activeSelectableKeys.length} 个可导入
+                    </Text>
+                    <AstryxNativeButton
+                      label={
+                        activeAllSelected ? t("settings.deselectAll") : t("settings.selectAll")
+                      }
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleAllActive}
+                      isDisabled={!activeSelectableKeys.length || submitting}
+                    />
+                  </HStack>
+
+                  <StackItem size="fill" isScrollable>
+                    <AstryxList density="balanced" hasDividers>
+                      {activeRows.map(({ item, key, exists, transferable, selectable }) => (
+                        <CcsProviderRow
+                          key={key}
+                          item={item}
+                          exists={exists}
+                          transferable={transferable}
+                          selectable={selectable}
+                          isSelected={selected.has(key)}
+                          submitting={submitting}
+                          onChange={() => toggleRow(key)}
+                        />
+                      ))}
+                    </AstryxList>
+                  </StackItem>
+                </VStack>
+              </StackItem>
+            </HStack>
+          )}
+        </StackItem>
+
+        <HStack width="100%" padding={4} hAlign="between" vAlign="center" gap={3} wrap="wrap">
+          <Text type="supporting" color="secondary">
+            共已选 {selectedCount} / {selectableKeys.length} 个可导入
+          </Text>
+          <HStack gap={2} vAlign="center">
+            <AstryxNativeButton
+              label={result ? "关闭" : t("settings.cancel")}
+              variant="secondary"
+              onClick={onClose}
+              isDisabled={submitting}
+            />
+            <AstryxNativeButton
+              label={submitting ? "正在导入…" : `导入 ${selectedCount} 个供应商`}
+              variant="primary"
+              onClick={() => void handleImport()}
+              isLoading={submitting}
+              isDisabled={submitting || selectedCount === 0}
+            />
+          </HStack>
+        </HStack>
+      </VStack>
+    </SettingsModalShell>
   );
 }
 
@@ -2915,7 +2865,7 @@ function ProviderList(props: {
                   label: `CC Switch${ccsAll.length > 0 ? ` (${ccsAll.length})` : ""}`,
                   description: ccsSubtitle,
                   icon: <CcsSourceLogo />,
-                  isDisabled: ccsLoading || !ccsAll.length,
+                  isDisabled: ccsLoading || thirdPartyImporting,
                   onClick: onOpenCcsImport,
                 },
                 {
@@ -2923,7 +2873,7 @@ function ProviderList(props: {
                   label: `Cherry Studio${cherryReady > 0 ? ` (${cherryReady})` : ""}`,
                   description: cherrySubtitle,
                   icon: <CherrySourceLogo />,
-                  isDisabled: cherryLoading || cherryImporting || !cherryAll.length,
+                  isDisabled: cherryLoading || cherryImporting,
                   onClick: onOpenCherryImport,
                 },
               ]}
@@ -3044,8 +2994,7 @@ export function ProvidersSection(
   const { t } = useLocale();
 
   const [activeTab, setActiveTab] = useState<ProviderId>("claude_code");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [customSettingsOpen, setCustomSettingsOpen] = useState(false);
+  const [view, setView] = useState<ProviderSettingsView>("list");
   const [editingProvider, setEditingProvider] = useState<CustomProvider | null>(null);
   const [ccsImportType, setCcsImportType] = useState<ProviderId | null>(null);
   const [cherryImportType, setCherryImportType] = useState<ProviderId | null>(null);
@@ -3099,14 +3048,14 @@ export function ProvidersSection(
 
   async function chooseCherryDataDirectory() {
     if (!thirdPartyImportEnabled) return;
-    const selected = await invoke<string | null>("system_pick_folder", {
-      initial_workdir: cherryDataPath ?? cherryProviders?.dataPath ?? undefined,
-    });
-    if (!selected) return;
-
-    setCherryLoading(true);
-    setCherryMessage("正在扫描选择的 Cherry Studio 数据目录…");
     try {
+      const selected = await invoke<string | null>("system_pick_folder", {
+        initial_workdir: cherryDataPath ?? cherryProviders?.dataPath ?? undefined,
+      });
+      if (!selected) return;
+
+      setCherryLoading(true);
+      setCherryMessage("正在扫描选择的 Cherry Studio 数据目录…");
       const response = await withScanFeedback(
         invoke<CherryProvidersResponse>("settings_list_cherry_studio_providers_from_path", {
           dataPath: selected,
@@ -3264,7 +3213,93 @@ export function ProvidersSection(
     return summary;
   }
 
-  async function importCherryProviders(items: CherryProviderImportItem[]) {
+  async function syncCherryModelsInBackground(
+    importable: CherryProviderImportItem[],
+    existingById: Map<string, CustomProvider>,
+    importedSummary: string,
+  ) {
+    const modelResults = await Promise.all(
+      importable.map(async (item) => {
+        const identity = cherryProviderId(item);
+        try {
+          const fetchedModels = await fetchModelsFromApi(
+            item.providerType,
+            item.baseUrl,
+            cherryEffectiveApiKey(item, existingById.get(identity)),
+            {
+              isFullUrl: existingById.get(identity)?.isFullUrl,
+              modelsUrl: existingById.get(identity)?.modelsUrl,
+            },
+          );
+          const models = fetchedModels.filter((model) => isLikelyCherryChatModel(model.id));
+          return { identity, models, fetched: true, failed: false };
+        } catch {
+          return {
+            identity,
+            models: [] as ProviderModelConfig[],
+            fetched: false,
+            failed: true,
+          };
+        }
+      }),
+    );
+
+    // Two selected items can normalize to the same provider id; merge their
+    // results instead of letting the last one win.
+    const resultsByIdentity = new Map<string, (typeof modelResults)[number]>();
+    for (const result of modelResults) {
+      const merged = resultsByIdentity.get(result.identity);
+      if (!merged) {
+        resultsByIdentity.set(result.identity, result);
+        continue;
+      }
+      resultsByIdentity.set(result.identity, {
+        identity: result.identity,
+        models: mergeFetchedModels(result.models, merged.models),
+        fetched: merged.fetched || result.fetched,
+        failed: merged.failed || result.failed,
+      });
+    }
+
+    setSettings((prev) => {
+      let changed = false;
+      const providers = prev.customProviders.map((provider) => {
+        const result = resultsByIdentity.get(provider.id);
+        if (!result?.fetched) return provider;
+
+        const models = mergeFetchedModels(result.models, provider.models);
+        const activeModels = models.map((model) => model.id);
+        if (
+          models.length === provider.models.length &&
+          models.every((model, index) => model.id === provider.models[index]?.id) &&
+          activeModels.length === provider.activeModels.length &&
+          activeModels.every((model, index) => model === provider.activeModels[index])
+        ) {
+          return provider;
+        }
+        changed = true;
+        return { ...provider, models, activeModels };
+      });
+      return changed ? updateCustomProviders(prev, providers) : prev;
+    });
+
+    const fetchedCount = modelResults.filter((result) => result.fetched).length;
+    const failedCount = modelResults.filter((result) => result.failed).length;
+    const refreshedModelCount = modelResults.reduce(
+      (total, result) => total + result.models.length,
+      0,
+    );
+    const details = [
+      importedSummary,
+      fetchedCount > 0 && refreshedModelCount > 0
+        ? `已在后台获取并激活 ${refreshedModelCount} 个模型`
+        : "API 未返回可用模型",
+      failedCount > 0 ? `${failedCount} 个供应商模型获取失败（配置已成功导入）` : "",
+    ].filter(Boolean);
+    setCherryMessage(details.join("，"));
+  }
+
+  function importCherryProviders(items: CherryProviderImportItem[]) {
     const importable = items.filter((item) => item.importable);
     if (!importable.length) {
       const message = "所选 Cherry Studio 配置没有可导入的 API 配置";
@@ -3273,137 +3308,66 @@ export function ProvidersSection(
     }
 
     setCherryImporting(true);
-    setCherryMessage("正在同步供应商、获取并激活全部模型…");
+    setCherryMessage("正在导入供应商配置…");
 
     const allItems = cherryProviders?.providers ?? importable;
     const existingById = new Map(
       settings.customProviders.map((provider) => [provider.id, provider] as const),
     );
 
-    try {
-      setSettings((prev) => {
-        let changed = false;
-        const providers = [...prev.customProviders];
+    setSettings((prev) => {
+      let changed = false;
+      const providers = [...prev.customProviders];
 
-        for (const item of importable) {
-          const id = cherryProviderId(item);
-          const existingIndex = providers.findIndex((provider) => provider.id === id);
-          const nextProvider = providerFromCherry(
-            item,
-            allItems,
-            existingIndex >= 0 ? providers[existingIndex] : undefined,
-          );
+      for (const item of importable) {
+        const id = cherryProviderId(item);
+        const existingIndex = providers.findIndex((provider) => provider.id === id);
+        const nextProvider = providerFromCherry(
+          item,
+          allItems,
+          existingIndex >= 0 ? providers[existingIndex] : undefined,
+        );
 
-          if (existingIndex >= 0) providers[existingIndex] = nextProvider;
-          else providers.push(nextProvider);
-          changed = true;
-        }
-
-        return changed ? updateCustomProviders(prev, providers) : prev;
-      });
-
-      const modelResults = await Promise.all(
-        importable.map(async (item) => {
-          const identity = cherryProviderId(item);
-          try {
-            const fetchedModels = await fetchModelsFromApi(
-              item.providerType,
-              item.baseUrl,
-              cherryEffectiveApiKey(item, existingById.get(identity)),
-              {
-                isFullUrl: existingById.get(identity)?.isFullUrl,
-                modelsUrl: existingById.get(identity)?.modelsUrl,
-              },
-            );
-            const models = fetchedModels.filter((model) => isLikelyCherryChatModel(model.id));
-            return { identity, models, fetched: true, failed: false };
-          } catch {
-            return {
-              identity,
-              models: [] as ProviderModelConfig[],
-              fetched: false,
-              failed: true,
-            };
-          }
-        }),
-      );
-
-      // Two selected items can normalize to the same provider id; merge their
-      // results instead of letting the last one win.
-      const resultsByIdentity = new Map<string, (typeof modelResults)[number]>();
-      for (const result of modelResults) {
-        const merged = resultsByIdentity.get(result.identity);
-        if (!merged) {
-          resultsByIdentity.set(result.identity, result);
-          continue;
-        }
-        resultsByIdentity.set(result.identity, {
-          identity: result.identity,
-          models: mergeFetchedModels(result.models, merged.models),
-          fetched: merged.fetched || result.fetched,
-          failed: merged.failed || result.failed,
-        });
+        if (existingIndex >= 0) providers[existingIndex] = nextProvider;
+        else providers.push(nextProvider);
+        changed = true;
       }
-      setSettings((prev) => {
-        let changed = false;
-        const providers = prev.customProviders.map((provider) => {
-          const result = resultsByIdentity.get(provider.id);
-          if (!result?.fetched) return provider;
 
-          const models = mergeFetchedModels(result.models, provider.models);
-          const activeModels = models.map((model) => model.id);
-          if (
-            models.length === provider.models.length &&
-            models.every((model, index) => model.id === provider.models[index]?.id) &&
-            activeModels.length === provider.activeModels.length &&
-            activeModels.every((model, index) => model === provider.activeModels[index])
-          ) {
-            return provider;
-          }
-          changed = true;
-          return { ...provider, models, activeModels };
-        });
-        return changed ? updateCustomProviders(prev, providers) : prev;
-      });
+      return changed ? updateCustomProviders(prev, providers) : prev;
+    });
 
-      const fetchedCount = modelResults.filter((result) => result.fetched).length;
-      const failedCount = modelResults.filter((result) => result.failed).length;
-      const refreshedModelCount = modelResults.reduce(
-        (total, result) => total + result.models.length,
-        0,
+    const importedByType = PROVIDER_TABS.map((type) => ({
+      type,
+      count: importable.filter((item) => item.providerType === type).length,
+    })).filter((entry) => entry.count > 0);
+    const importedSummary = `已导入 ${importedByType
+      .map((entry) => `${entry.count} 个 ${getProviderLabel(entry.type)}`)
+      .join("、")} 供应商`;
+
+    // Saving the provider configuration is the completion boundary. Model
+    // discovery is network-bound and must never keep the import screen locked.
+    setCherryMessage(`${importedSummary}，正在后台获取模型列表…`);
+    setCherryImportType(null);
+    setCherryImporting(false);
+    void syncCherryModelsInBackground(importable, existingById, importedSummary).catch((error) => {
+      setCherryMessage(
+        `${importedSummary}，后台获取模型失败：${error instanceof Error ? error.message : String(error)}`,
       );
-      const importedByType = PROVIDER_TABS.map((type) => ({
-        type,
-        count: importable.filter((item) => item.providerType === type).length,
-      })).filter((entry) => entry.count > 0);
-      const details = [
-        `已同步 ${importedByType
-          .map((entry) => `${entry.count} 个 ${getProviderLabel(entry.type)}`)
-          .join("、")} 供应商`,
-        fetchedCount > 0 && refreshedModelCount > 0
-          ? `XAgent 获取并激活 ${refreshedModelCount} 个模型`
-          : "XAgent API 未返回可用模型",
-        failedCount > 0 ? `${failedCount} 个供应商模型获取失败` : "",
-      ].filter(Boolean);
-      setCherryMessage(details.join("，"));
-      setCherryImportType(null);
-    } finally {
-      setCherryImporting(false);
-    }
+    });
   }
 
   function openAdd() {
     setEditingProvider(null);
-    setModalOpen(true);
+    setView("editor");
   }
 
   function openEdit(provider: CustomProvider) {
     setEditingProvider(provider);
-    setModalOpen(true);
+    setView("editor");
   }
 
-  function closeModal() {
-    setModalOpen(false);
+  function closeEditor() {
+    setView("list");
     setEditingProvider(null);
   }
 
@@ -3422,7 +3386,7 @@ export function ProvidersSection(
       };
       return updateCustomProviders(prev, [...prev.customProviders, newProvider]);
     });
-    closeModal();
+    closeEditor();
   }
 
   function handleDelete(id: string) {
@@ -3434,111 +3398,128 @@ export function ProvidersSection(
     );
   }
 
+  if (view === "list" && thirdPartyImportEnabled && ccsImportType) {
+    return (
+      <CcsImportModal
+        initialType={ccsImportType}
+        items={ccsProviders?.providers ?? []}
+        existingProviders={settings.customProviders}
+        message={ccsMessage}
+        onRefresh={() => void refreshThirdPartyProviders()}
+        onImport={importCcsProviders}
+        onClose={() => setCcsImportType(null)}
+      />
+    );
+  }
+
+  if (view === "list" && thirdPartyImportEnabled && cherryImportType) {
+    return (
+      <CherryStudioImportModal
+        initialType={cherryImportType}
+        response={
+          cherryProviders ?? {
+            status: "not-found",
+            message: cherryMessage || "未检测到 Cherry Studio 配置",
+            version: "",
+            dataPath: cherryDataPath ?? "",
+            totalProviderCount: 0,
+            enabledProviderCount: 0,
+            providers: [],
+          }
+        }
+        importing={cherryImporting}
+        scanning={cherryLoading}
+        dataPath={cherryDataPath}
+        isExisting={(item) =>
+          settings.customProviders.some((provider) => provider.id === cherryProviderId(item))
+        }
+        onChooseDataDirectory={() => void chooseCherryDataDirectory()}
+        onResetDataDirectory={resetCherryDataDirectory}
+        onConfirm={(items) => void importCherryProviders(items)}
+        onClose={() => setCherryImportType(null)}
+      />
+    );
+  }
+
   return (
     <>
-      <VStack height="100%" minHeight={0} gap={0}>
-        <Toolbar
-          label={t("settings.navProviders")}
-          size="sm"
-          dividers={["bottom"]}
-          startContent={
-            <TabList
-              value={activeTab}
-              onChange={(value) => setActiveTab(value as ProviderId)}
-              size="sm"
-              overflow="scroll"
-              role="tablist"
-            >
-              {PROVIDER_TABS.map((tab) => (
-                <Tab
-                  key={tab}
-                  value={tab}
-                  label={getProviderLabel(tab)}
-                  icon={<ProviderBrandIcon type={tab} />}
-                  panelId={`provider-panel-${tab}`}
-                />
-              ))}
-            </TabList>
-          }
-          endContent={
-            <IconButton
-              label={t("settings.openCustomSettings")}
-              tooltip={t("settings.openCustomSettings")}
-              variant="ghost"
-              size="sm"
-              icon={<Settings />}
-              onClick={() => setCustomSettingsOpen(true)}
-            />
-          }
-        />
-        <StackItem size="fill" isScrollable>
-          <VStack id={`provider-panel-${activeTab}`} role="tabpanel" padding={4}>
-            <ProviderList
-              type={activeTab}
-              isActive
-              providers={settings.customProviders}
-              onAdd={openAdd}
-              onEdit={openEdit}
-              onDelete={handleDelete}
-              ccsProviders={ccsProviders}
-              ccsLoading={ccsLoading}
-              ccsMessage={ccsMessage}
-              cherryProviders={cherryProviders}
-              cherryLoading={cherryLoading}
-              cherryImporting={cherryImporting}
-              cherryMessage={cherryMessage}
-              onEnsureThirdPartyScan={ensureThirdPartyScan}
-              onRefreshThirdPartyProviders={() => void refreshThirdPartyProviders()}
-              onOpenCcsImport={() => setCcsImportType(activeTab)}
-              onOpenCherryImport={() => setCherryImportType(activeTab)}
-              thirdPartyImportEnabled={thirdPartyImportEnabled}
-              usage={usage}
-            />
-          </VStack>
-        </StackItem>
-      </VStack>
-
-      {modalOpen ? (
-        <ProviderModal
+      {view === "editor" ? (
+        <ProviderEditor
           providerType={activeTab}
           initialData={editingProvider ?? undefined}
           onSave={handleSave}
-          onClose={closeModal}
+          onClose={closeEditor}
         />
-      ) : null}
-      {thirdPartyImportEnabled && ccsImportType ? (
-        <CcsImportModal
-          initialType={ccsImportType}
-          items={ccsProviders?.providers ?? []}
-          existingProviders={settings.customProviders}
-          onImport={importCcsProviders}
-          onClose={() => setCcsImportType(null)}
-        />
-      ) : null}
-      {thirdPartyImportEnabled && cherryImportType && cherryProviders ? (
-        <CherryStudioImportModal
-          initialType={cherryImportType}
-          response={cherryProviders}
-          importing={cherryImporting}
-          scanning={cherryLoading}
-          dataPath={cherryDataPath}
-          isExisting={(item) =>
-            settings.customProviders.some((provider) => provider.id === cherryProviderId(item))
-          }
-          onChooseDataDirectory={() => void chooseCherryDataDirectory()}
-          onResetDataDirectory={resetCherryDataDirectory}
-          onConfirm={(items) => void importCherryProviders(items)}
-          onClose={() => setCherryImportType(null)}
-        />
-      ) : null}
-      {customSettingsOpen ? (
-        <CustomSettingsDrawer
+      ) : view === "advanced" ? (
+        <ProviderAdvancedSettingsPanel
           settings={settings}
           setSettings={setSettings}
           providerType={activeTab}
-          onClose={() => setCustomSettingsOpen(false)}
+          onClose={() => setView("list")}
         />
-      ) : null}
+      ) : (
+        <VStack height="100%" minHeight={0} gap={0}>
+          <Toolbar
+            label={t("settings.navProviders")}
+            size="sm"
+            dividers={["bottom"]}
+            startContent={
+              <TabList
+                value={activeTab}
+                onChange={(value) => setActiveTab(value as ProviderId)}
+                size="sm"
+                overflow="scroll"
+                role="tablist"
+              >
+                {PROVIDER_TABS.map((tab) => (
+                  <Tab
+                    key={tab}
+                    value={tab}
+                    label={getProviderLabel(tab)}
+                    icon={<ProviderBrandIcon type={tab} />}
+                    panelId={`provider-panel-${tab}`}
+                  />
+                ))}
+              </TabList>
+            }
+            endContent={
+              <IconButton
+                label={t("settings.openCustomSettings")}
+                tooltip={t("settings.openCustomSettings")}
+                variant="ghost"
+                size="sm"
+                icon={<Settings />}
+                onClick={() => setView("advanced")}
+              />
+            }
+          />
+          <StackItem size="fill" isScrollable>
+            <VStack id={`provider-panel-${activeTab}`} role="tabpanel" padding={4}>
+              <ProviderList
+                type={activeTab}
+                isActive
+                providers={settings.customProviders}
+                onAdd={openAdd}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+                ccsProviders={ccsProviders}
+                ccsLoading={ccsLoading}
+                ccsMessage={ccsMessage}
+                cherryProviders={cherryProviders}
+                cherryLoading={cherryLoading}
+                cherryImporting={cherryImporting}
+                cherryMessage={cherryMessage}
+                onEnsureThirdPartyScan={ensureThirdPartyScan}
+                onRefreshThirdPartyProviders={() => void refreshThirdPartyProviders()}
+                onOpenCcsImport={() => setCcsImportType(activeTab)}
+                onOpenCherryImport={() => setCherryImportType(activeTab)}
+                thirdPartyImportEnabled={thirdPartyImportEnabled}
+                usage={usage}
+              />
+            </VStack>
+          </StackItem>
+        </VStack>
+      )}
     </>
   );
 }
