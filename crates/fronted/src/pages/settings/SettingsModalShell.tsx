@@ -1,6 +1,22 @@
 import type { DialogPurpose } from "@astryxdesign/core/Dialog";
 import { VStack } from "@astryxdesign/core/Layout";
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useContext, useEffect } from "react";
+
+const SettingsDetailLayerContext = createContext<((delta: 1 | -1) => void) | null>(null);
+
+export function SettingsDetailLayerProvider({
+  children,
+  onLayerChange,
+}: {
+  children: ReactNode;
+  onLayerChange: (delta: 1 | -1) => void;
+}) {
+  return (
+    <SettingsDetailLayerContext.Provider value={onLayerChange}>
+      {children}
+    </SettingsDetailLayerContext.Provider>
+  );
+}
 
 type SettingsModalShellProps = {
   children: ReactNode;
@@ -17,6 +33,13 @@ export function SettingsModalShell({
   ariaLabel,
   panelClassName,
 }: SettingsModalShellProps) {
+  const onLayerChange = useContext(SettingsDetailLayerContext);
+
+  useEffect(() => {
+    onLayerChange?.(1);
+    return () => onLayerChange?.(-1);
+  }, [onLayerChange]);
+
   return (
     <VStack
       width="100%"
@@ -26,6 +49,7 @@ export function SettingsModalShell({
       role="region"
       aria-label={ariaLabel ?? "Settings"}
       data-purpose={purpose}
+      data-settings-detail-layer
       className={panelClassName}
     >
       {children}

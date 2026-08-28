@@ -1,7 +1,8 @@
 import { BottomSheet } from "@astryxdesign/core/BottomSheet";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
-import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import {
@@ -65,9 +66,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { Input } from "../ui/input";
@@ -542,110 +540,75 @@ const HistoryRow = memo(function HistoryRow(props: {
               menuOpen && "opacity-100",
             )}
           >
-            <Button
-              type="button"
+            <IconButton
               variant="ghost"
-              size="icon"
-              className={PROJECT_ICON_BUTTON_CLASS}
-              title={item.isPinned ? t("chat.conversationUnpin") : t("chat.conversationPin")}
-              aria-label={item.isPinned ? t("chat.conversationUnpin") : t("chat.conversationPin")}
+              size="sm"
+              label={item.isPinned ? t("chat.conversationUnpin") : t("chat.conversationPin")}
+              tooltip={item.isPinned ? t("chat.conversationUnpin") : t("chat.conversationPin")}
+              icon={item.isPinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
               onClick={handleTogglePinned}
-              disabled={item.isPending || isBusy}
-            >
-              {item.isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-            </Button>
-            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className={PROJECT_ICON_BUTTON_CLASS}
-                    title={t("chat.conversationMore")}
-                    aria-label={t("chat.conversationMore")}
-                    onPointerDown={(e: React.PointerEvent<HTMLButtonElement>) =>
-                      e.stopPropagation()
-                    }
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => e.stopPropagation()}
-                  />
-                }
-              >
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                side={touchActions ? "bottom" : "right"}
-                align={touchActions ? "end" : "start"}
-                sideOffset={touchActions ? 4 : 8}
-                collisionPadding={12}
-                className="sidebar-context-menu min-w-[10rem] rounded-xl border-border/60 bg-background/95 backdrop-blur-xl"
-              >
-                <DropdownMenuItem
-                  disabled={isRunning || isBusy}
-                  onSelect={handleStartRenaming}
-                  className="gap-2"
-                >
-                  <Edit3 className="h-3.5 w-3.5" />
-                  {t("chat.conversationRename")}
-                </DropdownMenuItem>
-                {onOpenInSplit && !touchActions ? (
-                  <DropdownMenuItem
-                    disabled={item.isPending || isActive}
-                    onSelect={() => onOpenInSplit(item.id)}
-                    className="gap-2"
-                  >
-                    <PanelRightOpen className="h-3.5 w-3.5" />
-                    {t("chat.conversationOpenInSplit")}
-                  </DropdownMenuItem>
-                ) : null}
-                <DropdownMenuItem
-                  disabled={item.isPending || isRunning || isBusy}
-                  onSelect={() => onEnterSelection(item.id)}
-                  className="gap-2"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                  {t("chat.history.select")}
-                </DropdownMenuItem>
-                {moveTargets.length > 0 ? (
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger
-                      disabled={item.isPending || isRunning || isBusy}
-                      className="gap-2"
-                    >
-                      <FolderTree className="h-3.5 w-3.5" />
-                      <AstryxInline className="min-w-0 flex-1">
-                        {t("chat.conversationMove")}
-                      </AstryxInline>
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent
-                      side={touchActions ? "left" : "right"}
-                      collisionPadding={12}
-                      className="min-w-[12rem] max-w-[min(20rem,80vw)]"
-                    >
-                      {moveTargets.map((project) => (
-                        <DropdownMenuItem
-                          key={project.id}
-                          onSelect={() => onMoveToWorkspace(item.id, project.path)}
-                          className="gap-2"
-                        >
-                          <FolderClosed className="h-3.5 w-3.5 shrink-0" />
-                          <AstryxInline className="min-w-0 truncate">{project.name}</AstryxInline>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                ) : null}
-                <DropdownMenuItem
-                  disabled={isDeleteDisabled || isBusy}
-                  onSelect={handleRequestDelete}
-                  className="gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  {t("chat.conversationDelete")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              isDisabled={item.isPending || isBusy}
+            />
+            <MoreMenu
+              label={t("chat.conversationMore")}
+              size="sm"
+              placement={touchActions ? "below" : "end"}
+              alignment={touchActions ? "end" : "start"}
+              onOpenChange={setMenuOpen}
+              items={[
+                {
+                  id: "rename",
+                  label: t("chat.conversationRename"),
+                  icon: <Edit3 aria-hidden="true" />,
+                  onClick: handleStartRenaming,
+                  isDisabled: isRunning || isBusy,
+                },
+                ...(onOpenInSplit && !touchActions
+                  ? [
+                      {
+                        id: "split",
+                        label: t("chat.conversationOpenInSplit"),
+                        icon: <PanelRightOpen aria-hidden="true" />,
+                        onClick: () => onOpenInSplit(item.id),
+                        isDisabled: item.isPending || isActive,
+                      },
+                    ]
+                  : []),
+                {
+                  id: "select",
+                  label: t("chat.history.select"),
+                  icon: <Check aria-hidden="true" />,
+                  onClick: () => onEnterSelection(item.id),
+                  isDisabled: item.isPending || isRunning || isBusy,
+                },
+                ...(moveTargets.length > 0
+                  ? [
+                      { type: "divider" as const },
+                      {
+                        type: "section" as const,
+                        id: "move",
+                        title: t("chat.conversationMove"),
+                        items: moveTargets.map((project) => ({
+                          id: project.id,
+                          label: project.name,
+                          icon: <FolderClosed aria-hidden="true" />,
+                          onClick: () => onMoveToWorkspace(item.id, project.path),
+                          isDisabled: item.isPending || isRunning || isBusy,
+                        })),
+                      },
+                    ]
+                  : []),
+                { type: "divider" as const },
+                {
+                  id: "delete",
+                  label: t("chat.conversationDelete"),
+                  icon: <Trash2 aria-hidden="true" />,
+                  onClick: handleRequestDelete,
+                  isDisabled: isDeleteDisabled || isBusy,
+                  variant: "destructive" as const,
+                },
+              ]}
+            />
           </AstryxView>
         </AstryxView>
       ) : null}
@@ -713,7 +676,6 @@ const ProjectRow = memo(function ProjectRow(props: {
     touchActions = false,
   } = props;
   const { t } = useLocale();
-  const rowRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const skipNextBlurCommitRef = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -802,7 +764,6 @@ const ProjectRow = memo(function ProjectRow(props: {
     <AstryxView
       layout="grid"
       direction="horizontal"
-      ref={rowRef}
       className={cn(
         "group/project grid h-[30px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-lg pl-1 transition-colors",
         isMissing
@@ -860,70 +821,52 @@ const ProjectRow = memo(function ProjectRow(props: {
           />
         </AstryxView>
       ) : (
-        <Tooltip
-          anchorRef={rowRef}
-          placement="end"
-          alignment="center"
-          delay={0}
-          hasHoverIndication={false}
-          content={
-            <VStack gap={1} width={256}>
-              <Text type="label" weight="semibold" maxLines={1}>
-                {project.name}
-              </Text>
-              <Text type="supporting" color="secondary" wordBreak="break-all">
-                {project.path}
-              </Text>
-            </VStack>
-          }
+        <AstryxButton
+          type="button"
+          aria-disabled={isArchived || undefined}
+          className={cn(
+            "flex h-[30px] min-w-0 items-center gap-3 rounded-md px-2 text-left outline-hidden transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+            isMissing
+              ? "hover:text-destructive focus-visible:bg-destructive/10"
+              : isArchived
+                ? "cursor-default"
+                : "hover:text-foreground focus-visible:bg-foreground/[0.06]",
+          )}
+          onClick={() => {
+            // Archived workspaces cannot be selected, so no new
+            // conversations can start in them.
+            if (!isArchived) {
+              onSelectProject(project);
+            }
+          }}
+          onDoubleClick={(event) => {
+            event.preventDefault();
+            if (!isDefaultProject) {
+              onStartRenamingProject(project);
+            }
+          }}
         >
-          <AstryxButton
-            type="button"
-            aria-disabled={isArchived || undefined}
+          <ProjectFolderIcon
             className={cn(
-              "flex h-[30px] min-w-0 items-center gap-3 rounded-md px-2 text-left outline-hidden transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+              "h-4 w-4 shrink-0 transition-colors",
               isMissing
-                ? "hover:text-destructive focus-visible:bg-destructive/10"
+                ? "text-destructive"
                 : isArchived
-                  ? "cursor-default"
-                  : "hover:text-foreground focus-visible:bg-foreground/[0.06]",
+                  ? "text-muted-foreground/40"
+                  : isActive
+                    ? "text-amber-500"
+                    : "text-foreground/65",
             )}
-            onClick={() => {
-              // Archived workspaces cannot be selected, so no new
-              // conversations can start in them.
-              if (!isArchived) {
-                onSelectProject(project);
-              }
-            }}
-            onDoubleClick={(event) => {
-              event.preventDefault();
-              if (!isDefaultProject) {
-                onStartRenamingProject(project);
-              }
-            }}
+          />
+          <AstryxInline
+            className={cn(
+              "sidebar-project-name-fade min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5",
+              isMissing ? "text-destructive" : undefined,
+            )}
           >
-            <ProjectFolderIcon
-              className={cn(
-                "h-4 w-4 shrink-0 transition-colors",
-                isMissing
-                  ? "text-destructive"
-                  : isArchived
-                    ? "text-muted-foreground/40"
-                    : isActive
-                      ? "text-amber-500"
-                      : "text-foreground/65",
-              )}
-            />
-            <AstryxInline
-              className={cn(
-                "sidebar-project-name-fade min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5",
-                isMissing ? "text-destructive" : undefined,
-              )}
-            >
-              {project.name}
-            </AstryxInline>
-          </AstryxButton>
-        </Tooltip>
+            {project.name}
+          </AstryxInline>
+        </AstryxButton>
       )}
       {!isRenaming ? (
         <AstryxView
@@ -970,162 +913,142 @@ const ProjectRow = memo(function ProjectRow(props: {
           >
             {isMissing && !isArchived ? (
               !isDefaultProject ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    PROJECT_ICON_BUTTON_CLASS,
-                    "text-destructive hover:!bg-transparent hover:text-destructive",
-                  )}
-                  title={t("chat.workspaceRemove")}
-                  aria-label={t("chat.workspaceRemove")}
+                <IconButton
+                  variant="destructive"
+                  size="sm"
+                  label={t("chat.workspaceRemove")}
+                  tooltip={t("chat.workspaceRemove")}
+                  icon={<Trash2 aria-hidden="true" />}
                   onClick={handleRequestRemove}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                />
               ) : null
             ) : (
               <>
                 {!isArchived ? (
-                  <Button
-                    type="button"
+                  <IconButton
                     variant="ghost"
-                    size="icon"
-                    className={PROJECT_ICON_BUTTON_CLASS}
-                    title={isPinned ? t("chat.workspaceUnpin") : t("chat.workspacePin")}
-                    aria-label={isPinned ? t("chat.workspaceUnpin") : t("chat.workspacePin")}
+                    size="sm"
+                    label={isPinned ? t("chat.workspaceUnpin") : t("chat.workspacePin")}
+                    tooltip={isPinned ? t("chat.workspaceUnpin") : t("chat.workspacePin")}
+                    icon={isPinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
                     onClick={handleTogglePinned}
-                  >
-                    {isPinned ? (
-                      <PinOff className="h-3.5 w-3.5" />
-                    ) : (
-                      <Pin className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
+                  />
                 ) : null}
-                <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className={PROJECT_ICON_BUTTON_CLASS}
-                        title={t("chat.workspaceMore")}
-                        aria-label={t("chat.workspaceMore")}
-                      />
-                    }
-                  >
-                    <MoreHorizontal className="h-3.5 w-3.5" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    side={touchActions ? "bottom" : "right"}
-                    align={touchActions ? "end" : "start"}
-                    sideOffset={touchActions ? 4 : 6}
-                    collisionPadding={12}
-                    className="sidebar-context-menu"
-                  >
-                    {onOpenWorkspaceSettings ? (
-                      <DropdownMenuItem
-                        onSelect={() => onOpenWorkspaceSettings(project)}
-                        className="gap-2"
-                      >
-                        <Settings2 className="h-3.5 w-3.5" />
-                        {t("chat.workspaceSettings")}
-                      </DropdownMenuItem>
-                    ) : null}
-                    {!isDefaultProject ? (
-                      <>
-                        <DropdownMenuItem
-                          onSelect={() => onStartRenamingProject(project)}
-                          className="gap-2"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          {t("chat.workspaceRename")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={handleRequestRemove}
-                          className="gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          {t("chat.workspaceRemove")}
-                        </DropdownMenuItem>
-                      </>
-                    ) : null}
-                    {workspaceProjectGroups.length > 0 && onMoveProjectToGroup ? (
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="gap-2">
-                          <FolderTree className="h-3.5 w-3.5" />
-                          <AstryxInline className="min-w-0 flex-1">
-                            {t("chat.workspaceMoveToGroup")}
-                          </AstryxInline>
-                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent
-                          side={touchActions ? "left" : "right"}
-                          collisionPadding={12}
-                          className="min-w-[12rem] max-w-[min(20rem,80vw)]"
-                        >
-                          <DropdownMenuItem
-                            onSelect={() => onMoveProjectToGroup(project.path, null)}
-                            className="gap-2"
-                          >
-                            <Check
-                              className={cn(
-                                "h-3.5 w-3.5",
-                                currentGroupId === null ? "opacity-100" : "opacity-0",
-                              )}
-                            />
-                            <AstryxInline>{t("chat.workspaceUngrouped")}</AstryxInline>
-                          </DropdownMenuItem>
-                          {workspaceProjectGroups.map((group) => (
-                            <DropdownMenuItem
-                              key={group.id}
-                              onSelect={() => onMoveProjectToGroup(project.path, group.id)}
-                              className="gap-2"
-                            >
-                              <Check
-                                className={cn(
-                                  "h-3.5 w-3.5",
-                                  currentGroupId === group.id ? "opacity-100" : "opacity-0",
-                                )}
-                              />
-                              <AstryxInline className="min-w-0 truncate">{group.name}</AstryxInline>
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    ) : null}
-                    {!isArchived && canArchive ? (
-                      <DropdownMenuItem onSelect={handleArchive} className="gap-2">
-                        <Archive className="h-3.5 w-3.5" />
-                        {t("chat.workspaceArchive")}
-                      </DropdownMenuItem>
-                    ) : null}
-                    {isArchived ? (
-                      <DropdownMenuItem onSelect={handleUnarchive} className="gap-2">
-                        <ArchiveRestore className="h-3.5 w-3.5" />
-                        {t("chat.workspaceUnarchive")}
-                      </DropdownMenuItem>
-                    ) : null}
-                    {onBrowseProjectInFileTree ? (
-                      <DropdownMenuItem onSelect={handleBrowseInFileTree} className="gap-2">
-                        <FolderTree className="h-3.5 w-3.5" />
-                        {t("chat.workspaceBrowseInFileTree")}
-                      </DropdownMenuItem>
-                    ) : null}
-                    {onBrowseProjectInSystemFileManager ? (
-                      <DropdownMenuItem
-                        onSelect={handleBrowseInSystemFileManager}
-                        className="gap-2"
-                      >
-                        <FolderOpen className="h-3.5 w-3.5" />
-                        {t("chat.workspaceBrowseInSystemFileManager")}
-                      </DropdownMenuItem>
-                    ) : null}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <MoreMenu
+                  label={t("chat.workspaceMore")}
+                  size="sm"
+                  placement={touchActions ? "below" : "end"}
+                  alignment={touchActions ? "end" : "start"}
+                  onOpenChange={setMenuOpen}
+                  items={[
+                    ...(onOpenWorkspaceSettings
+                      ? [
+                          {
+                            id: "settings",
+                            label: t("chat.workspaceSettings"),
+                            icon: <Settings2 aria-hidden="true" />,
+                            onClick: () => onOpenWorkspaceSettings(project),
+                          },
+                        ]
+                      : []),
+                    ...(!isDefaultProject
+                      ? [
+                          {
+                            id: "rename",
+                            label: t("chat.workspaceRename"),
+                            icon: <Edit3 aria-hidden="true" />,
+                            onClick: () => onStartRenamingProject(project),
+                          },
+                        ]
+                      : []),
+                    ...(workspaceProjectGroups.length > 0 && onMoveProjectToGroup
+                      ? [
+                          { type: "divider" as const },
+                          {
+                            type: "section" as const,
+                            id: "groups",
+                            title: t("chat.workspaceMoveToGroup"),
+                            items: [
+                              {
+                                id: "ungrouped",
+                                label: t("chat.workspaceUngrouped"),
+                                icon:
+                                  currentGroupId === null ? (
+                                    <Check aria-hidden="true" />
+                                  ) : (
+                                    <FolderTree aria-hidden="true" />
+                                  ),
+                                onClick: () => onMoveProjectToGroup(project.path, null),
+                              },
+                              ...workspaceProjectGroups.map((group) => ({
+                                id: group.id,
+                                label: group.name,
+                                icon:
+                                  currentGroupId === group.id ? (
+                                    <Check aria-hidden="true" />
+                                  ) : (
+                                    <FolderClosed aria-hidden="true" />
+                                  ),
+                                onClick: () => onMoveProjectToGroup(project.path, group.id),
+                              })),
+                            ],
+                          },
+                        ]
+                      : []),
+                    ...(!isArchived && canArchive
+                      ? [
+                          {
+                            id: "archive",
+                            label: t("chat.workspaceArchive"),
+                            icon: <Archive aria-hidden="true" />,
+                            onClick: handleArchive,
+                          },
+                        ]
+                      : []),
+                    ...(isArchived
+                      ? [
+                          {
+                            id: "unarchive",
+                            label: t("chat.workspaceUnarchive"),
+                            icon: <ArchiveRestore aria-hidden="true" />,
+                            onClick: handleUnarchive,
+                          },
+                        ]
+                      : []),
+                    ...(onBrowseProjectInFileTree
+                      ? [
+                          {
+                            id: "browse-tree",
+                            label: t("chat.workspaceBrowseInFileTree"),
+                            icon: <FolderTree aria-hidden="true" />,
+                            onClick: handleBrowseInFileTree,
+                          },
+                        ]
+                      : []),
+                    ...(onBrowseProjectInSystemFileManager
+                      ? [
+                          {
+                            id: "browse-system",
+                            label: t("chat.workspaceBrowseInSystemFileManager"),
+                            icon: <FolderOpen aria-hidden="true" />,
+                            onClick: handleBrowseInSystemFileManager,
+                          },
+                        ]
+                      : []),
+                    ...(!isDefaultProject
+                      ? [
+                          { type: "divider" as const },
+                          {
+                            id: "remove",
+                            label: t("chat.workspaceRemove"),
+                            icon: <Trash2 aria-hidden="true" />,
+                            onClick: handleRequestRemove,
+                            variant: "destructive" as const,
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
               </>
             )}
           </AstryxView>

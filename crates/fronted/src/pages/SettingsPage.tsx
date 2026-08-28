@@ -15,7 +15,7 @@ import { List, ListItem } from "@astryxdesign/core/List";
 import { StatusDot, type StatusDotVariant } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Archive,
   ArrowLeft,
@@ -50,6 +50,7 @@ import { MobileExecutionSection } from "./settings/MobileExecutionSection";
 import { MemoryPanel } from "./settings/memory/MemoryPanel";
 import { ProjectRootsSection } from "./settings/ProjectRootsSection";
 import { ProviderSettingsSection } from "./settings/ProviderSettingsSection";
+import { SettingsDetailLayerProvider } from "./settings/SettingsModalShell";
 import { SkillsSettingsForm } from "./settings/SkillsSettingsForm";
 import { SoulSection } from "./settings/SoulSection";
 import { SshSettingsSection } from "./settings/SshSettingsSection";
@@ -245,6 +246,10 @@ export function SettingsPage(props: SettingsPageProps) {
     () => compactSettings && initialSection !== "system",
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [detailLayerDepth, setDetailLayerDepth] = useState(0);
+  const handleDetailLayerChange = useCallback((delta: 1 | -1) => {
+    setDetailLayerDepth((current) => Math.max(0, current + delta));
+  }, []);
 
   const sectionLabels: Record<SectionId, string> = {
     system: t("settings.navSystem"),
@@ -394,163 +399,177 @@ export function SettingsPage(props: SettingsPageProps) {
 
   if (compactSettings) {
     return (
-      <Layout
-        height="fill"
-        padding={0}
-        className="settings-page settings-page-compact"
-        data-edge-swipe-ignore
-        header={
-          <DialogHeader
-            title={mobileDetailOpen ? sectionLabels[section] : t("settings.title")}
-            hasDivider
-            startContent={
-              <IconButton
-                label={
-                  mobileDetailOpen ? t("settings.mobile.backToSettings") : t("settings.backToChat")
+      <SettingsDetailLayerProvider onLayerChange={handleDetailLayerChange}>
+        <Layout
+          height="fill"
+          padding={0}
+          className="settings-page settings-page-compact"
+          data-edge-swipe-ignore
+          header={
+            detailLayerDepth > 0 ? undefined : (
+              <DialogHeader
+                title={mobileDetailOpen ? sectionLabels[section] : t("settings.title")}
+                hasDivider
+                startContent={
+                  <IconButton
+                    label={
+                      mobileDetailOpen
+                        ? t("settings.mobile.backToSettings")
+                        : t("settings.backToChat")
+                    }
+                    tooltip={
+                      mobileDetailOpen
+                        ? t("settings.mobile.backToSettings")
+                        : t("settings.backToChat")
+                    }
+                    icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
+                    variant="ghost"
+                    onClick={mobileDetailOpen ? () => setMobileDetailOpen(false) : onBack}
+                  />
                 }
-                tooltip={
-                  mobileDetailOpen ? t("settings.mobile.backToSettings") : t("settings.backToChat")
-                }
-                icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
-                variant="ghost"
-                onClick={mobileDetailOpen ? () => setMobileDetailOpen(false) : onBack}
+                endContent={<SaveStatus indicator={saveIndicator} />}
               />
-            }
-            endContent={<SaveStatus indicator={saveIndicator} />}
-          />
-        }
-        content={
-          mobileDetailOpen ? (
-            <LayoutContent
-              key={section}
-              data-settings-section={section}
-              padding={4}
-              isScrollable={!sectionManagesScroll}
-              className="settings-section-enter"
-            >
-              <VStack
-                width="100%"
-                maxWidth="var(--xagent-settings-content-max-width)"
-                height="100%"
-                minHeight={sectionManagesScroll ? 0 : "100%"}
-                className="settings-section-shell"
-                style={{ marginInline: "auto" }}
+            )
+          }
+          content={
+            mobileDetailOpen ? (
+              <LayoutContent
+                key={section}
+                data-settings-section={section}
+                padding={4}
+                isScrollable={!sectionManagesScroll}
+                className="settings-section-enter"
               >
-                {sectionContent}
-              </VStack>
-            </LayoutContent>
-          ) : (
-            <LayoutContent padding={4} label={t("settings.title")}>
-              <VStack
-                width="100%"
-                maxWidth="var(--xagent-content-width-md)"
-                gap={4}
-                style={{ marginInline: "auto" }}
-              >
-                <List density="spacious" hasDividers>
-                  {navItems.map((item) => (
-                    <ListItem
-                      key={item.id}
-                      label={item.label}
-                      description={item.description}
-                      startContent={<Icon icon={item.icon} size="md" color="secondary" />}
-                      endContent={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
-                      onClick={() => {
-                        setSection(item.id);
-                        setMobileDetailOpen(true);
-                      }}
-                    />
-                  ))}
-                </List>
-              </VStack>
-            </LayoutContent>
-          )
-        }
-      />
+                <VStack
+                  width="100%"
+                  maxWidth="var(--xagent-settings-content-max-width)"
+                  height="100%"
+                  minHeight={sectionManagesScroll ? 0 : "100%"}
+                  className="settings-section-shell"
+                  style={{ marginInline: "auto" }}
+                >
+                  {sectionContent}
+                </VStack>
+              </LayoutContent>
+            ) : (
+              <LayoutContent padding={4} label={t("settings.title")}>
+                <VStack
+                  width="100%"
+                  maxWidth="var(--xagent-content-width-md)"
+                  gap={4}
+                  style={{ marginInline: "auto" }}
+                >
+                  <List density="spacious" hasDividers>
+                    {navItems.map((item) => (
+                      <ListItem
+                        key={item.id}
+                        label={item.label}
+                        description={item.description}
+                        startContent={<Icon icon={item.icon} size="md" color="secondary" />}
+                        endContent={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
+                        onClick={() => {
+                          setSection(item.id);
+                          setMobileDetailOpen(true);
+                        }}
+                      />
+                    ))}
+                  </List>
+                </VStack>
+              </LayoutContent>
+            )
+          }
+        />
+      </SettingsDetailLayerProvider>
     );
   }
 
   return (
-    <Layout
-      height="fill"
-      padding={0}
-      className="settings-page settings-page-desktop"
-      style={{ height: "var(--xagent-settings-dialog-height)" }}
-      data-edge-swipe-ignore
-      start={
-        <LayoutPanel
-          width="var(--xagent-settings-sidebar-width)"
-          padding={4}
-          hasDivider
-          isScrollable={false}
-          role="navigation"
-          label={t("settings.title")}
-        >
-          <VStack height="100%" gap={3}>
-            <HStack width="100%" hAlign="start">
-              <IconButton
-                label={t("settings.backToChat")}
-                tooltip={t("settings.backToChat")}
-                icon={<Icon icon={X} size="sm" color="inherit" />}
-                variant="ghost"
-                onClick={onBack}
+    <SettingsDetailLayerProvider onLayerChange={handleDetailLayerChange}>
+      <Layout
+        height="fill"
+        padding={0}
+        className="settings-page settings-page-desktop"
+        style={{ height: "var(--xagent-settings-dialog-height)" }}
+        data-edge-swipe-ignore
+        start={
+          <LayoutPanel
+            width="var(--xagent-settings-sidebar-width)"
+            padding={4}
+            hasDivider
+            isScrollable={false}
+            role="navigation"
+            label={t("settings.title")}
+          >
+            <VStack height="100%" gap={3}>
+              <HStack width="100%" hAlign="start">
+                <IconButton
+                  label={t("settings.backToChat")}
+                  tooltip={t("settings.backToChat")}
+                  icon={<Icon icon={X} size="sm" color="inherit" />}
+                  variant="ghost"
+                  onClick={onBack}
+                />
+              </HStack>
+              <TextInput
+                type="text"
+                value={searchQuery}
+                onChange={setSearchQuery}
+                label={t("settings.searchPlaceholder")}
+                isLabelHidden
+                placeholder={t("settings.searchPlaceholder")}
+                startIcon="search"
+                hasClear
+                width="100%"
               />
-            </HStack>
-            <TextInput
-              type="text"
-              value={searchQuery}
-              onChange={setSearchQuery}
-              label={t("settings.searchPlaceholder")}
-              isLabelHidden
-              placeholder={t("settings.searchPlaceholder")}
-              startIcon="search"
-              hasClear
-              width="100%"
-            />
-            <StackItem size="fill" isScrollable>
-              <VStack gap={2}>
-                <List density="balanced">
-                  {visibleDesktopNavItems.map((item) => (
-                    <NavItem
-                      key={item.id}
-                      icon={item.icon}
-                      label={item.label}
-                      active={section === item.id}
-                      onClick={() => setSection(item.id)}
-                    />
-                  ))}
-                </List>
-                {visibleDesktopNavItems.length === 0 ? (
-                  <EmptyState title={t("settings.searchEmpty")} isCompact />
-                ) : null}
+              <StackItem size="fill" isScrollable>
+                <VStack gap={2}>
+                  <List density="balanced">
+                    {visibleDesktopNavItems.map((item) => (
+                      <NavItem
+                        key={item.id}
+                        icon={item.icon}
+                        label={item.label}
+                        active={section === item.id}
+                        onClick={() => setSection(item.id)}
+                      />
+                    ))}
+                  </List>
+                  {visibleDesktopNavItems.length === 0 ? (
+                    <EmptyState title={t("settings.searchEmpty")} isCompact />
+                  ) : null}
+                </VStack>
+              </StackItem>
+              <SaveStatus indicator={saveIndicator} />
+            </VStack>
+          </LayoutPanel>
+        }
+        content={
+          <VStack height="100%" minHeight={0} gap={0}>
+            {detailLayerDepth === 0 ? (
+              <LayoutHeader hasDivider height="var(--xagent-settings-header-height)">
+                <HStack height="100%" vAlign="center">
+                  <Heading level={2}>{sectionLabels[section]}</Heading>
+                </HStack>
+              </LayoutHeader>
+            ) : null}
+            <StackItem size="fill" isScrollable={!sectionManagesScroll}>
+              <VStack
+                key={section}
+                data-settings-section={section}
+                width="100%"
+                maxWidth="var(--xagent-settings-content-max-width)"
+                height="100%"
+                minHeight={sectionManagesScroll ? 0 : "100%"}
+                padding={sectionManagesScroll ? 0 : 5}
+                className="settings-section-shell settings-section-enter"
+                style={{ marginInline: "auto" }}
+              >
+                {sectionContent}
               </VStack>
             </StackItem>
-            <SaveStatus indicator={saveIndicator} />
           </VStack>
-        </LayoutPanel>
-      }
-      content={
-        <VStack height="100%" minHeight={0} gap={0}>
-          <LayoutHeader hasDivider height="var(--xagent-settings-header-height)">
-            <Heading level={2}>{sectionLabels[section]}</Heading>
-          </LayoutHeader>
-          <StackItem size="fill" isScrollable={!sectionManagesScroll}>
-            <VStack
-              key={section}
-              data-settings-section={section}
-              width="100%"
-              maxWidth="var(--xagent-settings-content-max-width)"
-              height="100%"
-              minHeight={sectionManagesScroll ? 0 : "100%"}
-              padding={sectionManagesScroll ? 0 : 5}
-              className="settings-section-shell settings-section-enter"
-              style={{ marginInline: "auto" }}
-            >
-              {sectionContent}
-            </VStack>
-          </StackItem>
-        </VStack>
-      }
-    />
+        }
+      />
+    </SettingsDetailLayerProvider>
   );
 }

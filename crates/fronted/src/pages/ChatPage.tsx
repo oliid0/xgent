@@ -57,7 +57,10 @@ import { useConfirmDialog } from "../components/ui/confirm-dialog";
 import type { WorkspaceCodeEditorOpenRequest } from "../components/workspace-editor/WorkspaceCodeEditorOverlay";
 import type { WorkspaceFilePreviewOpenRequest } from "../components/workspace-editor/WorkspaceFilePreviewOverlay";
 import type { WorkspaceSshTerminalOpenRequest } from "../components/workspace-editor/WorkspaceSshTerminalOverlay";
-import { isWorkspacePreviewPath } from "../components/workspace-editor/workspaceImagePreview";
+import {
+  isWorkspaceEditablePreviewPath,
+  isWorkspacePreviewPath,
+} from "../components/workspace-editor/workspaceImagePreview";
 import { WorkspaceNavigationRail } from "../components/workspace-tools/WorkspaceNavigationRail";
 import { WorkspaceSidePanel } from "../components/workspace-tools/WorkspaceSidePanel";
 import { useLocale } from "../i18n";
@@ -714,6 +717,12 @@ export function ChatPage(props: ChatPageProps) {
     minSizePx: 320,
     maxSizePx: 720,
     autoSaveId: "xagent-workspace-panel-width",
+  });
+  const workspaceHubPanelResize = useResizable({
+    defaultSize: 420,
+    minSizePx: 400,
+    maxSizePx: 720,
+    autoSaveId: "xagent-workspace-hub-panel-width",
   });
   const splitConversationResize = useResizable({
     defaultSize: 520,
@@ -1829,7 +1838,7 @@ export function ChatPage(props: ChatPageProps) {
         path,
         imagePaths,
       };
-      if (isWorkspacePreviewPath(path)) {
+      if (isWorkspacePreviewPath(path) && !isWorkspaceEditablePreviewPath(path)) {
         openWorkspaceFilePreview(request);
         return;
       }
@@ -1852,7 +1861,7 @@ export function ChatPage(props: ChatPageProps) {
         imagePaths,
       };
       setMobileWorkspaceDestination(null);
-      if (isWorkspacePreviewPath(path)) {
+      if (isWorkspacePreviewPath(path) && !isWorkspaceEditablePreviewPath(path)) {
         openWorkspaceFilePreview(request);
         return;
       }
@@ -5669,7 +5678,12 @@ export function ChatPage(props: ChatPageProps) {
         workspaceToolLaunchRequest.target === "skills" ||
         workspaceToolLaunchRequest.target === "mcp") ? (
         <WorkspaceSidePanel
-          width={workspacePanelResize.size}
+          width={
+            workspaceToolLaunchRequest.target === "skills" ||
+            workspaceToolLaunchRequest.target === "mcp"
+              ? workspaceHubPanelResize.size
+              : workspacePanelResize.size
+          }
           target={workspaceToolLaunchRequest.target}
           shell={workspaceToolLaunchRequest.shell}
           requestNonce={workspaceToolLaunchRequest.nonce}
@@ -5722,7 +5736,12 @@ export function ChatPage(props: ChatPageProps) {
           direction="horizontal"
           hasDivider
           pillPlacement="center"
-          resizable={workspacePanelResize.props}
+          resizable={
+            workspaceToolLaunchRequest.target === "skills" ||
+            workspaceToolLaunchRequest.target === "mcp"
+              ? workspaceHubPanelResize.props
+              : workspacePanelResize.props
+          }
           label={t("projectTools.resizePanelWidth")}
         />
       ) : null}

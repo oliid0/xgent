@@ -1,10 +1,13 @@
+import { Badge } from "@astryxdesign/core/Badge";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { FormLayout } from "@astryxdesign/core/FormLayout";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Selector } from "@astryxdesign/core/Selector";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Paragraph as AstryxParagraph, View as AstryxView } from "@xagent/ui/components/ui/view";
-import { ChevronDown, Globe, Trash2 } from "../../components/icons";
-import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
-import { Textarea } from "../../components/ui/textarea";
+import { Text } from "@astryxdesign/core/Text";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { ChevronDown, ChevronRight, Globe, Trash2 } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   canHttpMethodHaveBody,
@@ -141,150 +144,127 @@ export function HttpRequestListEditor({
   }
 
   return (
-    <AstryxView layout="block" direction="horizontal" className="space-y-3">
+    <VStack gap={0}>
       {requests.map((request, index) => {
         const bodyEnabled = canHttpMethodHaveBody(request.method);
         const isExpanded = expandedRequestId === request.id;
 
         return (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            key={request.id}
-            className="overflow-hidden rounded-xl border border-border/60 bg-background/80 transition-colors hover:border-border/80"
-          >
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="settings-http-row flex items-center gap-3 px-4 py-3"
-            >
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-xs font-bold text-emerald-600 dark:text-emerald-400"
-              >
-                {index + 1}
-              </AstryxView>
-
-              <Selector
-                label={t("settings.cronHttpMethod")}
-                isLabelHidden
-                value={request.method}
-                width="var(--xagent-http-method-width)"
-                size="sm"
-                options={HTTP_METHODS.map((method) => ({ value: method, label: method }))}
-                onChange={(value) => {
-                  onDirty();
-                  updateRequest(request.id, {
-                    method: value as HttpMethod,
-                    bodyText: canHttpMethodHaveBody(value as HttpMethod) ? request.bodyText : "",
-                  });
-                }}
-              />
-
-              <Input
-                value={request.url}
-                placeholder={urlPlaceholder}
-                className="h-8 flex-1 font-mono text-xs"
-                onChange={(e) => {
-                  onDirty();
-                  updateRequest(request.id, { url: e.currentTarget.value });
-                }}
-              />
-
-              <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-1">
-                <AstryxButton
-                  type="button"
-                  onClick={() => onExpand(isExpanded ? null : request.id)}
-                  className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-muted/50 ${
-                    isExpanded ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  <ChevronDown
-                    className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "" : "-rotate-90"}`}
+          <Section key={request.id} variant="transparent" padding={3} dividers={["bottom"]}>
+            <VStack gap={3}>
+              <HStack gap={2} vAlign="center">
+                <Badge label={index + 1} variant="neutral" />
+                <Selector
+                  label={t("settings.cronHttpMethod")}
+                  isLabelHidden
+                  value={request.method}
+                  width="var(--xagent-http-method-width)"
+                  size="sm"
+                  options={HTTP_METHODS.map((method) => ({
+                    value: method,
+                    label: method,
+                  }))}
+                  onChange={(value) => {
+                    onDirty();
+                    updateRequest(request.id, {
+                      method: value as HttpMethod,
+                      bodyText: canHttpMethodHaveBody(value as HttpMethod) ? request.bodyText : "",
+                    });
+                  }}
+                />
+                <StackItem size="fill">
+                  <TextInput
+                    label="URL"
+                    isLabelHidden
+                    value={request.url}
+                    size="sm"
+                    placeholder={urlPlaceholder}
+                    onChange={(value) => {
+                      onDirty();
+                      updateRequest(request.id, { url: value });
+                    }}
                   />
-                </AstryxButton>
-                <AstryxButton
-                  type="button"
+                </StackItem>
+                <IconButton
+                  label={isExpanded ? t("settings.collapse") : t("settings.expand")}
+                  tooltip={isExpanded ? t("settings.collapse") : t("settings.expand")}
+                  variant="ghost"
+                  size="sm"
+                  icon={
+                    isExpanded ? (
+                      <ChevronDown aria-hidden="true" />
+                    ) : (
+                      <ChevronRight aria-hidden="true" />
+                    )
+                  }
+                  onClick={() => onExpand(isExpanded ? null : request.id)}
+                />
+                <IconButton
+                  label={t("settings.delete")}
+                  tooltip={t("settings.delete")}
+                  variant="destructive"
+                  size="sm"
+                  icon={<Trash2 aria-hidden="true" />}
                   onClick={() => {
                     onDirty();
                     onChange(requests.filter((item) => item.id !== request.id));
-                    if (expandedRequestId === request.id) {
-                      onExpand(null);
-                    }
+                    if (expandedRequestId === request.id) onExpand(null);
                   }}
-                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  title={t("settings.delete")}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </AstryxButton>
-              </AstryxView>
-            </AstryxView>
+                />
+              </HStack>
 
-            {isExpanded ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="border-t border-border/30 bg-muted/10 px-4 py-4"
-              >
-                <AstryxView
-                  layout="grid"
-                  direction="horizontal"
-                  className="settings-form-grid grid gap-4 sm:grid-cols-2"
-                >
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground">Headers</Label>
-                    <Textarea
-                      value={request.headersText}
-                      placeholder={'{\n  "Authorization": "Bearer ..."\n}'}
-                      className="min-h-[100px] resize-y font-mono text-xs leading-relaxed"
-                      onChange={(e) => {
+              {isExpanded ? (
+                <FormLayout direction="horizontal">
+                  <TextArea
+                    label="Headers"
+                    value={request.headersText}
+                    rows={5}
+                    hasSpellCheck={false}
+                    placeholder={'{\n  "Authorization": "Bearer ..."\n}'}
+                    onChange={(value) => {
+                      onDirty();
+                      updateRequest(request.id, { headersText: value });
+                    }}
+                  />
+                  {bodyEnabled ? (
+                    <TextArea
+                      label="Body"
+                      value={request.bodyText}
+                      rows={5}
+                      hasSpellCheck={false}
+                      placeholder={'{\n  "message": "hello"\n}'}
+                      onChange={(value) => {
                         onDirty();
-                        updateRequest(request.id, { headersText: e.currentTarget.value });
+                        updateRequest(request.id, { bodyText: value });
                       }}
                     />
-                  </AstryxView>
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground">Body</Label>
-                    {bodyEnabled ? (
-                      <Textarea
-                        value={request.bodyText}
-                        placeholder={'{\n  "message": "hello"\n}'}
-                        className="min-h-[100px] resize-y font-mono text-xs leading-relaxed"
-                        onChange={(e) => {
-                          onDirty();
-                          updateRequest(request.id, { bodyText: e.currentTarget.value });
-                        }}
-                      />
-                    ) : (
-                      <AstryxView
-                        layout="flex"
-                        direction="horizontal"
-                        className="flex min-h-[100px] items-center justify-center rounded-lg border border-dashed border-border/50 bg-muted/10 text-xs text-muted-foreground/60"
-                      >
-                        {t("settings.cronHttpBodyDisabled")}
-                      </AstryxView>
-                    )}
-                  </AstryxView>
-                </AstryxView>
-              </AstryxView>
-            ) : null}
-          </AstryxView>
+                  ) : (
+                    <VStack gap={1}>
+                      <Text type="body" weight="semibold">
+                        Body
+                      </Text>
+                      <Section variant="muted" padding={4}>
+                        <Text type="supporting" color="secondary">
+                          {t("settings.cronHttpBodyDisabled")}
+                        </Text>
+                      </Section>
+                    </VStack>
+                  )}
+                </FormLayout>
+              ) : null}
+            </VStack>
+          </Section>
         );
       })}
 
       {requests.length === 0 ? (
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="rounded-xl border border-dashed border-border/50 bg-muted/5 py-8 text-center"
-        >
-          <Globe className="mx-auto h-6 w-6 text-muted-foreground/30" />
-          <AstryxParagraph className="mt-2 text-xs text-muted-foreground">
-            {t("settings.cronHttpRequestRequired")}
-          </AstryxParagraph>
-        </AstryxView>
+        <EmptyState
+          isCompact
+          icon={<Globe aria-hidden="true" />}
+          title={t("settings.cronHttpRequestRequired")}
+          description={t("settings.cronHttpRequestRequired")}
+        />
       ) : null}
-    </AstryxView>
+    </VStack>
   );
 }

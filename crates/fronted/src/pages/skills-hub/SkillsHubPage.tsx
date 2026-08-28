@@ -3,8 +3,10 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Grid } from "@astryxdesign/core/Grid";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
+import { Item } from "@astryxdesign/core/Item";
 import { HStack, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Link } from "@astryxdesign/core/Link";
 import { List, ListItem } from "@astryxdesign/core/List";
@@ -3293,55 +3295,18 @@ function StoreCategoryChips(props: {
 }) {
   const { t } = useLocale();
   return (
-    <HStack gap={1} vAlign="center" wrap="wrap">
-      {STORE_CATEGORY_OPTIONS.map((value) => {
-        const CategoryIcon = STORE_CATEGORY_ICONS[value];
-        return (
-          <ToggleButton
-            key={value}
-            label={t(storeCategoryLabelKey(value))}
-            icon={<Icon icon={CategoryIcon} size="sm" color="inherit" />}
-            isPressed={props.value === value}
-            size="sm"
-            onPressedChange={() => props.onChange(value)}
-          >
-            <HStack gap={1} vAlign="center">
-              <Text type="inherit" color="inherit">
-                {t(storeCategoryLabelKey(value))}
-              </Text>
-              <Badge label={props.counts.get(value) ?? 0} />
-            </HStack>
-          </ToggleButton>
-        );
-      })}
-    </HStack>
-  );
-}
-
-function SkillCategoryBadges(props: {
-  categories: ClawHubCategorySlug[];
-  topics?: string[];
-  onSelect: (category: ClawHubCategorySlug) => void;
-}) {
-  const { t } = useLocale();
-  return (
-    <HStack gap={1} vAlign="center" wrap="wrap">
-      {props.categories.map((category) => {
-        return (
-          <Token
-            key={category}
-            label={t(storeCategoryLabelKey(category))}
-            color="gray"
-            size="sm"
-            icon={<Icon icon={STORE_CATEGORY_ICONS[category]} size="sm" color="inherit" />}
-            onClick={() => props.onSelect(category)}
-          />
-        );
-      })}
-      {(props.topics ?? []).slice(0, 3).map((topic) => (
-        <Token key={topic} label={topic} color="gray" size="sm" />
-      ))}
-    </HStack>
+    <Selector
+      label={t("settings.skillsStoreCategoryAll")}
+      isLabelHidden
+      value={props.value}
+      options={STORE_CATEGORY_OPTIONS.map((value) => ({
+        value,
+        label: `${t(storeCategoryLabelKey(value))} (${props.counts.get(value) ?? 0})`,
+        icon: <Icon icon={STORE_CATEGORY_ICONS[value]} size="sm" color="inherit" />,
+      }))}
+      width="var(--xagent-hub-category-control-width)"
+      onChange={(value) => props.onChange(value as StoreCategoryValue)}
+    />
   );
 }
 
@@ -3491,7 +3456,7 @@ function SkillsStoreView(props: {
   }
 
   return (
-    <VStack height="100%" gap={3}>
+    <VStack height="100%" minHeight={0} gap={3}>
       <HStack width="100%" gap={2} vAlign="center" hAlign="between" wrap="wrap">
         <StackItem size="fill">
           <StoreCategoryChips
@@ -3547,152 +3512,150 @@ function SkillsStoreView(props: {
           ) : null}
 
           {filteredItems.length > 0 ? (
-            <List
-              density="balanced"
-              hasDividers
-              header={
-                <HStack gap={1} vAlign="center">
-                  <Text type="supporting" color="secondary" hasTabularNumbers>
-                    {filteredItems.length}
-                  </Text>
-                  <Text type="supporting" color="secondary">
-                    {t("settings.skillsHubStoreTab")}
-                  </Text>
-                </HStack>
-              }
-            >
-              {filteredItems.map(({ skill, categories }) => {
-                const { done, installing, pending, job, progress } = getInstallState(skill);
-                const link = buildClawHubSkillUrl(skill);
-                const PrimaryCategoryIcon = STORE_CATEGORY_ICONS[categories[0] ?? "other"];
-                const installLabel = installing
-                  ? installPhaseLabel(pending ? undefined : job, t)
-                  : done
-                    ? t("settings.skillsStoreInstalled")
-                    : t("settings.skillsStoreInstall");
-                const stats = [
-                  formatCompactNumber(skill.downloads) +
-                    " " +
-                    t("settings.skillsStorePreviewDownloads"),
-                  formatCompactNumber(skill.stars) + " " + t("settings.skillsStorePreviewStars"),
-                  formatCompactNumber(skill.installsCurrent) +
-                    " " +
-                    t("settings.skillsStorePreviewInstalls"),
-                  skill.updatedAt ? formatStoreDate(skill.updatedAt) : "",
-                ]
-                  .filter(Boolean)
-                  .join(" · ");
+            <VStack gap={2}>
+              <HStack gap={1} vAlign="center">
+                <Text type="supporting" color="secondary" hasTabularNumbers>
+                  {filteredItems.length}
+                </Text>
+                <Text type="supporting" color="secondary">
+                  {t("settings.skillsHubStoreTab")}
+                </Text>
+              </HStack>
+              <Grid columns={{ minWidth: 400, max: 2, repeat: "fit" }} gap={2} width="100%">
+                {filteredItems.map(({ skill, categories }) => {
+                  const { done, installing, pending, job, progress } = getInstallState(skill);
+                  const link = buildClawHubSkillUrl(skill);
+                  const PrimaryCategoryIcon = STORE_CATEGORY_ICONS[categories[0] ?? "other"];
+                  const installLabel = installing
+                    ? installPhaseLabel(pending ? undefined : job, t)
+                    : done
+                      ? t("settings.skillsStoreInstalled")
+                      : t("settings.skillsStoreInstall");
+                  const stats = [
+                    formatCompactNumber(skill.downloads) +
+                      " " +
+                      t("settings.skillsStorePreviewDownloads"),
+                    formatCompactNumber(skill.stars) + " " + t("settings.skillsStorePreviewStars"),
+                    formatCompactNumber(skill.installsCurrent) +
+                      " " +
+                      t("settings.skillsStorePreviewInstalls"),
+                    skill.updatedAt ? formatStoreDate(skill.updatedAt) : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ");
 
-                return (
-                  <ListItem
-                    key={buildClawHubSkillKey(skill)}
-                    label={skill.displayName}
-                    startContent={
-                      <Icon
-                        icon={PrimaryCategoryIcon}
-                        size="md"
-                        color={done ? "success" : "secondary"}
-                      />
-                    }
-                    description={
-                      <VStack gap={1}>
-                        {skill.summary ? (
-                          <Text type="supporting" color="secondary" maxLines={2}>
-                            {skill.summary}
-                          </Text>
-                        ) : null}
-                        <SkillCategoryBadges
-                          categories={categories}
-                          topics={skill.topics}
-                          onSelect={setStoreCategory}
+                  return (
+                    <Item
+                      key={buildClawHubSkillKey(skill)}
+                      label={skill.displayName}
+                      align="start"
+                      density="balanced"
+                      startContent={
+                        <Icon
+                          icon={PrimaryCategoryIcon}
+                          size="md"
+                          color={done ? "success" : "secondary"}
                         />
-                        <Text type="supporting" color="secondary" hasTabularNumbers>
-                          {stats}
-                        </Text>
-                        {installing && !done ? (
-                          <ProgressBar
-                            label={installLabel}
-                            value={progress ?? 0}
-                            isIndeterminate={progress === null}
-                            hasValueLabel={progress !== null}
-                            variant="accent"
-                          />
-                        ) : null}
-                        {job?.phase === "error" && job.error && !done && !pending ? (
-                          <HStack gap={1} vAlign="center">
-                            <Token label={t("settings.skillsImportError")} color="red" size="sm" />
+                      }
+                      description={
+                        <VStack gap={1}>
+                          {skill.summary ? (
                             <Text type="supporting" color="secondary" maxLines={2}>
-                              {job.error}
+                              {skill.summary}
                             </Text>
-                          </HStack>
-                        ) : null}
-                      </VStack>
-                    }
-                    endContent={
-                      <HStack gap={1} vAlign="center" wrap="wrap">
-                        <Token
-                          label={
-                            "v" + (skill.latestVersion ?? t("settings.skillsStoreVersionLatest"))
-                          }
-                          color="gray"
-                          size="sm"
-                        />
-                        {done ? (
+                          ) : null}
+                          <Text type="supporting" color="secondary" hasTabularNumbers>
+                            {stats}
+                          </Text>
+                          {installing && !done ? (
+                            <ProgressBar
+                              label={installLabel}
+                              value={progress ?? 0}
+                              isIndeterminate={progress === null}
+                              hasValueLabel={progress !== null}
+                              variant="accent"
+                            />
+                          ) : null}
+                          {job?.phase === "error" && job.error && !done && !pending ? (
+                            <HStack gap={1} vAlign="center">
+                              <Token
+                                label={t("settings.skillsImportError")}
+                                color="red"
+                                size="sm"
+                              />
+                              <Text type="supporting" color="secondary" maxLines={2}>
+                                {job.error}
+                              </Text>
+                            </HStack>
+                          ) : null}
+                        </VStack>
+                      }
+                      endContent={
+                        <HStack gap={1} vAlign="center" wrap="wrap">
                           <Token
-                            label={t("settings.skillsStoreInstalled")}
-                            color="green"
-                            size="sm"
-                            icon={<Icon icon={Check} size="sm" color="inherit" />}
-                          />
-                        ) : null}
-                        {link ? (
-                          <IconButton
-                            href={link}
-                            target="_blank"
-                            rel="noreferrer"
-                            label={t("settings.skillsStoreOpenInClawHub")}
-                            tooltip={t("settings.skillsStoreOpenInClawHub")}
-                            icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
-                            variant="ghost"
-                            size="sm"
-                          />
-                        ) : null}
-                        <IconButton
-                          label={t("settings.skillsStorePreviewTitle")}
-                          tooltip={t("settings.skillsStorePreviewTitle")}
-                          icon={<Icon icon={FileText} size="sm" color="inherit" />}
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPreviewSkill(skill)}
-                        />
-                        {job && !pending && installing ? (
-                          <IconButton
-                            label={t("settings.cancel")}
-                            tooltip={t("settings.cancel")}
-                            icon={<Icon icon={X} size="sm" color="inherit" />}
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              void cancelSkillInstallJob(job.jobId).catch(() => undefined)
+                            label={
+                              "v" + (skill.latestVersion ?? t("settings.skillsStoreVersionLatest"))
                             }
+                            color="gray"
+                            size="sm"
                           />
-                        ) : null}
-                        <AstryxCoreButton
-                          label={installLabel}
-                          icon={<Icon icon={done ? Check : Cloud} size="sm" color="inherit" />}
-                          variant={done ? "secondary" : "primary"}
-                          size="sm"
-                          isLoading={installing}
-                          isDisabled={done || installing}
-                          aria-busy={installing}
-                          onClick={() => onInstall(skill)}
-                        />
-                      </HStack>
-                    }
-                  />
-                );
-              })}
-            </List>
+                          {done ? (
+                            <Token
+                              label={t("settings.skillsStoreInstalled")}
+                              color="green"
+                              size="sm"
+                              icon={<Icon icon={Check} size="sm" color="inherit" />}
+                            />
+                          ) : null}
+                          {link ? (
+                            <IconButton
+                              href={link}
+                              target="_blank"
+                              rel="noreferrer"
+                              label={t("settings.skillsStoreOpenInClawHub")}
+                              tooltip={t("settings.skillsStoreOpenInClawHub")}
+                              icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
+                              variant="ghost"
+                              size="sm"
+                            />
+                          ) : null}
+                          <IconButton
+                            label={t("settings.skillsStorePreviewTitle")}
+                            tooltip={t("settings.skillsStorePreviewTitle")}
+                            icon={<Icon icon={FileText} size="sm" color="inherit" />}
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setPreviewSkill(skill)}
+                          />
+                          {job && !pending && installing ? (
+                            <IconButton
+                              label={t("settings.cancel")}
+                              tooltip={t("settings.cancel")}
+                              icon={<Icon icon={X} size="sm" color="inherit" />}
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                void cancelSkillInstallJob(job.jobId).catch(() => undefined)
+                              }
+                            />
+                          ) : null}
+                          <AstryxCoreButton
+                            label={installLabel}
+                            icon={<Icon icon={done ? Check : Cloud} size="sm" color="inherit" />}
+                            variant={done ? "secondary" : "primary"}
+                            size="sm"
+                            isLoading={installing}
+                            isDisabled={done || installing}
+                            aria-busy={installing}
+                            onClick={() => onInstall(skill)}
+                          />
+                        </HStack>
+                      }
+                    />
+                  );
+                })}
+              </Grid>
+            </VStack>
           ) : null}
 
           {items.length > 0 && filteredItems.length === 0 && !loading ? (

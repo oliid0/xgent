@@ -1,18 +1,22 @@
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { FormLayout } from "@astryxdesign/core/FormLayout";
+import { Grid } from "@astryxdesign/core/Grid";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { MultiSelector } from "@astryxdesign/core/MultiSelector";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Selector } from "@astryxdesign/core/Selector";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
 import { invoke } from "@xagent/runtime";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Label as AstryxLabel } from "@xagent/ui/components/ui/label";
-import {
-  Heading as AstryxHeading,
-  Inline as AstryxInline,
-  Paragraph as AstryxParagraph,
-  View as AstryxView,
-} from "@xagent/ui/components/ui/view";
 import { useEffect, useMemo, useState } from "react";
-import { FolderTree, Loader2, Trash2 } from "../../components/icons";
-import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
+import { FolderTree, Trash2 } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   updateWorkspaceResourceSettings,
@@ -154,9 +158,9 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
     ]);
   };
 
-  const updateRoot = (localId: string, patch: Partial<EditableRoot>) => {
+  const updateRoot = (localId: string, next: Partial<EditableRoot>) => {
     setRoots((previous) =>
-      previous.map((root) => (root.localId === localId ? { ...root, ...patch } : root)),
+      previous.map((root) => (root.localId === localId ? { ...root, ...next } : root)),
     );
   };
 
@@ -184,8 +188,8 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
           state: grant.state,
         })),
       );
-      setSettings((prev) =>
-        updateWorkspaceResourceSettings(prev, project.path, {
+      setSettings((previous) =>
+        updateWorkspaceResourceSettings(previous, project.path, {
           mode: resourceMode,
           skillNames: resourceSkillNames,
           mcpServerIds: resourceMcpServerIds,
@@ -212,267 +216,222 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
     }
   };
 
+  const skillOptions = Array.from(
+    new Set([...availableSkills.map((skill) => skill.name), ...resourceSkillNames]),
+  ).map((name) => ({ value: name, label: name }));
+
+  const mcpOptions = settings.mcp.servers.map((server) => ({
+    value: server.id,
+    label: server.enabled ? server.id : `${server.id} — ${t("settings.projectRoots.disabled")}`,
+    disabled: !server.enabled,
+  }));
+
   return (
-    <AstryxView layout="block" direction="horizontal" className="space-y-5">
-      <AstryxView as="section" className="rounded-2xl border border-border/60 bg-card p-4">
-        <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-3">
-          <AstryxView
-            as="span"
-            layout="flex"
-            direction="horizontal"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-300"
-          >
-            <FolderTree className="h-5 w-5" />
-          </AstryxView>
-          <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-            <AstryxHeading level={2} className="text-sm font-semibold">
-              {t("settings.projectRoots.title")}
-            </AstryxHeading>
-            <AstryxParagraph className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              {t("settings.projectRoots.desc")}
-            </AstryxParagraph>
-          </AstryxView>
-        </AstryxView>
-        <Selector
-          label={t("settings.projectRoots.project")}
-          value={projectId}
-          onChange={setProjectId}
-          options={projects.map((item) => ({
-            value: item.id,
-            label: `${item.name} — ${item.path}`,
-          }))}
-          width="100%"
-        />
-      </AstryxView>
+    <VStack gap={4} width="100%">
+      <Section variant="transparent" padding={0}>
+        <VStack gap={3}>
+          <HStack gap={3} vAlign="center">
+            <Icon icon={FolderTree} size="md" color="accent" />
+            <StackItem size="fill">
+              <VStack gap={0.5}>
+                <Text type="label" weight="semibold">
+                  {t("settings.projectRoots.title")}
+                </Text>
+                <Text type="supporting" color="secondary">
+                  {t("settings.projectRoots.desc")}
+                </Text>
+              </VStack>
+            </StackItem>
+          </HStack>
+          <Selector
+            label={t("settings.projectRoots.project")}
+            value={projectId}
+            onChange={setProjectId}
+            options={projects.map((item) => ({
+              value: item.id,
+              label: `${item.name} — ${item.path}`,
+            }))}
+            width="100%"
+          />
+        </VStack>
+      </Section>
 
-      <AstryxView as="section" className="rounded-2xl border border-border/60 bg-card p-4">
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex items-center justify-between gap-3"
-        >
-          <AstryxHeading level={3} className="text-sm font-semibold">
-            {t("settings.projectRoots.grants")}
-          </AstryxHeading>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!project || loading || saving}
-            onClick={addRoot}
-          >
-            <FolderTree className="mr-1.5 h-4 w-4" />
-            {t("settings.projectRoots.add")}
-          </Button>
-        </AstryxView>
+      <Section variant="transparent" padding={0} dividers={["top"]}>
+        <VStack gap={3}>
+          <HStack gap={2} hAlign="between" vAlign="center" wrap="wrap">
+            <Text type="label" weight="semibold">
+              {t("settings.projectRoots.grants")}
+            </Text>
+            <Button
+              label={t("settings.projectRoots.add")}
+              icon={<Icon icon={FolderTree} size="sm" color="inherit" />}
+              variant="secondary"
+              size="sm"
+              isDisabled={!project || loading || saving}
+              onClick={addRoot}
+            />
+          </HStack>
 
-        {loading ? (
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex items-center gap-2 py-6 text-xs text-muted-foreground"
-          >
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {t("settings.loading")}
-          </AstryxView>
-        ) : roots.length === 0 ? (
-          <AstryxParagraph className="mt-3 rounded-xl bg-muted/45 px-3 py-3 text-xs text-muted-foreground">
-            {projects.length === 0
-              ? t("settings.projectRoots.noProjects")
-              : t("settings.projectRoots.empty")}
-          </AstryxParagraph>
-        ) : (
-          <AstryxView layout="block" direction="horizontal" className="mt-3 space-y-3">
-            {roots.map((root) => (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                key={root.localId}
-                className="rounded-xl border border-border/50 p-3"
-              >
-                <AstryxView
-                  layout="grid"
-                  direction="horizontal"
-                  className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]"
-                >
-                  <AstryxLabel className="space-y-1 text-xs text-muted-foreground">
-                    <AstryxInline>{t("settings.projectRoots.path")}</AstryxInline>
-                    <Input
-                      value={root.displayPath}
-                      onChange={(event) =>
-                        updateRoot(root.localId, { displayPath: event.target.value })
+          {loading ? (
+            <HStack gap={2} vAlign="center">
+              <Spinner size="sm" label={t("settings.loading")} />
+              <Text type="supporting" color="secondary">
+                {t("settings.loading")}
+              </Text>
+            </HStack>
+          ) : roots.length === 0 ? (
+            <EmptyState
+              title={
+                projects.length === 0
+                  ? t("settings.projectRoots.noProjects")
+                  : t("settings.projectRoots.empty")
+              }
+              icon={<Icon icon={FolderTree} size="lg" color="secondary" />}
+              isCompact
+            />
+          ) : (
+            <List density="balanced" hasDividers header={t("settings.projectRoots.grants")}>
+              {roots.map((root) => (
+                <ListItem
+                  key={root.localId}
+                  label={root.alias || root.displayPath}
+                  startContent={<Icon icon={FolderTree} size="sm" color="secondary" />}
+                  description={
+                    <VStack gap={2}>
+                      <FormLayout direction="horizontal">
+                        <TextInput
+                          label={t("settings.projectRoots.path")}
+                          value={root.displayPath}
+                          onChange={(displayPath) => updateRoot(root.localId, { displayPath })}
+                        />
+                        <TextInput
+                          label={t("settings.projectRoots.alias")}
+                          value={root.alias}
+                          onChange={(alias) =>
+                            updateRoot(root.localId, { alias: alias.slice(0, 32) })
+                          }
+                        />
+                        <Selector
+                          label={t("settings.projectRoots.read")}
+                          value={root.access}
+                          options={[
+                            { value: "read", label: t("settings.projectRoots.read") },
+                            { value: "write", label: t("settings.projectRoots.write") },
+                          ]}
+                          onChange={(access) =>
+                            updateRoot(root.localId, {
+                              access: access as WorkspaceRootAccess,
+                            })
+                          }
+                        />
+                      </FormLayout>
+                      {root.state && root.state !== "active" ? (
+                        <HStack gap={1} vAlign="center">
+                          <StatusDot
+                            variant="warning"
+                            label={t(`settings.projectRoots.state.${root.state}`)}
+                          />
+                          <Text type="supporting" color="secondary">
+                            {t(`settings.projectRoots.state.${root.state}`)}
+                          </Text>
+                        </HStack>
+                      ) : null}
+                    </VStack>
+                  }
+                  endContent={
+                    <IconButton
+                      label={t("settings.projectRoots.remove")}
+                      tooltip={t("settings.projectRoots.remove")}
+                      icon={<Icon icon={Trash2} size="sm" color="inherit" />}
+                      variant="destructive"
+                      size="sm"
+                      onClick={() =>
+                        setRoots((previous) =>
+                          previous.filter((item) => item.localId !== root.localId),
+                        )
                       }
                     />
-                  </AstryxLabel>
-                  <AstryxLabel className="space-y-1 text-xs text-muted-foreground">
-                    <AstryxInline>{t("settings.projectRoots.alias")}</AstryxInline>
-                    <Input
-                      value={root.alias}
-                      maxLength={32}
-                      onChange={(event) => updateRoot(root.localId, { alias: event.target.value })}
-                    />
-                  </AstryxLabel>
-                  <AstryxButton
-                    type="button"
-                    onClick={() =>
-                      setRoots((previous) =>
-                        previous.filter((item) => item.localId !== root.localId),
-                      )
-                    }
-                    className="mt-5 inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    aria-label={t("settings.projectRoots.remove")}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </AstryxButton>
-                </AstryxView>
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="mt-2 flex flex-wrap items-center gap-2"
-                >
-                  {(["read", "write"] as const).map((access: WorkspaceRootAccess) => (
-                    <AstryxButton
-                      key={access}
-                      type="button"
-                      onClick={() => updateRoot(root.localId, { access })}
-                      className={`rounded-lg px-2.5 py-1 text-xs ${
-                        root.access === access
-                          ? "bg-cyan-500/12 text-cyan-700 ring-1 ring-cyan-500/25 dark:text-cyan-300"
-                          : "bg-muted/50 text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {t(`settings.projectRoots.${access}`)}
-                    </AstryxButton>
-                  ))}
-                  {root.state && root.state !== "active" ? (
-                    <AstryxInline className="text-xs text-amber-600 dark:text-amber-300">
-                      {t(`settings.projectRoots.state.${root.state}`)}
-                    </AstryxInline>
-                  ) : null}
-                </AstryxView>
-              </AstryxView>
-            ))}
-          </AstryxView>
-        )}
+                  }
+                />
+              ))}
+            </List>
+          )}
+        </VStack>
+      </Section>
 
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="mt-5 border-t border-border/50 pt-4"
-        >
-          <AstryxHeading level={3} className="text-sm font-semibold">
-            {t("settings.projectRoots.resources")}
-          </AstryxHeading>
-          <AstryxParagraph className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            {t("settings.projectRoots.resourcesDesc")}
-          </AstryxParagraph>
-          <AstryxView layout="flex" direction="horizontal" className="mt-3 flex flex-wrap gap-2">
-            {(["inherit", "custom"] as const).map((mode) => (
-              <AstryxButton
-                key={mode}
-                type="button"
-                onClick={() => setResourceMode(mode)}
-                className={`rounded-lg px-3 py-1.5 text-xs ${
-                  resourceMode === mode
-                    ? "bg-cyan-500/12 text-cyan-700 ring-1 ring-cyan-500/25 dark:text-cyan-300"
-                    : "bg-muted/50 text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {t(`settings.projectRoots.resources.${mode}`)}
-              </AstryxButton>
-            ))}
-          </AstryxView>
+      <Section variant="transparent" padding={0} dividers={["top"]}>
+        <VStack gap={3}>
+          <VStack gap={0.5}>
+            <Text type="label" weight="semibold">
+              {t("settings.projectRoots.resources")}
+            </Text>
+            <Text type="supporting" color="secondary">
+              {t("settings.projectRoots.resourcesDesc")}
+            </Text>
+          </VStack>
+          <SegmentedControl
+            label={t("settings.projectRoots.resources")}
+            value={resourceMode}
+            layout="fill"
+            onChange={(mode) => setResourceMode(mode as "inherit" | "custom")}
+          >
+            <SegmentedControlItem
+              value="inherit"
+              label={t("settings.projectRoots.resources.inherit")}
+            />
+            <SegmentedControlItem
+              value="custom"
+              label={t("settings.projectRoots.resources.custom")}
+            />
+          </SegmentedControl>
           {resourceMode === "custom" ? (
-            <AstryxView
-              layout="grid"
-              direction="horizontal"
-              className="mt-4 grid gap-4 md:grid-cols-2"
-            >
-              <AstryxView layout="block" direction="horizontal">
-                <AstryxView layout="block" direction="horizontal" className="text-xs font-medium">
-                  {t("settings.projectRoots.skills")}
-                </AstryxView>
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-border/50 p-2"
-                >
-                  {Array.from(
-                    new Set([...availableSkills.map((skill) => skill.name), ...resourceSkillNames]),
-                  ).map((name) => (
-                    <CheckboxInput
-                      key={name}
-                      label={name}
-                      value={resourceSkillNames.includes(name)}
-                      onChange={(checked) =>
-                        setResourceSkillNames((current) =>
-                          checked
-                            ? Array.from(new Set([...current, name]))
-                            : current.filter((item) => item !== name),
-                        )
-                      }
-                      size="sm"
-                    />
-                  ))}
-                  {availableSkills.length === 0 && resourceSkillNames.length === 0 ? (
-                    <AstryxParagraph className="px-2 py-2 text-xs text-muted-foreground">
-                      {t("settings.projectRoots.resourcesEmpty")}
-                    </AstryxParagraph>
-                  ) : null}
-                </AstryxView>
-              </AstryxView>
-              <AstryxView layout="block" direction="horizontal">
-                <AstryxView layout="block" direction="horizontal" className="text-xs font-medium">
-                  {t("settings.projectRoots.mcp")}
-                </AstryxView>
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-border/50 p-2"
-                >
-                  {settings.mcp.servers.map((server) => (
-                    <CheckboxInput
-                      key={server.id}
-                      label={server.id}
-                      description={server.enabled ? undefined : t("settings.projectRoots.disabled")}
-                      value={resourceMcpServerIds.includes(server.id)}
-                      isDisabled={!server.enabled}
-                      disabledMessage={
-                        server.enabled ? undefined : t("settings.projectRoots.disabled")
-                      }
-                      onChange={(checked) =>
-                        setResourceMcpServerIds((current) =>
-                          checked
-                            ? Array.from(new Set([...current, server.id]))
-                            : current.filter((item) => item !== server.id),
-                        )
-                      }
-                      size="sm"
-                    />
-                  ))}
-                  {settings.mcp.servers.length === 0 ? (
-                    <AstryxParagraph className="px-2 py-2 text-xs text-muted-foreground">
-                      {t("settings.projectRoots.resourcesEmpty")}
-                    </AstryxParagraph>
-                  ) : null}
-                </AstryxView>
-              </AstryxView>
-            </AstryxView>
+            <Grid columns={{ minWidth: 280, max: 2, repeat: "fit" }} gap={3} width="100%">
+              <MultiSelector
+                label={t("settings.projectRoots.skills")}
+                options={skillOptions}
+                value={resourceSkillNames}
+                onChange={setResourceSkillNames}
+                placeholder={t("settings.projectRoots.resourcesEmpty")}
+                triggerDisplay="count"
+                hasSearch={skillOptions.length > 15}
+                hasSelectAll
+                hasClear
+                width="100%"
+              />
+              <MultiSelector
+                label={t("settings.projectRoots.mcp")}
+                options={mcpOptions}
+                value={resourceMcpServerIds}
+                onChange={setResourceMcpServerIds}
+                placeholder={t("settings.projectRoots.resourcesEmpty")}
+                triggerDisplay="count"
+                hasSearch={mcpOptions.length > 15}
+                hasSelectAll
+                hasClear
+                width="100%"
+              />
+            </Grid>
           ) : null}
-        </AstryxView>
+        </VStack>
+      </Section>
 
-        {error ? (
-          <AstryxParagraph className="mt-3 text-xs text-destructive">{error}</AstryxParagraph>
-        ) : null}
-        <AstryxView layout="flex" direction="horizontal" className="mt-4 flex justify-end gap-2">
-          <Button variant="outline" disabled={!project || saving} onClick={revoke}>
-            {t("settings.projectRoots.revoke")}
-          </Button>
-          <Button disabled={!project || saving} onClick={save}>
-            {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-            {t("settings.save")}
-          </Button>
-        </AstryxView>
-      </AstryxView>
-    </AstryxView>
+      {error ? <Banner status="error" title={error} collapsible={false} /> : null}
+
+      <HStack gap={2} hAlign="end" wrap="wrap">
+        <Button
+          label={t("settings.projectRoots.revoke")}
+          variant="secondary"
+          isDisabled={!project || saving}
+          onClick={revoke}
+        />
+        <Button
+          label={t("settings.save")}
+          variant="primary"
+          isLoading={saving}
+          isDisabled={!project || saving}
+          onClick={save}
+        />
+      </HStack>
+    </VStack>
   );
 }

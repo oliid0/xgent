@@ -2,20 +2,19 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Grid } from "@astryxdesign/core/Grid";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
-import { HStack, Layout, LayoutContent, VStack } from "@astryxdesign/core/Layout";
+import { Item } from "@astryxdesign/core/Item";
+import { HStack, Layout, LayoutContent, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Link } from "@astryxdesign/core/Link";
-import { List, ListItem } from "@astryxdesign/core/List";
-import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Selector as AstryxSelector } from "@astryxdesign/core/Selector";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { Token } from "@astryxdesign/core/Token";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import {
   Heading as AstryxHeading,
@@ -753,25 +752,6 @@ function McpConfigureModal(props: {
   );
 }
 
-function ConfigChips({ card }: { card: McpRegistryCard }) {
-  const inputs = configureDraftForCard(card)?.requiredConfig ?? [];
-  if (inputs.length === 0) return null;
-  return (
-    <HStack gap={1} wrap="wrap">
-      {inputs.slice(0, 5).map((input) => (
-        <Token
-          key={`${input.target}:${input.name}`}
-          label={input.name}
-          description={input.description ?? input.name}
-          size="sm"
-          icon={input.secret ? <Icon icon={Key} size="sm" color="inherit" /> : undefined}
-        />
-      ))}
-      {inputs.length > 5 ? <Token label={`+${inputs.length - 5}`} size="sm" /> : null}
-    </HStack>
-  );
-}
-
 function RegistryCard(props: {
   group: McpRegistryCardGroup;
   installedIdForCard: (card: McpRegistryCard) => string | undefined;
@@ -796,7 +776,6 @@ function RegistryCard(props: {
   const installing = installingId === card.id;
   const done = Boolean(installedId);
   const configureDraft = configureDraftForCard(card);
-  const transports = configureDraft ? [configureDraft.server.transport] : card.transportHints;
   const link = primaryRegistryLink(card);
   const versionOptions = group.cards.map((item) => ({
     value: item.id,
@@ -805,8 +784,10 @@ function RegistryCard(props: {
   const hasVersionSelector = versionOptions.length > 1;
 
   return (
-    <ListItem
+    <Item
       label={card.displayName}
+      align="start"
+      density="balanced"
       startContent={
         <Icon
           icon={card.remote ? Globe2 : Server}
@@ -817,29 +798,14 @@ function RegistryCard(props: {
       description={
         <VStack gap={1}>
           <Text color="secondary">{card.description || t("mcpHub.storeNoDescription")}</Text>
-          <HStack gap={1} wrap="wrap">
-            <Token label={card.source} size="sm" />
-            {card.verified ? (
-              <Token
-                label={t("mcpHub.storePreviewVerified")}
-                color="green"
-                size="sm"
-                icon={<Icon icon={Shield} size="sm" color="inherit" />}
-              />
-            ) : null}
-            {transports.map((transport) => (
-              <Token key={transport} label={transport.toUpperCase()} color="blue" size="sm" />
-            ))}
-            {card.tags.slice(0, 3).map((tag) => (
-              <Token key={tag} label={tag} size="sm" />
-            ))}
-          </HStack>
+          {card.verified ? (
+            <StatusDot variant="success" label={t("mcpHub.storePreviewVerified")} />
+          ) : null}
           {configureDraft?.commandPreview ? (
             <Text type="code" color="secondary">
               {configureDraft.commandPreview}
             </Text>
           ) : null}
-          <ConfigChips card={card} />
           {done ? (
             <HStack gap={1} vAlign="center">
               <StatusDot variant="success" label={t("mcpHub.storeInstalled")} />
@@ -1557,20 +1523,31 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
         as="form"
         width="100%"
         gap={2}
+        wrap="wrap"
         onSubmit={(event) => {
           event.preventDefault();
           void runSearch("replace");
         }}
       >
-        <TextInput
-          label={t("mcpHub.storeSearchPlaceholder")}
+        <StackItem size="fill">
+          <TextInput
+            label={t("mcpHub.storeSearchPlaceholder")}
+            isLabelHidden
+            startIcon={Search}
+            value={query}
+            onChange={setQuery}
+            placeholder={t("mcpHub.storeSearchPlaceholder")}
+            hasClear
+            width="100%"
+          />
+        </StackItem>
+        <AstryxSelector
+          label={t("mcpHub.tabStore")}
           isLabelHidden
-          startIcon={Search}
-          value={query}
-          onChange={setQuery}
-          placeholder={t("mcpHub.storeSearchPlaceholder")}
-          hasClear
-          width="100%"
+          value={source}
+          options={MCP_REGISTRY_SOURCE_OPTIONS}
+          width="var(--xagent-hub-category-control-width)"
+          onChange={(value) => setSource(value as McpRegistrySource)}
         />
         <AstryxCoreButton
           type="submit"
@@ -1590,17 +1567,6 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
           onClick={() => void runSearch("replace")}
         />
       </HStack>
-
-      <SegmentedControl
-        label={t("mcpHub.tabStore")}
-        value={source}
-        size="sm"
-        onChange={(value) => setSource(value as McpRegistrySource)}
-      >
-        {MCP_REGISTRY_SOURCE_OPTIONS.map((option) => (
-          <SegmentedControlItem key={option.value} value={option.value} label={option.label} />
-        ))}
-      </SegmentedControl>
 
       {error ? <Banner status="error" title={error} collapsible={false} /> : null}
 
@@ -1634,7 +1600,7 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
                   ))}
                 </VStack>
               ) : groupedItems.length > 0 ? (
-                <List density="balanced" hasDividers>
+                <Grid columns={{ minWidth: 400, max: 2, repeat: "fit" }} gap={2} width="100%">
                   {groupedItems.map((group) => (
                     <RegistryCard
                       key={group.id}
@@ -1645,7 +1611,7 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
                       onInstall={(next) => void installCard(next)}
                     />
                   ))}
-                </List>
+                </Grid>
               ) : (
                 <EmptyState
                   title={t("mcpHub.storeEmptyTitle")}

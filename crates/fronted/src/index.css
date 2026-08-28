@@ -50,7 +50,9 @@
     --xagent-hub-header-control-size: 2.75rem;
     --xagent-hub-header-icon-size: 2.5rem;
     --xagent-hub-sort-control-width: 11.25rem;
+    --xagent-hub-category-control-width: 14rem;
     --xagent-hub-search-control-width: 18rem;
+    --xagent-hub-panel-min-width: 25rem;
     --xagent-confirm-popover-width: 20rem;
     --xagent-memory-schedule-control-min-width: 10rem;
     --xagent-hub-sidebar-reserve: 2.75rem;
@@ -2896,7 +2898,7 @@
 
 .workspace-side-panel[data-workspace-tool="skills"],
 .workspace-side-panel[data-workspace-tool="mcp"] {
-  min-width: 0;
+  min-width: var(--xagent-hub-panel-min-width);
   container: workspace-hub-panel / inline-size;
 }
 

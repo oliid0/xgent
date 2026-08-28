@@ -6,6 +6,7 @@ import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { List as AstryxList, ListItem } from "@astryxdesign/core/List";
@@ -30,8 +31,6 @@ import {
   View as AstryxView,
 } from "@xagent/ui/components/ui/view";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ccswitchLogoUrl from "../../../src-tauri/icons/custom/ccswitch.png";
-import cherryStudioLogoUrl from "../../../src-tauri/icons/custom/cherrystudio.png";
 import {
   ArrowLeft,
   ClaudeIcon,
@@ -2375,28 +2374,6 @@ function ccsItemKey(item: CcsProviderImportItem) {
   return `${item.appType}:${item.sourceId}`;
 }
 
-function CcsSourceLogo({ className }: { className?: string }) {
-  return (
-    <img
-      src={ccswitchLogoUrl}
-      alt=""
-      draggable={false}
-      className={cn("shrink-0 select-none rounded-lg object-contain", className)}
-    />
-  );
-}
-
-function CherrySourceLogo({ className }: { className?: string }) {
-  return (
-    <img
-      src={cherryStudioLogoUrl}
-      alt=""
-      draggable={false}
-      className={cn("shrink-0 select-none rounded-lg object-contain", className)}
-    />
-  );
-}
-
 function CcsProviderRow(props: {
   item: CcsProviderImportItem;
   exists: boolean;
@@ -2582,7 +2559,7 @@ function CcsImportModal(props: {
               onClick={onClose}
             />
           }
-          endContent={<CcsSourceLogo className="h-7 w-7" />}
+          endContent={<Icon icon={Download} size="sm" color="secondary" />}
         />
 
         {result ? (
@@ -2864,7 +2841,7 @@ function ProviderList(props: {
                   id: "cc-switch",
                   label: `CC Switch${ccsAll.length > 0 ? ` (${ccsAll.length})` : ""}`,
                   description: ccsSubtitle,
-                  icon: <CcsSourceLogo />,
+                  icon: <Icon icon={Waypoints} size="sm" color="inherit" />,
                   isDisabled: ccsLoading || thirdPartyImporting,
                   onClick: onOpenCcsImport,
                 },
@@ -2872,7 +2849,7 @@ function ProviderList(props: {
                   id: "cherry-studio",
                   label: `Cherry Studio${cherryReady > 0 ? ` (${cherryReady})` : ""}`,
                   description: cherrySubtitle,
-                  icon: <CherrySourceLogo />,
+                  icon: <Icon icon={Download} size="sm" color="inherit" />,
                   isDisabled: cherryLoading || cherryImporting,
                   onClick: onOpenCherryImport,
                 },

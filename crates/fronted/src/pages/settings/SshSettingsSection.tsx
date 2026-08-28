@@ -1,21 +1,37 @@
 import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { FileInput } from "@astryxdesign/core/FileInput";
+import { FormLayout } from "@astryxdesign/core/FormLayout";
 import { Icon as AstryxIcon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
-import { HStack, Section, VStack } from "@astryxdesign/core/Layout";
+import {
+  HStack,
+  Layout,
+  LayoutContent,
+  LayoutFooter,
+  Section,
+  StackItem,
+  VStack,
+} from "@astryxdesign/core/Layout";
 import { List as AstryxList, ListItem } from "@astryxdesign/core/List";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
 import { invoke, isBrowserRuntime } from "@xagent/runtime";
 import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
 import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Check,
-  ChevronDown,
   Eye,
   EyeOff,
   Key,
@@ -29,9 +45,6 @@ import {
   Upload,
 } from "../../components/icons";
 import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
-import { Textarea } from "../../components/ui/textarea";
 import { useLocale } from "../../i18n";
 import {
   removeSshHostFromProjectAssociations,
@@ -61,22 +74,6 @@ type SshKnownHostResetResponse = {
   deleted: number;
 };
 
-function normalizePortInput(value: string) {
-  const port = Number(value);
-  if (!Number.isFinite(port)) return 22;
-  const normalized = Math.floor(port);
-  return normalized >= 1 && normalized <= 65535 ? normalized : 22;
-}
-
-function normalizeOptionalPortInput(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return 0;
-  const port = Number(trimmed);
-  if (!Number.isFinite(port)) return 0;
-  const normalized = Math.floor(port);
-  return normalized >= 1 && normalized <= 65535 ? normalized : 0;
-}
-
 function authLabel(host: Pick<SshHostConfig, "authType">, t: (key: string) => string) {
   if (host.authType === "privateKey") return t("settings.sshAuthPrivateKey");
   if (host.authType === "keyboardInteractive") return t("settings.sshAuthKeyboardInteractive");
@@ -84,39 +81,44 @@ function authLabel(host: Pick<SshHostConfig, "authType">, t: (key: string) => st
 }
 
 function SshPasswordInput(props: {
-  id: string;
+  label: string;
   value: string;
   disabled?: boolean;
+  configuredMessage?: string;
   onChange: (value: string) => void;
 }) {
-  const { id, value, disabled = false, onChange } = props;
+  const { label, value, disabled = false, configuredMessage, onChange } = props;
   const { t } = useLocale();
   const [visible, setVisible] = useState(false);
   const toggleLabel = visible ? t("settings.sshHidePassword") : t("settings.sshShowPassword");
 
   return (
-    <AstryxView layout="block" direction="horizontal" className="relative">
-      <Input
-        id={id}
-        type={visible ? "text" : "password"}
-        value={value}
-        disabled={disabled}
-        className="pr-10"
-        onChange={(event) => onChange(event.currentTarget.value)}
-      />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
-        disabled={disabled}
-        onClick={() => setVisible((current) => !current)}
-        title={toggleLabel}
-        aria-label={toggleLabel}
-      >
-        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-      </Button>
-    </AstryxView>
+    <VStack gap={1}>
+      <HStack gap={2} vAlign="end">
+        <StackItem size="fill">
+          <TextInput
+            label={label}
+            type={visible ? "text" : "password"}
+            value={value}
+            isDisabled={disabled}
+            onChange={onChange}
+          />
+        </StackItem>
+        <IconButton
+          label={toggleLabel}
+          tooltip={toggleLabel}
+          variant="ghost"
+          icon={visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+          isDisabled={disabled}
+          onClick={() => setVisible((current) => !current)}
+        />
+      </HStack>
+      {configuredMessage && !value.trim() ? (
+        <Text type="supporting" color="secondary">
+          {configuredMessage}
+        </Text>
+      ) : null}
+    </VStack>
   );
 }
 
@@ -128,10 +130,9 @@ function SshHostModal(props: {
   const browser = isBrowserRuntime();
   const { initialData, onSave, onClose } = props;
   const { t } = useLocale();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState(initialData?.name ?? "");
   const [host, setHost] = useState(initialData?.host ?? "");
-  const [port, setPort] = useState(String(initialData?.port ?? 22));
+  const [port, setPort] = useState(initialData?.port ?? 22);
   const [username, setUsername] = useState(initialData?.username ?? "");
   const [authType, setAuthType] = useState<SshAuthType>(initialData?.authType ?? "password");
   const [password, setPassword] = useState(initialData?.password ?? "");
@@ -140,32 +141,20 @@ function SshHostModal(props: {
   const [privateKeyPassphrase, setPrivateKeyPassphrase] = useState(
     initialData?.privateKeyPassphrase ?? "",
   );
+  const [selectedKeyFile, setSelectedKeyFile] = useState<File | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [proxyType, setProxyType] = useState<SshProxyType>(initialData?.proxy.type ?? "socks5");
   const [proxyUrl, setProxyUrl] = useState(initialData?.proxy.url ?? "");
-  const [proxyPort, setProxyPort] = useState(
-    initialData?.proxy.port ? String(initialData.proxy.port) : "",
-  );
+  const [proxyPort, setProxyPort] = useState<number | null>(initialData?.proxy.port || null);
   const [proxyUsername, setProxyUsername] = useState(initialData?.proxy.username ?? "");
   const [proxyPassword, setProxyPassword] = useState(initialData?.proxy.password ?? "");
   const isEditing = Boolean(initialData);
   const isPasswordAuth = authType === "password";
   const isPrivateKeyAuth = authType === "privateKey";
   const isKeyboardInteractiveAuth = authType === "keyboardInteractive";
-  const passwordAuthPanelStyle: CSSProperties = {
-    maxHeight: isPasswordAuth ? "7rem" : "0rem",
-    opacity: isPasswordAuth ? 1 : 0,
-    pointerEvents: isPasswordAuth ? "auto" : "none",
-    transform: isPasswordAuth ? "translateY(0)" : "translateY(-4px)",
-  };
-  const privateKeyAuthPanelStyle: CSSProperties = {
-    maxHeight: isPrivateKeyAuth ? "29rem" : "0rem",
-    opacity: isPrivateKeyAuth ? 1 : 0,
-    pointerEvents: isPrivateKeyAuth ? "auto" : "none",
-    transform: isPrivateKeyAuth ? "translateY(0)" : "translateY(4px)",
-  };
 
-  function handleFileSelected(file: File | undefined) {
+  function handleFileSelected(file: File | null) {
+    setSelectedKeyFile(file);
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
@@ -190,11 +179,12 @@ function SshHostModal(props: {
     const nextPrivateKey = isPrivateKeyAuth ? trimmedPrivateKey : "";
     const nextPrivateKeyPath = isPrivateKeyAuth ? trimmedPrivateKeyPath : "";
     const nextPrivateKeyPassphrase = isPrivateKeyAuth ? trimmedPrivateKeyPassphrase : "";
+
     onSave({
       name: trimmedName,
       description: initialData?.description ?? "",
       host: trimmedHost,
-      port: normalizePortInput(port),
+      port,
       username: username.trim(),
       authType,
       password: nextPassword,
@@ -218,7 +208,7 @@ function SshHostModal(props: {
       proxy: {
         type: proxyType,
         url: proxyUrl.trim(),
-        port: normalizeOptionalPortInput(proxyPort),
+        port: proxyPort ?? 0,
         username: proxyUsername.trim(),
         password: trimmedProxyPassword,
         passwordConfigured:
@@ -230,458 +220,247 @@ function SshHostModal(props: {
 
   return (
     <SettingsModalShell onClose={onClose} purpose="form" ariaLabel={t("settings.sshAdd")}>
-      <AstryxView
-        layout="flex"
-        direction="vertical"
-        className="flex h-full min-h-0 w-full flex-col overflow-hidden"
-      >
-        <DialogHeader
-          title={isEditing ? t("settings.sshEdit") : t("settings.sshAdd")}
-          subtitle={t("settings.sshDesc")}
-          startContent={
-            <AstryxButton
-              type="button"
-              onClick={onClose}
-              aria-label={t("settings.cancel")}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </AstryxButton>
-          }
-        />
+      <Layout
+        height="fill"
+        header={
+          <DialogHeader
+            title={isEditing ? t("settings.sshEdit") : t("settings.sshAdd")}
+            subtitle={t("settings.sshDesc")}
+            startContent={
+              <IconButton
+                label={t("settings.cancel")}
+                tooltip={t("settings.cancel")}
+                variant="ghost"
+                size="sm"
+                icon={<ArrowLeft aria-hidden="true" />}
+                onClick={onClose}
+              />
+            }
+          />
+        }
+        content={
+          <LayoutContent isScrollable>
+            <VStack gap={5}>
+              <FormLayout>
+                <FormLayout direction="horizontal">
+                  <TextInput
+                    label={t("settings.sshName")}
+                    value={name}
+                    isRequired
+                    onChange={setName}
+                  />
+                  <TextInput
+                    label={t("settings.sshHost")}
+                    value={host}
+                    isRequired
+                    onChange={setHost}
+                  />
+                </FormLayout>
+                <FormLayout direction="horizontal">
+                  <TextInput
+                    label={t("settings.sshUsername")}
+                    value={username}
+                    onChange={setUsername}
+                  />
+                  <NumberInput
+                    label={t("settings.sshPort")}
+                    value={port}
+                    min={1}
+                    max={65535}
+                    step={1}
+                    isIntegerOnly
+                    isWheelEnabled={false}
+                    onChange={setPort}
+                  />
+                </FormLayout>
+              </FormLayout>
 
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="settings-modal-body flex-1 overflow-y-auto px-6 py-5"
-        >
-          <AstryxView layout="grid" direction="horizontal" className="grid grid-cols-2 gap-4">
-            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-              <Label htmlFor="ssh-name" className="text-xs font-medium text-muted-foreground">
-                {t("settings.sshName")}
-                <AstryxInline className="ml-0.5 text-red-500">*</AstryxInline>
-              </Label>
-              <Input
-                id="ssh-name"
-                value={name}
-                onChange={(event) => setName(event.currentTarget.value)}
-              />
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-              <Label htmlFor="ssh-host" className="text-xs font-medium text-muted-foreground">
-                {t("settings.sshHost")}
-                <AstryxInline className="ml-0.5 text-red-500">*</AstryxInline>
-              </Label>
-              <Input
-                id="ssh-host"
-                value={host}
-                onChange={(event) => setHost(event.currentTarget.value)}
-              />
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-              <Label htmlFor="ssh-username" className="text-xs font-medium text-muted-foreground">
-                {t("settings.sshUsername")}
-              </Label>
-              <Input
-                id="ssh-username"
-                value={username}
-                onChange={(event) => setUsername(event.currentTarget.value)}
-              />
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-              <Label htmlFor="ssh-port" className="text-xs font-medium text-muted-foreground">
-                {t("settings.sshPort")}
-              </Label>
-              <Input
-                id="ssh-port"
-                type="number"
-                min={1}
-                max={65535}
-                value={port}
-                onChange={(event) => setPort(event.currentTarget.value)}
-              />
-            </AstryxView>
-          </AstryxView>
+              <RadioList
+                label={t("settings.sshAuthMethod")}
+                value={authType}
+                orientation="vertical"
+                onChange={(value) => {
+                  if (
+                    value === "password" ||
+                    value === "privateKey" ||
+                    value === "keyboardInteractive"
+                  ) {
+                    setAuthType(value);
+                  }
+                }}
+              >
+                <RadioListItem
+                  value="password"
+                  label={t("settings.sshAuthPassword")}
+                  description={t("settings.sshAuthPasswordHint")}
+                  startContent={<Lock aria-hidden="true" />}
+                />
+                <RadioListItem
+                  value="privateKey"
+                  label={t("settings.sshAuthPrivateKey")}
+                  description={t("settings.sshAuthPrivateKeyHint")}
+                  startContent={<Key aria-hidden="true" />}
+                />
+                <RadioListItem
+                  value="keyboardInteractive"
+                  label={t("settings.sshAuthKeyboardInteractive")}
+                  description={t("settings.sshAuthKeyboardInteractiveHint")}
+                  startContent={<Terminal aria-hidden="true" />}
+                />
+              </RadioList>
 
-          <AstryxView layout="block" direction="horizontal" className="mt-4 space-y-2">
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="text-xs font-medium text-muted-foreground"
-            >
-              {t("settings.sshAuthMethod")}
-            </AstryxView>
-            <AstryxView
-              layout="grid"
-              direction="horizontal"
-              className="grid grid-cols-1 gap-2 sm:grid-cols-3"
-            >
-              <AstryxButton
-                type="button"
-                onClick={() => setAuthType("password")}
-                className={`group relative flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-all duration-200 ease-out hover:-translate-y-0.5 ${
-                  isPasswordAuth
-                    ? "border-emerald-500/40 bg-emerald-500/[0.06] shadow-sm"
-                    : "border-border/60 bg-card hover:border-border hover:bg-muted/20"
-                }`}
-              >
-                <Lock
-                  className={`h-4 w-4 shrink-0 text-emerald-500 transition-transform duration-200 ${
-                    isPasswordAuth ? "scale-110" : "group-hover:scale-105"
-                  }`}
-                />
-                <AstryxView layout="block" direction="horizontal" className="min-w-0">
-                  <AstryxView layout="block" direction="horizontal" className="text-sm font-medium">
-                    {t("settings.sshAuthPassword")}
-                  </AstryxView>
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="text-xs text-muted-foreground"
-                  >
-                    {t("settings.sshAuthPasswordHint")}
-                  </AstryxView>
-                </AstryxView>
-                <Check
-                  aria-hidden="true"
-                  className={`ml-auto h-4 w-4 shrink-0 text-emerald-500 transition-all duration-200 ${
-                    isPasswordAuth ? "scale-100 opacity-100" : "scale-75 opacity-0"
-                  }`}
-                />
-              </AstryxButton>
-              <AstryxButton
-                type="button"
-                onClick={() => setAuthType("privateKey")}
-                className={`group relative flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-all duration-200 ease-out hover:-translate-y-0.5 ${
-                  isPrivateKeyAuth
-                    ? "border-emerald-500/40 bg-emerald-500/[0.06] shadow-sm"
-                    : "border-border/60 bg-card hover:border-border hover:bg-muted/20"
-                }`}
-              >
-                <Key
-                  className={`h-4 w-4 shrink-0 text-emerald-500 transition-transform duration-200 ${
-                    isPrivateKeyAuth ? "scale-110" : "group-hover:scale-105"
-                  }`}
-                />
-                <AstryxView layout="block" direction="horizontal" className="min-w-0">
-                  <AstryxView layout="block" direction="horizontal" className="text-sm font-medium">
-                    {t("settings.sshAuthPrivateKey")}
-                  </AstryxView>
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="text-xs text-muted-foreground"
-                  >
-                    {t("settings.sshAuthPrivateKeyHint")}
-                  </AstryxView>
-                </AstryxView>
-                <Check
-                  aria-hidden="true"
-                  className={`ml-auto h-4 w-4 shrink-0 text-emerald-500 transition-all duration-200 ${
-                    isPrivateKeyAuth ? "scale-100 opacity-100" : "scale-75 opacity-0"
-                  }`}
-                />
-              </AstryxButton>
-              <AstryxButton
-                type="button"
-                onClick={() => setAuthType("keyboardInteractive")}
-                className={`group relative flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-all duration-200 ease-out hover:-translate-y-0.5 ${
-                  isKeyboardInteractiveAuth
-                    ? "border-emerald-500/40 bg-emerald-500/[0.06] shadow-sm"
-                    : "border-border/60 bg-card hover:border-border hover:bg-muted/20"
-                }`}
-              >
-                <Terminal
-                  className={`h-4 w-4 shrink-0 text-emerald-500 transition-transform duration-200 ${
-                    isKeyboardInteractiveAuth ? "scale-110" : "group-hover:scale-105"
-                  }`}
-                />
-                <AstryxView layout="block" direction="horizontal" className="min-w-0">
-                  <AstryxView layout="block" direction="horizontal" className="text-sm font-medium">
-                    {t("settings.sshAuthKeyboardInteractive")}
-                  </AstryxView>
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="text-xs text-muted-foreground"
-                  >
-                    {t("settings.sshAuthKeyboardInteractiveHint")}
-                  </AstryxView>
-                </AstryxView>
-                <Check
-                  aria-hidden="true"
-                  className={`ml-auto h-4 w-4 shrink-0 text-emerald-500 transition-all duration-200 ${
-                    isKeyboardInteractiveAuth ? "scale-100 opacity-100" : "scale-75 opacity-0"
-                  }`}
-                />
-              </AstryxButton>
-            </AstryxView>
-          </AstryxView>
-
-          <AstryxView layout="block" direction="horizontal" className="mt-4">
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              aria-hidden={!isPasswordAuth}
-              className="ssh-auth-panel ssh-auth-panel--password"
-              data-state={isPasswordAuth ? "open" : "closed-up"}
-              style={passwordAuthPanelStyle}
-            >
-              <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                <Label htmlFor="ssh-password" className="text-xs font-medium text-muted-foreground">
-                  {t("settings.sshPassword")}
-                </Label>
+              {isPasswordAuth ? (
                 <SshPasswordInput
-                  id="ssh-password"
+                  label={t("settings.sshPassword")}
                   value={password}
-                  disabled={!isPasswordAuth || browser}
+                  disabled={browser}
+                  configuredMessage={
+                    initialData?.passwordConfigured
+                      ? t("settings.sshPasswordConfigured")
+                      : undefined
+                  }
                   onChange={setPassword}
                 />
-                {initialData?.passwordConfigured && !password.trim() ? (
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="text-[11px] text-muted-foreground"
-                  >
-                    {t("settings.sshPasswordConfigured")}
-                  </AstryxView>
-                ) : null}
-              </AstryxView>
-            </AstryxView>
+              ) : null}
 
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              aria-hidden={!isPrivateKeyAuth}
-              className="ssh-auth-panel ssh-auth-panel--private-key"
-              data-state={isPrivateKeyAuth ? "open" : "closed-down"}
-              style={privateKeyAuthPanelStyle}
-            >
-              <AstryxView layout="block" direction="horizontal" className="space-y-3">
-                <AstryxView layout="block" direction="horizontal" className="relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-2 z-10 h-7 w-7 rounded-md border border-transparent bg-background/80 p-0 text-muted-foreground shadow-none hover:border-border/70 hover:bg-muted/70 hover:text-foreground"
-                    aria-label={t("settings.sshPrivateKeyImport")}
-                    disabled={!isPrivateKeyAuth || browser}
-                    onClick={() => fileInputRef.current?.click()}
-                    title={t("settings.sshPrivateKeyImport")}
-                  >
-                    <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    disabled={!isPrivateKeyAuth || browser}
-                    onChange={(event) => handleFileSelected(event.currentTarget.files?.[0])}
+              {isPrivateKeyAuth ? (
+                <FormLayout>
+                  <FileInput
+                    label={t("settings.sshPrivateKeyImport")}
+                    description={t("settings.sshAuthPrivateKeyHint")}
+                    value={selectedKeyFile}
+                    accept=".pem,.key,.ppk,text/plain"
+                    mode="input"
+                    isDisabled={browser}
+                    onChange={(file) => {
+                      if (Array.isArray(file)) return;
+                      handleFileSelected(file);
+                    }}
                   />
-                  <Textarea
-                    id="ssh-private-key"
-                    aria-label={t("settings.sshPrivateKey")}
+                  <TextArea
+                    label={t("settings.sshPrivateKey")}
                     value={privateKey}
-                    disabled={!isPrivateKeyAuth || browser}
-                    className="min-h-[180px] resize-y pr-12 font-mono text-xs leading-relaxed"
-                    onChange={(event) => setPrivateKey(event.currentTarget.value)}
+                    rows={9}
+                    hasSpellCheck={false}
+                    isDisabled={browser}
+                    onChange={setPrivateKey}
                   />
-                </AstryxView>
-                {initialData?.privateKeyConfigured && !privateKey.trim() ? (
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="text-[11px] text-muted-foreground"
-                  >
-                    {t("settings.sshPrivateKeyConfigured")}
-                  </AstryxView>
-                ) : null}
-                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                  <Label
-                    htmlFor="ssh-private-key-passphrase"
-                    className="text-xs font-medium text-muted-foreground"
-                  >
-                    {t("settings.sshPrivateKeyPassphrase")}
-                  </Label>
+                  {initialData?.privateKeyConfigured && !privateKey.trim() ? (
+                    <Text type="supporting" color="secondary">
+                      {t("settings.sshPrivateKeyConfigured")}
+                    </Text>
+                  ) : null}
                   <SshPasswordInput
-                    id="ssh-private-key-passphrase"
+                    label={t("settings.sshPrivateKeyPassphrase")}
                     value={privateKeyPassphrase}
-                    disabled={!isPrivateKeyAuth || browser}
+                    disabled={browser}
+                    configuredMessage={
+                      initialData?.privateKeyPassphraseConfigured
+                        ? t("settings.sshPrivateKeyPassphraseConfigured")
+                        : undefined
+                    }
                     onChange={setPrivateKeyPassphrase}
                   />
-                  {initialData?.privateKeyPassphraseConfigured && !privateKeyPassphrase.trim() ? (
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="text-[11px] text-muted-foreground"
-                    >
-                      {t("settings.sshPrivateKeyPassphraseConfigured")}
-                    </AstryxView>
-                  ) : null}
-                </AstryxView>
-              </AstryxView>
-            </AstryxView>
-          </AstryxView>
+                </FormLayout>
+              ) : null}
 
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="mt-5 overflow-hidden rounded-xl border border-border/60 bg-muted/10"
-          >
-            <AstryxButton
-              type="button"
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-muted/30"
-              onClick={() => setAdvancedOpen((open) => !open)}
-            >
-              <AstryxInline>{t("settings.sshAdvancedSettings")}</AstryxInline>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
-                  advancedOpen ? "rotate-180" : ""
-                }`}
-              />
-            </AstryxButton>
+              {isKeyboardInteractiveAuth ? (
+                <Banner
+                  status="info"
+                  title={t("settings.sshAuthKeyboardInteractive")}
+                  description={t("settings.sshAuthKeyboardInteractiveHint")}
+                />
+              ) : null}
 
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="ssh-collapsible"
-              data-open={advancedOpen}
-            >
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                aria-hidden={!advancedOpen}
-                className={`ssh-collapsible-inner border-border/60 px-4 transition-[border-width,padding] duration-200 ease-out ${
-                  advancedOpen ? "border-t py-4" : "border-t-0 py-0"
-                }`}
-                inert={!advancedOpen}
+              <Collapsible
+                trigger={t("settings.sshAdvancedSettings")}
+                isOpen={advancedOpen}
+                onOpenChange={setAdvancedOpen}
               >
-                <AstryxView
-                  layout="grid"
-                  direction="horizontal"
-                  className="grid grid-cols-1 gap-4 sm:grid-cols-2"
-                >
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="space-y-1.5 sm:col-span-2"
-                  >
-                    <Label className="text-xs font-medium text-muted-foreground">
+                <FormLayout>
+                  <VStack gap={2}>
+                    <Text type="body" weight="semibold">
                       {t("settings.sshProxyType")}
-                    </Label>
-                    <AstryxView
-                      layout="grid"
-                      direction="horizontal"
-                      className="grid grid-cols-2 gap-2 rounded-xl border border-border/60 bg-background p-1"
+                    </Text>
+                    <SegmentedControl
+                      label={t("settings.sshProxyType")}
+                      value={proxyType}
+                      layout="fill"
+                      onChange={(value) => {
+                        if (value === "socks5" || value === "http") setProxyType(value);
+                      }}
                     >
-                      {(["socks5", "http"] as SshProxyType[]).map((type) => (
-                        <AstryxButton
-                          key={type}
-                          type="button"
-                          className={`rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-                            proxyType === type
-                              ? "bg-muted text-foreground shadow-sm"
-                              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                          }`}
-                          onClick={() => setProxyType(type)}
-                        >
-                          {type === "socks5"
-                            ? t("settings.sshProxyTypeSocks5")
-                            : t("settings.sshProxyTypeHttp")}
-                        </AstryxButton>
-                      ))}
-                    </AstryxView>
-                  </AstryxView>
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                    <Label
-                      htmlFor="ssh-proxy-url"
-                      className="text-xs font-medium text-muted-foreground"
-                    >
-                      {t("settings.sshProxyUrl")}
-                    </Label>
-                    <Input
-                      id="ssh-proxy-url"
+                      <SegmentedControlItem
+                        value="socks5"
+                        label={t("settings.sshProxyTypeSocks5")}
+                      />
+                      <SegmentedControlItem value="http" label={t("settings.sshProxyTypeHttp")} />
+                    </SegmentedControl>
+                  </VStack>
+                  <FormLayout direction="horizontal">
+                    <TextInput
+                      label={t("settings.sshProxyUrl")}
                       value={proxyUrl}
                       placeholder={t(
                         proxyType === "socks5"
                           ? "settings.sshProxyUrlSocks5Placeholder"
                           : "settings.sshProxyUrlHttpPlaceholder",
                       )}
-                      onChange={(event) => setProxyUrl(event.currentTarget.value)}
+                      onChange={setProxyUrl}
                     />
-                  </AstryxView>
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                    <Label
-                      htmlFor="ssh-proxy-port"
-                      className="text-xs font-medium text-muted-foreground"
-                    >
-                      {t("settings.sshProxyPort")}
-                    </Label>
-                    <Input
-                      id="ssh-proxy-port"
-                      type="number"
+                    <NumberInput
+                      label={t("settings.sshProxyPort")}
+                      value={proxyPort}
                       min={1}
                       max={65535}
-                      value={proxyPort}
-                      onChange={(event) => setProxyPort(event.currentTarget.value)}
+                      step={1}
+                      hasClear
+                      isIntegerOnly
+                      isWheelEnabled={false}
+                      onChange={(value) => setProxyPort(value ?? null)}
                     />
-                  </AstryxView>
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                    <Label
-                      htmlFor="ssh-proxy-username"
-                      className="text-xs font-medium text-muted-foreground"
-                    >
-                      {t("settings.sshProxyUsername")}
-                    </Label>
-                    <Input
-                      id="ssh-proxy-username"
+                  </FormLayout>
+                  <FormLayout direction="horizontal">
+                    <TextInput
+                      label={t("settings.sshProxyUsername")}
                       value={proxyUsername}
-                      onChange={(event) => setProxyUsername(event.currentTarget.value)}
+                      onChange={setProxyUsername}
                     />
-                  </AstryxView>
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                    <Label
-                      htmlFor="ssh-proxy-password"
-                      className="text-xs font-medium text-muted-foreground"
-                    >
-                      {t("settings.sshProxyPassword")}
-                    </Label>
                     <SshPasswordInput
-                      id="ssh-proxy-password"
+                      label={t("settings.sshProxyPassword")}
                       value={proxyPassword}
                       disabled={browser}
+                      configuredMessage={
+                        initialData?.proxy.passwordConfigured
+                          ? t("settings.sshProxyPasswordConfigured")
+                          : undefined
+                      }
                       onChange={setProxyPassword}
                     />
-                    {initialData?.proxy.passwordConfigured && !proxyPassword.trim() ? (
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="text-[11px] text-muted-foreground"
-                      >
-                        {t("settings.sshProxyPasswordConfigured")}
-                      </AstryxView>
-                    ) : null}
-                  </AstryxView>
-                </AstryxView>
-              </AstryxView>
-            </AstryxView>
-          </AstryxView>
-        </AstryxView>
-
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="settings-modal-footer flex items-center justify-end border-t px-6 py-4"
-        >
-          <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
-            <Button variant="outline" onClick={onClose}>
-              {t("settings.cancel")}
-            </Button>
-            <Button onClick={handleSave} disabled={!name.trim() || !host.trim()}>
-              {t("settings.save")}
-            </Button>
-          </AstryxView>
-        </AstryxView>
-      </AstryxView>
+                  </FormLayout>
+                </FormLayout>
+              </Collapsible>
+            </VStack>
+          </LayoutContent>
+        }
+        footer={
+          <LayoutFooter hasDivider>
+            <HStack gap={2} hAlign="end">
+              <AstryxCoreButton
+                label={t("settings.cancel")}
+                variant="secondary"
+                onClick={onClose}
+              />
+              <AstryxCoreButton
+                label={t("settings.save")}
+                variant="primary"
+                isDisabled={!name.trim() || !host.trim()}
+                onClick={handleSave}
+              />
+            </HStack>
+          </LayoutFooter>
+        }
+      />
     </SettingsModalShell>
   );
 }
