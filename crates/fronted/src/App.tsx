@@ -6,7 +6,6 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { StackItem, VStack } from "@astryxdesign/core/Stack";
 import { ToastViewport } from "@astryxdesign/core/Toast";
 import { Theme } from "@astryxdesign/core/theme";
-import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 import type { Context } from "@earendil-works/pi-ai";
 import {
   configureLanPcCommandHost,
@@ -53,6 +52,7 @@ import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { SectionId, SettingsOpenOptions } from "./pages/settings/types";
 import { startLocalAccessHostBridge } from "./runtime/localAccessHostBridge";
+import { xgentChatTheme } from "./theme/xgent-chat";
 
 function getDefaultContext(): Context {
   return {
@@ -553,7 +553,7 @@ export default function App() {
 
   if (!settingsReady || !platformResolved) {
     return (
-      <Theme theme={neutralTheme} mode={effectiveTheme}>
+      <Theme theme={xgentChatTheme} mode={effectiveTheme}>
         <ToastViewport position="topEnd" maxVisible={4}>
           <LocaleContext.Provider value={localeContextValue}>
             <AppChrome nativeMobile={nativeMobile}>
@@ -568,7 +568,7 @@ export default function App() {
   }
 
   return (
-    <Theme theme={neutralTheme} mode={effectiveTheme}>
+    <Theme theme={xgentChatTheme} mode={effectiveTheme}>
       <ToastViewport position="topEnd" maxVisible={4}>
         <LocaleContext.Provider value={localeContextValue}>
           <SoulProvider>

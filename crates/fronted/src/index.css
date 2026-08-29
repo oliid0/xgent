@@ -4,7 +4,7 @@
 @import "tailwindcss/preflight.css" layer(base);
 @import "@astryxdesign/core/reset.css";
 @import "@astryxdesign/core/astryx.css";
-@import "@astryxdesign/theme-neutral/theme.css";
+@import "./theme/xgentTheme.css";
 @import "@astryxdesign/core/tailwind-theme.css";
 @import "tailwindcss/utilities.css" layer(utilities);
 @config "../tailwind.config.js";
@@ -67,11 +67,11 @@
     --xagent-content-width-lg: 45rem;
     --xagent-content-width-xl: 56rem;
     --xagent-chat-landing-suggestions-width: 32rem;
-    --xagent-settings-content-max-width: 39rem;
-    --xagent-settings-sidebar-width: 16rem;
-    --xagent-settings-dialog-width: min(58rem, calc(100dvw - (var(--spacing-6) * 2)));
-    --xagent-settings-dialog-height: min(46rem, calc(100dvh - (var(--spacing-6) * 2)));
-    --xagent-settings-header-height: 5rem;
+    --xagent-settings-content-max-width: 36rem;
+    --xagent-settings-sidebar-width: 14rem;
+    --xagent-settings-dialog-width: min(52rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xagent-settings-dialog-height: min(40rem, calc(100dvh - (var(--spacing-4) * 2)));
+    --xagent-settings-header-height: 3.75rem;
     --xagent-settings-control-width: 18rem;
     --xagent-http-method-width: 6.25rem;
     --xagent-provider-import-menu-width: 20rem;
@@ -2872,6 +2872,7 @@ input[type="password"]::-ms-clear {
 .workspace-side-panel[data-workspace-tool="skills"],
 .workspace-side-panel[data-workspace-tool="mcp"] {
   min-width: var(--xagent-hub-panel-min-width);
+  max-width: calc(100dvw - 3.5rem);
   container: workspace-hub-panel / inline-size;
 }
 
@@ -2936,6 +2937,11 @@ input[type="password"]::-ms-clear {
 }
 
 @media (max-width: 768px) {
+  .workspace-side-panel[data-workspace-tool="skills"],
+  .workspace-side-panel[data-workspace-tool="mcp"] {
+    min-width: 0;
+  }
+
   .hub-scroll {
     padding: 10px 12px calc(14px + env(safe-area-inset-bottom, 0px));
   }

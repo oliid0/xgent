@@ -1,8 +1,11 @@
 import { Button as AstryxButton } from "@astryxdesign/core/Button";
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
+import { Icon as AstryxIcon } from "@astryxdesign/core/Icon";
+import { List, ListItem } from "@astryxdesign/core/List";
 import { Popover } from "@astryxdesign/core/Popover";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Text as AstryxText } from "@astryxdesign/core/Text";
+import { Token } from "@astryxdesign/core/Token";
 import { openUrl } from "@xagent/runtime";
 import {
   type ClipboardEvent,
@@ -1780,116 +1783,75 @@ function Popup({
             event.preventDefault();
           }}
         >
-          <AstryxStack
-            direction="vertical"
-            className="px-3.5 pb-1.5 pt-3 text-xs font-medium text-muted-foreground"
-          >
+          <AstryxStack direction="vertical" padding={3}>
             {trigger === "skill" ? "Skills" : "文件"}
           </AstryxStack>
           <AstryxStack
             direction="vertical"
             ref={listRef}
-            className="mention-popup-scroll relative flex max-h-[320px] flex-col overflow-y-auto px-2 pb-2"
+            isScrollable
+            padding={2}
+            style={{ maxHeight: "min(20rem, var(--available-height, 20rem))" }}
           >
             {isLoading && (
-              <AstryxStack direction="vertical" className="px-2 py-2 text-xs text-muted-foreground">
+              <AstryxText type="supporting" color="secondary">
                 Indexing files...
-              </AstryxStack>
+              </AstryxText>
             )}
             {error && !isLoading && (
-              <AstryxStack direction="vertical" className="px-2 py-2 text-xs text-destructive">
+              <AstryxText type="supporting" color="error">
                 {error}
-              </AstryxStack>
+              </AstryxText>
             )}
-            {suggestions.map((suggestion, i) => {
-              const isSkill = suggestion.type === "skill";
-              const entry = suggestion.type === "file" ? suggestion.entry : null;
-              const skill = suggestion.type === "skill" ? suggestion.skill : null;
-              const isDir = entry?.kind === "dir";
-              const parts = entry ? entry.path.split("/") : [];
-              const fileName = parts.pop() || "";
-              const dirPath = parts.join("/");
-              const Icon = entry ? getFileTypeIcon(entry.path, entry.kind) : null;
-              const title = skill?.name ?? fileName;
-              const subtitle = skill?.description ?? (dirPath ? `${dirPath}/` : "");
-              return (
-                <AstryxStack
-                  direction="horizontal"
-                  key={
-                    entry
-                      ? `${entry.kind}:${entry.path}`
-                      : `skill:${skill?.skillFile ?? skill?.name}`
-                  }
-                  ref={i === highlightIndex ? hlRef : undefined}
-                  className={cn(
-                    // Rows are 38px hitboxes with 2px transparent borders so the
-                    // visual 34px row keeps the 4px gap while clicks in the gap
-                    // still land on a row instead of a dead strip. shrink-0 stops
-                    // the max-h flex column from compressing rows before it scrolls.
-                    "mention-popup-item group flex h-[38px] shrink-0 cursor-pointer items-center gap-3 rounded-lg border-y-2 border-transparent bg-clip-padding px-3 text-xs leading-5 transition-colors",
-                    i === highlightIndex
-                      ? "bg-foreground/[0.07] text-foreground"
-                      : "text-foreground/85 hover:bg-foreground/[0.05] dark:text-foreground/90",
-                  )}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    onSelect(suggestion);
-                  }}
-                >
-                  <AstryxStack
-                    as="span"
-                    direction="horizontal"
-                    className={cn(
-                      "flex h-4 w-4 shrink-0 items-center justify-center",
-                      isSkill
-                        ? "text-foreground/85"
-                        : isDir
-                          ? "text-amber-600 dark:text-amber-300"
-                          : "text-muted-foreground",
-                    )}
-                  >
-                    {Icon ? <Icon width={16} height={16} /> : <Blend className="h-4 w-4" />}
-                  </AstryxStack>
-                  <AstryxText as="span" type="inherit" className="min-w-0 flex-1 truncate">
-                    <AstryxText as="span" type="inherit" className="font-normal text-foreground/95">
-                      {title}
-                    </AstryxText>
-                    {subtitle && (
-                      <AstryxText
-                        as="span"
-                        type="inherit"
-                        className="ml-2 text-xs text-muted-foreground/75"
-                      >
-                        {subtitle}
-                      </AstryxText>
-                    )}
-                  </AstryxText>
-                  {isSkill ? (
-                    <AstryxText
-                      as="span"
-                      type="inherit"
-                      className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/60"
-                    >
-                      skill
-                    </AstryxText>
-                  ) : (
-                    isDir && (
-                      <AstryxText
-                        as="span"
-                        type="inherit"
-                        className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/60"
-                      >
-                        dir
-                      </AstryxText>
-                    )
-                  )}
-                </AstryxStack>
-              );
-            })}
+            <List density="compact">
+              {suggestions.map((suggestion, i) => {
+                const isSkill = suggestion.type === "skill";
+                const entry = suggestion.type === "file" ? suggestion.entry : null;
+                const skill = suggestion.type === "skill" ? suggestion.skill : null;
+                const isDir = entry?.kind === "dir";
+                const parts = entry ? entry.path.split("/") : [];
+                const fileName = parts.pop() || "";
+                const dirPath = parts.join("/");
+                const FileIcon = entry ? getFileTypeIcon(entry.path, entry.kind) : Blend;
+                const title = skill?.name ?? fileName;
+                const subtitle = skill?.description ?? (dirPath ? `${dirPath}/` : undefined);
+                return (
+                  <ListItem
+                    key={
+                      entry
+                        ? `${entry.kind}:${entry.path}`
+                        : `skill:${skill?.skillFile ?? skill?.name}`
+                    }
+                    ref={i === highlightIndex ? hlRef : undefined}
+                    label={title}
+                    description={subtitle}
+                    startContent={
+                      <AstryxIcon
+                        icon={FileIcon}
+                        size="sm"
+                        color={isDir ? "warning" : isSkill ? "accent" : "secondary"}
+                      />
+                    }
+                    endContent={
+                      isSkill || isDir ? (
+                        <Token
+                          label={isSkill ? "Skill" : "Folder"}
+                          color={isSkill ? "purple" : "yellow"}
+                          size="sm"
+                        />
+                      ) : undefined
+                    }
+                    isSelected={i === highlightIndex}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => onSelect(suggestion)}
+                  />
+                );
+              })}
+            </List>
             {showEmpty && !isLoading && !error && suggestions.length === 0 && (
-              <AstryxStack direction="vertical" className="px-2 py-2 text-xs text-muted-foreground">
+              <AstryxText type="supporting" color="secondary">
                 {emptyLabel}
-              </AstryxStack>
+              </AstryxText>
             )}
           </AstryxStack>
         </AstryxStack>

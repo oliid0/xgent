@@ -13,6 +13,7 @@ export type SectionId =
   | "memory"
   | "skills"
   | "mcp"
+  | "other"
   | "hooks"
   | "cron"
   | "ssh"

@@ -86,7 +86,7 @@ export function useManualCompaction(params: {
   resolveManualCompactionPromptInputs: (input: {
     isCurrentConversation: boolean;
     workdir?: string;
-  }) => Promise<{ soulPrompt: string; skillsPrompt: string; memoryPrompt: string }>;
+  }) => Promise<{ skillsPrompt: string; memoryPrompt: string }>;
 }) {
   const {
     settings,
@@ -280,7 +280,7 @@ export function useManualCompaction(params: {
               buildPreparedConversationContext({
                 state,
                 tools,
-                soulPrompt: promptInputs.soulPrompt,
+                soulPrompt: "",
                 skillsPrompt: promptInputs.skillsPrompt,
                 memoryPrompt,
                 memoryTurnUpdates,
@@ -293,7 +293,7 @@ export function useManualCompaction(params: {
                 state,
                 resumeMessage,
                 tools,
-                soulPrompt: promptInputs.soulPrompt,
+                soulPrompt: "",
                 skillsPrompt: promptInputs.skillsPrompt,
                 memoryPrompt,
                 memoryTurnUpdates,

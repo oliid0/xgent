@@ -1,16 +1,17 @@
-import { Button as AstryxButton, Button } from "@astryxdesign/core/Button";
-import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { FormLayout } from "@astryxdesign/core/FormLayout";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
 import { Selector } from "@astryxdesign/core/Selector";
-import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
-import {
-  Heading as AstryxHeadingCore,
-  Text as AstryxLabel,
-  Text as AstryxText,
-} from "@astryxdesign/core/Text";
-import { TextArea as Textarea } from "@astryxdesign/core/TextArea";
-import { TextInput as Input } from "@astryxdesign/core/TextInput";
+import { StackItem } from "@astryxdesign/core/Stack";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { VStack } from "@astryxdesign/core/VStack";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Plus, RefreshCw, Save, Sparkles, Trash2, X } from "../../components/icons";
+import { Plus, RefreshCw, Save, Trash2 } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { DEFAULT_SOUL_METADATA, type SoulDraft, useSoul, validateSoulDraft } from "../../lib/soul";
 
@@ -20,10 +21,7 @@ type SoulSectionProps = {
 
 function createEmptySoulDraft(): SoulDraft {
   return {
-    metadata: {
-      ...DEFAULT_SOUL_METADATA,
-      name: "",
-    },
+    metadata: { ...DEFAULT_SOUL_METADATA, name: "" },
     body: "",
   };
 }
@@ -38,6 +36,7 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
   const [localError, setLocalError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [presetToDelete, setPresetToDelete] = useState<string | null>(null);
 
   const beginCreate = useCallback(() => {
     setCreating(true);
@@ -109,7 +108,7 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
   };
 
   const handleSelect = async (presetId: string) => {
-    if (presetId === soul.activeId && !creating) return;
+    if (!presetId || (presetId === soul.activeId && !creating)) return;
     try {
       setCreating(false);
       await soul.select(presetId);
@@ -120,7 +119,10 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
     }
   };
 
-  const handleDelete = async (presetId: string) => {
+  const handleDelete = async () => {
+    const presetId = presetToDelete;
+    if (!presetId) return;
+    setPresetToDelete(null);
     try {
       await soul.remove(presetId);
       setLocalError(null);
@@ -130,217 +132,91 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
     }
   };
 
-  return (
-    <AstryxStack direction="vertical" className="mx-auto w-full max-w-3xl space-y-6 pb-4">
-      <AstryxStack direction="horizontal" className="flex items-start justify-between gap-4">
-        <AstryxStack direction="horizontal" className="flex min-w-0 items-center gap-3">
-          <AstryxStack
-            direction="horizontal"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-500"
-          >
-            <Sparkles className="h-5 w-5" />
-          </AstryxStack>
-          <AstryxStack direction="vertical" className="min-w-0">
-            <AstryxHeadingCore level={2} className="text-base font-semibold">
-              {t("settings.soulTitle")}
-            </AstryxHeadingCore>
-            <AstryxText
-              as="p"
-              type="inherit"
-              display="block"
-              className="mt-0.5 text-xs leading-5 text-muted-foreground"
-            >
-              {t("settings.soulDescription")}
-            </AstryxText>
-          </AstryxStack>
-        </AstryxStack>
-        <Button
-          variant="primary"
-          label={soul.saving ? t("settings.saving") : t("settings.soulSave")}
-          type="button"
-          size="sm"
-          onClick={() => void handleSave()}
-          isDisabled={!changed || soul.saving || !validation.valid}
-          className="shrink-0 gap-1.5"
-        >
-          <Save className="h-3.5 w-3.5" />
-          {soul.saving ? t("settings.saving") : t("settings.soulSave")}
-        </Button>
-      </AstryxStack>
+  const presetOptions = soul.presets.map((preset) => ({
+    value: preset.id,
+    label: preset.metadata.name || t("settings.soulNewDefaultName"),
+    description: preset.metadata.style || t("settings.soulPresetNoStyle"),
+  }));
 
-      <AstryxStack direction="vertical" as="section">
-        <AstryxStack
-          direction="horizontal"
-          className="mb-2 flex items-center justify-between gap-3 px-1"
-        >
-          <AstryxHeadingCore
-            level={3}
-            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
-          >
-            {t("settings.soulPresetsGroup")}
-          </AstryxHeadingCore>
-          <AstryxStack direction="horizontal" className="flex items-center gap-1.5">
+  return (
+    <>
+      <VStack width="100%" gap={5}>
+        <HStack width="100%" gap={3} vAlign="start" wrap="wrap">
+          <StackItem size="fill">
+            <Text type="supporting" color="secondary">
+              {t("settings.soulDescription")}
+            </Text>
+          </StackItem>
+          <Button
+            label={soul.saving ? t("settings.saving") : t("settings.soulSave")}
+            variant="primary"
+            size="sm"
+            icon={<Icon icon={Save} size="sm" />}
+            onClick={() => void handleSave()}
+            isLoading={soul.saving}
+            isDisabled={!changed || !validation.valid}
+          />
+        </HStack>
+
+        <VStack as="section" width="100%" gap={3}>
+          <Heading level={4}>{t("settings.soulPresetsGroup")}</Heading>
+          <HStack width="100%" gap={2} vAlign="end" wrap="wrap">
+            <StackItem size="fill">
+              <Selector
+                label={t("settings.soulPresetsGroup")}
+                isLabelHidden
+                options={presetOptions}
+                value={soul.activeId}
+                onChange={(value) => void handleSelect(value)}
+                width="100%"
+                isLoading={soul.loading}
+                isDisabled={soul.saving || presetOptions.length === 0}
+              />
+            </StackItem>
             {creating ? (
               <Button
                 label={t("settings.cancel")}
-                type="button"
                 variant="ghost"
                 size="sm"
                 onClick={cancelCreate}
                 isDisabled={soul.saving}
-                className="h-8 gap-1.5 rounded-lg px-2.5 text-xs"
-              >
-                <X className="h-3.5 w-3.5" />
-                {t("settings.cancel")}
-              </Button>
-            ) : null}
+              />
+            ) : (
+              <Button
+                label={t("settings.soulAddPreset")}
+                variant="secondary"
+                size="sm"
+                icon={<Icon icon={Plus} size="sm" />}
+                onClick={beginCreate}
+                isDisabled={soul.saving}
+              />
+            )}
             <Button
-              label={t("settings.soulAddPreset")}
-              type="button"
+              label={t("settings.soulDeletePreset")}
               variant="ghost"
               size="sm"
-              onClick={beginCreate}
-              isDisabled={soul.saving || creating}
-              className="h-8 gap-1.5 rounded-lg px-2.5 text-xs"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {t("settings.soulAddPreset")}
-            </Button>
-          </AstryxStack>
-        </AstryxStack>
-        <AstryxStack
-          direction="vertical"
-          className="divide-y divide-border/55 overflow-hidden rounded-2xl border border-border/60 bg-card"
-        >
-          {soul.presets.map((preset) => {
-            const active = preset.id === soul.activeId;
-            return (
-              <AstryxStack
-                direction="horizontal"
-                key={preset.id}
-                className="flex min-h-14 items-center gap-3 px-3 py-2"
-              >
-                <AstryxButton
-                  variant="ghost"
-                  label={preset.metadata.style || t("settings.soulPresetNoStyle")}
-                  type="button"
-                  onClick={() => void handleSelect(preset.id)}
-                  isDisabled={soul.saving}
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-1 py-1 text-left"
-                >
-                  <AstryxText
-                    as="span"
-                    type="inherit"
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                      active ? "bg-violet-500 text-white" : "bg-violet-500/10 text-violet-500"
-                    }`}
-                  >
-                    {active && !creating ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                  </AstryxText>
-                  <AstryxText as="span" type="inherit" className="min-w-0 flex-1">
-                    <AstryxText
-                      as="span"
-                      type="inherit"
-                      className="block truncate text-sm font-medium"
-                    >
-                      {preset.metadata.name || t("settings.soulNewDefaultName")}
-                    </AstryxText>
-                    <AstryxText
-                      as="span"
-                      type="inherit"
-                      className="block truncate text-xs text-muted-foreground"
-                    >
-                      {preset.metadata.style || t("settings.soulPresetNoStyle")}
-                    </AstryxText>
-                  </AstryxText>
-                </AstryxButton>
-                <Button
-                  label={t("settings.soulDeletePreset")}
-                  type="button"
-                  variant="ghost"
-                  size="md"
-                  onClick={() => void handleDelete(preset.id)}
-                  isDisabled={soul.saving || soul.presets.length <= 1}
-                  className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                  tooltip={t("settings.soulDeletePreset")}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </AstryxStack>
-            );
-          })}
-        </AstryxStack>
-      </AstryxStack>
+              icon={<Icon icon={Trash2} size="sm" />}
+              onClick={() => setPresetToDelete(soul.activeId)}
+              isDisabled={soul.saving || creating || soul.presets.length <= 1}
+            />
+          </HStack>
+          {creating ? <Banner status="info" title={t("settings.soulCreateDraftHint")} /> : null}
+        </VStack>
 
-      {creating ? (
-        <AstryxStack
-          direction="vertical"
-          className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-4 py-3 text-sm text-violet-700 dark:text-violet-300"
-        >
-          {t("settings.soulCreateDraftHint")}
-        </AstryxStack>
-      ) : null}
-
-      <AstryxStack direction="vertical" as="section">
-        <AstryxHeadingCore
-          level={3}
-          className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
-        >
-          {t("settings.soulIdentityGroup")}
-        </AstryxHeadingCore>
-        <AstryxStack
-          direction="vertical"
-          className="divide-y divide-border/55 overflow-hidden rounded-2xl border border-border/60 bg-card"
-        >
-          <AstryxLabel
-            as="label"
-            type="label"
-            weight="medium"
-            className="grid min-h-16 grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(14rem,1.2fr)] sm:items-center"
-          >
-            <AstryxText as="span" type="inherit">
-              <AstryxText as="span" type="inherit" className="block text-sm font-medium">
-                {t("settings.soulName")}
-              </AstryxText>
-              <AstryxText
-                as="span"
-                type="inherit"
-                className="mt-0.5 block text-xs text-muted-foreground"
-              >
-                {t("settings.soulNameHint")}
-              </AstryxText>
-            </AstryxText>
-            <Input
+        <VStack as="section" width="100%" gap={3}>
+          <Heading level={4}>{t("settings.soulIdentityGroup")}</Heading>
+          <FormLayout direction="horizontal-labels">
+            <TextInput
               label={t("settings.soulName")}
-              isLabelHidden
-              {...({ maxLength: 64 } as const)}
+              description={t("settings.soulNameHint")}
               type="text"
               value={draft.metadata.name}
-              onChange={(nextValue) => updateMetadata({ name: nextValue })}
-              className="h-10 rounded-xl"
+              onChange={(value) => updateMetadata({ name: value.slice(0, 64) })}
+              width="100%"
             />
-          </AstryxLabel>
-          <AstryxGrid className="grid min-h-16 grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(14rem,1.2fr)] sm:items-center">
-            <AstryxText as="span" type="inherit">
-              <AstryxText as="span" type="inherit" className="block text-sm font-medium">
-                {t("settings.soulLanguage")}
-              </AstryxText>
-              <AstryxText
-                as="span"
-                type="inherit"
-                className="mt-0.5 block text-xs text-muted-foreground"
-              >
-                {t("settings.soulLanguageHint")}
-              </AstryxText>
-            </AstryxText>
             <Selector
               label={t("settings.soulLanguage")}
-              isLabelHidden
-              width="100%"
+              description={t("settings.soulLanguageHint")}
               value={draft.metadata.lang}
               onChange={(lang) => updateMetadata({ lang })}
               options={[
@@ -350,121 +226,83 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
                 { value: "ja-JP", label: "日本語" },
                 { value: "ko-KR", label: "한국어" },
               ]}
+              width="100%"
             />
-          </AstryxGrid>
-        </AstryxStack>
-      </AstryxStack>
+          </FormLayout>
+        </VStack>
 
-      <AstryxStack direction="vertical" as="section">
-        <AstryxHeadingCore
-          level={3}
-          className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
-        >
-          {t("settings.soulVoiceGroup")}
-        </AstryxHeadingCore>
-        <AstryxStack
-          direction="vertical"
-          className="space-y-4 rounded-2xl border border-border/60 bg-card p-4"
-        >
-          <AstryxLabel as="label" type="label" weight="medium" className="block">
-            <AstryxText as="span" type="inherit" className="text-sm font-medium">
-              {t("settings.soulStyle")}
-            </AstryxText>
-            <AstryxText
-              as="span"
-              type="inherit"
-              className="mt-0.5 block text-xs text-muted-foreground"
-            >
-              {t("settings.soulStyleHint")}
-            </AstryxText>
-            <Input
-              label={t("settings.soulStylePlaceholder")}
-              isLabelHidden
+        <VStack as="section" width="100%" gap={3}>
+          <Heading level={4}>{t("settings.soulVoiceGroup")}</Heading>
+          <FormLayout>
+            <TextInput
+              label={t("settings.soulStyle")}
+              description={t("settings.soulStyleHint")}
               value={draft.metadata.style}
-              onChange={(nextValue) => updateMetadata({ style: nextValue })}
+              onChange={(value) => updateMetadata({ style: value })}
               placeholder={t("settings.soulStylePlaceholder")}
-              className="mt-2 h-10 rounded-xl"
+              width="100%"
             />
-          </AstryxLabel>
-          <AstryxLabel as="label" type="label" weight="medium" className="block">
-            <AstryxText as="span" type="inherit" className="text-sm font-medium">
-              {t("settings.soulPersonality")}
-            </AstryxText>
-            <AstryxText
-              as="span"
-              type="inherit"
-              className="mt-0.5 block text-xs text-muted-foreground"
-            >
-              {t("settings.soulPersonalityHint")}
-            </AstryxText>
-            <Textarea
+            <TextArea
               label={t("settings.soulPersonality")}
-              isLabelHidden
+              description={t("settings.soulPersonalityHint")}
               value={draft.body}
-              onChange={(nextValue) => {
+              onChange={(value) => {
                 setSaved(false);
-                setDraft((current) => ({ ...current, body: nextValue }));
+                setDraft((current) => ({ ...current, body: value }));
               }}
-              className="mt-2 min-h-56 resize-y rounded-xl font-mono text-[13px] leading-6"
+              rows={10}
+              width="100%"
+              status={validation.valid ? undefined : { type: "error", message: validation.message }}
+              statusVariant="detached"
             />
-            <AstryxText
-              as="span"
-              type="inherit"
-              className={`mt-2 block text-right text-[11px] tabular-nums ${
-                validation.valid ? "text-muted-foreground" : "text-destructive"
-              }`}
-            >
+          </FormLayout>
+          <HStack width="100%" hAlign="end">
+            <Text type="supporting" color="secondary">
               {validation.bodyCount} / {validation.bodyLimit}{" "}
               {validation.countKind === "characters"
                 ? t("settings.soulCharacters")
                 : t("settings.soulWords")}
-            </AstryxText>
-          </AstryxLabel>
-        </AstryxStack>
-      </AstryxStack>
+            </Text>
+          </HStack>
+        </VStack>
 
-      {localError || soul.error ? (
-        <AstryxStack
-          direction="vertical"
-          className="rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-        >
-          {localError ?? soul.error}
-        </AstryxStack>
-      ) : saved ? (
-        <AstryxStack
-          direction="vertical"
-          className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400"
-        >
-          {t("settings.soulSaved")}
-        </AstryxStack>
-      ) : null}
+        {localError || soul.error ? (
+          <Banner status="error" title={localError ?? soul.error} />
+        ) : saved ? (
+          <Banner
+            status="success"
+            title={t("settings.soulSaved")}
+            isDismissable
+            onDismiss={() => setSaved(false)}
+          />
+        ) : null}
 
-      <AstryxStack
-        direction="horizontal"
-        className="flex items-center justify-between gap-3 border-t border-border/55 pt-4"
-      >
-        <AstryxText
-          as="p"
-          type="inherit"
-          display="block"
-          className="min-w-0 truncate text-xs text-muted-foreground"
-          aria-label={soul.document?.path}
-        >
-          {soul.document?.path || t("settings.soulLoading")}
-        </AstryxText>
-        <Button
-          label={t("settings.soulReload")}
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => void soul.reload()}
-          isDisabled={soul.loading || soul.saving}
-          className="shrink-0 gap-1.5"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${soul.loading ? "animate-spin" : ""}`} />
-          {t("settings.soulReload")}
-        </Button>
-      </AstryxStack>
-    </AstryxStack>
+        <HStack width="100%" hAlign="end">
+          <Button
+            label={t("settings.soulReload")}
+            variant="ghost"
+            size="sm"
+            icon={<Icon icon={RefreshCw} size="sm" />}
+            onClick={() => void soul.reload()}
+            isLoading={soul.loading}
+            isDisabled={soul.saving}
+          />
+        </HStack>
+      </VStack>
+
+      <AlertDialog
+        isOpen={presetToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPresetToDelete(null);
+        }}
+        title={t("settings.soulDeletePreset")}
+        description={t("settings.soulDeletePresetConfirm")}
+        actionLabel={t("settings.soulDeletePreset")}
+        cancelLabel={t("settings.cancel")}
+        actionVariant="destructive"
+        isActionLoading={soul.saving}
+        onAction={handleDelete}
+      />
+    </>
   );
 }

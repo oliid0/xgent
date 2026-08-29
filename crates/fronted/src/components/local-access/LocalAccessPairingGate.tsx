@@ -8,10 +8,10 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Theme } from "@astryxdesign/core/theme";
-import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 import { isBrowserRuntime } from "@xagent/runtime";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { LOCAL_ACCESS_CSRF_KEY, LOCAL_ACCESS_SESSION_CHANGED_EVENT } from "../../runtime/browser";
+import { xgentChatTheme } from "../../theme/xgent-chat";
 
 type SessionResponse = {
   authenticated?: boolean;
@@ -101,7 +101,7 @@ export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
   if (!browser || state === "ready") return children;
   if (state === "checking") {
     return (
-      <Theme theme={neutralTheme} mode="system">
+      <Theme theme={xgentChatTheme} mode="system">
         <Center minHeight="100dvh" width="100%">
           <VStack gap={3} hAlign="center">
             <Spinner aria-label="正在验证设备" />
@@ -114,7 +114,7 @@ export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
     );
   }
   return (
-    <Theme theme={neutralTheme} mode="system">
+    <Theme theme={xgentChatTheme} mode="system">
       <Center
         minHeight="100dvh"
         width="100%"

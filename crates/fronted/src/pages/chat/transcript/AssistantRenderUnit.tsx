@@ -34,10 +34,11 @@ export type AssistantRenderUnitProps = {
 const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
   unit: AssistantFooterRenderUnit;
   compacted: boolean;
+  onOpenFileLink?: AssistantRenderUnitProps["onOpenFileLink"];
   onResendFromEdit: AssistantRenderUnitProps["onResendFromEdit"];
   onBranchConversation?: AssistantRenderUnitProps["onBranchConversation"];
 }) {
-  const { unit, compacted, onResendFromEdit, onBranchConversation } = props;
+  const { unit, compacted, onOpenFileLink, onResendFromEdit, onBranchConversation } = props;
   const changedFiles = useMemo(
     () => (unit.hasChangedFilesCandidate ? collectChangedFiles(unit.rounds) : null),
     [unit.hasChangedFilesCandidate, unit.rounds],
@@ -55,7 +56,9 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
       {hasCards ? (
         <VStack gap={2} width="100%">
           {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
-          {cloudArtifacts.length > 0 ? <CloudArtifactsCard artifacts={cloudArtifacts} /> : null}
+          {cloudArtifacts.length > 0 ? (
+            <CloudArtifactsCard artifacts={cloudArtifacts} onOpenFileLink={onOpenFileLink} />
+          ) : null}
         </VStack>
       ) : null}
       <AssistantRowFooter
@@ -91,6 +94,7 @@ export const AssistantRenderUnit = memo(function AssistantRenderUnit(
       <AssistantFooterUnit
         unit={row.unit}
         compacted={row.compacted}
+        onOpenFileLink={onOpenFileLink}
         onResendFromEdit={onResendFromEdit}
         onBranchConversation={onBranchConversation}
       />

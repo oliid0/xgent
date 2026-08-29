@@ -3209,7 +3209,7 @@ export function ChatPage(props: ChatPageProps) {
   const resolveManualCompactionPromptInputs = useCallback(
     async (input: { isCurrentConversation: boolean; workdir?: string }) => {
       if (!input.isCurrentConversation) {
-        return { soulPrompt: "", skillsPrompt: "", memoryPrompt: "" };
+        return { skillsPrompt: "", memoryPrompt: "" };
       }
       const skillsPrompt =
         skillsEnabled && enabledComposerSkills.length > 0
@@ -3224,9 +3224,9 @@ export function ChatPage(props: ChatPageProps) {
       } catch (error) {
         console.warn("Failed to build memory overview for manual compaction", error);
       }
-      return { soulPrompt, skillsPrompt, memoryPrompt };
+      return { skillsPrompt, memoryPrompt };
     },
-    [enabledComposerSkills, skillsEnabled, skillsRootDir, soulPrompt],
+    [enabledComposerSkills, skillsEnabled, skillsRootDir],
   );
 
   const runManualCompaction = useManualCompaction({
@@ -5822,7 +5822,6 @@ export function ChatPage(props: ChatPageProps) {
                       )
                     }
                     sidebarOpen={sidebarOpen}
-                    onOpenSettings={onOpenSettings}
                     onToggleTheme={onToggleTheme}
                     onOpenSidebar={handleOpenSidebar}
                     mobileExperience={mobileExperience}

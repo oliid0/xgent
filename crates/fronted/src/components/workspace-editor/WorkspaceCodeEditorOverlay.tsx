@@ -2,6 +2,7 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import {
@@ -13,10 +14,12 @@ import {
   StackItem,
   VStack,
 } from "@astryxdesign/core/Layout";
+import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
+import * as stylex from "@stylexjs/stylex";
 import * as monaco from "monaco-editor";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import CssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
@@ -130,6 +133,15 @@ type PendingDialog =
   | { kind: "reloadTab"; tabKey: string };
 
 const EDITOR_OVERLAY_ANIMATION_MS = 180;
+
+const editorStyles = stylex.create({
+  contextMenuTrigger: {
+    display: "flex",
+    width: "100%",
+    height: "100%",
+    minHeight: 0,
+  },
+});
 
 type WorkspaceCodeEditorOverlayProps = {
   openRequest: WorkspaceCodeEditorOpenRequest | null;
@@ -307,6 +319,7 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
   } = props;
   const { t } = useLocale();
   const contextMenuShortcuts = useMemo(() => getEditorContextMenuShortcuts(), []);
+  const isNarrow = useMediaQuery("(max-width: 768px)");
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -967,51 +980,92 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
                       }
                       onClick={() => activeTab && void saveTab(activeTab.key)}
                     />
-                    <IconButton
-                      label={t("workspaceEditor.find")}
-                      tooltip={t("workspaceEditor.find")}
-                      icon={<Icon icon={Search} size="sm" color="inherit" />}
-                      variant="ghost"
-                      size="sm"
-                      isDisabled={!activeTab}
-                      onClick={showFind}
-                    />
-                    <IconButton
-                      label={t("workspaceEditor.replace")}
-                      tooltip={t("workspaceEditor.replace")}
-                      icon={<Icon icon={Replace} size="sm" color="inherit" />}
-                      variant="ghost"
-                      size="sm"
-                      isDisabled={!activeTab}
-                      onClick={showReplace}
-                    />
-                    <IconButton
-                      label={t("workspaceEditor.reload")}
-                      tooltip={t("workspaceEditor.reload")}
-                      icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
-                      variant="ghost"
-                      size="sm"
-                      isLoading={isOpening}
-                      isDisabled={!activeTab || isOpening}
-                      onClick={() => activeTab && requestReloadTab(activeTab.key)}
-                    />
-                    {canPreviewActiveTab && activeTab ? (
-                      <IconButton
-                        label={t("workspaceEditor.preview")}
-                        tooltip={t("workspaceEditor.preview")}
-                        icon={<Icon icon={Eye} size="sm" color="inherit" />}
-                        variant="ghost"
+                    {isNarrow ? (
+                      <MoreMenu
+                        label={t("workspaceEditor.moreActions")}
                         size="sm"
-                        onClick={() =>
-                          onPreviewFile({
-                            id: Date.now(),
-                            projectPathKey: activeTab.projectPathKey,
-                            workdir: activeTab.workdir,
-                            path: activeTab.path,
-                          })
-                        }
+                        alignment="end"
+                        items={[
+                          {
+                            label: t("workspaceEditor.find"),
+                            onClick: showFind,
+                            isDisabled: !activeTab,
+                          },
+                          {
+                            label: t("workspaceEditor.replace"),
+                            onClick: showReplace,
+                            isDisabled: !activeTab,
+                          },
+                          {
+                            label: t("workspaceEditor.reload"),
+                            onClick: () => activeTab && requestReloadTab(activeTab.key),
+                            isDisabled: !activeTab || isOpening,
+                          },
+                          ...(canPreviewActiveTab && activeTab
+                            ? [
+                                {
+                                  label: t("workspaceEditor.preview"),
+                                  onClick: () =>
+                                    onPreviewFile({
+                                      id: Date.now(),
+                                      projectPathKey: activeTab.projectPathKey,
+                                      workdir: activeTab.workdir,
+                                      path: activeTab.path,
+                                    }),
+                                },
+                              ]
+                            : []),
+                        ]}
                       />
-                    ) : null}
+                    ) : (
+                      <>
+                        <IconButton
+                          label={t("workspaceEditor.find")}
+                          tooltip={t("workspaceEditor.find")}
+                          icon={<Icon icon={Search} size="sm" color="inherit" />}
+                          variant="ghost"
+                          size="sm"
+                          isDisabled={!activeTab}
+                          onClick={showFind}
+                        />
+                        <IconButton
+                          label={t("workspaceEditor.replace")}
+                          tooltip={t("workspaceEditor.replace")}
+                          icon={<Icon icon={Replace} size="sm" color="inherit" />}
+                          variant="ghost"
+                          size="sm"
+                          isDisabled={!activeTab}
+                          onClick={showReplace}
+                        />
+                        <IconButton
+                          label={t("workspaceEditor.reload")}
+                          tooltip={t("workspaceEditor.reload")}
+                          icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+                          variant="ghost"
+                          size="sm"
+                          isLoading={isOpening}
+                          isDisabled={!activeTab || isOpening}
+                          onClick={() => activeTab && requestReloadTab(activeTab.key)}
+                        />
+                        {canPreviewActiveTab && activeTab ? (
+                          <IconButton
+                            label={t("workspaceEditor.preview")}
+                            tooltip={t("workspaceEditor.preview")}
+                            icon={<Icon icon={Eye} size="sm" color="inherit" />}
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              onPreviewFile({
+                                id: Date.now(),
+                                projectPathKey: activeTab.projectPathKey,
+                                workdir: activeTab.workdir,
+                                path: activeTab.path,
+                              })
+                            }
+                          />
+                        ) : null}
+                      </>
+                    )}
                     <IconButton
                       label={t("workspaceEditor.close")}
                       tooltip={t("workspaceEditor.close")}
@@ -1103,11 +1157,13 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
                 menuWidth="var(--xagent-editor-context-menu-width)"
                 size="sm"
                 isDisabled={!activeTab || Boolean(pendingDialog)}
+                triggerXstyle={editorStyles.contextMenuTrigger}
               >
                 <LayoutContent
                   ref={containerRef}
                   className="xagent-workspace-editor-stage"
                   padding={0}
+                  isScrollable={false}
                   onContextMenu={openEditorContextMenu}
                 >
                   {!activeTab ? (

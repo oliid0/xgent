@@ -677,6 +677,7 @@ function normalizeCodexRequestFormat(input: unknown): CodexRequestFormat | undef
 function normalizeCodexRouting(
   baseUrlInput: unknown,
   requestFormatInput: unknown,
+  isFullUrl = false,
 ): {
   baseUrl: string;
   requestFormat: CodexRequestFormat;
@@ -684,15 +685,24 @@ function normalizeCodexRouting(
   let baseUrl = normalizeBaseUrl(typeof baseUrlInput === "string" ? baseUrlInput : "");
   let requestFormat = normalizeCodexRequestFormat(requestFormatInput);
   const lower = baseUrl.toLowerCase();
+  let routePath = lower;
+  if (isFullUrl) {
+    try {
+      routePath = new URL(baseUrl).pathname.replace(/\/+$/, "").toLowerCase();
+    } catch {
+      // URL validation happens in the request layer; suffix inference still
+      // works for legacy values that are not parseable by URL yet.
+    }
+  }
 
-  if (lower.endsWith(CODEX_CHAT_COMPLETIONS_SUFFIX)) {
-    baseUrl = baseUrl.slice(0, -CODEX_CHAT_COMPLETIONS_SUFFIX.length);
+  if (routePath.endsWith(CODEX_CHAT_COMPLETIONS_SUFFIX)) {
+    if (!isFullUrl) baseUrl = baseUrl.slice(0, -CODEX_CHAT_COMPLETIONS_SUFFIX.length);
     requestFormat ??= "openai-completions";
-  } else if (lower.endsWith(CODEX_RESPONSES_SUFFIX)) {
-    baseUrl = baseUrl.slice(0, -CODEX_RESPONSES_SUFFIX.length);
+  } else if (routePath.endsWith(CODEX_RESPONSES_SUFFIX)) {
+    if (!isFullUrl) baseUrl = baseUrl.slice(0, -CODEX_RESPONSES_SUFFIX.length);
     requestFormat ??= "openai-responses";
-  } else if (lower.endsWith(CODEX_RESPONSE_SUFFIX)) {
-    baseUrl = baseUrl.slice(0, -CODEX_RESPONSE_SUFFIX.length);
+  } else if (routePath.endsWith(CODEX_RESPONSE_SUFFIX)) {
+    if (!isFullUrl) baseUrl = baseUrl.slice(0, -CODEX_RESPONSE_SUFFIX.length);
     requestFormat ??= "openai-responses";
   }
 
@@ -1673,7 +1683,11 @@ export function normalizeCustomProvider(input: unknown): CustomProvider {
   const type = normalizeProviderId(obj.type);
   const codexRouting =
     type === "codex" || type === "xai"
-      ? normalizeCodexRouting(obj.baseUrl, type === "xai" ? "openai-responses" : obj.requestFormat)
+      ? normalizeCodexRouting(
+          obj.baseUrl,
+          type === "xai" ? "openai-responses" : obj.requestFormat,
+          obj.isFullUrl === true,
+        )
       : undefined;
   const models = normalizeProviderModelConfigs(obj.models, type);
   const validModelIds = new Set(models.map((model) => model.id));

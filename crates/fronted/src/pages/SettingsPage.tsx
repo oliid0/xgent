@@ -21,11 +21,9 @@ import {
   ArrowLeft,
   Brain,
   ChevronRight,
-  Clock3,
   Cloud,
   Cpu,
   Info,
-  Key,
   Keyboard,
   Mic,
   Settings2,
@@ -33,7 +31,6 @@ import {
   Sparkles,
   Terminal,
   X,
-  Zap,
 } from "../components/icons";
 
 import { useLocale } from "../i18n";
@@ -41,19 +38,17 @@ import { useCompactViewport } from "../lib/responsive/compactViewport";
 import { AboutSection } from "./settings/AboutSection";
 import { AccessSection } from "./settings/AccessSection";
 import { BackupSyncSection } from "./settings/BackupSyncSection";
-import { CronSection } from "./settings/CronSection";
 import { GlobalShortcutsSection } from "./settings/GlobalShortcutsSection";
-import { HooksSection } from "./settings/HooksSection";
 import { McpSettingsSection } from "./settings/McpSettingsSection";
 import { MobileAssistantSection } from "./settings/MobileAssistantSection";
 import { MobileExecutionSection } from "./settings/MobileExecutionSection";
 import { MemoryPanel } from "./settings/memory/MemoryPanel";
+import { OtherSettingsSection } from "./settings/OtherSettingsSection";
 import { ProjectRootsSection } from "./settings/ProjectRootsSection";
 import { ProviderSettingsSection } from "./settings/ProviderSettingsSection";
 import { SettingsDetailLayerProvider } from "./settings/SettingsModalShell";
 import { SkillsSettingsForm } from "./settings/SkillsSettingsForm";
 import { SoulSection } from "./settings/SoulSection";
-import { SshSettingsSection } from "./settings/SshSettingsSection";
 import { SttSettingsSection } from "./settings/SttSettingsSection";
 import { SystemSettingsForm } from "./settings/SystemSettingsForm";
 import { ToolPermissionsSection } from "./settings/ToolPermissionsSection";
@@ -183,19 +178,9 @@ const NAV_ITEMS: NavDefinition[] = [
     descriptionKey: "settings.mobile.memoryDescription",
   },
   {
-    id: "hooks",
-    icon: Zap,
-    descriptionKey: "settings.mobile.hooksDescription",
-  },
-  {
-    id: "cron",
-    icon: Clock3,
-    descriptionKey: "settings.mobile.cronDescription",
-  },
-  {
-    id: "ssh",
-    icon: Key,
-    descriptionKey: "settings.mobile.sshDescription",
+    id: "other",
+    icon: Terminal,
+    descriptionKey: "settings.mobile.otherDescription",
   },
   {
     id: "access",
@@ -222,7 +207,9 @@ const NAV_ITEMS: NavDefinition[] = [
 ];
 
 function normalizeSettingsSection(value: SectionId): SectionId {
-  return value === "failover" || value === "usage" ? "providers" : value;
+  if (value === "failover" || value === "usage") return "providers";
+  if (value === "hooks" || value === "cron" || value === "ssh") return "other";
+  return value;
 }
 
 export function SettingsPage(props: SettingsPageProps) {
@@ -260,6 +247,7 @@ export function SettingsPage(props: SettingsPageProps) {
     memory: t("settings.navMemory"),
     skills: t("settings.navSkills"),
     mcp: "MCP",
+    other: t("settings.navOther"),
     hooks: t("settings.navHooks"),
     cron: t("settings.navCron"),
     ssh: t("settings.navSsh"),
@@ -365,11 +353,11 @@ export function SettingsPage(props: SettingsPageProps) {
           />
         );
       case "hooks":
-        return <HooksSection settings={settings} setSettings={setSettings} />;
       case "cron":
-        return <CronSection settings={settings} setSettings={setSettings} />;
       case "ssh":
-        return <SshSettingsSection settings={settings} setSettings={setSettings} />;
+        return null;
+      case "other":
+        return <OtherSettingsSection settings={settings} setSettings={setSettings} />;
       case "shortcuts":
         return <GlobalShortcutsSection />;
       case "backup":
@@ -494,13 +482,13 @@ export function SettingsPage(props: SettingsPageProps) {
         start={
           <LayoutPanel
             width="var(--xagent-settings-sidebar-width)"
-            padding={4}
+            padding={3}
             hasDivider
             isScrollable={false}
             role="navigation"
             label={t("settings.title")}
           >
-            <VStack height="100%" gap={3}>
+            <VStack height="100%" gap={2}>
               <HStack width="100%" hAlign="start">
                 <IconButton
                   label={t("settings.backToChat")}
@@ -548,7 +536,7 @@ export function SettingsPage(props: SettingsPageProps) {
             {detailLayerDepth === 0 ? (
               <LayoutHeader hasDivider height="var(--xagent-settings-header-height)">
                 <HStack height="100%" vAlign="center">
-                  <Heading level={2}>{sectionLabels[section]}</Heading>
+                  <Heading level={3}>{sectionLabels[section]}</Heading>
                 </HStack>
               </LayoutHeader>
             ) : null}
@@ -560,7 +548,7 @@ export function SettingsPage(props: SettingsPageProps) {
                 maxWidth="var(--xagent-settings-content-max-width)"
                 height="100%"
                 minHeight={sectionManagesScroll ? 0 : "100%"}
-                padding={sectionManagesScroll ? 0 : 5}
+                padding={sectionManagesScroll ? 0 : 4}
                 className="settings-section-shell settings-section-enter"
                 style={{ marginInline: "auto" }}
               >

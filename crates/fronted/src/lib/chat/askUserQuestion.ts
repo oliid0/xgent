@@ -4,6 +4,7 @@ export const ASK_USER_QUESTION_MIN_OPTIONS = 2;
 export const ASK_USER_QUESTION_MAX_OPTIONS = 6;
 export const ASK_USER_QUESTION_TIMEOUT_MS = 3 * 60 * 1000;
 export const ASK_USER_QUESTION_CUSTOM_MAX_LENGTH = 2000;
+export const ASK_USER_QUESTION_DEADLINE_ARG = "__askUserQuestionDeadlineAt";
 
 export type AskUserQuestionOption = {
   label: string;
@@ -35,6 +36,12 @@ export type AskUserQuestionResultDetails = {
 
 function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+export function readAskUserQuestionDeadlineAt(args: unknown): number | null {
+  if (!args || typeof args !== "object") return null;
+  const value = (args as Record<string, unknown>)[ASK_USER_QUESTION_DEADLINE_ARG];
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 
 function orderOptions(options: AskUserQuestionOption[]) {
@@ -94,6 +101,12 @@ export function parseAskUserQuestionItems(raw: unknown): AskUserQuestionItem[] {
     );
   }
 
+  const expectedOptionCount =
+    raw[0] &&
+    typeof raw[0] === "object" &&
+    Array.isArray((raw[0] as Record<string, unknown>).options)
+      ? ((raw[0] as Record<string, unknown>).options as unknown[]).length
+      : 0;
   const questionIds = new Set<string>();
   return raw.map((value, questionIndex) => {
     if (!value || typeof value !== "object") {
@@ -115,6 +128,11 @@ export function parseAskUserQuestionItems(raw: unknown): AskUserQuestionItem[] {
     ) {
       throw new Error(
         `AskUserQuestion questions[${questionIndex}] needs ${ASK_USER_QUESTION_MIN_OPTIONS}-${ASK_USER_QUESTION_MAX_OPTIONS} options.`,
+      );
+    }
+    if (candidate.options.length !== expectedOptionCount) {
+      throw new Error(
+        `AskUserQuestion requires every question in one call to have the same number of options; questions[0] has ${expectedOptionCount} while questions[${questionIndex}] has ${candidate.options.length}.`,
       );
     }
 

@@ -1,7 +1,15 @@
 import { Button } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Heading } from "@astryxdesign/core/Heading";
-import { HStack, LayoutPanel, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
+import {
+  HStack,
+  Layout,
+  LayoutContent,
+  LayoutHeader,
+  LayoutPanel,
+  StackItem,
+  VStack,
+} from "@astryxdesign/core/Layout";
 import { openUrl } from "@xagent/runtime";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
@@ -280,118 +288,114 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
         style={
           {
             "--zone-font-scale": props.fontScale ?? 1,
+            height: "100%",
+            minHeight: 0,
           } as CSSProperties
         }
       >
-        <Section variant="transparent" padding={3} dividers={["bottom"]}>
-          <HStack gap={2} vAlign="center">
-            <Icon />
-            <StackItem size="fill">
-              <Heading level={2} maxLines={1}>
-                {title}
-              </Heading>
-            </StackItem>
-          </HStack>
-        </Section>
-
-        {props.target === "skills" ? (
-          <StackItem size="fill">
-            <SkillsHubPage
-              settings={props.settings}
-              setSettings={props.setSettings}
-              initialSkills={props.initialSkills}
-              initialRootDir={props.initialSkillsRootDir}
-              isAgentMode={props.isAgentMode}
-              sidebarOpen
-              onOpenSidebar={() => undefined}
-              embedded
-            />
-          </StackItem>
-        ) : props.target === "mcp" ? (
-          <StackItem size="fill">
-            <McpHubPage
-              settings={props.settings}
-              setSettings={props.setSettings}
-              isAgentMode={props.isAgentMode}
-              sidebarOpen
-              onOpenSidebar={() => undefined}
-              allowStdio
-              embedded
-            />
-          </StackItem>
-        ) : !projectReady && props.target !== "backgroundTasks" ? (
-          <StackItem size="fill">
-            <EmptyState
-              isCompact
-              icon={<Icon />}
-              title={t("projectTools.noProjectSelected")}
-              description={props.disabledMessage ?? t("projectTools.noProjectSelected")}
-            />
-          </StackItem>
-        ) : props.target === "fileTree" ? (
-          <StackItem size="fill">
-            <FileTreePanel active />
-          </StackItem>
-        ) : props.target === "gitReview" ? (
-          <StackItem size="fill">
-            <GitReviewPanel active />
-          </StackItem>
-        ) : props.target === "sshConnection" ? (
-          <StackItem size="fill">
-            <SshConnectionPanel
-              active
-              cwd={props.cwd}
-              projectPathKey={props.projectPathKey}
-              hosts={props.sshHosts}
-              associatedHostIds={props.associatedSshHostIds}
-              client={props.client}
-              sessions={sessions.sshSessions}
-              onSessionSnapshot={sessions.rememberTerminalSnapshot}
-              onSessionClosed={sessions.forgetTerminalSession}
-              onSshSessionsReconcile={sessions.reconcileSshSessions}
-              onOpenSession={props.onOpenSshSession}
-              onAssociatedHostIdsChange={props.onSshProjectHostIdsChange}
-            />
-          </StackItem>
-        ) : props.target === "backgroundTasks" ? (
-          <StackItem size="fill">
-            <BackgroundServicesPanel settings={props.settings} setSettings={props.setSettings} />
-          </StackItem>
-        ) : (
-          <StackItem size="fill">
-            {activeLocalSession ? (
-              <VStack height="100%" gap={0} className="workspace-terminal-surface">
-                <XTermViewport
-                  client={props.client}
-                  session={activeLocalSession}
-                  theme={props.theme}
-                  isActive
-                  initialSnapshot={
-                    sessions.initialTerminalSnapshotsRef.current.get(activeLocalSession.id) ??
-                    undefined
-                  }
-                  onError={(_sessionId, message) => sessions.setError(message)}
-                  onInitialSnapshotConsumed={sessions.handleInitialTerminalSnapshotConsumed}
+        <Layout
+          height="fill"
+          padding={0}
+          header={
+            <LayoutHeader hasDivider padding={3}>
+              <HStack gap={2} vAlign="center">
+                <Icon />
+                <StackItem size="fill">
+                  <Heading level={3} maxLines={1}>
+                    {title}
+                  </Heading>
+                </StackItem>
+              </HStack>
+            </LayoutHeader>
+          }
+          content={
+            <LayoutContent padding={0} isScrollable={false} label={title}>
+              {props.target === "skills" ? (
+                <SkillsHubPage
+                  settings={props.settings}
+                  setSettings={props.setSettings}
+                  initialSkills={props.initialSkills}
+                  initialRootDir={props.initialSkillsRootDir}
+                  isAgentMode={props.isAgentMode}
+                  sidebarOpen
+                  onOpenSidebar={() => undefined}
+                  embedded
                 />
-              </VStack>
-            ) : (
-              <EmptyState
-                isCompact
-                icon={<Terminal />}
-                title={t("sidebar.terminal")}
-                description={t("projectTools.terminalDescription")}
-                actions={
-                  <Button
-                    label={t("projectTools.newTerminal")}
-                    size="sm"
-                    isLoading={sessions.creating}
-                    onClick={() => sessions.createTerminal(props.shell)}
+              ) : props.target === "mcp" ? (
+                <McpHubPage
+                  settings={props.settings}
+                  setSettings={props.setSettings}
+                  isAgentMode={props.isAgentMode}
+                  sidebarOpen
+                  onOpenSidebar={() => undefined}
+                  allowStdio
+                  embedded
+                />
+              ) : !projectReady && props.target !== "backgroundTasks" ? (
+                <EmptyState
+                  isCompact
+                  icon={<Icon />}
+                  title={t("projectTools.noProjectSelected")}
+                  description={props.disabledMessage ?? t("projectTools.noProjectSelected")}
+                />
+              ) : props.target === "fileTree" ? (
+                <FileTreePanel active />
+              ) : props.target === "gitReview" ? (
+                <GitReviewPanel active />
+              ) : props.target === "sshConnection" ? (
+                <SshConnectionPanel
+                  active
+                  cwd={props.cwd}
+                  projectPathKey={props.projectPathKey}
+                  hosts={props.sshHosts}
+                  associatedHostIds={props.associatedSshHostIds}
+                  client={props.client}
+                  sessions={sessions.sshSessions}
+                  onSessionSnapshot={sessions.rememberTerminalSnapshot}
+                  onSessionClosed={sessions.forgetTerminalSession}
+                  onSshSessionsReconcile={sessions.reconcileSshSessions}
+                  onOpenSession={props.onOpenSshSession}
+                  onAssociatedHostIdsChange={props.onSshProjectHostIdsChange}
+                />
+              ) : props.target === "backgroundTasks" ? (
+                <BackgroundServicesPanel
+                  settings={props.settings}
+                  setSettings={props.setSettings}
+                />
+              ) : activeLocalSession ? (
+                <VStack height="100%" minHeight={0} gap={0} className="workspace-terminal-surface">
+                  <XTermViewport
+                    client={props.client}
+                    session={activeLocalSession}
+                    theme={props.theme}
+                    isActive
+                    initialSnapshot={
+                      sessions.initialTerminalSnapshotsRef.current.get(activeLocalSession.id) ??
+                      undefined
+                    }
+                    onError={(_sessionId, message) => sessions.setError(message)}
+                    onInitialSnapshotConsumed={sessions.handleInitialTerminalSnapshotConsumed}
                   />
-                }
-              />
-            )}
-          </StackItem>
-        )}
+                </VStack>
+              ) : (
+                <EmptyState
+                  isCompact
+                  icon={<Terminal />}
+                  title={t("sidebar.terminal")}
+                  description={t("projectTools.terminalDescription")}
+                  actions={
+                    <Button
+                      label={t("projectTools.newTerminal")}
+                      size="sm"
+                      isLoading={sessions.creating}
+                      onClick={() => sessions.createTerminal(props.shell)}
+                    />
+                  }
+                />
+              )}
+            </LayoutContent>
+          }
+        />
       </LayoutPanel>
     </WorkspaceToolsContext.Provider>
   );

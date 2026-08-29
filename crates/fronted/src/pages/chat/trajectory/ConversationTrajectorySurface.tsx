@@ -1,6 +1,7 @@
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -17,6 +18,7 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
+import { pixel, proportional, Table, type TableColumn } from "@astryxdesign/core/Table";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Timestamp } from "@astryxdesign/core/Timestamp";
@@ -36,6 +38,7 @@ import {
   type TrajectorySectionInput,
   trajectorySectionSlotAt,
 } from "../../../lib/trajectory/sections";
+import { diffTrajectoryText } from "../../../lib/trajectory/textDiff";
 import type {
   TrajectoryEvent,
   TrajectorySection,
@@ -58,7 +61,46 @@ type TrajectoryEventsResponse = {
 
 type TrajectorySectionResponse = TrajectorySection & { bytes: number };
 
-type TrajectoryDetailsTab = "overview" | "input" | "system" | "tools" | "usage" | "raw";
+type TrajectoryDetailsTab =
+  | "overview"
+  | "input"
+  | "system"
+  | "tools"
+  | "usage"
+  | "diff"
+  | "subagents"
+  | "raw";
+
+type TrajectorySubagentRunsResponse = {
+  runsJson: string;
+};
+
+type TrajectorySubagentRunState = {
+  run?: {
+    id?: unknown;
+    agentId?: unknown;
+    mode?: unknown;
+    status?: unknown;
+    startedAt?: unknown;
+    endedAt?: unknown;
+  };
+  segments?: unknown;
+};
+
+type SubagentRunState =
+  | { status: "idle" | "loading" }
+  | { status: "ready"; runs: ReadonlyMap<string, TrajectorySubagentRunState> }
+  | { status: "error"; message: string };
+
+interface TrajectoryTableRow extends Record<string, unknown> {
+  id: string;
+  label: string;
+  lane: TrajectoryLane;
+  turn: number | null;
+  step: number | null;
+  durationMs: number;
+  item: TrajectoryTimelineItem;
+}
 
 const LANE_TOKEN_COLORS: Record<TrajectoryLane, TokenColor> = {
   user: "blue",
@@ -201,6 +243,13 @@ function eventSectionRefs(event: TrajectoryEvent): string[] {
   );
 }
 
+function eventRunIds(event: TrajectoryEvent | undefined): string[] {
+  if (!event || event.k !== "tool_end" || !Array.isArray(event.run)) return [];
+  return event.run.filter(
+    (runId): runId is string => typeof runId === "string" && runId.trim() !== "",
+  );
+}
+
 function headerForItem(
   item: TrajectoryTimelineItem,
   events: readonly TrajectoryEvent[],
@@ -221,6 +270,17 @@ function headerForItem(
   const headerId = directHeaderId ?? (stepHost ? textField(stepHost, "hid") : undefined);
   if (!headerId) return undefined;
   return events.find((event) => event.k === "header" && textField(event, "hid") === headerId);
+}
+
+function previousHeaderForItem(
+  header: TrajectoryEvent | undefined,
+  events: readonly TrajectoryEvent[],
+) {
+  const previousHeaderId = header ? textField(header, "prev") : undefined;
+  if (!previousHeaderId) return undefined;
+  return events.find(
+    (event) => event.k === "header" && textField(event, "hid") === previousHeaderId,
+  );
 }
 
 function sectionsForHeader(
@@ -269,21 +329,47 @@ function TrajectoryDetails({
   item,
   events,
   sections,
+  subagentState,
 }: {
   item: TrajectoryTimelineItem;
   events: readonly TrajectoryEvent[];
   sections: ReadonlyMap<string, TrajectorySection>;
+  subagentState: SubagentRunState;
 }) {
   const { t } = useLocale();
   const [tab, setTab] = useState<TrajectoryDetailsTab>("overview");
   const label = eventLabel(item.event, t);
   const details = eventDetails(item.endEvent ?? item.event);
   const header = headerForItem(item, events);
+  const previousHeader = previousHeaderForItem(header, events);
   const headerSections = sectionsForHeader(header, sections);
+  const previousHeaderSections = sectionsForHeader(previousHeader, sections);
   const systemPrompt = composeTrajectorySystemPrompt(headerSections);
+  const previousSystemPrompt = composeTrajectorySystemPrompt(previousHeaderSections);
   const tools = headerSections.toolCatalog;
   const usage = (item.endEvent ?? item.event).u;
   const input = inputText(item);
+  const runIds = eventRunIds(item.endEvent ?? item.event);
+  const promptDiff = useMemo(() => {
+    if (!previousSystemPrompt || !systemPrompt || previousSystemPrompt === systemPrompt) return "";
+    return diffTrajectoryText(previousSystemPrompt, systemPrompt)
+      .map(
+        (line) =>
+          `${line.kind === "added" ? "+" : line.kind === "removed" ? "-" : " "}${line.text}`,
+      )
+      .join("\n");
+  }, [previousSystemPrompt, systemPrompt]);
+  const subagentCode = useMemo(() => {
+    if (subagentState.status !== "ready" || runIds.length === 0) return "";
+    return JSON.stringify(
+      runIds.flatMap((runId) => {
+        const run = subagentState.runs.get(runId);
+        return run ? [run] : [];
+      }),
+      null,
+      2,
+    );
+  }, [runIds, subagentState]);
   const availableTabs = useMemo(() => {
     const next: Array<{ id: TrajectoryDetailsTab; label: string }> = [
       { id: "overview", label: t("chat.trajectory.overview") },
@@ -294,9 +380,13 @@ function TrajectoryDetails({
     if (usage && typeof usage === "object") {
       next.push({ id: "usage", label: t("chat.trajectory.usage") });
     }
+    if (promptDiff) next.push({ id: "diff", label: t("chat.trajectory.diff") });
+    if (runIds.length > 0) {
+      next.push({ id: "subagents", label: t("chat.trajectory.subagents") });
+    }
     next.push({ id: "raw", label: t("chat.trajectory.details") });
     return next;
-  }, [input, systemPrompt, t, tools, usage]);
+  }, [input, promptDiff, runIds.length, systemPrompt, t, tools, usage]);
 
   useEffect(() => {
     if (!availableTabs.some((candidate) => candidate.id === tab)) setTab("overview");
@@ -307,6 +397,8 @@ function TrajectoryDetails({
     if (tab === "system") return systemPrompt ?? "";
     if (tab === "tools") return tools ?? "";
     if (tab === "usage") return JSON.stringify(usage, null, 2);
+    if (tab === "diff") return promptDiff;
+    if (tab === "subagents") return subagentCode;
     return JSON.stringify(
       item.endEvent ? { start: item.event, end: item.endEvent } : item.event,
       null,
@@ -377,10 +469,24 @@ function TrajectoryDetails({
               </VStack>
             ) : null}
           </VStack>
+        ) : tab === "subagents" && subagentState.status === "loading" ? (
+          <Spinner label={t("chat.trajectory.subagentsLoading")} size="sm" />
+        ) : tab === "subagents" && subagentState.status === "error" ? (
+          <Banner
+            status="warning"
+            title={t("chat.trajectory.subagentsFailed")}
+            description={subagentState.message}
+          />
         ) : (
           <CodeBlock
             code={code}
-            language={tab === "raw" || tab === "usage" || tab === "tools" ? "json" : "text"}
+            language={
+              tab === "diff"
+                ? "diff"
+                : tab === "raw" || tab === "usage" || tab === "tools" || tab === "subagents"
+                  ? "json"
+                  : "text"
+            }
             title={availableTabs.find((candidate) => candidate.id === tab)?.label}
             size="sm"
             width="100%"
@@ -405,7 +511,10 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [search, setSearch] = useState("");
   const [scale, setScale] = useState<"actual" | "sequence">("actual");
+  const [displayMode, setDisplayMode] = useState<"timeline" | "table">("timeline");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [collapsedTurns, setCollapsedTurns] = useState<ReadonlySet<string>>(new Set());
+  const [subagentState, setSubagentState] = useState<SubagentRunState>({ status: "idle" });
   const liveEvents = useSyncExternalStore(subscribeDesktopLiveTrajectory, () =>
     desktopLiveTrajectoryEvents(props.conversationId),
   );
@@ -458,6 +567,11 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
   );
   const sectionIds = useMemo(() => [...new Set(events.flatMap(eventSectionRefs))].sort(), [events]);
   const sectionRequestKey = sectionIds.join("\u0000");
+  const subagentRunIds = useMemo(
+    () => [...new Set(events.flatMap((event) => eventRunIds(event)))].sort(),
+    [events],
+  );
+  const subagentRequestKey = subagentRunIds.join("\u0000");
 
   useEffect(() => {
     const conversationId = props.conversationId.trim();
@@ -488,6 +602,53 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
       cancelled = true;
     };
   }, [props.conversationId, sectionRequestKey]);
+
+  useEffect(() => {
+    const conversationId = props.conversationId.trim();
+    const requestedRunIds = subagentRequestKey ? subagentRequestKey.split("\u0000") : [];
+    let cancelled = false;
+    if (!conversationId || requestedRunIds.length === 0) {
+      setSubagentState({ status: "idle" });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setSubagentState({ status: "loading" });
+    void (async () => {
+      const runs = new Map<string, TrajectorySubagentRunState>();
+      for (let offset = 0; offset < requestedRunIds.length; offset += 128) {
+        const response = await invoke<TrajectorySubagentRunsResponse>(
+          "trajectory_get_subagent_runs",
+          {
+            conversationId,
+            runIds: requestedRunIds.slice(offset, offset + 128),
+          },
+        );
+        const parsed = JSON.parse(response.runsJson) as unknown;
+        if (!Array.isArray(parsed)) continue;
+        for (const state of parsed as TrajectorySubagentRunState[]) {
+          const runId = state.run?.id;
+          if (typeof runId === "string" && runId.trim()) runs.set(runId, state);
+        }
+      }
+      return runs;
+    })()
+      .then((runs) => {
+        if (!cancelled) setSubagentState({ status: "ready", runs });
+      })
+      .catch((reason: unknown) => {
+        if (cancelled) return;
+        setSubagentState({
+          status: "error",
+          message: reason instanceof Error ? reason.message : String(reason),
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [props.conversationId, refreshNonce, reloadVersion, subagentRequestKey]);
   const timeline = useMemo(() => buildTrajectoryTimeline(events, scale), [events, scale]);
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -508,12 +669,105 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
     }
     return [...groups.values()];
   }, [filtered]);
+  const collapsibleTurnKeys = useMemo(
+    () =>
+      grouped
+        .filter((group) => group.turn !== null && group.items.length > 1)
+        .map((group) => group.key),
+    [grouped],
+  );
+  const allTurnsCollapsed =
+    collapsibleTurnKeys.length > 0 && collapsibleTurnKeys.every((key) => collapsedTurns.has(key));
+  const tableRows = useMemo<TrajectoryTableRow[]>(
+    () =>
+      filtered.map((item) => ({
+        id: item.id,
+        label: eventLabel(item.event, t),
+        lane: item.lane,
+        turn: item.turn,
+        step: item.step,
+        durationMs: item.durationMs,
+        item,
+      })),
+    [filtered, t],
+  );
+  const tableColumns = useMemo<TableColumn<TrajectoryTableRow>[]>(
+    () => [
+      {
+        key: "label",
+        header: t("chat.trajectory.eventColumn"),
+        width: proportional(2),
+        renderCell: (row) => (
+          <Button
+            label={row.label}
+            variant={selectedId === row.id ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setSelectedId(row.id)}
+          >
+            {row.label}
+          </Button>
+        ),
+      },
+      {
+        key: "lane",
+        header: t("chat.trajectory.typeColumn"),
+        width: proportional(1),
+        renderCell: (row) => (
+          <Token label={laneLabel(row.lane, t)} color={LANE_TOKEN_COLORS[row.lane]} size="sm" />
+        ),
+      },
+      {
+        key: "turn",
+        header: t("chat.trajectory.turnLabel"),
+        width: pixel(72),
+        renderCell: (row) => (row.turn === null ? "—" : String(row.turn)),
+      },
+      {
+        key: "step",
+        header: t("chat.trajectory.stepLabel"),
+        width: pixel(72),
+        renderCell: (row) => (row.step === null ? "—" : String(row.step)),
+      },
+      {
+        key: "durationMs",
+        header: t("chat.trajectory.duration"),
+        width: pixel(104),
+        align: "end",
+        renderCell: (row) => durationLabel(row.durationMs),
+      },
+    ],
+    [selectedId, t],
+  );
   const selected = timeline.find((item) => item.id === selectedId) ?? null;
   const refresh = () => setRefreshNonce((value) => value + 1);
+
+  const toggleAllTurns = () => {
+    setCollapsedTurns((current) => {
+      if (collapsibleTurnKeys.every((key) => current.has(key))) return new Set();
+      return new Set(collapsibleTurnKeys);
+    });
+  };
+
+  const toggleTurn = (key: string, isOpen: boolean) => {
+    setCollapsedTurns((current) => {
+      const next = new Set(current);
+      if (isOpen) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (selectedId && !timeline.some((item) => item.id === selectedId)) setSelectedId(null);
   }, [selectedId, timeline]);
+
+  useEffect(() => {
+    setCollapsedTurns((current) => {
+      const activeKeys = new Set(collapsibleTurnKeys);
+      const next = new Set([...current].filter((key) => activeKeys.has(key)));
+      return next.size === current.size ? current : next;
+    });
+  }, [collapsibleTurnKeys]);
 
   const content = (
     <LayoutContent isScrollable padding={3}>
@@ -559,71 +813,138 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
         ) : (
           <VStack gap={5}>
             {compact && selected ? (
-              <TrajectoryDetails item={selected} events={events} sections={sections} />
+              <TrajectoryDetails
+                item={selected}
+                events={events}
+                sections={sections}
+                subagentState={subagentState}
+              />
             ) : null}
-            <HStack gap={2} wrap="wrap" aria-label={t("chat.trajectory.legend")}>
-              {(
-                ["user", "context", "model", "tool", "transport", "warning", "compaction"] as const
-              ).map((lane) => (
-                <Token
-                  key={lane}
-                  label={laneLabel(lane, t)}
-                  color={LANE_TOKEN_COLORS[lane]}
-                  size="sm"
-                />
-              ))}
-            </HStack>
-            {grouped.map((group) => (
-              <VStack key={group.key} gap={2}>
-                <HStack hAlign="between" vAlign="center">
-                  <Text type="label" color="secondary" weight="semibold">
-                    {group.turn === null
-                      ? t("chat.trajectory.standalone")
-                      : t("chat.trajectory.turn").replace("{turn}", String(group.turn))}
-                  </Text>
-                  <Text type="supporting" color="secondary">
-                    {String(group.items.length)}
-                  </Text>
-                </HStack>
-                <List density="compact" hasDividers>
-                  {group.items.map((item) => {
-                    const label = eventLabel(item.event, t);
-                    const details = eventDetails(item.endEvent ?? item.event);
-                    return (
-                      <ListItem
-                        key={item.id}
-                        label={label}
-                        description={details[0]}
-                        isSelected={selectedId === item.id}
-                        startContent={
-                          <Token
-                            label={laneLabel(item.lane, t)}
-                            color={LANE_TOKEN_COLORS[item.lane]}
-                            size="sm"
-                            isLabelHidden
-                          />
-                        }
-                        endContent={
-                          <HStack gap={3} vAlign="center">
-                            <TimelineTrack item={item} label={label} />
-                            <Text
-                              type="supporting"
-                              color="secondary"
-                              className="xagent-trajectory-duration"
-                            >
-                              {durationLabel(item.durationMs)}
-                            </Text>
-                          </HStack>
-                        }
-                        onClick={() =>
-                          setSelectedId((current) => (current === item.id ? null : item.id))
-                        }
+            {displayMode === "table" ? (
+              <Table
+                data={tableRows}
+                columns={tableColumns}
+                idKey="id"
+                density="compact"
+                dividers="rows"
+                hasHover
+                textOverflow="truncate"
+              />
+            ) : (
+              <VStack gap={5}>
+                <HStack gap={2} hAlign="between" vAlign="center" wrap="wrap">
+                  <HStack gap={2} wrap="wrap" aria-label={t("chat.trajectory.legend")}>
+                    {(
+                      [
+                        "user",
+                        "context",
+                        "model",
+                        "tool",
+                        "transport",
+                        "warning",
+                        "compaction",
+                      ] as const
+                    ).map((lane) => (
+                      <Token
+                        key={lane}
+                        label={laneLabel(lane, t)}
+                        color={LANE_TOKEN_COLORS[lane]}
+                        size="sm"
                       />
-                    );
-                  })}
-                </List>
+                    ))}
+                  </HStack>
+                  {collapsibleTurnKeys.length > 0 ? (
+                    <Button
+                      label={
+                        allTurnsCollapsed
+                          ? t("chat.trajectory.expandTurns")
+                          : t("chat.trajectory.collapseTurns")
+                      }
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleAllTurns}
+                    />
+                  ) : null}
+                </HStack>
+                {grouped.map((group) => {
+                  const label =
+                    group.turn === null
+                      ? t("chat.trajectory.standalone")
+                      : t("chat.trajectory.turn").replace("{turn}", String(group.turn));
+                  const list = (
+                    <List key={group.key} density="compact" hasDividers>
+                      {group.items.map((item) => {
+                        const eventName = eventLabel(item.event, t);
+                        const details = eventDetails(item.endEvent ?? item.event);
+                        return (
+                          <ListItem
+                            key={item.id}
+                            label={eventName}
+                            description={details[0]}
+                            isSelected={selectedId === item.id}
+                            startContent={
+                              <Token
+                                label={laneLabel(item.lane, t)}
+                                color={LANE_TOKEN_COLORS[item.lane]}
+                                size="sm"
+                                isLabelHidden
+                              />
+                            }
+                            endContent={
+                              <HStack gap={3} vAlign="center">
+                                <TimelineTrack item={item} label={eventName} />
+                                <Text
+                                  type="supporting"
+                                  color="secondary"
+                                  className="xagent-trajectory-duration"
+                                >
+                                  {durationLabel(item.durationMs)}
+                                </Text>
+                              </HStack>
+                            }
+                            onClick={() =>
+                              setSelectedId((current) => (current === item.id ? null : item.id))
+                            }
+                          />
+                        );
+                      })}
+                    </List>
+                  );
+                  return group.turn !== null && group.items.length > 1 ? (
+                    <Collapsible
+                      key={group.key}
+                      value={group.key}
+                      trigger={
+                        <HStack hAlign="between" vAlign="center" width="100%">
+                          <Text type="label" color="secondary" weight="semibold">
+                            {label}
+                          </Text>
+                          <Text type="supporting" color="secondary">
+                            {String(group.items.length)}
+                          </Text>
+                        </HStack>
+                      }
+                      isOpen={!collapsedTurns.has(group.key)}
+                      onOpenChange={(isOpen) => toggleTurn(group.key, isOpen)}
+                    >
+                      {list}
+                    </Collapsible>
+                  ) : (
+                    <VStack key={group.key} gap={2}>
+                      <HStack hAlign="between" vAlign="center">
+                        <Text type="label" color="secondary" weight="semibold">
+                          {label}
+                        </Text>
+                        <Text type="supporting" color="secondary">
+                          {String(group.items.length)}
+                        </Text>
+                      </HStack>
+                      {list}
+                    </VStack>
+                  );
+                })}
               </VStack>
-            ))}
+            )}
           </VStack>
         )}
       </VStack>
@@ -675,6 +996,15 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
                 />
               </StackItem>
               <SegmentedControl
+                value={displayMode}
+                onChange={(value) => setDisplayMode(value as "timeline" | "table")}
+                label={t("chat.trajectory.view")}
+                size="sm"
+              >
+                <SegmentedControlItem value="timeline" label={t("chat.trajectory.timelineView")} />
+                <SegmentedControlItem value="table" label={t("chat.trajectory.tableView")} />
+              </SegmentedControl>
+              <SegmentedControl
                 value={scale}
                 onChange={(value) => setScale(value as "actual" | "sequence")}
                 label={t("chat.trajectory.scale")}
@@ -697,7 +1027,12 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
             isScrollable={false}
             label={t("chat.trajectory.details")}
           >
-            <TrajectoryDetails item={selected} events={events} sections={sections} />
+            <TrajectoryDetails
+              item={selected}
+              events={events}
+              sections={sections}
+              subagentState={subagentState}
+            />
           </LayoutPanel>
         ) : undefined
       }

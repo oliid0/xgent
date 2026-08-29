@@ -1,11 +1,17 @@
 import { ChatToolCalls } from "@astryxdesign/core/Chat";
 import { memo, useMemo, useState } from "react";
-
+import { useLocale } from "../../../../i18n";
 import type { ToolTraceItem } from "../../../../lib/chat/messages/uiMessages";
-import { areToolTraceItemsEqual, createAstryxToolCall, ToolCallDetail } from "./ToolCallItem";
+import {
+  areToolTraceItemsEqual,
+  createAstryxToolCall,
+  getLocalizedToolTitle,
+  ToolCallDetail,
+} from "./ToolCallItem";
 
 function ToolTraceGroupInner(props: { items: ToolTraceItem[]; runningToolCallIds?: string[] }) {
   const { items, runningToolCallIds = [] } = props;
+  const { t } = useLocale();
   const [isExpanded, setIsExpanded] = useState(false);
   const runningIds = useMemo(() => new Set(runningToolCallIds), [runningToolCallIds]);
   const calls = useMemo(
@@ -16,9 +22,10 @@ function ToolTraceGroupInner(props: { items: ToolTraceItem[]; runningToolCallIds
           item,
           isRunning,
           <ToolCallDetail item={item} isRunning={isRunning} />,
+          getLocalizedToolTitle(item, t),
         );
       }),
-    [items, runningIds],
+    [items, runningIds, t],
   );
 
   return <ChatToolCalls calls={calls} isExpanded={isExpanded} onExpandedChange={setIsExpanded} />;

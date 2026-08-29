@@ -1,4 +1,3 @@
-import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
@@ -7,8 +6,7 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
-import { Tab, TabList } from "@astryxdesign/core/TabList";
-import { Heading, Text } from "@astryxdesign/core/Text";
+import { Text } from "@astryxdesign/core/Text";
 import { Token, type TokenColor } from "@astryxdesign/core/Token";
 import { type ReactNode, useState } from "react";
 import {
@@ -26,7 +24,6 @@ import {
 import { useLocale } from "../../i18n";
 import {
   applyHookOps,
-  HOOK_EVENT_DESCRIPTION_TRANSLATION_KEYS,
   HOOK_EVENT_TRANSLATION_KEYS,
   type HookDef,
   type HookEvent,
@@ -66,13 +63,11 @@ function getHookTypeColor(type: HookType): TokenColor {
 
 export function HooksSection(_props: SettingsSectionProps) {
   const { t } = useLocale();
-  const [activeEvent, setActiveEvent] = useState<HookEvent>(EVENT_FLOW[0].event);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingHook, setEditingHook] = useState<HookDef | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const { hooks: hooksSnapshot } = useAutomation();
   const hooks = hooksSnapshot.hooks;
-  const activeHooks = hooks.filter((hook) => hook.event === activeEvent);
   const enabledCount = hooks.filter((hook) => hook.enabled).length;
 
   const phasesByKey: Record<LifecyclePhase["key"], LifecyclePhase> = {
@@ -102,12 +97,9 @@ export function HooksSection(_props: SettingsSectionProps) {
     },
   };
 
-  const orderedEvents = EVENT_FLOW.map(({ event, phaseKey }) => ({
-    event,
-    phase: phasesByKey[phaseKey],
-  }));
-  const activePhase =
-    orderedEvents.find(({ event }) => event === activeEvent)?.phase ?? phasesByKey.agent;
+  const phaseByEvent = new Map(
+    EVENT_FLOW.map(({ event, phaseKey }) => [event, phasesByKey[phaseKey]] as const),
+  );
 
   function closeModal() {
     setModalOpen(false);
@@ -121,7 +113,6 @@ export function HooksSection(_props: SettingsSectionProps) {
 
   function openEdit(hook: HookDef) {
     setEditingHook(hook);
-    setActiveEvent(hook.event);
     setModalOpen(true);
   }
 
@@ -152,7 +143,7 @@ export function HooksSection(_props: SettingsSectionProps) {
   if (modalOpen) {
     return (
       <HookModal
-        event={editingHook?.event ?? activeEvent}
+        event={editingHook?.event}
         initialData={editingHook ?? undefined}
         onSave={handleSave}
         onClose={closeModal}
@@ -194,51 +185,8 @@ export function HooksSection(_props: SettingsSectionProps) {
 
       {actionError ? <Banner status="error" title={actionError} collapsible={false} /> : null}
 
-      <TabList
-        value={activeEvent}
-        onChange={(value) => setActiveEvent(value as HookEvent)}
-        role="tablist"
-        overflow="scroll"
-        size="sm"
-        hasDivider
-      >
-        {orderedEvents.map(({ event, phase }) => {
-          const eventHookCount = hooks.filter((hook) => hook.event === event).length;
-          return (
-            <Tab
-              key={event}
-              value={event}
-              label={`${getHookEventLabel(t, event)} · ${phase.label}`}
-              panelId="settings-hooks-event-panel"
-              icon={phase.icon}
-              endContent={
-                eventHookCount > 0 ? <Badge label={eventHookCount} variant="neutral" /> : undefined
-              }
-            />
-          );
-        })}
-      </TabList>
-
-      <Section variant="transparent" padding={0} id="settings-hooks-event-panel" role="tabpanel">
-        <Section variant="muted" padding={3} dividers={["bottom"]}>
-          <HStack width="100%" gap={3} vAlign="center">
-            <Token
-              label={activePhase.label}
-              color={activePhase.tokenColor}
-              icon={activePhase.icon}
-            />
-            <StackItem size="fill">
-              <VStack gap={0.5}>
-                <Heading level={3}>{getHookEventLabel(t, activeEvent)}</Heading>
-                <Text type="supporting" color="secondary" wordBreak="break-word">
-                  {t(HOOK_EVENT_DESCRIPTION_TRANSLATION_KEYS[activeEvent])}
-                </Text>
-              </VStack>
-            </StackItem>
-          </HStack>
-        </Section>
-
-        {activeHooks.length === 0 ? (
+      <Section variant="transparent" padding={0}>
+        {hooks.length === 0 ? (
           <EmptyState
             isCompact
             icon={<Icon icon={Zap} size="lg" color="secondary" />}
@@ -256,7 +204,8 @@ export function HooksSection(_props: SettingsSectionProps) {
           />
         ) : (
           <List density="balanced" hasDividers>
-            {activeHooks.map((hook) => {
+            {hooks.map((hook) => {
+              const phase = phaseByEvent.get(hook.event) ?? phasesByKey.agent;
               const stepCount =
                 hook.type === "command"
                   ? (hook.script ?? "").split(/\r?\n/).filter((line) => line.trim()).length
@@ -283,6 +232,12 @@ export function HooksSection(_props: SettingsSectionProps) {
                       </Text>
                       <HStack gap={1} wrap="wrap">
                         <Token
+                          label={getHookEventLabel(t, hook.event)}
+                          color={phase.tokenColor}
+                          size="sm"
+                          icon={phase.icon}
+                        />
+                        <Token
                           label={
                             hook.type === "command"
                               ? t("settings.hooksTypeCommand")
@@ -296,33 +251,39 @@ export function HooksSection(_props: SettingsSectionProps) {
                     </VStack>
                   }
                   endContent={
-                    <HStack gap={1} vAlign="center">
-                      <AgentActivationSwitch
-                        checked={hook.enabled}
-                        title={hook.enabled ? t("settings.disable") : t("settings.enable")}
-                        onToggle={() => toggleHook(hook)}
-                      />
-                      <IconButton
-                        label={t("settings.edit")}
-                        tooltip={t("settings.edit")}
-                        icon={<Icon icon={Pencil} size="sm" color="inherit" />}
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEdit(hook)}
-                      />
-                      <ConfirmDeletePopover name={hook.name} onConfirm={() => deleteHook(hook.id)}>
-                        {(open) => (
-                          <IconButton
-                            label={t("settings.delete")}
-                            tooltip={t("settings.delete")}
-                            icon={<Icon icon={Trash2} size="sm" color="inherit" />}
-                            variant="ghost"
-                            size="sm"
-                            onClick={open}
-                          />
-                        )}
-                      </ConfirmDeletePopover>
-                    </HStack>
+                    <VStack gap={1} hAlign="end">
+                      <Token label={phase.label} color={phase.tokenColor} size="sm" />
+                      <HStack gap={1} vAlign="center">
+                        <AgentActivationSwitch
+                          checked={hook.enabled}
+                          title={hook.enabled ? t("settings.disable") : t("settings.enable")}
+                          onToggle={() => toggleHook(hook)}
+                        />
+                        <IconButton
+                          label={t("settings.edit")}
+                          tooltip={t("settings.edit")}
+                          icon={<Icon icon={Pencil} size="sm" color="inherit" />}
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEdit(hook)}
+                        />
+                        <ConfirmDeletePopover
+                          name={hook.name}
+                          onConfirm={() => deleteHook(hook.id)}
+                        >
+                          {(open) => (
+                            <IconButton
+                              label={t("settings.delete")}
+                              tooltip={t("settings.delete")}
+                              icon={<Icon icon={Trash2} size="sm" color="inherit" />}
+                              variant="ghost"
+                              size="sm"
+                              onClick={open}
+                            />
+                          )}
+                        </ConfirmDeletePopover>
+                      </HStack>
+                    </VStack>
                   }
                 />
               );

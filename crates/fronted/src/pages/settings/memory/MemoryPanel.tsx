@@ -260,6 +260,8 @@ export function MemoryPanel(props: {
     <>
       <AstryxStack
         direction="vertical"
+        paddingBlockStart={4}
+        paddingBlockEnd={4}
         className="settings-memory-panel flex min-h-0 flex-1 flex-col gap-5"
       >
         <AstryxStack

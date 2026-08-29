@@ -39,6 +39,7 @@ import {
   EyeOff,
   GeminiIcon,
   Globe,
+  GripVertical,
   List,
   OpenaiChatgptIcon,
   Pencil,
@@ -187,6 +188,24 @@ const CHERRY_DATA_PATH_STORAGE_KEY = "xagent.cherryStudioDataPath";
 // spinner revolution so the rescan reads as motion instead of a flicker.
 const THIRD_PARTY_SCAN_FEEDBACK_MS = 1000;
 
+function inferFullRequestUrl(providerType: ProviderId, input: string) {
+  const trimmed = input.trim().replace(/\/+$/, "");
+  if (!trimmed) return false;
+  let route = trimmed.toLowerCase();
+  try {
+    const parsed = new URL(trimmed);
+    route = `${parsed.pathname}${parsed.search}`.replace(/\/+$/, "").toLowerCase();
+  } catch {
+    // The request layer owns URL validation. Suffix inference also works while
+    // the user is still typing an incomplete URL.
+  }
+  if (providerType === "gemini") {
+    return /:streamgeneratecontent$|:generatecontent$/.test(route);
+  }
+  if (providerType === "claude_code") return /\/v\d+\/messages$/.test(route);
+  return /\/chat\/completions$|\/responses?$/.test(route);
+}
+
 function withScanFeedback<T>(work: Promise<T>): Promise<T> {
   return Promise.all([
     work,
@@ -257,11 +276,11 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
     (initialApiKey.trim() === "" || isLocalAccessSecretSentinel(initialApiKey));
   const [name, setName] = useState(initialData?.name ?? "");
   const [baseUrl, setBaseUrl] = useState(initialData?.baseUrl ?? "");
-  const [isFullUrl, setIsFullUrl] = useState(initialData?.isFullUrl ?? false);
   const [modelsUrl, setModelsUrl] = useState(initialData?.modelsUrl ?? "");
   const [apiKey, setApiKey] = useState(
     initialUsesRedactedApiKey ? REDACTED_API_KEY_DISPLAY : initialApiKey,
   );
+  const isFullUrl = inferFullRequestUrl(providerType, baseUrl);
   const supportsOAuth = providerType === "claude_code" || providerType === "codex";
   const [authMode, setAuthMode] = useState<ProviderAuthMode>(
     providerType === "codex" && initialData?.authMode === "oauth-managed"
@@ -299,6 +318,8 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   const [addingModel, setAddingModel] = useState(false);
   const [newModelName, setNewModelName] = useState("");
   const [modelSearch, setModelSearch] = useState("");
+  const [modelBulkMode, setModelBulkMode] = useState(false);
+  const [modelBulkSelection, setModelBulkSelection] = useState<Set<string>>(new Set());
   const [editingModel, setEditingModel] = useState<ModelEditDraft | null>(null);
   const [activePanel, setActivePanel] = useState<ProviderDialogPanel>("general");
   const [headerValidationSubmitted, setHeaderValidationSubmitted] = useState(false);
@@ -336,7 +357,8 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
         : apiKey.trim();
   const modelFetchCredential =
     authMode === "oauth-managed" ? managedOAuthAccountId.trim() : apiKeyForRequest;
-  const canFetchModels = baseUrl.trim().length > 0 && modelFetchCredential.length > 0;
+  const canFetchModels =
+    (baseUrl.trim().length > 0 || modelsUrl.trim().length > 0) && modelFetchCredential.length > 0;
 
   const doFetch = useCallback(
     async (url: string, key: string) => {
@@ -384,7 +406,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
       isFullUrl,
       modelsUrl,
     );
-    if (!trimUrl || !trimCredential) return;
+    if ((!trimUrl && !modelsUrl.trim()) || !trimCredential) return;
     if (key === prevFetchKey.current) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -413,7 +435,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   function handleRefresh() {
     const trimUrl = baseUrl.trim();
     const trimKey = apiKeyForRequest;
-    if (!trimUrl || !modelFetchCredential) {
+    if ((!trimUrl && !modelsUrl.trim()) || !modelFetchCredential) {
       setFetchError(t("settings.noBaseUrlApiKey"));
       return;
     }
@@ -719,6 +741,32 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
         : orderedModels,
     [orderedModels, modelSearchQuery],
   );
+  const selectedModelsToEnable = Array.from(modelBulkSelection).filter(
+    (modelId) => !activeModels.has(modelId),
+  );
+  const selectedModelsToDisable = Array.from(modelBulkSelection).filter((modelId) =>
+    activeModels.has(modelId),
+  );
+
+  function setModelBulkState(enabled: boolean) {
+    setActiveModels((current) => {
+      const next = new Set(current);
+      for (const modelId of modelBulkSelection) {
+        if (enabled) next.add(modelId);
+        else next.delete(modelId);
+      }
+      return next;
+    });
+  }
+
+  function toggleModelBulkSelection(modelId: string) {
+    setModelBulkSelection((current) => {
+      const next = new Set(current);
+      if (next.has(modelId)) next.delete(modelId);
+      else next.add(modelId);
+      return next;
+    });
+  }
   const headerSuggestQuery = headerSuggest
     ? (customHeaders[headerSuggest.index]?.key ?? "").trim().toLowerCase()
     : "";
@@ -992,41 +1040,19 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                   ) : null}
                 </AstryxGrid>
 
-                <AstryxGrid className="mt-3 grid gap-3 rounded-xl border bg-muted/20 p-3 sm:grid-cols-2">
-                  <AstryxStack
-                    direction="horizontal"
-                    className="flex items-center justify-between gap-3"
-                  >
-                    <AstryxStack direction="vertical">
-                      <AstryxStack direction="vertical" className="text-sm font-medium">
-                        {t("settings.providerFullUrl")}
-                      </AstryxStack>
-                      <AstryxStack direction="vertical" className="text-xs text-muted-foreground">
-                        {t("settings.providerFullUrlDesc")}
-                      </AstryxStack>
-                    </AstryxStack>
-                    <DialogSwitch
-                      checked={isFullUrl}
-                      onCheckedChange={setIsFullUrl}
-                      ariaLabel={t("settings.providerFullUrl")}
+                {providerType !== "gemini" ? (
+                  <VStack gap={1} paddingTop={3}>
+                    <TextInput
+                      label={t("settings.providerModelsUrl")}
+                      description={t("settings.providerModelsUrlHint")}
+                      id="modal-models-url"
+                      value={modelsUrl}
+                      width="100%"
+                      onChange={setModelsUrl}
+                      placeholder="https://example.com/v1/models"
                     />
-                  </AstryxStack>
-                  {providerType !== "gemini" ? (
-                    <AstryxStack direction="vertical" className="space-y-1.5">
-                      <Label as="label" type="label" weight="medium">
-                        {t("settings.providerModelsUrl")}
-                      </Label>
-                      <Input
-                        label="https://example.com/v1/models"
-                        isLabelHidden
-                        id="modal-models-url"
-                        value={modelsUrl}
-                        onChange={(nextValue) => setModelsUrl(nextValue)}
-                        placeholder="https://example.com/v1/models"
-                      />
-                    </AstryxStack>
-                  ) : null}
-                </AstryxGrid>
+                  </VStack>
+                ) : null}
 
                 {providerType === "codex" && authMode === "oauth-managed" ? (
                   <AstryxStack direction="vertical" className="mt-4 space-y-1.5">
@@ -1131,6 +1157,20 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                         </AstryxButton>
                       ) : null}
                     </AstryxStack>
+                    <ToggleButton
+                      label={t("settings.skillsBulkSelect")}
+                      size="sm"
+                      isPressed={modelBulkMode}
+                      icon={<Icon icon={List} size="sm" color="inherit" />}
+                      onPressedChange={(pressed) => {
+                        setModelBulkMode(pressed);
+                        if (!pressed) setModelBulkSelection(new Set());
+                      }}
+                    >
+                      {modelBulkMode
+                        ? t("settings.skillsBulkDone")
+                        : t("settings.skillsBulkSelect")}
+                    </ToggleButton>
                     <Button
                       label={fetchingModels ? t("settings.fetching") : t("settings.refreshModels")}
                       type="button"
@@ -1155,6 +1195,49 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                       {t("settings.manualAddModel")}
                     </Button>
                   </AstryxStack>
+
+                  {modelBulkMode ? (
+                    <HStack gap={2} vAlign="center" wrap="wrap" padding={2}>
+                      <CheckboxInput
+                        label={t("settings.skillsBulkSelectAll")}
+                        value={
+                          modelBulkSelection.size === 0
+                            ? false
+                            : visibleModels.every((model) => modelBulkSelection.has(model.id))
+                              ? true
+                              : "indeterminate"
+                        }
+                        size="sm"
+                        onChange={(checked) =>
+                          setModelBulkSelection(
+                            checked ? new Set(visibleModels.map((model) => model.id)) : new Set(),
+                          )
+                        }
+                      />
+                      <StackItem size="fill">
+                        <Text type="supporting" color="secondary">
+                          {t("settings.skillsBulkSelectedCount").replace(
+                            "{count}",
+                            String(modelBulkSelection.size),
+                          )}
+                        </Text>
+                      </StackItem>
+                      <Button
+                        label={`${t("settings.skillsBulkEnable")} (${selectedModelsToEnable.length})`}
+                        variant="ghost"
+                        size="sm"
+                        isDisabled={selectedModelsToEnable.length === 0}
+                        onClick={() => setModelBulkState(true)}
+                      />
+                      <Button
+                        label={`${t("settings.skillsBulkDisable")} (${selectedModelsToDisable.length})`}
+                        variant="ghost"
+                        size="sm"
+                        isDisabled={selectedModelsToDisable.length === 0}
+                        onClick={() => setModelBulkState(false)}
+                      />
+                    </HStack>
+                  ) : null}
 
                   {fetchError ? (
                     <AstryxStack
@@ -1230,11 +1313,21 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                               direction="horizontal"
                               className="flex items-center gap-2 px-3 py-2 max-[720px]:flex-wrap"
                             >
-                              <DialogSwitch
-                                checked={activeModels.has(model.id)}
-                                onCheckedChange={() => toggleModel(model.id)}
-                                ariaLabel={model.id}
-                              />
+                              {modelBulkMode ? (
+                                <CheckboxInput
+                                  label={model.id}
+                                  isLabelHidden
+                                  value={modelBulkSelection.has(model.id)}
+                                  size="sm"
+                                  onChange={() => toggleModelBulkSelection(model.id)}
+                                />
+                              ) : (
+                                <DialogSwitch
+                                  checked={activeModels.has(model.id)}
+                                  onCheckedChange={() => toggleModel(model.id)}
+                                  ariaLabel={model.id}
+                                />
+                              )}
                               <AstryxStack
                                 direction="vertical"
                                 className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]"
@@ -2739,6 +2832,7 @@ function ProviderList(props: {
   onAdd: () => void;
   onEdit: (provider: CustomProvider) => void;
   onDelete: (id: string) => void;
+  onReorder: (type: ProviderId, nextIds: string[]) => void;
   ccsProviders: CcsProvidersResponse | null;
   ccsLoading: boolean;
   ccsMessage: string | null;
@@ -2761,6 +2855,7 @@ function ProviderList(props: {
     onAdd,
     onEdit,
     onDelete,
+    onReorder,
     ccsProviders,
     ccsLoading,
     ccsMessage,
@@ -2775,7 +2870,11 @@ function ProviderList(props: {
     thirdPartyImportEnabled,
   } = props;
   const [syncMenuOpen, setSyncMenuOpen] = useState(false);
+  const [draggingProviderId, setDraggingProviderId] = useState("");
+  const providerListRef = useRef<HTMLUListElement | HTMLOListElement | null>(null);
+  const providerOrderRef = useRef<CustomProvider[]>([]);
   const filtered = providers.filter((provider) => provider.type === type);
+  providerOrderRef.current = filtered;
   const ccsAll = ccsProviders?.providers ?? [];
   const cherryAll = cherryProviders?.providers ?? [];
   const ccsBreakdown = PROVIDER_TABS.map((tab) => ({
@@ -2788,6 +2887,68 @@ function ProviderList(props: {
   useEffect(() => {
     if (!isActive) setSyncMenuOpen(false);
   }, [isActive]);
+
+  useEffect(() => {
+    if (!draggingProviderId) return;
+    const handlePointerMove = (event: PointerEvent) => {
+      const rows = Array.from(
+        providerListRef.current?.querySelectorAll<HTMLElement>("[data-provider-reorder-id]") ?? [],
+      );
+      if (rows.length < 2) return;
+      const current = providerOrderRef.current;
+      const sourceIndex = current.findIndex((provider) => provider.id === draggingProviderId);
+      if (sourceIndex < 0) return;
+      let insertionIndex = rows.findIndex(
+        (row) => event.clientY < row.getBoundingClientRect().top + row.offsetHeight / 2,
+      );
+      if (insertionIndex < 0) insertionIndex = rows.length;
+      const next = current.filter((provider) => provider.id !== draggingProviderId);
+      const adjustedInsertionIndex =
+        insertionIndex > sourceIndex ? insertionIndex - 1 : insertionIndex;
+      const boundedIndex = Math.max(0, Math.min(next.length, adjustedInsertionIndex));
+      next.splice(boundedIndex, 0, current[sourceIndex]);
+      const nextIds = next.map((provider) => provider.id);
+      if (nextIds.every((id, index) => id === current[index]?.id)) return;
+      providerOrderRef.current = next;
+      onReorder(type, nextIds);
+    };
+    const finish = () => setDraggingProviderId("");
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", finish, { once: true });
+    window.addEventListener("pointercancel", finish, { once: true });
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+    };
+  }, [draggingProviderId, onReorder, type]);
+
+  function reorderProviderByKeyboard(providerId: string, key: string) {
+    const current = providerOrderRef.current;
+    const sourceIndex = current.findIndex((provider) => provider.id === providerId);
+    if (sourceIndex < 0) return false;
+    const targetIndex =
+      key === "ArrowUp"
+        ? sourceIndex - 1
+        : key === "ArrowDown"
+          ? sourceIndex + 1
+          : key === "Home"
+            ? 0
+            : key === "End"
+              ? current.length - 1
+              : sourceIndex;
+    const boundedIndex = Math.max(0, Math.min(current.length - 1, targetIndex));
+    if (boundedIndex === sourceIndex) return false;
+    const next = [...current];
+    const [moved] = next.splice(sourceIndex, 1);
+    next.splice(boundedIndex, 0, moved);
+    providerOrderRef.current = next;
+    onReorder(
+      type,
+      next.map((provider) => provider.id),
+    );
+    return true;
+  }
 
   function handleSyncMenuOpenChange(open: boolean) {
     setSyncMenuOpen(open);
@@ -2895,7 +3056,7 @@ function ProviderList(props: {
             }
           />
         ) : (
-          <AstryxList density="compact" hasDividers>
+          <AstryxList ref={providerListRef} density="compact" hasDividers>
             {filtered.map((provider) => {
               const usageState = props.usage.getState(provider.id);
               const usagePlan = usageState.result?.data[0];
@@ -2914,7 +3075,9 @@ function ProviderList(props: {
               return (
                 <ListItem
                   key={provider.id}
+                  data-provider-reorder-id={provider.id}
                   label={provider.name}
+                  isSelected={draggingProviderId === provider.id}
                   description={
                     usageSummary ||
                     `${provider.baseUrl || t("settings.noBaseUrl")} · ${provider.activeModels.length} ${t("settings.activeModels")}`
@@ -2922,6 +3085,28 @@ function ProviderList(props: {
                   startContent={<ProviderBrandIcon type={type} />}
                   endContent={
                     <HStack gap={1} vAlign="center">
+                      <IconButton
+                        label={`${t("settings.reorderProvider")}: ${provider.name}`}
+                        tooltip={t("settings.reorderVerticalHint")}
+                        variant="ghost"
+                        size="sm"
+                        isDisabled={filtered.length < 2}
+                        style={{ touchAction: "none" }}
+                        icon={<Icon icon={GripVertical} size="sm" color="inherit" />}
+                        onClick={(event) => event.stopPropagation()}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          if (event.button === 0 && filtered.length > 1) {
+                            setDraggingProviderId(provider.id);
+                          }
+                        }}
+                        onKeyDown={(event) => {
+                          if (reorderProviderByKeyboard(provider.id, event.key)) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }
+                        }}
+                      />
                       {provider.usageQuery?.enabled ? (
                         <IconButton
                           label={t("settings.usage.refresh")}
@@ -3399,6 +3584,29 @@ export function ProvidersSection(
     );
   }
 
+  function handleProviderReorder(type: ProviderId, nextIds: string[]) {
+    setSettings((previous) => {
+      const byId = new Map(
+        previous.customProviders
+          .filter((provider) => provider.type === type)
+          .map((provider) => [provider.id, provider]),
+      );
+      const reordered = nextIds
+        .map((id) => byId.get(id))
+        .filter((provider): provider is CustomProvider => Boolean(provider));
+      for (const provider of byId.values()) {
+        if (!nextIds.includes(provider.id)) reordered.push(provider);
+      }
+      let index = 0;
+      return updateCustomProviders(
+        previous,
+        previous.customProviders.map((provider) =>
+          provider.type === type ? (reordered[index++] ?? provider) : provider,
+        ),
+      );
+    });
+  }
+
   if (view === "list" && thirdPartyImportEnabled && ccsImportType) {
     return (
       <CcsImportModal
@@ -3514,6 +3722,7 @@ export function ProvidersSection(
                 onAdd={openAdd}
                 onEdit={openEdit}
                 onDelete={handleDelete}
+                onReorder={handleProviderReorder}
                 ccsProviders={ccsProviders}
                 ccsLoading={ccsLoading}
                 ccsMessage={ccsMessage}

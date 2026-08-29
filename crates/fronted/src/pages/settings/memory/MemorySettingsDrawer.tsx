@@ -305,20 +305,22 @@ export function MemorySettingsDrawer(props: {
         as="aside"
         className="relative flex h-full w-full flex-col overflow-hidden"
       >
-        <DialogHeader
-          title={t("settings.memorySettingsTitle")}
-          subtitle={t("settings.memorySettingsLocalOnly")}
-          startContent={
-            <IconButton
-              label={t("settings.memorySettingsClose")}
-              tooltip={t("settings.memorySettingsClose")}
-              variant="ghost"
-              size="sm"
-              icon={<ArrowLeft />}
-              onClick={onClose}
-            />
-          }
-        />
+        <VStack paddingBlockStart={2}>
+          <DialogHeader
+            title={t("settings.memorySettingsTitle")}
+            subtitle={t("settings.memorySettingsLocalOnly")}
+            startContent={
+              <IconButton
+                label={t("settings.memorySettingsClose")}
+                tooltip={t("settings.memorySettingsClose")}
+                variant="ghost"
+                size="sm"
+                icon={<ArrowLeft />}
+                onClick={onClose}
+              />
+            }
+          />
+        </VStack>
 
         <AstryxStack
           direction="vertical"

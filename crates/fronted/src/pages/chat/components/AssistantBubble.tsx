@@ -101,7 +101,9 @@ export const AssistantBubble = memo(function AssistantBubble(props: {
           />
         ))}
         {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
-        {cloudArtifacts.length > 0 ? <CloudArtifactsCard artifacts={cloudArtifacts} /> : null}
+        {cloudArtifacts.length > 0 ? (
+          <CloudArtifactsCard artifacts={cloudArtifacts} onOpenFileLink={onOpenFileLink} />
+        ) : null}
       </VStack>
     </ChatMessage>
   );

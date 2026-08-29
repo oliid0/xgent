@@ -1,6 +1,7 @@
 import { BottomSheet } from "@astryxdesign/core/BottomSheet";
 import { Button as AstryxButton, Button } from "@astryxdesign/core/Button";
 import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { Icon as AstryxIcon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Stack as AstryxStack, VStack } from "@astryxdesign/core/Stack";
@@ -795,17 +796,12 @@ const ProjectRow = memo(function ProjectRow(props: {
           direction="horizontal"
           className="flex h-[30px] min-w-0 items-center gap-3 rounded-md px-2 text-left"
         >
-          <ProjectFolderIcon
-            className={cn(
-              "h-4 w-4 shrink-0 transition-colors",
-              isMissing
-                ? "text-destructive"
-                : isArchived
-                  ? "text-muted-foreground/40"
-                  : isActive
-                    ? "text-amber-500"
-                    : "text-foreground/65",
-            )}
+          <AstryxIcon
+            icon={ProjectFolderIcon}
+            size="sm"
+            color={
+              isMissing ? "error" : isArchived ? "disabled" : isActive ? "accent" : "secondary"
+            }
           />
           <Input
             label={project.name}
@@ -864,17 +860,12 @@ const ProjectRow = memo(function ProjectRow(props: {
             }
           }}
         >
-          <ProjectFolderIcon
-            className={cn(
-              "h-4 w-4 shrink-0 transition-colors",
-              isMissing
-                ? "text-destructive"
-                : isArchived
-                  ? "text-muted-foreground/40"
-                  : isActive
-                    ? "text-amber-500"
-                    : "text-foreground/65",
-            )}
+          <AstryxIcon
+            icon={ProjectFolderIcon}
+            size="sm"
+            color={
+              isMissing ? "error" : isArchived ? "disabled" : isActive ? "accent" : "secondary"
+            }
           />
           <AstryxText
             as="span"
@@ -2104,7 +2095,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     }}
                     isDisabled={!onCreateWorkspaceGroup}
                   >
-                    <FolderTree className="h-3.5 w-3.5" />
+                    <AstryxIcon icon={FolderTree} size="sm" color="inherit" />
                   </Button>
                   <Button
                     label={t("chat.workspaceCreate")}
@@ -2120,7 +2111,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     onClick={() => onCreateProject?.()}
                     isDisabled={!onCreateProject}
                   >
-                    <Plus className="h-3.5 w-3.5" />
+                    <AstryxIcon icon={Plus} size="sm" color="inherit" />
                   </Button>
                 </AstryxStack>
               </AstryxStack>

@@ -38,6 +38,11 @@ const REASONING_I18N_KEYS: Record<ReasoningLevel, string> = {
 };
 
 const COMPOSER_REASONING_ORDER: ReasoningLevel[] = ["minimal", "low", "medium", "high"];
+const COMPOSER_EXTENDED_REASONING_ORDER: ReasoningLevel[] = [
+  ...COMPOSER_REASONING_ORDER,
+  "xhigh",
+  "max",
+];
 
 function isReasoningLevel(value: string): value is ReasoningLevel {
   return Object.hasOwn(REASONING_I18N_KEYS, value);
@@ -69,7 +74,7 @@ function ModelSelectorContent(props: {
   const selectedGroupId = props.modelOptions.find(
     (option) => option.value === props.selectedValue,
   )?.providerId;
-  const visibleReasoningOptions = COMPOSER_REASONING_ORDER.filter((value) =>
+  const visibleReasoningOptions = COMPOSER_EXTENDED_REASONING_ORDER.filter((value) =>
     props.reasoningOptions.includes(value),
   );
   const selectedReasoning = visibleReasoningOptions.includes(props.chatRuntimeControls.reasoning)
@@ -102,7 +107,10 @@ function ModelSelectorContent(props: {
         onChange={setModelSearch}
         placeholder={t("chat.searchModel")}
         startIcon={<Search size={16} />}
+        onBeforeInput={(event) => event.stopPropagation()}
+        onInput={(event) => event.stopPropagation()}
         onKeyDown={(event) => event.stopPropagation()}
+        onKeyUp={(event) => event.stopPropagation()}
       />
       {visibleReasoningOptions.length > 0 ? (
         <RadioList

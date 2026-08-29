@@ -4,7 +4,7 @@ import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/Segme
 import { HStack } from "@astryxdesign/core/Stack";
 import { memo, type ReactNode } from "react";
 
-import { MonitorSmartphone, Moon, PanelLeft, Settings, Sun } from "../../../components/icons";
+import { MonitorSmartphone, Moon, PanelLeft, Sun } from "../../../components/icons";
 import { isMacOsTauri } from "../../../components/MacOsTitleBarSpacer";
 import { useLocale } from "../../../i18n";
 import {
@@ -13,7 +13,6 @@ import {
   getNextTheme,
   type Theme,
 } from "../../../lib/settings";
-import type { SectionId } from "../../settings/types";
 
 function ThemeToggleIcon(props: { theme: Theme }) {
   if (props.theme === "light") return <Sun size={16} />;
@@ -25,7 +24,6 @@ export const ChatHeader = memo(function ChatHeader(props: {
   settings: AppSettings;
   sidebarOpen: boolean;
   onSelectExecutionMode: (mode: ExecutionMode) => void;
-  onOpenSettings: (section?: SectionId) => void;
   onToggleTheme: () => void;
   onOpenSidebar: () => void;
   mobileExperience?: boolean;
@@ -36,7 +34,6 @@ export const ChatHeader = memo(function ChatHeader(props: {
     settings,
     sidebarOpen,
     onSelectExecutionMode,
-    onOpenSettings,
     onToggleTheme,
     onOpenSidebar,
     mobileExperience = false,
@@ -121,16 +118,6 @@ export const ChatHeader = memo(function ChatHeader(props: {
               variant="ghost"
               size="md"
               onClick={onToggleTheme}
-            />
-          ) : null}
-          {!mobileExperience && !sidebarOpen && !macOsTauri ? (
-            <IconButton
-              label={t("tooltip.settings")}
-              tooltip={t("tooltip.settings")}
-              icon={<Settings size={16} />}
-              variant="ghost"
-              size="md"
-              onClick={() => onOpenSettings()}
             />
           ) : null}
           {trailingActions}

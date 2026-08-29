@@ -2,6 +2,8 @@ const CJK_CHARACTER =
   /[\u2e80-\u2fff\u3000-\u303f\u3040-\u30ff\u31f0-\u31ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/u;
 
 export const MESSAGE_ENVELOPE_TOKENS = 8;
+export const CONTEXT_USAGE_WARN_RATIO = 0.5;
+export const CONTEXT_USAGE_DANGER_RATIO = 0.8;
 
 export function positiveTokenCount(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value > 0
@@ -60,7 +62,7 @@ export function contextUsageRatio(totalTokens: unknown, contextWindow: unknown):
 }
 
 export function canManualCompact(ratio: number): boolean {
-  return Number.isFinite(ratio) && ratio > 0;
+  return Number.isFinite(ratio) && ratio >= CONTEXT_USAGE_WARN_RATIO;
 }
 
 /**

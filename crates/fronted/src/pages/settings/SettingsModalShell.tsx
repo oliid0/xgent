@@ -1,6 +1,6 @@
 import type { DialogPurpose } from "@astryxdesign/core/Dialog";
 import { VStack } from "@astryxdesign/core/Layout";
-import { createContext, type ReactNode, useContext, useEffect } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect } from "react";
 
 const SettingsDetailLayerContext = createContext<((delta: 1 | -1) => void) | null>(null);
 
@@ -11,8 +11,16 @@ export function SettingsDetailLayerProvider({
   children: ReactNode;
   onLayerChange: (delta: 1 | -1) => void;
 }) {
+  const parentLayerChange = useContext(SettingsDetailLayerContext);
+  const reportLayerChange = useCallback(
+    (delta: 1 | -1) => {
+      onLayerChange(delta);
+      parentLayerChange?.(delta);
+    },
+    [onLayerChange, parentLayerChange],
+  );
   return (
-    <SettingsDetailLayerContext.Provider value={onLayerChange}>
+    <SettingsDetailLayerContext.Provider value={reportLayerChange}>
       {children}
     </SettingsDetailLayerContext.Provider>
   );

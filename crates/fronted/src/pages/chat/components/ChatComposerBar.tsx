@@ -1,11 +1,12 @@
+import { Button } from "@astryxdesign/core/Button";
 import { Carousel } from "@astryxdesign/core/Carousel";
 import { ChatComposer, ChatComposerDrawer, ChatSendButton } from "@astryxdesign/core/Chat";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { Heading } from "@astryxdesign/core/Heading";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Popover } from "@astryxdesign/core/Popover";
-import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { Section } from "@astryxdesign/core/Section";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Switch } from "@astryxdesign/core/Switch";
@@ -47,6 +48,7 @@ import {
   Trash2,
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
+import { canManualCompact, contextUsageRatio } from "../../../lib/chat/contextUsage";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
 import type { GitClient } from "../../../lib/git/types";
 import {
@@ -156,40 +158,108 @@ function ContextUsageIndicator(props: {
     typeof props.contextWindow === "number" && Number.isFinite(props.contextWindow)
       ? Math.max(0, Math.floor(props.contextWindow))
       : 0;
-  if (contextWindow <= 0) return null;
-
   const usedTokens = Math.max(0, tokens ?? 0);
-  const ratio = Math.min(1, usedTokens / contextWindow);
-  const percent = Math.round(ratio * 100);
-  const variant = ratio >= 0.9 ? "error" : ratio >= 0.7 ? "warning" : "success";
+  const ratio = contextUsageRatio(usedTokens, contextWindow);
+  const compactAvailable =
+    canManualCompact(ratio) && !props.manualCompactionDisabled && Boolean(props.onManualCompact);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    if (!compactAvailable) setConfirmOpen(false);
+  }, [compactAvailable]);
+
+  if (contextWindow <= 0 || usedTokens <= 0) return null;
+
+  const ringPercent = Math.min(100, ratio * 100);
+  const percent = Math.min(999, Math.round(ratio * 100));
+  const ringColor =
+    ratio >= 0.8
+      ? "var(--color-error)"
+      : ratio >= 0.5
+        ? "var(--color-warning)"
+        : "var(--color-success)";
   const usageLabel = `${t("chat.contextUsage")}: ${formatCompactTokens(usedTokens)} / ${formatCompactTokens(contextWindow)} tokens (${percent}%)`;
-  const label = props.onManualCompact ? `${usageLabel} · ${t("chat.manualCompact")}` : usageLabel;
+
+  const ring = (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="28" height="28">
+      <circle cx="12" cy="12" r="9.5" fill="none" stroke="var(--color-border)" strokeWidth="2.25" />
+      <circle
+        cx="12"
+        cy="12"
+        r="9.5"
+        fill="none"
+        pathLength="100"
+        stroke={ringColor}
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeDasharray="100"
+        strokeDashoffset={100 - ringPercent}
+        transform="rotate(-90 12 12)"
+        style={{ transition: "stroke-dashoffset 180ms ease, stroke 180ms ease" }}
+      />
+      <text
+        x="12"
+        y="12.25"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fill="currentColor"
+        fontSize="5.5"
+        fontWeight="600"
+      >
+        {percent}%
+      </text>
+    </svg>
+  );
+
+  const trigger = (
+    <IconButton
+      label={compactAvailable ? t("chat.manualCompact") : usageLabel}
+      tooltip={usageLabel}
+      icon={ring}
+      variant="ghost"
+      size="md"
+      isDisabled={props.manualCompactionDisabled}
+    />
+  );
+
+  if (!compactAvailable) return trigger;
 
   return (
-    <HStack gap={1} vAlign="center" width="var(--xagent-context-progress-width)">
-      <VStack width="100%">
-        <ProgressBar
-          label={usageLabel}
-          value={usedTokens}
-          max={contextWindow}
-          variant={variant}
-          isLabelHidden
-          hasValueLabel
-          formatValueLabel={() => `${percent}%`}
-        />
-      </VStack>
-      {props.onManualCompact ? (
-        <IconButton
-          label={label}
-          tooltip={label}
-          icon={<Sparkle />}
-          variant="ghost"
-          size="sm"
-          isDisabled={props.manualCompactionDisabled}
-          onClick={props.onManualCompact}
-        />
-      ) : null}
-    </HStack>
+    <Popover
+      isOpen={confirmOpen}
+      onOpenChange={setConfirmOpen}
+      placement="above"
+      alignment="end"
+      label={t("chat.manualCompactTitle")}
+      width="min(20rem, calc(100dvw - var(--spacing-4)))"
+      content={
+        <VStack gap={3}>
+          <Heading level={4}>{t("chat.manualCompactTitle")}</Heading>
+          <Text type="supporting" color="secondary">
+            {t("chat.manualCompactDescription")}
+          </Text>
+          <HStack gap={2} hAlign="end">
+            <Button
+              label={t("chat.cancel")}
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmOpen(false)}
+            />
+            <Button
+              label={t("chat.manualCompactConfirm")}
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setConfirmOpen(false);
+                props.onManualCompact?.();
+              }}
+            />
+          </HStack>
+        </VStack>
+      }
+    >
+      {trigger}
+    </Popover>
   );
 }
 

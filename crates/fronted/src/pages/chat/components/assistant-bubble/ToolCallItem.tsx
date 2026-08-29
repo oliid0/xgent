@@ -46,6 +46,53 @@ import { FileToolArgsDisplay } from "./FileToolArgs";
 import { sanitizeTodoItems, TodoListView } from "./TodoListView";
 import { ToolResultDisplay } from "./ToolResultDisplay";
 
+const TOOL_NAME_KEYS: Record<string, string> = {
+  Agent: "chat.tool.name.agent",
+  AskUserQuestion: "chat.tool.name.askUser",
+  Bash: "chat.tool.name.bash",
+  CronTaskManager: "chat.tool.name.cron",
+  Delete: "chat.tool.name.delete",
+  Edit: "chat.tool.name.edit",
+  Glob: "chat.tool.name.glob",
+  Grep: "chat.tool.name.grep",
+  Image: "chat.tool.name.image",
+  List: "chat.tool.name.list",
+  ManagedProcess: "chat.tool.name.process",
+  McpManager: "chat.tool.name.mcp",
+  MemoryManager: "chat.tool.name.memory",
+  Read: "chat.tool.name.read",
+  SendMessage: "chat.tool.name.sendMessage",
+  SkillsManager: "chat.tool.name.skills",
+  SSHManager: "chat.tool.name.ssh",
+  SshManager: "chat.tool.name.ssh",
+  TodoWrite: "chat.tool.name.todo",
+  Write: "chat.tool.name.write",
+};
+
+const TOOL_ACTION_KEYS: Record<string, string> = {
+  add: "chat.tool.action.add",
+  create: "chat.tool.action.create",
+  delete: "chat.tool.action.delete",
+  disable: "chat.tool.action.disable",
+  enable: "chat.tool.action.enable",
+  get: "chat.tool.action.get",
+  list: "chat.tool.action.list",
+  read: "chat.tool.action.read",
+  remove: "chat.tool.action.remove",
+  run: "chat.tool.action.run",
+  update: "chat.tool.action.update",
+};
+
+export function getLocalizedToolTitle(item: ToolTraceItem, translate: (key: string) => string) {
+  const title = getToolDisplayTitle(item.toolCall);
+  const nameKey = TOOL_NAME_KEYS[item.toolCall.name] ?? TOOL_NAME_KEYS[title.name];
+  const name = nameKey ? translate(nameKey) : title.name;
+  const normalizedAction = title.action.trim().toLowerCase();
+  const actionKey = TOOL_ACTION_KEYS[normalizedAction];
+  const action = actionKey ? translate(actionKey) : title.action;
+  return action ? `${name} · ${action}` : name;
+}
+
 function ToolDetailSection(props: { label?: string; children: ReactNode }) {
   return (
     <VStack gap={1}>
@@ -279,12 +326,7 @@ function ToolCallItem({ item, isRunning }: { item: ToolTraceItem; isRunning?: bo
   const detail = hasToolCallDetail(item) ? (
     <ToolCallDetail item={item} isRunning={isRunning} />
   ) : undefined;
-  const name =
-    item.toolCall.name === "TodoWrite"
-      ? t("chat.tool.todoTitle")
-      : item.toolCall.name === ASK_USER_QUESTION_TOOL_NAME
-        ? t("chat.tool.askUserTitle")
-        : undefined;
+  const name = getLocalizedToolTitle(item, t);
   const call = createAstryxToolCall(item, Boolean(isRunning), pinned ? undefined : detail, name);
 
   return (

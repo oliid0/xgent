@@ -8,6 +8,10 @@
   "files": {
     "includes": [
       "src/**",
+      "!!src/theme/xgent-chat.js",
+      "!!src/theme/xgent-chat.d.ts",
+      "!!src/theme/xgent-chat.variants.d.ts",
+      "!!src/theme/xgentTheme.css",
       "!!**/dist",
       "!!**/node_modules"
     ]

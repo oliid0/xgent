@@ -22,6 +22,7 @@ import { ArrowLeft, Globe, Plus, Terminal } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   HOOK_EVENT_TRANSLATION_KEYS,
+  HOOK_EVENTS,
   type HookDef,
   type HookEvent,
   type HookType,
@@ -38,7 +39,7 @@ import { SettingsModalShell } from "./SettingsModalShell";
 const DEFAULT_HOOK_TIMEOUT_SECONDS = 60;
 
 type HookModalProps = {
-  event: HookEvent;
+  event?: HookEvent;
   initialData?: HookDef;
   onSave: (data: Omit<HookDef, "id">) => void | Promise<void>;
   onClose: () => void;
@@ -47,6 +48,9 @@ type HookModalProps = {
 export function HookModal({ event, initialData, onSave, onClose }: HookModalProps) {
   const { t } = useLocale();
   const [name, setName] = useState(initialData?.name ?? "");
+  const [selectedEvent, setSelectedEvent] = useState<HookEvent>(
+    initialData?.event ?? event ?? HOOK_EVENTS[0],
+  );
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [type, setType] = useState<HookType>(initialData?.type ?? "command");
   const [scriptText, setScriptText] = useState(initialData?.script ?? "");
@@ -88,7 +92,7 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
       }
 
       await onSave({
-        event,
+        event: selectedEvent,
         name: trimmedName,
         description: description.trim(),
         enabled: initialData?.enabled ?? true,
@@ -122,7 +126,7 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
       <VStack as="form" onSubmit={handleSubmit} height="100%" minHeight={0} gap={0}>
         <DialogHeader
           title={title}
-          subtitle={t(HOOK_EVENT_TRANSLATION_KEYS[event])}
+          subtitle={t(HOOK_EVENT_TRANSLATION_KEYS[selectedEvent])}
           startContent={
             <IconButton
               label={t("settings.cancel")}
@@ -139,9 +143,26 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
           content={
             <LayoutContent padding={5} isScrollable>
               <FormLayout direction="vertical">
+                <Selector
+                  label={t("settings.hooksLifecycle")}
+                  value={selectedEvent}
+                  width="100%"
+                  options={HOOK_EVENTS.map((hookEvent) => ({
+                    value: hookEvent,
+                    label: t(HOOK_EVENT_TRANSLATION_KEYS[hookEvent]),
+                  }))}
+                  onChange={(value) => {
+                    clearError();
+                    setSelectedEvent(value as HookEvent);
+                  }}
+                />
                 <HStack gap={1} wrap="wrap">
-                  <Token label={event} color="gray" size="sm" />
-                  <Token label={t(HOOK_EVENT_TRANSLATION_KEYS[event])} color="purple" size="sm" />
+                  <Token label={selectedEvent} color="gray" size="sm" />
+                  <Token
+                    label={t(HOOK_EVENT_TRANSLATION_KEYS[selectedEvent])}
+                    color="purple"
+                    size="sm"
+                  />
                 </HStack>
 
                 <FormLayout direction="horizontal">

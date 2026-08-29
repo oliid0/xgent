@@ -80,7 +80,7 @@ export function AskUserQuestionCard({
   const current = questions[currentIndex];
   const isSettled = settled.size > 0 || cancelled;
   const selected = isSettled ? settled.get(current.id) : drafts[current.id];
-  const canInteract = interactive && !isSettled && !submitting;
+  const canInteract = interactive && !isSettled && remaining > 0 && !submitting;
   const answeredCount = questions.filter((question) => {
     const answer = isSettled ? settled.get(question.id) : drafts[question.id];
     return Boolean(answer?.value.trim());

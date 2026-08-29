@@ -4,6 +4,7 @@ import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { DialogHeader } from "@astryxdesign/core/Dialog";
+import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { FileInput } from "@astryxdesign/core/FileInput";
 import { FormLayout } from "@astryxdesign/core/FormLayout";
@@ -848,19 +849,28 @@ export function SshSettingsSection(props: SettingsSectionProps) {
       <Section variant="transparent" padding={0}>
         <HStack width="100%" gap={2} vAlign="center" hAlign="end" wrap="wrap">
           <Badge label={hosts.length} variant="neutral" />
-          <AstryxCoreButton
-            label={t("settings.sshImport")}
-            variant="secondary"
-            size="sm"
-            icon={<AstryxIcon icon={Upload} size="sm" color="inherit" />}
-            onClick={() => setImportOpen(true)}
-          />
-          <AstryxCoreButton
-            label={t("settings.sshAdd")}
-            variant="primary"
-            size="sm"
-            icon={<AstryxIcon icon={Plus} size="sm" color="inherit" />}
-            onClick={openAdd}
+          <DropdownMenu
+            button={{
+              label: t("settings.sshAdd"),
+              variant: "primary",
+              size: "sm",
+              icon: <AstryxIcon icon={Plus} size="sm" color="inherit" />,
+            }}
+            alignment="end"
+            items={[
+              {
+                id: "add",
+                label: t("settings.sshAdd"),
+                icon: <AstryxIcon icon={Server} size="sm" color="inherit" />,
+                onClick: openAdd,
+              },
+              {
+                id: "import",
+                label: t("settings.sshImport"),
+                icon: <AstryxIcon icon={Upload} size="sm" color="inherit" />,
+                onClick: () => setImportOpen(true),
+              },
+            ]}
           />
         </HStack>
       </Section>

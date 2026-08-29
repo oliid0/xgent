@@ -1,6 +1,11 @@
 import type { Model, ModelThinkingLevel, OpenAICompletionsCompat } from "@earendil-works/pi-ai";
-import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
+import {
+  type ModelThinkingCapability,
+  resolveModelThinking,
+  type ThinkingLevelMap,
+  toThinkingLevelMap,
+} from "../../models/modelThinking";
 import {
   type CodexRequestFormat,
   getProviderModelDefaults,
@@ -39,6 +44,19 @@ const DEEPSEEK_THINKING_LEVEL_MAP = {
   medium: "high",
   xhigh: "high",
 } as const;
+
+function resolveModelThinkingFields(
+  capability: ModelThinkingCapability,
+  wireValues?: ThinkingLevelMap,
+): Pick<Model<any>, "reasoning"> & { thinkingLevelMap?: Model<any>["thinkingLevelMap"] } {
+  const thinkingLevelMap = toThinkingLevelMap(capability, wireValues);
+  return {
+    reasoning: capability.reasoning,
+    ...(thinkingLevelMap
+      ? { thinkingLevelMap: thinkingLevelMap as Model<any>["thinkingLevelMap"] }
+      : {}),
+  };
+}
 
 function resolveKnownModel(
   provider: "openai" | "anthropic" | "google",
@@ -323,6 +341,7 @@ export function createModelFromConfig(
   const configuredCost = modelConfig?.cost;
   const zeroCost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   const customModelCost = configuredCost ?? zeroCost;
+  const thinking = resolveModelThinking(providerId, modelId);
 
   if (providerId === "deepseek") {
     return {
@@ -333,8 +352,7 @@ export function createModelFromConfig(
       baseUrl: normalizeDeepSeekResponsesBaseUrl(baseUrl, {
         officialHost: isOfficialDeepSeekBaseUrl(upstreamBaseUrl?.trim() || baseUrl),
       }),
-      reasoning: true,
-      thinkingLevelMap: DEEPSEEK_THINKING_LEVEL_MAP,
+      ...resolveModelThinkingFields(thinking, DEEPSEEK_THINKING_LEVEL_MAP),
       input: ["text"],
       cost: customModelCost,
       contextWindow,
@@ -379,7 +397,12 @@ export function createModelFromConfig(
           contextWindow,
           maxTokens,
           ...(configuredCost ? { cost: configuredCost } : {}),
-          ...(isXaiTarget ? { reasoning: true, thinkingLevelMap: XAI_THINKING_LEVEL_MAP } : {}),
+          ...resolveModelThinkingFields(
+            thinking,
+            isXaiTarget
+              ? XAI_THINKING_LEVEL_MAP
+              : (known.thinkingLevelMap as ThinkingLevelMap | undefined),
+          ),
           ...(responsesCompat
             ? {
                 compat: {
@@ -407,12 +430,11 @@ export function createModelFromConfig(
       // 目录之外的自定义模型无法从 id 可靠判断推理能力，与 anthropic/gemini
       // 自定义分支一致按可推理处理（标准档位，xhigh/max 仍需目录 opt-in），
       // 是否真的下发思考由用户的开关决定。
-      reasoning: true,
+      ...resolveModelThinkingFields(thinking, isXaiTarget ? XAI_THINKING_LEVEL_MAP : undefined),
       input: resolveCodexModelInput(api, modelId),
       cost: customModelCost,
       contextWindow,
       maxTokens,
-      ...(isXaiTarget ? { thinkingLevelMap: XAI_THINKING_LEVEL_MAP } : {}),
     };
     if (api === "openai-responses" && responsesCompat) {
       custom.compat = responsesCompat;
@@ -425,7 +447,10 @@ export function createModelFromConfig(
       if (overrides) {
         custom.compat = overrides.compat;
         if (overrides.thinkingLevelMap) {
-          custom.thinkingLevelMap = overrides.thinkingLevelMap;
+          custom.thinkingLevelMap = toThinkingLevelMap(
+            thinking,
+            overrides.thinkingLevelMap as ThinkingLevelMap,
+          ) as Model<any>["thinkingLevelMap"];
         }
       }
     }
@@ -446,6 +471,10 @@ export function createModelFromConfig(
         contextWindow,
         maxTokens,
         ...(configuredCost ? { cost: configuredCost } : {}),
+        ...resolveModelThinkingFields(
+          thinking,
+          known.thinkingLevelMap as ThinkingLevelMap | undefined,
+        ),
       };
     }
 
@@ -455,7 +484,7 @@ export function createModelFromConfig(
       api: "google-generative-ai",
       provider: "google",
       baseUrl: normalizedBaseUrl,
-      reasoning: true,
+      ...resolveModelThinkingFields(thinking),
       input: ["text", "image"],
       cost: customModelCost,
       contextWindow,
@@ -472,6 +501,10 @@ export function createModelFromConfig(
         contextWindow,
         maxTokens,
         ...(configuredCost ? { cost: configuredCost } : {}),
+        ...resolveModelThinkingFields(
+          thinking,
+          known.thinkingLevelMap as ThinkingLevelMap | undefined,
+        ),
       },
       {
         providerId,
@@ -489,15 +522,15 @@ export function createModelFromConfig(
     api: "anthropic-messages",
     provider: "anthropic",
     baseUrl,
-    reasoning: true,
+    ...resolveModelThinkingFields(
+      thinking,
+      thinkingOverrides.thinkingLevelMap as ThinkingLevelMap | undefined,
+    ),
     input: ["text"],
     cost: customModelCost,
     contextWindow,
     maxTokens,
     ...(thinkingOverrides.compat ? { compat: thinkingOverrides.compat } : {}),
-    ...(thinkingOverrides.thinkingLevelMap
-      ? { thinkingLevelMap: thinkingOverrides.thinkingLevelMap }
-      : {}),
   };
   return applyDeepSeekModelDefaults(custom, {
     providerId,
@@ -516,15 +549,7 @@ export function getAvailableThinkingLevelsForModel(
   upstreamBaseUrl?: string,
 ): ModelThinkingLevel[] {
   if (!modelId.trim()) return [];
-  const model = createModelFromConfig(
-    providerId,
-    modelId,
-    baseUrl,
-    requestFormat,
-    modelConfig,
-    upstreamBaseUrl,
-  );
-  return getSupportedThinkingLevels(model).filter((level) => level !== "off");
+  return resolveModelThinking(providerId, modelId).levels as ModelThinkingLevel[];
 }
 
 export function isThinkingAlwaysOnForModel(
@@ -536,13 +561,5 @@ export function isThinkingAlwaysOnForModel(
   upstreamBaseUrl?: string,
 ): boolean {
   if (!modelId.trim()) return false;
-  const model = createModelFromConfig(
-    providerId,
-    modelId,
-    baseUrl,
-    requestFormat,
-    modelConfig,
-    upstreamBaseUrl,
-  );
-  return !getSupportedThinkingLevels(model).includes("off");
+  return resolveModelThinking(providerId, modelId).alwaysOn;
 }
