@@ -1744,7 +1744,7 @@ function Popup({
   onDismiss: () => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
-  const hlRef = useRef<HTMLDivElement>(null);
+  const hlRef = useRef<HTMLLIElement>(null);
   useEffect(() => {
     hlRef.current?.scrollIntoView({ block: "nearest" });
   }, [highlightIndex]);
@@ -1799,7 +1799,7 @@ function Popup({
               </AstryxText>
             )}
             {error && !isLoading && (
-              <AstryxText type="supporting" color="error">
+              <AstryxText type="supporting" color="secondary" role="alert">
                 {error}
               </AstryxText>
             )}

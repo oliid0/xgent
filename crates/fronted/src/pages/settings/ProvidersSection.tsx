@@ -1041,7 +1041,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                 </AstryxGrid>
 
                 {providerType !== "gemini" ? (
-                  <VStack gap={1} paddingTop={3}>
+                  <VStack gap={1} paddingBlockStart={3}>
                     <TextInput
                       label={t("settings.providerModelsUrl")}
                       description={t("settings.providerModelsUrlHint")}

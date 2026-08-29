@@ -543,10 +543,10 @@ export function createModelFromConfig(
 export function getAvailableThinkingLevelsForModel(
   providerId: ProviderId,
   modelId: string,
-  baseUrl: string,
-  requestFormat?: CodexRequestFormat,
-  modelConfig?: ProviderModelConfig,
-  upstreamBaseUrl?: string,
+  _baseUrl: string,
+  _requestFormat?: CodexRequestFormat,
+  _modelConfig?: ProviderModelConfig,
+  _upstreamBaseUrl?: string,
 ): ModelThinkingLevel[] {
   if (!modelId.trim()) return [];
   return resolveModelThinking(providerId, modelId).levels as ModelThinkingLevel[];
@@ -555,10 +555,10 @@ export function getAvailableThinkingLevelsForModel(
 export function isThinkingAlwaysOnForModel(
   providerId: ProviderId,
   modelId: string,
-  baseUrl: string,
-  requestFormat?: CodexRequestFormat,
-  modelConfig?: ProviderModelConfig,
-  upstreamBaseUrl?: string,
+  _baseUrl: string,
+  _requestFormat?: CodexRequestFormat,
+  _modelConfig?: ProviderModelConfig,
+  _upstreamBaseUrl?: string,
 ): boolean {
   if (!modelId.trim()) return false;
   return resolveModelThinking(providerId, modelId).alwaysOn;
