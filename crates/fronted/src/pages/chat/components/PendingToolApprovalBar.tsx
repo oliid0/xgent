@@ -1,5 +1,5 @@
-import { ToolApprovalBar } from "@xagent/ui/components/chat/ToolApprovalBar";
 import { useCallback, useSyncExternalStore } from "react";
+import { ToolApprovalBar } from "@/components/chat/ToolApprovalBar";
 import {
   answerToolApproval,
   getPendingToolApprovalsSnapshot,

@@ -6,8 +6,8 @@
  * persisted window through the same idempotent local ledger.
  */
 
-import { createTrajectoryLiveStore } from "@xagent/ui/lib/trajectory/liveStore";
-import type { TrajectoryEvent } from "@xagent/ui/lib/trajectory/types";
+import { createTrajectoryLiveStore } from "@/lib/trajectory/liveStore";
+import type { TrajectoryEvent } from "@/lib/trajectory/types";
 
 const NOTIFY_COALESCE_MS = 100;
 

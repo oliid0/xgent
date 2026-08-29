@@ -37,6 +37,7 @@ import {
   createCodeMentionReference,
 } from "../../lib/chat/messages/mentionReferences";
 import { invokeFs, isFsBackendError } from "../../lib/tools/fsBackend";
+import { AdaptiveDialog } from "../astryx/AdaptiveDialog";
 import {
   AlertTriangle,
   ClipboardPaste,
@@ -55,7 +56,6 @@ import {
   X,
 } from "../icons";
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
-import { AdaptiveDialog } from "../ui/adaptive-dialog";
 import { isWorkspacePreviewPath } from "./workspaceImagePreview";
 
 type MonacoEnvironmentGlobal = typeof globalThis & {

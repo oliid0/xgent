@@ -3,7 +3,7 @@
 // ChatPage), the conversation-rename UI state, the delete flow, and the
 // error-code → i18n mapping for every frontend target.
 
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ChatHistorySidebar } from "../../../components/chat/ChatHistorySidebar";
 import type { WorkspaceToolTarget } from "../../../components/project-tools/workspaceToolsModel";
@@ -265,6 +265,8 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
   return (
     <Fragment>
       <AstryxButton
+        variant="ghost"
+        label={t("sidebar.closeSidebar")}
         type="button"
         aria-label={t("sidebar.closeSidebar")}
         onClick={props.onCloseSidebar}

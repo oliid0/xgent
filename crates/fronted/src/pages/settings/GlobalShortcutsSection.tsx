@@ -1,9 +1,7 @@
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import {
-  Inline as AstryxInline,
-  Paragraph as AstryxParagraph,
-  View as AstryxView,
-} from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
+import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText } from "@astryxdesign/core/Text";
 import {
   type ReactNode,
   useCallback,
@@ -379,11 +377,7 @@ function KeyCap(props: {
   const { def, pressed, held, decor, fill } = props;
   if (!def.code && !def.label) {
     return (
-      <AstryxView
-        layout="block"
-        direction="horizontal"
-        style={{ width: keyWidth(def.units), height: KEY_UNIT }}
-      />
+      <AstryxStack direction="vertical" style={{ width: keyWidth(def.units), height: KEY_UNIT }} />
     );
   }
   const bound = decor?.bound;
@@ -393,28 +387,39 @@ function KeyCap(props: {
     bound ? ` ghk-bound ${bound.colorClass}` : ""
   }${pressed ? " ghk-down" : ""}${held && !pressed ? " ghk-held" : ""}`;
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
+    <AstryxStack
+      direction="vertical"
       className={className}
       style={fill ? { width: "100%", height: "100%" } : { width: keyWidth(def.units) }}
-      title={bound?.title ?? decor?.hintTitle}
+      aria-label={bound?.title ?? decor?.hintTitle}
     >
-      <AstryxInline
+      <AstryxText
+        as="span"
+        type="inherit"
         className="ghk-klegend"
         style={def.label.length > 3 ? { fontSize: 9 } : undefined}
       >
         {def.label}
-      </AstryxInline>
-      {bound ? <AstryxInline className="ghk-tag">{bound.tag}</AstryxInline> : null}
-      {!bound && hintDots.length > 0 ? (
-        <AstryxInline className="ghk-dots">
-          {hintDots.map((hex) => (
-            <AstryxInline key={hex} className="ghk-dot" style={{ background: hex }} />
-          ))}
-        </AstryxInline>
+      </AstryxText>
+      {bound ? (
+        <AstryxText as="span" type="inherit" className="ghk-tag">
+          {bound.tag}
+        </AstryxText>
       ) : null}
-    </AstryxView>
+      {!bound && hintDots.length > 0 ? (
+        <AstryxText as="span" type="inherit" className="ghk-dots">
+          {hintDots.map((hex) => (
+            <AstryxStack
+              as="span"
+              direction="vertical"
+              key={hex}
+              className="ghk-dot"
+              style={{ background: hex }}
+            />
+          ))}
+        </AstryxText>
+      ) : null}
+    </AstryxStack>
   );
 }
 
@@ -773,13 +778,7 @@ export function GlobalShortcutsSection() {
 
   function renderRow(defs: KeyDef[], key: string) {
     return (
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        key={key}
-        className="flex"
-        style={{ gap: KEY_GAP }}
-      >
+      <AstryxStack direction="horizontal" key={key} className="flex" style={{ gap: KEY_GAP }}>
         {defs.map((def) => (
           <KeyCap
             key={def.id}
@@ -789,26 +788,17 @@ export function GlobalShortcutsSection() {
             decor={decorForCode(def.code)}
           />
         ))}
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   function renderMainBlock(withFnRow: boolean) {
     return (
-      <AstryxView
-        layout="flex"
-        direction="vertical"
-        className="flex flex-col"
-        style={{ gap: KEY_GAP }}
-      >
+      <AstryxStack direction="vertical" className="flex flex-col" style={{ gap: KEY_GAP }}>
         {withFnRow ? (
           <>
             {renderRow(ROW_FN, "fn")}
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              style={{ height: ROW_GAP_LARGE - KEY_GAP }}
-            />
+            <AstryxStack direction="vertical" style={{ height: ROW_GAP_LARGE - KEY_GAP }} />
           </>
         ) : null}
         {renderRow(ROW_NUM, "num")}
@@ -816,50 +806,30 @@ export function GlobalShortcutsSection() {
         {renderRow(ROW_A, "a")}
         {renderRow(ROW_Z, "z")}
         {renderRow(ROW_CTL, "ctl")}
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   function renderNavBlock() {
     return (
-      <AstryxView
-        layout="flex"
-        direction="vertical"
-        className="flex flex-col"
-        style={{ gap: KEY_GAP }}
-      >
+      <AstryxStack direction="vertical" className="flex flex-col" style={{ gap: KEY_GAP }}>
         {renderRow(NAV_TOP, "navtop")}
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          style={{ height: ROW_GAP_LARGE - KEY_GAP }}
-        />
+        <AstryxStack direction="vertical" style={{ height: ROW_GAP_LARGE - KEY_GAP }} />
         {renderRow(NAV_MID[0], "navmid0")}
         {renderRow(NAV_MID[1], "navmid1")}
-        <AstryxView layout="block" direction="horizontal" style={{ height: KEY_UNIT }} />
+        <AstryxStack direction="vertical" style={{ height: KEY_UNIT }} />
         {renderRow(NAV_ARROW_TOP, "arrowtop")}
         {renderRow(NAV_ARROW_BOTTOM, "arrowbottom")}
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   function renderNumBlock() {
     return (
-      <AstryxView
-        layout="flex"
-        direction="vertical"
-        className="flex flex-col"
-        style={{ gap: KEY_GAP }}
-      >
+      <AstryxStack direction="vertical" className="flex flex-col" style={{ gap: KEY_GAP }}>
         {renderRow(NUM_TOP, "numtop")}
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          style={{ height: ROW_GAP_LARGE - KEY_GAP }}
-        />
-        <AstryxView
-          layout="grid"
-          direction="horizontal"
+        <AstryxStack direction="vertical" style={{ height: ROW_GAP_LARGE - KEY_GAP }} />
+        <AstryxGrid
           className="grid"
           style={{
             gridTemplateColumns: `repeat(4, ${KEY_UNIT}px)`,
@@ -868,9 +838,8 @@ export function GlobalShortcutsSection() {
           }}
         >
           {NUM_GRID.map((cell) => (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               key={cell.def.id}
               style={{
                 gridRow: cell.tall ? "span 2" : undefined,
@@ -884,33 +853,38 @@ export function GlobalShortcutsSection() {
                 decor={decorForCode(cell.def.code)}
                 fill
               />
-            </AstryxView>
+            </AstryxStack>
           ))}
-        </AstryxView>
-      </AstryxView>
+        </AstryxGrid>
+      </AstryxStack>
     );
   }
 
   return (
-    <AstryxView layout="block" direction="horizontal" className="ghk-root space-y-6">
+    <AstryxStack direction="vertical" className="ghk-root space-y-6">
       <style>{GHK_STYLE}</style>
-      <AstryxView
+      <AstryxStack
+        direction="vertical"
         as="section"
         className="space-y-3 rounded-2xl border border-border/60 bg-card p-4"
       >
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="flex items-center gap-2 text-sm font-medium text-foreground"
         >
           <Keyboard className="h-4 w-4 text-muted-foreground" />
           {t("settings.globalShortcuts")}
-        </AstryxView>
-        <AstryxParagraph className="text-xs leading-relaxed text-muted-foreground">
+        </AstryxStack>
+        <AstryxText
+          as="p"
+          type="inherit"
+          display="block"
+          className="text-xs leading-relaxed text-muted-foreground"
+        >
           {t("settings.globalShortcutsDesc")}
-        </AstryxParagraph>
+        </AstryxText>
 
-        <AstryxView layout="block" direction="horizontal" className="space-y-2">
+        <AstryxStack direction="vertical" className="space-y-2">
           {actionMeta.map((action) => {
             const isRecording = recording === action.id;
             const binding = bindings[action.id];
@@ -921,8 +895,7 @@ export function GlobalShortcutsSection() {
                 ? binding.accelerator.split("+").map((token) => displayToken(token))
                 : [];
             return (
-              <AstryxView
-                layout="flex"
+              <AstryxStack
                 direction="horizontal"
                 key={action.id}
                 data-ghk-row={action.id}
@@ -934,6 +907,8 @@ export function GlobalShortcutsSection() {
                 )}
               >
                 <AstryxButton
+                  variant="ghost"
+                  label={action.desc}
                   type="button"
                   onClick={() => {
                     if (isRecording) {
@@ -945,13 +920,8 @@ export function GlobalShortcutsSection() {
                   }}
                   className="group flex min-w-0 flex-1 items-center justify-between gap-3 px-3.5 py-3 text-left"
                 >
-                  <AstryxView
-                    layout="flex"
-                    direction="horizontal"
-                    className="flex min-w-0 items-center gap-3"
-                  >
-                    <AstryxView
-                      layout="flex"
+                  <AstryxStack direction="horizontal" className="flex min-w-0 items-center gap-3">
+                    <AstryxStack
                       direction="horizontal"
                       className={cn(
                         "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
@@ -961,26 +931,23 @@ export function GlobalShortcutsSection() {
                       )}
                     >
                       {action.icon}
-                    </AstryxView>
-                    <AstryxView layout="block" direction="horizontal" className="min-w-0">
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
+                    </AstryxStack>
+                    <AstryxStack direction="vertical" className="min-w-0">
+                      <AstryxStack
+                        direction="vertical"
                         className="text-sm font-semibold text-foreground"
                       >
                         {action.label}
-                      </AstryxView>
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
+                      </AstryxStack>
+                      <AstryxStack
+                        direction="vertical"
                         className="mt-0.5 text-xs leading-relaxed text-muted-foreground"
                       >
                         {action.desc}
-                      </AstryxView>
-                    </AstryxView>
-                  </AstryxView>
-                  <AstryxView
-                    layout="flex"
+                      </AstryxStack>
+                    </AstryxStack>
+                  </AstryxStack>
+                  <AstryxStack
                     direction="horizontal"
                     className={cn(
                       "flex shrink-0 items-center gap-1.5",
@@ -989,21 +956,30 @@ export function GlobalShortcutsSection() {
                   >
                     {tokens.length > 0 ? (
                       tokens.map((token, index) => (
-                        <AstryxView
+                        <AstryxStack
                           as="span"
-                          layout="flex"
                           direction="horizontal"
                           key={token}
                           className="flex items-center gap-1.5"
                         >
                           {index > 0 ? (
-                            <AstryxInline className="text-xs text-muted-foreground">+</AstryxInline>
+                            <AstryxText
+                              as="span"
+                              type="inherit"
+                              className="text-xs text-muted-foreground"
+                            >
+                              +
+                            </AstryxText>
                           ) : null}
-                          <AstryxInline className="ghk-kbd">{token}</AstryxInline>
-                        </AstryxView>
+                          <AstryxText as="span" type="inherit" className="ghk-kbd">
+                            {token}
+                          </AstryxText>
+                        </AstryxStack>
                       ))
                     ) : (
-                      <AstryxInline
+                      <AstryxText
+                        as="span"
+                        type="inherit"
                         className={cn(
                           "text-xs",
                           isRecording ? "text-primary" : "text-muted-foreground",
@@ -1012,14 +988,18 @@ export function GlobalShortcutsSection() {
                         {isRecording
                           ? t("settings.shortcutRecordingHint")
                           : t("settings.shortcutNotSet")}
-                      </AstryxInline>
+                      </AstryxText>
                     )}
                     {isRecording && tokens.length > 0 ? (
-                      <AstryxInline className="ml-1 text-xs font-medium text-primary">
+                      <AstryxText
+                        as="span"
+                        type="inherit"
+                        className="ml-1 text-xs font-medium text-primary"
+                      >
                         {t("settings.shortcutPressEnter")}
-                      </AstryxInline>
+                      </AstryxText>
                     ) : null}
-                  </AstryxView>
+                  </AstryxStack>
                 </AstryxButton>
                 {!isRecording && binding ? (
                   <>
@@ -1029,58 +1009,56 @@ export function GlobalShortcutsSection() {
                       onToggle={() => toggleBinding(action.id)}
                     />
                     <AstryxButton
+                      variant="ghost"
+                      label={t("settings.shortcutClear")}
                       type="button"
                       onClick={() => clearBinding(action.id)}
-                      title={t("settings.shortcutClear")}
+                      tooltip={t("settings.shortcutClear")}
                       className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                       <X className="h-3.5 w-3.5" />
                     </AstryxButton>
                   </>
                 ) : null}
-              </AstryxView>
+              </AstryxStack>
             );
           })}
-        </AstryxView>
+        </AstryxStack>
 
         {status ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className={cn(
               "text-xs font-medium",
               status.kind === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-destructive",
             )}
           >
             {status.text}
-          </AstryxView>
+          </AstryxStack>
         ) : null}
-      </AstryxView>
+      </AstryxStack>
 
-      <AstryxView
+      <AstryxStack
+        direction="vertical"
         as="section"
         className="space-y-3 rounded-2xl border border-border/60 bg-card p-4"
       >
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex items-center justify-between"
-        >
-          <AstryxView
-            layout="flex"
+        <AstryxStack direction="horizontal" className="flex items-center justify-between">
+          <AstryxStack
             direction="horizontal"
             className="flex items-center gap-2 text-sm font-medium text-foreground"
           >
             <Keyboard className="h-4 w-4 text-muted-foreground" />
             {t("settings.shortcutKeyboardTitle")}
-          </AstryxView>
-          <AstryxView
-            layout="flex"
+          </AstryxStack>
+          <AstryxStack
             direction="horizontal"
             className="flex items-center gap-0.5 rounded-lg bg-muted/50 p-0.5"
           >
             {LAYOUT_OPTIONS.map((option) => (
               <AstryxButton
+                variant="ghost"
+                label={t(`settings.shortcutLayout${option}`)}
                 key={option}
                 type="button"
                 onClick={() => setLayout(option)}
@@ -1094,55 +1072,47 @@ export function GlobalShortcutsSection() {
                 {t(`settings.shortcutLayout${option}`)}
               </AstryxButton>
             ))}
-          </AstryxView>
-        </AstryxView>
+          </AstryxStack>
+        </AstryxStack>
 
         {!recording && boundEntries.length > 0 ? (
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex flex-wrap items-center gap-2"
-          >
+          <AstryxStack direction="horizontal" className="flex flex-wrap items-center gap-2">
             {boundEntries.map((entry) => (
-              <AstryxView
+              <AstryxStack
                 as="span"
-                layout="flex"
                 direction="horizontal"
                 key={entry.action}
                 className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-background/80 px-2 py-1 text-xs"
               >
-                <AstryxInline
+                <AstryxStack
+                  as="span"
+                  direction="vertical"
                   className="h-2 w-2 rounded-full"
                   style={{ background: ACTION_COLOR_HEX[entry.colorIndex] }}
                 />
-                <AstryxInline className="font-medium text-foreground">{entry.label}</AstryxInline>
-                <AstryxInline className="text-muted-foreground">{entry.combo}</AstryxInline>
-              </AstryxView>
+                <AstryxText as="span" type="inherit" className="font-medium text-foreground">
+                  {entry.label}
+                </AstryxText>
+                <AstryxText as="span" type="inherit" className="text-muted-foreground">
+                  {entry.combo}
+                </AstryxText>
+              </AstryxStack>
             ))}
-          </AstryxView>
+          </AstryxStack>
         ) : null}
 
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          ref={outerRef}
-          className="overflow-hidden pt-2"
-        >
-          <AstryxView layout="block" direction="horizontal" ref={scalerRef}>
-            <AstryxView layout="block" direction="horizontal" className="ghk-stage">
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className={cn("ghk-board", recording && "ghk-rec")}
-              >
+        <AstryxStack direction="vertical" ref={outerRef} className="overflow-hidden pt-2">
+          <AstryxStack direction="vertical" ref={scalerRef}>
+            <AstryxStack direction="vertical" className="ghk-stage">
+              <AstryxStack direction="vertical" className={cn("ghk-board", recording && "ghk-rec")}>
                 {renderMainBlock(layout !== "61")}
                 {layout !== "61" ? renderNavBlock() : null}
                 {layout === "104" ? renderNumBlock() : null}
-              </AstryxView>
-            </AstryxView>
-          </AstryxView>
-        </AstryxView>
-      </AstryxView>
-    </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
+          </AstryxStack>
+        </AstryxStack>
+      </AstryxStack>
+    </AstryxStack>
   );
 }

@@ -1,10 +1,7 @@
 import type { AssistantMessage, Context } from "@earendil-works/pi-ai";
-import type { HostedSearchBlock } from "@xagent/ui/lib/chat/hostedSearch";
-import {
-  composeTrajectorySystemPrompt,
-  serializeToolCatalog,
-} from "@xagent/ui/lib/trajectory/sections";
-import type { TrajectoryUsage } from "@xagent/ui/lib/trajectory/types";
+import type { HostedSearchBlock } from "@/lib/chat/hostedSearch";
+import { composeTrajectorySystemPrompt, serializeToolCatalog } from "@/lib/trajectory/sections";
+import type { TrajectoryUsage } from "@/lib/trajectory/types";
 import type { CompactionController } from "../../../lib/chat/compaction/controller";
 import { estimateTextTokenUnits } from "../../../lib/chat/compaction/tokenLedger";
 import type { ProviderRuntimeConfig } from "../../../lib/chat/compaction/types";

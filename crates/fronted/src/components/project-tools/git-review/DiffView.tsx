@@ -1,3 +1,9 @@
+import { ContextMenu } from "@astryxdesign/core/ContextMenu";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText } from "@astryxdesign/core/Text";
+import { DiffFile } from "@git-diff-view/file";
+import { DiffModeEnum, DiffView } from "@git-diff-view/react";
+
 // GitReview diff rendering: DiffContent (patch chunks, diff stat, selection
 // context menu, selection autoscroll, horizontal scrollbar) and the
 // DiffReviewCard wrapper used by the changes view.
@@ -5,11 +11,7 @@
 // Shared by every frontend runtime; only relative or @xagent/runtime imports
 // are allowed here.
 
-import { DiffFile } from "@git-diff-view/file";
-import { DiffModeEnum, DiffView } from "@git-diff-view/react";
-import "@git-diff-view/react/styles/diff-view.css";
-import { ContextMenu } from "@astryxdesign/core/ContextMenu";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { Button } from "@astryxdesign/core/Button";
 import {
   memo,
   type MouseEvent as ReactMouseEvent,
@@ -26,7 +28,6 @@ import { useLocale } from "../../../i18n";
 import type { GitDiffResponse } from "../../../lib/git/types";
 import { cn } from "../../../lib/shared/utils";
 import { Copy, FolderTree, GitBranch, Loader2 } from "../../icons";
-import { Button } from "../../ui/button";
 import {
   basename,
   buildPatchChunks,
@@ -266,28 +267,31 @@ const DiffChunkView = memo(function DiffChunkView(props: { item: PatchChunk; isD
   const placeholderHeight = item.large ? 416 : Math.max(48, item.lineCount * 20);
 
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
+    <AstryxStack
+      direction="vertical"
       ref={containerRef}
       className="border-b border-border/60 last:border-b-0"
     >
-      <AstryxView
-        layout="flex"
+      <AstryxStack
         direction="horizontal"
         className="flex select-none items-center gap-2 border-b border-border/60 bg-muted/20 px-3 py-1.5 text-[calc(11px*var(--zone-font-scale,1))] font-medium text-muted-foreground"
       >
-        <AstryxInline className="min-w-0 flex-1 truncate">{item.label}</AstryxInline>
+        <AstryxText as="span" type="inherit" className="min-w-0 flex-1 truncate">
+          {item.label}
+        </AstryxText>
         {item.large ? (
-          <AstryxInline className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[calc(10px*var(--zone-font-scale,1))] text-amber-700 dark:text-amber-300">
+          <AstryxText
+            as="span"
+            type="inherit"
+            className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[calc(10px*var(--zone-font-scale,1))] text-amber-700 dark:text-amber-300"
+          >
             {t("projectTools.gitReview.largeDiff")}
-          </AstryxInline>
+          </AstryxText>
         ) : null}
-      </AstryxView>
+      </AstryxStack>
       {!visible ? (
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           aria-hidden="true"
           style={{ height: placeholderHeight }}
         />
@@ -311,7 +315,7 @@ const DiffChunkView = memo(function DiffChunkView(props: { item: PatchChunk; isD
           {rawPreview}
         </pre>
       )}
-    </AstryxView>
+    </AstryxStack>
   );
 });
 
@@ -339,98 +343,105 @@ function DiffStatView(props: { stat: string }) {
   }
 
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
-      className="border-b border-border/70 bg-muted/10 px-3 py-2"
-    >
+    <AstryxStack direction="vertical" className="border-b border-border/70 bg-muted/10 px-3 py-2">
       {parsed.files.length > 0 ? (
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           className={cn(GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS, "max-h-40 overflow-auto space-y-1")}
           onScroll={handleOverlayScroll}
         >
           {parsed.files.map((file) => (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               key={file.key}
               className="rounded-md border border-border/60 bg-background/75 px-2.5 py-2"
-              title={file.raw}
+              aria-label={file.raw}
             >
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                className="flex min-w-0 items-center gap-2"
-              >
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
+              <AstryxStack direction="horizontal" className="flex min-w-0 items-center gap-2">
+                <AstryxStack
+                  direction="vertical"
                   className="min-w-0 flex-1 truncate text-[calc(11px*var(--zone-font-scale,1))] font-medium text-foreground"
                 >
                   {basename(file.path)}
-                </AstryxView>
-                <AstryxView
-                  layout="flex"
+                </AstryxStack>
+                <AstryxStack
                   direction="horizontal"
                   className="flex shrink-0 items-center gap-1 text-[calc(10px*var(--zone-font-scale,1))] tabular-nums"
                 >
                   {file.binary ? (
-                    <AstryxInline className="rounded-full bg-muted px-1.5 py-0.5 text-muted-foreground">
+                    <AstryxText
+                      as="span"
+                      type="inherit"
+                      className="rounded-full bg-muted px-1.5 py-0.5 text-muted-foreground"
+                    >
                       {t("projectTools.gitReview.statBinary")}
-                    </AstryxInline>
+                    </AstryxText>
                   ) : (
                     <>
-                      <AstryxInline className="rounded-full bg-muted px-1.5 py-0.5 text-muted-foreground">
+                      <AstryxText
+                        as="span"
+                        type="inherit"
+                        className="rounded-full bg-muted px-1.5 py-0.5 text-muted-foreground"
+                      >
                         {file.changes} {t("projectTools.gitReview.statChanges")}
-                      </AstryxInline>
+                      </AstryxText>
                       {file.additions > 0 ? (
-                        <AstryxInline
+                        <AstryxText
+                          as="span"
+                          type="inherit"
                           className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 font-semibold text-emerald-700 dark:text-emerald-300"
-                          title={t("projectTools.gitReview.statInsertions")}
+                          aria-label={t("projectTools.gitReview.statInsertions")}
                         >
                           +{file.additions}
-                        </AstryxInline>
+                        </AstryxText>
                       ) : null}
                       {file.deletions > 0 ? (
-                        <AstryxInline
+                        <AstryxText
+                          as="span"
+                          type="inherit"
                           className="rounded-full bg-rose-500/10 px-1.5 py-0.5 font-semibold text-rose-700 dark:text-rose-300"
-                          title={t("projectTools.gitReview.statDeletions")}
+                          aria-label={t("projectTools.gitReview.statDeletions")}
                         >
                           -{file.deletions}
-                        </AstryxInline>
+                        </AstryxText>
                       ) : null}
                     </>
                   )}
-                </AstryxView>
-              </AstryxView>
-              <AstryxView layout="block" direction="horizontal" className="min-w-0">
-                <AstryxView
-                  layout="flex"
+                </AstryxStack>
+              </AstryxStack>
+              <AstryxStack direction="vertical" className="min-w-0">
+                <AstryxStack
                   direction="horizontal"
                   className="mt-1 flex h-1.5 overflow-hidden rounded-full bg-muted"
                 >
                   {file.additions > 0 ? (
-                    <AstryxInline
+                    <AstryxStack
+                      as="span"
+                      direction="vertical"
                       className="h-full bg-emerald-500/75"
                       style={{ width: `${file.additionPercent}%` }}
                     />
                   ) : null}
                   {file.deletions > 0 ? (
-                    <AstryxInline
+                    <AstryxStack
+                      as="span"
+                      direction="vertical"
                       className="h-full bg-rose-500/75"
                       style={{ width: `${file.deletionPercent}%` }}
                     />
                   ) : null}
                   {!file.binary && file.additions + file.deletions === 0 ? (
-                    <AstryxInline className="h-full w-full bg-muted-foreground/25" />
+                    <AstryxStack
+                      as="span"
+                      direction="vertical"
+                      className="h-full w-full bg-muted-foreground/25"
+                    />
                   ) : null}
-                </AstryxView>
-              </AstryxView>
-            </AstryxView>
+                </AstryxStack>
+              </AstryxStack>
+            </AstryxStack>
           ))}
-        </AstryxView>
+        </AstryxStack>
       ) : null}
       {parsed.fallbackLines.length > 0 ? (
         <pre
@@ -443,7 +454,7 @@ function DiffStatView(props: { stat: string }) {
           {parsed.fallbackLines.join("\n")}
         </pre>
       ) : null}
-    </AstryxView>
+    </AstryxStack>
   );
 }
 
@@ -848,29 +859,25 @@ export function DiffContent(props: {
         onPointerDownCapture={handleSelectionPointerDownCapture}
       >
         {error ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="shrink-0 px-3 py-3 text-xs text-destructive"
-          >
+          <AstryxStack direction="vertical" className="shrink-0 px-3 py-3 text-xs text-destructive">
             {error}
-          </AstryxView>
+          </AstryxStack>
         ) : null}
         {!error && showDiffStat ? <DiffStatView stat={diff?.stat ?? ""} /> : null}
         {showLoadingState ? (
-          <AstryxView
-            layout="flex"
+          <AstryxStack
             direction="horizontal"
             className="flex min-h-0 flex-1 items-center justify-center gap-2 px-3 py-8 text-center text-xs text-muted-foreground"
           >
             <Loader2 className="h-4 w-4 animate-spin" />
-            <AstryxInline>{t("projectTools.loading")}</AstryxInline>
-          </AstryxView>
+            <AstryxText as="span" type="inherit">
+              {t("projectTools.loading")}
+            </AstryxText>
+          </AstryxStack>
         ) : null}
         {!error && !showLoadingState && patchChunks.length > 0 ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             id={diffScrollViewportId}
             ref={(node) => {
               scrollViewportRef.current = node;
@@ -884,7 +891,7 @@ export function DiffContent(props: {
             {patchChunks.map((item) => (
               <DiffChunkView key={item.key} item={item} isDark={isDark} />
             ))}
-          </AstryxView>
+          </AstryxStack>
         ) : null}
         {!error && !showLoadingState && diff?.patch.trim() && patchChunks.length === 0 ? (
           <pre
@@ -902,32 +909,28 @@ export function DiffContent(props: {
           </pre>
         ) : null}
         {!error && !showLoadingState && diff && !diff.patch.trim() && patchChunks.length === 0 ? (
-          <AstryxView
-            layout="flex"
+          <AstryxStack
             direction="horizontal"
             className="flex min-h-0 flex-1 items-center justify-center px-3 py-8 text-center text-xs text-muted-foreground"
           >
             {t("projectTools.gitReview.noDiff")}
-          </AstryxView>
+          </AstryxStack>
         ) : null}
         {diff?.truncated ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className="shrink-0 border-t border-border/70 px-3 py-2 text-[calc(11px*var(--zone-font-scale,1))] text-amber-600 dark:text-amber-300"
           >
             {t("projectTools.gitReview.diffOutputTruncated")}
-          </AstryxView>
+          </AstryxStack>
         ) : null}
         {diffHorizontalScrollbar.visible ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className="shrink-0 border-t border-border/70 bg-background/80 px-2 py-0.5"
           >
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               ref={diffHorizontalScrollbarTrackRef}
               role="scrollbar"
               aria-label={locale === "en-US" ? "Horizontal diff scrollbar" : "diff 横向滚动条"}
@@ -940,17 +943,16 @@ export function DiffContent(props: {
               className="relative h-1.5 overflow-hidden rounded-full bg-muted/35"
               onPointerDown={handleDiffHorizontalScrollbarPointerDown}
             >
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+              <AstryxStack
+                direction="vertical"
                 className="git-review-diff-horizontal-scrollbar-thumb absolute left-0 top-0 h-full rounded-full bg-muted-foreground/35 shadow-sm transition-colors hover:bg-muted-foreground/55"
                 style={{
                   width: `${diffHorizontalScrollbar.thumbWidth}px`,
                   transform: `translateX(${diffHorizontalScrollbar.thumbLeft}px)`,
                 }}
               />
-            </AstryxView>
-          </AstryxView>
+            </AstryxStack>
+          </AstryxStack>
         ) : null}
       </fieldset>
     </ContextMenu>
@@ -983,65 +985,58 @@ export function DiffReviewCard(props: {
   const activeError = activeView === "branch" ? branchError : "";
 
   return (
-    <AstryxView
+    <AstryxStack
+      direction="vertical"
       as="section"
       className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/70 bg-background"
     >
-      <AstryxView
-        layout="flex"
+      <AstryxStack
         direction="horizontal"
         className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-2 border-b border-border/70 bg-background px-3 py-2"
       >
-        <AstryxView layout="block" direction="horizontal" className="min-w-0">
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="truncate text-xs font-semibold"
-          >
+        <AstryxStack direction="vertical" className="min-w-0">
+          <AstryxStack direction="vertical" className="truncate text-xs font-semibold">
             {activeTitle}
-          </AstryxView>
+          </AstryxStack>
           {activeDiff ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="truncate text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground"
             >
               {activeDiff.baseRef} → {activeDiff.headRef}
-            </AstryxView>
+            </AstryxStack>
           ) : null}
-        </AstryxView>
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex shrink-0 items-center gap-1"
-        >
+        </AstryxStack>
+        <AstryxStack direction="horizontal" className="flex shrink-0 items-center gap-1">
           {diffLoading ? (
             <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin text-muted-foreground" />
           ) : null}
           <Button
+            label={t("projectTools.gitReview.showWorkingTree")}
             type="button"
             size="sm"
             variant={activeView === "workingTree" ? "secondary" : "ghost"}
             className="h-7 w-7 px-0"
-            title={workingTreeTitle}
+            tooltip={workingTreeTitle}
             aria-label={t("projectTools.gitReview.showWorkingTree")}
             onClick={() => onActiveViewChange("workingTree")}
           >
             <FolderTree className="h-3.5 w-3.5" />
           </Button>
           <Button
+            label={t("projectTools.gitReview.showBranchDiff")}
             type="button"
             size="sm"
             variant={activeView === "branch" ? "secondary" : "ghost"}
             className="h-7 w-7 px-0"
-            title={branchTitle}
+            tooltip={branchTitle}
             aria-label={t("projectTools.gitReview.showBranchDiff")}
             onClick={() => onActiveViewChange("branch")}
           >
             <GitBranch className="h-3.5 w-3.5" />
           </Button>
-        </AstryxView>
-      </AstryxView>
+        </AstryxStack>
+      </AstryxStack>
       <DiffContent
         title={activeTitle}
         diff={activeDiff}
@@ -1049,7 +1044,7 @@ export function DiffReviewCard(props: {
         loading={diffLoading}
         showStat={showStat}
       />
-    </AstryxView>
+    </AstryxStack>
   );
 }
 

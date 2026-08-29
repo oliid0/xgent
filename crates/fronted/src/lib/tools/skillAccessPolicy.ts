@@ -1,4 +1,4 @@
-import { isAlwaysEnabledSkillName } from "@xagent/ui/lib/skills/builtin";
+import { isAlwaysEnabledSkillName } from "@/lib/skills/builtin";
 
 export type SkillAccessPolicy = {
   allowedSkillNames?: readonly string[];

@@ -1,5 +1,6 @@
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText } from "@astryxdesign/core/Text";
 import { useMemo, useState } from "react";
 import { ImagePreview, type ImagePreviewSlide } from "../../../components/chat/ImagePreview";
 import { File, FileText, X } from "../../../components/icons";
@@ -71,10 +72,9 @@ function UserImageAttachmentCard({
     ];
   }, [file.absolutePath, file.fileName, imageSrc, workspaceRoot]);
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
-      title={file.relativePath}
+    <AstryxStack
+      direction="vertical"
+      aria-label={file.relativePath}
       className={cn(
         "group relative overflow-hidden rounded-xl border border-white/60 bg-white/75 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] transition-shadow hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:border-white/[0.12] dark:bg-white/[0.06]",
         compact ? "min-w-0 basis-[calc(33.333%-5.33px)] grow" : "w-full max-w-[280px]",
@@ -82,11 +82,13 @@ function UserImageAttachmentCard({
     >
       {onRemove ? (
         <AstryxButton
+          variant="ghost"
+          label={removeLabel ?? file.fileName}
           type="button"
           onClick={() => onRemove(file.relativePath)}
           className="absolute top-1.5 right-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/30 text-white/90 opacity-0 backdrop-blur-sm transition-all hover:bg-black/45 group-hover:opacity-100"
           aria-label={removeLabel ?? file.fileName}
-          title={removeLabel}
+          tooltip={removeLabel}
         >
           <X className="h-3 w-3" />
         </AstryxButton>
@@ -94,10 +96,12 @@ function UserImageAttachmentCard({
       {imageSrc ? (
         <>
           <AstryxButton
+            variant="ghost"
+            label={labeledPreview}
             type="button"
             className="block w-full cursor-zoom-in overflow-hidden text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45"
             aria-label={labeledPreview}
-            title={labeledPreview}
+            tooltip={labeledPreview}
             onClick={() => setPreviewOpen(true)}
           >
             <img
@@ -119,16 +123,14 @@ function UserImageAttachmentCard({
           ) : null}
         </>
       ) : (
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className={cn(
             "flex w-full items-center justify-center bg-black/[0.02] dark:bg-white/5",
             compact ? "h-28" : "h-36",
           )}
         >
-          <AstryxView
-            layout="flex"
+          <AstryxStack
             direction="horizontal"
             className={
               isLoading
@@ -137,28 +139,27 @@ function UserImageAttachmentCard({
             }
           >
             {isLoading ? null : <File className="h-5 w-5 opacity-40" />}
-          </AstryxView>
-        </AstryxView>
+          </AstryxStack>
+        </AstryxStack>
       )}
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="flex items-center gap-1.5 px-2.5 py-1.5"
-      >
-        <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+      <AstryxStack direction="horizontal" className="flex items-center gap-1.5 px-2.5 py-1.5">
+        <AstryxStack direction="vertical" className="min-w-0 flex-1">
+          <AstryxStack
+            direction="vertical"
             className="truncate text-xs font-medium leading-tight text-primary/85"
           >
             {file.fileName}
-          </AstryxView>
-        </AstryxView>
-        <AstryxInline className="shrink-0 text-2xs tabular-nums text-primary/40">
+          </AstryxStack>
+        </AstryxStack>
+        <AstryxText
+          as="span"
+          type="inherit"
+          className="shrink-0 text-2xs tabular-nums text-primary/40"
+        >
           {formatUploadedFileSize(file.sizeBytes)}
-        </AstryxInline>
-      </AstryxView>
-    </AstryxView>
+        </AstryxText>
+      </AstryxStack>
+    </AstryxStack>
   );
 }
 
@@ -174,50 +175,48 @@ function UserFileAttachmentCard({
   compact: boolean;
 }) {
   return (
-    <AstryxView
-      layout="flex"
+    <AstryxStack
       direction="horizontal"
-      title={file.relativePath}
+      aria-label={file.relativePath}
       className={cn(
         "group relative flex items-center gap-2 rounded-xl border border-white/60 bg-white/75 px-2.5 py-2 text-left shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] transition-shadow hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:border-white/[0.12] dark:bg-white/[0.06]",
         compact ? "min-w-0 basis-[calc(33.333%-5.33px)] grow" : "w-full",
       )}
     >
-      <AstryxView
-        layout="flex"
+      <AstryxStack
         direction="horizontal"
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-b from-black/[0.03] to-black/[0.06] dark:from-white/[0.06] dark:to-white/[0.1]"
       >
         <FileText className="h-4 w-4 text-primary/45" />
-      </AstryxView>
-      <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+      </AstryxStack>
+      <AstryxStack direction="vertical" className="min-w-0 flex-1">
+        <AstryxStack
+          direction="vertical"
           className="truncate text-xs font-medium leading-tight text-primary/85"
         >
           {file.fileName}
-        </AstryxView>
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        </AstryxStack>
+        <AstryxStack
+          direction="vertical"
           className="mt-0.5 text-2xs tabular-nums leading-tight text-primary/40"
         >
           {formatUploadedFileSize(file.sizeBytes)}
-        </AstryxView>
-      </AstryxView>
+        </AstryxStack>
+      </AstryxStack>
       {onRemove ? (
         <AstryxButton
+          variant="ghost"
+          label={removeLabel ?? file.fileName}
           type="button"
           onClick={() => onRemove(file.relativePath)}
           className="absolute top-1/2 right-1.5 z-10 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-primary/30 opacity-0 transition-all hover:bg-overlay-hover hover:text-primary/60 group-hover:opacity-100"
           aria-label={removeLabel ?? file.fileName}
-          title={removeLabel}
+          tooltip={removeLabel}
         >
           <X className="h-3 w-3" />
         </AstryxButton>
       ) : null}
-    </AstryxView>
+    </AstryxStack>
   );
 }
 
@@ -293,9 +292,9 @@ export function UserAttachmentCards({
   const closePreviewLabel = t("chat.upload.closePreview");
 
   return (
-    <AstryxView layout="flex" direction="vertical" className="mb-2 flex flex-col gap-2">
+    <AstryxStack direction="vertical" className="mb-2 flex flex-col gap-2">
       {imageFiles.length > 0 ? (
-        <AstryxView layout="flex" direction="horizontal" className="flex flex-wrap gap-2">
+        <AstryxStack direction="horizontal" className="flex flex-wrap gap-2">
           {imageFiles.map((file) => (
             <UserAttachmentCard
               key={`${file.relativePath}-${file.absolutePath ?? file.fileName}`}
@@ -309,10 +308,10 @@ export function UserAttachmentCards({
               closePreviewLabel={closePreviewLabel}
             />
           ))}
-        </AstryxView>
+        </AstryxStack>
       ) : null}
       {otherFiles.length > 0 ? (
-        <AstryxView layout="flex" direction="horizontal" className="flex flex-wrap gap-2">
+        <AstryxStack direction="horizontal" className="flex flex-wrap gap-2">
           {otherFiles.map((file) => (
             <UserAttachmentCard
               key={`${file.relativePath}-${file.absolutePath ?? file.fileName}`}
@@ -326,8 +325,8 @@ export function UserAttachmentCards({
               closePreviewLabel={closePreviewLabel}
             />
           ))}
-        </AstryxView>
+        </AstryxStack>
       ) : null}
-    </AstryxView>
+    </AstryxStack>
   );
 }

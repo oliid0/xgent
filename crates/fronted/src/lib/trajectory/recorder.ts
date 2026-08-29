@@ -8,17 +8,14 @@
  * 落到当前 segment。两条路同源，所以实时状态和最终落盘保持一致。
  */
 
-import {
-  buildTrajectoryHeader,
-  type TrajectorySectionInput,
-} from "@xagent/ui/lib/trajectory/sections";
+import { buildTrajectoryHeader, type TrajectorySectionInput } from "@/lib/trajectory/sections";
 import type {
   TrajectoryEvent,
   TrajectorySection,
   TrajectorySectionRefs,
   TrajectoryStatus,
   TrajectoryUsage,
-} from "@xagent/ui/lib/trajectory/types";
+} from "@/lib/trajectory/types";
 import { createTrajectoryPersistenceQueue } from "./persistenceQueue";
 
 /** 工具参数在事件里的截断长度：实时通道要小，详情由正文索引另行提供。 */

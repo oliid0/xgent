@@ -1,35 +1,40 @@
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
-import { Dialog } from "@astryxdesign/core/Dialog";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { FormLayout } from "@astryxdesign/core/FormLayout";
 import { Grid } from "@astryxdesign/core/Grid";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Item } from "@astryxdesign/core/Item";
-import { HStack, Layout, LayoutContent, StackItem, VStack } from "@astryxdesign/core/Layout";
-import { Link } from "@astryxdesign/core/Link";
+import {
+  HStack,
+  Layout,
+  LayoutContent,
+  LayoutFooter,
+  StackItem,
+  VStack,
+} from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { Section } from "@astryxdesign/core/Section";
 import { Selector as AstryxSelector } from "@astryxdesign/core/Selector";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
-import { Text } from "@astryxdesign/core/Text";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import {
-  Heading as AstryxHeading,
-  Inline as AstryxInline,
-  Paragraph as AstryxParagraph,
-  View as AstryxView,
-} from "@xagent/ui/components/ui/view";
+import { Token } from "@astryxdesign/core/Token";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   Check,
   ExternalLink,
   Globe2,
   Key,
-  Loader2,
   Plus,
   RefreshCw,
   Search,
@@ -37,19 +42,7 @@ import {
   Shield,
   Sparkles,
   Terminal,
-  X,
 } from "../../components/icons";
-import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
-import { Textarea } from "../../components/ui/textarea";
 import { useLocale } from "../../i18n";
 import {
   applyMcpRegistryInstallConfig,
@@ -65,8 +58,6 @@ import {
   withUniqueMcpServerId,
 } from "../../lib/mcpRegistry";
 import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
-import { cn } from "../../lib/shared/utils";
-import { SettingsModalShell } from "../settings/SettingsModalShell";
 
 const STORE_PAGE_LIMIT = 18;
 const STORE_SKELETON_IDS = ["one", "two", "three", "four", "five", "six"] as const;
@@ -101,15 +92,6 @@ type McpRegistryCardGroup = {
   id: string;
   cards: McpRegistryCard[];
 };
-
-function sourceTone(_source: McpRegistrySource) {
-  // Source label is rendered as a neutral frosted-glass chip; the text alone communicates the source.
-  return "border-border/45 bg-background/70 text-foreground/75";
-}
-
-function transportTone(_transport: string) {
-  return "bg-background/70 text-foreground/75 ring-border/45";
-}
 
 function versionLabelForCard(card: McpRegistryCard) {
   return card.versionLabel ?? (card.source === "official" ? card.scoreLabel : undefined);
@@ -430,325 +412,192 @@ function McpConfigureModal(props: {
   const isSse = draft.transport === "sse";
 
   return (
-    <SettingsModalShell
-      onClose={onClose}
+    <Dialog
+      isOpen
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
+      variant="standard"
       purpose="form"
-      ariaLabel={t("mcpHub.storeConfigureTitle")}
+      aria-label={t("mcpHub.storeConfigureTitle")}
+      width="min(var(--xagent-settings-dialog-width), calc(100dvw - (var(--spacing-4) * 2)))"
+      padding={0}
     >
-      <AstryxView
-        as="form"
-        onSubmit={handleSubmit}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-      >
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="settings-modal-header flex items-center gap-3 border-b border-border/40 px-6 py-4"
-        >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-          >
-            <Sparkles className="h-5 w-5" />
-          </AstryxView>
-          <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-            <AstryxHeading level={2} className="text-base font-semibold">
-              {t("mcpHub.storeConfigureTitle")}
-            </AstryxHeading>
-            <AstryxParagraph
-              className="mt-0.5 truncate text-xs text-muted-foreground"
-              title={card.displayName}
-            >
-              {t("mcpHub.storeConfigureSubtitle").replace("{name}", card.displayName)}
-            </AstryxParagraph>
-          </AstryxView>
-          <AstryxButton
-            type="button"
-            onClick={onClose}
-            title={t("settings.cancel")}
-            aria-label={t("settings.cancel")}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </AstryxButton>
-        </AstryxView>
-
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="settings-modal-body flex-1 overflow-y-auto px-6 py-5"
-        >
-          <AstryxView layout="block" direction="horizontal" className="space-y-5">
-            <AstryxView layout="grid" direction="horizontal" className="grid gap-3 sm:grid-cols-3">
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="space-y-1.5 sm:col-span-1"
-              >
-                <Label htmlFor="mcp-store-config-id" className="text-xs text-muted-foreground">
-                  {t("mcpHub.serverName")}
-                </Label>
-                <Input
-                  id="mcp-store-config-id"
-                  value={draft.id}
-                  placeholder={t("mcpHub.serverNamePlaceholder")}
-                  onChange={(event) => updateDraft({ id: event.currentTarget.value })}
-                />
-              </AstryxView>
-              <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                <Label
-                  htmlFor="mcp-store-config-transport"
-                  className="text-xs text-muted-foreground"
-                >
-                  {t("mcpHub.transport")}
-                </Label>
-                <Select
-                  value={draft.transport}
-                  onValueChange={(value) => {
-                    const transport = value === "http" ? "http" : value === "sse" ? "sse" : "stdio";
-                    updateDraft({ transport });
-                  }}
-                >
-                  <SelectTrigger id="mcp-store-config-transport">
-                    <SelectValue placeholder={t("mcpHub.selectTransport")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="stdio" disabled={!allowStdio}>
-                      {t("mcpHub.stdio")}
-                    </SelectItem>
-                    <SelectItem value="http">{t("mcpHub.http")}</SelectItem>
-                    <SelectItem value="sse">{t("mcpHub.sse")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </AstryxView>
-              <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                <Label htmlFor="mcp-store-config-timeout" className="text-xs text-muted-foreground">
-                  {t("mcpHub.timeout")}
-                </Label>
-                <Input
-                  id="mcp-store-config-timeout"
-                  type="number"
-                  value={draft.timeoutMs}
-                  placeholder="60000"
-                  onChange={(event) => updateDraft({ timeoutMs: event.currentTarget.value })}
-                />
-              </AstryxView>
-            </AstryxView>
-
-            {isStdio ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="space-y-3 rounded-xl border border-border/45 bg-muted/20 p-4"
-              >
-                <AstryxView
-                  layout="grid"
-                  direction="horizontal"
-                  className="grid gap-3 sm:grid-cols-2"
-                >
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                    <Label
-                      htmlFor="mcp-store-config-command"
-                      className="text-xs text-muted-foreground"
-                    >
-                      {t("mcpHub.command")}
-                    </Label>
-                    <Input
-                      id="mcp-store-config-command"
-                      value={draft.command}
-                      placeholder="npx"
-                      className="font-mono text-[12.5px]"
-                      onChange={(event) => updateDraft({ command: event.currentTarget.value })}
+      <form onSubmit={handleSubmit}>
+        <Layout
+          header={
+            <DialogHeader
+              title={t("mcpHub.storeConfigureTitle")}
+              subtitle={t("mcpHub.storeConfigureSubtitle").replace("{name}", card.displayName)}
+              startContent={<Icon icon={Sparkles} size="md" color="secondary" />}
+              onOpenChange={(isOpen) => {
+                if (!isOpen) onClose();
+              }}
+            />
+          }
+          content={
+            <LayoutContent isScrollable>
+              <VStack gap={5}>
+                <FormLayout>
+                  <FormLayout direction="horizontal">
+                    <TextInput
+                      label={t("mcpHub.serverName")}
+                      value={draft.id}
+                      placeholder={t("mcpHub.serverNamePlaceholder")}
+                      onChange={(value) => updateDraft({ id: value })}
                     />
-                  </AstryxView>
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                    <Label htmlFor="mcp-store-config-cwd" className="text-xs text-muted-foreground">
-                      {t("mcpHub.cwd")}
-                    </Label>
-                    <Input
-                      id="mcp-store-config-cwd"
-                      value={draft.cwd}
-                      placeholder={t("mcpHub.cwdDefault")}
-                      className="font-mono text-[12.5px]"
-                      onChange={(event) => updateDraft({ cwd: event.currentTarget.value })}
+                    <AstryxSelector
+                      label={t("mcpHub.transport")}
+                      value={draft.transport}
+                      options={[
+                        {
+                          value: "stdio",
+                          label: t("mcpHub.stdio"),
+                          disabled: !allowStdio,
+                        },
+                        { value: "http", label: t("mcpHub.http") },
+                        { value: "sse", label: t("mcpHub.sse") },
+                      ]}
+                      onChange={(value) =>
+                        updateDraft({
+                          transport: value === "http" ? "http" : value === "sse" ? "sse" : "stdio",
+                        })
+                      }
                     />
-                  </AstryxView>
-                </AstryxView>
-                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                  <Label htmlFor="mcp-store-config-args" className="text-xs text-muted-foreground">
-                    {t("mcpHub.args")}
-                  </Label>
-                  <Textarea
-                    id="mcp-store-config-args"
-                    value={draft.argsText}
-                    placeholder={"-y\n@modelcontextprotocol/server-time"}
-                    className="min-h-[92px] font-mono text-[12.5px]"
-                    onChange={(event) => updateDraft({ argsText: event.currentTarget.value })}
-                  />
-                </AstryxView>
-                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                  <Label htmlFor="mcp-store-config-env" className="text-xs text-muted-foreground">
-                    {t("mcpHub.env")}
-                  </Label>
-                  <Textarea
-                    id="mcp-store-config-env"
-                    value={draft.envText}
-                    placeholder={"BRAVE_API_KEY=...\nHTTP_PROXY=..."}
-                    className="min-h-[92px] font-mono text-[12.5px]"
-                    onChange={(event) => updateDraft({ envText: event.currentTarget.value })}
-                  />
-                </AstryxView>
-              </AstryxView>
-            ) : (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="space-y-3 rounded-xl border border-border/45 bg-muted/20 p-4"
-              >
-                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                  <Label htmlFor="mcp-store-config-url" className="text-xs text-muted-foreground">
-                    {draft.transport === "http" ? t("mcpHub.urlHttp") : t("mcpHub.urlSse")}
-                  </Label>
-                  <Input
-                    id="mcp-store-config-url"
-                    value={draft.url}
-                    placeholder={
-                      draft.transport === "http"
-                        ? "http://127.0.0.1:3000/mcp"
-                        : "http://127.0.0.1:3000/sse"
-                    }
-                    className="font-mono text-[12.5px]"
-                    onChange={(event) => updateDraft({ url: event.currentTarget.value })}
-                  />
-                </AstryxView>
-                {isSse ? (
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                    <Label
-                      htmlFor="mcp-store-config-message-url"
-                      className="text-xs text-muted-foreground"
-                    >
-                      {t("mcpHub.messageUrl")}
-                    </Label>
-                    <Input
-                      id="mcp-store-config-message-url"
-                      value={draft.messageUrl}
-                      placeholder="http://127.0.0.1:3000/message"
-                      className="font-mono text-[12.5px]"
-                      onChange={(event) => updateDraft({ messageUrl: event.currentTarget.value })}
+                    <NumberInput
+                      label={t("mcpHub.timeout")}
+                      min={1}
+                      value={Number.parseInt(draft.timeoutMs, 10) || null}
+                      isWheelEnabled={false}
+                      onChange={(value) => updateDraft({ timeoutMs: value ? String(value) : "" })}
                     />
-                  </AstryxView>
-                ) : null}
-                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                  <Label
-                    htmlFor="mcp-store-config-headers"
-                    className="text-xs text-muted-foreground"
-                  >
-                    {t("mcpHub.headers")}
-                  </Label>
-                  <Textarea
-                    id="mcp-store-config-headers"
-                    value={draft.headersText}
-                    placeholder={"Authorization=Bearer ...\nX-API-Key=..."}
-                    className="min-h-[92px] font-mono text-[12.5px]"
-                    onChange={(event) => updateDraft({ headersText: event.currentTarget.value })}
-                  />
-                </AstryxView>
-              </AstryxView>
-            )}
+                  </FormLayout>
+                </FormLayout>
 
-            {requiredConfig.length > 0 ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="space-y-3 rounded-xl border border-border/50 bg-background/65 p-4 backdrop-blur-md"
-              >
-                <AstryxView layout="block" direction="horizontal">
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="text-sm font-semibold"
-                  >
-                    {t("mcpHub.storeConfigureRequiredTitle")}
-                  </AstryxView>
-                  <AstryxParagraph className="mt-1 text-xs text-muted-foreground">
-                    {t("mcpHub.storeConfigureRequiredDesc")}
-                  </AstryxParagraph>
-                </AstryxView>
-                <AstryxView
-                  layout="grid"
-                  direction="horizontal"
-                  className="grid gap-3 sm:grid-cols-2"
-                >
-                  {requiredConfig.map((input) => {
-                    const key = mcpRegistryConfigInputKey(input);
-                    return (
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        key={key}
-                        className="space-y-1.5"
-                      >
-                        <Label
-                          htmlFor={`mcp-store-config-${key}`}
-                          className="text-xs text-muted-foreground"
-                        >
-                          {input.label ?? input.name}
-                        </Label>
-                        <Input
-                          id={`mcp-store-config-${key}`}
-                          type={input.secret ? "password" : "text"}
-                          value={draft.configValues[key] ?? ""}
-                          placeholder={input.name}
-                          onChange={(event) => updateConfigValue(input, event.currentTarget.value)}
+                <Section variant="muted">
+                  <FormLayout>
+                    {isStdio ? (
+                      <>
+                        <FormLayout direction="horizontal">
+                          <TextInput
+                            label={t("mcpHub.command")}
+                            value={draft.command}
+                            placeholder="npx"
+                            onChange={(value) => updateDraft({ command: value })}
+                          />
+                          <TextInput
+                            label={t("mcpHub.cwd")}
+                            value={draft.cwd}
+                            placeholder={t("mcpHub.cwdDefault")}
+                            onChange={(value) => updateDraft({ cwd: value })}
+                          />
+                        </FormLayout>
+                        <TextArea
+                          label={t("mcpHub.args")}
+                          value={draft.argsText}
+                          rows={4}
+                          hasSpellCheck={false}
+                          placeholder={"-y\n@modelcontextprotocol/server-time"}
+                          onChange={(value) => updateDraft({ argsText: value })}
                         />
-                        <AstryxView
-                          layout="flex"
-                          direction="horizontal"
-                          className="flex items-start gap-1.5 text-[10.5px] text-muted-foreground/75"
-                        >
-                          <AstryxInline className="rounded bg-background/60 px-1.5 py-0.5 font-mono">
-                            {configTargetLabel(input, t)}
-                          </AstryxInline>
-                          {input.description ? (
-                            <AstryxInline>{input.description}</AstryxInline>
-                          ) : null}
-                        </AstryxView>
-                      </AstryxView>
-                    );
-                  })}
-                </AstryxView>
-              </AstryxView>
-            ) : null}
+                        <TextArea
+                          label={t("mcpHub.env")}
+                          value={draft.envText}
+                          rows={4}
+                          hasSpellCheck={false}
+                          placeholder={"BRAVE_API_KEY=...\nHTTP_PROXY=..."}
+                          onChange={(value) => updateDraft({ envText: value })}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <TextInput
+                          label={
+                            draft.transport === "http" ? t("mcpHub.urlHttp") : t("mcpHub.urlSse")
+                          }
+                          value={draft.url}
+                          placeholder={
+                            draft.transport === "http"
+                              ? "http://127.0.0.1:3000/mcp"
+                              : "http://127.0.0.1:3000/sse"
+                          }
+                          onChange={(value) => updateDraft({ url: value })}
+                        />
+                        {isSse ? (
+                          <TextInput
+                            label={t("mcpHub.messageUrl")}
+                            value={draft.messageUrl}
+                            placeholder="http://127.0.0.1:3000/message"
+                            onChange={(value) => updateDraft({ messageUrl: value })}
+                          />
+                        ) : null}
+                        <TextArea
+                          label={t("mcpHub.headers")}
+                          value={draft.headersText}
+                          rows={4}
+                          hasSpellCheck={false}
+                          placeholder={"Authorization=Bearer ...\nX-API-Key=..."}
+                          onChange={(value) => updateDraft({ headersText: value })}
+                        />
+                      </>
+                    )}
+                  </FormLayout>
+                </Section>
 
-            {formError ? (
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/[0.06] px-3 py-2.5 text-xs text-destructive"
-              >
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <AstryxInline>{formError}</AstryxInline>
-              </AstryxView>
-            ) : null}
-          </AstryxView>
-        </AstryxView>
+                {requiredConfig.length > 0 ? (
+                  <Section variant="transparent" padding={0}>
+                    <VStack gap={3}>
+                      <VStack gap={1}>
+                        <Heading level={4}>{t("mcpHub.storeConfigureRequiredTitle")}</Heading>
+                        <Text color="secondary">{t("mcpHub.storeConfigureRequiredDesc")}</Text>
+                      </VStack>
+                      <Grid columns={{ minWidth: 240, max: 2, repeat: "fit" }} gap={3}>
+                        {requiredConfig.map((input) => {
+                          const key = mcpRegistryConfigInputKey(input);
+                          return (
+                            <VStack key={key} gap={1}>
+                              <TextInput
+                                label={input.label ?? input.name}
+                                type={input.secret ? "password" : "text"}
+                                value={draft.configValues[key] ?? ""}
+                                placeholder={input.name}
+                                description={input.description}
+                                onChange={(value) => updateConfigValue(input, value)}
+                              />
+                              <Token label={configTargetLabel(input, t)} size="sm" />
+                            </VStack>
+                          );
+                        })}
+                      </Grid>
+                    </VStack>
+                  </Section>
+                ) : null}
 
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="settings-modal-footer settings-modal-footer-row flex items-center justify-end gap-2 border-t border-border/40 px-6 py-4"
-        >
-          <Button type="button" variant="outline" onClick={onClose}>
-            {t("settings.cancel")}
-          </Button>
-          <Button type="submit" className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" />
-            {t("mcpHub.storeConfigureSubmit")}
-          </Button>
-        </AstryxView>
-      </AstryxView>
-    </SettingsModalShell>
+                {formError ? <Banner status="error" title={formError} collapsible={false} /> : null}
+              </VStack>
+            </LayoutContent>
+          }
+          footer={
+            <LayoutFooter hasDivider>
+              <HStack gap={2} hAlign="end">
+                <AstryxCoreButton
+                  type="button"
+                  label={t("settings.cancel")}
+                  variant="secondary"
+                  onClick={onClose}
+                />
+                <AstryxCoreButton
+                  type="submit"
+                  label={t("mcpHub.storeConfigureSubmit")}
+                  icon={<Icon icon={Plus} size="sm" color="inherit" />}
+                  variant="primary"
+                />
+              </HStack>
+            </LayoutFooter>
+          }
+        />
+      </form>
+    </Dialog>
   );
 }
 
@@ -776,7 +625,6 @@ function RegistryCard(props: {
   const installing = installingId === card.id;
   const done = Boolean(installedId);
   const configureDraft = configureDraftForCard(card);
-  const link = primaryRegistryLink(card);
   const versionOptions = group.cards.map((item) => ({
     value: item.id,
     label: versionLabelForCard(item) ?? t("mcpHub.storeVersionLatest"),
@@ -838,23 +686,12 @@ function RegistryCard(props: {
             size="sm"
             onClick={() => onPreview(card)}
           />
-          {link ? (
-            <AstryxCoreButton
-              href={link}
-              target="_blank"
-              rel="noreferrer"
-              label={t("mcpHub.storeOpenExternal")}
-              tooltip={t("mcpHub.storeOpenExternal")}
-              icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
-              isIconOnly
-              variant="ghost"
-              size="sm"
-            />
-          ) : null}
           <AstryxCoreButton
             label={done ? t("mcpHub.storeInstalled") : t(installLabelKey(card))}
             icon={<Icon icon={done ? Check : Sparkles} size="sm" color="inherit" />}
-            variant={done ? "secondary" : "primary"}
+            isIconOnly
+            tooltip={done ? t("mcpHub.storeInstalled") : t(installLabelKey(card))}
+            variant="ghost"
             size="sm"
             isDisabled={done || installing}
             isLoading={installing}
@@ -921,445 +758,235 @@ function McpRegistryPreviewDrawer(props: {
           : { borderRadius: "var(--radius-container) 0 0 var(--radius-container)" }),
       }}
     >
-      <AstryxView as="aside" className="flex h-full w-full flex-col">
-        <AstryxView
-          layout="flex"
-          direction="vertical"
-          className="flex flex-col gap-2.5 border-b border-border/40 px-5 py-4"
-        >
-          <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-3">
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-            >
-              {data.remote ? <Globe2 className="h-5 w-5" /> : <Server className="h-5 w-5" />}
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="text-[10.5px] font-medium uppercase tracking-wider text-muted-foreground/80"
-              >
-                {t("mcpHub.storePreviewTitle")}
-              </AstryxView>
-              <AstryxHeading
-                level={2}
-                className="mt-0.5 truncate text-[15px] font-semibold tracking-tight text-foreground"
-              >
-                {data.displayName}
-              </AstryxHeading>
-            </AstryxView>
-            <AstryxButton
-              type="button"
-              onClick={onClose}
-              title={t("settings.cancel")}
-              aria-label={t("settings.cancel")}
-              className="flex h-8 w-8 shrink-0 items-center justify-center self-start rounded-full text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </AstryxButton>
-          </AstryxView>
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"
-          >
-            <AstryxView
-              as="span"
-              layout="inline-flex"
-              direction="horizontal"
-              className={cn("inline-flex rounded-md border px-1.5 py-0.5", sourceTone(data.source))}
-            >
-              {data.source}
-            </AstryxView>
-            {transports.map((transport) => (
-              <AstryxView
-                as="span"
-                layout="inline-flex"
-                direction="horizontal"
-                key={transport}
-                className={cn(
-                  "inline-flex rounded-md px-1.5 py-0.5 font-semibold uppercase ring-1",
-                  transportTone(transport),
-                )}
-              >
-                {transport}
-              </AstryxView>
-            ))}
-            {data.verified ? (
-              <AstryxView
-                as="span"
-                layout="inline-flex"
-                direction="horizontal"
-                className="inline-flex items-center gap-1 text-foreground/75"
-              >
-                <Shield className="h-3 w-3" />
-                {t("mcpHub.storePreviewVerified")}
-              </AstryxView>
-            ) : null}
-          </AstryxView>
-        </AstryxView>
+      <Layout
+        height="fill"
+        header={
+          <DialogHeader
+            title={data.displayName}
+            subtitle={data.source}
+            startContent={<Icon icon={data.remote ? Globe2 : Server} size="md" color="secondary" />}
+            onOpenChange={(isOpen) => {
+              if (!isOpen) onClose();
+            }}
+          />
+        }
+        content={
+          <LayoutContent isScrollable>
+            <VStack gap={5}>
+              <Text color="secondary">{data.description || t("mcpHub.storeNoDescription")}</Text>
 
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="min-h-0 flex-1 overflow-y-auto px-5 py-4"
-        >
-          <AstryxView layout="flex" direction="vertical" className="flex flex-col gap-4">
-            <AstryxParagraph className="text-[13px] leading-6 text-muted-foreground">
-              {data.description || t("mcpHub.storeNoDescription")}
-            </AstryxParagraph>
+              <HStack gap={2} vAlign="center" wrap="wrap">
+                <Token label={data.source} color="gray" size="sm" />
+                {transports.map((transport) => (
+                  <Token key={transport} label={transport.toUpperCase()} color="gray" size="sm" />
+                ))}
+                {data.verified ? (
+                  <Token
+                    label={t("mcpHub.storePreviewVerified")}
+                    color="green"
+                    size="sm"
+                    icon={<Icon icon={Shield} size="sm" color="inherit" />}
+                  />
+                ) : null}
+              </HStack>
 
-            <AstryxView layout="grid" direction="horizontal" className="grid grid-cols-2 gap-2">
-              <McpPreviewMetric label={t("mcpHub.storePreviewSource")} value={data.source} />
-              <McpPreviewMetric
-                label={t("mcpHub.storePreviewMode")}
-                value={data.remote ? t("mcpHub.storePreviewRemote") : t("mcpHub.storePreviewLocal")}
-              />
-            </AstryxView>
+              <MetadataList columns={2} label={{ position: "top" }}>
+                <MetadataListItem label={t("mcpHub.storePreviewSource")}>
+                  {data.source}
+                </MetadataListItem>
+                <MetadataListItem label={t("mcpHub.storePreviewMode")}>
+                  {data.remote ? t("mcpHub.storePreviewRemote") : t("mcpHub.storePreviewLocal")}
+                </MetadataListItem>
+              </MetadataList>
 
-            {loading ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="space-y-2 rounded-2xl border border-border/35 bg-background/60 p-3"
-              >
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex items-center gap-2 text-[12px] text-muted-foreground"
-                >
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground/65" />
-                  {t("mcpHub.storePreviewLoadingDetail")}
-                </AstryxView>
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="skills-skeleton-shimmer h-3 w-full rounded"
-                />
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="skills-skeleton-shimmer h-3 w-4/5 rounded"
-                />
-              </AstryxView>
-            ) : null}
+              {loading ? (
+                <VStack gap={2} aria-busy="true">
+                  <HStack gap={2} vAlign="center">
+                    <Spinner size="sm" aria-label={t("mcpHub.storePreviewLoadingDetail")} />
+                    <Text type="supporting" color="secondary">
+                      {t("mcpHub.storePreviewLoadingDetail")}
+                    </Text>
+                  </HStack>
+                  <Skeleton width="100%" height="var(--spacing-3)" index={0} />
+                  <Skeleton width="80%" height="var(--spacing-3)" index={1} />
+                </VStack>
+              ) : null}
 
-            {error ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="rounded-2xl border border-border/40 bg-muted/35 p-3"
-              >
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex items-start gap-2 text-[12px] text-muted-foreground"
-                >
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-foreground/65" />
-                  <AstryxInline>{t("mcpHub.storePreviewDetailUnavailable")}</AstryxInline>
-                </AstryxView>
-              </AstryxView>
-            ) : null}
+              {error ? (
+                <Banner
+                  status="warning"
+                  title={t("mcpHub.storePreviewDetailUnavailable")}
+                  collapsible={false}
+                />
+              ) : null}
 
-            {data.tags.length > 0 ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="rounded-2xl border border-border/40 bg-background/60 p-3"
-              >
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="mb-2 text-[12px] font-semibold text-foreground"
-                >
-                  {t("mcpHub.storePreviewTags")}
-                </AstryxView>
-                <AstryxView layout="flex" direction="horizontal" className="flex flex-wrap gap-1.5">
-                  {data.tags.map((tag) => (
-                    <AstryxInline
-                      key={tag}
-                      className="rounded-md bg-muted/55 px-1.5 py-0.5 text-[10.5px] text-muted-foreground ring-1 ring-border/30"
-                    >
-                      {tag}
-                    </AstryxInline>
-                  ))}
-                </AstryxView>
-              </AstryxView>
-            ) : null}
+              {data.tags.length > 0 ? (
+                <Section padding={0} variant="transparent">
+                  <VStack gap={2}>
+                    <Text type="label">{t("mcpHub.storePreviewTags")}</Text>
+                    <HStack gap={1} wrap="wrap">
+                      {data.tags.map((tag) => (
+                        <Token key={tag} label={tag} color="gray" size="sm" />
+                      ))}
+                    </HStack>
+                  </VStack>
+                </Section>
+              ) : null}
 
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="rounded-2xl border border-border/40 bg-background/60 p-3"
-            >
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="mb-2 text-[12px] font-semibold text-foreground"
-              >
-                {t("mcpHub.storePreviewInstallPreview")}
-              </AstryxView>
-              {draft?.commandPreview ? (
-                <code className="mb-2 block max-h-28 overflow-y-auto whitespace-pre-wrap break-all rounded-xl border border-border/35 bg-muted/35 px-3 py-2 text-[11px] leading-5 text-muted-foreground">
-                  {draft.commandPreview}
-                </code>
-              ) : (
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="mb-2 rounded-xl border border-border/35 bg-muted/35 px-3 py-2 text-[12px] text-muted-foreground"
-                >
-                  {data.installUnavailableReason === "needs-manual-command"
-                    ? t("mcpHub.storeNeedsCommand")
-                    : t("mcpHub.storeManualOnly")}
-                </AstryxView>
-              )}
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="divide-y divide-border/30"
-              >
-                <McpPreviewField
-                  label={t("mcpHub.serverName")}
-                  value={server?.id ?? data.name}
-                  mono
-                />
-                <McpPreviewField
-                  label={t("mcpHub.transport")}
-                  value={transports.length > 0 ? transports.join(", ") : null}
-                />
-                <McpPreviewField
-                  label={t("mcpHub.timeout")}
-                  value={server?.timeoutMs ? `${server.timeoutMs} ms` : null}
-                />
-                <McpPreviewField label={t("mcpHub.command")} value={server?.command} mono />
-                <McpPreviewField
-                  label={t("mcpHub.args")}
-                  value={server?.args?.length ? server.args.join("\n") : null}
-                  mono
-                />
-                <McpPreviewField
-                  label={server?.transport === "sse" ? t("mcpHub.urlSse") : t("mcpHub.urlHttp")}
-                  value={server?.url}
-                  mono
-                />
-                <McpPreviewField label={t("mcpHub.messageUrl")} value={server?.messageUrl} mono />
-                <McpPreviewField label={t("mcpHub.env")} value={keyListLabel(server?.env)} mono />
-                <McpPreviewField
-                  label={t("mcpHub.headers")}
-                  value={keyListLabel(server?.headers)}
-                  mono
-                />
-              </AstryxView>
-            </AstryxView>
-
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="rounded-2xl border border-border/40 bg-background/60 p-3"
-            >
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="mb-2 text-[12px] font-semibold text-foreground"
-              >
-                {t("mcpHub.storePreviewRequiredConfig")}
-              </AstryxView>
-              {requiredConfig.length > 0 ? (
-                <AstryxView layout="block" direction="horizontal" className="space-y-2">
-                  {requiredConfig.map((input) => (
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      key={mcpRegistryConfigInputKey(input)}
-                      className="rounded-xl border border-border/35 bg-muted/25 px-3 py-2"
-                    >
-                      <AstryxView
-                        layout="flex"
-                        direction="horizontal"
-                        className="flex min-w-0 items-center gap-2"
+              <Section padding={0} variant="transparent">
+                <VStack gap={3}>
+                  <Text type="label">{t("mcpHub.storePreviewInstallPreview")}</Text>
+                  {draft?.commandPreview ? (
+                    <CodeBlock code={draft.commandPreview} size="sm" />
+                  ) : (
+                    <Banner
+                      status="info"
+                      title={
+                        data.installUnavailableReason === "needs-manual-command"
+                          ? t("mcpHub.storeNeedsCommand")
+                          : t("mcpHub.storeManualOnly")
+                      }
+                      collapsible={false}
+                    />
+                  )}
+                  <MetadataList label={{ position: "start", width: "var(--spacing-28)" }}>
+                    <MetadataListItem label={t("mcpHub.serverName")}>
+                      {server?.id ?? data.name}
+                    </MetadataListItem>
+                    {transports.length > 0 ? (
+                      <MetadataListItem label={t("mcpHub.transport")}>
+                        {transports.join(", ")}
+                      </MetadataListItem>
+                    ) : null}
+                    {server?.timeoutMs ? (
+                      <MetadataListItem label={t("mcpHub.timeout")}>
+                        {`${server.timeoutMs} ms`}
+                      </MetadataListItem>
+                    ) : null}
+                    {server?.command ? (
+                      <MetadataListItem label={t("mcpHub.command")}>
+                        {server.command}
+                      </MetadataListItem>
+                    ) : null}
+                    {server?.args?.length ? (
+                      <MetadataListItem label={t("mcpHub.args")}>
+                        {server.args.join(" ")}
+                      </MetadataListItem>
+                    ) : null}
+                    {server?.url ? (
+                      <MetadataListItem
+                        label={
+                          server.transport === "sse" ? t("mcpHub.urlSse") : t("mcpHub.urlHttp")
+                        }
                       >
-                        {input.secret ? (
-                          <Key className="h-3.5 w-3.5 shrink-0 text-foreground/65" />
-                        ) : null}
-                        <AstryxInline className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground">
-                          {input.label ?? input.name}
-                        </AstryxInline>
-                        <AstryxInline className="rounded-md bg-background/70 px-1.5 py-0.5 text-[10px] text-muted-foreground ring-1 ring-border/30">
-                          {configTargetLabel(input, t)}
-                        </AstryxInline>
-                      </AstryxView>
-                      {input.description ? (
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="mt-1 text-[11px] leading-4 text-muted-foreground"
-                        >
-                          {input.description}
-                        </AstryxView>
-                      ) : null}
-                    </AstryxView>
-                  ))}
-                </AstryxView>
-              ) : (
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="text-[12px] text-muted-foreground"
-                >
-                  {t("mcpHub.storePreviewNoRequiredConfig")}
-                </AstryxView>
-              )}
-            </AstryxView>
+                        {server.url}
+                      </MetadataListItem>
+                    ) : null}
+                    {server?.messageUrl ? (
+                      <MetadataListItem label={t("mcpHub.messageUrl")}>
+                        {server.messageUrl}
+                      </MetadataListItem>
+                    ) : null}
+                    {keyListLabel(server?.env) ? (
+                      <MetadataListItem label={t("mcpHub.env")}>
+                        {keyListLabel(server?.env)}
+                      </MetadataListItem>
+                    ) : null}
+                    {keyListLabel(server?.headers) ? (
+                      <MetadataListItem label={t("mcpHub.headers")}>
+                        {keyListLabel(server?.headers)}
+                      </MetadataListItem>
+                    ) : null}
+                  </MetadataList>
+                </VStack>
+              </Section>
 
-            {warnings.length > 0 ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="rounded-2xl border border-border/55 bg-background/65 p-3 backdrop-blur-md"
-              >
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="mb-2 text-[12px] font-semibold text-foreground/85"
-                >
-                  {t("mcpHub.storePreviewWarnings")}
-                </AstryxView>
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="space-y-1 text-[12px] text-muted-foreground"
-                >
-                  {warnings.map((warning) => (
-                    <AstryxView layout="block" direction="horizontal" key={warning}>
-                      {warning}
-                    </AstryxView>
-                  ))}
-                </AstryxView>
-              </AstryxView>
-            ) : null}
+              <Section padding={0} variant="transparent">
+                <VStack gap={2}>
+                  <Text type="label">{t("mcpHub.storePreviewRequiredConfig")}</Text>
+                  {requiredConfig.length > 0 ? (
+                    <List density="balanced" hasDividers>
+                      {requiredConfig.map((input) => (
+                        <ListItem
+                          key={mcpRegistryConfigInputKey(input)}
+                          label={input.label ?? input.name}
+                          description={input.description}
+                          startContent={
+                            input.secret ? (
+                              <Icon icon={Key} size="sm" color="secondary" />
+                            ) : undefined
+                          }
+                          endContent={
+                            <Token label={configTargetLabel(input, t)} color="gray" size="sm" />
+                          }
+                        />
+                      ))}
+                    </List>
+                  ) : (
+                    <Text type="supporting" color="secondary">
+                      {t("mcpHub.storePreviewNoRequiredConfig")}
+                    </Text>
+                  )}
+                </VStack>
+              </Section>
 
-            {links.length > 0 ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="rounded-2xl border border-border/40 bg-background/60 p-3"
-              >
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="mb-2 text-[12px] font-semibold text-foreground"
-                >
-                  {t("mcpHub.storePreviewLinks")}
-                </AstryxView>
-                <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                  {links.map((link) => (
-                    <Link
-                      key={`${link.key}:${link.url}`}
-                      href={link.url}
-                      isExternalLink
-                      isStandalone
-                      className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                      <AstryxInline className="shrink-0">{t(link.labelKey)}</AstryxInline>
-                      <AstryxInline className="min-w-0 truncate font-mono text-[11px] opacity-70">
-                        {link.url}
-                      </AstryxInline>
-                    </Link>
-                  ))}
-                </AstryxView>
-              </AstryxView>
-            ) : null}
-          </AstryxView>
-        </AstryxView>
+              {warnings.length > 0 ? (
+                <Banner
+                  status="warning"
+                  title={t("mcpHub.storePreviewWarnings")}
+                  description={warnings.join("\n")}
+                  collapsible={false}
+                />
+              ) : null}
 
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex shrink-0 gap-2 border-t border-border/40 px-5 py-4"
-        >
-          {primaryLink ? (
-            <Link href={primaryLink} isExternalLink isStandalone weight="semibold">
-              {t("mcpHub.storeOpenExternal")}
-            </Link>
-          ) : null}
-          <Button
-            type="button"
-            variant={installed || draft?.status === "needs_config" ? "outline" : "default"}
-            size="sm"
-            className={cn(
-              "h-9 flex-1 gap-1.5 rounded-xl",
-              installed && "border-border/55 bg-background/75 text-foreground/85 backdrop-blur-md",
-            )}
-            disabled={installed || installing}
-            onClick={() => onInstall(data)}
-          >
-            {installing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : installed ? (
-              <Check className="h-3.5 w-3.5" />
-            ) : (
-              <Sparkles className="h-3.5 w-3.5" />
-            )}
-            {actionLabel}
-          </Button>
-        </AstryxView>
-      </AstryxView>
+              {links.length > 0 ? (
+                <Section padding={0} variant="transparent">
+                  <VStack gap={2}>
+                    <Text type="label">{t("mcpHub.storePreviewLinks")}</Text>
+                    <List density="balanced" hasDividers>
+                      {links.map((link) => (
+                        <ListItem
+                          key={`${link.key}:${link.url}`}
+                          label={t(link.labelKey)}
+                          description={link.url}
+                          startContent={<Icon icon={ExternalLink} size="sm" color="secondary" />}
+                          href={link.url}
+                          target="_blank"
+                        />
+                      ))}
+                    </List>
+                  </VStack>
+                </Section>
+              ) : null}
+            </VStack>
+          </LayoutContent>
+        }
+        footer={
+          <LayoutFooter hasDivider>
+            <HStack gap={2} hAlign="end" wrap="wrap">
+              {primaryLink ? (
+                <AstryxCoreButton
+                  href={primaryLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  label={t("mcpHub.storeOpenExternal")}
+                  icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
+                  variant="secondary"
+                />
+              ) : null}
+              <AstryxCoreButton
+                label={actionLabel}
+                icon={<Icon icon={installed ? Check : Sparkles} size="sm" color="inherit" />}
+                variant={installed || draft?.status === "needs_config" ? "secondary" : "primary"}
+                isDisabled={installed || installing}
+                isLoading={installing}
+                onClick={() => onInstall(data)}
+              />
+            </HStack>
+          </LayoutFooter>
+        }
+      />
     </Dialog>
-  );
-}
-
-function McpPreviewMetric(props: { label: string; value: string }) {
-  return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
-      className="rounded-2xl border border-border/35 bg-background/60 px-3 py-2.5"
-    >
-      <AstryxView
-        layout="block"
-        direction="horizontal"
-        className="text-[10.5px] text-muted-foreground"
-      >
-        {props.label}
-      </AstryxView>
-      <AstryxView
-        layout="block"
-        direction="horizontal"
-        className="mt-1 truncate text-sm font-semibold text-foreground"
-        title={props.value}
-      >
-        {props.value}
-      </AstryxView>
-    </AstryxView>
-  );
-}
-
-function McpPreviewField(props: { label: string; value?: string | null; mono?: boolean }) {
-  if (!props.value) return null;
-  return (
-    <AstryxView
-      layout="grid"
-      direction="horizontal"
-      className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 py-2 text-[12px]"
-    >
-      <AstryxView layout="block" direction="horizontal" className="text-muted-foreground">
-        {props.label}
-      </AstryxView>
-      <AstryxView
-        layout="block"
-        direction="horizontal"
-        className={cn(
-          "min-w-0 break-words text-foreground",
-          props.mono && "whitespace-pre-wrap font-mono text-[11px]",
-        )}
-      >
-        {props.value}
-      </AstryxView>
-    </AstryxView>
   );
 }
 

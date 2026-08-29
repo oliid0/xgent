@@ -453,39 +453,6 @@
 }
 
 @layer components {
-  /*
-   * The migration boundary must preserve the CSS formatting context requested by
-   * each call site. Astryx Stack is a flex primitive, so using it for a legacy
-   * block container without resetting display makes every arbitrary wrapper a
-   * flex formatting context. Components sits after Astryx's layers but before
-   * utilities, so responsive hidden/flex/grid utilities still win when present.
-   */
-  .astryx-stack.astryx-view-block {
-    display: block;
-  }
-
-  .astryx-stack.astryx-view-inline-flex {
-    display: inline-flex;
-  }
-
-  .astryx-grid.astryx-view-inline-grid,
-  .astryx-view-inline-grid {
-    display: inline-grid;
-  }
-
-  /*
-   * Legacy compound actions can contain complete row/grid compositions rather
-   * than a text label. Keep Astryx's interaction, focus and motion surface, but
-   * remove its label wrapper from layout so the original semantic children are
-   * the flex/grid items instead of being clipped inside a single inline span.
-   */
-  .astryx-button[data-xagent-rich-layout="true"] > span
-    > span:has(> [class], > [data-astryx-theme]) {
-    display: contents;
-    overflow: visible;
-    text-overflow: clip;
-  }
-
   .memory-organizer-schedule-grid {
     width: 100%;
     grid-template-columns: repeat(
@@ -2878,6 +2845,12 @@
   }
 }
 
+/* Let Astryx own the password affordance on Edge/WebView2. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
 @media (prefers-contrast: more) {
   .settings-mobile-group,
   .settings-page-desktop .settings-memory-status-group,
@@ -3562,6 +3535,26 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 .xagent-chat-mention-composer-expanded {
   height: 100%;
   max-height: none;
+}
+
+/* Sidebar rows use Astryx semantic surfaces in every theme. Keeping hover
+ * color independent from foreground alpha avoids black flashes in WebView. */
+.chat-history-row:hover,
+.workspace-project-row:hover {
+  background: var(--color-overlay-hover);
+}
+
+.chat-history-row[data-active="true"],
+.workspace-project-row[data-active="true"] {
+  background: var(--color-background-muted);
+}
+
+.chat-history-row[data-selected="true"] {
+  background: var(--color-accent-muted);
+}
+
+.workspace-project-row[data-missing="true"]:hover {
+  background: color-mix(in srgb, var(--color-error) 10%, transparent);
 }
 
 [data-transcript-context-trigger] {

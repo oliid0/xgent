@@ -2,9 +2,8 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack } from "@astryxdesign/core/Stack";
 import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { useState } from "react";
-
+import { ConfirmActionPopover } from "../../../components/astryx/ConfirmActionPopover";
 import { Check, Copy, GitBranch, Pencil, RefreshCw, Undo2 } from "../../../components/icons";
-import { ConfirmActionPopover } from "../../../components/ui/confirm-action-popover";
 import { useLocale } from "../../../i18n";
 import { useCheckpointRewind } from "../../../lib/chat/checkpointRewind";
 import type {

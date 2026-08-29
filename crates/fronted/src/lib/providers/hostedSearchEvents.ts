@@ -5,9 +5,9 @@ import {
   type HostedSearchStatus,
   mergeHostedSearchBlocks,
   normalizeHostedSearchStatus,
-} from "@xagent/ui/lib/chat/hostedSearch";
-import { hashText } from "@xagent/ui/lib/shared/hash";
-import { createUuid } from "@xagent/ui/lib/shared/id";
+} from "@/lib/chat/hostedSearch";
+import { hashText } from "@/lib/shared/hash";
+import { createUuid } from "@/lib/shared/id";
 import type { ProviderId } from "../settings";
 
 type HostedSearchUpdate = {

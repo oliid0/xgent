@@ -1,4 +1,4 @@
-import type { FsBackendError } from "@xagent/ui/lib/tools/fsBackend";
+import type { FsBackendError } from "@/lib/tools/fsBackend";
 import { formatPathWithinResolvedRoot, formatResolvedTarget, type ResolvedPath } from "./pathUtils";
 
 function displayCandidate(resolved: ResolvedPath, candidate: string) {

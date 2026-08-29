@@ -1,18 +1,20 @@
-import { Button as XdsButton } from "@astryxdesign/core/Button";
+import { Button as AstryxButton, Button as XdsButton } from "@astryxdesign/core/Button";
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
+import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
 import { HStack } from "@astryxdesign/core/Layout";
 import { Popover } from "@astryxdesign/core/Popover";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
-import { TextInput } from "@astryxdesign/core/TextInput";
+import { TextInput as AstryxInput, TextInput } from "@astryxdesign/core/TextInput";
 import { useToast } from "@astryxdesign/core/Toast";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Input as AstryxInput } from "@xagent/ui/components/ui/input";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import type { SftpClient, SftpEntry, SftpSide, SftpTransfer } from "../../lib/sftp/types";
 import { cn } from "../../lib/shared/utils";
 import type { TerminalSession } from "../../lib/terminal/types";
+import { AdaptiveDialog } from "../astryx/AdaptiveDialog";
+import { useConfirmDialog } from "../astryx/useConfirmDialog";
 import { getFileTypeIcon } from "../chat/fileTypeIcons";
 import {
   AlertTriangle,
@@ -28,8 +30,6 @@ import {
   Trash2,
   Upload,
 } from "../icons";
-import { AdaptiveDialog } from "../ui/adaptive-dialog";
-import { useConfirmDialog } from "../ui/confirm-dialog";
 
 type WorkspaceSftpPanelProps = {
   session: TerminalSession;
@@ -236,8 +236,7 @@ function PathCrumbRow(props: {
   }, [crumbs]);
 
   return (
-    <AstryxView
-      layout="flex"
+    <AstryxStack
       direction="horizontal"
       ref={scrollRef}
       className="sftp-path-scroll flex min-w-0 items-center overflow-x-auto"
@@ -250,6 +249,8 @@ function PathCrumbRow(props: {
               <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/40" />
             ) : null}
             <AstryxButton
+              variant="ghost"
+              label={crumb.path || crumb.label}
               type="button"
               className={cn(
                 "shrink-0 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-foreground/[0.05]",
@@ -257,7 +258,7 @@ function PathCrumbRow(props: {
                   ? "font-medium text-foreground"
                   : "text-muted-foreground hover:text-foreground",
               )}
-              title={crumb.path || crumb.label}
+              tooltip={crumb.path || crumb.label}
               onClick={() => onNavigate(crumb.path)}
             >
               {crumb.label || fallbackLabel || crumb.path}
@@ -265,7 +266,7 @@ function PathCrumbRow(props: {
           </Fragment>
         );
       })}
-    </AstryxView>
+    </AstryxStack>
   );
 }
 
@@ -444,8 +445,7 @@ function PathNavigator(props: {
   };
 
   return (
-    <AstryxView
-      layout="flex"
+    <AstryxStack
       direction="horizontal"
       ref={anchorRef}
       role="group"
@@ -458,13 +458,23 @@ function PathNavigator(props: {
       }}
     >
       {editing ? (
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="group relative flex h-8 min-w-0 flex-1 items-center rounded-lg border border-border/60 bg-background/85 shadow-sm transition-all focus-within:border-primary/40 focus-within:bg-background focus-within:ring-[3px] focus-within:ring-primary/10"
         >
           <FolderTree className="pointer-events-none absolute left-2.5 h-4 w-4 text-muted-foreground/70 transition-colors group-focus-within:text-primary" />
           <AstryxInput
+            label={t(
+              side === "remote"
+                ? "workspaceSftp.pathPlaceholder"
+                : "workspaceSftp.pathPlaceholderLocal",
+            )}
+            isLabelHidden
+            {...({
+              spellCheck: false,
+              autoCapitalize: "none",
+              autoCorrect: "off",
+            } as const)}
             ref={inputRef}
             value={value}
             type="text"
@@ -475,9 +485,6 @@ function PathNavigator(props: {
             aria-activedescendant={
               open && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
             }
-            spellCheck={false}
-            autoCapitalize="none"
-            autoCorrect="off"
             className="h-full min-w-0 flex-1 bg-transparent pl-8 pr-11 font-mono text-xs text-foreground outline-none placeholder:font-sans placeholder:text-muted-foreground/60"
             placeholder={t(
               side === "remote"
@@ -485,15 +492,14 @@ function PathNavigator(props: {
                 : "workspaceSftp.pathPlaceholderLocal",
             )}
             onFocus={() => setOpen(true)}
-            onChange={(event) => {
-              setValue(event.target.value);
+            onChange={(nextValue) => {
+              setValue(nextValue);
               setOpen(true);
             }}
             onKeyDown={handleKeyDown}
           />
-          <AstryxView
+          <AstryxStack
             as="span"
-            layout="flex"
             direction="horizontal"
             className="pointer-events-none absolute right-2 flex items-center gap-1 text-[10px] text-muted-foreground/70"
           >
@@ -501,16 +507,17 @@ function PathNavigator(props: {
             <kbd className="rounded-[5px] border border-border/70 bg-background/80 px-1 py-0.5 font-sans text-muted-foreground/80">
               ↵
             </kbd>
-          </AstryxView>
-        </AstryxView>
+          </AstryxStack>
+        </AstryxStack>
       ) : (
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="flex h-8 min-w-0 flex-1 items-center rounded-lg px-0.5"
         >
           <PathCrumbRow crumbs={crumbs} onNavigate={navigate} />
           <AstryxButton
+            variant="ghost"
+            label={t("workspaceSftp.pathEdit")}
             type="button"
             className="h-full min-w-4 flex-1 cursor-text"
             aria-label={t("workspaceSftp.pathEdit")}
@@ -520,7 +527,7 @@ function PathNavigator(props: {
           {loading ? (
             <Loader2 className="mx-1 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground/70" />
           ) : null}
-        </AstryxView>
+        </AstryxStack>
       )}
 
       {editing && open ? (
@@ -538,39 +545,32 @@ function PathNavigator(props: {
           hasAutoFocus={false}
           hasCloseButton={false}
           content={
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               id={listboxId}
               role="listbox"
               className="overflow-hidden"
             >
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="max-h-64 overflow-y-auto p-1"
-              >
+              <AstryxStack direction="vertical" className="max-h-64 overflow-y-auto p-1">
                 {suggestionError ? (
-                  <AstryxView
-                    layout="flex"
+                  <AstryxStack
                     direction="horizontal"
                     className="flex items-center gap-2 rounded-lg px-2.5 py-3 text-xs text-destructive"
-                    title={suggestionError}
+                    aria-label={suggestionError}
                   >
                     <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <AstryxInline className="truncate">
+                    <AstryxText as="span" type="inherit" className="truncate">
                       {t("workspaceSftp.pathSearchFailed")}
-                    </AstryxInline>
-                  </AstryxView>
+                    </AstryxText>
+                  </AstryxStack>
                 ) : suggestionsLoading ? (
-                  <AstryxView
-                    layout="flex"
+                  <AstryxStack
                     direction="horizontal"
                     className="flex items-center justify-center gap-2 px-3 py-5 text-xs text-muted-foreground"
                   >
                     <Loader2 className="h-4 w-4 animate-spin" />
                     {t("workspaceSftp.pathSearching")}
-                  </AstryxView>
+                  </AstryxStack>
                 ) : suggestions.length ? (
                   suggestions.map((entry, index) => {
                     const DirectoryIcon = getFileTypeIcon(entry.name || entry.path, "dir", {
@@ -578,6 +578,8 @@ function PathNavigator(props: {
                     });
                     return (
                       <AstryxButton
+                        variant="ghost"
+                        label={entry.path}
                         key={entry.path}
                         ref={(element) => {
                           if (element) suggestionRefs.current.set(index, element);
@@ -593,14 +595,13 @@ function PathNavigator(props: {
                             ? "bg-primary/[0.08] text-foreground"
                             : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
                         )}
-                        title={entry.path}
+                        tooltip={entry.path}
                         onMouseEnter={() => setActiveIndex(index)}
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => navigate(entry.path)}
                       >
-                        <AstryxView
+                        <AstryxStack
                           as="span"
-                          layout="flex"
                           direction="horizontal"
                           className={cn(
                             "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
@@ -610,15 +611,23 @@ function PathNavigator(props: {
                           )}
                         >
                           <DirectoryIcon className="h-4 w-4" />
-                        </AstryxView>
-                        <AstryxInline className="min-w-0 flex-1">
-                          <AstryxInline className="block truncate text-xs font-medium text-foreground">
+                        </AstryxStack>
+                        <AstryxText as="span" type="inherit" className="min-w-0 flex-1">
+                          <AstryxText
+                            as="span"
+                            type="inherit"
+                            className="block truncate text-xs font-medium text-foreground"
+                          >
                             {entry.name}
-                          </AstryxInline>
-                          <AstryxInline className="block truncate font-mono text-[10px] text-muted-foreground/80">
+                          </AstryxText>
+                          <AstryxText
+                            as="span"
+                            type="inherit"
+                            className="block truncate font-mono text-[10px] text-muted-foreground/80"
+                          >
                             {entry.path}
-                          </AstryxInline>
-                        </AstryxInline>
+                          </AstryxText>
+                        </AstryxText>
                         <ChevronRight
                           className={cn(
                             "h-3.5 w-3.5 shrink-0 transition-opacity",
@@ -629,28 +638,26 @@ function PathNavigator(props: {
                     );
                   })
                 ) : (
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
+                  <AstryxStack
+                    direction="vertical"
                     className="px-3 py-5 text-center text-xs text-muted-foreground"
                   >
                     {t("workspaceSftp.pathNoMatches")}
-                  </AstryxView>
+                  </AstryxStack>
                 )}
-              </AstryxView>
+              </AstryxStack>
 
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+              <AstryxStack
+                direction="vertical"
                 className="border-t border-border/50 bg-muted/25 px-3 py-1.5 text-[10px] text-muted-foreground/80"
               >
                 {t("workspaceSftp.pathKeyboardHint")}
-              </AstryxView>
-            </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
           }
         />
       ) : null}
-    </AstryxView>
+    </AstryxStack>
   );
 }
 
@@ -1543,19 +1550,18 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
 
   if (!connected) {
     return (
-      <AstryxView
-        layout="flex"
+      <AstryxStack
         direction="vertical"
         className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground"
       >
         <AlertTriangle className="h-8 w-8 text-amber-500" />
-        <AstryxView layout="block" direction="horizontal" className="font-medium text-foreground">
+        <AstryxStack direction="vertical" className="font-medium text-foreground">
           {t("workspaceSftp.disconnected")}
-        </AstryxView>
-        <AstryxView layout="block" direction="horizontal" className="max-w-md text-xs">
+        </AstryxStack>
+        <AstryxStack direction="vertical" className="max-w-md text-xs">
           {t("workspaceSftp.disconnectedHint")}
-        </AstryxView>
-      </AstryxView>
+        </AstryxStack>
+      </AstryxStack>
     );
   }
 
@@ -1569,22 +1575,16 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
         if (!isOpen) setContextMenu(null);
       }}
     >
-      <AstryxView
-        layout="flex"
+      <AstryxStack
         direction="vertical"
         ref={panelRef}
         className="relative flex h-full min-h-0 flex-col bg-background"
       >
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="flex min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
         >
-          <AstryxView
-            layout="grid"
-            direction="horizontal"
-            className="grid h-full min-h-0 min-w-[860px] flex-1 grid-cols-2 divide-x divide-border"
-          >
+          <AstryxGrid className="grid h-full min-h-0 min-w-[860px] flex-1 grid-cols-2 divide-x divide-border">
             {panes.map(({ side, label, root, pane }) => {
               const dropMode =
                 activeDragSource?.side === "local" && side === "remote"
@@ -1598,8 +1598,7 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
               const PaneFolderIcon = getFileTypeIcon(root || pane.path, "dir", { expanded: true });
 
               return (
-                <AstryxView
-                  layout="flex"
+                <AstryxStack
                   direction="vertical"
                   key={side}
                   data-sftp-drop-side={side}
@@ -1616,61 +1615,61 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
                     openContextMenu(event, side, pane.path, "directory", false)
                   }
                 >
-                  <AstryxView
-                    layout="flex"
+                  <AstryxStack
                     direction="horizontal"
                     className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3"
                   >
-                    <AstryxView
-                      layout="flex"
+                    <AstryxStack
                       direction="horizontal"
                       className="flex h-8 w-8 items-center justify-center rounded-lg bg-background text-muted-foreground"
                     >
                       <PaneFolderIcon className="h-4 w-4" />
-                    </AstryxView>
-                    <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
+                    </AstryxStack>
+                    <AstryxStack direction="vertical" className="min-w-0 flex-1">
+                      <AstryxStack
+                        direction="vertical"
                         className="truncate text-sm font-semibold text-foreground"
                       >
                         {label}
-                      </AstryxView>
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
+                      </AstryxStack>
+                      <AstryxStack
+                        direction="vertical"
                         className="truncate font-mono text-[11px] text-muted-foreground"
                       >
                         {root}
-                      </AstryxView>
-                    </AstryxView>
+                      </AstryxStack>
+                    </AstryxStack>
                     {pane.selectedPaths.length ? (
                       <AstryxButton
+                        variant="ghost"
+                        label={t("workspaceSftp.clearSelection")}
                         type="button"
                         className="inline-flex h-7 max-w-[112px] shrink-0 items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-500/15 dark:text-emerald-300"
-                        title={t("workspaceSftp.clearSelection")}
+                        tooltip={t("workspaceSftp.clearSelection")}
                         onClick={(event) => {
                           event.stopPropagation();
                           clearSelection(side);
                         }}
                       >
-                        <AstryxInline className="truncate">
+                        <AstryxText as="span" type="inherit" className="truncate">
                           {t("workspaceSftp.selectedCount").replace(
                             "{count}",
                             String(pane.selectedPaths.length),
                           )}
-                        </AstryxInline>
+                        </AstryxText>
                       </AstryxButton>
                     ) : null}
                     <AstryxButton
+                      variant="ghost"
+                      label={t("workspaceSftp.refresh")}
                       type="button"
                       className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-background hover:text-foreground"
-                      title={t("workspaceSftp.refresh")}
+                      tooltip={t("workspaceSftp.refresh")}
                       onClick={() => refreshPane(side)}
                     >
                       <RefreshCw className={cn("h-4 w-4", pane.loading && "animate-spin")} />
                     </AstryxButton>
-                  </AstryxView>
+                  </AstryxStack>
 
                   <PathNavigator
                     side={side}
@@ -1686,19 +1685,19 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
                   />
 
                   {pane.error ? (
-                    <AstryxView
-                      layout="flex"
+                    <AstryxStack
                       direction="horizontal"
                       className="m-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive"
                     >
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <AstryxInline className="min-w-0 break-words">{pane.error}</AstryxInline>
-                    </AstryxView>
+                      <AstryxText as="span" type="inherit" className="min-w-0 break-words">
+                        {pane.error}
+                      </AstryxText>
+                    </AstryxStack>
                   ) : null}
 
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
+                  <AstryxStack
+                    direction="vertical"
                     className="relative min-h-0 flex-1 overscroll-contain overflow-auto p-2"
                     onClick={(event) => {
                       const target = event.target;
@@ -1708,45 +1707,50 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
                     }}
                   >
                     {dropMode ? (
-                      <AstryxView
-                        layout="flex"
+                      <AstryxStack
                         direction="horizontal"
                         className={cn(
                           "pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg bg-background/80 text-center opacity-75 shadow-inner backdrop-blur-[1px] transition-all",
                           dropActive && "bg-emerald-500/10 opacity-100",
                         )}
                       >
-                        <AstryxInline
+                        <AstryxStack
+                          as="span"
+                          direction="vertical"
                           className={cn(
                             "absolute left-0 top-0 h-14 w-14 rounded-tl-lg border-l-2 border-t-2",
                             dropActive ? "border-emerald-600" : "border-foreground/65",
                           )}
                         />
-                        <AstryxInline
+                        <AstryxStack
+                          as="span"
+                          direction="vertical"
                           className={cn(
                             "absolute right-0 top-0 h-14 w-14 rounded-tr-lg border-r-2 border-t-2",
                             dropActive ? "border-emerald-600" : "border-foreground/65",
                           )}
                         />
-                        <AstryxInline
+                        <AstryxStack
+                          as="span"
+                          direction="vertical"
                           className={cn(
                             "absolute bottom-0 left-0 h-14 w-14 rounded-bl-lg border-b-2 border-l-2",
                             dropActive ? "border-emerald-600" : "border-foreground/65",
                           )}
                         />
-                        <AstryxInline
+                        <AstryxStack
+                          as="span"
+                          direction="vertical"
                           className={cn(
                             "absolute bottom-0 right-0 h-14 w-14 rounded-br-lg border-b-2 border-r-2",
                             dropActive ? "border-emerald-600" : "border-foreground/65",
                           )}
                         />
-                        <AstryxView
-                          layout="flex"
+                        <AstryxStack
                           direction="vertical"
                           className="flex max-w-[75%] flex-col items-center gap-3"
                         >
-                          <AstryxView
-                            layout="flex"
+                          <AstryxStack
                             direction="horizontal"
                             className={cn(
                               "flex h-14 w-14 items-center justify-center rounded-xl border-2 bg-background/90 shadow-sm",
@@ -1756,18 +1760,16 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
                             )}
                           >
                             <DropIcon className="h-7 w-7" />
-                          </AstryxView>
-                          <AstryxView layout="block" direction="horizontal">
-                            <AstryxView
-                              layout="block"
-                              direction="horizontal"
+                          </AstryxStack>
+                          <AstryxStack direction="vertical">
+                            <AstryxStack
+                              direction="vertical"
                               className="text-sm font-semibold text-foreground"
                             >
                               {t("workspaceSftp.dropHere")}
-                            </AstryxView>
-                            <AstryxView
-                              layout="block"
-                              direction="horizontal"
+                            </AstryxStack>
+                            <AstryxStack
+                              direction="vertical"
                               className="mt-1 text-xs text-muted-foreground"
                             >
                               {t(
@@ -1775,41 +1777,37 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
                                   ? "workspaceSftp.drop.upload"
                                   : "workspaceSftp.drop.download",
                               )}
-                            </AstryxView>
+                            </AstryxStack>
                             {dropPath ? (
-                              <AstryxView
-                                layout="block"
-                                direction="horizontal"
+                              <AstryxStack
+                                direction="vertical"
                                 className="mx-auto mt-2 max-w-full truncate rounded bg-background/70 px-2 py-1 font-mono text-[11px] text-muted-foreground"
                               >
                                 {normalizePath(dropPath, side)}
-                              </AstryxView>
+                              </AstryxStack>
                             ) : null}
-                          </AstryxView>
-                        </AstryxView>
-                      </AstryxView>
+                          </AstryxStack>
+                        </AstryxStack>
+                      </AstryxStack>
                     ) : null}
                     {pane.loading && pane.entries.length === 0 ? (
-                      <AstryxView
-                        layout="flex"
+                      <AstryxStack
                         direction="horizontal"
                         className="flex h-full items-center justify-center gap-2 text-xs text-muted-foreground"
                       >
                         <Loader2 className="h-4 w-4 animate-spin" />
                         {t("workspaceSftp.loading")}
-                      </AstryxView>
+                      </AstryxStack>
                     ) : pane.entries.length === 0 ? (
-                      <AstryxView
-                        layout="flex"
+                      <AstryxStack
                         direction="horizontal"
                         className="flex h-full items-center justify-center text-xs text-muted-foreground"
                       >
                         {t("workspaceSftp.empty")}
-                      </AstryxView>
+                      </AstryxStack>
                     ) : (
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
+                      <AstryxStack
+                        direction="vertical"
                         role="listbox"
                         aria-multiselectable="true"
                         className="space-y-1"
@@ -1818,6 +1816,10 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
                           const isSelected = pane.selectedPaths.includes(entry.path);
                           return (
                             <AstryxButton
+                              variant="ghost"
+                              label={
+                                entry.kind === "directory" ? "--" : formatBytes(entry.sizeBytes)
+                              }
                               key={entry.path}
                               type="button"
                               draggable={false}
@@ -1914,39 +1916,43 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
                                 openContextMenu(event, side, entry.path, entry.kind, true);
                               }}
                             >
-                              <AstryxView
+                              <AstryxStack
                                 as="span"
-                                layout="flex"
                                 direction="horizontal"
                                 className="flex min-w-0 items-center gap-2"
                               >
                                 {entryIcon(entry)}
-                                <AstryxInline className="truncate">{entry.name}</AstryxInline>
-                              </AstryxView>
-                              <AstryxInline className="text-right font-mono text-[11px] text-muted-foreground">
+                                <AstryxText as="span" type="inherit" className="truncate">
+                                  {entry.name}
+                                </AstryxText>
+                              </AstryxStack>
+                              <AstryxText
+                                as="span"
+                                type="inherit"
+                                className="text-right font-mono text-[11px] text-muted-foreground"
+                              >
                                 {entry.kind === "directory" ? "--" : formatBytes(entry.sizeBytes)}
-                              </AstryxInline>
+                              </AstryxText>
                             </AstryxButton>
                           );
                         })}
-                      </AstryxView>
+                      </AstryxStack>
                     )}
-                  </AstryxView>
-                </AstryxView>
+                  </AstryxStack>
+                </AstryxStack>
               );
             })}
-          </AstryxView>
-        </AstryxView>
+          </AstryxGrid>
+        </AstryxStack>
 
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="flex h-10 shrink-0 items-center gap-2 border-t border-border bg-muted/30 px-3 text-xs text-muted-foreground"
         >
           {busyMessage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-          <AstryxInline className="min-w-0 flex-1 truncate">
+          <AstryxText as="span" type="inherit" className="min-w-0 flex-1 truncate">
             {busyMessage || (transfer ? "" : t("workspaceSftp.transfer.idle"))}
-          </AstryxInline>
+          </AstryxText>
           {transfer ? (
             <TransferToast
               transfer={transfer}
@@ -1962,7 +1968,7 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
               }
             />
           ) : null}
-        </AstryxView>
+        </AstryxStack>
 
         {dragPreview ? (
           <DragPreview
@@ -2012,7 +2018,7 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
           />
         ) : null}
         {dialog}
-      </AstryxView>
+      </AstryxStack>
     </ContextMenu>
   );
 }
@@ -2073,7 +2079,8 @@ function CreateFolderDialog(props: {
         </HStack>
       }
     >
-      <AstryxView
+      <AstryxStack
+        direction="vertical"
         as="form"
         onSubmit={(event) => {
           event.preventDefault();
@@ -2088,7 +2095,7 @@ function CreateFolderDialog(props: {
           hasAutoFocus
           width="100%"
         />
-      </AstryxView>
+      </AstryxStack>
     </AdaptiveDialog>
   );
 }
@@ -2192,7 +2199,8 @@ function RenameEntryDialog(props: {
         </HStack>
       }
     >
-      <AstryxView
+      <AstryxStack
+        direction="vertical"
         as="form"
         onSubmit={(event) => {
           event.preventDefault();
@@ -2207,7 +2215,7 @@ function RenameEntryDialog(props: {
           hasAutoFocus
           width="100%"
         />
-      </AstryxView>
+      </AstryxStack>
     </AdaptiveDialog>
   );
 }
@@ -2235,70 +2243,83 @@ function TransferToast(props: {
       : "text-sky-600 dark:text-sky-300";
 
   return (
-    <AstryxView
-      layout="flex"
+    <AstryxStack
       direction="horizontal"
       className="pointer-events-auto relative ml-auto flex h-full w-[340px] max-w-[50%] shrink-0 items-center gap-2 pl-3 text-foreground before:absolute before:bottom-2 before:left-0 before:top-2 before:w-px before:bg-border/60"
     >
-      <AstryxView
-        layout="flex"
+      <AstryxStack
         direction="horizontal"
         className="flex h-4 w-4 shrink-0 items-center justify-center"
       >
         <StatusIcon className={cn("h-3.5 w-3.5", iconClass, isRunning && "animate-spin")} />
-      </AstryxView>
-      <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-        <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-1.5">
-          <AstryxInline className="shrink-0 text-[11px] font-medium leading-none text-foreground">
+      </AstryxStack>
+      <AstryxStack direction="vertical" className="min-w-0 flex-1">
+        <AstryxStack direction="horizontal" className="flex items-center gap-1.5">
+          <AstryxText
+            as="span"
+            type="inherit"
+            className="shrink-0 text-[11px] font-medium leading-none text-foreground"
+          >
             {statusLabel}
-          </AstryxInline>
-          <AstryxInline className="min-w-0 flex-1 truncate font-mono text-[11px] leading-none text-muted-foreground/90">
+          </AstryxText>
+          <AstryxText
+            as="span"
+            type="inherit"
+            className="min-w-0 flex-1 truncate font-mono text-[11px] leading-none text-muted-foreground/90"
+          >
             {currentPath}
-          </AstryxInline>
-          <AstryxInline className="shrink-0 font-mono text-[10px] leading-none text-muted-foreground">
+          </AstryxText>
+          <AstryxText
+            as="span"
+            type="inherit"
+            className="shrink-0 font-mono text-[10px] leading-none text-muted-foreground"
+          >
             {progress}%
-          </AstryxInline>
-        </AstryxView>
+          </AstryxText>
+        </AstryxStack>
         {transfer.error ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className="mt-1.5 truncate text-[11px] leading-none text-destructive"
           >
             {transfer.error}
-          </AstryxView>
+          </AstryxStack>
         ) : (
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="mt-1.5 flex items-center gap-1.5"
-          >
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+          <AstryxStack direction="horizontal" className="mt-1.5 flex items-center gap-1.5">
+            <AstryxStack
+              direction="vertical"
               className="h-1 min-w-16 flex-1 overflow-hidden rounded-full bg-border/60"
             >
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+              <AstryxStack
+                direction="vertical"
                 className={cn(
                   "h-full rounded-full transition-all duration-300",
                   transferTone(transfer),
                 )}
                 style={{ width: `${progress}%` }}
               />
-            </AstryxView>
-            <AstryxInline className="shrink-0 text-[10px] leading-none text-muted-foreground">
+            </AstryxStack>
+            <AstryxText
+              as="span"
+              type="inherit"
+              className="shrink-0 text-[10px] leading-none text-muted-foreground"
+            >
               {transfer.filesDone}/{transfer.filesTotal || queueCount || 1} {filesLabel}
-            </AstryxInline>
-            <AstryxInline className="shrink-0 font-mono text-[10px] leading-none text-muted-foreground">
+            </AstryxText>
+            <AstryxText
+              as="span"
+              type="inherit"
+              className="shrink-0 font-mono text-[10px] leading-none text-muted-foreground"
+            >
               {formatBytes(transfer.bytesDone)} / {formatBytes(transfer.bytesTotal)}
-            </AstryxInline>
-          </AstryxView>
+            </AstryxText>
+          </AstryxStack>
         )}
-      </AstryxView>
+      </AstryxStack>
       {onCancel ? (
         <AstryxButton
+          variant="ghost"
+          label={cancelLabel}
           type="button"
           className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-destructive hover:bg-destructive/10"
           onClick={onCancel}
@@ -2306,7 +2327,7 @@ function TransferToast(props: {
           {cancelLabel}
         </AstryxButton>
       ) : null}
-    </AstryxView>
+    </AstryxStack>
   );
 }
 
@@ -2328,8 +2349,7 @@ function DragPreview(props: {
   const count = dragItems(fallback).length;
 
   return (
-    <AstryxView
-      layout="flex"
+    <AstryxStack
       direction="horizontal"
       className="pointer-events-none fixed z-[120] flex w-[260px] max-w-[calc(100vw-32px)] items-center gap-2 rounded-md bg-sky-500/90 px-2.5 py-2 text-xs text-white shadow-xl ring-1 ring-sky-200/50 backdrop-blur-sm"
       style={{
@@ -2338,33 +2358,44 @@ function DragPreview(props: {
         transform: "translateY(-50%)",
       }}
     >
-      <AstryxView
+      <AstryxStack
         as="span"
-        layout="flex"
         direction="horizontal"
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-white/15 text-white"
       >
         {entryIcon(previewEntry, "h-4 w-4 text-white")}
-      </AstryxView>
-      <AstryxInline className="min-w-0 flex-1">
-        <AstryxInline className="block truncate font-medium leading-4">
+      </AstryxStack>
+      <AstryxText as="span" type="inherit" className="min-w-0 flex-1">
+        <AstryxText as="span" type="inherit" className="block truncate font-medium leading-4">
           {previewEntry.name}
           {count > 1 ? ` +${count - 1}` : ""}
-        </AstryxInline>
-        <AstryxInline className="block truncate text-[10px] leading-3 text-white/75">
+        </AstryxText>
+        <AstryxText
+          as="span"
+          type="inherit"
+          className="block truncate text-[10px] leading-3 text-white/75"
+        >
           {typeLabel(previewEntry)}
           {previewEntry.kind === "directory" ? "" : ` · ${formatBytes(previewEntry.sizeBytes)}`}
-        </AstryxInline>
-      </AstryxInline>
+        </AstryxText>
+      </AstryxText>
       {count > 1 ? (
-        <AstryxInline className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-white/90">
+        <AstryxText
+          as="span"
+          type="inherit"
+          className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-white/90"
+        >
           {count}
-        </AstryxInline>
+        </AstryxText>
       ) : previewEntry.kind === "directory" ? null : (
-        <AstryxInline className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-white/90">
+        <AstryxText
+          as="span"
+          type="inherit"
+          className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-white/90"
+        >
           {formatBytes(previewEntry.sizeBytes)}
-        </AstryxInline>
+        </AstryxText>
       )}
-    </AstryxView>
+    </AstryxStack>
   );
 }

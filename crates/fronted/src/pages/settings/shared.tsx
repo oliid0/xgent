@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 export {
   ConfirmActionPopover,
   ConfirmDeletePopover,
-} from "../../components/ui/confirm-action-popover";
+} from "../../components/astryx/ConfirmActionPopover";
 
 export function SettingsRowGroup(props: {
   title: string;

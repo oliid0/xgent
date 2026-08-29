@@ -1,6 +1,8 @@
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
+import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText } from "@astryxdesign/core/Text";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { type ReactNode, useSyncExternalStore } from "react";
 import { Markdown } from "../../../../components/Markdown";
 import { useLocale } from "../../../../i18n";
@@ -52,72 +54,65 @@ import {
 import { EditDiffView } from "./EditDiffView";
 import { TodoListView } from "./TodoListView";
 import { getToolResultImages, ToolResultImagePreview } from "./ToolImages";
-
 export function ToolSection(props: { label?: string; trailing?: ReactNode; children: ReactNode }) {
   const { label, trailing, children } = props;
   return (
-    <AstryxView as="section" className="space-y-1.5">
+    <AstryxStack direction="vertical" as="section" className="space-y-1.5">
       {label || trailing ? (
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex min-h-5 items-center gap-2"
-        >
+        <AstryxStack direction="horizontal" className="flex min-h-5 items-center gap-2">
           {label ? (
-            <AstryxInline className="shrink-0 text-[calc(11px*var(--zone-font-scale,1))] font-medium text-muted-foreground/65">
+            <AstryxText
+              as="span"
+              type="inherit"
+              className="shrink-0 text-[calc(11px*var(--zone-font-scale,1))] font-medium text-muted-foreground/65"
+            >
               {label}
-            </AstryxInline>
+            </AstryxText>
           ) : null}
           {trailing}
-        </AstryxView>
+        </AstryxStack>
       ) : null}
       {children}
-    </AstryxView>
+    </AstryxStack>
   );
 }
 
 export function ToolSurface(props: { children: ReactNode; className?: string }) {
   const { children, className } = props;
   return (
-    <AstryxView layout="block" direction="horizontal" className={cn("min-w-0 py-0.5", className)}>
+    <AstryxStack direction="vertical" className={cn("min-w-0 py-0.5", className)}>
       {children}
-    </AstryxView>
+    </AstryxStack>
   );
 }
 
 export function ToolSurfaceLabel({ label }: { label: string }) {
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
+    <AstryxStack
+      direction="vertical"
       className="mb-0.5 text-[calc(10.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground/55"
     >
       {label}
-    </AstryxView>
+    </AstryxStack>
   );
 }
 
 export function ToolFactGrid({ tags }: { tags: MetaTag[] }) {
   if (tags.length === 0) return null;
   return (
-    <AstryxView
-      layout="grid"
-      direction="horizontal"
-      className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2"
-    >
+    <AstryxGrid className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
       {tags.map((tag) => (
         <ToolSurface key={`${tag.label}-${tag.value}`}>
           <ToolSurfaceLabel label={tag.label} />
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className="break-all font-mono text-[calc(11px*var(--zone-font-scale,1))] leading-[1.55] text-foreground/78"
           >
             {tag.value}
-          </AstryxView>
+          </AstryxStack>
         </ToolSurface>
       ))}
-    </AstryxView>
+    </AstryxGrid>
   );
 }
 
@@ -152,35 +147,42 @@ export function PathDisplay({ path, className }: { path: string; className?: str
   const lastSlash = path.lastIndexOf("/");
   if (lastSlash < 0) {
     return (
-      <AstryxInline
+      <AstryxText
+        as="span"
+        type="inherit"
         className={cn(
           className,
           "block max-w-full overflow-hidden text-ellipsis whitespace-nowrap break-normal",
         )}
-        title={path}
+        aria-label={path}
       >
         {path}
-      </AstryxInline>
+      </AstryxText>
     );
   }
   const dir = path.slice(0, lastSlash + 1);
   const file = path.slice(lastSlash + 1);
   return (
-    <AstryxView
+    <AstryxStack
       as="span"
-      layout="inline-flex"
       direction="horizontal"
       className={cn(
         className,
         "inline-flex max-w-full min-w-0 items-baseline overflow-hidden whitespace-nowrap break-normal",
       )}
-      title={path}
+      aria-label={path}
     >
-      <AstryxInline className="min-w-0 flex-1 truncate text-muted-foreground/40">
+      <AstryxText
+        as="span"
+        type="inherit"
+        className="min-w-0 flex-1 truncate text-muted-foreground/40"
+      >
         {dir.length > 50 ? `…${dir.slice(-50)}` : dir}
-      </AstryxInline>
-      <AstryxInline className="max-w-[70%] truncate text-foreground/85">{file}</AstryxInline>
-    </AstryxView>
+      </AstryxText>
+      <AstryxText as="span" type="inherit" className="max-w-[70%] truncate text-foreground/85">
+        {file}
+      </AstryxText>
+    </AstryxStack>
   );
 }
 
@@ -189,29 +191,32 @@ export function MetaTags({ tags }: { tags: MetaTag[] }) {
   if (tags.length === 0) return null;
   const labelCounts = new Map<string, number>();
   return (
-    <AstryxView layout="flex" direction="horizontal" className="flex flex-wrap gap-x-3 gap-y-1">
+    <AstryxStack direction="horizontal" className="flex flex-wrap gap-x-3 gap-y-1">
       {tags.map((tag) => {
         const seenCount = labelCounts.get(tag.label) ?? 0;
         labelCounts.set(tag.label, seenCount + 1);
         const stableKey = seenCount === 0 ? tag.label : `${tag.label}-${seenCount}`;
         return (
-          <AstryxView
+          <AstryxStack
             as="span"
-            layout="inline-flex"
             direction="horizontal"
             key={stableKey}
             className="inline-flex min-h-5 items-baseline gap-1 text-[calc(11px*var(--zone-font-scale,1))] leading-5"
           >
-            <AstryxInline className="font-medium text-muted-foreground/55">
+            <AstryxText as="span" type="inherit" className="font-medium text-muted-foreground/55">
               {tag.label}
-            </AstryxInline>
-            <AstryxInline className="min-w-0 break-all font-mono tabular-nums text-foreground/75">
+            </AstryxText>
+            <AstryxText
+              as="span"
+              type="inherit"
+              className="min-w-0 break-all font-mono tabular-nums text-foreground/75"
+            >
               {tag.value}
-            </AstryxInline>
-          </AstryxView>
+            </AstryxText>
+          </AstryxStack>
         );
       })}
-    </AstryxView>
+    </AstryxStack>
   );
 }
 
@@ -270,26 +275,26 @@ export function ToolResultDisplay({
     const pending = isPlanDecisionPending(result.toolCallId);
     const approved = isPlanApprovalToolCall(result.toolCallId);
     return (
-      <AstryxView
-        layout="block"
-        direction="horizontal"
+      <AstryxStack
+        direction="vertical"
         className="space-y-3 rounded-xl border border-violet-500/20 bg-violet-500/[0.04] p-3.5"
       >
         <Markdown content={rawDetails.plan} />
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="flex items-center justify-end gap-2 border-t border-violet-500/15 pt-3"
         >
-          <AstryxInline className="mr-auto text-xs text-muted-foreground">
+          <AstryxText as="span" type="inherit" className="mr-auto text-xs text-muted-foreground">
             {approved
               ? t("chat.planMode.approved")
               : pending
                 ? t("chat.planMode.pending")
                 : t("chat.planMode.updated")}
-          </AstryxInline>
+          </AstryxText>
           {pending ? (
             <AstryxButton
+              variant="ghost"
+              label={t("chat.planMode.approve")}
               type="button"
               onClick={() => answerPlanDecision(result.toolCallId, "approve")}
               className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-violet-500"
@@ -297,8 +302,8 @@ export function ToolResultDisplay({
               {t("chat.planMode.approve")}
             </AstryxButton>
           ) : null}
-        </AstryxView>
-      </AstryxView>
+        </AstryxStack>
+      </AstryxStack>
     );
   }
 
@@ -339,7 +344,7 @@ export function ToolResultDisplay({
   if (kind === "read_text") {
     const details = result.details as ReadTextResultDetails;
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+      <AstryxStack direction="vertical" className="space-y-2">
         <ToolSurface>
           <MetaTags
             tags={[
@@ -360,7 +365,7 @@ export function ToolResultDisplay({
         {!details.reusedExisting ? (
           <CodePreview text={extractReadBody(text)} maxChars={8000} />
         ) : null}
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
@@ -368,7 +373,7 @@ export function ToolResultDisplay({
     const details = result.details as SkillsManagerResultDetails;
     if (details.kind !== "read_skill") return null;
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+      <AstryxStack direction="vertical" className="space-y-2">
         <ToolSurface>
           <MetaTags
             tags={[
@@ -384,14 +389,14 @@ export function ToolResultDisplay({
           />
         </ToolSurface>
         <CodePreview text={extractReadBody(text)} maxChars={8000} />
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (kind === "manage_skill") {
     const details = result.details as Extract<SkillsManagerResultDetails, { kind: "manage_skill" }>;
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+      <AstryxStack direction="vertical" className="space-y-2">
         <ToolSurface>
           <MetaTags
             tags={[
@@ -425,14 +430,14 @@ export function ToolResultDisplay({
           />
         </ToolSurface>
         <CodePreview text={text} maxChars={8000} />
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (kind === "manage_mcp") {
     const details = result.details as McpManagerResultDetails;
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+      <AstryxStack direction="vertical" className="space-y-2">
         <ToolSurface>
           <MetaTags
             tags={[
@@ -462,14 +467,14 @@ export function ToolResultDisplay({
           />
         </ToolSurface>
         <CodePreview text={text} maxChars={8000} />
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (kind === "read_image") {
     const details = result.details as ReadImageResultDetails;
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+      <AstryxStack direction="vertical" className="space-y-2">
         <ToolSurface>
           <MetaTags
             tags={[
@@ -481,9 +486,8 @@ export function ToolResultDisplay({
           />
         </ToolSurface>
         {!details.reusedExisting && images.length > 0 ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className="overflow-hidden rounded-[10px] border border-black/[0.06] bg-white/[0.55] p-2 dark:border-white/[0.08] dark:bg-white/[0.04]"
           >
             {images.map((image, index) => (
@@ -495,16 +499,16 @@ export function ToolResultDisplay({
                 sizeBytes={details.sizeBytes}
               />
             ))}
-          </AstryxView>
+          </AstryxStack>
         ) : null}
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (kind === "read_pdf") {
     const details = result.details as ReadPdfResultDetails;
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+      <AstryxStack direction="vertical" className="space-y-2">
         <ToolSurface>
           <MetaTags
             tags={[
@@ -524,14 +528,14 @@ export function ToolResultDisplay({
         {!details.reusedExisting ? (
           <CodePreview text={extractReadBody(text)} maxChars={8000} />
         ) : null}
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (kind === "read_notebook") {
     const details = result.details as ReadNotebookResultDetails;
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+      <AstryxStack direction="vertical" className="space-y-2">
         <ToolSurface>
           <MetaTags
             tags={[
@@ -551,14 +555,14 @@ export function ToolResultDisplay({
         {!details.reusedExisting ? (
           <CodePreview text={extractReadBody(text)} maxChars={8000} />
         ) : null}
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (kind === "read_word" || kind === "read_spreadsheet" || kind === "read_archive") {
     const details = result.details as ReadDocumentResultDetails;
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+      <AstryxStack direction="vertical" className="space-y-2">
         <ToolSurface>
           <MetaTags
             tags={[
@@ -575,14 +579,14 @@ export function ToolResultDisplay({
         {!details.reusedExisting ? (
           <CodePreview text={extractReadBody(text)} maxChars={8000} />
         ) : null}
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (kind === "write") {
     const details = result.details as WriteResultDetails;
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+      <AstryxStack direction="vertical" className="space-y-2">
         <ToolSurface>
           <MetaTags
             tags={[
@@ -594,7 +598,7 @@ export function ToolResultDisplay({
           />
         </ToolSurface>
         <CodePreview text={details.preview} />
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
@@ -621,7 +625,7 @@ export function ToolResultDisplay({
   if (kind === "list") {
     const details = result.details as ListResultDetails;
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+      <AstryxStack direction="vertical" className="space-y-2">
         <ToolSurface>
           <MetaTags
             tags={buildPagedResultTags({
@@ -634,33 +638,36 @@ export function ToolResultDisplay({
           />
         </ToolSurface>
         <ToolSurface className="max-h-56 overflow-auto">
-          <AstryxView layout="block" direction="horizontal" className="space-y-1">
+          <AstryxStack direction="vertical" className="space-y-1">
             {details.entries.map((entry) => (
-              <AstryxView
-                layout="flex"
+              <AstryxStack
                 direction="horizontal"
                 key={`${entry.kind}-${entry.path}`}
                 className="flex items-start gap-2 rounded-[8px] px-1.5 py-1 text-[calc(11px*var(--zone-font-scale,1))] leading-[1.5] even:bg-black/[0.02] dark:even:bg-white/[0.03]"
               >
-                <AstryxInline className="mt-[1px] shrink-0 text-[calc(10px*var(--zone-font-scale,1))] font-semibold uppercase text-muted-foreground/35">
+                <AstryxText
+                  as="span"
+                  type="inherit"
+                  className="mt-[1px] shrink-0 text-[calc(10px*var(--zone-font-scale,1))] font-semibold uppercase text-muted-foreground/35"
+                >
                   {entry.kind}
-                </AstryxInline>
+                </AstryxText>
                 <PathDisplay
                   path={entry.path}
                   className="min-w-0 break-all font-mono text-[calc(11px*var(--zone-font-scale,1))]"
                 />
-              </AstryxView>
+              </AstryxStack>
             ))}
-          </AstryxView>
+          </AstryxStack>
         </ToolSurface>
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (kind === "glob") {
     const details = result.details as GlobResultDetails;
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+      <AstryxStack direction="vertical" className="space-y-2">
         <ToolSurface>
           <MetaTags
             tags={buildPagedResultTags({
@@ -673,7 +680,7 @@ export function ToolResultDisplay({
           />
         </ToolSurface>
         <ToolSurface className="max-h-56 overflow-auto">
-          <AstryxView layout="block" direction="horizontal" className="space-y-1">
+          <AstryxStack direction="vertical" className="space-y-1">
             {details.paths.map((entry) => (
               <PathDisplay
                 key={entry}
@@ -681,16 +688,16 @@ export function ToolResultDisplay({
                 className="block rounded-[8px] px-1.5 py-1 break-all font-mono text-[calc(11px*var(--zone-font-scale,1))] leading-[1.5] even:bg-black/[0.02] dark:even:bg-white/[0.03]"
               />
             ))}
-          </AstryxView>
+          </AstryxStack>
         </ToolSurface>
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (kind === "grep") {
     const details = result.details as GrepResultDetails;
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+      <AstryxStack direction="vertical" className="space-y-2">
         <ToolSurface>
           <MetaTags
             tags={[
@@ -705,11 +712,10 @@ export function ToolResultDisplay({
         </ToolSurface>
         {details.outputMode === "count" ? null : details.outputMode === "files" ? (
           <ToolSurface className="max-h-56 overflow-auto">
-            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
+            <AstryxStack direction="vertical" className="space-y-1.5">
               {details.files.map((file) => (
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
+                <AstryxStack
+                  direction="vertical"
                   key={file.path}
                   className="space-y-1 rounded-[8px] px-1.5 py-1 even:bg-black/[0.02] dark:even:bg-white/[0.03]"
                 >
@@ -725,28 +731,31 @@ export function ToolResultDisplay({
                         : []),
                     ]}
                   />
-                </AstryxView>
+                </AstryxStack>
               ))}
-            </AstryxView>
+            </AstryxStack>
           </ToolSurface>
         ) : (
           <ToolSurface className="max-h-64 overflow-auto space-y-2">
             {details.matches.map((match, index) => (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+              <AstryxStack
+                direction="vertical"
                 key={`${match.path}:${match.line}:${index}`}
                 className="rounded-[8px] border border-black/[0.05] bg-white/[0.55] p-2 dark:border-white/[0.06] dark:bg-white/[0.03]"
               >
-                <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-2">
+                <AstryxStack direction="horizontal" className="flex items-start gap-2">
                   <PathDisplay
                     path={match.path}
                     className="min-w-0 break-all font-mono text-[calc(11px*var(--zone-font-scale,1))] leading-[1.5]"
                   />
-                  <AstryxInline className="shrink-0 rounded bg-black/[0.04] px-1.5 py-[1px] text-[calc(10px*var(--zone-font-scale,1))] font-semibold text-muted-foreground/60 dark:bg-white/[0.05]">
+                  <AstryxText
+                    as="span"
+                    type="inherit"
+                    className="shrink-0 rounded bg-black/[0.04] px-1.5 py-[1px] text-[calc(10px*var(--zone-font-scale,1))] font-semibold text-muted-foreground/60 dark:bg-white/[0.05]"
+                  >
                     line {match.line}
-                  </AstryxInline>
-                </AstryxView>
+                  </AstryxText>
+                </AstryxStack>
                 {match.before.length > 0 ? (
                   <CodePreview text={match.before.join("\n")} maxChars={1500} />
                 ) : null}
@@ -754,11 +763,11 @@ export function ToolResultDisplay({
                 {match.after.length > 0 ? (
                   <CodePreview text={match.after.join("\n")} maxChars={1500} />
                 ) : null}
-              </AstryxView>
+              </AstryxStack>
             ))}
           </ToolSurface>
         )}
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
@@ -777,13 +786,12 @@ export function ToolResultDisplay({
             { label: "issues", value: String(issues.length) },
           ]}
         />
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           className="text-[calc(12px*var(--zone-font-scale,1))] font-semibold leading-[1.45] text-foreground/90"
         >
           Agent call rejected — no subagents were started
-        </AstryxView>
+        </AstryxStack>
         {issues.length > 0 ? (
           <CodePreview
             text={issues
@@ -837,41 +845,43 @@ export function ToolResultDisplay({
     return (
       <ToolSurface className="space-y-2">
         <MetaTags tags={tags} />
-        <AstryxView layout="block" direction="horizontal" className="space-y-2">
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+        <AstryxStack direction="vertical" className="space-y-2">
+          <AstryxStack
+            direction="vertical"
             className="text-[calc(12px*var(--zone-font-scale,1))] font-semibold leading-[1.45] text-foreground/90"
           >
             {agentDisplayName}
-          </AstryxView>
+          </AstryxStack>
           {agent.role ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="text-[calc(11px*var(--zone-font-scale,1))] font-medium leading-[1.55] text-foreground/78"
             >
-              <AstryxInline className="text-muted-foreground">role</AstryxInline> {agent.role}
-            </AstryxView>
+              <AstryxText as="span" type="inherit" className="text-muted-foreground">
+                role
+              </AstryxText>{" "}
+              {agent.role}
+            </AstryxStack>
           ) : null}
           {agentTask ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="break-words text-[calc(11px*var(--zone-font-scale,1))] font-medium leading-[1.6] text-foreground/80"
             >
-              <AstryxInline className="text-muted-foreground">task</AstryxInline> {agentTask}
-            </AstryxView>
+              <AstryxText as="span" type="inherit" className="text-muted-foreground">
+                task
+              </AstryxText>{" "}
+              {agentTask}
+            </AstryxStack>
           ) : null}
           {shouldShowSubagentWorktreeLocation(agent) ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="break-all text-[calc(10px*var(--zone-font-scale,1))] text-muted-foreground/70"
             >
               {agent.branchName ? `${agent.branchName} | ` : ""}
               {agent.worktreeRoot}
-            </AstryxView>
+            </AstryxStack>
           ) : null}
           {agent.diffStat ? <CodePreview text={agent.diffStat} maxChars={1200} /> : null}
           {showUntrackedFiles ? (
@@ -937,7 +947,7 @@ export function ToolResultDisplay({
           ) : agent.summary ? (
             <CodePreview text={agent.summary} maxChars={2400} />
           ) : null}
-        </AstryxView>
+        </AstryxStack>
       </ToolSurface>
     );
   }
@@ -957,22 +967,20 @@ export function ToolResultDisplay({
           ]}
         />
         {details.subject ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className="break-words text-[calc(11.5px*var(--zone-font-scale,1))] font-semibold leading-[1.5] text-foreground/86"
           >
             {details.subject}
-          </AstryxView>
+          </AstryxStack>
         ) : null}
         {details.bodyPreview ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className="rounded-[8px] border border-black/[0.05] bg-white/[0.45] px-2.5 py-2 text-[calc(11.5px*var(--zone-font-scale,1))] leading-[1.6] dark:border-white/[0.07] dark:bg-white/[0.03]"
           >
             <Markdown content={details.bodyPreview} />
-          </AstryxView>
+          </AstryxStack>
         ) : null}
       </ToolSurface>
     );
@@ -980,10 +988,9 @@ export function ToolResultDisplay({
 
   if (images.length > 0) {
     return (
-      <AstryxView layout="block" direction="horizontal" className="space-y-2">
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+      <AstryxStack direction="vertical" className="space-y-2">
+        <AstryxStack
+          direction="vertical"
           className="overflow-hidden rounded-[10px] border border-black/[0.06] bg-white/[0.55] p-2 dark:border-white/[0.08] dark:bg-white/[0.04]"
         >
           {images.map((image, index) => (
@@ -994,9 +1001,9 @@ export function ToolResultDisplay({
               alt={item.toolCall.name}
             />
           ))}
-        </AstryxView>
+        </AstryxStack>
         {/\S/.test(text) ? <CodePreview text={text} maxChars={3000} /> : null}
-      </AstryxView>
+      </AstryxStack>
     );
   }
 

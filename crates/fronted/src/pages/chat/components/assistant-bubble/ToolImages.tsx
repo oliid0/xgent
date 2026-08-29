@@ -1,6 +1,6 @@
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import type { ImageContent, ToolResultMessage } from "@earendil-works/pi-ai";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useEffect, useMemo, useState } from "react";
 import { ImagePreview, type ImagePreviewSlide } from "../../../../components/chat/ImagePreview";
 import { ImageOff, Loader2 } from "../../../../components/icons";
@@ -20,7 +20,6 @@ import type {
   DisplayImageResultDetails,
 } from "../../../../lib/tools/builtinTypes";
 import { getBuiltinResultKind } from "./assistantBubbleUtils";
-
 export function getToolResultImages(result?: ToolResultMessage) {
   if (!result) return [];
   return result.content.filter((block): block is ImageContent => block.type === "image");
@@ -227,8 +226,7 @@ function ToolImageStatusCard(props: {
   const Icon = isError ? ImageOff : Loader2;
 
   return (
-    <AstryxView
-      layout="flex"
+    <AstryxStack
       direction="vertical"
       className={cn(
         "relative flex min-h-28 w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-[8px] border border-dashed px-4 py-5 text-center",
@@ -238,8 +236,7 @@ function ToolImageStatusCard(props: {
         className,
       )}
     >
-      <AstryxView
-        layout="flex"
+      <AstryxStack
         direction="horizontal"
         className={cn(
           "flex h-9 w-9 items-center justify-center rounded-[8px] border bg-white/80 shadow-sm dark:bg-black/20",
@@ -252,33 +249,31 @@ function ToolImageStatusCard(props: {
             !isError && "animate-spin text-primary motion-reduce:animate-none",
           )}
         />
-      </AstryxView>
-      <AstryxView layout="block" direction="horizontal" className="max-w-full space-y-1">
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+      </AstryxStack>
+      <AstryxStack direction="vertical" className="max-w-full space-y-1">
+        <AstryxStack
+          direction="vertical"
           className={cn(
             "text-[calc(12px*var(--zone-font-scale,1))] font-medium",
             !isError && "shimmer",
           )}
         >
           {title ?? (isError ? t("chat.image.unavailable") : t("chat.image.loading"))}
-        </AstryxView>
+        </AstryxStack>
         {detail ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className={cn(
               "max-w-full truncate text-[calc(11px*var(--zone-font-scale,1))]",
               isError ? "text-red-700/75 dark:text-red-200/75" : "text-muted-foreground",
             )}
-            title={detail}
+            aria-label={detail}
           >
             {detail}
-          </AstryxView>
+          </AstryxStack>
         ) : null}
-      </AstryxView>
-    </AstryxView>
+      </AstryxStack>
+    </AstryxStack>
   );
 }
 
@@ -323,23 +318,26 @@ export function ToolResultImagePreview(props: {
   return (
     <>
       <AstryxButton
+        variant="ghost"
+        label={
+          canPreview ? `${t("chat.image.preview")} ${alt}` : `${t("chat.image.loading")} ${alt}`
+        }
         type="button"
         className={cn(
           "relative block w-full overflow-hidden rounded-[8px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 disabled:opacity-100",
           canPreview ? "cursor-zoom-in" : "cursor-default",
         )}
-        disabled={!canPreview}
+        isDisabled={!canPreview}
         onClick={() => {
           if (canPreview) setPreviewOpen(true);
         }}
-        title={alt}
+        tooltip={alt}
         aria-label={
           canPreview ? `${t("chat.image.preview")} ${alt}` : `${t("chat.image.loading")} ${alt}`
         }
       >
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           className={cn("relative w-full", imageStatus !== "loaded" && "min-h-32")}
         >
           {imageStatus !== "loaded" ? (
@@ -369,7 +367,7 @@ export function ToolResultImagePreview(props: {
               onError={() => setImageStatus("error")}
             />
           ) : null}
-        </AstryxView>
+        </AstryxStack>
       </AstryxButton>
       {previewOpen ? (
         <ImagePreview open={previewOpen} slides={slides} onClose={() => setPreviewOpen(false)} />
@@ -449,6 +447,8 @@ function NativeDisplayImageTile(props: {
 
   return (
     <AstryxButton
+      variant="ghost"
+      label={canPreview ? `${t("chat.image.preview")} ${alt}` : statusTitle}
       type="button"
       className={cn(
         "relative flex max-w-full items-center justify-center overflow-hidden rounded-[10px] text-left shadow-sm transition-[filter,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 disabled:opacity-100",
@@ -459,7 +459,7 @@ function NativeDisplayImageTile(props: {
         !isGallery && (isSvgImage || isWaiting) && "min-h-28 w-full max-w-3xl bg-muted/30",
         imageStatus === "error" && "shadow-none",
       )}
-      disabled={!canPreview}
+      isDisabled={!canPreview}
       aria-label={canPreview ? `${t("chat.image.preview")} ${alt}` : statusTitle}
       onClick={() => {
         if (canPreview) onPreview();
@@ -527,11 +527,7 @@ export function NativeDisplayImageBlock(props: {
 
   return (
     <>
-      <AstryxView
-        layout="block"
-        direction="horizontal"
-        className={getNativeImageGridClass(payload.entries.length)}
-      >
+      <AstryxStack direction="vertical" className={getNativeImageGridClass(payload.entries.length)}>
         {payload.entries.map((entry, index) => {
           const id = entry.image
             ? `${entry.image.mimeType}-${entry.image.data.length}-${index}`
@@ -551,7 +547,7 @@ export function NativeDisplayImageBlock(props: {
             />
           );
         })}
-      </AstryxView>
+      </AstryxStack>
       {previewIndex !== null ? (
         <ImagePreview
           open={previewIndex !== null}

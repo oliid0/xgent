@@ -1,8 +1,7 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import { isAlwaysEnabledSkillName } from "@xagent/ui/lib/skills/builtin";
-
-import { manageSkill, notifySkillsDiscoveryUpdated } from "@xagent/ui/lib/skills/index";
 import { Type } from "typebox";
+import { isAlwaysEnabledSkillName } from "@/lib/skills/builtin";
+import { manageSkill, notifySkillsDiscoveryUpdated } from "@/lib/skills/index";
 import {
   type BuiltinToolBundle,
   createBuiltinMetadataMap,

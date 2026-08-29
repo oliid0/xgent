@@ -1,26 +1,11 @@
 import { Button } from "@astryxdesign/core/Button";
-import { Center } from "@astryxdesign/core/Center";
 import { FormLayout } from "@astryxdesign/core/FormLayout";
-import { Grid } from "@astryxdesign/core/Grid";
-import { Icon } from "@astryxdesign/core/Icon";
-import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { VStack } from "@astryxdesign/core/Layout";
 import { Section } from "@astryxdesign/core/Section";
-import { SelectableCard } from "@astryxdesign/core/SelectableCard";
 import { Selector } from "@astryxdesign/core/Selector";
-import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { isBrowserRuntime } from "@xagent/runtime";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import {
-  LogOut,
-  MessageSquare,
-  Minimize2,
-  MonitorSmartphone,
-  Moon,
-  Sun,
-  Wrench,
-} from "../../components/icons";
+import { useEffect, useMemo, useState } from "react";
 import { SUPPORTED_LOCALES, useLocale } from "../../i18n";
 import { inferRuntimePlatform } from "../../lib/runtimePlatform";
 import {
@@ -57,58 +42,6 @@ const CONTROL_WIDTH = "min(100%, var(--xagent-settings-control-width))";
 type SystemSettingsFormProps = SettingsSectionProps & {
   compact?: boolean;
 };
-
-function SettingsChoiceCard(props: {
-  label: string;
-  description?: string;
-  icon: ReactNode;
-  isSelected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <SelectableCard
-      label={props.label}
-      isSelected={props.isSelected}
-      onChange={(isSelected) => {
-        if (isSelected) props.onSelect();
-      }}
-      padding={3}
-      variant="muted"
-      width="100%"
-      height="100%"
-    >
-      <HStack width="100%" gap={3} vAlign="start">
-        <Center
-          width="var(--size-element-md)"
-          height="var(--size-element-md)"
-          style={{
-            flexShrink: 0,
-            borderRadius: "var(--radius-element)",
-            color: props.isSelected ? "var(--color-text-accent)" : "var(--color-icon-secondary)",
-            backgroundColor: props.isSelected
-              ? "var(--color-accent-muted)"
-              : "var(--color-background-muted)",
-          }}
-        >
-          {props.icon}
-        </Center>
-        <StackItem size="fill">
-          <VStack gap={0.5}>
-            <Text type="label" weight="semibold" wordBreak="break-word">
-              {props.label}
-            </Text>
-            {props.description ? (
-              <Text type="supporting" color="secondary" wordBreak="break-word">
-                {props.description}
-              </Text>
-            ) : null}
-          </VStack>
-        </StackItem>
-        {props.isSelected ? <Icon icon="check" size="sm" color="accent" /> : null}
-      </HStack>
-    </SelectableCard>
-  );
-}
 
 export function SystemSettingsForm({ settings, setSettings }: SystemSettingsFormProps) {
   const { t } = useLocale();
@@ -272,22 +205,32 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
   return (
     <VStack width="100%" gap={6}>
       <SettingsRowGroup title={t("settings.executionMode")}>
-        <Grid columns={{ minWidth: 220, max: 2, repeat: "fit" }} gap={3} width="100%">
-          <SettingsChoiceCard
-            label={t("settings.chatMode")}
-            description={t("settings.chatModeDesc")}
-            icon={<MessageSquare />}
-            isSelected={settings.system.executionMode === "text"}
-            onSelect={() => setSettings((prev) => updateSystem(prev, { executionMode: "text" }))}
+        <SettingsRow
+          label={t("settings.executionMode")}
+          description={
+            settings.system.executionMode === "text"
+              ? t("settings.chatModeDesc")
+              : t("settings.agentModeDesc")
+          }
+        >
+          <Selector
+            label={t("settings.executionMode")}
+            isLabelHidden
+            value={settings.system.executionMode === "text" ? "text" : "tools"}
+            width={CONTROL_WIDTH}
+            options={[
+              { value: "text", label: t("settings.chatMode") },
+              { value: "tools", label: t("settings.agentMode") },
+            ]}
+            onChange={(executionMode) =>
+              setSettings((prev) =>
+                updateSystem(prev, {
+                  executionMode: executionMode === "text" ? "text" : "tools",
+                }),
+              )
+            }
           />
-          <SettingsChoiceCard
-            label={t("settings.agentMode")}
-            description={t("settings.agentModeDesc")}
-            icon={<Wrench />}
-            isSelected={settings.system.executionMode !== "text"}
-            onSelect={() => setSettings((prev) => updateSystem(prev, { executionMode: "tools" }))}
-          />
-        </Grid>
+        </SettingsRow>
       </SettingsRowGroup>
 
       {terminalShellOptions.length > 0 ? (
@@ -319,19 +262,19 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
       ) : null}
 
       <SettingsRowGroup title={t("settings.appearance")}>
-        <Grid columns={{ minWidth: 150, max: 3, repeat: "fit" }} gap={3} width="100%">
-          {THEME_OPTIONS.map((theme) => (
-            <SettingsChoiceCard
-              key={theme}
-              label={getThemeLabel(theme)}
-              icon={
-                theme === "light" ? <Sun /> : theme === "dark" ? <Moon /> : <MonitorSmartphone />
-              }
-              isSelected={settings.theme === theme}
-              onSelect={() => setSettings((prev) => ({ ...prev, theme }))}
-            />
-          ))}
-        </Grid>
+        <SettingsRow label={t("settings.appearance")}>
+          <Selector
+            label={t("settings.appearance")}
+            isLabelHidden
+            value={settings.theme}
+            width={CONTROL_WIDTH}
+            options={THEME_OPTIONS.map((theme) => ({
+              value: theme,
+              label: getThemeLabel(theme),
+            }))}
+            onChange={(theme) => setSettings((prev) => ({ ...prev, theme: theme as Theme }))}
+          />
+        </SettingsRow>
         <SettingsRow label={t("settings.language")}>
           <Selector
             label={t("settings.language")}
@@ -396,21 +339,17 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
       <SettingsRowGroup title={t("settings.fontSize")}>
         {fontScaleZones.map((zone) => (
           <SettingsRow key={zone.key} label={zone.label}>
-            <HStack gap={1} wrap="wrap" hAlign="end">
-              {FONT_SCALE_OPTIONS.map((value) => (
-                <ToggleButton
-                  key={value}
-                  label={getFontScaleLabel(value)}
-                  isPressed={fontScale[zone.key] === value}
-                  size="sm"
-                  onPressedChange={(isPressed) => {
-                    if (isPressed) setZoneFontScale(zone.key, value);
-                  }}
-                >
-                  {getFontScaleLabel(value)}
-                </ToggleButton>
-              ))}
-            </HStack>
+            <Selector
+              label={zone.label}
+              isLabelHidden
+              value={String(fontScale[zone.key])}
+              width={CONTROL_WIDTH}
+              options={FONT_SCALE_OPTIONS.map((value) => ({
+                value: String(value),
+                label: getFontScaleLabel(value),
+              }))}
+              onChange={(value) => setZoneFontScale(zone.key, Number(value))}
+            />
           </SettingsRow>
         ))}
       </SettingsRowGroup>
@@ -511,26 +450,34 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
       </SettingsRowGroup>
 
       <SettingsRowGroup title={t("settings.closeWindowBehavior")}>
-        <Grid columns={{ minWidth: 220, max: 2, repeat: "fit" }} gap={3} width="100%">
-          {CLOSE_WINDOW_BEHAVIOR_OPTIONS.map((behavior) => (
-            <SettingsChoiceCard
-              key={behavior}
-              label={
+        <SettingsRow
+          label={t("settings.closeWindowBehavior")}
+          description={
+            settings.closeWindowBehavior === "minimize"
+              ? t("settings.closeWindowMinimizeDesc")
+              : t("settings.closeWindowExitDesc")
+          }
+        >
+          <Selector
+            label={t("settings.closeWindowBehavior")}
+            isLabelHidden
+            value={settings.closeWindowBehavior}
+            width={CONTROL_WIDTH}
+            options={CLOSE_WINDOW_BEHAVIOR_OPTIONS.map((behavior) => ({
+              value: behavior,
+              label:
                 behavior === "minimize"
                   ? t("settings.closeWindowMinimize")
-                  : t("settings.closeWindowExit")
-              }
-              description={
-                behavior === "minimize"
-                  ? t("settings.closeWindowMinimizeDesc")
-                  : t("settings.closeWindowExitDesc")
-              }
-              icon={behavior === "minimize" ? <Minimize2 /> : <LogOut />}
-              isSelected={settings.closeWindowBehavior === behavior}
-              onSelect={() => setSettings((prev) => ({ ...prev, closeWindowBehavior: behavior }))}
-            />
-          ))}
-        </Grid>
+                  : t("settings.closeWindowExit"),
+            }))}
+            onChange={(closeWindowBehavior) =>
+              setSettings((prev) => ({
+                ...prev,
+                closeWindowBehavior: closeWindowBehavior as typeof prev.closeWindowBehavior,
+              }))
+            }
+          />
+        </SettingsRow>
       </SettingsRowGroup>
 
       {!browser ? (

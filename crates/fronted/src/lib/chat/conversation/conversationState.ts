@@ -1,12 +1,12 @@
 import type { AssistantMessage, Context, Message } from "@earendil-works/pi-ai";
-import type { HistoryMessageRef } from "@xagent/ui/lib/chat/historyMessageRef";
+import type { HistoryMessageRef } from "@/lib/chat/historyMessageRef";
 import {
   getUserMessageAttachments,
   getUserMessageDisplayText,
   type PendingUploadedFile,
   stripUploadedFilesMessageMetadata,
-} from "@xagent/ui/lib/chat/uploadedFiles";
-import { createUuid } from "@xagent/ui/lib/shared/id";
+} from "@/lib/chat/uploadedFiles";
+import { createUuid } from "@/lib/shared/id";
 import { assistantMessageToText } from "../../providers/llm";
 import type { TaskListState } from "../../tools/builtinTypes";
 import {

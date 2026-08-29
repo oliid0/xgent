@@ -1,6 +1,5 @@
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import "@xterm/xterm/css/xterm.css";
-
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { type CSSProperties, useEffect, useRef } from "react";
@@ -507,9 +506,8 @@ export function XTermViewport({
   }, [client, session.id, session.projectPathKey]);
 
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
+    <AstryxStack
+      direction="vertical"
       ref={containerRef}
       style={viewportStyle}
       className={cn("project-terminal-viewport h-full min-h-0 w-full overflow-hidden", className)}

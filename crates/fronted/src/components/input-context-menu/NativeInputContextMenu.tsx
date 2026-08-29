@@ -1,3 +1,4 @@
+import type { ContextMenuOption } from "@astryxdesign/core/ContextMenu";
 import {
   type MouseEvent as ReactMouseEvent,
   useCallback,
@@ -371,5 +372,3 @@ export function useNativeInputContextMenu(options: { enabled?: boolean } = {}) {
     },
   };
 }
-
-import type { ContextMenuOption } from "@astryxdesign/core/ContextMenu";

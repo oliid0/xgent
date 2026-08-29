@@ -1,4 +1,4 @@
-import type { TrajectoryStatus } from "@xagent/ui/lib/trajectory/types";
+import type { TrajectoryStatus } from "@/lib/trajectory/types";
 
 type TerminalAssistantOutcome = {
   stopReason?: unknown;

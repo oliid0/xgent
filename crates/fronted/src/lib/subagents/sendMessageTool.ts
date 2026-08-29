@@ -1,6 +1,6 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import type { SubagentMessageDetails } from "@xagent/ui/lib/subagents/protocol";
 import { Type } from "typebox";
+import type { SubagentMessageDetails } from "@/lib/subagents/protocol";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "../tools/builtinTypes";
 import { displayRecipientLabel } from "./bus";
 import { toolErrorResult } from "./errors";

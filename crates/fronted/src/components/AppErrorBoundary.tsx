@@ -1,10 +1,10 @@
 import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
 import { Center } from "@astryxdesign/core/Center";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Text } from "@astryxdesign/core/Text";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { useLocale } from "../i18n";
-import { Button } from "./ui/button";
 
 type FallbackLabels = {
   title: string;
@@ -50,8 +50,15 @@ class ErrorBoundaryInner extends Component<ErrorBoundaryInnerProps, ErrorBoundar
             collapsible={{ defaultIsOpen: import.meta.env.DEV }}
             endContent={
               <HStack gap={2}>
-                <Button onClick={() => window.location.reload()}>{this.props.labels.reload}</Button>
                 <Button
+                  variant="primary"
+                  label={this.props.labels.reload}
+                  onClick={() => window.location.reload()}
+                >
+                  {this.props.labels.reload}
+                </Button>
+                <Button
+                  label={this.props.labels.copy}
                   variant="ghost"
                   onClick={() => {
                     void navigator.clipboard.writeText(

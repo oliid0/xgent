@@ -1,9 +1,8 @@
 import { Card } from "@astryxdesign/core/Card";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { Stack as AstryxStack, HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { type Range, useVirtualizer } from "@tanstack/react-virtual";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
 import {
   type MutableRefObject,
   memo,
@@ -473,9 +472,8 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
   useEffect(() => () => saveMeasurementsRef.current(), []);
 
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
+    <AstryxStack
+      direction="vertical"
       className="relative"
       style={{ height: virtualizer.getTotalSize() }}
     >
@@ -488,7 +486,7 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
           body = <SummaryCard item={row.item} />;
         } else if (row.kind === "user") {
           body = (
-            <AstryxView layout="flex" direction="horizontal" className="flex justify-end">
+            <AstryxStack direction="horizontal" className="flex justify-end">
               <UserMessageRow
                 row={row}
                 isEditing={editingMessageKey === row.key}
@@ -499,11 +497,11 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
                 onCancelEdit={handleCancelEdit}
                 onResendFromEdit={onResendFromEdit}
               />
-            </AstryxView>
+            </AstryxStack>
           );
         } else if (row.kind === "assistant-activity") {
           body = (
-            <AstryxView layout="flex" direction="horizontal" className="flex justify-start">
+            <AstryxStack direction="horizontal" className="flex justify-start">
               <AssistantActivityRow
                 row={row}
                 showUsage={showUsage}
@@ -517,11 +515,11 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
                 onResendFromEdit={onResendFromEdit}
                 onBranchConversation={onBranchConversation}
               />
-            </AstryxView>
+            </AstryxStack>
           );
         } else {
           body = (
-            <AstryxView layout="flex" direction="horizontal" className="flex justify-start">
+            <AstryxStack direction="horizontal" className="flex justify-start">
               <AssistantRenderUnit
                 row={row}
                 showUsage={showUsage}
@@ -535,14 +533,13 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
                 onResendFromEdit={onResendFromEdit}
                 onBranchConversation={onBranchConversation}
               />
-            </AstryxView>
+            </AstryxStack>
           );
         }
 
         return (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             key={virtualRow.key}
             data-index={virtualRow.index}
             ref={virtualizer.measureElement}
@@ -551,16 +548,15 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
           >
             {body}
             {row.gapAfter > 0 && virtualRow.index < rows.length - 1 ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+              <AstryxStack
+                direction="vertical"
                 aria-hidden="true"
                 style={{ height: row.gapAfter }}
               />
             ) : null}
-          </AstryxView>
+          </AstryxStack>
         );
       })}
-    </AstryxView>
+    </AstryxStack>
   );
 });

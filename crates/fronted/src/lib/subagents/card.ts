@@ -1,9 +1,6 @@
 import type { ToolCall } from "@earendil-works/pi-ai";
 
-import {
-  isSubagentCardArguments,
-  type SubagentCardArguments,
-} from "@xagent/ui/lib/subagents/protocol";
+import { isSubagentCardArguments, type SubagentCardArguments } from "@/lib/subagents/protocol";
 import { AGENT_TOOL_NAME } from "./types";
 
 export type SubagentCardToolCall = ToolCall & {

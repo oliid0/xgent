@@ -9,8 +9,8 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { type SearchableItem, type SearchSource, Typeahead } from "@astryxdesign/core/Typeahead";
 import { invoke } from "@xagent/runtime";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { AdaptiveDialog } from "../../../components/astryx/AdaptiveDialog";
 import { FolderOpen, GitBranch, Plus } from "../../../components/icons";
-import { AdaptiveDialog } from "../../../components/ui/adaptive-dialog";
 import { useLocale } from "../../../i18n";
 import { listGitRemoteBranches, startGitClone } from "../../../lib/git/tauriGitClient";
 

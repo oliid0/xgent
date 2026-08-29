@@ -1,4 +1,4 @@
-import type { TrajectoryEvent, TrajectorySection } from "@xagent/ui/lib/trajectory/types";
+import type { TrajectoryEvent, TrajectorySection } from "@/lib/trajectory/types";
 
 export type TrajectoryPersistencePorts = {
   persist: (conversationId: string, segmentIndex: number, eventsJson: string) => Promise<unknown>;

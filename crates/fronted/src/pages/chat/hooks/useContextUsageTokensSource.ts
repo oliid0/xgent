@@ -1,8 +1,5 @@
-import {
-  buildContextUsageScanItems,
-  deriveContextUsageTokens,
-} from "@xagent/ui/lib/chat/contextUsage";
 import { useMemo } from "react";
+import { buildContextUsageScanItems, deriveContextUsageTokens } from "@/lib/chat/contextUsage";
 import type { CompactionController } from "../../../lib/chat/compaction/controller";
 import type { RenderTimelineItem } from "../../../lib/chat/conversation/conversationState";
 import type { LiveTranscriptStore } from "../../../lib/chat/conversation/liveTranscriptStore";

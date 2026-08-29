@@ -1,5 +1,5 @@
 import type { Context, Message, TextContent, ToolResultMessage } from "@earendil-works/pi-ai";
-import { normalizeHostedSearchBlock } from "@xagent/ui/lib/chat/hostedSearch";
+import { normalizeHostedSearchBlock } from "@/lib/chat/hostedSearch";
 import { isSubagentCardToolCall } from "../../subagents/card";
 import type { DisplayImageItemDetails, DisplayImageResultDetails } from "../../tools/builtinTypes";
 import { isOnlyDsmlOrphanCloseTags, stripDsmlToolCallMarkup } from "../runner/deepSeekDsml";

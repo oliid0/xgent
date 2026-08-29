@@ -35,6 +35,7 @@ import type {
   TerminalSnapshot,
   TerminalSshPrompt,
 } from "../../lib/terminal/types";
+import { useConfirmDialog } from "../astryx/useConfirmDialog";
 import {
   ArrowLeft,
   Clock3,
@@ -47,7 +48,6 @@ import {
   Terminal,
   X,
 } from "../icons";
-import { useConfirmDialog } from "../ui/confirm-dialog";
 
 type SshConnectionScope = "project" | "all";
 type SshConnectionView = "list" | "settings" | "create";

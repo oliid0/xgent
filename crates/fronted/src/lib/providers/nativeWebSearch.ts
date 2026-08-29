@@ -1,5 +1,5 @@
 import type { ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import type { HostedSearchBlock } from "@xagent/ui/lib/chat/hostedSearch";
+import type { HostedSearchBlock } from "@/lib/chat/hostedSearch";
 import type { ProviderId } from "../settings";
 import { isRecord } from "./runtime/common";
 

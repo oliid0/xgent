@@ -1,5 +1,5 @@
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import {
   useCallback,
   useEffect,
@@ -249,8 +249,7 @@ export function FloorNavRail(props: {
     const isActive = floor.rowKey === activeRowKey;
     const isBookmarked = bookmarks.has(floor.messageId);
     return (
-      <AstryxView
-        layout="flex"
+      <AstryxStack
         direction="horizontal"
         key={isPinnedCopy ? `pinned-${floor.rowKey}` : floor.rowKey}
         // 收藏区的副本不带定位锚点，展开自动居中永远对准主列表里的当前行。
@@ -261,20 +260,24 @@ export function FloorNavRail(props: {
         )}
       >
         <AstryxButton
+          variant="ghost"
+          label={floor.preview}
           type="button"
           onClick={() => handleJump(floor.rowKey)}
           className={cn(
             "min-w-0 flex-1 truncate px-2 py-1.5 text-left text-[12px] leading-tight",
             isActive ? "font-medium text-foreground" : "text-muted-foreground",
           )}
-          title={floor.preview}
+          tooltip={floor.preview}
         >
           {floor.preview}
         </AstryxButton>
         <AstryxButton
+          variant="ghost"
+          label={isBookmarked ? unpinLabel : pinLabel}
           type="button"
           aria-label={isBookmarked ? unpinLabel : pinLabel}
-          title={isBookmarked ? unpinLabel : pinLabel}
+          tooltip={isBookmarked ? unpinLabel : pinLabel}
           onClick={() => toggleFloorBookmark(conversationId, floor.messageId)}
           className={cn(
             "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-all",
@@ -287,12 +290,13 @@ export function FloorNavRail(props: {
         >
           <Pin className={cn("h-3 w-3", isBookmarked && "fill-current")} />
         </AstryxButton>
-      </AstryxView>
+      </AstryxStack>
     );
   };
 
   return (
-    <AstryxView
+    <AstryxStack
+      direction="vertical"
       as="nav"
       ref={setNavEl}
       aria-label={railLabel}
@@ -304,8 +308,7 @@ export function FloorNavRail(props: {
       style={{ bottom: bottomOffset }}
     >
       {expanded ? (
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="vertical"
           className={cn(
             "floor-nav-panel flex max-h-[min(78%,560px)] w-60 max-w-[calc(100vw-2rem)] touch-manipulation flex-col overflow-hidden rounded-xl border border-border/50 bg-background/85 shadow-[0_12px_32px_-16px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.06]",
@@ -314,35 +317,31 @@ export function FloorNavRail(props: {
           )}
           {...hoverHandlers}
         >
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             ref={panelScrollRef}
             className="min-h-0 overflow-y-auto p-1.5"
           >
             {bookmarkedFloors.length > 0 ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+              <AstryxStack
+                direction="vertical"
                 className="mb-1.5 rounded-lg bg-amber-500/[0.07] p-1 ring-1 ring-amber-500/20"
               >
-                <AstryxView
-                  layout="flex"
+                <AstryxStack
                   direction="horizontal"
                   className="flex items-center gap-1.5 px-1.5 pb-1 pt-0.5 text-[10.5px] font-medium text-amber-600/90 dark:text-amber-400/90"
                 >
                   <Pin className="h-2.5 w-2.5 fill-current" />
                   {pinnedTitle}
-                </AstryxView>
+                </AstryxStack>
                 {bookmarkedFloors.map((floor) => renderPanelRow(floor, true))}
-              </AstryxView>
+              </AstryxStack>
             ) : null}
             {floors.map((floor) => renderPanelRow(floor))}
-          </AstryxView>
-        </AstryxView>
+          </AstryxStack>
+        </AstryxStack>
       ) : (
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="vertical"
           className={cn(
             "flex max-h-full touch-manipulation flex-col items-end gap-[7px] overflow-hidden py-2 pl-3 pr-0.5",
@@ -366,10 +365,12 @@ export function FloorNavRail(props: {
             const isBookmarked = bookmarks.has(floor.messageId);
             return (
               <AstryxButton
+                variant="ghost"
+                label={floor.preview}
                 key={floor.rowKey}
                 type="button"
                 aria-label={floor.preview}
-                title={floor.preview}
+                tooltip={floor.preview}
                 onClick={() => handleJump(floor.rowKey)}
                 className={cn(
                   // after 伪元素把命中区扩到整条槽位高度，覆盖标记间 7px 间隙。
@@ -384,8 +385,8 @@ export function FloorNavRail(props: {
               />
             );
           })}
-        </AstryxView>
+        </AstryxStack>
       )}
-    </AstryxView>
+    </AstryxStack>
   );
 }

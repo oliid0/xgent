@@ -1,8 +1,8 @@
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { HStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Lightbulb, RefreshCw } from "../../../../components/icons";
 import { Markdown } from "../../../../components/Markdown";
@@ -272,12 +272,12 @@ export const RoundContent = memo(function RoundContent(props: {
   if (!hasContent) return null;
 
   return (
-    <AstryxView layout="block" direction="horizontal" className="space-y-2">
+    <AstryxStack direction="vertical" className="space-y-2">
       {isActive &&
       isLive &&
       normalizedToolStatus &&
       (!hasRunningToolCall || isCompactionStatus || isVibingStatus) ? (
-        <AstryxView layout="block" direction="horizontal" className="py-1.5">
+        <AstryxStack direction="vertical" className="py-1.5">
           {isCompactionStatus ? (
             <CompactingText />
           ) : isVibingStatus ? (
@@ -285,7 +285,7 @@ export const RoundContent = memo(function RoundContent(props: {
           ) : (
             <AssistantStatus>{normalizedToolStatus}</AssistantStatus>
           )}
-        </AstryxView>
+        </AstryxStack>
       ) : null}
 
       {isActive && isLive && retryAttempts && retryAttempts.length > 0 ? (
@@ -365,6 +365,6 @@ export const RoundContent = memo(function RoundContent(props: {
       {showUsage ? (
         <UsagePanel usage={round.meta?.usage} contextWindow={usageContextWindow} />
       ) : null}
-    </AstryxView>
+    </AstryxStack>
   );
 });

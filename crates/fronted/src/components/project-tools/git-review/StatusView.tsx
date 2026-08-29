@@ -1,13 +1,17 @@
+import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
+import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
+import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText } from "@astryxdesign/core/Text";
+
 // GitReview status view: staged/unstaged change lists, the commit bar, the
 // working-tree/branch diff pane and the change context menus.
 //
 // Shared by every frontend runtime; only relative or @xagent/runtime imports
 // are allowed here.
 
-import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
-import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton, Button } from "@astryxdesign/core/Button";
+import { TextInput as Input } from "@astryxdesign/core/TextInput";
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../../i18n";
 import type { GitStatusEntry } from "../../../lib/git/types";
@@ -26,8 +30,6 @@ import {
   RefreshCw,
   Trash2,
 } from "../../icons";
-import { Button } from "../../ui/button";
-import { Input } from "../../ui/input";
 import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
 import { DiffReviewCard } from "./DiffView";
 import {
@@ -321,49 +323,55 @@ export function GitReviewStatusView(props: {
         menuWidth="var(--xagent-git-context-menu-width)"
         size="sm"
       >
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           className={cn(
             "select-none border-b border-l-2 border-border/60 border-l-transparent px-3 py-2 transition-colors hover:bg-muted/40",
             selected && "border-l-emerald-500 bg-emerald-500/10",
           )}
         >
           <AstryxButton
+            label={entry.path}
+            tooltip={entry.path}
             type="button"
             className="flex w-full select-none items-start gap-2 rounded-sm bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             onClick={() => selectEntry(entry)}
-            title={entry.path}
           >
             <TypeIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <AstryxInline className="min-w-0 flex-1 select-none">
-              <AstryxInline
+            <AstryxText as="span" type="inherit" className="min-w-0 flex-1 select-none">
+              <AstryxText
+                as="span"
+                type="inherit"
                 className={cn(
                   "block truncate text-xs font-medium text-foreground",
                   deleted && "line-through",
                 )}
               >
                 {fileName}
-              </AstryxInline>
-              <AstryxInline
+              </AstryxText>
+              <AstryxText
+                as="span"
+                type="inherit"
                 className={cn(
                   "block truncate text-[calc(11px*var(--zone-font-scale,1))] leading-4 text-muted-foreground",
                   deleted && "line-through",
                 )}
               >
                 {filePath}
-              </AstryxInline>
-            </AstryxInline>
-            <AstryxInline
+              </AstryxText>
+            </AstryxText>
+            <AstryxText
+              as="span"
+              type="inherit"
               className={cn(
                 "mt-0.5 shrink-0 text-[calc(10px*var(--zone-font-scale,1))] font-semibold",
                 statusTone(entry),
               )}
             >
               {statusLabel(entry)}
-            </AstryxInline>
+            </AstryxText>
           </AstryxButton>
-        </AstryxView>
+        </AstryxStack>
       </ContextMenu>
     );
   };
@@ -379,16 +387,14 @@ export function GitReviewStatusView(props: {
     collapsed: boolean,
     onToggle: () => void,
   ) => (
-    <AstryxView
+    <AstryxStack
+      direction="vertical"
       as="section"
       className="relative border-b border-border/60 bg-background last:border-b-0"
     >
-      <AstryxView
-        layout="grid"
-        direction="horizontal"
-        className="sticky top-0 z-20 grid h-7 w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-border/60 bg-muted px-3"
-      >
+      <AstryxGrid className="sticky top-0 z-20 grid h-7 w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-border/60 bg-muted px-3">
         <AstryxButton
+          label={title}
           type="button"
           className="flex min-w-0 items-center gap-1.5 rounded-sm bg-transparent p-0 text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           aria-expanded={!collapsed}
@@ -401,18 +407,21 @@ export function GitReviewStatusView(props: {
             )}
             aria-hidden="true"
           />
-          <AstryxInline className="min-w-0 truncate text-[calc(11px*var(--zone-font-scale,1))] font-semibold text-muted-foreground">
+          <AstryxText
+            as="span"
+            type="inherit"
+            className="min-w-0 truncate text-[calc(11px*var(--zone-font-scale,1))] font-semibold text-muted-foreground"
+          >
             {title}
-          </AstryxInline>
+          </AstryxText>
         </AstryxButton>
-        <AstryxView
+        <AstryxStack
           as="span"
-          layout="inline-flex"
           direction="horizontal"
           className="inline-flex h-4 min-w-6 shrink-0 items-center justify-center justify-self-end rounded bg-background/70 px-1.5 text-center text-[calc(10px*var(--zone-font-scale,1))] font-medium tabular-nums text-muted-foreground"
         >
           {sectionEntries.length}
-        </AstryxView>
+        </AstryxStack>
         <DropdownMenu
           button={{
             label: t("projectTools.gitReview.changesActions"),
@@ -456,10 +465,8 @@ export function GitReviewStatusView(props: {
           alignment="end"
           hasChevron={false}
         />
-      </AstryxView>
-      <AstryxView
-        layout="grid"
-        direction="horizontal"
+      </AstryxGrid>
+      <AstryxGrid
         aria-hidden={collapsed}
         inert={collapsed}
         className={cn(
@@ -467,32 +474,27 @@ export function GitReviewStatusView(props: {
           collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100",
         )}
       >
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           className={cn(
             "min-h-0 overflow-hidden transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none",
             collapsed ? "-translate-y-1 opacity-0" : "translate-y-0 opacity-100",
           )}
         >
           {sectionEntries.length === 0 ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="px-3 py-3 text-xs text-muted-foreground"
-            >
+            <AstryxStack direction="vertical" className="px-3 py-3 text-xs text-muted-foreground">
               {emptyLabel}
-            </AstryxView>
+            </AstryxStack>
           ) : (
             <>
               {visibleSectionEntries.map((entry) => renderChangeEntry(entry, section))}
               {hiddenCount > 0 ? (
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="border-b border-border/60 px-3 py-2"
-                >
+                <AstryxStack direction="vertical" className="border-b border-border/60 px-3 py-2">
                   <Button
+                    label={t("projectTools.gitReview.showMoreChanges").replace(
+                      "{count}",
+                      String(hiddenCount),
+                    )}
                     type="button"
                     variant="ghost"
                     size="sm"
@@ -504,13 +506,13 @@ export function GitReviewStatusView(props: {
                       String(hiddenCount),
                     )}
                   </Button>
-                </AstryxView>
+                </AstryxStack>
               ) : null}
             </>
           )}
-        </AstryxView>
-      </AstryxView>
-    </AstryxView>
+        </AstryxStack>
+      </AstryxGrid>
+    </AstryxStack>
   );
 
   return (
@@ -521,8 +523,7 @@ export function GitReviewStatusView(props: {
         onClose={closeDiscardConfirm}
         onConfirm={confirmDiscardChanges}
       />
-      <AstryxView
-        layout="flex"
+      <AstryxStack
         direction="vertical"
         key="changes"
         className={cn(
@@ -530,7 +531,8 @@ export function GitReviewStatusView(props: {
           useSplitReviewLayout ? `grid ${GIT_REVIEW_SPLIT_GRID_CLASS}` : "flex flex-col",
         )}
       >
-        <AstryxView
+        <AstryxStack
+          direction="vertical"
           as="aside"
           ref={listPaneRef}
           className={cn(
@@ -539,9 +541,8 @@ export function GitReviewStatusView(props: {
             !useSplitReviewLayout && "flex-1",
           )}
         >
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className={cn(
               GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS,
               "isolate min-h-0 flex-1 overflow-auto [overscroll-behavior:contain]",
@@ -549,13 +550,9 @@ export function GitReviewStatusView(props: {
             onScroll={handleOverlayScroll}
           >
             {entries.length === 0 ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="px-3 py-6 text-xs text-muted-foreground"
-              >
+              <AstryxStack direction="vertical" className="px-3 py-6 text-xs text-muted-foreground">
                 {t("projectTools.gitReview.noLocalChanges")}
-              </AstryxView>
+              </AstryxStack>
             ) : (
               <>
                 {renderChangeSection(
@@ -588,9 +585,10 @@ export function GitReviewStatusView(props: {
                 )}
               </>
             )}
-          </AstryxView>
-        </AstryxView>
-        <AstryxView
+          </AstryxStack>
+        </AstryxStack>
+        <AstryxStack
+          direction="vertical"
           as="main"
           ref={detailPaneRef}
           className={cn(
@@ -599,22 +597,22 @@ export function GitReviewStatusView(props: {
             !useSplitReviewLayout && "flex-1",
           )}
         >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="mb-3 flex shrink-0 items-center gap-2"
-          >
+          <AstryxStack direction="horizontal" className="mb-3 flex shrink-0 items-center gap-2">
             <GitCommitHorizontal className="h-4 w-4 text-muted-foreground" />
             <Input
+              label={t("projectTools.gitReview.commitMessagePlaceholder")}
+              isLabelHidden
               value={commitMessage}
-              onChange={(event) => onCommitMessageChange(event.target.value)}
+              onChange={(nextValue) => onCommitMessageChange(nextValue)}
               placeholder={t("projectTools.gitReview.commitMessagePlaceholder")}
-              disabled={writeDisabled || operationBusy}
+              isDisabled={writeDisabled || operationBusy}
               className="h-8 text-[calc(11px*var(--zone-font-scale,1))] placeholder:text-[calc(11px*var(--zone-font-scale,1))] focus-visible:ring-1 focus-visible:ring-border/40"
             />
             <Button
+              variant="primary"
+              label={t("projectTools.gitReview.commit")}
               size="sm"
-              disabled={writeDisabled || operationBusy || !commitMessage.trim()}
+              isDisabled={writeDisabled || operationBusy || !commitMessage.trim()}
               onClick={() => {
                 void runOperation(
                   "commit",
@@ -631,28 +629,28 @@ export function GitReviewStatusView(props: {
                 t("projectTools.gitReview.commit")
               )}
             </Button>
-          </AstryxView>
+          </AstryxStack>
           {selectedEntry ? (
-            <AstryxView
-              layout="flex"
+            <AstryxStack
               direction="vertical"
               className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden"
             >
-              <AstryxView
-                layout="flex"
+              <AstryxStack
                 direction="horizontal"
                 className="flex shrink-0 items-center gap-2 rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-xs"
               >
-                <AstryxInline className="text-muted-foreground">
+                <AstryxText as="span" type="inherit" className="text-muted-foreground">
                   {t("projectTools.gitReview.selected")}
-                </AstryxInline>
-                <AstryxInline
+                </AstryxText>
+                <AstryxText
+                  as="span"
+                  type="inherit"
                   className="min-w-0 flex-1 truncate font-medium"
-                  title={selectedEntry.path}
+                  aria-label={selectedEntry.path}
                 >
                   {selectedEntry.path}
-                </AstryxInline>
-              </AstryxView>
+                </AstryxText>
+              </AstryxStack>
               <DiffReviewCard
                 activeView={activeDiffView}
                 branchDiff={branchDiff}
@@ -662,18 +660,17 @@ export function GitReviewStatusView(props: {
                 showStat={useSplitReviewLayout}
                 worktreeDiff={worktreeDiff}
               />
-            </AstryxView>
+            </AstryxStack>
           ) : (
-            <AstryxView
-              layout="flex"
+            <AstryxStack
               direction="horizontal"
               className="flex min-h-0 flex-1 items-center justify-center rounded-lg border border-border/70 bg-muted/10 px-4 text-center text-xs text-muted-foreground"
             >
               {t("projectTools.gitReview.selectFileToViewDiff")}
-            </AstryxView>
+            </AstryxStack>
           )}
-        </AstryxView>
-      </AstryxView>
+        </AstryxStack>
+      </AstryxStack>
     </>
   );
 }

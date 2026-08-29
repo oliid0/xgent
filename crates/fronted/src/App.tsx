@@ -17,10 +17,10 @@ import {
 } from "@xagent/runtime";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
+import { useConfirmDialog } from "./components/astryx/useConfirmDialog";
 import { CronPromptRunner } from "./components/cron/CronPromptRunner";
 import { useNativeInputContextMenu } from "./components/input-context-menu/NativeInputContextMenu";
 import { MemoryOrganizerHost } from "./components/memory/useMemoryOrganizer";
-import { useConfirmDialog } from "./components/ui/confirm-dialog";
 import { WindowsTitleBar } from "./components/WindowsTitleBar";
 import { LocaleContext, t as translate } from "./i18n";
 import { useAppUpdateController } from "./lib/appUpdates";

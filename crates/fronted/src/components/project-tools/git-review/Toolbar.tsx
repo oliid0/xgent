@@ -1,3 +1,12 @@
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText, Text } from "@astryxdesign/core/Text";
+import { useToast } from "@astryxdesign/core/Toast";
+import { ToggleButton, ToggleButtonGroup } from "@astryxdesign/core/ToggleButton";
+
 // GitReview toolbar: panel header (branch summary, remote actions, counters,
 // mode/pane switchers) plus the modal dialogs and the operation toast shared
 // by the status and history views.
@@ -5,21 +14,17 @@
 // Shared by every frontend runtime; only relative or @xagent/runtime imports
 // are allowed here.
 
-import { AlertDialog } from "@astryxdesign/core/AlertDialog";
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
-import { HStack, VStack } from "@astryxdesign/core/Layout";
-import { Text } from "@astryxdesign/core/Text";
-import { useToast } from "@astryxdesign/core/Toast";
-import { ToggleButton, ToggleButtonGroup } from "@astryxdesign/core/ToggleButton";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { Button } from "@astryxdesign/core/Button";
+import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
+import { TextInput as Input } from "@astryxdesign/core/TextInput";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale } from "../../../i18n";
 import type { GitBranch as GitBranchInfo, GitWorktreeInfo } from "../../../lib/git/types";
 import { gitDiscoveredRepositoryLabel, selectedGitRepositoryLabel } from "../../../lib/git/types";
 import { cn } from "../../../lib/shared/utils";
+import { AdaptiveDialog } from "../../astryx/AdaptiveDialog";
 import {
   Check,
-  ChevronDown,
   Cloud,
   Download,
   Eye,
@@ -32,17 +37,6 @@ import {
   Trash2,
   Upload,
 } from "../../icons";
-import { AdaptiveDialog } from "../../ui/adaptive-dialog";
-import { Button } from "../../ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../../ui/dropdown-menu";
-import { Input } from "../../ui/input";
 import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
 import {
   type GitBranchFromCommitState,
@@ -97,13 +91,22 @@ export function GitRemoteSetupModal(props: {
       bottomSheetHeight="tall"
       footer={
         <HStack gap={2} hAlign="end" wrap="wrap">
-          <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={loading}>
+          <Button
+            label={t("chat.cancel")}
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            isDisabled={loading}
+          >
             {t("chat.cancel")}
           </Button>
           <Button
+            variant="primary"
+            label={t(remoteSetupSubmitKey(action))}
             type="button"
             size="sm"
-            disabled={loading || !remoteUrl.trim()}
+            isDisabled={loading || !remoteUrl.trim()}
             onClick={onSubmit}
           >
             {loading ? (
@@ -118,55 +121,50 @@ export function GitRemoteSetupModal(props: {
         </HStack>
       }
     >
-      <AstryxView
+      <AstryxStack
+        direction="vertical"
         as="form"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit();
         }}
       >
-        <AstryxView layout="block" direction="horizontal" className="space-y-4">
-          <AstryxView
-            layout="grid"
-            direction="horizontal"
-            className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2"
-          >
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+        <AstryxStack direction="vertical" className="space-y-4">
+          <AstryxGrid className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+            <AstryxStack
+              direction="vertical"
               className="truncate rounded-lg border border-border/70 bg-muted/35 px-3 py-2"
-              title={branch}
+              aria-label={branch}
             >
               {branch}
-            </AstryxView>
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            </AstryxStack>
+            <AstryxStack
+              direction="vertical"
               className="truncate rounded-lg border border-border/70 bg-muted/35 px-3 py-2"
-              title={workdir}
+              aria-label={workdir}
             >
               {workdir}
-            </AstryxView>
-          </AstryxView>
+            </AstryxStack>
+          </AstryxGrid>
           <Input
+            isLabelHidden
             label={t("projectTools.gitReview.remoteUrl")}
             value={remoteUrl}
-            onChange={(event) => onRemoteUrlChange(event.target.value)}
+            onChange={(nextValue) => onRemoteUrlChange(nextValue)}
             placeholder={t("projectTools.gitReview.remoteUrlPlaceholder")}
-            autoFocus
-            disabled={loading}
+            hasAutoFocus
+            isDisabled={loading}
           />
           {error ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
             >
               {error}
-            </AstryxView>
+            </AstryxStack>
           ) : null}
-        </AstryxView>
-      </AstryxView>
+        </AstryxStack>
+      </AstryxStack>
     </AdaptiveDialog>
   );
 }
@@ -235,13 +233,22 @@ export function GitBranchFromCommitModal(props: {
       bottomSheetHeight="tall"
       footer={
         <HStack gap={2} hAlign="end" wrap="wrap">
-          <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={loading}>
+          <Button
+            label={t("chat.cancel")}
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            isDisabled={loading}
+          >
             {t("chat.cancel")}
           </Button>
           <Button
+            variant="primary"
+            label={t("projectTools.gitReview.createBranch")}
             type="button"
             size="sm"
-            disabled={loading || !branchName.trim()}
+            isDisabled={loading || !branchName.trim()}
             onClick={onSubmit}
           >
             {loading ? (
@@ -254,54 +261,52 @@ export function GitBranchFromCommitModal(props: {
         </HStack>
       }
     >
-      <AstryxView
+      <AstryxStack
+        direction="vertical"
         as="form"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit();
         }}
       >
-        <AstryxView layout="block" direction="horizontal" className="space-y-4">
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+        <AstryxStack direction="vertical" className="space-y-4">
+          <AstryxStack
+            direction="vertical"
             className="rounded-lg border border-border/70 bg-muted/35 px-3 py-2 text-xs"
           >
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="font-mono text-[calc(11px*var(--zone-font-scale,1))] text-muted-foreground"
             >
               {target.shortSha}
-            </AstryxView>
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            </AstryxStack>
+            <AstryxStack
+              direction="vertical"
               className="mt-1 truncate font-medium"
-              title={target.subject}
+              aria-label={target.subject}
             >
               {target.subject || target.commitSha}
-            </AstryxView>
-          </AstryxView>
+            </AstryxStack>
+          </AstryxStack>
           <Input
+            isLabelHidden
             label={t("projectTools.gitReview.branchName")}
             value={branchName}
-            onChange={(event) => onBranchNameChange(event.target.value)}
+            onChange={(nextValue) => onBranchNameChange(nextValue)}
             placeholder={t("projectTools.gitReview.branchNamePlaceholder")}
-            autoFocus
-            disabled={loading}
+            hasAutoFocus
+            isDisabled={loading}
           />
           {error ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
             >
               {error}
-            </AstryxView>
+            </AstryxStack>
           ) : null}
-        </AstryxView>
-      </AstryxView>
+        </AstryxStack>
+      </AstryxStack>
     </AdaptiveDialog>
   );
 }
@@ -462,42 +467,52 @@ function GitWorktreeModal(props: { data: GitReviewData; open: boolean; onClose: 
       touchPresentation="bottom-sheet"
       bottomSheetHeight="tall"
     >
-      <AstryxView layout="block" direction="horizontal" className="space-y-4">
-        <AstryxView as="section" className="rounded-xl border p-3">
-          <AstryxView layout="block" direction="horizontal" className="mb-3 text-xs font-semibold">
+      <AstryxStack direction="vertical" className="space-y-4">
+        <AstryxStack direction="vertical" as="section" className="rounded-xl border p-3">
+          <AstryxStack direction="vertical" className="mb-3 text-xs font-semibold">
             {t("projectTools.gitReview.createWorktree")}
-          </AstryxView>
-          <AstryxView layout="grid" direction="horizontal" className="grid gap-2 sm:grid-cols-2">
+          </AstryxStack>
+          <AstryxGrid className="grid gap-2 sm:grid-cols-2">
             <Input
+              label={t("projectTools.gitReview.worktreeBranch")}
+              isLabelHidden
               value={branch}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
+              onChange={(nextValue) => {
+                const value = nextValue;
                 setBranch(value);
                 if (!directoryName) setDirectoryName(value.replace(/[\\/\s]+/g, "-"));
               }}
               placeholder={t("projectTools.gitReview.worktreeBranch")}
             />
             <Input
+              label={t("projectTools.gitReview.worktreeDirectory")}
+              isLabelHidden
               value={directoryName}
-              onChange={(event) => setDirectoryName(event.currentTarget.value)}
+              onChange={(nextValue) => setDirectoryName(nextValue)}
               placeholder={t("projectTools.gitReview.worktreeDirectory")}
             />
             <Input
+              label={t("projectTools.gitReview.worktreeStartPoint")}
+              isLabelHidden
               value={startPoint}
-              onChange={(event) => setStartPoint(event.currentTarget.value)}
+              onChange={(nextValue) => setStartPoint(nextValue)}
               placeholder={t("projectTools.gitReview.worktreeStartPoint")}
             />
             <Input
+              label={t("projectTools.gitReview.worktreeParent")}
+              isLabelHidden
               value={parentDirectory}
-              onChange={(event) => setParentDirectory(event.currentTarget.value)}
+              onChange={(nextValue) => setParentDirectory(nextValue)}
               placeholder={t("projectTools.gitReview.worktreeParent")}
             />
-          </AstryxView>
+          </AstryxGrid>
           <Button
+            variant="ghost"
+            label={t("projectTools.gitReview.createWorktree")}
             type="button"
             size="sm"
             className="mt-3 w-full"
-            disabled={busy || !branch.trim() || !directoryName.trim()}
+            isDisabled={busy || !branch.trim() || !directoryName.trim()}
             onClick={() => void create()}
           >
             {busy ? (
@@ -507,58 +522,51 @@ function GitWorktreeModal(props: { data: GitReviewData; open: boolean; onClose: 
             )}
             {t("projectTools.gitReview.createWorktree")}
           </Button>
-        </AstryxView>
-        <AstryxView as="section" className="space-y-2">
+        </AstryxStack>
+        <AstryxStack direction="vertical" as="section" className="space-y-2">
           {worktrees.length === 0 ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground"
             >
               {t("projectTools.gitReview.noWorktrees")}
-            </AstryxView>
+            </AstryxStack>
           ) : (
             worktrees.map((worktree) => (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+              <AstryxStack
+                direction="vertical"
                 key={worktree.path}
                 className="rounded-xl border px-3 py-2.5"
               >
-                <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-2">
+                <AstryxStack direction="horizontal" className="flex items-start gap-2">
                   <Folder className="mt-0.5 h-4 w-4 shrink-0 text-sky-500" />
-                  <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="truncate text-xs font-semibold"
-                    >
+                  <AstryxStack direction="vertical" className="min-w-0 flex-1">
+                    <AstryxStack direction="vertical" className="truncate text-xs font-semibold">
                       {worktree.branch || t("projectTools.gitReview.unresolved")}
-                    </AstryxView>
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
+                    </AstryxStack>
+                    <AstryxStack
+                      direction="vertical"
                       className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground"
-                      title={worktree.path}
+                      aria-label={worktree.path}
                     >
                       {worktree.path}
-                    </AstryxView>
-                  </AstryxView>
+                    </AstryxStack>
+                  </AstryxStack>
                   <Button
+                    label={t("chat.remove")}
                     type="button"
                     variant="ghost"
-                    size="icon"
+                    size="md"
                     className="h-8 w-8 text-destructive"
-                    disabled={busy}
+                    isDisabled={busy}
                     onClick={() => setRemovingPath(worktree.path)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
-                </AstryxView>
+                </AstryxStack>
                 {removingPath === worktree.path ? (
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
+                  <AstryxStack
+                    direction="vertical"
                     className="mt-2 rounded-lg bg-muted/50 p-2 text-xs"
                   >
                     <CheckboxInput
@@ -573,46 +581,43 @@ function GitWorktreeModal(props: { data: GitReviewData; open: boolean; onClose: 
                       onChange={setForce}
                       size="sm"
                     />
-                    <AstryxView
-                      layout="flex"
-                      direction="horizontal"
-                      className="mt-2 flex justify-end gap-2"
-                    >
+                    <AstryxStack direction="horizontal" className="mt-2 flex justify-end gap-2">
                       <Button
+                        label={t("chat.cancel")}
                         type="button"
                         variant="ghost"
                         size="sm"
-                        disabled={busy}
+                        isDisabled={busy}
                         onClick={() => setRemovingPath("")}
                       >
                         {t("chat.cancel")}
                       </Button>
                       <Button
+                        label={t("settings.delete")}
                         type="button"
                         variant="destructive"
                         size="sm"
-                        disabled={busy}
+                        isDisabled={busy}
                         onClick={() => void remove(worktree)}
                       >
                         {t("settings.delete")}
                       </Button>
-                    </AstryxView>
-                  </AstryxView>
+                    </AstryxStack>
+                  </AstryxStack>
                 ) : null}
-              </AstryxView>
+              </AstryxStack>
             ))
           )}
-        </AstryxView>
+        </AstryxStack>
         {error ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-destructive"
           >
             {error}
-          </AstryxView>
+          </AstryxStack>
         ) : null}
-      </AstryxView>
+      </AstryxStack>
     </AdaptiveDialog>
   );
 }
@@ -655,38 +660,28 @@ function GitReviewBranchMenu(props: { data: GitReviewData; writeDisabled: boolea
   const title = state.head || t("projectTools.gitReviewTitle");
   if (state.status !== "ready") {
     return (
-      <AstryxView
-        layout="flex"
+      <AstryxStack
         direction="horizontal"
         className="flex min-w-0 flex-1 items-center px-2 text-[calc(12px*var(--zone-font-scale,1))] font-medium text-muted-foreground"
       >
-        <AstryxInline className="min-w-0 truncate">{title}</AstryxInline>
-      </AstryxView>
+        <AstryxText as="span" type="inherit" className="min-w-0 truncate">
+          {title}
+        </AstryxText>
+      </AstryxStack>
     );
   }
 
   const localBranches = branches.filter((branch) => branch.kind === "local");
   const remoteBranches = branches.filter((branch) => branch.kind === "remote");
 
-  const renderBranchRow = (branch: GitBranchInfo, isCurrent: boolean, labelText: string) => (
-    <DropdownMenuItem
-      key={`${branch.kind}:${branch.fullName}`}
-      disabled={operationBusy}
-      onSelect={() => {
-        if (isCurrent || writeDisabled) return;
-        void switchBranch(branch.fullName, branch.kind);
-      }}
-      className={cn("gap-2 text-xs", (isCurrent || writeDisabled) && "text-muted-foreground")}
-      title={branch.fullName}
-    >
-      {isCurrent ? (
-        <Check className="h-3.5 w-3.5 shrink-0" />
-      ) : (
-        <GitBranch className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      )}
-      <AstryxInline className="min-w-0 flex-1 truncate">{labelText}</AstryxInline>
-    </DropdownMenuItem>
-  );
+  const branchItem = (branch: GitBranchInfo, isCurrent: boolean, labelText: string) => ({
+    id: `${branch.kind}:${branch.fullName}`,
+    label: labelText,
+    description: branch.fullName === labelText ? undefined : branch.fullName,
+    icon: isCurrent ? <Check className="h-3.5 w-3.5" /> : <GitBranch className="h-3.5 w-3.5" />,
+    isDisabled: operationBusy || isCurrent || writeDisabled,
+    onClick: () => void switchBranch(branch.fullName, branch.kind),
+  });
 
   return (
     <>
@@ -696,72 +691,72 @@ function GitReviewBranchMenu(props: { data: GitReviewData; writeDisabled: boolea
         onClose={() => setWorktreeModalOpen(false)}
       />
       <DropdownMenu
-        open={open}
+        isMenuOpen={open}
         onOpenChange={(next) => {
           setOpen(next);
           if (next) void loadBranches();
         }}
-      >
-        <DropdownMenuTrigger
-          disabled={operationBusy}
-          className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[calc(12px*var(--zone-font-scale,1))] font-medium outline-hidden transition-colors hover:bg-muted/70 focus-visible:bg-muted/70 disabled:pointer-events-none disabled:opacity-60"
-          title={t("projectTools.gitReview.switchBranch")}
-          aria-label={t("projectTools.gitReview.switchBranch")}
-        >
-          <AstryxInline className="min-w-0 flex-1 truncate text-left">{title}</AstryxInline>
-          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground opacity-70" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="min-w-56 max-w-72">
-          <DropdownMenuLabel className="px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            {t("projectTools.gitReview.switchBranch")}
-          </DropdownMenuLabel>
-          {branchesLoading ? (
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex items-center justify-center px-2 py-3"
-            >
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            </AstryxView>
-          ) : branchesError ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="px-2 py-2 text-xs text-destructive"
-            >
-              {branchesError}
-            </AstryxView>
-          ) : (
-            <>
-              {localBranches.length > 0 ? (
-                <DropdownMenuLabel className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground/70">
-                  {t("git.branchSelector.localBranches")}
-                </DropdownMenuLabel>
-              ) : null}
-              {localBranches.map((branch) => renderBranchRow(branch, branch.current, branch.name))}
-              {remoteBranches.length > 0 ? (
-                <DropdownMenuLabel className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground/70">
-                  {t("git.branchSelector.remoteBranches")}
-                </DropdownMenuLabel>
-              ) : null}
-              {remoteBranches.slice(0, GIT_REVIEW_REMOTE_BRANCH_DISPLAY_LIMIT).map((branch) => {
-                const isCurrentUpstream =
-                  branch.current || (state.upstream !== "" && branch.fullName === state.upstream);
-                return renderBranchRow(branch, isCurrentUpstream, branch.fullName);
-              })}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                disabled={operationBusy || writeDisabled}
-                className="gap-2 text-xs"
-                onSelect={() => setWorktreeModalOpen(true)}
-              >
-                <Folder className="h-3.5 w-3.5 text-muted-foreground" />
-                {t("projectTools.gitReview.manageWorktrees")}
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        alignment="start"
+        menuWidth="calc(var(--spacing-10) * 7)"
+        button={{
+          label: t("projectTools.gitReview.switchBranch"),
+          children: title,
+          variant: "ghost",
+          isDisabled: operationBusy,
+          className:
+            "flex min-w-0 flex-1 items-center px-2 text-[calc(12px*var(--zone-font-scale,1))] font-medium",
+        }}
+        items={
+          branchesLoading
+            ? [
+                {
+                  label: t("common.loading"),
+                  icon: <Loader2 className="h-4 w-4 animate-spin" />,
+                  isDisabled: true,
+                },
+              ]
+            : branchesError
+              ? [{ label: branchesError, isDisabled: true }]
+              : [
+                  ...(localBranches.length > 0
+                    ? [
+                        {
+                          type: "section" as const,
+                          title: t("git.branchSelector.localBranches"),
+                          items: localBranches.map((branch) =>
+                            branchItem(branch, branch.current, branch.name),
+                          ),
+                        },
+                      ]
+                    : []),
+                  ...(remoteBranches.length > 0
+                    ? [
+                        {
+                          type: "section" as const,
+                          title: t("git.branchSelector.remoteBranches"),
+                          items: remoteBranches
+                            .slice(0, GIT_REVIEW_REMOTE_BRANCH_DISPLAY_LIMIT)
+                            .map((branch) =>
+                              branchItem(
+                                branch,
+                                branch.current ||
+                                  (state.upstream !== "" && branch.fullName === state.upstream),
+                                branch.fullName,
+                              ),
+                            ),
+                        },
+                      ]
+                    : []),
+                  { type: "divider" as const },
+                  {
+                    label: t("projectTools.gitReview.manageWorktrees"),
+                    icon: <Folder className="h-3.5 w-3.5" />,
+                    isDisabled: operationBusy || writeDisabled,
+                    onClick: () => setWorktreeModalOpen(true),
+                  },
+                ]
+        }
+      />
     </>
   );
 }
@@ -873,11 +868,7 @@ export function GitReviewToolbar(props: {
   const effectiveScope: GitReviewScope = showRepositoryScope ? scope : "branch";
 
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
-      className="shrink-0 border-b border-border px-3 py-3"
-    >
+    <AstryxStack direction="vertical" className="shrink-0 border-b border-border px-3 py-3">
       <GitBranchSwitchConflictModal
         conflict={data.branchSwitchConflict}
         loading={busy === "switch_branch"}
@@ -888,7 +879,7 @@ export function GitReviewToolbar(props: {
           multiple repositories to pick between — with a single repository it
           collapses to a static branch icon), then the active scope's dropdown
           taking the remaining width, then the action buttons. */}
-      <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
+      <AstryxStack direction="horizontal" className="flex items-center gap-2">
         {showRepositoryScope ? (
           <GitReviewScopeDial
             value={effectiveScope}
@@ -897,75 +888,61 @@ export function GitReviewToolbar(props: {
             branchLabel={t("projectTools.gitReview.switchBranch")}
           />
         ) : (
-          <AstryxView
-            layout="flex"
+          <AstryxStack
             direction="horizontal"
             className="flex h-7 w-7 shrink-0 items-center justify-center"
-            title={t("projectTools.gitReview.switchBranch")}
+            aria-label={t("projectTools.gitReview.switchBranch")}
           >
             <GitBranch className="h-[18px] w-[18px] text-emerald-600 dark:text-emerald-300" />
-          </AstryxView>
+          </AstryxStack>
         )}
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="flex h-7 min-w-0 flex-1 items-stretch overflow-hidden rounded-md border border-border bg-muted/25"
         >
           {effectiveScope === "repository" ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                disabled={operationBusy}
-                className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[calc(12px*var(--zone-font-scale,1))] font-medium outline-hidden transition-colors hover:bg-muted/70 focus-visible:bg-muted/70 disabled:pointer-events-none disabled:opacity-60"
-                title={t("projectTools.gitReview.repositoryPicker")}
-                aria-label={t("projectTools.gitReview.repositoryPicker")}
-              >
-                <AstryxInline className="min-w-0 flex-1 truncate text-left">
-                  {selectedGitRepositoryLabel(repositories, selectedRepoRoot) ||
-                    state.repoRoot ||
-                    t("projectTools.gitReview.noRepository")}
-                </AstryxInline>
-                <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground opacity-70" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-56 max-w-72">
-                <DropdownMenuLabel className="px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  {t("projectTools.gitReview.repositoryPicker")}
-                </DropdownMenuLabel>
-                {repositories.map((repo) => {
-                  const value = repo.isWorkspaceRoot ? "" : repo.root;
-                  const selected = value === selectedRepoRoot;
-                  return (
-                    <DropdownMenuItem
-                      key={repo.root}
-                      disabled={operationBusy}
-                      onSelect={() => {
-                        if (!selected) selectRepository(value);
-                      }}
-                      className="gap-2 text-xs"
-                      title={repo.root}
-                    >
-                      {selected ? (
-                        <Check className="h-3.5 w-3.5 shrink-0" />
-                      ) : (
-                        <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      )}
-                      <AstryxInline className="min-w-0 flex-1 truncate">
-                        {gitDiscoveredRepositoryLabel(repo)}
-                      </AstryxInline>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <DropdownMenu
+              alignment="start"
+              menuWidth="calc(var(--spacing-10) * 7)"
+              button={{
+                label: t("projectTools.gitReview.repositoryPicker"),
+                children:
+                  selectedGitRepositoryLabel(repositories, selectedRepoRoot) ||
+                  state.repoRoot ||
+                  t("projectTools.gitReview.noRepository"),
+                variant: "ghost",
+                isDisabled: operationBusy,
+                className:
+                  "flex min-w-0 flex-1 items-center px-2 text-[calc(12px*var(--zone-font-scale,1))] font-medium",
+              }}
+              items={repositories.map((repo) => {
+                const value = repo.isWorkspaceRoot ? "" : repo.root;
+                const selected = value === selectedRepoRoot;
+                return {
+                  id: repo.root,
+                  label: gitDiscoveredRepositoryLabel(repo),
+                  description: repo.root,
+                  icon: selected ? (
+                    <Check className="h-3.5 w-3.5" />
+                  ) : (
+                    <Folder className="h-3.5 w-3.5" />
+                  ),
+                  isDisabled: operationBusy || selected,
+                  onClick: () => selectRepository(value),
+                };
+              })}
+            />
           ) : (
             <GitReviewBranchMenu data={data} writeDisabled={writeDisabled} />
           )}
-        </AstryxView>
+        </AstryxStack>
         <Button
+          label={t("projectTools.gitReview.addAiReview")}
           size="sm"
           variant="ghost"
-          disabled={!onInsertCodeReviewSkill || state.status !== "ready"}
+          isDisabled={!onInsertCodeReviewSkill || state.status !== "ready"}
           className="h-7 w-7 px-0"
-          title={t(
+          tooltip={t(
             !onInsertCodeReviewSkill
               ? "projectTools.gitReview.aiReviewUnavailable"
               : state.status === "ready"
@@ -978,11 +955,12 @@ export function GitReviewToolbar(props: {
           <Sparkles className="h-3.5 w-3.5 text-primary" />
         </Button>
         <Button
+          label={t("projectTools.gitReview.refresh")}
           size="sm"
           variant="ghost"
-          disabled={loading || historyLoading || operationBusy}
+          isDisabled={loading || historyLoading || operationBusy}
           className="h-7 w-7 px-0"
-          title={t("projectTools.gitReview.refresh")}
+          tooltip={t("projectTools.gitReview.refresh")}
           aria-label={t("projectTools.gitReview.refresh")}
           onClick={() => {
             if (data.isBusy()) return;
@@ -999,10 +977,11 @@ export function GitReviewToolbar(props: {
           <RefreshCw className={cn("h-3.5 w-3.5", (loading || historyLoading) && "animate-spin")} />
         </Button>
         <Button
+          label={t("projectTools.gitReview.fetch")}
           size="sm"
           variant="ghost"
-          disabled={writeDisabled || operationBusy}
-          title={t("projectTools.gitReview.fetch")}
+          isDisabled={writeDisabled || operationBusy}
+          tooltip={t("projectTools.gitReview.fetch")}
           aria-label={t("projectTools.gitReview.fetch")}
           className="h-7 w-7 px-0"
           onClick={() => void runOperation("fetch", () => gitClient!.fetch(cwd), "fetch")}
@@ -1014,10 +993,11 @@ export function GitReviewToolbar(props: {
           )}
         </Button>
         <Button
+          label={t("projectTools.gitReview.pull")}
           size="sm"
           variant="ghost"
-          disabled={writeDisabled || operationBusy}
-          title={t("projectTools.gitReview.pull")}
+          isDisabled={writeDisabled || operationBusy}
+          tooltip={t("projectTools.gitReview.pull")}
           aria-label={t("projectTools.gitReview.pull")}
           className="h-7 w-7 px-0"
           onClick={() => void runOperation("pull", () => gitClient!.pull(cwd), "pull")}
@@ -1029,10 +1009,11 @@ export function GitReviewToolbar(props: {
           )}
         </Button>
         <Button
+          label={t("projectTools.gitReview.push")}
           size="sm"
           variant="ghost"
-          disabled={writeDisabled || operationBusy}
-          title={t("projectTools.gitReview.push")}
+          isDisabled={writeDisabled || operationBusy}
+          tooltip={t("projectTools.gitReview.push")}
           aria-label={t("projectTools.gitReview.push")}
           className="h-7 w-7 px-0"
           onClick={() => void runOperation("push", () => gitClient!.push(cwd), "push")}
@@ -1043,32 +1024,36 @@ export function GitReviewToolbar(props: {
             <Upload className="h-3.5 w-3.5" />
           )}
         </Button>
-      </AstryxView>
+      </AstryxStack>
       {state.status === "ready" ? (
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           className="mt-1.5 overflow-hidden rounded-xl border border-white/20 bg-white/50 shadow-sm backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.03]"
         >
-          <AstryxView
-            layout="flex"
+          <AstryxStack
             direction="horizontal"
             className="flex items-center gap-1.5 border-b border-black/[0.04] px-3 py-2 dark:border-white/[0.06]"
           >
-            <AstryxInline className="shrink-0 rounded bg-muted/70 px-1.5 py-0.5 text-[calc(10px*var(--zone-font-scale,1))] font-medium leading-none text-muted-foreground">
+            <AstryxText
+              as="span"
+              type="inherit"
+              className="shrink-0 rounded bg-muted/70 px-1.5 py-0.5 text-[calc(10px*var(--zone-font-scale,1))] font-medium leading-none text-muted-foreground"
+            >
               {t("projectTools.gitReview.labelBase")}
-            </AstryxInline>
+            </AstryxText>
             <Cloud className="h-3 w-3 shrink-0 text-muted-foreground/60" />
-            <AstryxInline
+            <AstryxText
+              as="span"
+              type="inherit"
               className="min-w-0 truncate font-mono text-[calc(11px*var(--zone-font-scale,1))] text-foreground/75"
-              title={
+              aria-label={
                 branchDiff?.baseRef || state.upstream || t("projectTools.gitReview.unresolved")
               }
             >
               {branchDiff?.baseRef || state.upstream || t("projectTools.gitReview.unresolved")}
-            </AstryxInline>
-          </AstryxView>
-          <AstryxView layout="grid" direction="horizontal" className="grid grid-cols-5">
+            </AstryxText>
+          </AstryxStack>
+          <AstryxGrid className="grid grid-cols-5">
             {[
               {
                 count: state.ahead,
@@ -1096,8 +1081,7 @@ export function GitReviewToolbar(props: {
                 tone: "text-violet-600 dark:text-violet-400",
               },
             ].map((item, index) => (
-              <AstryxView
-                layout="flex"
+              <AstryxStack
                 direction="vertical"
                 key={item.label}
                 className={cn(
@@ -1105,23 +1089,29 @@ export function GitReviewToolbar(props: {
                   index > 0 && "border-l border-black/[0.04] dark:border-white/[0.06]",
                 )}
               >
-                <AstryxInline
+                <AstryxText
+                  as="span"
+                  type="inherit"
                   className={cn(
                     "text-sm font-semibold tabular-nums leading-none",
                     item.count > 0 ? item.tone : "text-muted-foreground/40",
                   )}
                 >
                   {item.count}
-                </AstryxInline>
-                <AstryxInline className="text-[calc(9px*var(--zone-font-scale,1))] leading-none text-muted-foreground/60">
+                </AstryxText>
+                <AstryxText
+                  as="span"
+                  type="inherit"
+                  className="text-[calc(9px*var(--zone-font-scale,1))] leading-none text-muted-foreground/60"
+                >
                   {item.label}
-                </AstryxInline>
-              </AstryxView>
+                </AstryxText>
+              </AstryxStack>
             ))}
-          </AstryxView>
-        </AstryxView>
+          </AstryxGrid>
+        </AstryxStack>
       ) : null}
-      <AstryxView layout="flex" direction="horizontal" className="mt-3 flex items-center gap-2">
+      <AstryxStack direction="horizontal" className="mt-3 flex items-center gap-2">
         <ToggleButtonGroup
           label={`${t("projectTools.gitReview.localChangesView")} / ${t("projectTools.gitReview.commitHistoryView")}`}
           type="single"
@@ -1147,7 +1137,7 @@ export function GitReviewToolbar(props: {
           </ToggleButton>
         </ToggleButtonGroup>
         {!useSplitReviewLayout ? (
-          <AstryxView layout="flex" direction="horizontal" className="ml-auto shrink-0">
+          <AstryxStack direction="horizontal" className="ml-auto shrink-0">
             <ToggleButtonGroup
               label={`${t("projectTools.gitReview.listPane")} / ${t("projectTools.gitReview.detailPane")}`}
               type="single"
@@ -1179,23 +1169,22 @@ export function GitReviewToolbar(props: {
                 isIconOnly
               />
             </ToggleButtonGroup>
-          </AstryxView>
+          </AstryxStack>
         ) : null}
-      </AstryxView>
+      </AstryxStack>
       {!canWrite && disabledMessage ? (
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           className="mt-2 rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground"
         >
           {disabledMessage}
-        </AstryxView>
+        </AstryxStack>
       ) : null}
       {visibleError ? (
-        <AstryxView layout="block" direction="horizontal" className="mt-2 text-xs text-destructive">
+        <AstryxStack direction="vertical" className="mt-2 text-xs text-destructive">
           {visibleError}
-        </AstryxView>
+        </AstryxStack>
       ) : null}
-    </AstryxView>
+    </AstryxStack>
   );
 }

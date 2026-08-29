@@ -1,5 +1,5 @@
-import { deriveContextUsageTokens } from "@xagent/ui/lib/chat/contextUsage";
 import { type MutableRefObject, useCallback } from "react";
+import { deriveContextUsageTokens } from "@/lib/chat/contextUsage";
 import { readMessageContextUsage } from "../../../lib/chat/compaction/contextUsageMetadata";
 import type {
   CompactionController,

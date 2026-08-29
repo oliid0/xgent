@@ -19,13 +19,13 @@ import {
   memoryList,
   memoryRecentRejections,
   memoryTodayLocalDate,
-} from "@xagent/ui/lib/memory/api";
+} from "@/lib/memory/api";
 import {
   EXTRACTION_CANDIDATE_LIMIT,
   EXTRACTION_REJECTION_DAYS,
   EXTRACTION_TIMEOUT_MS,
-} from "@xagent/ui/lib/memory/config";
-import type { MemoryReviewerMode, ValidatedPlanItem } from "@xagent/ui/lib/memory/schema";
+} from "@/lib/memory/config";
+import type { MemoryReviewerMode, ValidatedPlanItem } from "@/lib/memory/schema";
 import type { StreamDebugLogger } from "../../debug/agentDebug";
 import {
   buildConversationWindowBlock,

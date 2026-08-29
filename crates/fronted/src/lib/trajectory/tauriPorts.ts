@@ -5,7 +5,7 @@
  */
 
 import { invoke } from "@xagent/runtime";
-import type { TrajectoryEvent, TrajectorySection } from "@xagent/ui/lib/trajectory/types";
+import type { TrajectoryEvent, TrajectorySection } from "@/lib/trajectory/types";
 import type { TrajectoryRecorderPorts } from "./recorder";
 
 export type TrajectoryPublish = (events: readonly TrajectoryEvent[]) => void;

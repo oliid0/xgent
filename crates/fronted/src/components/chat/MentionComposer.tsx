@@ -1,8 +1,9 @@
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
 import { Popover } from "@astryxdesign/core/Popover";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText } from "@astryxdesign/core/Text";
 import { openUrl } from "@xagent/runtime";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import {
   type ClipboardEvent,
   type FocusEvent,
@@ -1760,9 +1761,8 @@ function Popup({
       hasAutoFocus={false}
       hasCloseButton={false}
       content={
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           className="overflow-hidden"
           onMouseDown={(event) => {
             // Any mousedown inside the popup must not blur the editor (blur closes
@@ -1780,36 +1780,26 @@ function Popup({
             event.preventDefault();
           }}
         >
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className="px-3.5 pb-1.5 pt-3 text-xs font-medium text-muted-foreground"
           >
             {trigger === "skill" ? "Skills" : "文件"}
-          </AstryxView>
-          <AstryxView
-            layout="flex"
+          </AstryxStack>
+          <AstryxStack
             direction="vertical"
             ref={listRef}
             className="mention-popup-scroll relative flex max-h-[320px] flex-col overflow-y-auto px-2 pb-2"
           >
             {isLoading && (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="px-2 py-2 text-xs text-muted-foreground"
-              >
+              <AstryxStack direction="vertical" className="px-2 py-2 text-xs text-muted-foreground">
                 Indexing files...
-              </AstryxView>
+              </AstryxStack>
             )}
             {error && !isLoading && (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="px-2 py-2 text-xs text-destructive"
-              >
+              <AstryxStack direction="vertical" className="px-2 py-2 text-xs text-destructive">
                 {error}
-              </AstryxView>
+              </AstryxStack>
             )}
             {suggestions.map((suggestion, i) => {
               const isSkill = suggestion.type === "skill";
@@ -1823,8 +1813,7 @@ function Popup({
               const title = skill?.name ?? fileName;
               const subtitle = skill?.description ?? (dirPath ? `${dirPath}/` : "");
               return (
-                <AstryxView
-                  layout="flex"
+                <AstryxStack
                   direction="horizontal"
                   key={
                     entry
@@ -1847,9 +1836,8 @@ function Popup({
                     onSelect(suggestion);
                   }}
                 >
-                  <AstryxView
+                  <AstryxStack
                     as="span"
-                    layout="flex"
                     direction="horizontal"
                     className={cn(
                       "flex h-4 w-4 shrink-0 items-center justify-center",
@@ -1861,40 +1849,50 @@ function Popup({
                     )}
                   >
                     {Icon ? <Icon width={16} height={16} /> : <Blend className="h-4 w-4" />}
-                  </AstryxView>
-                  <AstryxInline className="min-w-0 flex-1 truncate">
-                    <AstryxInline className="font-normal text-foreground/95">{title}</AstryxInline>
+                  </AstryxStack>
+                  <AstryxText as="span" type="inherit" className="min-w-0 flex-1 truncate">
+                    <AstryxText as="span" type="inherit" className="font-normal text-foreground/95">
+                      {title}
+                    </AstryxText>
                     {subtitle && (
-                      <AstryxInline className="ml-2 text-xs text-muted-foreground/75">
+                      <AstryxText
+                        as="span"
+                        type="inherit"
+                        className="ml-2 text-xs text-muted-foreground/75"
+                      >
                         {subtitle}
-                      </AstryxInline>
+                      </AstryxText>
                     )}
-                  </AstryxInline>
+                  </AstryxText>
                   {isSkill ? (
-                    <AstryxInline className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                    <AstryxText
+                      as="span"
+                      type="inherit"
+                      className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/60"
+                    >
                       skill
-                    </AstryxInline>
+                    </AstryxText>
                   ) : (
                     isDir && (
-                      <AstryxInline className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                      <AstryxText
+                        as="span"
+                        type="inherit"
+                        className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/60"
+                      >
                         dir
-                      </AstryxInline>
+                      </AstryxText>
                     )
                   )}
-                </AstryxView>
+                </AstryxStack>
               );
             })}
             {showEmpty && !isLoading && !error && suggestions.length === 0 && (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="px-2 py-2 text-xs text-muted-foreground"
-              >
+              <AstryxStack direction="vertical" className="px-2 py-2 text-xs text-muted-foreground">
                 {emptyLabel}
-              </AstryxView>
+              </AstryxStack>
             )}
-          </AstryxView>
-        </AstryxView>
+          </AstryxStack>
+        </AstryxStack>
       }
     />
   );
@@ -1979,9 +1977,8 @@ function CommitMentionCard({
   const authorLabel = commit.authorEmail ? `${author} <${commit.authorEmail}>` : author;
 
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
+    <AstryxStack
+      direction="vertical"
       className="overflow-y-auto"
       style={{
         minWidth: "var(--xagent-hover-card-min-width)",
@@ -1992,67 +1989,78 @@ function CommitMentionCard({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-2">
+      <AstryxStack direction="horizontal" className="flex items-start gap-2">
         <GitHubMarkIcon className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
-        <AstryxView layout="block" direction="horizontal" className="min-w-0">
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="break-words font-medium leading-tight"
-          >
+        <AstryxStack direction="vertical" className="min-w-0">
+          <AstryxStack direction="vertical" className="break-words font-medium leading-tight">
             {authorLabel}
-          </AstryxView>
+          </AstryxStack>
           {date ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="mt-0.5 text-[calc(11px*var(--zone-font-scale,1))] leading-tight text-muted-foreground"
             >
               {date.relative} ({date.absolute})
-            </AstryxView>
+            </AstryxStack>
           ) : null}
-        </AstryxView>
-      </AstryxView>
-      <AstryxView
-        layout="block"
-        direction="horizontal"
+        </AstryxStack>
+      </AstryxStack>
+      <AstryxStack
+        direction="vertical"
         className="mt-2 whitespace-pre-wrap break-words font-medium leading-snug"
       >
         {subject}
-      </AstryxView>
+      </AstryxStack>
       {messageBody ? (
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           className="mt-1.5 whitespace-pre-wrap break-words leading-snug text-muted-foreground"
         >
           {messageBody}
-        </AstryxView>
+        </AstryxStack>
       ) : null}
-      <AstryxView
-        layout="flex"
+      <AstryxStack
         direction="horizontal"
         className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[calc(11px*var(--zone-font-scale,1))] leading-tight"
       >
-        <AstryxInline className="text-muted-foreground">{filesChangedLabel}</AstryxInline>
-        <AstryxInline className="font-medium text-emerald-600 dark:text-emerald-400">
+        <AstryxText as="span" type="inherit" className="text-muted-foreground">
+          {filesChangedLabel}
+        </AstryxText>
+        <AstryxText
+          as="span"
+          type="inherit"
+          className="font-medium text-emerald-600 dark:text-emerald-400"
+        >
           {insertionsLabel}
-        </AstryxInline>
-        <AstryxInline className="font-medium text-rose-600 dark:text-rose-400">
+        </AstryxText>
+        <AstryxText
+          as="span"
+          type="inherit"
+          className="font-medium text-rose-600 dark:text-rose-400"
+        >
           {deletionsLabel}
-        </AstryxInline>
-      </AstryxView>
-      <AstryxView
-        layout="flex"
+        </AstryxText>
+      </AstryxStack>
+      <AstryxStack
         direction="horizontal"
         className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/70 pt-1.5 text-[calc(11px*var(--zone-font-scale,1))] leading-tight text-muted-foreground"
       >
-        <AstryxInline className="font-mono text-foreground">{shortSha}</AstryxInline>
-        {commit.remoteName ? <AstryxInline>{commit.remoteName}</AstryxInline> : null}
+        <AstryxText as="span" type="inherit" className="font-mono text-foreground">
+          {shortSha}
+        </AstryxText>
+        {commit.remoteName ? (
+          <AstryxText as="span" type="inherit">
+            {commit.remoteName}
+          </AstryxText>
+        ) : null}
         {commit.githubUrl ? (
           <>
-            <AstryxInline className="text-border">|</AstryxInline>
+            <AstryxText as="span" type="inherit" className="text-border">
+              |
+            </AstryxText>
             <AstryxButton
+              variant="ghost"
+              label={t("chat.composer.commitTooltipOpenGithub")}
               type="button"
               className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-primary hover:bg-primary/10"
               onClick={() => void openUrl(commit.githubUrl!)}
@@ -2062,8 +2070,8 @@ function CommitMentionCard({
             </AstryxButton>
           </>
         ) : null}
-      </AstryxView>
-    </AstryxView>
+      </AstryxStack>
+    </AstryxStack>
   );
 }
 
@@ -3494,9 +3502,8 @@ export const MentionComposer = memo(
     ]);
 
     return (
-      <AstryxView
-        layout="block"
-        direction="horizontal"
+      <AstryxStack
+        direction="vertical"
         ref={wrapperRef}
         className="relative w-full min-w-0 max-w-full flex-1"
       >
@@ -3549,12 +3556,13 @@ export const MentionComposer = memo(
           }}
         >
           {/* biome-ignore lint/a11y/useSemanticElements: The composer is contenteditable so it can host inline mention chips. */}
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             ref={editorRef}
-            contentEditable={!disabled && !isTypewriting}
-            suppressContentEditableWarning
+            {...({
+              contentEditable: !disabled && !isTypewriting,
+              suppressContentEditableWarning: true,
+            } as const)}
             role="textbox"
             tabIndex={disabled ? undefined : 0}
             aria-multiline
@@ -3583,7 +3591,7 @@ export const MentionComposer = memo(
             data-placeholder={placeholder}
           />
         </ContextMenu>
-      </AstryxView>
+      </AstryxStack>
     );
   }),
 );

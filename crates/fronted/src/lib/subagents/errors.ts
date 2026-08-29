@@ -5,7 +5,7 @@ import type {
   SubagentBatchIssue,
   SubagentRosterEntry,
   SubagentTemplateEntry,
-} from "@xagent/ui/lib/subagents/protocol";
+} from "@/lib/subagents/protocol";
 
 export type SubagentIssueCode =
   | "invalid_arguments"

@@ -4,7 +4,7 @@ import {
   getUserMessageAttachments,
   type PendingUploadedFile,
   parsePastedTextDisplayReferences,
-} from "@xagent/ui/lib/chat/uploadedFiles";
+} from "@/lib/chat/uploadedFiles";
 
 type NativeAttachmentCommandResponse = {
   mimeType: string;

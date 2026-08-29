@@ -1,5 +1,5 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import type { SubagentReportDetails } from "@xagent/ui/lib/subagents/protocol";
+import type { SubagentReportDetails } from "@/lib/subagents/protocol";
 import { CompactionController } from "../chat/compaction/controller";
 import {
   appendMessagesToConversation,

@@ -7,7 +7,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { RETRYABLE_PRESET_HTTP_STATUS_CODES } from "../../settings";
 
-export type { RetryAttemptRecord } from "@xagent/ui/lib/chat/retryAttempts";
+export type { RetryAttemptRecord } from "@/lib/chat/retryAttempts";
 
 /** 6 total attempts = 5 retries after the initial try — matches codex's stream_max_retries=5. */
 export const DEFAULT_STREAM_RETRY_MAX_ATTEMPTS = 6;

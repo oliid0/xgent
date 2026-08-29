@@ -1,4 +1,5 @@
 import { Banner } from "@astryxdesign/core/Banner";
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -12,10 +13,9 @@ import {
   VStack,
 } from "@astryxdesign/core/Layout";
 import { Spinner } from "@astryxdesign/core/Spinner";
-import { Heading, Text } from "@astryxdesign/core/Text";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText, Heading, Text } from "@astryxdesign/core/Text";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { renderAsync } from "docx-preview";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { read, utils } from "xlsx";
@@ -42,7 +42,6 @@ import {
   isWorkspaceEditablePreviewPath,
   type WorkspacePreviewKind,
 } from "./workspaceImagePreview";
-
 export type WorkspaceFilePreviewOpenRequest = {
   id: number;
   projectPathKey: string;
@@ -753,11 +752,7 @@ function PreviewBody(props: {
 
   if (preview.kind === "markdown") {
     return (
-      <AstryxView
-        layout="block"
-        direction="horizontal"
-        className="h-full overflow-auto bg-background px-6 py-5"
-      >
+      <AstryxStack direction="vertical" className="h-full overflow-auto bg-background px-6 py-5">
         <WorkspaceMarkdownPreview
           workdir={workdir}
           markdownPath={preview.path || activePath}
@@ -765,42 +760,37 @@ function PreviewBody(props: {
           className="text-sm leading-6"
           onOpenWorkspacePath={(path) => onOpenImagePath(path, 0)}
         />
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (preview.kind === "document") {
     return (
-      <AstryxView
-        layout="block"
-        direction="horizontal"
+      <AstryxStack
+        direction="vertical"
         className="h-full overflow-auto bg-neutral-200 p-4 dark:bg-neutral-950"
       >
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           ref={docxContainerRef}
           className="workspace-file-preview-docx min-h-full"
         />
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (preview.kind === "spreadsheet") {
     return (
-      <AstryxView
-        layout="flex"
-        direction="vertical"
-        className="flex h-full min-h-0 flex-col bg-background"
-      >
+      <AstryxStack direction="vertical" className="flex h-full min-h-0 flex-col bg-background">
         {spreadsheet && spreadsheet.sheetNames.length > 1 ? (
-          <AstryxView
-            layout="flex"
+          <AstryxStack
             direction="horizontal"
             className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-muted/35 px-2"
           >
             {spreadsheet.sheetNames.map((sheetName) => (
               <AstryxButton
+                variant="ghost"
+                label={sheetName}
                 key={sheetName}
                 type="button"
                 className={cn(
@@ -809,15 +799,15 @@ function PreviewBody(props: {
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
-                title={sheetName}
+                tooltip={sheetName}
                 onClick={() => onActiveSheetNameChange(sheetName)}
               >
                 {sheetName}
               </AstryxButton>
             ))}
-          </AstryxView>
+          </AstryxStack>
         ) : null}
-        <AstryxView layout="block" direction="horizontal" className="min-h-0 flex-1 overflow-auto">
+        <AstryxStack direction="vertical" className="min-h-0 flex-1 overflow-auto">
           {spreadsheet?.rows.length ? (
             <table className="min-w-full border-separate border-spacing-0 text-xs">
               <tbody>
@@ -839,47 +829,40 @@ function PreviewBody(props: {
               </tbody>
             </table>
           ) : (
-            <AstryxView
-              layout="flex"
+            <AstryxStack
               direction="horizontal"
               className="flex h-full items-center justify-center text-sm text-muted-foreground"
             >
               {t("workspaceFilePreview.emptySheet")}
-            </AstryxView>
+            </AstryxStack>
           )}
-        </AstryxView>
+        </AstryxStack>
         {spreadsheet?.truncatedRows || spreadsheet?.truncatedColumns ? (
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className="shrink-0 border-t border-border bg-muted/35 px-3 py-1.5 text-[11px] text-muted-foreground"
           >
             {t("workspaceFilePreview.truncated")}
-          </AstryxView>
+          </AstryxStack>
         ) : null}
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (preview.kind === "audio") {
     return (
-      <AstryxView
-        layout="flex"
-        direction="horizontal"
-        className="flex h-full items-center justify-center p-6"
-      >
+      <AstryxStack direction="horizontal" className="flex h-full items-center justify-center p-6">
         {/* biome-ignore lint/a11y/useMediaCaption: Workspace media previews do not have a separate caption track available. */}
         <audio className="w-full max-w-2xl" controls src={preview.blobUrl}>
           {basename(preview.path)}
         </audio>
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   if (preview.kind === "video") {
     return (
-      <AstryxView
-        layout="flex"
+      <AstryxStack
         direction="horizontal"
         className="flex h-full items-center justify-center overflow-auto p-4 sm:p-6"
       >
@@ -887,20 +870,16 @@ function PreviewBody(props: {
         <video className="max-h-full max-w-full bg-black" controls src={preview.blobUrl}>
           {basename(preview.path)}
         </video>
-      </AstryxView>
+      </AstryxStack>
     );
   }
 
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
-      className="h-full overflow-auto bg-background p-4"
-    >
+    <AstryxStack direction="vertical" className="h-full overflow-auto bg-background p-4">
       <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-foreground">
         {preview.text ?? ""}
       </pre>
-    </AstryxView>
+    </AstryxStack>
   );
 }
 
@@ -913,11 +892,13 @@ function ImagePreviewToolButton(props: {
   const { label, disabled, onClick, children } = props;
   return (
     <AstryxButton
+      variant="ghost"
+      label={label}
       type="button"
       className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-      title={label}
+      tooltip={label}
       aria-label={label}
-      disabled={disabled}
+      isDisabled={disabled}
       onClick={onClick}
     >
       {children}
@@ -983,21 +964,12 @@ function WorkspaceImagePreviewBody(props: {
   const enterScale = transitionDirection === 0 ? 0.985 : 0.99;
 
   return (
-    <AstryxView
-      layout="flex"
-      direction="vertical"
-      className="flex h-full min-h-0 flex-col bg-muted/25"
-    >
-      <AstryxView
-        layout="flex"
+    <AstryxStack direction="vertical" className="flex h-full min-h-0 flex-col bg-muted/25">
+      <AstryxStack
         direction="horizontal"
         className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border bg-background/90 px-2"
       >
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex min-w-0 items-center gap-1"
-        >
+        <AstryxStack direction="horizontal" className="flex min-w-0 items-center gap-1">
           <ImagePreviewToolButton
             label={t("workspaceFilePreview.previousImage")}
             disabled={!canOpenPrevious || isSwitchingImage}
@@ -1012,15 +984,15 @@ function WorkspaceImagePreviewBody(props: {
           >
             <ChevronRight className="h-4 w-4" />
           </ImagePreviewToolButton>
-          <AstryxInline className="ml-1 shrink-0 text-[11px] text-muted-foreground">
+          <AstryxText
+            as="span"
+            type="inherit"
+            className="ml-1 shrink-0 text-[11px] text-muted-foreground"
+          >
             {counter}
-          </AstryxInline>
-        </AstryxView>
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="flex shrink-0 items-center gap-1"
-        >
+          </AstryxText>
+        </AstryxStack>
+        <AstryxStack direction="horizontal" className="flex shrink-0 items-center gap-1">
           <ImagePreviewToolButton
             label={t("workspaceFilePreview.zoomOut")}
             disabled={!canZoomOut}
@@ -1030,9 +1002,13 @@ function WorkspaceImagePreviewBody(props: {
           >
             <Minus className="h-4 w-4" />
           </ImagePreviewToolButton>
-          <AstryxInline className="w-11 text-center text-[11px] tabular-nums text-muted-foreground">
+          <AstryxText
+            as="span"
+            type="inherit"
+            className="w-11 text-center text-[11px] tabular-nums text-muted-foreground"
+          >
             {Math.round(scale * 100)}%
-          </AstryxInline>
+          </AstryxText>
           <ImagePreviewToolButton
             label={t("workspaceFilePreview.zoomIn")}
             disabled={!canZoomIn}
@@ -1048,11 +1024,10 @@ function WorkspaceImagePreviewBody(props: {
           >
             <RotateCwSquare className="h-4 w-4" />
           </ImagePreviewToolButton>
-        </AstryxView>
-      </AstryxView>
-      <AstryxView
-        layout="block"
-        direction="horizontal"
+        </AstryxStack>
+      </AstryxStack>
+      <AstryxStack
+        direction="vertical"
         className={cn(
           "relative min-h-0 flex-1",
           isClippingEnterOverflow ? "overflow-x-hidden overflow-y-auto" : "overflow-auto",
@@ -1067,16 +1042,14 @@ function WorkspaceImagePreviewBody(props: {
         }}
       >
         {isSwitchingImage ? (
-          <AstryxView
-            layout="inline-flex"
+          <AstryxStack
             direction="horizontal"
             className="pointer-events-none absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/85 text-muted-foreground shadow-sm backdrop-blur"
           >
             <Loader2 className="h-4 w-4 animate-spin" />
-          </AstryxView>
+          </AstryxStack>
         ) : null}
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="flex h-full min-h-full w-full min-w-full items-center justify-center p-4 transition-[opacity,transform,filter] duration-200 ease-out motion-reduce:transition-none sm:p-6"
           style={{
@@ -1087,8 +1060,7 @@ function WorkspaceImagePreviewBody(props: {
               : "translateX(0) scale(1)",
           }}
         >
-          <AstryxView
-            layout="flex"
+          <AstryxStack
             direction="horizontal"
             className="flex shrink-0 items-center justify-center"
             style={{
@@ -1107,9 +1079,9 @@ function WorkspaceImagePreviewBody(props: {
                 transition: "transform 120ms ease-out",
               }}
             />
-          </AstryxView>
-        </AstryxView>
-      </AstryxView>
-    </AstryxView>
+          </AstryxStack>
+        </AstryxStack>
+      </AstryxStack>
+    </AstryxStack>
   );
 }

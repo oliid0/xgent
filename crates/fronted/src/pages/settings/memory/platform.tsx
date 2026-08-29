@@ -3,6 +3,7 @@
 
 import { Selector } from "@astryxdesign/core/Selector";
 
+export { Button } from "@astryxdesign/core/Button";
 export {
   AlertTriangle,
   ArrowLeft,
@@ -21,8 +22,6 @@ export {
   Trash2,
   X,
 } from "../../../components/icons";
-export { Button } from "../../../components/ui/button";
-export { Input } from "../../../components/ui/input";
 export { buildModelOptions } from "../../../lib/chat/page/chatPageHelpers";
 export { pokeMemoryOrganizer } from "../../../lib/memory/organizer/service";
 export { parseModelValue, toModelValue } from "../../../lib/providers/llm";

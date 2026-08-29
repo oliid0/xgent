@@ -1,9 +1,8 @@
+import { Button } from "@astryxdesign/core/Button";
+import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Heading as AstryxHeadingCore, Text as AstryxText } from "@astryxdesign/core/Text";
 import { openUrl } from "@xagent/runtime";
-import {
-  Heading as AstryxHeading,
-  Paragraph as AstryxParagraph,
-  View as AstryxView,
-} from "@xagent/ui/components/ui/view";
 import iconSimpleUrl from "../../../src-tauri/icons/icon-simple.png";
 import {
   AlertTriangle,
@@ -16,7 +15,6 @@ import {
   Sparkles,
 } from "../../components/icons";
 import { Markdown } from "../../components/Markdown";
-import { Button } from "../../components/ui/button";
 import { useLocale } from "../../i18n";
 import {
   type AppUpdateCheckResult,
@@ -137,14 +135,12 @@ export function AboutSection(props: AboutSectionProps) {
                     : latestResult?.message || t("settings.aboutUpdaterNotConfiguredDesc");
 
   return (
-    <AstryxView layout="block" direction="horizontal" className="settings-about-section space-y-6">
-      <AstryxView
-        layout="flex"
+    <AstryxStack direction="vertical" className="settings-about-section space-y-6">
+      <AstryxStack
         direction="horizontal"
         className="settings-about-header flex flex-wrap items-start justify-between gap-4"
       >
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="settings-about-identity flex min-w-0 items-center gap-3"
         >
@@ -153,32 +149,36 @@ export function AboutSection(props: AboutSectionProps) {
             alt=""
             className="settings-about-app-icon h-14 w-14 shrink-0 rounded-[15px] shadow-[0_12px_30px_-18px_rgba(0,0,0,0.65)]"
           />
-          <AstryxView layout="block" direction="horizontal" className="min-w-0">
-            <AstryxHeading level={3} className="text-lg font-semibold tracking-tight">
+          <AstryxStack direction="vertical" className="min-w-0">
+            <AstryxHeadingCore level={3} className="text-lg font-semibold tracking-tight">
               XGent
-            </AstryxHeading>
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            </AstryxHeadingCore>
+            <AstryxStack
+              direction="vertical"
               className="mt-0.5 text-xs font-medium tabular-nums text-muted-foreground"
             >
               v{currentVersion}
-            </AstryxView>
-            <AstryxParagraph className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+            </AstryxStack>
+            <AstryxText
+              as="p"
+              type="inherit"
+              display="block"
+              className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground"
+            >
               {t("settings.aboutDescription")}
-            </AstryxParagraph>
-          </AstryxView>
-        </AstryxView>
+            </AstryxText>
+          </AstryxStack>
+        </AstryxStack>
 
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="settings-about-header-actions flex items-center gap-2"
         >
           {latestResult?.releaseUrl ? (
             <Button
+              label={t("settings.aboutOpenRelease")}
               type="button"
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={() => void openUrl(latestResult.releaseUrl || "")}
             >
@@ -187,11 +187,12 @@ export function AboutSection(props: AboutSectionProps) {
             </Button>
           ) : null}
           <Button
+            label={t("settings.aboutCheckUpdate")}
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => void appUpdate.runCheck().catch(() => undefined)}
-            disabled={checking || installing || restarting}
+            isDisabled={checking || installing || restarting}
           >
             {checking ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -200,57 +201,48 @@ export function AboutSection(props: AboutSectionProps) {
             )}
             {t("settings.aboutCheckUpdate")}
           </Button>
-        </AstryxView>
-      </AstryxView>
+        </AstryxStack>
+      </AstryxStack>
 
-      <AstryxView
-        layout="grid"
-        direction="horizontal"
-        className="settings-about-grid grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]"
-      >
-        <AstryxView
+      <AstryxGrid className="settings-about-grid grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <AstryxStack
+          direction="vertical"
           as="section"
           className="settings-about-card space-y-4 rounded-2xl border border-border/60 bg-card p-4"
         >
-          <AstryxView
-            layout="flex"
+          <AstryxStack
             direction="horizontal"
             className="settings-about-version-row flex flex-wrap items-center justify-between gap-3"
           >
-            <AstryxView layout="block" direction="horizontal">
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+            <AstryxStack direction="vertical">
+              <AstryxStack
+                direction="vertical"
                 className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
               >
                 {t("settings.aboutCurrentVersion")}
-              </AstryxView>
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+              </AstryxStack>
+              <AstryxStack
+                direction="vertical"
                 className="mt-1 text-2xl font-semibold leading-none tabular-nums"
               >
                 v{currentVersion}
-              </AstryxView>
-            </AstryxView>
-            <AstryxView
-              layout="inline-flex"
+              </AstryxStack>
+            </AstryxStack>
+            <AstryxStack
               direction="horizontal"
               className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-muted/45 px-2.5 py-1 text-xs font-medium"
             >
               <Sparkles className="h-3.5 w-3.5 text-primary" />
               {channelLabel}
-            </AstryxView>
-          </AstryxView>
+            </AstryxStack>
+          </AstryxStack>
 
-          <AstryxView
-            layout="block"
-            direction="horizontal"
+          <AstryxStack
+            direction="vertical"
             className="settings-about-status-card rounded-xl border border-border/60 bg-background/70 p-4"
           >
-            <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-3">
-              <AstryxView
-                layout="flex"
+            <AstryxStack direction="horizontal" className="flex items-start gap-3">
+              <AstryxStack
                 direction="horizontal"
                 className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted"
               >
@@ -265,75 +257,50 @@ export function AboutSection(props: AboutSectionProps) {
                 ) : (
                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                 )}
-              </AstryxView>
-              <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-                <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
+              </AstryxStack>
+              <AstryxStack direction="vertical" className="min-w-0 flex-1">
+                <AstryxStack direction="vertical" className="text-sm font-semibold">
                   {statusTitle}
-                </AstryxView>
-                <AstryxParagraph className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                </AstryxStack>
+                <AstryxText
+                  as="p"
+                  type="inherit"
+                  display="block"
+                  className="mt-1 text-xs leading-relaxed text-muted-foreground"
+                >
                   {statusDescription}
-                </AstryxParagraph>
+                </AstryxText>
 
                 {nextVersion ? (
-                  <AstryxView
-                    layout="grid"
-                    direction="horizontal"
-                    className="mt-3 grid gap-2 text-xs sm:grid-cols-2"
-                  >
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="rounded-lg bg-muted/45 px-3 py-2"
-                    >
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="text-muted-foreground"
-                      >
+                  <AstryxGrid className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                    <AstryxStack direction="vertical" className="rounded-lg bg-muted/45 px-3 py-2">
+                      <AstryxStack direction="vertical" className="text-muted-foreground">
                         {t("settings.aboutLatestVersion")}
-                      </AstryxView>
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="mt-0.5 font-medium tabular-nums"
-                      >
+                      </AstryxStack>
+                      <AstryxStack direction="vertical" className="mt-0.5 font-medium tabular-nums">
                         v{nextVersion}
-                      </AstryxView>
-                    </AstryxView>
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="rounded-lg bg-muted/45 px-3 py-2"
-                    >
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="text-muted-foreground"
-                      >
+                      </AstryxStack>
+                    </AstryxStack>
+                    <AstryxStack direction="vertical" className="rounded-lg bg-muted/45 px-3 py-2">
+                      <AstryxStack direction="vertical" className="text-muted-foreground">
                         {t("settings.aboutReleaseDate")}
-                      </AstryxView>
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
-                        className="mt-0.5 truncate font-medium"
-                      >
+                      </AstryxStack>
+                      <AstryxStack direction="vertical" className="mt-0.5 truncate font-medium">
                         {releaseDate || "N/A"}
-                      </AstryxView>
-                    </AstryxView>
-                  </AstryxView>
+                      </AstryxStack>
+                    </AstryxStack>
+                  </AstryxGrid>
                 ) : null}
-              </AstryxView>
-            </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
 
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="mt-4 flex flex-wrap items-center gap-2"
-            >
+            <AstryxStack direction="horizontal" className="mt-4 flex flex-wrap items-center gap-2">
               <Button
+                variant="primary"
+                label={installed ? t("settings.aboutRestartApp") : t("settings.aboutInstallUpdate")}
                 type="button"
                 onClick={installed ? handleRestartApp : handleInstallUpdate}
-                disabled={(installed ? false : !canInstall) || installing || restarting}
+                isDisabled={(installed ? false : !canInstall) || installing || restarting}
               >
                 {installing || restarting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -344,62 +311,54 @@ export function AboutSection(props: AboutSectionProps) {
                 )}
                 {installed ? t("settings.aboutRestartApp") : t("settings.aboutInstallUpdate")}
               </Button>
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="text-xs text-muted-foreground"
-              >
+              <AstryxStack direction="vertical" className="text-xs text-muted-foreground">
                 {latestResult?.repository || "oliid0/xgent"}
-              </AstryxView>
-            </AstryxView>
-          </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
+          </AstryxStack>
 
           {latestReleaseNotes ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="settings-about-release-notes space-y-2 rounded-xl border border-border/60 bg-background/70 p-4"
             >
-              <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
+              <AstryxStack direction="vertical" className="text-sm font-semibold">
                 {releaseTitle(latestResult)}
-              </AstryxView>
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="max-h-48 overflow-auto pr-2"
-              >
+              </AstryxStack>
+              <AstryxStack direction="vertical" className="max-h-48 overflow-auto pr-2">
                 <Markdown
                   content={latestReleaseNotes}
                   className="release-notes-markdown text-xs leading-relaxed text-muted-foreground"
                 />
-              </AstryxView>
-            </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
           ) : null}
-        </AstryxView>
+        </AstryxStack>
 
-        <AstryxView as="aside" className="space-y-4">
-          <AstryxView
+        <AstryxStack direction="vertical" as="aside" className="space-y-4">
+          <AstryxStack
+            direction="vertical"
             as="section"
             className="settings-about-card rounded-2xl border border-border/60 bg-card p-4"
           >
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex items-start justify-between gap-4"
-            >
-              <AstryxView layout="block" direction="horizontal" className="min-w-0">
-                <AstryxView
-                  layout="flex"
+            <AstryxStack direction="horizontal" className="flex items-start justify-between gap-4">
+              <AstryxStack direction="vertical" className="min-w-0">
+                <AstryxStack
                   direction="horizontal"
                   className="flex items-center gap-2 text-sm font-medium"
                 >
                   <Shield className="h-4 w-4 text-muted-foreground" />
                   {t("settings.aboutPrereleaseTitle")}
-                </AstryxView>
-                <AstryxParagraph className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                </AstryxStack>
+                <AstryxText
+                  as="p"
+                  type="inherit"
+                  display="block"
+                  className="mt-2 text-xs leading-relaxed text-muted-foreground"
+                >
                   {t("settings.aboutPrereleaseDesc")}
-                </AstryxParagraph>
-              </AstryxView>
+                </AstryxText>
+              </AstryxStack>
               <AgentActivationSwitch
                 checked={includePrereleases}
                 title={t("settings.aboutPrereleaseToggle")}
@@ -411,25 +370,36 @@ export function AboutSection(props: AboutSectionProps) {
                   )
                 }
               />
-            </AstryxView>
-          </AstryxView>
+            </AstryxStack>
+          </AstryxStack>
 
-          <AstryxView
+          <AstryxStack
+            direction="vertical"
             as="section"
             className="settings-about-card space-y-3 rounded-2xl border border-border/60 bg-card p-4"
           >
-            <AstryxView layout="block" direction="horizontal" className="text-sm font-semibold">
+            <AstryxStack direction="vertical" className="text-sm font-semibold">
               {t("settings.aboutNotesTitle")}
-            </AstryxView>
-            <AstryxParagraph className="text-xs leading-relaxed text-muted-foreground">
+            </AstryxStack>
+            <AstryxText
+              as="p"
+              type="inherit"
+              display="block"
+              className="text-xs leading-relaxed text-muted-foreground"
+            >
               {t("settings.aboutNotesBody")}
-            </AstryxParagraph>
-            <AstryxParagraph className="text-xs leading-relaxed text-muted-foreground">
+            </AstryxText>
+            <AstryxText
+              as="p"
+              type="inherit"
+              display="block"
+              className="text-xs leading-relaxed text-muted-foreground"
+            >
               {t("settings.aboutSecurityBody")}
-            </AstryxParagraph>
-          </AstryxView>
-        </AstryxView>
-      </AstryxView>
-    </AstryxView>
+            </AstryxText>
+          </AstryxStack>
+        </AstryxStack>
+      </AstryxGrid>
+    </AstryxStack>
   );
 }

@@ -4,6 +4,7 @@ import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
@@ -75,11 +76,11 @@ const PROVIDER_LABELS: Record<ProviderId, string> = {
 };
 
 function ProviderTypeIcon({ type }: { type: ProviderId }) {
-  if (type === "claude_code") return <ClaudeIcon height="1em" />;
-  if (type === "gemini") return <GeminiIcon height="1em" />;
-  if (type === "xai") return <RefreshCw height="1em" width="1em" />;
-  if (type === "deepseek") return <Settings height="1em" width="1em" />;
-  return <OpenaiChatgptIcon height="1em" />;
+  if (type === "claude_code") return <Icon icon={ClaudeIcon} size="sm" color="inherit" />;
+  if (type === "gemini") return <Icon icon={GeminiIcon} size="sm" color="inherit" />;
+  if (type === "xai") return <Icon icon={RefreshCw} size="sm" color="inherit" />;
+  if (type === "deepseek") return <Icon icon={Settings} size="sm" color="inherit" />;
+  return <Icon icon={OpenaiChatgptIcon} size="sm" color="inherit" />;
 }
 
 function itemKey(item: CherryProviderImportItem) {
@@ -269,7 +270,7 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
               tooltip="返回同步设置"
               variant="ghost"
               size="sm"
-              icon={<ArrowLeft />}
+              icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
               onClick={() => setPathDialogOpen(false)}
             />
           }
@@ -290,7 +291,7 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
               tooltip="选择 Cherry Studio 数据目录"
               variant="secondary"
               size="sm"
-              icon={<FolderOpen />}
+              icon={<Icon icon={FolderOpen} size="sm" color="inherit" />}
               isLoading={scanning}
               isDisabled={scanning || importing}
               onClick={onChooseDataDirectory}
@@ -327,7 +328,7 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
               tooltip="返回供应商配置"
               variant="ghost"
               size="sm"
-              icon={<ArrowLeft />}
+              icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
               isDisabled={importing}
               onClick={onClose}
             />
@@ -338,7 +339,7 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
               tooltip="设置 Cherry Studio 数据目录"
               variant="ghost"
               size="sm"
-              icon={<Settings />}
+              icon={<Icon icon={Settings} size="sm" color="inherit" />}
               onClick={() => setPathDialogOpen(true)}
               isDisabled={importing}
             />
@@ -384,7 +385,7 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
                     label="选择数据目录"
                     variant="secondary"
                     size="sm"
-                    icon={<FolderOpen />}
+                    icon={<Icon icon={FolderOpen} size="sm" color="inherit" />}
                     onClick={() => setPathDialogOpen(true)}
                     isDisabled={importing}
                   />

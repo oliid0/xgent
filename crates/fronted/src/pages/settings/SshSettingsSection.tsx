@@ -1,6 +1,7 @@
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
@@ -14,26 +15,21 @@ import {
   LayoutContent,
   LayoutFooter,
   Section,
-  StackItem,
   VStack,
 } from "@astryxdesign/core/Layout";
 import { List as AstryxList, ListItem } from "@astryxdesign/core/List";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { Spinner } from "@astryxdesign/core/Spinner";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { invoke, isBrowserRuntime } from "@xagent/runtime";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
-  Check,
-  Eye,
-  EyeOff,
   Key,
   Lock,
   Pencil,
@@ -44,7 +40,6 @@ import {
   Trash2,
   Upload,
 } from "../../components/icons";
-import { Button } from "../../components/ui/button";
 import { useLocale } from "../../i18n";
 import {
   removeSshHostFromProjectAssociations,
@@ -60,7 +55,7 @@ import {
   scanSshImportCandidates,
 } from "../../lib/ssh/scan";
 import { SettingsModalShell } from "./SettingsModalShell";
-import { ConfirmActionPopover, ConfirmDeletePopover, PromptTag } from "./shared";
+import { ConfirmActionPopover, ConfirmDeletePopover } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 type SshHostDraft = Omit<SshHostConfig, "id">;
@@ -88,31 +83,17 @@ function SshPasswordInput(props: {
   onChange: (value: string) => void;
 }) {
   const { label, value, disabled = false, configuredMessage, onChange } = props;
-  const { t } = useLocale();
-  const [visible, setVisible] = useState(false);
-  const toggleLabel = visible ? t("settings.sshHidePassword") : t("settings.sshShowPassword");
 
   return (
     <VStack gap={1}>
-      <HStack gap={2} vAlign="end">
-        <StackItem size="fill">
-          <TextInput
-            label={label}
-            type={visible ? "text" : "password"}
-            value={value}
-            isDisabled={disabled}
-            onChange={onChange}
-          />
-        </StackItem>
-        <IconButton
-          label={toggleLabel}
-          tooltip={toggleLabel}
-          variant="ghost"
-          icon={visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
-          isDisabled={disabled}
-          onClick={() => setVisible((current) => !current)}
-        />
-      </HStack>
+      <TextInput
+        label={label}
+        type="password"
+        value={value}
+        isDisabled={disabled}
+        width="100%"
+        onChange={onChange}
+      />
       {configuredMessage && !value.trim() ? (
         <Text type="supporting" color="secondary">
           {configuredMessage}
@@ -465,6 +446,56 @@ function SshHostModal(props: {
   );
 }
 
+function SshImportCandidateRow(props: {
+  candidate: SshImportCandidate;
+  selected: boolean;
+  onChange: () => void;
+}) {
+  const { candidate, selected, onChange } = props;
+  const { t } = useLocale();
+  const checkboxRef = useRef<HTMLInputElement>(null);
+  const connection = `${candidate.username ? `${candidate.username}@` : ""}${candidate.host}:${candidate.port}`;
+
+  return (
+    <ListItem
+      label={candidate.name}
+      description={
+        <VStack gap={1}>
+          <Text type="supporting" color="secondary">
+            {connection}
+          </Text>
+          <HStack gap={2} vAlign="center" wrap="wrap">
+            <Text type="supporting" color="secondary">
+              {authLabel(candidate, t)}
+            </Text>
+            {candidate.duplicate ? (
+              <StatusDot
+                variant="warning"
+                label={t("settings.sshImportDuplicate")}
+                tooltip={t("settings.sshImportDuplicate")}
+              />
+            ) : null}
+          </HStack>
+        </VStack>
+      }
+      startContent={
+        <CheckboxInput
+          ref={checkboxRef}
+          label={candidate.name}
+          isLabelHidden
+          value={selected}
+          size="sm"
+          isDisabled={candidate.duplicate}
+          disabledMessage={candidate.duplicate ? t("settings.sshImportDuplicate") : undefined}
+          onChange={onChange}
+        />
+      }
+      interactiveRef={checkboxRef}
+      isDisabled={candidate.duplicate}
+    />
+  );
+}
+
 function SshImportModal(props: {
   existingHosts: SshHostConfig[];
   onImport: (hosts: SshImportCandidate[]) => void;
@@ -511,184 +542,105 @@ function SshImportModal(props: {
 
   return (
     <SettingsModalShell onClose={onClose} ariaLabel={t("settings.sshImport")}>
-      <AstryxView
-        layout="flex"
-        direction="vertical"
-        className="flex h-full min-h-0 w-full flex-col overflow-hidden"
-      >
-        <DialogHeader
-          title={t("settings.sshImport")}
-          subtitle={t("settings.sshImportDesc")}
-          startContent={
-            <AstryxButton
-              type="button"
-              onClick={onClose}
-              aria-label={t("settings.cancel")}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </AstryxButton>
-          }
-        />
+      <Layout
+        height="fill"
+        header={
+          <DialogHeader
+            title={t("settings.sshImport")}
+            subtitle={t("settings.sshImportDesc")}
+            startContent={
+              <IconButton
+                label={t("settings.cancel")}
+                tooltip={t("settings.cancel")}
+                variant="ghost"
+                size="sm"
+                icon={<AstryxIcon icon={ArrowLeft} size="sm" color="inherit" />}
+                onClick={onClose}
+              />
+            }
+          />
+        }
+        content={
+          <LayoutContent padding={5} isScrollable>
+            <VStack gap={4}>
+              {!result && !error ? (
+                <VStack minHeight="var(--spacing-32)" hAlign="center" vAlign="center" gap={2}>
+                  <Spinner size="sm" aria-label={t("settings.sshImportScanning")} />
+                  <Text color="secondary">{t("settings.sshImportScanning")}</Text>
+                </VStack>
+              ) : null}
 
-        <AstryxView
-          layout="block"
-          direction="horizontal"
-          className="settings-modal-body flex-1 overflow-y-auto px-6 py-5"
-        >
-          {!result && !error ? (
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 text-sm text-muted-foreground"
-            >
-              {t("settings.sshImportScanning")}
-            </AstryxView>
-          ) : null}
+              {error ? (
+                <Banner
+                  status="error"
+                  title={t("settings.sshImportFailed")}
+                  description={error}
+                  collapsible={false}
+                />
+              ) : null}
 
-          {error ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
-            >
-              {t("settings.sshImportFailed")}: {error}
-            </AstryxView>
-          ) : null}
+              {result ? (
+                <VStack gap={4}>
+                  <AstryxList density="balanced">
+                    <ListItem
+                      label={result.sshDirPath}
+                      description={t("settings.sshImportFound")
+                        .replace("{count}", String(candidates.length))
+                        .replace("{keys}", String(result.keyFiles.length))}
+                      startContent={<AstryxIcon icon={Key} size="sm" color="secondary" />}
+                    />
+                  </AstryxList>
 
-          {result ? (
-            <AstryxView layout="block" direction="horizontal" className="space-y-4">
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground"
-              >
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="font-medium text-foreground"
-                >
-                  {result.sshDirPath}
-                </AstryxView>
-                <AstryxView layout="block" direction="horizontal" className="mt-1">
-                  {t("settings.sshImportFound")
-                    .replace("{count}", String(candidates.length))
-                    .replace("{keys}", String(result.keyFiles.length))}
-                </AstryxView>
-              </AstryxView>
-
-              {candidates.length === 0 ? (
-                <AstryxView
-                  layout="flex"
-                  direction="vertical"
-                  className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/60 bg-muted/20 py-12 text-center"
-                >
-                  <Key className="h-8 w-8 text-muted-foreground/50" />
-                  <AstryxView layout="block" direction="horizontal">
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="text-sm font-medium"
-                    >
-                      {t("settings.sshImportEmpty")}
-                    </AstryxView>
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
-                      className="mt-1 text-xs text-muted-foreground"
-                    >
-                      {t("settings.sshImportEmptyHint")}
-                    </AstryxView>
-                  </AstryxView>
-                </AstryxView>
-              ) : (
-                <AstryxView layout="block" direction="horizontal" className="space-y-2">
-                  {candidates.map((candidate) => (
-                    <AstryxButton
-                      key={candidate.id}
-                      type="button"
-                      disabled={candidate.duplicate}
-                      onClick={() => toggle(candidate.id)}
-                      className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
-                        selectedIds.has(candidate.id)
-                          ? "border-emerald-500/40 bg-emerald-500/[0.06]"
-                          : "border-border/60 bg-card hover:border-border"
-                      } ${candidate.duplicate ? "cursor-not-allowed opacity-60" : ""}`}
-                    >
-                      <AstryxInline
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors duration-150 ${
-                          selectedIds.has(candidate.id)
-                            ? "border-emerald-500 bg-emerald-500 text-white"
-                            : "border-border bg-background"
-                        }`}
-                      >
-                        <Check
-                          className={`h-3.5 w-3.5 transition-[transform,opacity] duration-150 ${
-                            selectedIds.has(candidate.id)
-                              ? "scale-100 opacity-100"
-                              : "scale-90 opacity-0"
-                          }`}
+                  {candidates.length === 0 ? (
+                    <EmptyState
+                      title={t("settings.sshImportEmpty")}
+                      description={t("settings.sshImportEmptyHint")}
+                      icon={<AstryxIcon icon={Key} size="lg" color="secondary" />}
+                      isCompact
+                    />
+                  ) : (
+                    <AstryxList density="balanced" hasDividers>
+                      {candidates.map((candidate) => (
+                        <SshImportCandidateRow
+                          key={candidate.id}
+                          candidate={candidate}
+                          selected={selectedIds.has(candidate.id)}
+                          onChange={() => toggle(candidate.id)}
                         />
-                      </AstryxInline>
-                      <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-                        <AstryxView
-                          layout="flex"
-                          direction="horizontal"
-                          className="flex items-center gap-2"
-                        >
-                          <AstryxInline className="truncate text-sm font-medium">
-                            {candidate.name}
-                          </AstryxInline>
-                          <PromptTag label={authLabel(candidate, t)} />
-                          {candidate.duplicate ? (
-                            <PromptTag label={t("settings.sshImportDuplicate")} muted />
-                          ) : null}
-                        </AstryxView>
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="mt-1 truncate text-xs text-muted-foreground"
-                        >
-                          {candidate.username ? `${candidate.username}@` : ""}
-                          {candidate.host}:{candidate.port}
-                        </AstryxView>
-                      </AstryxView>
-                    </AstryxButton>
-                  ))}
-                </AstryxView>
-              )}
-            </AstryxView>
-          ) : null}
-        </AstryxView>
-
-        <AstryxView
-          layout="flex"
-          direction="horizontal"
-          className="settings-modal-footer flex items-center justify-between border-t px-6 py-4"
-        >
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="text-xs text-muted-foreground"
-          >
-            {t("settings.sshImportSelected").replace("{count}", String(selected.length))}
-          </AstryxView>
-          <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
-            <Button variant="outline" onClick={onClose}>
-              {t("settings.cancel")}
-            </Button>
-            <Button
-              disabled={selected.length === 0}
-              onClick={() => {
-                onImport(selected);
-                onClose();
-              }}
-            >
-              {t("settings.sshImport")}
-            </Button>
-          </AstryxView>
-        </AstryxView>
-      </AstryxView>
+                      ))}
+                    </AstryxList>
+                  )}
+                </VStack>
+              ) : null}
+            </VStack>
+          </LayoutContent>
+        }
+        footer={
+          <LayoutFooter hasDivider>
+            <HStack gap={3} hAlign="between" vAlign="center" wrap="wrap">
+              <Text type="supporting" color="secondary" hasTabularNumbers>
+                {t("settings.sshImportSelected").replace("{count}", String(selected.length))}
+              </Text>
+              <HStack gap={2} vAlign="center">
+                <AstryxCoreButton
+                  label={t("settings.cancel")}
+                  variant="secondary"
+                  onClick={onClose}
+                />
+                <AstryxCoreButton
+                  label={t("settings.sshImport")}
+                  variant="primary"
+                  isDisabled={selected.length === 0}
+                  onClick={() => {
+                    onImport(selected);
+                    onClose();
+                  }}
+                />
+              </HStack>
+            </HStack>
+          </LayoutFooter>
+        }
+      />
     </SettingsModalShell>
   );
 }

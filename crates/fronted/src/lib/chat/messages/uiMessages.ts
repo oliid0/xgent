@@ -12,16 +12,13 @@ import {
   normalizeHostedSearchBlock,
   resolveHostedSearchTextBoundary,
   splitTextAroundHostedSearch,
-} from "@xagent/ui/lib/chat/hostedSearch";
-import {
-  getUserMessageAttachments,
-  type PendingUploadedFile,
-} from "@xagent/ui/lib/chat/uploadedFiles";
+} from "@/lib/chat/hostedSearch";
+import { getUserMessageAttachments, type PendingUploadedFile } from "@/lib/chat/uploadedFiles";
 import {
   buildSubagentCardToolCallId,
   type SubagentBatchDetails,
   type SubagentCardDetails,
-} from "@xagent/ui/lib/subagents/protocol";
+} from "@/lib/subagents/protocol";
 import { assistantMessageToText } from "../../providers/llm";
 import { isProviderNativeWebSearchToolName } from "../../providers/nativeWebSearch";
 import { isSubagentCardToolCall } from "../../subagents/card";

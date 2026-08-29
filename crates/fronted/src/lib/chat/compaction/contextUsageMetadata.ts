@@ -1,6 +1,6 @@
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 
-import { positiveTokenCount } from "@xagent/ui/lib/chat/contextUsage";
+import { positiveTokenCount } from "@/lib/chat/contextUsage";
 
 // Keep reading the legacy persisted key without restoring the removed brand
 // as a source-level dependency checked by the architecture guard.

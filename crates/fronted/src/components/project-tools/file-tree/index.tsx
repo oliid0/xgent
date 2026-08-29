@@ -27,9 +27,9 @@ import {
 } from "react";
 import { useLocale } from "../../../i18n";
 import type { WorkspaceFileTreeStatePatch } from "../../../lib/settings";
+import { useConfirmDialog } from "../../astryx/useConfirmDialog";
 import { getFileTypeIcon } from "../../chat/fileTypeIcons";
 import { Check, Edit3, FolderClosed, FolderOpen, Plus, RefreshCw, Trash2, X } from "../../icons";
-import { useConfirmDialog } from "../../ui/confirm-dialog";
 import { isWorkspaceImagePath } from "../../workspace-editor/workspaceImagePreview";
 import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
 import { FileTreeContextMenu } from "./ContextMenu";

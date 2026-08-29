@@ -1,4 +1,4 @@
-import type { SubagentRosterEntry, SubagentTemplateEntry } from "@xagent/ui/lib/subagents/protocol";
+import type { SubagentRosterEntry, SubagentTemplateEntry } from "@/lib/subagents/protocol";
 import type { SubagentIdentity, SubagentRunSummary, SubagentSpec, SubagentTemplate } from "./types";
 import { truncateText } from "./utils";
 

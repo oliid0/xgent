@@ -1,4 +1,4 @@
-import type { CompletePromptRunInput } from "@xagent/ui/lib/automation/index";
+import type { CompletePromptRunInput } from "@/lib/automation/index";
 
 export const PROMPT_RUN_RECONCILE_INTERVAL_MS = 15_000;
 

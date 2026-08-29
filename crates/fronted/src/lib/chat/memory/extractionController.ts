@@ -13,7 +13,7 @@
 import {
   EXTRACTION_CONVERSATION_STATE_LIMIT,
   EXTRACTION_WRITTEN_SLUG_LIMIT,
-} from "@xagent/ui/lib/memory/config";
+} from "@/lib/memory/config";
 import { extractLatestUserText } from "../../memory/extraction/context";
 import { extractionSkipReason, isConfirmationDeferral } from "../../memory/extraction/gating";
 import type { MemoryExtractionEngineParams, MemoryExtractionResult } from "./extractionEngine";

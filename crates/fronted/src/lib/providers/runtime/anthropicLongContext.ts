@@ -1,5 +1,5 @@
 import type { Api, Context, Model } from "@earendil-works/pi-ai";
-import { isAnthropicOAuthApiKey } from "@xagent/ui/lib/providers/customHeaders";
+import { isAnthropicOAuthApiKey } from "@/lib/providers/customHeaders";
 import type { ProviderId } from "../../settings";
 import {
   ANTHROPIC_STANDARD_CONTEXT_WINDOW,

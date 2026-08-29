@@ -1,9 +1,7 @@
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import {
-  Inline as AstryxInline,
-  Paragraph as AstryxParagraph,
-  View as AstryxView,
-} from "@xagent/ui/components/ui/view";
+import { Button as AstryxButton, Button } from "@astryxdesign/core/Button";
+import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText } from "@astryxdesign/core/Text";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HubPanel, HubSegmentedButton, HubSegmentedControl } from "../../components/hub/HubChrome";
 import {
@@ -17,7 +15,6 @@ import {
   RefreshCw,
   Terminal,
 } from "../../components/icons";
-import { Button } from "../../components/ui/button";
 import { useLocale } from "../../i18n";
 import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
 import { cn } from "../../lib/shared/utils";
@@ -238,73 +235,71 @@ export function McpImportView(props: {
   }
 
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
+    <AstryxStack
+      direction="vertical"
       className="h-full min-h-0 overflow-y-auto px-0.5 pb-4 pr-1 pt-1.5"
     >
-      <AstryxView layout="flex" direction="vertical" className="flex flex-col gap-4">
+      <AstryxStack direction="vertical" className="flex flex-col gap-4">
         {error ? (
           <HubPanel tone="error" className="hub-panel-enter">
-            <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
+            <AstryxStack direction="horizontal" className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-              <AstryxInline className="text-xs text-destructive">
+              <AstryxText as="span" type="inherit" className="text-xs text-destructive">
                 {t("mcpHub.importScanFailed")}: {error}
-              </AstryxInline>
-            </AstryxView>
+              </AstryxText>
+            </AstryxStack>
           </HubPanel>
         ) : null}
 
         {!allowStdio ? (
           <HubPanel tone="muted" className="hub-panel-enter">
-            <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-2">
+            <AstryxStack direction="horizontal" className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <AstryxInline className="text-xs leading-5 text-muted-foreground">
+              <AstryxText
+                as="span"
+                type="inherit"
+                className="text-xs leading-5 text-muted-foreground"
+              >
                 {t("mcpHub.mobileNetworkOnly")}
-              </AstryxInline>
-            </AstryxView>
+              </AstryxText>
+            </AstryxStack>
           </HubPanel>
         ) : null}
 
         {fileError ? (
           <HubPanel tone="error" className="hub-panel-enter">
-            <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
+            <AstryxStack direction="horizontal" className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-              <AstryxInline className="text-xs text-destructive">
+              <AstryxText as="span" type="inherit" className="text-xs text-destructive">
                 {t("mcpHub.importFileFailed")}: {fileError}
-              </AstryxInline>
-            </AstryxView>
+              </AstryxText>
+            </AstryxStack>
           </HubPanel>
         ) : null}
 
         {importedCount !== null && importedCount > 0 ? (
           <HubPanel tone="muted" className="hub-panel-enter">
-            <AstryxView layout="flex" direction="horizontal" className="flex items-center gap-2">
+            <AstryxStack direction="horizontal" className="flex items-center gap-2">
               <Check className="h-4 w-4 shrink-0 text-success" />
-              <AstryxInline className="text-xs text-muted-foreground">
+              <AstryxText as="span" type="inherit" className="text-xs text-muted-foreground">
                 {t("mcpHub.importDone").replace("{count}", String(importedCount))}
-              </AstryxInline>
-            </AstryxView>
+              </AstryxText>
+            </AstryxStack>
           </HubPanel>
         ) : null}
 
         {loading && !scans ? (
           <HubPanel className="hub-panel-enter">
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex items-center gap-3 py-4"
-            >
+            <AstryxStack direction="horizontal" className="flex items-center gap-3 py-4">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              <AstryxInline className="text-xs text-muted-foreground">
+              <AstryxText as="span" type="inherit" className="text-xs text-muted-foreground">
                 {t("mcpHub.importScanning")}
-              </AstryxInline>
-            </AstryxView>
+              </AstryxText>
+            </AstryxStack>
           </HubPanel>
         ) : (
           <>
-            <AstryxView
-              layout="flex"
+            <AstryxStack
               direction="horizontal"
               className="hub-panel-enter flex flex-wrap items-center justify-between gap-3"
             >
@@ -331,11 +326,12 @@ export function McpImportView(props: {
                       ) : (
                         <Folder className="h-3.5 w-3.5" />
                       )}
-                      <AstryxInline className="max-w-[10rem] truncate">{toolLabel}</AstryxInline>
+                      <AstryxText as="span" type="inherit" className="max-w-[10rem] truncate">
+                        {toolLabel}
+                      </AstryxText>
                       {scan.exists ? (
-                        <AstryxView
+                        <AstryxStack
                           as="span"
-                          layout="inline-flex"
                           direction="horizontal"
                           className={cn(
                             "ml-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums",
@@ -345,22 +341,22 @@ export function McpImportView(props: {
                           )}
                         >
                           {scan.servers.length}
-                        </AstryxView>
+                        </AstryxStack>
                       ) : (
-                        <AstryxInline className="ml-0.5 text-[10px] text-muted-foreground/70">
+                        <AstryxText
+                          as="span"
+                          type="inherit"
+                          className="ml-0.5 text-[10px] text-muted-foreground/70"
+                        >
                           {t("mcpHub.importNotDetected")}
-                        </AstryxInline>
+                        </AstryxText>
                       )}
                     </HubSegmentedButton>
                   );
                 })}
               </HubSegmentedControl>
 
-              <AstryxView
-                layout="flex"
-                direction="horizontal"
-                className="flex shrink-0 items-center gap-2"
-              >
+              <AstryxStack direction="horizontal" className="flex shrink-0 items-center gap-2">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -372,11 +368,12 @@ export function McpImportView(props: {
                   }}
                 />
                 <Button
-                  variant="outline"
+                  label={t("mcpHub.importFromFileHint")}
+                  variant="secondary"
                   size="sm"
                   className="gap-1.5 rounded-full"
-                  disabled={filePicking}
-                  title={t("mcpHub.importFromFileHint")}
+                  isDisabled={filePicking}
+                  tooltip={t("mcpHub.importFromFileHint")}
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {filePicking ? (
@@ -387,68 +384,85 @@ export function McpImportView(props: {
                   {t("mcpHub.importFromFile")}
                 </Button>
                 <Button
-                  variant="outline"
+                  label={t("mcpHub.importRescan")}
+                  variant="secondary"
                   size="sm"
                   className="gap-1.5 rounded-full"
-                  disabled={loading}
+                  isDisabled={loading}
                   onClick={() => void rescan()}
                 >
                   <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
                   {t("mcpHub.importRescan")}
                 </Button>
                 <Button
+                  variant="primary"
+                  label={`${t("mcpHub.importButton")}${selected.size > 0 ? ` (${selected.size})` : ""}`}
                   size="sm"
                   className="gap-1.5 rounded-full"
-                  disabled={selected.size === 0 || loading}
+                  isDisabled={selected.size === 0 || loading}
                   onClick={importSelected}
                 >
                   <Download className="h-3.5 w-3.5" />
                   {`${t("mcpHub.importButton")}${selected.size > 0 ? ` (${selected.size})` : ""}`}
                 </Button>
-              </AstryxView>
-            </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
 
             {activeScan ? (
-              <AstryxView
-                layout="flex"
+              <AstryxStack
                 direction="vertical"
                 key={activeScan.tool}
                 className="hub-panel-enter flex flex-col gap-3"
               >
-                <AstryxView
-                  layout="flex"
+                <AstryxStack
                   direction="horizontal"
                   className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"
                 >
-                  <AstryxParagraph className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground/70">
-                    <AstryxInline className="font-mono">{activeScan.configPath}</AstryxInline>
+                  <AstryxText
+                    as="p"
+                    type="inherit"
+                    display="block"
+                    className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground/70"
+                  >
+                    <AstryxText as="span" type="inherit" className="font-mono">
+                      {activeScan.configPath}
+                    </AstryxText>
                     {activeScan.errors.length > 0 ? (
                       <>
-                        <AstryxInline aria-hidden="true">·</AstryxInline>
-                        <AstryxInline
+                        <AstryxText as="span" type="inherit" aria-hidden="true">
+                          ·
+                        </AstryxText>
+                        <AstryxText
+                          as="span"
+                          type="inherit"
                           className="cursor-help underline decoration-dotted underline-offset-2"
-                          title={activeScan.errors.join("\n")}
+                          aria-label={activeScan.errors.join("\n")}
                         >
                           {t("mcpHub.importUnparsable").replace(
                             "{count}",
                             String(activeScan.errors.length),
                           )}
-                        </AstryxInline>
+                        </AstryxText>
                       </>
                     ) : null}
-                  </AstryxParagraph>
+                  </AstryxText>
                   {importableInActive.length > 0 ? (
-                    <AstryxView
-                      layout="flex"
+                    <AstryxStack
                       direction="horizontal"
                       className="flex items-center gap-2 text-[11px] text-muted-foreground"
                     >
-                      <AstryxInline className="tabular-nums">
+                      <AstryxText as="span" type="inherit" className="tabular-nums">
                         {t("mcpHub.importSelectedCount")
                           .replace("{selected}", String(selectedInActive))
                           .replace("{total}", String(importableInActive.length))}
-                      </AstryxInline>
+                      </AstryxText>
                       <AstryxButton
+                        variant="ghost"
+                        label={
+                          allActiveSelected
+                            ? t("mcpHub.importDeselectAll")
+                            : t("mcpHub.importSelectAll")
+                        }
                         type="button"
                         onClick={toggleAllActive}
                         className="rounded-full border border-border/45 bg-background/70 px-2 py-0.5 text-[11px] font-medium text-foreground/80 transition-colors hover:bg-background/90"
@@ -457,28 +471,34 @@ export function McpImportView(props: {
                           ? t("mcpHub.importDeselectAll")
                           : t("mcpHub.importSelectAll")}
                       </AstryxButton>
-                    </AstryxView>
+                    </AstryxStack>
                   ) : null}
-                </AstryxView>
+                </AstryxStack>
 
                 {!activeScan.exists ? (
                   <HubPanel tone="muted">
-                    <AstryxParagraph className="py-2 text-center text-xs text-muted-foreground">
+                    <AstryxText
+                      as="p"
+                      type="inherit"
+                      display="block"
+                      className="py-2 text-center text-xs text-muted-foreground"
+                    >
                       {t("mcpHub.importNotDetected")} · {activeScan.configPath}
-                    </AstryxParagraph>
+                    </AstryxText>
                   </HubPanel>
                 ) : activeScan.servers.length === 0 ? (
                   <HubPanel tone="muted">
-                    <AstryxParagraph className="py-2 text-center text-xs text-muted-foreground">
+                    <AstryxText
+                      as="p"
+                      type="inherit"
+                      display="block"
+                      className="py-2 text-center text-xs text-muted-foreground"
+                    >
                       {t("mcpHub.importEmpty")}
-                    </AstryxParagraph>
+                    </AstryxText>
                   </HubPanel>
                 ) : (
-                  <AstryxView
-                    layout="grid"
-                    direction="horizontal"
-                    className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
-                  >
+                  <AstryxGrid className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {activeScan.servers.map((server) => {
                       const key = externalServerKey(activeScan.tool, server);
                       const alreadyImported = installedIds.has(server.id.trim().toLowerCase());
@@ -499,9 +519,11 @@ export function McpImportView(props: {
                       ].filter((item): item is string => Boolean(item));
                       return (
                         <AstryxButton
+                          variant="ghost"
+                          label={preview}
                           key={key}
                           type="button"
-                          disabled={alreadyImported || unsupported}
+                          isDisabled={alreadyImported || unsupported}
                           onClick={() => toggleServer(activeScan.tool, server)}
                           className={cn(
                             "group flex items-start gap-2.5 rounded-xl border p-3 text-left transition-all",
@@ -512,9 +534,8 @@ export function McpImportView(props: {
                                 : "border-border/40 bg-background/60 hover:border-border/70 hover:bg-background/85",
                           )}
                         >
-                          <AstryxView
+                          <AstryxStack
                             as="span"
-                            layout="flex"
                             direction="horizontal"
                             className={cn(
                               "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
@@ -524,20 +545,22 @@ export function McpImportView(props: {
                             )}
                           >
                             {checked && !alreadyImported ? <Check className="h-3 w-3" /> : null}
-                          </AstryxView>
-                          <AstryxInline className="min-w-0 flex-1">
-                            <AstryxView
+                          </AstryxStack>
+                          <AstryxText as="span" type="inherit" className="min-w-0 flex-1">
+                            <AstryxStack
                               as="span"
-                              layout="flex"
                               direction="horizontal"
                               className="flex flex-wrap items-center gap-1.5"
                             >
-                              <AstryxInline className="truncate text-[13px] font-medium text-foreground">
-                                {server.id}
-                              </AstryxInline>
-                              <AstryxView
+                              <AstryxText
                                 as="span"
-                                layout="inline-flex"
+                                type="inherit"
+                                className="truncate text-[13px] font-medium text-foreground"
+                              >
+                                {server.id}
+                              </AstryxText>
+                              <AstryxStack
+                                as="span"
                                 direction="horizontal"
                                 className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground"
                               >
@@ -547,70 +570,72 @@ export function McpImportView(props: {
                                   <Globe2 className="h-2.5 w-2.5" />
                                 )}
                                 {server.transport}
-                              </AstryxView>
+                              </AstryxStack>
                               {server.origin !== "user" ? (
-                                <AstryxView
+                                <AstryxStack
                                   as="span"
-                                  layout="inline-flex"
                                   direction="horizontal"
                                   className="inline-flex max-w-[10rem] shrink-0 items-center truncate rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                                  title={server.origin}
+                                  aria-label={server.origin}
                                 >
                                   {t("mcpHub.importOriginProject")}
-                                </AstryxView>
+                                </AstryxStack>
                               ) : null}
                               {alreadyImported ? (
-                                <AstryxView
+                                <AstryxStack
                                   as="span"
-                                  layout="inline-flex"
                                   direction="horizontal"
                                   className="inline-flex shrink-0 items-center rounded-full bg-foreground/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-foreground/70 ring-1 ring-border/45"
                                 >
                                   {t("mcpHub.importAlreadyImported")}
-                                </AstryxView>
+                                </AstryxStack>
                               ) : null}
                               {unsupported ? (
-                                <AstryxView
+                                <AstryxStack
                                   as="span"
-                                  layout="inline-flex"
                                   direction="horizontal"
                                   className="inline-flex shrink-0 rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] text-muted-foreground"
                                 >
                                   {t("mcpHub.mobileNetworkOnly")}
-                                </AstryxView>
+                                </AstryxStack>
                               ) : null}
-                            </AstryxView>
-                            <AstryxInline className="mt-1 block truncate font-mono text-[11px] text-muted-foreground">
+                            </AstryxStack>
+                            <AstryxText
+                              as="span"
+                              type="inherit"
+                              className="mt-1 block truncate font-mono text-[11px] text-muted-foreground"
+                            >
                               {preview}
-                            </AstryxInline>
+                            </AstryxText>
                             {extras.length > 0 ? (
-                              <AstryxView
+                              <AstryxStack
                                 as="span"
-                                layout="flex"
                                 direction="horizontal"
                                 className="mt-1 flex flex-wrap gap-1"
                               >
                                 {extras.map((extra) => (
-                                  <AstryxInline
+                                  <AstryxText
+                                    as="span"
+                                    type="inherit"
                                     key={extra}
                                     className="rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground"
                                   >
                                     {extra}
-                                  </AstryxInline>
+                                  </AstryxText>
                                 ))}
-                              </AstryxView>
+                              </AstryxStack>
                             ) : null}
-                          </AstryxInline>
+                          </AstryxText>
                         </AstryxButton>
                       );
                     })}
-                  </AstryxView>
+                  </AstryxGrid>
                 )}
-              </AstryxView>
+              </AstryxStack>
             ) : null}
           </>
         )}
-      </AstryxView>
-    </AstryxView>
+      </AstryxStack>
+    </AstryxStack>
   );
 }

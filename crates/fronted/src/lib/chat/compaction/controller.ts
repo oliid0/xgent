@@ -1,10 +1,6 @@
 import type { Context, UserMessage } from "@earendil-works/pi-ai";
-import {
-  canManualCompact,
-  contextUsageRatio,
-  positiveTokenCount,
-} from "@xagent/ui/lib/chat/contextUsage";
-import type { PendingUploadedFile } from "@xagent/ui/lib/chat/uploadedFiles";
+import { canManualCompact, contextUsageRatio, positiveTokenCount } from "@/lib/chat/contextUsage";
+import type { PendingUploadedFile } from "@/lib/chat/uploadedFiles";
 import type { StreamDebugLogger } from "../../debug/agentDebug";
 import type { ProviderId } from "../../settings";
 import { type ConversationViewState, getActiveSegment } from "../conversation/conversationState";

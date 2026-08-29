@@ -1,7 +1,8 @@
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
 import { HoverCard } from "@astryxdesign/core/HoverCard";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText } from "@astryxdesign/core/Text";
 import { openUrl } from "@xagent/runtime";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { getFileTypeIcon } from "../../../components/chat/fileTypeIcons";
 import { mentionChipClassName } from "../../../components/chat/mentionChipStyles";
@@ -551,9 +552,8 @@ function CommitReferenceCard({ commit }: { commit: CommitDisplayReference }) {
   );
 
   return (
-    <AstryxView
-      layout="block"
-      direction="horizontal"
+    <AstryxStack
+      direction="vertical"
       className="overflow-y-auto"
       style={{
         minWidth: "var(--xagent-hover-card-min-width)",
@@ -561,80 +561,90 @@ function CommitReferenceCard({ commit }: { commit: CommitDisplayReference }) {
         maxHeight: "var(--xagent-hover-card-height)",
       }}
     >
-      <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-2">
+      <AstryxStack direction="horizontal" className="flex items-start gap-2">
         <GitHubMarkIcon className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
-        <AstryxView layout="block" direction="horizontal" className="min-w-0">
+        <AstryxStack direction="vertical" className="min-w-0">
           {detailed ? (
             <>
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="break-words font-medium leading-tight"
-              >
+              <AstryxStack direction="vertical" className="break-words font-medium leading-tight">
                 {authorLabel}
-              </AstryxView>
+              </AstryxStack>
               {date ? (
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
+                <AstryxStack
+                  direction="vertical"
                   className="mt-0.5 text-[11px] leading-tight text-muted-foreground"
                 >
                   {date.relative} ({date.absolute})
-                </AstryxView>
+                </AstryxStack>
               ) : null}
             </>
           ) : (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="font-mono text-[11px] leading-tight text-muted-foreground"
             >
               {shortSha}
-            </AstryxView>
+            </AstryxStack>
           )}
-        </AstryxView>
-      </AstryxView>
-      <AstryxView
-        layout="block"
-        direction="horizontal"
+        </AstryxStack>
+      </AstryxStack>
+      <AstryxStack
+        direction="vertical"
         className="mt-2 whitespace-pre-wrap break-words font-medium leading-snug"
       >
         {subject}
-      </AstryxView>
+      </AstryxStack>
       {body ? (
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           className="mt-1.5 whitespace-pre-wrap break-words leading-snug text-muted-foreground"
         >
           {body}
-        </AstryxView>
+        </AstryxStack>
       ) : null}
       {detailed ? (
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-tight"
         >
-          <AstryxInline className="text-muted-foreground">{filesChangedLabel}</AstryxInline>
-          <AstryxInline className="font-medium text-emerald-600 dark:text-emerald-400">
+          <AstryxText as="span" type="inherit" className="text-muted-foreground">
+            {filesChangedLabel}
+          </AstryxText>
+          <AstryxText
+            as="span"
+            type="inherit"
+            className="font-medium text-emerald-600 dark:text-emerald-400"
+          >
             {insertionsLabel}
-          </AstryxInline>
-          <AstryxInline className="font-medium text-rose-600 dark:text-rose-400">
+          </AstryxText>
+          <AstryxText
+            as="span"
+            type="inherit"
+            className="font-medium text-rose-600 dark:text-rose-400"
+          >
             {deletionsLabel}
-          </AstryxInline>
-        </AstryxView>
+          </AstryxText>
+        </AstryxStack>
       ) : null}
       {commit.githubUrl ? (
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/70 pt-1.5 text-[11px] leading-tight text-muted-foreground"
         >
-          <AstryxInline className="font-mono text-foreground">{shortSha}</AstryxInline>
-          {commit.remoteName ? <AstryxInline>{commit.remoteName}</AstryxInline> : null}
-          <AstryxInline className="text-border">|</AstryxInline>
+          <AstryxText as="span" type="inherit" className="font-mono text-foreground">
+            {shortSha}
+          </AstryxText>
+          {commit.remoteName ? (
+            <AstryxText as="span" type="inherit">
+              {commit.remoteName}
+            </AstryxText>
+          ) : null}
+          <AstryxText as="span" type="inherit" className="text-border">
+            |
+          </AstryxText>
           <AstryxButton
+            variant="ghost"
+            label={t("chat.composer.commitTooltipOpenGithub")}
             type="button"
             className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-primary hover:bg-primary/10"
             onClick={() => void openUrl(commit.githubUrl!)}
@@ -642,18 +652,23 @@ function CommitReferenceCard({ commit }: { commit: CommitDisplayReference }) {
             <GitHubMarkIcon className="h-3 w-3" />
             {t("chat.composer.commitTooltipOpenGithub")}
           </AstryxButton>
-        </AstryxView>
+        </AstryxStack>
       ) : detailed ? (
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/70 pt-1.5 text-[11px] leading-tight text-muted-foreground"
         >
-          <AstryxInline className="font-mono text-foreground">{shortSha}</AstryxInline>
-          {commit.remoteName ? <AstryxInline>{commit.remoteName}</AstryxInline> : null}
-        </AstryxView>
+          <AstryxText as="span" type="inherit" className="font-mono text-foreground">
+            {shortSha}
+          </AstryxText>
+          {commit.remoteName ? (
+            <AstryxText as="span" type="inherit">
+              {commit.remoteName}
+            </AstryxText>
+          ) : null}
+        </AstryxStack>
       ) : null}
-    </AstryxView>
+    </AstryxStack>
   );
 }
 
@@ -676,23 +691,30 @@ function PastedTextChip({
   const Icon = getFileTypeIcon(file.relativePath || "pasted.txt", "file");
 
   return (
-    <AstryxInline title={file.relativePath} className={mentionChipClassName("pastedText")}>
+    <AstryxText
+      as="span"
+      type="inherit"
+      aria-label={file.relativePath}
+      className={mentionChipClassName("pastedText")}
+    >
       <Icon className="h-3 w-3 shrink-0 self-center" />
       {chipText}
-    </AstryxInline>
+    </AstryxText>
   );
 }
 
 function MentionChip({ reference }: { reference: FileMentionReference }) {
   const Icon = getFileTypeIcon(reference.path, reference.kind);
   return (
-    <AstryxInline
-      title={fileMentionTitle(reference)}
+    <AstryxText
+      as="span"
+      type="inherit"
+      aria-label={fileMentionTitle(reference)}
       className={mentionChipClassName(reference.kind === "dir" ? "dir" : "file")}
     >
       <Icon className="h-3 w-3 shrink-0 self-center" />
       {fileMentionDisplayName(reference)}
-    </AstryxInline>
+    </AstryxText>
   );
 }
 
@@ -700,10 +722,18 @@ function CodeRefMentionChip({ reference }: { reference: CodeMentionReference }) 
   const Icon = getFileTypeIcon(reference.path, "file");
   const lineLabel = codeMentionLineLabel(reference);
   return (
-    <AstryxInline title={codeMentionTitle(reference)} className={mentionChipClassName("codeRef")}>
+    <AstryxText
+      as="span"
+      type="inherit"
+      aria-label={codeMentionTitle(reference)}
+      className={mentionChipClassName("codeRef")}
+    >
       <Icon className="h-3 w-3 shrink-0 self-center" />
-      <AstryxInline>{`${codeMentionDisplayName(reference)}：${lineLabel}`}</AstryxInline>
-    </AstryxInline>
+      <AstryxText
+        as="span"
+        type="inherit"
+      >{`${codeMentionDisplayName(reference)}：${lineLabel}`}</AstryxText>
+    </AstryxText>
   );
 }
 
@@ -736,8 +766,10 @@ function GitFileMentionChip({ file }: { file: GitFileDisplayReference }) {
   }, [normalized.githubUrl]);
 
   return (
-    <AstryxInline
-      title={title}
+    <AstryxText
+      as="span"
+      type="inherit"
+      aria-label={title}
       role={normalized.githubUrl ? "button" : undefined}
       tabIndex={normalized.githubUrl ? 0 : undefined}
       className={mentionChipClassName("gitFile", { interactive: Boolean(normalized.githubUrl) })}
@@ -749,20 +781,27 @@ function GitFileMentionChip({ file }: { file: GitFileDisplayReference }) {
       }}
     >
       <Icon className="h-3 w-3 shrink-0 self-center" />
-      <AstryxInline>{fileName}</AstryxInline>
-      <AstryxInline className="max-w-[8rem] truncate text-[10px] opacity-70">
+      <AstryxText as="span" type="inherit">
+        {fileName}
+      </AstryxText>
+      <AstryxText as="span" type="inherit" className="max-w-[8rem] truncate text-[10px] opacity-70">
         @{refLabel}
-      </AstryxInline>
-    </AstryxInline>
+      </AstryxText>
+    </AstryxText>
   );
 }
 
 function SkillMentionChip({ name }: { name: string }) {
   return (
-    <AstryxInline title={`Skill: ${name}`} className={mentionChipClassName("skill")}>
+    <AstryxText
+      as="span"
+      type="inherit"
+      aria-label={`Skill: ${name}`}
+      className={mentionChipClassName("skill")}
+    >
       <SkillIcon className="h-3 w-3 shrink-0 self-center" />
       {name}
-    </AstryxInline>
+    </AstryxText>
   );
 }
 
@@ -824,7 +863,9 @@ function CommitMentionChip({
         if (isOpen) maybeLoadCommitDetails();
       }}
     >
-      <AstryxInline
+      <AstryxText
+        as="span"
+        type="inherit"
         role={resolvedCommit.githubUrl ? "button" : undefined}
         tabIndex={resolvedCommit.githubUrl ? 0 : undefined}
         className={mentionChipClassName("commit", {
@@ -839,7 +880,7 @@ function CommitMentionChip({
       >
         <GitHubMarkIcon className="h-3 w-3 shrink-0 self-center" />
         {label}
-      </AstryxInline>
+      </AstryxText>
     </HoverCard>
   );
 }
@@ -895,7 +936,11 @@ export const UserMessageContent = memo(function UserMessageContent({
         if (part.type === "pastedText") {
           return <PastedTextChip key={key} reference={part.reference} file={part.file} />;
         }
-        return <AstryxInline key={key}>{part.value}</AstryxInline>;
+        return (
+          <AstryxText as="span" type="inherit" key={key}>
+            {part.value}
+          </AstryxText>
+        );
       })}
     </>
   );

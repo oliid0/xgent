@@ -4,11 +4,11 @@ export type {
   SubagentCardDetails,
   SubagentMessageDetails,
   SubagentReportDetails,
-} from "@xagent/ui/lib/subagents/protocol";
+} from "@/lib/subagents/protocol";
 export {
   buildSubagentCardToolCallId,
   isSubagentCardArguments,
-} from "@xagent/ui/lib/subagents/protocol";
+} from "@/lib/subagents/protocol";
 export { createSubagentTools, type SubagentRuntimeConfig } from "./agentTool";
 export { renderMessageBusDelta, renderMessageBusSnapshot } from "./bus";
 export { isSubagentCardToolCall } from "./card";

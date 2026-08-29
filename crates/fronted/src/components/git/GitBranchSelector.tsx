@@ -1,7 +1,16 @@
+import { Button as AstryxButton, Button } from "@astryxdesign/core/Button";
 import { Dialog } from "@astryxdesign/core/Dialog";
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuDivider as DropdownMenuSeparator,
+  DropdownMenuSubMenu,
+} from "@astryxdesign/core/DropdownMenu";
+import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText, Text as Label } from "@astryxdesign/core/Text";
+import { TextInput as Input } from "@astryxdesign/core/TextInput";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import type {
@@ -18,6 +27,7 @@ import {
 import { cn } from "../../lib/shared/utils";
 import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types";
 import { useWorkspaceInvalidation } from "../../lib/workspace-activity/useWorkspaceInvalidation";
+import { useConfirmDialog } from "../astryx/useConfirmDialog";
 import {
   Check,
   ChevronRight,
@@ -37,21 +47,6 @@ import {
   Upload,
   X,
 } from "../icons";
-import { Button } from "../ui/button";
-import { useConfirmDialog } from "../ui/confirm-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
 
 function assertGitOperationResult(value: unknown, fallbackMessage: string) {
   if (!value || typeof value !== "object") return;
@@ -161,7 +156,8 @@ function GitInitModal(props: {
       maxHeight={isCompact ? "100dvh" : "90dvh"}
       padding={0}
     >
-      <AstryxView
+      <AstryxStack
+        direction="vertical"
         as="form"
         className="flex min-h-0 flex-col overflow-hidden"
         onSubmit={(event) => {
@@ -169,127 +165,156 @@ function GitInitModal(props: {
           onSubmit();
         }}
       >
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4"
         >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex min-w-0 items-start gap-3"
-          >
-            <AstryxView
-              layout="flex"
+          <AstryxStack direction="horizontal" className="flex min-w-0 items-start gap-3">
+            <AstryxStack
               direction="horizontal"
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
             >
               <GitBranch className="h-5 w-5" />
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal" className="min-w-0">
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+            </AstryxStack>
+            <AstryxStack direction="vertical" className="min-w-0">
+              <AstryxStack
+                direction="vertical"
                 id={titleId}
                 className="text-sm font-semibold text-foreground"
               >
                 {t("git.branchSelector.initRepositoryTitle")}
-              </AstryxView>
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+              </AstryxStack>
+              <AstryxStack
+                direction="vertical"
                 className="mt-1 text-xs leading-5 text-muted-foreground"
               >
                 {t("git.branchSelector.initRepositoryDescription")}
-              </AstryxView>
-            </AstryxView>
-          </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
+          </AstryxStack>
           <Button
+            label={t("window.close")}
             type="button"
             variant="ghost"
-            size="icon"
+            size="md"
             onClick={onClose}
-            disabled={loading}
+            isDisabled={loading}
             className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
-            title={t("window.close")}
+            tooltip={t("window.close")}
             aria-label={t("window.close")}
           >
             <X className="h-4 w-4" />
           </Button>
-        </AstryxView>
-        <AstryxView layout="block" direction="horizontal" className="space-y-4 px-5 py-4">
-          <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">
+        </AstryxStack>
+        <AstryxStack direction="vertical" className="space-y-4 px-5 py-4">
+          <AstryxStack direction="vertical" className="space-y-1.5">
+            <Label
+              as="label"
+              type="label"
+              weight="medium"
+              className="text-xs text-muted-foreground"
+            >
               {t("git.branchSelector.targetDirectory")}
             </Label>
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="truncate rounded-lg border border-border/70 bg-muted/35 px-3 py-2 text-xs text-foreground"
-              title={workdir}
+              aria-label={workdir}
             >
               {workdir}
-            </AstryxView>
-          </AstryxView>
-          <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-            <Label htmlFor={branchId} className="text-xs text-muted-foreground">
+            </AstryxStack>
+          </AstryxStack>
+          <AstryxStack direction="vertical" className="space-y-1.5">
+            <Label
+              as="label"
+              type="label"
+              weight="medium"
+              className="text-xs text-muted-foreground"
+            >
               {t("git.branchSelector.initialBranch")}
             </Label>
             <Input
+              label="main"
+              isLabelHidden
               id={branchId}
               value={branch}
-              onChange={(event) => onBranchChange(event.target.value)}
+              onChange={(nextValue) => onBranchChange(nextValue)}
               className="h-9 text-sm"
               placeholder="main"
-              autoFocus
-              disabled={loading}
+              hasAutoFocus
+              isDisabled={loading}
             />
-          </AstryxView>
-          <AstryxView layout="grid" direction="horizontal" className="grid gap-3 sm:grid-cols-2">
-            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-              <Label htmlFor={userNameId} className="text-xs text-muted-foreground">
+          </AstryxStack>
+          <AstryxGrid className="grid gap-3 sm:grid-cols-2">
+            <AstryxStack direction="vertical" className="space-y-1.5">
+              <Label
+                as="label"
+                type="label"
+                weight="medium"
+                className="text-xs text-muted-foreground"
+              >
                 {t("git.branchSelector.userNameOptional")}
               </Label>
               <Input
+                label={userNameId}
+                isLabelHidden
                 id={userNameId}
                 value={userName}
-                onChange={(event) => onUserNameChange(event.target.value)}
+                onChange={(nextValue) => onUserNameChange(nextValue)}
                 className="h-9 text-sm"
-                disabled={loading}
+                isDisabled={loading}
               />
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-              <Label htmlFor={userEmailId} className="text-xs text-muted-foreground">
+            </AstryxStack>
+            <AstryxStack direction="vertical" className="space-y-1.5">
+              <Label
+                as="label"
+                type="label"
+                weight="medium"
+                className="text-xs text-muted-foreground"
+              >
                 {t("git.branchSelector.userEmailOptional")}
               </Label>
               <Input
+                label={userEmailId}
+                isLabelHidden
                 id={userEmailId}
                 value={userEmail}
-                onChange={(event) => onUserEmailChange(event.target.value)}
+                onChange={(nextValue) => onUserEmailChange(nextValue)}
                 className="h-9 text-sm"
-                disabled={loading}
+                isDisabled={loading}
               />
-            </AstryxView>
-          </AstryxView>
+            </AstryxStack>
+          </AstryxGrid>
           {error ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
+            <AstryxStack
+              direction="vertical"
               className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
             >
               {error}
-            </AstryxView>
+            </AstryxStack>
           ) : null}
-        </AstryxView>
-        <AstryxView
-          layout="flex"
+        </AstryxStack>
+        <AstryxStack
           direction="horizontal"
           className="flex items-center justify-end gap-2 border-t border-border/60 px-5 py-4"
         >
-          <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={loading}>
+          <Button
+            label={t("chat.cancel")}
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            isDisabled={loading}
+          >
             {t("chat.cancel")}
           </Button>
-          <Button type="submit" size="sm" disabled={loading || !branch.trim()}>
+          <Button
+            variant="primary"
+            label={t("git.branchSelector.initRepository")}
+            type="submit"
+            size="sm"
+            isDisabled={loading || !branch.trim()}
+          >
             {loading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
@@ -297,8 +322,8 @@ function GitInitModal(props: {
             )}
             {t("git.branchSelector.initRepository")}
           </Button>
-        </AstryxView>
-      </AstryxView>
+        </AstryxStack>
+      </AstryxStack>
     </Dialog>
   );
 }
@@ -370,7 +395,8 @@ function BranchActionsModal(props: {
       maxHeight={isCompact ? "100dvh" : "90dvh"}
       padding={0}
     >
-      <AstryxView
+      <AstryxStack
+        direction="vertical"
         as="form"
         className="flex min-h-0 flex-col overflow-hidden"
         onSubmit={(event) => {
@@ -378,143 +404,164 @@ function BranchActionsModal(props: {
           if (isForm) onSubmit();
         }}
       >
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="horizontal"
           className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4"
         >
-          <AstryxView
-            layout="flex"
-            direction="horizontal"
-            className="flex min-w-0 items-start gap-3"
-          >
-            <AstryxView
-              layout="flex"
+          <AstryxStack direction="horizontal" className="flex min-w-0 items-start gap-3">
+            <AstryxStack
               direction="horizontal"
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
             >
               <GitBranch className="h-5 w-5" />
-            </AstryxView>
-            <AstryxView layout="block" direction="horizontal" className="min-w-0">
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+            </AstryxStack>
+            <AstryxStack direction="vertical" className="min-w-0">
+              <AstryxStack
+                direction="vertical"
                 id={titleId}
                 className="truncate text-sm font-semibold text-foreground"
-                title={branch.fullName}
+                aria-label={branch.fullName}
               >
                 {branch.fullName}
-              </AstryxView>
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+              </AstryxStack>
+              <AstryxStack
+                direction="vertical"
                 className="mt-1 text-xs leading-5 text-muted-foreground"
               >
                 {isForm ? formTitle : kindLabel}
-              </AstryxView>
-            </AstryxView>
-          </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
+          </AstryxStack>
           <Button
+            label={t("window.close")}
             type="button"
             variant="ghost"
-            size="icon"
+            size="md"
             onClick={onClose}
-            disabled={busy}
+            isDisabled={busy}
             className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
-            title={t("window.close")}
+            tooltip={t("window.close")}
             aria-label={t("window.close")}
           >
             <X className="h-4 w-4" />
           </Button>
-        </AstryxView>
+        </AstryxStack>
         {mode === "menu" ? (
-          <AstryxView layout="block" direction="horizontal" className="space-y-1 px-3 py-3">
+          <AstryxStack direction="vertical" className="space-y-1 px-3 py-3">
             {canWrite ? (
               <AstryxButton
+                variant="ghost"
+                label={t("git.branchSelector.createFromHere")}
                 type="button"
                 className={ACTION_MENU_BUTTON_CLASS}
                 onClick={onShowCreateFrom}
-                disabled={busy}
+                isDisabled={busy}
               >
                 <Plus className="h-3.5 w-3.5" />
-                <AstryxInline>{t("git.branchSelector.createFromHere")}</AstryxInline>
+                <AstryxText as="span" type="inherit">
+                  {t("git.branchSelector.createFromHere")}
+                </AstryxText>
               </AstryxButton>
             ) : null}
             {canWrite && isLocal ? (
               <AstryxButton
+                variant="ghost"
+                label={t("git.branchSelector.renameBranch")}
                 type="button"
                 className={ACTION_MENU_BUTTON_CLASS}
                 onClick={onShowRename}
-                disabled={busy}
+                isDisabled={busy}
               >
                 <Pencil className="h-3.5 w-3.5" />
-                <AstryxInline>{t("git.branchSelector.renameBranch")}</AstryxInline>
+                <AstryxText as="span" type="inherit">
+                  {t("git.branchSelector.renameBranch")}
+                </AstryxText>
               </AstryxButton>
             ) : null}
             <AstryxButton
+              variant="ghost"
+              label={copied ? t("git.branchSelector.copied") : t("git.branchSelector.copyName")}
               type="button"
               className={ACTION_MENU_BUTTON_CLASS}
               onClick={onCopyName}
-              disabled={busy}
+              isDisabled={busy}
             >
               <Copy className="h-3.5 w-3.5" />
-              <AstryxInline>
+              <AstryxText as="span" type="inherit">
                 {copied ? t("git.branchSelector.copied") : t("git.branchSelector.copyName")}
-              </AstryxInline>
+              </AstryxText>
             </AstryxButton>
             {canWrite && isLocal && !branch.current ? (
               <AstryxButton
+                variant="ghost"
+                label={t("git.branchSelector.deleteBranch")}
                 type="button"
                 className={cn(
                   ACTION_MENU_BUTTON_CLASS,
                   "text-destructive hover:bg-destructive/10 hover:text-destructive",
                 )}
                 onClick={onDelete}
-                disabled={busy}
+                isDisabled={busy}
               >
                 {busy ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Trash2 className="h-3.5 w-3.5" />
                 )}
-                <AstryxInline>{t("git.branchSelector.deleteBranch")}</AstryxInline>
+                <AstryxText as="span" type="inherit">
+                  {t("git.branchSelector.deleteBranch")}
+                </AstryxText>
               </AstryxButton>
             ) : null}
             {error ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+              <AstryxStack
+                direction="vertical"
                 className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
               >
                 {error}
-              </AstryxView>
+              </AstryxStack>
             ) : null}
-          </AstryxView>
+          </AstryxStack>
         ) : (
-          <AstryxView layout="block" direction="horizontal" className="space-y-4 px-5 py-4">
+          <AstryxStack direction="vertical" className="space-y-4 px-5 py-4">
             {mode === "createFrom" ? (
-              <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">
+              <AstryxStack direction="vertical" className="space-y-1.5">
+                <Label
+                  as="label"
+                  type="label"
+                  weight="medium"
+                  className="text-xs text-muted-foreground"
+                >
                   {t("git.branchSelector.startPointLabel")}
                 </Label>
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
+                <AstryxStack
+                  direction="vertical"
                   className="truncate rounded-lg border border-border/70 bg-muted/35 px-3 py-2 text-xs text-foreground"
-                  title={branch.fullName}
+                  aria-label={branch.fullName}
                 >
                   {branch.fullName}
-                </AstryxView>
-              </AstryxView>
+                </AstryxStack>
+              </AstryxStack>
             ) : null}
-            <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
-              <Label htmlFor={inputId} className="text-xs text-muted-foreground">
+            <AstryxStack direction="vertical" className="space-y-1.5">
+              <Label
+                as="label"
+                type="label"
+                weight="medium"
+                className="text-xs text-muted-foreground"
+              >
                 {formTitle}
               </Label>
               <Input
+                label={
+                  mode === "rename"
+                    ? t("git.branchSelector.renamePlaceholder")
+                    : t("git.branchSelector.newBranchPlaceholder")
+                }
+                isLabelHidden
                 id={inputId}
                 value={draft}
-                onChange={(event) => onDraftChange(event.target.value)}
+                onChange={(nextValue) => onDraftChange(nextValue)}
                 onKeyDown={(event) => {
                   // Keep keystrokes local to the sheet; Escape steps back to
                   // the action list instead of dismissing the whole dialog.
@@ -531,31 +578,46 @@ function BranchActionsModal(props: {
                     : t("git.branchSelector.newBranchPlaceholder")
                 }
                 className="h-8 text-xs"
-                autoFocus
-                disabled={busy}
+                hasAutoFocus
+                isDisabled={busy}
               />
-            </AstryxView>
+            </AstryxStack>
             {error ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
+              <AstryxStack
+                direction="vertical"
                 className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
               >
                 {error}
-              </AstryxView>
+              </AstryxStack>
             ) : null}
-          </AstryxView>
+          </AstryxStack>
         )}
         {isForm ? (
-          <AstryxView
-            layout="flex"
+          <AstryxStack
             direction="horizontal"
             className="flex items-center justify-end gap-2 border-t border-border/60 px-5 py-4"
           >
-            <Button type="button" variant="ghost" size="sm" onClick={onBack} disabled={busy}>
+            <Button
+              label={t("chat.cancel")}
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onBack}
+              isDisabled={busy}
+            >
               {t("chat.cancel")}
             </Button>
-            <Button type="submit" size="sm" disabled={busy || !draft.trim()}>
+            <Button
+              variant="primary"
+              label={
+                mode === "rename"
+                  ? t("git.branchSelector.renameBranch")
+                  : t("git.branchSelector.create")
+              }
+              type="submit"
+              size="sm"
+              isDisabled={busy || !draft.trim()}
+            >
               {busy ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : mode === "rename" ? (
@@ -567,9 +629,9 @@ function BranchActionsModal(props: {
                 ? t("git.branchSelector.renameBranch")
                 : t("git.branchSelector.create")}
             </Button>
-          </AstryxView>
+          </AstryxStack>
         ) : null}
-      </AstryxView>
+      </AstryxStack>
     </Dialog>
   );
 }
@@ -629,7 +691,7 @@ export function GitBranchSelector(props: {
   const [menuOpen, setMenuOpen] = useState(false);
   // Controlled so picking a repository can close only the submenu while the
   // root menu stays open for a manual branch pick on the new repository.
-  const [repoMenuOpen, setRepoMenuOpen] = useState(false);
+  const [, setRepoMenuOpen] = useState(false);
   const [remoteAction, setRemoteAction] = useState<GitRemoteActionKind>("");
   const [branchAction, setBranchAction] = useState<GitBranchActionState | null>(null);
   const [actionDraft, setActionDraft] = useState("");
@@ -1118,16 +1180,12 @@ export function GitBranchSelector(props: {
   const renderBranchRow = (branch: GitBranchInfo, isCurrent: boolean, labelText: string) => (
     <DropdownMenuItem
       key={branch.fullName}
-      disabled={mutating}
-      onSelect={() => {
+      isDisabled={mutating}
+      onClick={() => {
         // Guarded no-op instead of `disabled` so the row's "⋯" button stays
         // clickable on the current branch and in read-only mode.
         if (isCurrent || !canWrite) return;
         selectBranch(branch);
-      }}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        openBranchActions(branch);
       }}
       className={cn(
         // active: gives touch long-press (contextmenu) visible pressed
@@ -1135,448 +1193,467 @@ export function GitBranchSelector(props: {
         "group/branch gap-2 text-xs active:bg-accent active:text-accent-foreground",
         (isCurrent || !canWrite) && "text-muted-foreground",
       )}
-    >
-      {isCurrent ? <Check className="h-3.5 w-3.5" /> : <GitBranch className="h-3.5 w-3.5" />}
-      <AstryxInline className="min-w-0 flex-1 truncate">{labelText}</AstryxInline>
-      <AstryxView
-        as="span"
-        layout="inline-flex"
-        direction="horizontal"
-        role="button"
-        tabIndex={-1}
-        aria-label={t("git.branchSelector.branchActions")}
-        title={t("git.branchSelector.branchActions")}
-        className="pointer-events-none ml-auto inline-flex shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground group-hover/branch:pointer-events-auto group-hover/branch:opacity-100 group-data-[highlighted]/branch:pointer-events-auto group-data-[highlighted]/branch:opacity-100"
-        onPointerDown={(event) => {
-          // Swallow every selection trigger the menu items listen to (Base UI
-          // selects on click plus mouseup for drag-release gestures, Radix on
-          // pointerup) so "⋯" never switches the branch.
-          event.preventDefault();
-          event.stopPropagation();
-        }}
-        onPointerUp={(event) => event.stopPropagation()}
-        onMouseUp={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          openBranchActions(branch);
-        }}
-      >
-        <MoreHorizontal className="h-3.5 w-3.5" />
-      </AstryxView>
-    </DropdownMenuItem>
+      label={
+        <>
+          {isCurrent ? <Check className="h-3.5 w-3.5" /> : <GitBranch className="h-3.5 w-3.5" />}
+          <AstryxText as="span" type="inherit" className="min-w-0 flex-1 truncate">
+            {labelText}
+          </AstryxText>
+          <AstryxStack
+            as="span"
+            direction="horizontal"
+            role="button"
+            tabIndex={-1}
+            aria-label={t("git.branchSelector.branchActions")}
+            className="pointer-events-none ml-auto inline-flex shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground group-hover/branch:pointer-events-auto group-hover/branch:opacity-100 group-data-[highlighted]/branch:pointer-events-auto group-data-[highlighted]/branch:opacity-100"
+            onPointerDown={(event) => {
+              // Swallow every selection trigger the menu items listen to (Base UI
+              // selects on click plus mouseup for drag-release gestures, Radix on
+              // pointerup) so "⋯" never switches the branch.
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onPointerUp={(event) => event.stopPropagation()}
+            onMouseUp={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              openBranchActions(branch);
+            }}
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" />
+          </AstryxStack>
+        </>
+      }
+    />
   );
 
   return (
     <>
-      <DropdownMenu open={menuOpen} onOpenChange={handleMenuOpenChange}>
-        <DropdownMenuTrigger
-          disabled={disabled || !gitClient || !workdir.trim()}
-          className={cn(
+      <DropdownMenu
+        isMenuOpen={menuOpen}
+        onOpenChange={handleMenuOpenChange}
+        placement="above"
+        alignment="start"
+        menuWidth="calc(var(--spacing-10) * 7)"
+        className="composer-branch-dropdown flex w-72 flex-col overflow-hidden p-0"
+        button={{
+          label,
+          tooltip: visibleError || (!canWrite ? disabledMessage : "") || label,
+          variant: "ghost",
+          isDisabled: disabled || !gitClient || !workdir.trim(),
+          className: cn(
             "composer-reasoning-trigger inline-flex h-8 min-w-0 max-w-[13rem] items-center gap-1 rounded-full border px-2 text-xs font-medium outline-hidden transition-colors",
             noRepo
               ? "border-transparent bg-foreground/[0.04] text-muted-foreground"
               : "border-emerald-300/25 bg-emerald-50/65 text-foreground hover:bg-emerald-50 dark:border-emerald-300/15 dark:bg-emerald-400/[0.08] dark:hover:bg-emerald-400/[0.13]",
             "disabled:pointer-events-none disabled:opacity-45",
-          )}
-          title={visibleError || (!canWrite ? disabledMessage : "") || label}
+          ),
+          children: (
+            <>
+              {loading || mutating || initializing ? (
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+              ) : (
+                <GitBranch className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-300" />
+              )}
+              <AstryxText as="span" type="inherit" className="min-w-0 truncate">
+                {label}
+              </AstryxText>
+            </>
+          ),
+        }}
+      >
+        <AstryxStack
+          direction="horizontal"
+          className="flex shrink-0 items-center gap-1 border-b border-border/60 px-2 py-1.5"
         >
-          {loading || mutating || initializing ? (
-            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-          ) : (
-            <GitBranch className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-300" />
-          )}
-          <AstryxInline className="min-w-0 truncate">{label}</AstryxInline>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          className="composer-branch-dropdown flex w-72 flex-col overflow-hidden p-0"
-          side="top"
-          align="start"
-        >
-          <AstryxView
-            layout="flex"
+          <AstryxStack
             direction="horizontal"
-            className="flex shrink-0 items-center gap-1 border-b border-border/60 px-2 py-1.5"
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-xs font-medium text-foreground"
           >
-            <AstryxView
-              layout="flex"
-              direction="horizontal"
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-xs font-medium text-foreground"
-            >
-              <Github className="h-3.5 w-3.5 shrink-0" />
-              <AstryxInline>Git</AstryxInline>
-            </AstryxView>
-            {noRepo ? null : (
-              <>
+            <Github className="h-3.5 w-3.5 shrink-0" />
+            <AstryxText as="span" type="inherit">
+              Git
+            </AstryxText>
+          </AstryxStack>
+          {noRepo ? null : (
+            <>
+              <AstryxButton
+                variant="ghost"
+                label={t("git.branchSelector.fetch")}
+                type="button"
+                className={HEADER_ICON_BUTTON_CLASS}
+                isDisabled={!canWrite || mutating}
+                onClick={() => runRemoteAction("fetch", () => gitClient!.fetch(workdir))}
+                tooltip={!canWrite ? disabledMessage : t("git.branchSelector.fetch")}
+                aria-label={t("git.branchSelector.fetch")}
+              >
+                {remoteAction === "fetch" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CloudDownload className="h-3.5 w-3.5" />
+                )}
+              </AstryxButton>
+              <AstryxStack as="span" direction="horizontal" className="relative inline-flex">
                 <AstryxButton
+                  variant="ghost"
+                  label={t("git.branchSelector.pull")}
                   type="button"
                   className={HEADER_ICON_BUTTON_CLASS}
-                  disabled={!canWrite || mutating}
-                  onClick={() => runRemoteAction("fetch", () => gitClient!.fetch(workdir))}
-                  title={!canWrite ? disabledMessage : t("git.branchSelector.fetch")}
-                  aria-label={t("git.branchSelector.fetch")}
+                  isDisabled={!canWrite || mutating}
+                  onClick={() => runRemoteAction("pull", () => gitClient!.pull(workdir))}
+                  tooltip={!canWrite ? disabledMessage : t("git.branchSelector.pull")}
+                  aria-label={t("git.branchSelector.pull")}
                 >
-                  {remoteAction === "fetch" ? (
+                  {remoteAction === "pull" ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <CloudDownload className="h-3.5 w-3.5" />
+                    <Download className="h-3.5 w-3.5" />
                   )}
                 </AstryxButton>
-                <AstryxView
-                  as="span"
-                  layout="inline-flex"
-                  direction="horizontal"
-                  className="relative inline-flex"
-                >
-                  <AstryxButton
-                    type="button"
-                    className={HEADER_ICON_BUTTON_CLASS}
-                    disabled={!canWrite || mutating}
-                    onClick={() => runRemoteAction("pull", () => gitClient!.pull(workdir))}
-                    title={!canWrite ? disabledMessage : t("git.branchSelector.pull")}
-                    aria-label={t("git.branchSelector.pull")}
+                {showSyncBadges && state.behind > 0 ? (
+                  <AstryxText
+                    as="span"
+                    type="inherit"
+                    className="pointer-events-none absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] font-medium leading-3 text-primary-foreground"
                   >
-                    {remoteAction === "pull" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Download className="h-3.5 w-3.5" />
-                    )}
-                  </AstryxButton>
-                  {showSyncBadges && state.behind > 0 ? (
-                    <AstryxInline className="pointer-events-none absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] font-medium leading-3 text-primary-foreground">
-                      {state.behind > 9 ? "9+" : state.behind}
-                    </AstryxInline>
-                  ) : null}
-                </AstryxView>
-                <AstryxView
-                  as="span"
-                  layout="inline-flex"
-                  direction="horizontal"
-                  className="relative inline-flex"
+                    {state.behind > 9 ? "9+" : state.behind}
+                  </AstryxText>
+                ) : null}
+              </AstryxStack>
+              <AstryxStack as="span" direction="horizontal" className="relative inline-flex">
+                <AstryxButton
+                  variant="ghost"
+                  label={t("git.branchSelector.push")}
+                  type="button"
+                  className={HEADER_ICON_BUTTON_CLASS}
+                  isDisabled={!canWrite || mutating}
+                  onClick={() => runRemoteAction("push", () => gitClient!.push(workdir))}
+                  tooltip={!canWrite ? disabledMessage : t("git.branchSelector.push")}
+                  aria-label={t("git.branchSelector.push")}
                 >
-                  <AstryxButton
-                    type="button"
-                    className={HEADER_ICON_BUTTON_CLASS}
-                    disabled={!canWrite || mutating}
-                    onClick={() => runRemoteAction("push", () => gitClient!.push(workdir))}
-                    title={!canWrite ? disabledMessage : t("git.branchSelector.push")}
-                    aria-label={t("git.branchSelector.push")}
-                  >
-                    {remoteAction === "push" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="h-3.5 w-3.5" />
-                    )}
-                  </AstryxButton>
-                  {showSyncBadges && state.ahead > 0 ? (
-                    <AstryxInline className="pointer-events-none absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] font-medium leading-3 text-primary-foreground">
-                      {state.ahead > 9 ? "9+" : state.ahead}
-                    </AstryxInline>
-                  ) : null}
-                </AstryxView>
-              </>
-            )}
-            <AstryxButton
-              type="button"
-              className={HEADER_ICON_BUTTON_CLASS}
-              onClick={() => {
-                // Manual refresh also re-scans for repositories so ones
-                // created mid-session show up.
-                void discoverRepositories();
-                void refresh();
-              }}
-              title={t("git.branchSelector.refresh")}
-              aria-label={t("git.branchSelector.refresh")}
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-            </AstryxButton>
-          </AstryxView>
-          {repositories.length > 1 ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="shrink-0 border-b border-border/60 p-1"
-            >
-              <DropdownMenuSub open={repoMenuOpen} onOpenChange={setRepoMenuOpen}>
-                <DropdownMenuSubTrigger
-                  clickToggle
-                  className="w-full gap-2 text-xs"
-                  title={t("git.branchSelector.switchRepository")}
-                  aria-label={t("git.branchSelector.switchRepository")}
-                >
-                  <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <AstryxInline className="shrink-0 text-muted-foreground">
-                    {t("git.branchSelector.repositoryLabel")}
-                  </AstryxInline>
-                  <AstryxInline className="min-w-0 flex-1 truncate font-medium">
-                    {selectedGitRepositoryLabel(repositories, selectedRepoRoot) ||
-                      t("git.branchSelector.switchRepository")}
-                  </AstryxInline>
-                  <AstryxInline className="ml-auto shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] leading-4 text-muted-foreground">
-                    {repositories.length}
-                  </AstryxInline>
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="min-w-52">
-                  {repositories.map((repo) => {
-                    const value = repo.isWorkspaceRoot ? "" : repo.root;
-                    const isCurrent = value === selectedRepoRoot;
-                    return (
-                      // Plain button (not a menu item): picking a repository
-                      // must close only the submenu and keep the root menu
-                      // open so the branch is still picked manually on the
-                      // newly selected repository.
-                      <AstryxButton
-                        key={repo.root}
-                        type="button"
-                        disabled={mutating}
-                        className={cn(
-                          "flex w-full cursor-default select-none items-center gap-2 rounded-xs px-2 py-1.5 text-left text-xs outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50",
-                          isCurrent && "text-muted-foreground",
-                        )}
-                        title={repo.root}
-                        onClick={(event) => {
-                          // Swallow the menu selection triggers so the root
-                          // menu stays open (see the footer create-branch
-                          // button for the same pattern).
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setRepoMenuOpen(false);
-                          if (!isCurrent) selectRepository(value);
-                        }}
-                      >
-                        {isCurrent ? (
-                          <Check className="h-3.5 w-3.5 shrink-0" />
-                        ) : (
-                          <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        )}
-                        <AstryxInline className="min-w-0 flex-1 truncate">
-                          {gitDiscoveredRepositoryLabel(repo)}
-                        </AstryxInline>
-                      </AstryxButton>
-                    );
-                  })}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            </AstryxView>
-          ) : null}
-          {showFilter ? (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="shrink-0 border-b border-border/60 px-2 py-1.5"
-            >
-              <AstryxView layout="block" direction="horizontal" className="relative">
-                <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={filter}
-                  onChange={(event) => setFilter(event.target.value)}
-                  onKeyDown={(event) => {
-                    // Keep keystrokes out of the menu typeahead; Escape clears
-                    // the filter without closing the menu.
-                    event.stopPropagation();
-                    if (event.nativeEvent.isComposing) return;
-                    if (event.key === "Escape") {
-                      event.preventDefault();
-                      setFilter("");
-                    }
-                  }}
-                  placeholder={t("git.branchSelector.filterBranches")}
-                  className="h-8 pl-7 text-xs"
-                />
-              </AstryxView>
-            </AstryxView>
-          ) : null}
-          <AstryxView
-            layout="block"
-            direction="horizontal"
-            className="min-h-0 flex-1 overflow-y-auto p-1"
-          >
-            {visibleError ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="px-2 py-1 text-xs text-destructive"
-              >
-                {visibleError}
-              </AstryxView>
-            ) : null}
-            {!canWrite && disabledMessage ? (
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="px-2 py-1 text-xs text-muted-foreground"
-              >
-                {disabledMessage}
-              </AstryxView>
-            ) : null}
-            {noRepo && !visibleError ? (
-              <>
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
-                  className="px-2 py-2 text-xs text-muted-foreground"
-                >
-                  {t("git.branchSelector.noRepositoryFound")}
-                </AstryxView>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  disabled={!canWrite || initializing}
-                  onSelect={openInitModal}
-                  className="gap-2 text-xs"
-                  title={!canWrite ? disabledMessage : undefined}
-                >
-                  {initializing ? (
+                  {remoteAction === "push" ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <Plus className="h-3.5 w-3.5" />
+                    <Upload className="h-3.5 w-3.5" />
                   )}
-                  <AstryxInline>{t("git.branchSelector.initRepository")}</AstryxInline>
-                </DropdownMenuItem>
-              </>
-            ) : noRepo ? null : (
-              <>
-                {filteredLocalBranches.length > 0 ? (
-                  <DropdownMenuLabel className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                    {t("git.branchSelector.localBranches")}
-                  </DropdownMenuLabel>
-                ) : null}
-                {filteredLocalBranches.map((branch) =>
-                  renderBranchRow(branch, branch.current, branch.name),
-                )}
-                {filteredRemoteBranches.length > 0 ? (
-                  <DropdownMenuLabel className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                    {t("git.branchSelector.remoteBranches")}
-                  </DropdownMenuLabel>
-                ) : null}
-                {filteredRemoteBranches.slice(0, REMOTE_BRANCH_DISPLAY_LIMIT).map((branch) => {
-                  const isCurrentUpstream =
-                    branch.current ||
-                    (currentUpstream !== "" && branch.fullName === currentUpstream);
-                  return renderBranchRow(branch, isCurrentUpstream, branch.fullName);
-                })}
-                {filteredRemoteBranches.length > REMOTE_BRANCH_DISPLAY_LIMIT ? (
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="px-2 py-1 text-[11px] text-muted-foreground"
+                </AstryxButton>
+                {showSyncBadges && state.ahead > 0 ? (
+                  <AstryxText
+                    as="span"
+                    type="inherit"
+                    className="pointer-events-none absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] font-medium leading-3 text-primary-foreground"
                   >
-                    {t("git.branchSelector.moreRemoteBranches").replace(
-                      "{count}",
-                      String(filteredRemoteBranches.length - REMOTE_BRANCH_DISPLAY_LIMIT),
-                    )}
-                  </AstryxView>
+                    {state.ahead > 9 ? "9+" : state.ahead}
+                  </AstryxText>
                 ) : null}
-                {normalizedFilter &&
-                filteredLocalBranches.length === 0 &&
-                filteredRemoteBranches.length === 0 ? (
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
-                    className="px-2 py-2 text-xs text-muted-foreground"
+              </AstryxStack>
+            </>
+          )}
+          <AstryxButton
+            variant="ghost"
+            label={t("git.branchSelector.refresh")}
+            type="button"
+            className={HEADER_ICON_BUTTON_CLASS}
+            onClick={() => {
+              // Manual refresh also re-scans for repositories so ones
+              // created mid-session show up.
+              void discoverRepositories();
+              void refresh();
+            }}
+            tooltip={t("git.branchSelector.refresh")}
+            aria-label={t("git.branchSelector.refresh")}
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+          </AstryxButton>
+        </AstryxStack>
+        {repositories.length > 1 ? (
+          <AstryxStack direction="vertical" className="shrink-0 border-b border-border/60 p-1">
+            <DropdownMenuSubMenu
+              label={
+                <>
+                  <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <AstryxText as="span" type="inherit" className="shrink-0 text-muted-foreground">
+                    {t("git.branchSelector.repositoryLabel")}
+                  </AstryxText>
+                  <AstryxText
+                    as="span"
+                    type="inherit"
+                    className="min-w-0 flex-1 truncate font-medium"
                   >
-                    {t("git.branchSelector.noMatches")}
-                  </AstryxView>
-                ) : null}
-              </>
-            )}
-          </AstryxView>
-          {noRepo ? null : (
-            <AstryxView
-              layout="block"
-              direction="horizontal"
-              className="shrink-0 border-t border-border/60 p-1"
+                    {selectedGitRepositoryLabel(repositories, selectedRepoRoot) ||
+                      t("git.branchSelector.switchRepository")}
+                  </AstryxText>
+                  <AstryxText
+                    as="span"
+                    type="inherit"
+                    className="ml-auto shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] leading-4 text-muted-foreground"
+                  >
+                    {repositories.length}
+                  </AstryxText>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                </>
+              }
+              onOpenChange={setRepoMenuOpen}
+              menuWidth="calc(var(--spacing-10) * 5)"
             >
-              {creating ? (
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex items-center gap-1 px-1 py-0.5"
-                >
-                  <Input
-                    value={draftBranch}
-                    onChange={(event) => setDraftBranch(event.target.value)}
-                    onKeyDown={(event) => {
-                      // Keep keystrokes out of the menu: typeahead would steal
-                      // focus while typing, and Escape should only discard the
-                      // draft instead of closing the whole menu.
-                      event.stopPropagation();
-                      if (event.nativeEvent.isComposing) return;
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        createBranch();
-                      } else if (event.key === "Escape") {
-                        resetCreateBranch();
-                      }
-                    }}
-                    placeholder={t("git.branchSelector.newBranchPlaceholder")}
-                    className="h-8 text-xs"
-                    autoFocus
-                  />
+              {repositories.map((repo) => {
+                const value = repo.isWorkspaceRoot ? "" : repo.root;
+                const isCurrent = value === selectedRepoRoot;
+                return (
+                  // Plain button (not a menu item): picking a repository
+                  // must close only the submenu and keep the root menu
+                  // open so the branch is still picked manually on the
+                  // newly selected repository.
                   <AstryxButton
+                    variant="ghost"
+                    label={repo.root}
+                    key={repo.root}
                     type="button"
-                    className="inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded bg-foreground px-2 text-xs text-background"
-                    onClick={createBranch}
-                  >
-                    {t("git.branchSelector.create")}
-                  </AstryxButton>
-                </AstryxView>
-              ) : (
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex items-center gap-1"
-                >
-                  <AstryxButton
-                    type="button"
-                    disabled={!canWrite || mutating}
-                    title={!canWrite ? disabledMessage : undefined}
-                    className="relative flex min-w-0 flex-1 cursor-default select-none items-center gap-2 rounded-xs px-2 py-1.5 text-left text-xs outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+                    isDisabled={mutating}
+                    className={cn(
+                      "flex w-full cursor-default select-none items-center gap-2 rounded-xs px-2 py-1.5 text-left text-xs outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50",
+                      isCurrent && "text-muted-foreground",
+                    )}
+                    tooltip={repo.root}
                     onClick={(event) => {
+                      // Swallow the menu selection triggers so the root
+                      // menu stays open (see the footer create-branch
+                      // button for the same pattern).
                       event.preventDefault();
                       event.stopPropagation();
-                      setCreating(true);
+                      setRepoMenuOpen(false);
+                      if (!isCurrent) selectRepository(value);
                     }}
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    {t("git.branchSelector.createNewBranch")}
+                    {isCurrent ? (
+                      <Check className="h-3.5 w-3.5 shrink-0" />
+                    ) : (
+                      <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    )}
+                    <AstryxText as="span" type="inherit" className="min-w-0 flex-1 truncate">
+                      {gitDiscoveredRepositoryLabel(repo)}
+                    </AstryxText>
                   </AstryxButton>
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger
-                      clickToggle
-                      className="shrink-0 px-1.5 text-xs"
-                      aria-label={t("git.branchSelector.moreActions")}
-                      title={t("git.branchSelector.moreActions")}
-                    >
+                );
+              })}
+            </DropdownMenuSubMenu>
+          </AstryxStack>
+        ) : null}
+        {showFilter ? (
+          <AstryxStack
+            direction="vertical"
+            className="shrink-0 border-b border-border/60 px-2 py-1.5"
+          >
+            <AstryxStack direction="vertical" className="relative">
+              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                label={t("git.branchSelector.filterBranches")}
+                isLabelHidden
+                value={filter}
+                onChange={(nextValue) => setFilter(nextValue)}
+                onKeyDown={(event) => {
+                  // Keep keystrokes out of the menu typeahead; Escape clears
+                  // the filter without closing the menu.
+                  event.stopPropagation();
+                  if (event.nativeEvent.isComposing) return;
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setFilter("");
+                  }
+                }}
+                placeholder={t("git.branchSelector.filterBranches")}
+                className="h-8 pl-7 text-xs"
+              />
+            </AstryxStack>
+          </AstryxStack>
+        ) : null}
+        <AstryxStack direction="vertical" className="min-h-0 flex-1 overflow-y-auto p-1">
+          {visibleError ? (
+            <AstryxStack direction="vertical" className="px-2 py-1 text-xs text-destructive">
+              {visibleError}
+            </AstryxStack>
+          ) : null}
+          {!canWrite && disabledMessage ? (
+            <AstryxStack direction="vertical" className="px-2 py-1 text-xs text-muted-foreground">
+              {disabledMessage}
+            </AstryxStack>
+          ) : null}
+          {noRepo && !visibleError ? (
+            <>
+              <AstryxStack direction="vertical" className="px-2 py-2 text-xs text-muted-foreground">
+                {t("git.branchSelector.noRepositoryFound")}
+              </AstryxStack>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                isDisabled={!canWrite || initializing}
+                onClick={openInitModal}
+                className="gap-2 text-xs"
+                label={
+                  <>
+                    {initializing ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="h-3.5 w-3.5" />
+                    )}
+                    <AstryxText as="span" type="inherit">
+                      {t("git.branchSelector.initRepository")}
+                    </AstryxText>
+                  </>
+                }
+              />
+            </>
+          ) : noRepo ? null : (
+            <>
+              {filteredLocalBranches.length > 0 ? (
+                <AstryxText
+                  as="div"
+                  type="supporting"
+                  color="secondary"
+                  weight="semibold"
+                  className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground"
+                >
+                  {t("git.branchSelector.localBranches")}
+                </AstryxText>
+              ) : null}
+              {filteredLocalBranches.map((branch) =>
+                renderBranchRow(branch, branch.current, branch.name),
+              )}
+              {filteredRemoteBranches.length > 0 ? (
+                <AstryxText
+                  as="div"
+                  type="supporting"
+                  color="secondary"
+                  weight="semibold"
+                  className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground"
+                >
+                  {t("git.branchSelector.remoteBranches")}
+                </AstryxText>
+              ) : null}
+              {filteredRemoteBranches.slice(0, REMOTE_BRANCH_DISPLAY_LIMIT).map((branch) => {
+                const isCurrentUpstream =
+                  branch.current || (currentUpstream !== "" && branch.fullName === currentUpstream);
+                return renderBranchRow(branch, isCurrentUpstream, branch.fullName);
+              })}
+              {filteredRemoteBranches.length > REMOTE_BRANCH_DISPLAY_LIMIT ? (
+                <AstryxStack
+                  direction="vertical"
+                  className="px-2 py-1 text-[11px] text-muted-foreground"
+                >
+                  {t("git.branchSelector.moreRemoteBranches").replace(
+                    "{count}",
+                    String(filteredRemoteBranches.length - REMOTE_BRANCH_DISPLAY_LIMIT),
+                  )}
+                </AstryxStack>
+              ) : null}
+              {normalizedFilter &&
+              filteredLocalBranches.length === 0 &&
+              filteredRemoteBranches.length === 0 ? (
+                <AstryxStack
+                  direction="vertical"
+                  className="px-2 py-2 text-xs text-muted-foreground"
+                >
+                  {t("git.branchSelector.noMatches")}
+                </AstryxStack>
+              ) : null}
+            </>
+          )}
+        </AstryxStack>
+        {noRepo ? null : (
+          <AstryxStack direction="vertical" className="shrink-0 border-t border-border/60 p-1">
+            {creating ? (
+              <AstryxStack direction="horizontal" className="flex items-center gap-1 px-1 py-0.5">
+                <Input
+                  label={t("git.branchSelector.newBranchPlaceholder")}
+                  isLabelHidden
+                  value={draftBranch}
+                  onChange={(nextValue) => setDraftBranch(nextValue)}
+                  onKeyDown={(event) => {
+                    // Keep keystrokes out of the menu: typeahead would steal
+                    // focus while typing, and Escape should only discard the
+                    // draft instead of closing the whole menu.
+                    event.stopPropagation();
+                    if (event.nativeEvent.isComposing) return;
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      createBranch();
+                    } else if (event.key === "Escape") {
+                      resetCreateBranch();
+                    }
+                  }}
+                  placeholder={t("git.branchSelector.newBranchPlaceholder")}
+                  className="h-8 text-xs"
+                  hasAutoFocus
+                />
+                <AstryxButton
+                  variant="ghost"
+                  label={t("git.branchSelector.create")}
+                  type="button"
+                  className="inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded bg-foreground px-2 text-xs text-background"
+                  onClick={createBranch}
+                >
+                  {t("git.branchSelector.create")}
+                </AstryxButton>
+              </AstryxStack>
+            ) : (
+              <AstryxStack direction="horizontal" className="flex items-center gap-1">
+                <AstryxButton
+                  variant="ghost"
+                  label={t("git.branchSelector.createNewBranch")}
+                  type="button"
+                  isDisabled={!canWrite || mutating}
+                  tooltip={!canWrite ? disabledMessage : undefined}
+                  className="relative flex min-w-0 flex-1 cursor-default select-none items-center gap-2 rounded-xs px-2 py-1.5 text-left text-xs outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setCreating(true);
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t("git.branchSelector.createNewBranch")}
+                </AstryxButton>
+                <DropdownMenuSubMenu
+                  label={
+                    <>
                       <MoreHorizontal className="h-3.5 w-3.5" />
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="min-w-44">
-                      <DropdownMenuItem
-                        disabled={!canWrite || mutating || dirtyTotal === 0}
-                        onSelect={() => void runBranchMutation(() => gitClient!.stashPush(workdir))}
-                        className="gap-2 text-xs"
-                      >
+                    </>
+                  }
+                  onOpenChange={undefined}
+                  menuWidth="calc(var(--spacing-10) * 5)"
+                >
+                  <DropdownMenuItem
+                    isDisabled={!canWrite || mutating || dirtyTotal === 0}
+                    onClick={() => void runBranchMutation(() => gitClient!.stashPush(workdir))}
+                    className="gap-2 text-xs"
+                    label={
+                      <>
                         <Download className="h-3.5 w-3.5" />
-                        <AstryxInline>{t("git.branchSelector.stashPush")}</AstryxInline>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        disabled={!canWrite || mutating || state.stashCount === 0}
-                        onSelect={() => void runBranchMutation(() => gitClient!.stashPop(workdir))}
-                        className="gap-2 text-xs"
-                      >
+                        <AstryxText as="span" type="inherit">
+                          {t("git.branchSelector.stashPush")}
+                        </AstryxText>
+                      </>
+                    }
+                  />
+                  <DropdownMenuItem
+                    isDisabled={!canWrite || mutating || state.stashCount === 0}
+                    onClick={() => void runBranchMutation(() => gitClient!.stashPop(workdir))}
+                    className="gap-2 text-xs"
+                    label={
+                      <>
                         <Upload className="h-3.5 w-3.5" />
-                        <AstryxInline>
+                        <AstryxText as="span" type="inherit">
                           {t("git.branchSelector.stashPop")}
                           {state.stashCount > 0 ? ` (${state.stashCount})` : ""}
-                        </AstryxInline>
-                      </DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                </AstryxView>
-              )}
-            </AstryxView>
-          )}
-        </DropdownMenuContent>
+                        </AstryxText>
+                      </>
+                    }
+                  />
+                </DropdownMenuSubMenu>
+              </AstryxStack>
+            )}
+          </AstryxStack>
+        )}
       </DropdownMenu>
       <BranchActionsModal
         action={branchAction}

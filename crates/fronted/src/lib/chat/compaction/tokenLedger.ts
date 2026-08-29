@@ -7,7 +7,7 @@ import {
   estimateTextTokenUnits,
   MESSAGE_ENVELOPE_TOKENS,
   stringifiedTokenUnits,
-} from "@xagent/ui/lib/chat/contextUsage";
+} from "@/lib/chat/contextUsage";
 import { isCompactionAssistantMessage } from "../conversation/conversationState";
 import { readMessageContextUsage, writeAssistantContextUsage } from "./contextUsageMetadata";
 

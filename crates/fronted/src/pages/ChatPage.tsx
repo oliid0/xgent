@@ -1,18 +1,14 @@
+import { Button } from "@astryxdesign/core/Button";
 import { Icon } from "@astryxdesign/core/Icon";
 import { Section } from "@astryxdesign/core/Layout";
 import { Overlay } from "@astryxdesign/core/Overlay";
 import { ResizeHandle, useResizable } from "@astryxdesign/core/Resizable";
-import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
+import { Stack as AstryxStack, HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
-import { Text } from "@astryxdesign/core/Text";
+import { Text as AstryxText, Text } from "@astryxdesign/core/Text";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import type { Context, Message, UserMessage } from "@earendil-works/pi-ai";
 import { invoke, isBrowserRuntime, listen, listenFileDrop, revealItemInDir } from "@xagent/runtime";
-import {
-  Inline as AstryxInline,
-  Paragraph as AstryxParagraph,
-  View as AstryxView,
-} from "@xagent/ui/components/ui/view";
 import {
   type CSSProperties,
   lazy,
@@ -25,6 +21,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useConfirmDialog } from "../components/astryx/useConfirmDialog";
 import {
   type ChangedFilesActions,
   ChangedFilesActionsProvider,
@@ -52,8 +49,6 @@ import {
   type WorkspaceToolLaunchRequest,
   type WorkspaceToolTarget,
 } from "../components/project-tools/workspaceToolsModel";
-import { Button } from "../components/ui/button";
-import { useConfirmDialog } from "../components/ui/confirm-dialog";
 import type { WorkspaceCodeEditorOpenRequest } from "../components/workspace-editor/WorkspaceCodeEditorOverlay";
 import type { WorkspaceFilePreviewOpenRequest } from "../components/workspace-editor/WorkspaceFilePreviewOverlay";
 import type { WorkspaceSshTerminalOpenRequest } from "../components/workspace-editor/WorkspaceSshTerminalOverlay";
@@ -2044,37 +2039,43 @@ export function ChatPage(props: ChatPageProps) {
           title: t("chat.exitConfirmTitle"),
           subtitle: t("chat.exitConfirmSubtitle"),
           description: (
-            <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-3">
-              <AstryxView
-                layout="flex"
+            <AstryxStack direction="horizontal" className="flex items-start gap-3">
+              <AstryxStack
                 direction="horizontal"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300"
               >
                 <Terminal className="h-4 w-4" />
-              </AstryxView>
-              <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-                <AstryxView
-                  layout="flex"
+              </AstryxStack>
+              <AstryxStack direction="vertical" className="min-w-0 flex-1">
+                <AstryxStack
                   direction="horizontal"
                   className="flex min-w-0 flex-wrap items-center gap-2"
                 >
-                  <AstryxInline className="text-sm font-semibold text-foreground">
-                    {t("chat.exitConfirmRunningLabel")}
-                  </AstryxInline>
-                  <AstryxView
+                  <AstryxText
                     as="span"
-                    layout="inline-flex"
+                    type="inherit"
+                    className="text-sm font-semibold text-foreground"
+                  >
+                    {t("chat.exitConfirmRunningLabel")}
+                  </AstryxText>
+                  <AstryxStack
+                    as="span"
                     direction="horizontal"
                     className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/15 px-1.5 text-[calc(11px*var(--zone-font-scale,1))] font-semibold text-amber-700 dark:text-amber-300"
                   >
                     {runningCount}
-                  </AstryxView>
-                </AstryxView>
-                <AstryxParagraph className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                  </AstryxStack>
+                </AstryxStack>
+                <AstryxText
+                  as="p"
+                  type="inherit"
+                  display="block"
+                  className="mt-1.5 text-xs leading-5 text-muted-foreground"
+                >
                   {t("chat.exitConfirmDescription")}
-                </AstryxParagraph>
-              </AstryxView>
-            </AstryxView>
+                </AstryxText>
+              </AstryxStack>
+            </AstryxStack>
           ),
           detail: t("chat.exitConfirmNote"),
           confirmLabel: t("chat.exitConfirmContinue"),
@@ -2850,37 +2851,43 @@ export function ChatPage(props: ChatPageProps) {
               title: t("chat.workspaceRemoveConfirm").replace("{name}", project.name),
               subtitle: t("chat.workspaceRemoveDescription"),
               description: (
-                <AstryxView layout="flex" direction="horizontal" className="flex items-start gap-3">
-                  <AstryxView
-                    layout="flex"
+                <AstryxStack direction="horizontal" className="flex items-start gap-3">
+                  <AstryxStack
                     direction="horizontal"
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300"
                   >
                     <Terminal className="h-4 w-4" />
-                  </AstryxView>
-                  <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
-                    <AstryxView
-                      layout="flex"
+                  </AstryxStack>
+                  <AstryxStack direction="vertical" className="min-w-0 flex-1">
+                    <AstryxStack
                       direction="horizontal"
                       className="flex min-w-0 flex-wrap items-center gap-2"
                     >
-                      <AstryxInline className="text-sm font-semibold text-foreground">
-                        {t("chat.exitConfirmRunningLabel")}
-                      </AstryxInline>
-                      <AstryxView
+                      <AstryxText
                         as="span"
-                        layout="inline-flex"
+                        type="inherit"
+                        className="text-sm font-semibold text-foreground"
+                      >
+                        {t("chat.exitConfirmRunningLabel")}
+                      </AstryxText>
+                      <AstryxStack
+                        as="span"
                         direction="horizontal"
                         className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/15 px-1.5 text-[calc(11px*var(--zone-font-scale,1))] font-semibold text-amber-700 dark:text-amber-300"
                       >
                         {runningTerminalCount}
-                      </AstryxView>
-                    </AstryxView>
-                    <AstryxParagraph className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                      </AstryxStack>
+                    </AstryxStack>
+                    <AstryxText
+                      as="p"
+                      type="inherit"
+                      display="block"
+                      className="mt-1.5 text-xs leading-5 text-muted-foreground"
+                    >
                       {t("chat.workspaceRemoveTerminalDescription")}
-                    </AstryxParagraph>
-                  </AstryxView>
-                </AstryxView>
+                    </AstryxText>
+                  </AstryxStack>
+                </AstryxStack>
               ),
               confirmLabel: t("chat.workspaceRemoveConfirmContinue"),
               cancelLabel: t("chat.cancel"),
@@ -5804,7 +5811,7 @@ export function ChatPage(props: ChatPageProps) {
               />
             ) : (
               <>
-                <AstryxView layout="block" direction="horizontal" className="relative z-20">
+                <AstryxStack direction="vertical" className="relative z-20">
                   <ChatHeader
                     settings={settings}
                     onSelectExecutionMode={(mode) =>
@@ -5887,10 +5894,11 @@ export function ChatPage(props: ChatPageProps) {
                         </>
                       ) : (
                         <Button
+                          label={t("browser.open")}
                           variant="ghost"
-                          size="icon"
+                          size="md"
                           onClick={handleOpenBrowser}
-                          title={t("browser.open")}
+                          tooltip={t("browser.open")}
                           className="relative h-8 w-8 rounded-lg text-muted-foreground transition-[background-color,color,transform] duration-150 hover:text-foreground active:scale-95"
                         >
                           <Globe className="h-4 w-4" />
@@ -5899,7 +5907,7 @@ export function ChatPage(props: ChatPageProps) {
                     }
                   />
                   <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
-                </AstryxView>
+                </AstryxStack>
 
                 {chatSurface === "trajectory" ? (
                   <ConversationTrajectorySurface conversationId={currentConversationId} />
@@ -6193,20 +6201,18 @@ export function ChatPage(props: ChatPageProps) {
       {workspaceEditorMounted ? (
         <Suspense
           fallback={
-            <AstryxView
-              layout="flex"
+            <AstryxStack
               direction="vertical"
               className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
             >
               <MacOsTitleBarSpacer className="bg-muted/45" />
-              <AstryxView
-                layout="flex"
+              <AstryxStack
                 direction="horizontal"
                 className="flex min-h-0 flex-1 items-center justify-center"
               >
                 {t("workspaceEditor.loading")}
-              </AstryxView>
-            </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
           }
         >
           <WorkspaceCodeEditorOverlay
@@ -6231,20 +6237,18 @@ export function ChatPage(props: ChatPageProps) {
       {workspaceFilePreviewMounted ? (
         <Suspense
           fallback={
-            <AstryxView
-              layout="flex"
+            <AstryxStack
               direction="vertical"
               className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
             >
               <MacOsTitleBarSpacer className="bg-muted/45" />
-              <AstryxView
-                layout="flex"
+              <AstryxStack
                 direction="horizontal"
                 className="flex min-h-0 flex-1 items-center justify-center"
               >
                 {t("workspaceFilePreview.loading")}
-              </AstryxView>
-            </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
           }
         >
           <WorkspaceFilePreviewOverlay
@@ -6259,20 +6263,18 @@ export function ChatPage(props: ChatPageProps) {
       {desktopBridgeEnabled && workspaceSshTerminalMounted ? (
         <Suspense
           fallback={
-            <AstryxView
-              layout="flex"
+            <AstryxStack
               direction="vertical"
               className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
             >
               <MacOsTitleBarSpacer className="bg-muted/45" />
-              <AstryxView
-                layout="flex"
+              <AstryxStack
                 direction="horizontal"
                 className="flex min-h-0 flex-1 items-center justify-center"
               >
                 {t("workspaceSshTerminal.loading")}
-              </AstryxView>
-            </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
           }
         >
           <WorkspaceSshTerminalOverlay

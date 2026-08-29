@@ -8,8 +8,8 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { Text } from "@astryxdesign/core/Text";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import { useMemo, useSyncExternalStore } from "react";
+import { AdaptiveDialog } from "../../../components/astryx/AdaptiveDialog";
 import { ChevronRight, Globe, Terminal, Wrench } from "../../../components/icons";
-import { AdaptiveDialog } from "../../../components/ui/adaptive-dialog";
 import { useLocale } from "../../../i18n";
 import type {
   LiveTranscriptState,

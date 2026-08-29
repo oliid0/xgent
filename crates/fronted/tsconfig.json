@@ -10,7 +10,7 @@
     "moduleResolution": "bundler",
     "paths": {
       "@xagent/runtime": ["./src/runtime/index.ts"],
-      "@xagent/ui/*": ["./src/*"]
+      "@/*": ["./src/*"]
     },
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,

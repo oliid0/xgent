@@ -110,8 +110,8 @@ test("Skills and MCP side panels retain the Astryx resize handle width", () => {
     appStyles.indexOf('.workspace-side-panel[data-workspace-tool="skills"]'),
     appStyles.indexOf(".hub-page-embedded"),
   );
-  assert.match(chatPageSource, /resizable=\{workspacePanelResize\.props\}/);
-  assert.match(hubPanelRule, /min-width:\s*0/);
+  assert.match(chatPageSource, /\? workspaceHubPanelResize\.props[\s\S]*: workspacePanelResize\.props/);
+  assert.match(hubPanelRule, /min-width:\s*var\(--xagent-hub-panel-min-width\)/);
   assert.doesNotMatch(hubPanelRule, /width:\s*min\(/);
   assert.match(skillsHubSource, /className=\{embedded \? "hub-page-embedded" : undefined\}/);
   assert.match(mcpHubSource, /className=\{embedded \? "hub-page-embedded" : undefined\}/);

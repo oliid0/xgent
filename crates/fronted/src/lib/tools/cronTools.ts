@@ -1,4 +1,5 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import {
   applyCronOps,
   type CronRunRecord,
@@ -7,9 +8,8 @@ import {
   initAutomation,
   listCronRuns,
   refreshAutomationSnapshot,
-} from "@xagent/ui/lib/automation/index";
-import { createUuid } from "@xagent/ui/lib/shared/id";
-import { Type } from "typebox";
+} from "@/lib/automation/index";
+import { createUuid } from "@/lib/shared/id";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
 
 type SelectedModelInput = {

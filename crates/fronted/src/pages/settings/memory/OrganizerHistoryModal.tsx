@@ -1,3 +1,12 @@
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { DialogHeader } from "@astryxdesign/core/Dialog";
+import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { VStack } from "@astryxdesign/core/Layout";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Text as AstryxText } from "@astryxdesign/core/Text";
 // Organizer run-history modal. All protocol parsing goes through the typed
 // run report in lib/memory/organizer/runRecord — v4 reports round-trip
 // unchanged; pre-v4 runs degrade to a read-only legacy view (summaries and
@@ -6,13 +15,6 @@
 // Shared by every frontend runtime. Platform differences belong in the
 // runtime boundary, never in this modal.
 
-import { AlertDialog } from "@astryxdesign/core/AlertDialog";
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
-import { Collapsible } from "@astryxdesign/core/Collapsible";
-import { DialogHeader } from "@astryxdesign/core/Dialog";
-import { VStack } from "@astryxdesign/core/Layout";
-import { Button as AstryxButton } from "@xagent/ui/components/ui/button";
-import { Inline as AstryxInline, View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useEffect, useState } from "react";
 import {
   formatMemoryError,
@@ -223,8 +225,7 @@ export function OrganizerHistoryModal(props: {
   return (
     <>
       <VStack width="100%" height="100%" minHeight={0} gap={0} role="region">
-        <AstryxView
-          layout="flex"
+        <AstryxStack
           direction="vertical"
           className="flex h-full min-h-0 w-full flex-col overflow-hidden"
         >
@@ -233,6 +234,8 @@ export function OrganizerHistoryModal(props: {
             subtitle={t("settings.memoryOrganizerHistoryDescription")}
             startContent={
               <AstryxButton
+                label={t("settings.memorySettingsClose")}
+                tooltip={t("settings.memorySettingsClose")}
                 type="button"
                 onClick={onClose}
                 aria-label={t("settings.memorySettingsClose")}
@@ -243,23 +246,15 @@ export function OrganizerHistoryModal(props: {
             }
           />
 
-          <AstryxView
-            layout="grid"
-            direction="horizontal"
-            className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)]"
-          >
-            <AstryxView as="aside" className="flex min-h-0 flex-col border-r border-border/50">
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="space-y-2 border-b border-border/40 p-3"
-              >
-                <AstryxView
-                  layout="flex"
-                  direction="horizontal"
-                  className="flex items-center gap-2"
-                >
-                  <AstryxView layout="block" direction="horizontal" className="min-w-0 flex-1">
+          <AstryxGrid className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)]">
+            <AstryxStack
+              direction="vertical"
+              as="aside"
+              className="flex min-h-0 flex-col border-r border-border/50"
+            >
+              <AstryxStack direction="vertical" className="space-y-2 border-b border-border/40 p-3">
+                <AstryxStack direction="horizontal" className="flex items-center gap-2">
+                  <AstryxStack direction="vertical" className="min-w-0 flex-1">
                     <DrawerSelect
                       value={statusFilter}
                       onValueChange={(next) =>
@@ -274,51 +269,50 @@ export function OrganizerHistoryModal(props: {
                         { value: "running", label: t("settings.memoryOrganizerStatusRunning") },
                       ]}
                     />
-                  </AstryxView>
+                  </AstryxStack>
                   <Button
                     type="button"
-                    variant="outline"
-                    size="icon"
+                    variant="secondary"
+                    size="md"
                     className="shrink-0 text-muted-foreground hover:text-destructive"
-                    title={t("settings.memoryOrganizerClearHistory")}
-                    aria-label={t("settings.memoryOrganizerClearHistory")}
+                    label={t("settings.memoryOrganizerClearHistory")}
+                    tooltip={t("settings.memoryOrganizerClearHistory")}
+                    isIconOnly
+                    icon={<BrushCleaning className="h-3.5 w-3.5" />}
                     onClick={() => setClearConfirmOpen(true)}
-                    disabled={loading || clearingHistory || runs.length === 0}
-                  >
-                    <BrushCleaning className="h-3.5 w-3.5" />
-                  </Button>
-                </AstryxView>
+                    isDisabled={loading || clearingHistory || runs.length === 0}
+                  />
+                </AstryxStack>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   className="w-full"
+                  label={t("settings.memoryRefresh")}
+                  icon={<RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />}
                   onClick={() => reload()}
-                  disabled={loading}
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-                  {t("settings.memoryRefresh")}
-                </Button>
-              </AstryxView>
-              <AstryxView
-                layout="block"
-                direction="horizontal"
-                className="min-h-0 flex-1 overflow-auto p-2"
-              >
+                  isDisabled={loading}
+                />
+              </AstryxStack>
+              <AstryxStack direction="vertical" className="min-h-0 flex-1 overflow-auto p-2">
                 {runs.length === 0 ? (
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
+                  <AstryxStack
+                    direction="vertical"
                     className="rounded-lg border border-dashed border-border/60 px-3 py-8 text-center text-xs text-muted-foreground"
                   >
                     {t("settings.memoryOrganizerHistoryEmpty")}
-                  </AstryxView>
+                  </AstryxStack>
                 ) : (
-                  <AstryxView layout="block" direction="horizontal" className="space-y-1.5">
+                  <AstryxStack direction="vertical" className="space-y-1.5">
                     {runs.map((run) => {
                       const active = selectedRun?.runId === run.runId;
                       return (
                         <AstryxButton
+                          label={
+                            run.finalSummary ||
+                            run.error ||
+                            t("settings.memoryOrganizerHistoryPending")
+                          }
                           key={run.runId}
                           type="button"
                           onClick={() => reload(run.runId)}
@@ -328,143 +322,148 @@ export function OrganizerHistoryModal(props: {
                               : "border-border/50 bg-background/70 hover:bg-muted/35"
                           }`}
                         >
-                          <AstryxView
-                            layout="flex"
+                          <AstryxStack
                             direction="horizontal"
                             className="flex items-center justify-between gap-2"
                           >
-                            <AstryxInline
+                            <AstryxText
+                              as="span"
+                              type="inherit"
                               className={`rounded border px-1.5 py-0.5 text-[10px] ${organizerStatusClass(run.status)}`}
                             >
                               {organizerStatusLabel(run.status, t)}
-                            </AstryxInline>
-                            <AstryxInline className="text-[10px] text-muted-foreground">
+                            </AstryxText>
+                            <AstryxText
+                              as="span"
+                              type="inherit"
+                              className="text-[10px] text-muted-foreground"
+                            >
                               {organizerTriggerLabel(run.trigger, t)}
-                            </AstryxInline>
-                          </AstryxView>
-                          <AstryxView
-                            layout="block"
-                            direction="horizontal"
+                            </AstryxText>
+                          </AstryxStack>
+                          <AstryxStack
+                            direction="vertical"
                             className="mt-1 truncate text-xs font-medium"
                           >
                             {run.finalSummary ||
                               run.error ||
                               t("settings.memoryOrganizerHistoryPending")}
-                          </AstryxView>
-                          <AstryxView
-                            layout="block"
-                            direction="horizontal"
+                          </AstryxStack>
+                          <AstryxStack
+                            direction="vertical"
                             className="mt-1 truncate text-[11px] text-muted-foreground"
                           >
                             {formatTime(run.startedAt || run.createdAt)} · {modelNameFromRun(run)}
-                          </AstryxView>
+                          </AstryxStack>
                         </AstryxButton>
                       );
                     })}
-                  </AstryxView>
+                  </AstryxStack>
                 )}
-              </AstryxView>
-            </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
 
-            <AstryxView as="section" className="min-h-0 overflow-auto p-5">
+            <AstryxStack direction="vertical" as="section" className="min-h-0 overflow-auto p-5">
               {error ? (
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
+                <AstryxStack
+                  direction="vertical"
                   className="mb-4 whitespace-pre-wrap rounded-lg border border-destructive/20 bg-destructive/[0.05] px-3 py-2 text-xs text-destructive"
                 >
                   {error}
-                </AstryxView>
+                </AstryxStack>
               ) : null}
               {historyFeedback ? (
-                <AstryxView
-                  layout="block"
-                  direction="horizontal"
+                <AstryxStack
+                  direction="vertical"
                   className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.05] px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300"
                 >
                   {historyFeedback}
-                </AstryxView>
+                </AstryxStack>
               ) : null}
               {selectedRun ? (
-                <AstryxView layout="block" direction="horizontal" className="space-y-4">
-                  <AstryxView
-                    layout="flex"
+                <AstryxStack direction="vertical" className="space-y-4">
+                  <AstryxStack
                     direction="horizontal"
                     className="flex flex-wrap items-start justify-between gap-3"
                   >
-                    <AstryxView layout="block" direction="horizontal" className="min-w-0 space-y-1">
-                      <AstryxView
-                        layout="flex"
+                    <AstryxStack direction="vertical" className="min-w-0 space-y-1">
+                      <AstryxStack
                         direction="horizontal"
                         className="flex flex-wrap items-center gap-2"
                       >
-                        <AstryxInline
+                        <AstryxText
+                          as="span"
+                          type="inherit"
                           className={`rounded border px-2 py-1 text-xs ${organizerStatusClass(selectedRun.status)}`}
                         >
                           {organizerStatusLabel(selectedRun.status, t)}
-                        </AstryxInline>
-                        <AstryxInline className="rounded border border-border/60 px-2 py-1 text-xs text-muted-foreground">
+                        </AstryxText>
+                        <AstryxText
+                          as="span"
+                          type="inherit"
+                          className="rounded border border-border/60 px-2 py-1 text-xs text-muted-foreground"
+                        >
                           {organizerTriggerLabel(selectedRun.trigger, t)}
-                        </AstryxInline>
-                        <AstryxInline className="rounded border border-border/60 px-2 py-1 text-xs text-muted-foreground">
+                        </AstryxText>
+                        <AstryxText
+                          as="span"
+                          type="inherit"
+                          className="rounded border border-border/60 px-2 py-1 text-xs text-muted-foreground"
+                        >
                           {selectedRun.scope} / {selectedRun.mode}
-                        </AstryxInline>
-                      </AstryxView>
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
+                        </AstryxText>
+                      </AstryxStack>
+                      <AstryxStack
+                        direction="vertical"
                         className="font-mono text-[11px] text-muted-foreground"
                       >
                         {selectedRun.runId}
-                      </AstryxView>
-                    </AstryxView>
-                    <AstryxView
-                      layout="grid"
-                      direction="horizontal"
-                      className="grid shrink-0 grid-cols-[auto_minmax(9rem,auto)] gap-x-2 gap-y-1 rounded-md border border-border/50 bg-background/70 px-3 py-2 text-xs text-muted-foreground"
-                    >
-                      <AstryxInline className="whitespace-nowrap">
+                      </AstryxStack>
+                    </AstryxStack>
+                    <AstryxGrid className="grid shrink-0 grid-cols-[auto_minmax(9rem,auto)] gap-x-2 gap-y-1 rounded-md border border-border/50 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+                      <AstryxText as="span" type="inherit" className="whitespace-nowrap">
                         {t("settings.memoryOrganizerStarted")}
-                      </AstryxInline>
-                      <AstryxInline className="whitespace-nowrap text-right font-mono text-foreground/80">
+                      </AstryxText>
+                      <AstryxText
+                        as="span"
+                        type="inherit"
+                        className="whitespace-nowrap text-right font-mono text-foreground/80"
+                      >
                         {formatTime(selectedRun.startedAt || selectedRun.createdAt)}
-                      </AstryxInline>
-                      <AstryxInline className="whitespace-nowrap">
+                      </AstryxText>
+                      <AstryxText as="span" type="inherit" className="whitespace-nowrap">
                         {t("settings.memoryOrganizerFinished")}
-                      </AstryxInline>
-                      <AstryxInline className="whitespace-nowrap text-right font-mono text-foreground/80">
+                      </AstryxText>
+                      <AstryxText
+                        as="span"
+                        type="inherit"
+                        className="whitespace-nowrap text-right font-mono text-foreground/80"
+                      >
                         {selectedRun.finishedAt ? formatTime(selectedRun.finishedAt) : "-"}
-                      </AstryxInline>
-                    </AstryxView>
-                  </AstryxView>
+                      </AstryxText>
+                    </AstryxGrid>
+                  </AstryxStack>
 
-                  <AstryxView
-                    layout="block"
-                    direction="horizontal"
+                  <AstryxStack
+                    direction="vertical"
                     className="rounded-lg border border-border/60 bg-muted/15 p-4"
                   >
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
+                    <AstryxStack
+                      direction="vertical"
                       className="mb-2 text-xs font-semibold text-muted-foreground"
                     >
                       {t("settings.memoryOrganizerFinalSummary")}
-                    </AstryxView>
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
+                    </AstryxStack>
+                    <AstryxStack
+                      direction="vertical"
                       className="whitespace-pre-wrap text-sm leading-relaxed"
                     >
                       {displayedFinalSummary(selectedRun, manualApplyDisplay) ||
                         t("settings.memoryOrganizerHistoryPending")}
-                    </AstryxView>
-                  </AstryxView>
+                    </AstryxStack>
+                  </AstryxStack>
 
-                  <AstryxView
-                    layout="grid"
-                    direction="horizontal"
-                    className="grid gap-2 sm:grid-cols-4"
-                  >
+                  <AstryxGrid className="grid gap-2 sm:grid-cols-4">
                     {[
                       ["settings.memoryOrganizerInputCount", selectedRun.inputCount],
                       ["settings.memoryOrganizerClusterCount", selectedRun.clusterCount],
@@ -475,52 +474,42 @@ export function OrganizerHistoryModal(props: {
                       ["settings.memoryOrganizerDeletedCount", selectedRun.deletedCount],
                       ["settings.memoryOrganizerParseFailures", selectedRun.parseFailures],
                     ].map(([key, value]) => (
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
+                      <AstryxStack
+                        direction="vertical"
                         key={key}
                         className="rounded-lg border border-border/50 bg-background/70 p-3"
                       >
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
+                        <AstryxStack
+                          direction="vertical"
                           className="text-[11px] text-muted-foreground"
                         >
                           {t(String(key))}
-                        </AstryxView>
-                        <AstryxView
-                          layout="block"
-                          direction="horizontal"
-                          className="mt-1 text-lg font-semibold"
-                        >
+                        </AstryxStack>
+                        <AstryxStack direction="vertical" className="mt-1 text-lg font-semibold">
                           {value}
-                        </AstryxView>
-                      </AstryxView>
+                        </AstryxStack>
+                      </AstryxStack>
                     ))}
-                  </AstryxView>
+                  </AstryxGrid>
 
                   {safeDecisions.length > 0 ? (
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
+                    <AstryxStack
+                      direction="vertical"
                       className="rounded-lg border border-border/60 p-4"
                     >
-                      <AstryxView
-                        layout="flex"
+                      <AstryxStack
                         direction="horizontal"
                         className="flex flex-wrap items-center justify-between gap-3"
                       >
-                        <AstryxView layout="block" direction="horizontal">
-                          <AstryxView
-                            layout="block"
-                            direction="horizontal"
+                        <AstryxStack direction="vertical">
+                          <AstryxStack
+                            direction="vertical"
                             className="text-xs font-semibold text-muted-foreground"
                           >
                             {t("settings.memoryOrganizerManualPreview")}
-                          </AstryxView>
-                          <AstryxView
-                            layout="block"
-                            direction="horizontal"
+                          </AstryxStack>
+                          <AstryxStack
+                            direction="vertical"
                             className="mt-1 text-xs text-muted-foreground"
                           >
                             {manualApplyDisplay.status === "applied"
@@ -530,21 +519,20 @@ export function OrganizerHistoryModal(props: {
                                 : manualApplyDisplay.status === "failed"
                                   ? t("settings.memoryOrganizerApplyFailed")
                                   : t("settings.memoryOrganizerManualPreviewDescription")}
-                          </AstryxView>
-                        </AstryxView>
+                          </AstryxStack>
+                        </AstryxStack>
                         {canApplyManualPreview ? (
                           <Button
                             type="button"
                             size="sm"
+                            label={t("settings.memoryOrganizerApplySelected")}
+                            icon={<Check className="h-3.5 w-3.5" />}
                             onClick={applyManualPreview}
-                            disabled={applyingPreview}
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                            {t("settings.memoryOrganizerApplySelected")}
-                          </Button>
+                            isDisabled={applyingPreview}
+                          />
                         ) : null}
-                      </AstryxView>
-                      <AstryxView layout="block" direction="horizontal" className="mt-3 space-y-2">
+                      </AstryxStack>
+                      <AstryxStack direction="vertical" className="mt-3 space-y-2">
                         {safeDecisions.map((decision, index) => {
                           const key = organizerDecisionKey(decision, index);
                           const checked =
@@ -554,8 +542,7 @@ export function OrganizerHistoryModal(props: {
                                 : manualApplyDisplay.appliedDecisionKeys.has(key)
                               : selectedDecisionKeys.has(key);
                           return (
-                            <AstryxView
-                              layout="flex"
+                            <AstryxStack
                               direction="horizontal"
                               key={key}
                               className="flex gap-3 rounded-md border border-border/50 bg-background/70 p-3 text-xs"
@@ -568,198 +555,229 @@ export function OrganizerHistoryModal(props: {
                                 onChange={() => togglePreviewDecision(key)}
                                 size="sm"
                               />
-                              <AstryxInline className="min-w-0 flex-1">
-                                <AstryxView
+                              <AstryxText as="span" type="inherit" className="min-w-0 flex-1">
+                                <AstryxStack
                                   as="span"
-                                  layout="flex"
                                   direction="horizontal"
                                   className="flex flex-wrap items-center gap-2"
                                 >
-                                  <AstryxInline className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+                                  <AstryxText
+                                    as="span"
+                                    type="inherit"
+                                    className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground"
+                                  >
                                     {decision.op === "delete"
                                       ? t("settings.memoryOrganizerDecisionDelete")
                                       : t("settings.memoryOrganizerDecisionUpsert")}
-                                  </AstryxInline>
-                                  <AstryxInline className="font-mono text-[11px]">
+                                  </AstryxText>
+                                  <AstryxText
+                                    as="span"
+                                    type="inherit"
+                                    className="font-mono text-[11px]"
+                                  >
                                     {decision.slug}
-                                  </AstryxInline>
+                                  </AstryxText>
                                   {decision.scope ? (
-                                    <AstryxInline className="text-[11px] text-muted-foreground">
+                                    <AstryxText
+                                      as="span"
+                                      type="inherit"
+                                      className="text-[11px] text-muted-foreground"
+                                    >
                                       {decision.scope}
                                       {decision.workdirHash ? `:${decision.workdirHash}` : ""}
-                                    </AstryxInline>
+                                    </AstryxText>
                                   ) : null}
-                                  <AstryxInline
+                                  <AstryxText
+                                    as="span"
+                                    type="inherit"
                                     className={`rounded border px-1.5 py-0.5 text-[10px] ${organizerRiskClass(decision.riskLevel)}`}
                                   >
                                     {organizerRiskLabel(decision.riskLevel, t)}
-                                  </AstryxInline>
+                                  </AstryxText>
                                   {decision.confidence != null ? (
-                                    <AstryxInline className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                    <AstryxText
+                                      as="span"
+                                      type="inherit"
+                                      className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                    >
                                       {t("settings.memoryOrganizerConfidence")}{" "}
                                       {decision.confidence.toFixed(2)}
-                                    </AstryxInline>
+                                    </AstryxText>
                                   ) : null}
                                   {decision.requiresUserAck ? (
-                                    <AstryxInline className="rounded border border-amber-500/30 bg-amber-500/[0.06] px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
+                                    <AstryxText
+                                      as="span"
+                                      type="inherit"
+                                      className="rounded border border-amber-500/30 bg-amber-500/[0.06] px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300"
+                                    >
                                       {t("settings.memoryOrganizerRequiresAck")}
-                                    </AstryxInline>
+                                    </AstryxText>
                                   ) : null}
                                   {decision.applyStatus ? (
-                                    <AstryxInline
+                                    <AstryxText
+                                      as="span"
+                                      type="inherit"
                                       className={`rounded border px-1.5 py-0.5 text-[10px] ${organizerApplyStatusClass(decision.applyStatus)}`}
                                     >
                                       {organizerApplyStatusLabel(decision.applyStatus, t)}
-                                    </AstryxInline>
+                                    </AstryxText>
                                   ) : null}
-                                </AstryxView>
-                                <AstryxInline className="mt-1 block break-words text-muted-foreground">
+                                </AstryxStack>
+                                <AstryxText
+                                  as="span"
+                                  type="inherit"
+                                  className="mt-1 block break-words text-muted-foreground"
+                                >
                                   {decision.reason || decision.description || "-"}
-                                </AstryxInline>
+                                </AstryxText>
                                 {decision.applyError?.message ? (
-                                  <AstryxInline className="mt-1 block break-words text-destructive">
+                                  <AstryxText
+                                    as="span"
+                                    type="inherit"
+                                    className="mt-1 block break-words text-destructive"
+                                  >
                                     {decision.applyError.message}
-                                  </AstryxInline>
+                                  </AstryxText>
                                 ) : null}
                                 {decision.sourceSlugs?.length ? (
-                                  <AstryxInline className="mt-1 block break-words font-mono text-[10px] text-muted-foreground">
+                                  <AstryxText
+                                    as="span"
+                                    type="inherit"
+                                    className="mt-1 block break-words font-mono text-[10px] text-muted-foreground"
+                                  >
                                     {t("settings.memoryOrganizerSources")}{" "}
                                     {decision.sourceSlugs.join(", ")}
-                                  </AstryxInline>
+                                  </AstryxText>
                                 ) : null}
-                              </AstryxInline>
-                            </AstryxView>
+                              </AstryxText>
+                            </AstryxStack>
                           );
                         })}
-                      </AstryxView>
-                    </AstryxView>
+                      </AstryxStack>
+                    </AstryxStack>
                   ) : null}
 
                   {rejectionBuckets.length > 0 ? (
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
+                    <AstryxStack
+                      direction="vertical"
                       className="rounded-lg border border-border/60 p-4"
                     >
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
+                      <AstryxStack
+                        direction="vertical"
                         className="mb-3 text-xs font-semibold text-muted-foreground"
                       >
                         {t("settings.memoryOrganizerRejectionBuckets")}
-                      </AstryxView>
-                      <AstryxView
-                        layout="grid"
-                        direction="horizontal"
-                        className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
-                      >
+                      </AstryxStack>
+                      <AstryxGrid className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                         {rejectionBuckets.map(([key, count]) => (
-                          <AstryxView
-                            layout="block"
-                            direction="horizontal"
+                          <AstryxStack
+                            direction="vertical"
                             key={key}
                             className="rounded-md border border-border/50 bg-background/70 px-3 py-2"
                           >
-                            <AstryxView
-                              layout="block"
-                              direction="horizontal"
+                            <AstryxStack
+                              direction="vertical"
                               className="text-[11px] text-muted-foreground"
                             >
                               {t(key)}
-                            </AstryxView>
-                            <AstryxView
-                              layout="block"
-                              direction="horizontal"
+                            </AstryxStack>
+                            <AstryxStack
+                              direction="vertical"
                               className="mt-1 text-sm font-semibold"
                             >
                               {count}
-                            </AstryxView>
-                          </AstryxView>
+                            </AstryxStack>
+                          </AstryxStack>
                         ))}
-                      </AstryxView>
-                    </AstryxView>
+                      </AstryxGrid>
+                    </AstryxStack>
                   ) : null}
 
                   {reviewItems.length > 0 ? (
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
+                    <AstryxStack
+                      direction="vertical"
                       className="rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-4"
                     >
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
+                      <AstryxStack
+                        direction="vertical"
                         className="mb-2 text-xs font-semibold text-amber-700 dark:text-amber-300"
                       >
                         {t("settings.memoryOrganizerReviewNotes")}
-                      </AstryxView>
-                      <AstryxView as="ul" className="space-y-2 text-xs text-muted-foreground">
+                      </AstryxStack>
+                      <AstryxStack
+                        direction="vertical"
+                        as="ul"
+                        className="space-y-2 text-xs text-muted-foreground"
+                      >
                         {reviewItems.map((item, index) => (
-                          <AstryxView
+                          <AstryxStack
+                            direction="vertical"
                             as="li"
                             key={`${index}:${item.phase}:${item.slug || ""}:${item.message}`}
                             className="rounded-md border border-border/50 bg-background/70 px-3 py-2"
                           >
-                            <AstryxView
-                              layout="flex"
+                            <AstryxStack
                               direction="horizontal"
                               className="mb-1 flex flex-wrap items-center gap-2"
                             >
-                              <AstryxInline
+                              <AstryxText
+                                as="span"
+                                type="inherit"
                                 className={`rounded border px-1.5 py-0.5 text-[10px] ${organizerReviewItemClass(item)}`}
                               >
                                 {organizerReviewItemLabel(item, t)}
-                              </AstryxInline>
+                              </AstryxText>
                               {item.code ? (
-                                <AstryxInline className="font-mono text-[10px] text-muted-foreground">
+                                <AstryxText
+                                  as="span"
+                                  type="inherit"
+                                  className="font-mono text-[10px] text-muted-foreground"
+                                >
                                   {item.code}
-                                </AstryxInline>
+                                </AstryxText>
                               ) : null}
                               {item.slug ? (
-                                <AstryxInline className="font-mono text-[10px] text-muted-foreground">
+                                <AstryxText
+                                  as="span"
+                                  type="inherit"
+                                  className="font-mono text-[10px] text-muted-foreground"
+                                >
                                   {item.slug}
-                                </AstryxInline>
+                                </AstryxText>
                               ) : null}
-                            </AstryxView>
-                            <AstryxView
-                              layout="block"
-                              direction="horizontal"
-                              className="break-words"
-                            >
+                            </AstryxStack>
+                            <AstryxStack direction="vertical" className="break-words">
                               {item.message}
-                            </AstryxView>
-                          </AstryxView>
+                            </AstryxStack>
+                          </AstryxStack>
                         ))}
-                      </AstryxView>
-                    </AstryxView>
+                      </AstryxStack>
+                    </AstryxStack>
                   ) : null}
 
                   {clusterSummaries.length > 0 ? (
-                    <AstryxView
-                      layout="block"
-                      direction="horizontal"
+                    <AstryxStack
+                      direction="vertical"
                       className="rounded-lg border border-border/60 p-4"
                     >
-                      <AstryxView
-                        layout="block"
-                        direction="horizontal"
+                      <AstryxStack
+                        direction="vertical"
                         className="mb-2 text-xs font-semibold text-muted-foreground"
                       >
                         {t("settings.memoryOrganizerClusterSummaries")}
-                      </AstryxView>
-                      <AstryxView layout="block" direction="horizontal" className="space-y-2">
+                      </AstryxStack>
+                      <AstryxStack direction="vertical" className="space-y-2">
                         {clusterSummaries.map((summary, index) => (
-                          <AstryxView
-                            layout="block"
-                            direction="horizontal"
+                          <AstryxStack
+                            direction="vertical"
                             key={`${index}:${summary}`}
                             className="rounded bg-muted/30 px-3 py-2 text-xs"
                           >
                             {summary}
-                          </AstryxView>
+                          </AstryxStack>
                         ))}
-                      </AstryxView>
-                    </AstryxView>
+                      </AstryxStack>
+                    </AstryxStack>
                   ) : null}
 
                   {rawBlocks.length > 0 ? (
@@ -772,19 +790,18 @@ export function OrganizerHistoryModal(props: {
                       </pre>
                     </Collapsible>
                   ) : null}
-                </AstryxView>
+                </AstryxStack>
               ) : (
-                <AstryxView
-                  layout="flex"
+                <AstryxStack
                   direction="horizontal"
                   className="flex h-full items-center justify-center text-sm text-muted-foreground"
                 >
                   {t("settings.memoryOrganizerHistoryEmpty")}
-                </AstryxView>
+                </AstryxStack>
               )}
-            </AstryxView>
-          </AstryxView>
-        </AstryxView>
+            </AstryxStack>
+          </AstryxGrid>
+        </AstryxStack>
       </VStack>
       <AlertDialog
         isOpen={clearConfirmOpen}

@@ -5,6 +5,7 @@
 // here.
 
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import {
   formatMemoryError,
   type MemoryHistoryTimeMode,
@@ -20,15 +21,14 @@ import {
   memorySearch,
   memoryUpdate,
   memoryWrite,
-} from "@xagent/ui/lib/memory/api";
+} from "@/lib/memory/api";
 import type {
   MemoryEvidenceFields,
   MemoryScopeFilter,
   MemorySearchType,
   MemoryType,
-} from "@xagent/ui/lib/memory/schema";
-import { asRecord } from "@xagent/ui/lib/shared/value";
-import { Type } from "typebox";
+} from "@/lib/memory/schema";
+import { asRecord } from "@/lib/shared/value";
 import {
   MEMORY_MANAGER_ACTION_DESCRIPTION_RO,
   MEMORY_MANAGER_ACTION_DESCRIPTION_RW,

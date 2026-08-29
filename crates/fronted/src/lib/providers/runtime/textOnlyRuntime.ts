@@ -4,7 +4,7 @@ import {
   type HostedSearchBlock,
   type HostedSearchOrderedBlock,
   mergeHostedSearchBlocks,
-} from "@xagent/ui/lib/chat/hostedSearch";
+} from "@/lib/chat/hostedSearch";
 import { buildStreamRequestDebugPayload, type StreamDebugLogger } from "../../debug/agentDebug";
 import type { ProviderId } from "../../settings";
 import { withPowerActivity } from "../../system/powerActivity";

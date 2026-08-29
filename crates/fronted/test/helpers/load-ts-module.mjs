@@ -285,8 +285,8 @@ export function createTsModuleLoader(options = {}) {
       };
     }
     if (mocks.has(specifier)) return mocks.get(specifier);
-    if (specifier === "@xagent/ui" || specifier.startsWith("@xagent/ui/")) {
-      const suffix = specifier === "@xagent/ui" ? "" : specifier.slice("@xagent/ui/".length);
+    if (specifier.startsWith("@/")) {
+      const suffix = specifier.slice(2);
       const aliasTarget = resolveLocal(path.join(rootDir, "src", suffix), rootDir);
       // Focused tests may mock the same dependency through its former relative
       // spelling. Match by resolved file so an alias refactor cannot silently
@@ -311,11 +311,8 @@ export function createTsModuleLoader(options = {}) {
     const mock = resolveMock(specifier, parentDir);
     if (mock !== undefined) return mock;
 
-    if (specifier === "@xagent/ui") {
-      return loadModule(path.join(rootDir, "src"), rootDir);
-    }
-    if (specifier.startsWith("@xagent/ui/")) {
-      return loadModule(path.join(rootDir, "src", specifier.slice("@xagent/ui/".length)), rootDir);
+    if (specifier.startsWith("@/")) {
+      return loadModule(path.join(rootDir, "src", specifier.slice(2)), rootDir);
     }
 
     if (specifier === "@earendil-works/pi-agent-core") {

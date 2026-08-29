@@ -36,7 +36,7 @@ const loader = createTsModuleLoader({
         return { type: "portal", children, container };
       },
     },
-    "./ui/button": {
+    "@astryxdesign/core/Button": {
       Button(props) {
         return { type: "Button", props };
       },
@@ -118,7 +118,7 @@ test("markdown image syntax falls back to alt text instead of rendering a real i
   assert.ok(node);
   assert.notEqual(node.type, "img");
   assert.equal(node.props["data-xagent-markdown-image"], "text-fallback");
-  assert.equal(node.props.title, "东门老街");
+  assert.equal(node.props["aria-label"], "东门老街");
   assert.equal(node.props.children, "东门老街");
 
   const titleOnly = markdownModule.markdownComponents.img({ title: "南头古城" });

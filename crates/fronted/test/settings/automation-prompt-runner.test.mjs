@@ -109,7 +109,7 @@ test("Cron manual run uses the task-scoped run-now command", async () => {
 test("Cron manual run stays wired in the unified frontend", () => {
   for (const source of [guiCronViewSource]) {
     assert.match(source, /const response = await runCronNow\(selectedTaskId\)/);
-    assert.match(source, /disabled=\{isRunningNow\}/);
+    assert.match(source, /isDisabled=\{isRunningNow\}/);
     assert.match(source, /if \(runNowLockRef\.current\) return/);
     assert.match(source, /setManualRunStartedAt\(response\.startedAt\)/);
     assert.match(source, /listCronRuns\(taskId, 500\)/);
@@ -174,7 +174,7 @@ test("Cron workspace pin stays wired in the unified frontend", () => {
     assert.match(source, /const CUSTOM_WORKDIR_VALUE = "__custom-workdir__"/);
     assert.match(
       source,
-      /customWorkdir \? CUSTOM_WORKDIR_VALUE : workdir \|\| FOLLOW_ACTIVE_WORKSPACE_VALUE/,
+      /customWorkdir\s*\? CUSTOM_WORKDIR_VALUE\s*: workdir \|\| FOLLOW_ACTIVE_WORKSPACE_VALUE/,
     );
     // The save payload must always carry the workdir key: an empty string is
     // the explicit clear signal — dropping the key would keep a stale pin.

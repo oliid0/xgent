@@ -15,6 +15,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
 import { isBrowserRuntime } from "@xagent/runtime";
 import { type FormEvent, memo, useEffect, useMemo, useState } from "react";
+import { ConfirmDeletePopover } from "../../components/astryx/ConfirmActionPopover";
 import { ToolPolicyToggle } from "../../components/hub/ToolPolicyToggle";
 import {
   Globe2,
@@ -27,7 +28,6 @@ import {
   Trash2,
   Wifi,
 } from "../../components/icons";
-import { ConfirmDeletePopover } from "../../components/ui/confirm-action-popover";
 import { useLocale } from "../../i18n";
 import {
   type AppSettings,

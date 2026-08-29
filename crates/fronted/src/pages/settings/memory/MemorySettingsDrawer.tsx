@@ -1,22 +1,23 @@
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button as AstryxNativeButton } from "@astryxdesign/core/Button";
+import { DialogHeader } from "@astryxdesign/core/Dialog";
+import { Divider } from "@astryxdesign/core/Divider";
+import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { type ISOTimeString, TimeInput } from "@astryxdesign/core/TimeInput";
 // Memory settings drawer: organizer model/schedule/scope/mode, extraction
 // summary model, Run Now, quota-ladder banner and the wipe-all danger zone.
 //
 // Shared by every frontend runtime. Platform differences belong in the
 // runtime boundary, never in this drawer.
 
-import { AlertDialog } from "@astryxdesign/core/AlertDialog";
-import { Banner } from "@astryxdesign/core/Banner";
-import { Button as AstryxNativeButton } from "@astryxdesign/core/Button";
-import { DialogHeader } from "@astryxdesign/core/Dialog";
-import { Divider } from "@astryxdesign/core/Divider";
-import { IconButton } from "@astryxdesign/core/IconButton";
-import { HStack, VStack } from "@astryxdesign/core/Layout";
-import { Selector } from "@astryxdesign/core/Selector";
-import { StatusDot } from "@astryxdesign/core/StatusDot";
-import { Switch } from "@astryxdesign/core/Switch";
-import { Heading, Text } from "@astryxdesign/core/Text";
-import { type ISOTimeString, TimeInput } from "@astryxdesign/core/TimeInput";
-import { View as AstryxView } from "@xagent/ui/components/ui/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   formatMemoryError,
@@ -299,7 +300,11 @@ export function MemorySettingsDrawer(props: {
       role="region"
       aria-label={t("settings.memorySettingsTitle")}
     >
-      <AstryxView as="aside" className="relative flex h-full w-full flex-col overflow-hidden">
+      <AstryxStack
+        direction="vertical"
+        as="aside"
+        className="relative flex h-full w-full flex-col overflow-hidden"
+      >
         <DialogHeader
           title={t("settings.memorySettingsTitle")}
           subtitle={t("settings.memorySettingsLocalOnly")}
@@ -315,12 +320,11 @@ export function MemorySettingsDrawer(props: {
           }
         />
 
-        <AstryxView
-          layout="block"
-          direction="horizontal"
+        <AstryxStack
+          direction="vertical"
           className="relative min-h-0 flex-1 overflow-y-auto px-5 py-5"
         >
-          <AstryxView layout="block" direction="horizontal" className="space-y-6">
+          <AstryxStack direction="vertical" className="space-y-6">
             {quotaLadder.level !== "normal" &&
             quotaLadder.bannerKey &&
             quotaLadder.tightestScope ? (
@@ -338,9 +342,9 @@ export function MemorySettingsDrawer(props: {
               />
             ) : null}
 
-            <AstryxView as="section" className="space-y-2">
+            <AstryxStack direction="vertical" as="section" className="space-y-2">
               <Heading level={4}>{t("settings.memoryDriverModels")}</Heading>
-              <AstryxView layout="block" direction="horizontal" className="space-y-4">
+              <AstryxStack direction="vertical" className="space-y-4">
                 <VStack gap={1}>
                   <Text type="supporting" color="secondary">
                     {t("settings.memoryOrganizerModel")}
@@ -371,12 +375,11 @@ export function MemorySettingsDrawer(props: {
                     collapsible={false}
                   />
                 ) : null}
-              </AstryxView>
-            </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
 
-            <AstryxView as="section" className="space-y-2">
-              <AstryxView
-                layout="flex"
+            <AstryxStack direction="vertical" as="section" className="space-y-2">
+              <AstryxStack
                 direction="horizontal"
                 className="flex items-center justify-between gap-2 px-1"
               >
@@ -388,14 +391,10 @@ export function MemorySettingsDrawer(props: {
                   isDisabled={!canEnableOrganizer}
                   onChange={handleOrganizerToggle}
                 />
-              </AstryxView>
-              <AstryxView layout="block" direction="horizontal" className="space-y-4">
-                <AstryxView layout="block" direction="horizontal" className="space-y-3">
-                  <AstryxView
-                    layout="grid"
-                    direction="horizontal"
-                    className="memory-organizer-schedule-grid"
-                  >
+              </AstryxStack>
+              <AstryxStack direction="vertical" className="space-y-4">
+                <AstryxStack direction="vertical" className="space-y-3">
+                  <AstryxGrid className="memory-organizer-schedule-grid">
                     <Selector
                       label={t("settings.memoryOrganizerSchedule")}
                       value={settings.memory.organizerSchedule.frequency}
@@ -419,7 +418,7 @@ export function MemorySettingsDrawer(props: {
                       size="sm"
                       width="100%"
                     />
-                  </AstryxView>
+                  </AstryxGrid>
                   {settings.memory.organizerSchedule.frequency === "weekly" ? (
                     <Selector
                       label={t("settings.memoryOrganizerWeekday")}
@@ -432,11 +431,7 @@ export function MemorySettingsDrawer(props: {
                       }))}
                     />
                   ) : null}
-                  <AstryxView
-                    layout="grid"
-                    direction="horizontal"
-                    className="grid grid-cols-2 gap-2.5"
-                  >
+                  <AstryxGrid className="grid grid-cols-2 gap-2.5">
                     <Selector
                       label={t("settings.memoryOrganizerScope")}
                       value={settings.memory.organizerScope}
@@ -461,7 +456,7 @@ export function MemorySettingsDrawer(props: {
                         label: t(item.labelKey),
                       }))}
                     />
-                  </AstryxView>
+                  </AstryxGrid>
                   {settings.memory.organizerEnabled && settings.memory.organizerNextRunAt ? (
                     <HStack width="100%" gap={2} vAlign="center" hAlign="between">
                       <HStack gap={2} vAlign="center">
@@ -478,8 +473,8 @@ export function MemorySettingsDrawer(props: {
                   {organizerFeedback ? (
                     <Banner status="info" title={organizerFeedback} collapsible={false} />
                   ) : null}
-                </AstryxView>
-              </AstryxView>
+                </AstryxStack>
+              </AstryxStack>
               <HStack width="100%" gap={2} vAlign="center">
                 <AstryxNativeButton
                   label={t("settings.memoryOrganizerHistory")}
@@ -500,11 +495,11 @@ export function MemorySettingsDrawer(props: {
                   onClick={() => void handleRunNow()}
                 />
               </HStack>
-            </AstryxView>
+            </AstryxStack>
 
-            <AstryxView as="section" className="space-y-2">
+            <AstryxStack direction="vertical" as="section" className="space-y-2">
               <Heading level={4}>{t("settings.memorySettingsDangerZone")}</Heading>
-              <AstryxView layout="block" direction="horizontal" className="space-y-3">
+              <AstryxStack direction="vertical" className="space-y-3">
                 <Text type="supporting" color="secondary">
                   {t("settings.memorySettingsWipeDescription")}
                 </Text>
@@ -517,11 +512,11 @@ export function MemorySettingsDrawer(props: {
                   onClick={() => setDrawerWipeConfirmOpen(true)}
                   isDisabled={saving}
                 />
-              </AstryxView>
-            </AstryxView>
-          </AstryxView>
-        </AstryxView>
-      </AstryxView>
+              </AstryxStack>
+            </AstryxStack>
+          </AstryxStack>
+        </AstryxStack>
+      </AstryxStack>
       <AlertDialog
         isOpen={drawerWipeConfirmOpen}
         onOpenChange={setDrawerWipeConfirmOpen}
