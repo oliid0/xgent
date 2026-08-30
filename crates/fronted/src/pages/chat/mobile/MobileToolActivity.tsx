@@ -4,12 +4,11 @@ import { ChatToolCalls } from "@astryxdesign/core/Chat";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
-import { Spinner } from "@astryxdesign/core/Spinner";
 import { Text } from "@astryxdesign/core/Text";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import { useMemo, useSyncExternalStore } from "react";
 import { AdaptiveDialog } from "../../../components/astryx/AdaptiveDialog";
-import { Globe, Terminal, Wrench } from "../../../components/icons";
+import { Wrench } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import type {
   LiveTranscriptState,
@@ -82,18 +81,6 @@ function activityKind(name: string): "shell" | "browser" | "tool" {
     return "browser";
   }
   return "tool";
-}
-
-function ActivityIcon({ name, running, label }: { name: string; running: boolean; label: string }) {
-  if (running) return <Spinner size="sm" aria-label={label} />;
-  switch (activityKind(name)) {
-    case "shell":
-      return <Terminal className="h-3.5 w-3.5" />;
-    case "browser":
-      return <Globe className="h-3.5 w-3.5" />;
-    case "tool":
-      return <Wrench className="h-3.5 w-3.5" />;
-  }
 }
 
 function toolOutput(item: ActivityItem) {

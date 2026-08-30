@@ -15,14 +15,11 @@ import { invoke } from "@xagent/runtime";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
-  Download,
   FileText,
   GitBranch,
   GitCommitHorizontal,
   History,
   RefreshCw,
-  Undo2,
-  Upload,
   X,
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
@@ -516,8 +513,6 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
           >
             <HStack gap={2}>
               {(["fetch", "pull", "push"] as const).map((operation) => {
-                const Icon =
-                  operation === "fetch" ? Download : operation === "pull" ? Undo2 : Upload;
                 return (
                   <Button
                     key={operation}

@@ -3103,32 +3103,34 @@ function InstalledSkillPreviewDrawer(props: {
               >
                 {t("settings.skillsInstalledPreviewDetails")}
               </AstryxStack>
-              <AstryxStack direction="vertical" className="divide-y divide-border/30">
-                <StorePreviewField
-                  label={t("settings.skillsInstalledPreviewBaseDir")}
-                  value={skill.baseDir}
-                />
-                <StorePreviewField
-                  label={t("settings.skillsInstalledPreviewSkillFile")}
-                  value={skill.skillFile}
-                />
-                <StorePreviewField
-                  label={t("settings.skillsInstalledPreviewSource")}
-                  value={source?.registry}
-                />
-                <StorePreviewField
-                  label={t("settings.skillsStorePreviewSlug")}
-                  value={source?.slug}
-                />
-                <StorePreviewField
-                  label={t("settings.skillsStorePreviewVersion")}
-                  value={source?.version}
-                />
-                <StorePreviewField
-                  label={t("settings.skillsInstalledPreviewPublished")}
-                  value={source?.publishedAt ? formatFullStoreDate(source.publishedAt) : null}
-                />
-              </AstryxStack>
+              <MetadataList>
+                <MetadataListItem label={t("settings.skillsInstalledPreviewBaseDir")}>
+                  {skill.baseDir}
+                </MetadataListItem>
+                <MetadataListItem label={t("settings.skillsInstalledPreviewSkillFile")}>
+                  {skill.skillFile}
+                </MetadataListItem>
+                {source?.registry ? (
+                  <MetadataListItem label={t("settings.skillsInstalledPreviewSource")}>
+                    {source.registry}
+                  </MetadataListItem>
+                ) : null}
+                {source?.slug ? (
+                  <MetadataListItem label={t("settings.skillsStorePreviewSlug")}>
+                    {source.slug}
+                  </MetadataListItem>
+                ) : null}
+                {source?.version ? (
+                  <MetadataListItem label={t("settings.skillsStorePreviewVersion")}>
+                    {source.version}
+                  </MetadataListItem>
+                ) : null}
+                {source?.publishedAt ? (
+                  <MetadataListItem label={t("settings.skillsInstalledPreviewPublished")}>
+                    {formatFullStoreDate(source.publishedAt)}
+                  </MetadataListItem>
+                ) : null}
+              </MetadataList>
             </AstryxStack>
 
             <AstryxStack
@@ -3974,26 +3976,6 @@ function getInstallProgressPercent(job: SkillInstallJobSnapshot) {
   if (job.phase === "done") return 100;
   if (!job.totalBytes || job.totalBytes <= 0) return null;
   return Math.max(2, Math.min(100, Math.round((job.downloadedBytes / job.totalBytes) * 100)));
-}
-
-function formatInstallProgress(job: SkillInstallJobSnapshot) {
-  if (job.phase === "done") return "100%";
-  if (job.totalBytes && job.totalBytes > 0) {
-    return `${formatBytes(job.downloadedBytes)} / ${formatBytes(job.totalBytes)}`;
-  }
-  return job.downloadedBytes > 0 ? formatBytes(job.downloadedBytes) : "";
-}
-
-function formatBytes(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  let next = value;
-  let unit = 0;
-  while (next >= 1024 && unit < units.length - 1) {
-    next /= 1024;
-    unit += 1;
-  }
-  return `${next >= 10 || unit === 0 ? Math.round(next) : next.toFixed(1)} ${units[unit]}`;
 }
 
 function installPhaseLabel(job: SkillInstallJobSnapshot | undefined, t: (key: string) => string) {

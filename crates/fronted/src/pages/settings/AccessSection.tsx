@@ -290,7 +290,6 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
           <TextInput
             label={t("settings.accessGithubToken")}
             type="password"
-            autoComplete="new-password"
             value={githubToken}
             onChange={setGithubToken}
             placeholder={t("settings.accessGithubToken")}

@@ -1072,7 +1072,8 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
       const requestQuery = mode === "append" ? activeQuery : query;
       const cached =
         mode === "append" &&
-        prefetchedPage?.cursor === cursor &&
+        prefetchedPage !== null &&
+        prefetchedPage.cursor === cursor &&
         prefetchedPage.source === source &&
         prefetchedPage.query === requestQuery
           ? prefetchedPage
@@ -1131,7 +1132,7 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
     })
       .then((result) => {
         if (cancelled) return;
-        setPrefetchedPage({ cursor, source, query: activeQuery, ...result });
+        setPrefetchedPage({ cursor, query: activeQuery, ...result });
       })
       .catch(() => {
         if (!cancelled) setPrefetchedPage(null);

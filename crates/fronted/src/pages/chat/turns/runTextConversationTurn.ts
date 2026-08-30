@@ -182,7 +182,6 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
     updateConversationEventToolStatus,
     updateRetryAttempts,
     commitVisibleAbortedConversation,
-    updateConversationRuntimeEntry,
     persistConversationWithHistorySync,
     memoryExtractionModel,
     onMemoryExtractionModelFailure,
