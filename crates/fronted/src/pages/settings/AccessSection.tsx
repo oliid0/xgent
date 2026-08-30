@@ -35,6 +35,7 @@ import {
   normalizeBrowserAddress,
 } from "../../lib/browser/browserSessionController";
 import type { AppSettings } from "../../lib/settings";
+import { writeClipboardText } from "../../lib/system/clipboardText";
 import type { SettingsSectionProps } from "./types";
 
 type LocalAccessStatus = {
@@ -95,9 +96,9 @@ function CopyButton({ value, label }: { value: string; label: string }) {
       tooltip={label}
       icon={<Icon icon={copied ? Check : Copy} size="sm" color="inherit" />}
       isDisabled={!value}
-      onClick={() => {
+      onClick={async () => {
         if (!value) return;
-        void navigator.clipboard.writeText(value);
+        if (!(await writeClipboardText(value))) return;
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1_500);
       }}
@@ -267,7 +268,6 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
           placeholder="agent-temp"
         />
       </Grid>
-      <Banner status="warning" title={t("settings.accessCloudPublicWarning")} collapsible={false} />
       <Text type="supporting" color="secondary">
         {t("settings.accessCloudEnvironmentHint")}
       </Text>

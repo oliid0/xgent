@@ -4,6 +4,7 @@ import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
 import { Icon as AstryxIcon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
+import { SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { Stack as AstryxStack, VStack } from "@astryxdesign/core/Stack";
 import { Text as AstryxText, Text } from "@astryxdesign/core/Text";
 import { TextInput as Input } from "@astryxdesign/core/TextInput";
@@ -34,7 +35,6 @@ import {
   Cable,
   Check,
   ChevronRight,
-  CirclePlus,
   Cpu,
   Edit3,
   FolderClosed,
@@ -53,6 +53,7 @@ import {
   Settings,
   Settings2,
   Sparkles,
+  SquarePen,
   Terminal,
   Trash2,
   X,
@@ -1957,92 +1958,41 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
             )}
           </AstryxStack>
 
-          <AstryxStack
-            direction="vertical"
-            className="chat-sidebar-primary-nav mt-3 flex flex-col gap-0.5"
-          >
-            <Button
-              label={t("chat.newConversation")}
-              type="button"
-              variant="ghost"
-              onClick={onNewConversation}
-              className={cn(
-                "chat-history-new-conversation-button h-[30px] w-full justify-start gap-3 rounded-lg px-3 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 shadow-none transition-colors",
-                activeView === "chat"
-                  ? "text-foreground/90 hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]"
-                  : "text-foreground/80 hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]",
-              )}
-            >
-              <CirclePlus className="h-4 w-4 shrink-0 text-foreground/85" />
-              <AstryxText as="span" type="inherit" className="chat-history-new-conversation-label">
-                {t("chat.newConversation")}
-              </AstryxText>
-            </Button>
-            <Button
-              label="Skills Hub"
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenSkillsHub?.()}
-              className={cn(
-                "sidebar-hub-menu-item h-[30px] w-full justify-start gap-3 rounded-lg px-3 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 shadow-none transition-colors",
-                desktopPanelMode && "md:hidden",
-                activeView === "skills-hub"
-                  ? "bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]"
-                  : "text-foreground/80 hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]",
-              )}
-              tooltip="Skills Hub"
-            >
-              <Blend
-                className={cn(
-                  "h-4 w-4 shrink-0",
-                  activeView === "skills-hub" ? "text-amber-500" : "text-foreground/85",
-                )}
+          <AstryxStack direction="vertical" className="chat-sidebar-primary-nav mt-3">
+            <SideNavSection title={t("sidebar.navigation")} isHeaderHidden>
+              <SideNavItem
+                label={t("chat.newConversation")}
+                icon={SquarePen}
+                isSelected={activeView === "chat"}
+                onClick={onNewConversation}
+                className="chat-history-new-conversation-button"
+                size="sm"
               />
-              <AstryxText as="span" type="inherit" className="truncate">
-                Skills
-              </AstryxText>
-            </Button>
-            <Button
-              label="MCP Hub"
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenMcpHub?.()}
-              className={cn(
-                "sidebar-hub-menu-item h-[30px] w-full justify-start gap-3 rounded-lg px-3 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 shadow-none transition-colors",
-                desktopPanelMode && "md:hidden",
-                activeView === "mcp-hub"
-                  ? "bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]"
-                  : "text-foreground/80 hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]",
-              )}
-              tooltip="MCP Hub"
-            >
-              <Cable
-                className={cn(
-                  "h-4 w-4 shrink-0",
-                  activeView === "mcp-hub" ? "text-violet-500" : "text-foreground/85",
-                )}
+              <SideNavItem
+                label="Skills"
+                icon={Blend}
+                isSelected={activeView === "skills-hub"}
+                onClick={() => onOpenSkillsHub?.()}
+                className={cn("sidebar-hub-menu-item", desktopPanelMode && "md:hidden")}
+                size="sm"
               />
-              <AstryxText as="span" type="inherit" className="truncate">
-                MCP
-              </AstryxText>
-            </Button>
-            <Button
-              label={t("sidebar.myFiles")}
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenWorkspaceTool?.("fileTree")}
-              isDisabled={!fileTreeAvailable || !onOpenWorkspaceTool}
-              className={cn(
-                "sidebar-hub-menu-item h-[30px] w-full justify-start gap-3 rounded-lg px-3 text-[calc(14px*var(--zone-font-scale,1))] font-normal leading-5 text-foreground/80 shadow-none transition-colors hover:bg-foreground/[0.08] hover:text-foreground focus-visible:bg-foreground/[0.08]",
-                desktopPanelMode && "md:hidden",
-              )}
-              tooltip={t("sidebar.myFiles")}
-            >
-              <FolderTree className="h-4 w-4 shrink-0 text-sky-500" />
-              <AstryxText as="span" type="inherit" className="truncate">
-                {t("sidebar.myFiles")}
-              </AstryxText>
-            </Button>
+              <SideNavItem
+                label="MCP"
+                icon={Cable}
+                isSelected={activeView === "mcp-hub"}
+                onClick={() => onOpenMcpHub?.()}
+                className={cn("sidebar-hub-menu-item", desktopPanelMode && "md:hidden")}
+                size="sm"
+              />
+              <SideNavItem
+                label={t("sidebar.myFiles")}
+                icon={FolderTree}
+                isDisabled={!fileTreeAvailable || !onOpenWorkspaceTool}
+                onClick={() => onOpenWorkspaceTool?.("fileTree")}
+                className={cn("sidebar-hub-menu-item", desktopPanelMode && "md:hidden")}
+                size="sm"
+              />
+            </SideNavSection>
           </AstryxStack>
         </AstryxStack>
 

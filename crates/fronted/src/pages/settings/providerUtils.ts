@@ -1,7 +1,7 @@
 import { isBrowserRuntime } from "@xagent/runtime";
 import { mergeCustomHeaders } from "../../lib/providers/customHeaders";
 import { sortModelsByActiveStateAndVendor } from "../../lib/providers/modelVendor";
-import { prepareProxyRequest } from "../../lib/providers/proxy";
+import { prepareProxyRequest, XAGENT_UPSTREAM_URL_HEADER } from "../../lib/providers/proxy";
 import {
   type CustomProvider,
   createProviderModelConfig,
@@ -216,10 +216,42 @@ export function pickProviderModelsFailure(
 
 function extractModelListItems(data: unknown): unknown[] | null {
   if (Array.isArray(data)) return data;
-  const payload = data as { data?: unknown; models?: unknown } | null;
+  const payload = data as { data?: unknown; models?: unknown; result?: unknown } | null;
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.models)) return payload.models;
+  for (const nested of [payload?.data, payload?.result]) {
+    if (!nested || typeof nested !== "object") continue;
+    const nestedPayload = nested as { data?: unknown; models?: unknown };
+    if (Array.isArray(nestedPayload.data)) return nestedPayload.data;
+    if (Array.isArray(nestedPayload.models)) return nestedPayload.models;
+  }
   return null;
+}
+
+type ModelPageCursor = { parameter: "pageToken" | "after_id"; value: string };
+
+function readModelPageCursor(data: unknown, providerType: ProviderId): ModelPageCursor | null {
+  if (!data || typeof data !== "object") return null;
+  const payload = data as Record<string, unknown>;
+  if (providerType === "gemini") {
+    const value = payload.nextPageToken ?? payload.next_page_token;
+    return typeof value === "string" && value.trim()
+      ? { parameter: "pageToken", value: value.trim() }
+      : null;
+  }
+  if (providerType === "claude_code" && payload.has_more === true) {
+    const value = payload.last_id ?? payload.lastId;
+    return typeof value === "string" && value.trim()
+      ? { parameter: "after_id", value: value.trim() }
+      : null;
+  }
+  return null;
+}
+
+function withModelPageCursor(url: string, cursor: ModelPageCursor) {
+  const parsed = new URL(url);
+  parsed.searchParams.set(cursor.parameter, cursor.value);
+  return parsed.toString();
 }
 
 async function readFetchError(response: Response, fallback: string) {
@@ -409,6 +441,7 @@ export async function fetchModelsFromApi(
   const attempts = buildProviderModelsAttempts(type, normalizedUrl, normalizedApiKey, options);
   const failures: ProviderModelsFailure[] = [];
   let emptyResult: ProviderModelConfig[] | null = null;
+  let discoveredModels: ProviderModelConfig[] = [];
 
   for (const attempt of attempts) {
     const proxyRequest = await prepareProxyRequest(
@@ -424,44 +457,80 @@ export async function fetchModelsFromApi(
     const modelsUrl = exactModelsUrl
       ? proxyRequest.baseUrl
       : buildProviderModelsUrl(type, proxyRequest.baseUrl, attempt.kind);
+    let requestUrl = modelsUrl;
+    let requestHeaders = proxyRequest.headers;
+    let attemptFailed = false;
+    const allItems: unknown[] = [];
+    const seenCursors = new Set<string>();
 
-    let response: Response;
-    try {
-      response = await fetch(modelsUrl, { headers: proxyRequest.headers });
-    } catch (error) {
-      failures.push({
-        status: null,
-        message: error instanceof Error ? error.message : String(error),
-      });
-      continue;
+    for (let page = 0; page < 100; page += 1) {
+      let response: Response;
+      try {
+        response = await fetch(requestUrl, { headers: requestHeaders });
+      } catch (error) {
+        failures.push({
+          status: null,
+          message: error instanceof Error ? error.message : String(error),
+        });
+        attemptFailed = true;
+        break;
+      }
+
+      if (!response.ok) {
+        failures.push({
+          status: response.status,
+          message: await readFetchError(response, `HTTP ${response.status} ${response.statusText}`),
+        });
+        attemptFailed = true;
+        break;
+      }
+
+      let data: unknown;
+      try {
+        data = await response.json();
+      } catch {
+        failures.push({ status: null, message: "Model list response is not valid JSON" });
+        attemptFailed = true;
+        break;
+      }
+
+      const items = extractModelListItems(data);
+      if (items === null) {
+        emptyResult ??= [];
+        break;
+      }
+      allItems.push(...items);
+
+      const cursor = readModelPageCursor(data, type);
+      if (!cursor || seenCursors.has(cursor.value)) break;
+      seenCursors.add(cursor.value);
+      if (exactModelsUrl) {
+        requestHeaders = {
+          ...requestHeaders,
+          [XAGENT_UPSTREAM_URL_HEADER]: withModelPageCursor(exactModelsUrl, cursor),
+        };
+      } else {
+        requestUrl = withModelPageCursor(modelsUrl, cursor);
+      }
     }
 
-    if (!response.ok) {
-      failures.push({
-        status: response.status,
-        message: await readFetchError(response, `HTTP ${response.status} ${response.statusText}`),
-      });
+    if (attemptFailed) continue;
+    const models = normalizeFetchedModels(allItems, type);
+    if (models.length > 0) {
+      if (type !== "gemini") return models;
+      // Gemini exposes different catalog versions at /v1 and /v1beta. A relay
+      // can return a valid subset from each, so merge both successful results.
+      const discoveredIds = new Set(discoveredModels.map((model) => model.id));
+      discoveredModels = [
+        ...discoveredModels,
+        ...models.filter((model) => !discoveredIds.has(model.id)),
+      ];
       continue;
     }
-
-    let data: unknown;
-    try {
-      data = await response.json();
-    } catch {
-      failures.push({ status: null, message: "Model list response is not valid JSON" });
-      continue;
-    }
-
-    const items = extractModelListItems(data);
-    if (items === null) {
-      emptyResult ??= [];
-      continue;
-    }
-    const models = normalizeFetchedModels(items, type);
-    if (models.length > 0) return models;
     emptyResult = models;
   }
 
+  if (discoveredModels.length > 0) return discoveredModels;
   if (emptyResult !== null) return emptyResult;
 
   const failure = pickProviderModelsFailure(failures);

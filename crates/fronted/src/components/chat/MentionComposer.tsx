@@ -40,7 +40,7 @@ import {
 } from "../../lib/chat/messages/mentionReferences";
 import { createUuid } from "../../lib/shared/id";
 import { cn } from "../../lib/shared/utils";
-import { readClipboardText } from "../../lib/system/clipboardText";
+import { readClipboardText, writeClipboardText } from "../../lib/system/clipboardText";
 import { invokeFs } from "../../lib/tools/fsBackend";
 import { Blend, ClipboardPaste, Copy, ScanText, Scissors, SKILL_ICON_SVG_MARKUP } from "../icons";
 import { getFileTypeIcon, getFileTypeIconSvg } from "./fileTypeIcons";
@@ -681,28 +681,7 @@ function extractClipboardFiles(data: DataTransfer) {
 
 function writeTextToClipboard(text: string) {
   if (!text) return;
-
-  if (navigator.clipboard?.writeText) {
-    void navigator.clipboard.writeText(text).catch(() => {
-      fallbackWriteTextToClipboard(text);
-    });
-    return;
-  }
-
-  fallbackWriteTextToClipboard(text);
-}
-
-function fallbackWriteTextToClipboard(text: string) {
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.left = "-9999px";
-  textarea.style.top = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand("copy");
-  document.body.removeChild(textarea);
+  void writeClipboardText(text);
 }
 
 function isImeKeyboardEvent(event: KeyboardEvent<HTMLDivElement>) {

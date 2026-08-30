@@ -22,6 +22,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { read, utils } from "xlsx";
 import { useLocale } from "../../i18n";
 import { cn } from "../../lib/shared/utils";
+import { writeClipboardText } from "../../lib/system/clipboardText";
 import { invokeFs } from "../../lib/tools/fsBackend";
 import { type FileTypeIconComponent, getFileTypeIcon } from "../chat/fileTypeIcons";
 import {
@@ -495,12 +496,11 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
 
   const copyPreviewSource = useCallback(async () => {
     if (preview?.text === null || preview?.text === undefined) return;
-    try {
-      await navigator.clipboard.writeText(preview.text);
+    if (await writeClipboardText(preview.text)) {
       setSourceCopied(true);
       window.setTimeout(() => setSourceCopied(false), 1600);
-    } catch (copyError) {
-      setError(toMessage(copyError, t("workspaceFilePreview.copyFailed")));
+    } else {
+      setError(t("workspaceFilePreview.copyFailed"));
     }
   }, [preview?.text, t]);
 

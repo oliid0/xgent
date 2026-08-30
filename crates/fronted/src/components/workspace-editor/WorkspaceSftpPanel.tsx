@@ -12,6 +12,7 @@ import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } fr
 import { useLocale } from "../../i18n";
 import type { SftpClient, SftpEntry, SftpSide, SftpTransfer } from "../../lib/sftp/types";
 import { cn } from "../../lib/shared/utils";
+import { writeClipboardText } from "../../lib/system/clipboardText";
 import type { TerminalSession } from "../../lib/terminal/types";
 import { AdaptiveDialog } from "../astryx/AdaptiveDialog";
 import { useConfirmDialog } from "../astryx/useConfirmDialog";
@@ -1150,10 +1151,9 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
 
   const copyPath = useCallback(
     async (path: string) => {
-      try {
-        await navigator.clipboard.writeText(path);
+      if (await writeClipboardText(path)) {
         showCopyToast();
-      } catch {
+      } else {
         setCopyPathDialog(path);
       }
     },

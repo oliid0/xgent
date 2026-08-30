@@ -1,8 +1,6 @@
-import { Center } from "@astryxdesign/core/Center";
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { Spinner } from "@astryxdesign/core/Spinner";
 import { StackItem, VStack } from "@astryxdesign/core/Stack";
 import { ToastViewport } from "@astryxdesign/core/Toast";
 import { Theme } from "@astryxdesign/core/theme";
@@ -21,7 +19,12 @@ import { CronPromptRunner } from "./components/cron/CronPromptRunner";
 import { useNativeInputContextMenu } from "./components/input-context-menu/NativeInputContextMenu";
 import { MemoryOrganizerHost } from "./components/memory/useMemoryOrganizer";
 import { WindowsTitleBar } from "./components/WindowsTitleBar";
-import { LocaleContext, t as translate } from "./i18n";
+import {
+  LocaleContext,
+  resolveEffectiveLocale,
+  subscribeToSystemLocalePreference,
+  t as translate,
+} from "./i18n";
 import { useAppUpdateController } from "./lib/appUpdates";
 import { initAutomation } from "./lib/automation";
 import { setRetryErrorExtension } from "./lib/providers/runtime/streamRetry";
@@ -109,9 +112,7 @@ export default function App() {
   const [runtimePlatform, setRuntimePlatform] = useState<RuntimePlatform>(inferRuntimePlatform);
   const [platformResolved, setPlatformResolved] = useState(browserRuntime);
   const nativeMobile =
-    platformResolved &&
-    !browserRuntime &&
-    (runtimePlatform === "android" || runtimePlatform === "ios");
+    !browserRuntime && (runtimePlatform === "android" || runtimePlatform === "ios");
   const compactSettingsDialog = useMediaQuery("(max-width: 768px)") || nativeMobile;
   const desktopBridgeEnabled = browserRuntime || (platformResolved && !nativeMobile);
 
@@ -147,9 +148,14 @@ export default function App() {
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const [systemThemeVersion, setSystemThemeVersion] = useState(0);
+  const [systemLocaleVersion, setSystemLocaleVersion] = useState(0);
   const effectiveTheme = useMemo(
     () => resolveEffectiveTheme(settings.theme),
     [settings.theme, systemThemeVersion],
+  );
+  const effectiveLocale = useMemo(
+    () => resolveEffectiveLocale(settings.locale),
+    [settings.locale, systemLocaleVersion],
   );
 
   useEffect(() => {
@@ -285,10 +291,18 @@ export default function App() {
     });
   }, [settings.theme]);
 
+  useEffect(() => {
+    if (settings.locale !== "system") return;
+    return subscribeToSystemLocalePreference(() => {
+      setSystemLocaleVersion((version) => version + 1);
+    });
+  }, [settings.locale]);
+
   // 同步主题 class 到 <html> 根节点
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", effectiveTheme === "dark");
+    root.style.colorScheme = effectiveTheme;
   }, [effectiveTheme]);
 
   useEffect(() => {
@@ -461,10 +475,10 @@ export default function App() {
   // 构建 locale context value，避免每次渲染重新创建
   const localeContextValue = useMemo(
     () => ({
-      locale: settings.locale,
-      t: (key: string) => translate(key, settings.locale),
+      locale: effectiveLocale,
+      t: (key: string) => translate(key, effectiveLocale),
     }),
-    [settings.locale],
+    [effectiveLocale],
   );
 
   const appUpdateMessages = useMemo(
@@ -551,30 +565,16 @@ export default function App() {
     });
   }, [desktopBridgeEnabled, lanPcCommandHostReady, nativeMobile, settingsReady]);
 
-  if (!settingsReady || !platformResolved) {
-    return (
-      <Theme theme={xgentChatTheme} mode={effectiveTheme}>
-        <ToastViewport position="topEnd" maxVisible={4}>
-          <LocaleContext.Provider value={localeContextValue}>
-            <AppChrome nativeMobile={nativeMobile}>
-              <Center width="100%" height="100%">
-                <Spinner label={translate("chat.loading", settings.locale)} />
-              </Center>
-            </AppChrome>
-          </LocaleContext.Provider>
-        </ToastViewport>
-      </Theme>
-    );
-  }
-
   return (
     <Theme theme={xgentChatTheme} mode={effectiveTheme}>
       <ToastViewport position="topEnd" maxVisible={4}>
         <LocaleContext.Provider value={localeContextValue}>
           <SoulProvider>
             <AppChrome nativeMobile={nativeMobile}>
-              <CronPromptRunner settings={settings} />
-              <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
+              {settingsReady ? <CronPromptRunner settings={settings} /> : null}
+              {settingsReady ? (
+                <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
+              ) : null}
               <AppErrorBoundary>
                 <ChatPage
                   settings={settings}

@@ -297,6 +297,97 @@ test("fetchModelsFromApi retries claude_code with official anthropic headers", a
   );
 });
 
+test("fetchModelsFromApi follows Gemini page tokens and returns every model", async () => {
+  await withFetchStub(
+    (url) =>
+      url.includes("/v1beta/models")
+        ? jsonResponse(200, { models: [] })
+        : url.includes("pageToken=page-2")
+          ? jsonResponse(200, { models: [{ name: "models/gemini-2.5-flash" }] })
+          : jsonResponse(200, {
+              models: [{ name: "models/gemini-2.5-pro" }],
+              nextPageToken: "page-2",
+            }),
+    async (calls) => {
+      const models = await providerUtils.fetchModelsFromApi(
+        "gemini",
+        "https://relay.example.com",
+        "test-key",
+      );
+      assert.equal(calls.length, 3);
+      assert.match(calls[1].url, /pageToken=page-2/);
+      assert.deepEqual(
+        models.map((model) => model.id),
+        ["gemini-2.5-pro", "gemini-2.5-flash"],
+      );
+    },
+  );
+});
+
+test("fetchModelsFromApi merges successful Gemini v1 and v1beta catalogs", async () => {
+  await withFetchStub(
+    (url) =>
+      url.includes("/v1beta/models")
+        ? jsonResponse(200, { models: [{ name: "models/gemini-2.5-flash" }] })
+        : jsonResponse(200, { models: [{ name: "models/gemini-2.5-pro" }] }),
+    async (calls) => {
+      const models = await providerUtils.fetchModelsFromApi(
+        "gemini",
+        "https://relay.example.com",
+        "test-key",
+      );
+      assert.equal(calls.length, 2);
+      assert.deepEqual(
+        models.map((model) => model.id),
+        ["gemini-2.5-pro", "gemini-2.5-flash"],
+      );
+    },
+  );
+});
+
+test("fetchModelsFromApi follows Anthropic after_id pagination", async () => {
+  await withFetchStub(
+    (_url, callIndex) =>
+      callIndex === 1
+        ? jsonResponse(200, {
+            data: [{ id: "claude-opus-4-8" }],
+            has_more: true,
+            last_id: "claude-opus-4-8",
+          })
+        : jsonResponse(200, { data: [{ id: "claude-sonnet-4-6" }], has_more: false }),
+    async (calls) => {
+      const models = await providerUtils.fetchModelsFromApi(
+        "claude_code",
+        "https://relay.example.com",
+        "test-key",
+      );
+      assert.equal(calls.length, 2);
+      assert.match(calls[1].url, /after_id=claude-opus-4-8/);
+      assert.deepEqual(
+        models.map((model) => model.id),
+        ["claude-opus-4-8", "claude-sonnet-4-6"],
+      );
+    },
+  );
+});
+
+test("fetchModelsFromApi accepts nested model-list response envelopes", async () => {
+  await withFetchStub(
+    () => jsonResponse(200, { result: { models: [{ id: "relay-model" }] } }),
+    async () => {
+      const models = await providerUtils.fetchModelsFromApi(
+        "codex",
+        "https://relay.example.com",
+        "test-key",
+      );
+      assert.deepEqual(
+        models.map((model) => model.id),
+        ["relay-model"],
+      );
+    },
+  );
+});
+
 test("fetchModelsFromApi derives model discovery from a complete inference URL", async () => {
   await withFetchStub(
     () => jsonResponse(200, { data: [{ id: "gpt-5" }] }),

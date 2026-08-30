@@ -153,10 +153,12 @@ export function GlobalShortcutsSection() {
             text: formatRegisterFailures(failures),
             action,
           });
+        } else {
+          setStatus({ kind: "success", text: t("settings.shortcutSaved"), action });
         }
       });
     },
-    [formatRegisterFailures],
+    [formatRegisterFailures, t],
   );
 
   useEffect(() => {
@@ -215,7 +217,6 @@ export function GlobalShortcutsSection() {
 
       setRecording(null);
       setDraft({ modifiers: [], mainKey: null });
-      setStatus({ kind: "success", text: t("settings.shortcutSaved"), action });
       commit(
         {
           ...bindingsRef.current,
@@ -310,7 +311,6 @@ export function GlobalShortcutsSection() {
           variant="secondary"
           onClick={() => {
             commit(getDefaultGlobalShortcutBindings());
-            setStatus({ kind: "success", text: t("settings.shortcutSaved") });
           }}
         />
       </HStack>

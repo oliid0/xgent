@@ -114,6 +114,7 @@ import {
   isInstalledSkillSort,
   sortInstalledSkillItems,
 } from "../../lib/skills/installedSort";
+import { writeClipboardText } from "../../lib/system/clipboardText";
 
 type SkillsHubView = "installed" | "store" | "import";
 
@@ -233,35 +234,8 @@ function emptyInstalledSkillPreviewState(): InstalledSkillPreviewState {
   };
 }
 
-function fallbackCopyText(text: string) {
-  let textarea: HTMLTextAreaElement | null = null;
-  try {
-    textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "fixed";
-    textarea.style.top = "-9999px";
-    textarea.style.opacity = "0";
-    document.body.appendChild(textarea);
-    textarea.select();
-    return document.execCommand("copy");
-  } catch {
-    return false;
-  } finally {
-    textarea?.remove();
-  }
-}
-
 async function copyText(text: string) {
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return fallbackCopyText(text);
-    }
-  }
-  return fallbackCopyText(text);
+  return writeClipboardText(text);
 }
 
 function normalizePreviewMetadataText(value: string) {
@@ -3323,7 +3297,7 @@ function StoreCategoryChips(props: {
         label: `${t(storeCategoryLabelKey(value))} (${props.counts.get(value) ?? 0})`,
         icon: <Icon icon={STORE_CATEGORY_ICONS[value]} size="sm" color="inherit" />,
       }))}
-      width="var(--xagent-hub-category-control-width)"
+      width="100%"
       onChange={(value) => props.onChange(value as StoreCategoryValue)}
     />
   );
@@ -3418,7 +3392,7 @@ function SkillsStoreView(props: {
       ([entry]) => {
         if (entry?.isIntersecting) onLoadMore();
       },
-      { root: storeScrollRef.current, rootMargin: "640px 0px" },
+      { root: storeScrollRef.current, rootMargin: "1600px 0px" },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
@@ -3491,28 +3465,28 @@ function SkillsStoreView(props: {
 
   return (
     <VStack height="100%" minHeight={0} gap={3}>
-      <HStack width="100%" gap={2} vAlign="center" hAlign="between" wrap="wrap">
-        <StackItem size="fill">
+      <VStack width="100%" gap={2}>
+        <Grid columns={{ minWidth: 180, max: 2, repeat: "fit" }} gap={2} width="100%">
           <StoreCategoryChips
             value={storeCategory}
             counts={categoryCounts}
             onChange={setStoreCategory}
           />
-        </StackItem>
-        <Selector
-          label={t("settings.skillsStoreSortLabel")}
-          isLabelHidden
-          value={sort}
-          options={STORE_SORT_OPTIONS.map((option) => ({
-            value: option.value,
-            label: t(option.labelKey),
-          }))}
-          width="var(--xagent-hub-sort-control-width)"
-          isDisabled={searching}
-          onChange={(value) => onSortChange(value as ClawHubSort)}
-        />
+          <Selector
+            label={t("settings.skillsStoreSortLabel")}
+            isLabelHidden
+            value={sort}
+            options={STORE_SORT_OPTIONS.map((option) => ({
+              value: option.value,
+              label: t(option.labelKey),
+            }))}
+            width="100%"
+            isDisabled={searching}
+            onChange={(value) => onSortChange(value as ClawHubSort)}
+          />
+        </Grid>
         {refreshing ? <Spinner size="sm" label={t("settings.skillsStoreLoadingTitle")} /> : null}
-      </HStack>
+      </VStack>
 
       {error ? (
         <Banner
@@ -3693,15 +3667,18 @@ function SkillsStoreView(props: {
           ) : null}
 
           {cursor && !searching ? (
-            <HStack ref={loadMoreSentinelRef} hAlign="center" padding={2}>
+            <VStack ref={loadMoreSentinelRef} width="100%" padding={2}>
               {loadingMore ? (
-                <Spinner size="sm" label={t("settings.skillsStoreLoadingMore")} />
+                <Grid columns={{ minWidth: 280, max: 2, repeat: "fit" }} gap={2} width="100%">
+                  <Skeleton width="100%" height="5rem" radius="rounded" index={0} />
+                  <Skeleton width="100%" height="5rem" radius="rounded" index={1} />
+                </Grid>
               ) : (
                 <Text type="supporting" color="secondary">
                   {t("settings.skillsStoreLoadMore")}
                 </Text>
               )}
-            </HStack>
+            </VStack>
           ) : null}
         </VStack>
       </StackItem>

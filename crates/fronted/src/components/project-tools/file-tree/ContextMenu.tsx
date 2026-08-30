@@ -7,6 +7,7 @@ import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextM
 import { useToast } from "@astryxdesign/core/Toast";
 import { type ReactNode, useCallback } from "react";
 import { useLocale } from "../../../i18n";
+import { writeClipboardText } from "../../../lib/system/clipboardText";
 import {
   Copy,
   Edit3,
@@ -25,23 +26,6 @@ import {
   isWorkspacePreviewPath,
 } from "../../workspace-editor/workspaceImagePreview";
 import { FILE_TREE_HAS_OS_INTEGRATION, type FileTreeKind } from "./model";
-
-function fallbackCopyToClipboard(text: string): boolean {
-  try {
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "fixed";
-    textarea.style.opacity = "0";
-    document.body.appendChild(textarea);
-    textarea.select();
-    const copied = document.execCommand("copy");
-    textarea.remove();
-    return copied;
-  } catch {
-    return false;
-  }
-}
 
 export type FileTreeContextMenuProps = {
   children: ReactNode;
@@ -89,16 +73,7 @@ export function FileTreeContextMenu(props: FileTreeContextMenuProps) {
 
   const handleCopy = useCallback(async () => {
     if (!path) return;
-    let copied = false;
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(path);
-        copied = true;
-      }
-    } catch {
-      copied = false;
-    }
-    if (!copied) copied = fallbackCopyToClipboard(path);
+    const copied = await writeClipboardText(path);
     if (!copied) {
       onActionError(t("projectTools.fileTree.copyFailed"));
       return;

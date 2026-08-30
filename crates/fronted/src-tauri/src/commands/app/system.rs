@@ -1701,6 +1701,82 @@ pub async fn system_clipboard_read_text() -> Result<String, String> {
         .map_err(|error| format!("system_clipboard_read_text join failed: {error}"))?
 }
 
+#[cfg(desktop)]
+fn system_clipboard_write_text_sync(text: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    let candidates: &[(&str, &[&str])] = &[(
+        "powershell.exe",
+        &[
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$InputEncoding = [Console]::InputEncoding = [Text.UTF8Encoding]::new($false); $value = [Console]::In.ReadToEnd(); Set-Clipboard -Value $value",
+        ],
+    )];
+    #[cfg(target_os = "macos")]
+    let candidates: &[(&str, &[&str])] = &[("pbcopy", &[])];
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let candidates: &[(&str, &[&str])] = &[
+        ("wl-copy", &["--type", "text/plain"]),
+        ("xclip", &["-selection", "clipboard", "-in"]),
+        ("xsel", &["--clipboard", "--input"]),
+    ];
+
+    let mut last_error = "no native clipboard writer is available".to_string();
+    for (program, args) in candidates {
+        let mut child = match std::process::Command::new(program)
+            .args(*args)
+            .stdin(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+        {
+            Ok(child) => child,
+            Err(error) => {
+                last_error = format!("failed to start {program}: {error}");
+                continue;
+            }
+        };
+        let write_result = child
+            .stdin
+            .take()
+            .ok_or_else(|| format!("failed to open {program} stdin"))
+            .and_then(|mut stdin| {
+                stdin
+                    .write_all(text.as_bytes())
+                    .map_err(|error| format!("failed to write clipboard text to {program}: {error}"))
+            });
+        if let Err(error) = write_result {
+            let _ = child.kill();
+            last_error = error;
+            continue;
+        }
+        match child.wait_with_output() {
+            Ok(output) if output.status.success() => return Ok(()),
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                last_error = if stderr.is_empty() {
+                    format!("{program} exited with {}", output.status)
+                } else {
+                    format!("{program} failed: {stderr}")
+                };
+            }
+            Err(error) => last_error = format!("failed to wait for {program}: {error}"),
+        }
+    }
+    Err(last_error)
+}
+
+/// Writes clipboard text through the native desktop clipboard instead of
+/// relying on WebView clipboard permissions.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn system_clipboard_write_text(text: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || system_clipboard_write_text_sync(text))
+        .await
+        .map_err(|error| format!("system_clipboard_write_text join failed: {error}"))?
+}
+
 #[tauri::command(rename_all = "snake_case")]
 #[cfg(desktop)]
 pub fn system_begin_power_activity(

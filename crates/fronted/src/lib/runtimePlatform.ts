@@ -22,12 +22,15 @@ export function normalizeRuntimePlatform(value: unknown): RuntimePlatform | unde
 }
 
 export function inferRuntimePlatform(): RuntimePlatform {
+  const touchPoints = typeof navigator !== "undefined" ? (navigator.maxTouchPoints ?? 0) : 0;
   const nav =
     typeof navigator !== "undefined"
       ? `${navigator.userAgent || ""} ${navigator.platform || ""}`
       : "";
   if (/Android/i.test(nav)) return "android";
-  if (/iPhone|iPad|iPod/i.test(nav)) return "ios";
+  // iPadOS can request a desktop user agent and report MacIntel. Touch points
+  // distinguish that shell from an actual macOS desktop before IPC resolves.
+  if (/iPhone|iPad|iPod/i.test(nav) || (/Mac/i.test(nav) && touchPoints > 1)) return "ios";
   if (/\bWindows\b|Win32|Win64|WOW64/i.test(nav)) return "windows";
   if (/Mac/i.test(nav)) return "macos";
   return "linux";

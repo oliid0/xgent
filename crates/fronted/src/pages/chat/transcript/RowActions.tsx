@@ -11,6 +11,7 @@ import type {
   RenderUserMessage,
 } from "../../../lib/chat/conversation/conversationState";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
+import { writeClipboardText } from "../../../lib/system/clipboardText";
 import { useRowInteraction } from "./rowInteraction";
 import { useCopiedFlag } from "./useCopiedFlag";
 
@@ -62,8 +63,9 @@ export function AssistantRowFooter(props: AssistantRowFooterProps) {
           size="sm"
           isDisabled={!replyText}
           onClick={() => {
-            void navigator.clipboard.writeText(replyText);
-            markCopied();
+            void writeClipboardText(replyText).then((copied) => {
+              if (copied) markCopied();
+            });
           }}
         />
         <ConfirmActionPopover
@@ -155,8 +157,9 @@ export function UserRowFooter(props: UserRowFooterProps) {
           variant="ghost"
           size="sm"
           onClick={() => {
-            void navigator.clipboard.writeText(text);
-            markCopied();
+            void writeClipboardText(text).then((copied) => {
+              if (copied) markCopied();
+            });
           }}
         />
         <IconButton

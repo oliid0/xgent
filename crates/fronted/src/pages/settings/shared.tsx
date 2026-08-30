@@ -14,16 +14,19 @@ export function SettingsRowGroup(props: {
   title: string;
   children: ReactNode;
   tone?: "default" | "danger";
+  hideTitle?: boolean;
 }) {
   return (
     <VStack as="section" gap={2} width="100%">
-      <Heading
-        level={3}
-        color="secondary"
-        style={props.tone === "danger" ? { color: "var(--color-error)" } : undefined}
-      >
-        {props.title}
-      </Heading>
+      {props.hideTitle ? null : (
+        <Heading
+          level={3}
+          color="secondary"
+          style={props.tone === "danger" ? { color: "var(--color-error)" } : undefined}
+        >
+          {props.title}
+        </Heading>
+      )}
       <Section padding={0} variant="transparent" width="100%">
         <VStack width="100%" gap={2}>
           {props.children}

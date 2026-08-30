@@ -537,11 +537,10 @@ export function SettingsPage(props: SettingsPageProps) {
               <LayoutHeader hasDivider height="var(--xagent-settings-header-height)" padding={0}>
                 <HStack
                   width="100%"
-                  maxWidth="var(--xagent-settings-content-max-width)"
                   height="100%"
-                  paddingInline={3}
+                  paddingInline={4}
+                  paddingBlockStart={2}
                   vAlign="center"
-                  style={{ marginInline: "auto" }}
                 >
                   <Heading level={2}>{sectionLabels[section]}</Heading>
                 </HStack>
@@ -557,7 +556,6 @@ export function SettingsPage(props: SettingsPageProps) {
                 minHeight={sectionManagesScroll ? 0 : "100%"}
                 padding={sectionManagesScroll ? 0 : 3}
                 className="settings-section-shell settings-section-enter"
-                style={{ marginInline: "auto" }}
               >
                 {sectionContent}
               </VStack>

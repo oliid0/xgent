@@ -32,6 +32,7 @@ import {
 import { type ChatFileLink, parseChatFileLink } from "../lib/chat/chatFileLinks";
 import { normalizeLatexDelimiters } from "../lib/normalizeLatexDelimiters";
 import { cn } from "../lib/shared/utils";
+import { writeClipboardText } from "../lib/system/clipboardText";
 import { AdaptiveDialog } from "./astryx/AdaptiveDialog";
 import { ExternalLink } from "./icons";
 
@@ -226,10 +227,8 @@ export function ExternalLinkModal({ isOpen, onClose, onConfirm, url }: LinkSafet
   }
 
   const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch (error) {
-      console.error("Failed to copy external link", error);
+    if (!(await writeClipboardText(url))) {
+      console.error("Failed to copy external link");
     }
   };
 

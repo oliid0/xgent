@@ -3,13 +3,14 @@
  * Maps keys to localized strings for zh-CN and en-US
  */
 
-export type Locale = "zh-CN" | "en-US";
+export type ResolvedLocale = "zh-CN" | "en-US";
+export type Locale = ResolvedLocale | "system";
 
-export const DEFAULT_LOCALE: Locale = "zh-CN";
+export const DEFAULT_LOCALE: ResolvedLocale = "zh-CN";
 
-export const SUPPORTED_LOCALES = ["zh-CN", "en-US"] as const satisfies readonly Locale[];
+export const SUPPORTED_LOCALES = ["system", "zh-CN", "en-US"] as const satisfies readonly Locale[];
 
-export const translations: Record<Locale, Record<string, string>> = {
+export const translations: Record<ResolvedLocale, Record<string, string>> = {
   "zh-CN": {
     "chat.trajectory.open": "\u6253\u5f00\u53ef\u89c6\u5316\u8f68\u8ff9",
     "chat.trajectory.backToChat": "\u8fd4\u56de\u4f1a\u8bdd",
@@ -2064,7 +2065,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     /* ── Settings SSH ── */
     "settings.sshTitle": "SSH",
     "settings.sshDesc": "管理常用 SSH 主机、用户名和登录凭据",
-    "settings.sshAdd": "添加",
+    "settings.sshAdd": "新增 SSH",
     "settings.sshEdit": "编辑 SSH",
     "settings.sshImport": "导入",
     "settings.sshCount": "台主机",
@@ -2179,10 +2180,6 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.cronPromptModelRequired": "请选择 Auto Prompt 要使用的模型。",
     "settings.cronPromptModelEmpty": "请先在供应商配置中至少启用一个模型。",
     "settings.cronPromptRequired": "请输入要执行的 Prompt 内容。",
-    "settings.cronPromptRunHint":
-      "Auto Prompt 会在后台独立执行，不会进入主页面最近对话，只会将最终结论写入当前任务的日志列表。",
-    "settings.cronPromptAgentModeOnlyHint":
-      "Auto Prompt 仅在系统执行模式为 Agent 模式或 Agent dev 模式时可运行。",
     "settings.cronPromptAgentModeRequired":
       "请先将 系统设置 -> 执行模式 切换为 Agent 模式或 Agent dev 模式，再运行 Auto Prompt。",
     "settings.cronPromptPlaceholder": "输入要执行的 Prompt 内容...",
@@ -2296,8 +2293,6 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.accessCloudExecution": "云端执行任务",
     "settings.accessCloudExecutionHint":
       "局域网和移动端本地执行不可用时，允许使用 GitHub Actions 后端",
-    "settings.accessCloudPublicWarning":
-      "agent-temp 是公开任务仓库，任务脚本和输入文件可被公开读取；凭据不要写进任务文件。",
     "settings.accessCloudEnvironmentHint":
       "任务环境变量：在仓库 Settings → Secrets and variables → Actions 中创建名为 XAGENT_CLOUD_ENV 的 Variable 或 Secret，每行填写 NAME=value；同名 Secret 会覆盖 Variable。",
     "settings.accessGithubOwner": "GitHub 用户或组织",
@@ -4839,7 +4834,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     /* ── Settings SSH ── */
     "settings.sshTitle": "SSH",
     "settings.sshDesc": "Manage SSH hosts, usernames, and login credentials",
-    "settings.sshAdd": "Add",
+    "settings.sshAdd": "New SSH",
     "settings.sshEdit": "Edit SSH",
     "settings.sshImport": "Import",
     "settings.sshCount": "hosts",
@@ -4960,10 +4955,6 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.cronPromptModelRequired": "Select the model for this Auto Prompt task.",
     "settings.cronPromptModelEmpty": "Enable at least one model in provider settings first.",
     "settings.cronPromptRequired": "Enter the prompt content to execute.",
-    "settings.cronPromptRunHint":
-      "Auto Prompt runs in the background, does not appear in recent conversations, and only writes the final conclusion to this task's log list.",
-    "settings.cronPromptAgentModeOnlyHint":
-      "Auto Prompt runs only when System -> Execution Mode is Agent Mode or Agent Dev Mode.",
     "settings.cronPromptAgentModeRequired":
       "Switch System -> Execution Mode to Agent Mode or Agent Dev Mode before running Auto Prompt.",
     "settings.cronPromptPlaceholder": "Enter the prompt content to execute...",
@@ -5085,8 +5076,6 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.accessCloudExecution": "Cloud task execution",
     "settings.accessCloudExecutionHint":
       "Allow GitHub Actions when LAN and mobile-local execution are unavailable",
-    "settings.accessCloudPublicWarning":
-      "agent-temp is public, so task scripts and input files are readable by anyone. Do not put credentials in task files.",
     "settings.accessCloudEnvironmentHint":
       "Task environment: create an Actions Variable or Secret named XAGENT_CLOUD_ENV under repository Settings → Secrets and variables → Actions, with one NAME=value per line. Secret values override Variables.",
     "settings.accessGithubOwner": "GitHub user or organization",
@@ -5492,10 +5481,26 @@ export const translations: Record<Locale, Record<string, string>> = {
 /**
  * Get translated string by key
  */
+export function resolveEffectiveLocale(locale: Locale): ResolvedLocale {
+  if (locale !== "system") return locale;
+  if (typeof navigator === "undefined") return DEFAULT_LOCALE;
+  const languages = [...(navigator.languages ?? []), navigator.language]
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.toLowerCase());
+  return languages.some((value) => value === "zh" || value.startsWith("zh-")) ? "zh-CN" : "en-US";
+}
+
+export function subscribeToSystemLocalePreference(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  window.addEventListener("languagechange", listener);
+  return () => window.removeEventListener("languagechange", listener);
+}
+
 export function t(key: string, locale: Locale = DEFAULT_LOCALE): string {
-  return translations[locale]?.[key] ?? key;
+  return translations[resolveEffectiveLocale(locale)]?.[key] ?? key;
 }
 
 export function normalizeLocale(input: unknown): Locale {
+  if (input === "system" || input === "auto") return "system";
   return input === "en-US" ? "en-US" : DEFAULT_LOCALE;
 }

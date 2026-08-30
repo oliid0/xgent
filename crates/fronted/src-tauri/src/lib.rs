@@ -309,6 +309,7 @@ macro_rules! app_invoke_handler {
             commands::system::system_manage_skill,
             commands::system::system_append_debug_jsonl,
             commands::system::system_clipboard_read_text,
+            commands::system::system_clipboard_write_text,
             commands::system::system_classify_dropped_paths,
             commands::system::system_resolve_dropped_workspace_folders,
             commands::system::system_begin_power_activity,

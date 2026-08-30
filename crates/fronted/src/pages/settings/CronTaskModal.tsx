@@ -436,17 +436,6 @@ export function CronTaskModal({
                       startContent={<MessageSquare aria-hidden="true" />}
                     />
                   </RadioList>
-                  {type === "prompt" ? (
-                    <Banner
-                      status={autoPromptSupported ? "info" : "warning"}
-                      title={
-                        autoPromptSupported
-                          ? t("settings.cronPromptRunHint")
-                          : t("settings.cronPromptAgentModeOnlyHint")
-                      }
-                      container="card"
-                    />
-                  ) : null}
                 </VStack>
               </Section>
 

@@ -25,6 +25,7 @@ import {
   selectedGitRepositoryLabel,
 } from "../../lib/git/types";
 import { cn } from "../../lib/shared/utils";
+import { writeClipboardText } from "../../lib/system/clipboardText";
 import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types";
 import { useWorkspaceInvalidation } from "../../lib/workspace-activity/useWorkspaceInvalidation";
 import { useConfirmDialog } from "../astryx/useConfirmDialog";
@@ -59,25 +60,6 @@ function assertGitOperationResult(value: unknown, fallbackMessage: string) {
           ? result.stderr
           : fallbackMessage;
     throw new Error(message);
-  }
-}
-
-// Legacy fallback for environments where the async clipboard API is missing
-// or rejects (insecure context, denied permission).
-function fallbackCopyToClipboard(text: string): boolean {
-  try {
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "fixed";
-    textarea.style.opacity = "0";
-    document.body.appendChild(textarea);
-    textarea.select();
-    const copied = document.execCommand("copy");
-    textarea.remove();
-    return copied;
-  } catch {
-    return false;
   }
 }
 
@@ -1052,18 +1034,7 @@ export function GitBranchSelector(props: {
   const copyBranchName = useCallback(async () => {
     if (!branchAction) return;
     const text = branchAction.branch.fullName;
-    let copied = false;
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        copied = true;
-      }
-    } catch {
-      copied = false;
-    }
-    if (!copied) {
-      copied = fallbackCopyToClipboard(text);
-    }
+    const copied = await writeClipboardText(text);
     if (copied) {
       setActionError("");
       actionErrorRef.current = "";

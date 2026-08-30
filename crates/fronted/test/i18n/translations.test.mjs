@@ -7,7 +7,8 @@ const i18n = loader.loadModule("src/i18n/config.ts");
 
 test("supported locales and default locale are stable", () => {
   assert.equal(i18n.DEFAULT_LOCALE, "zh-CN");
-  assert.deepEqual([...i18n.SUPPORTED_LOCALES], ["zh-CN", "en-US"]);
+  assert.deepEqual([...i18n.SUPPORTED_LOCALES], ["system", "zh-CN", "en-US"]);
+  assert.equal(i18n.normalizeLocale("system"), "system");
   assert.equal(i18n.normalizeLocale("en-US"), "en-US");
   assert.equal(i18n.normalizeLocale("fr-FR"), "zh-CN");
 });

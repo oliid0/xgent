@@ -33,6 +33,7 @@ import {
 import { tauriTerminalClient } from "../../lib/terminal/tauriTerminalClient";
 import type { TerminalShellOption } from "../../lib/terminal/types";
 import { useTrayPrefs, writeTrayPrefs } from "../../lib/tray/trayPrefs";
+import { SecretTextInput } from "./SecretTextInput";
 import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
@@ -203,8 +204,8 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
   ];
 
   return (
-    <VStack width="100%" gap={6}>
-      <SettingsRowGroup title={t("settings.executionMode")}>
+    <VStack width="100%" gap={2}>
+      <SettingsRowGroup title={t("settings.executionMode")} hideTitle>
         <SettingsRow
           label={t("settings.executionMode")}
           description={
@@ -234,7 +235,7 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
       </SettingsRowGroup>
 
       {terminalShellOptions.length > 0 ? (
-        <SettingsRowGroup title={t("settings.terminalShell")}>
+        <SettingsRowGroup title={t("settings.terminalShell")} hideTitle>
           <SettingsRow
             label={t("settings.terminalShell")}
             description={t("settings.terminalShellDesc")}
@@ -261,7 +262,7 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
         </SettingsRowGroup>
       ) : null}
 
-      <SettingsRowGroup title={t("settings.appearance")}>
+      <SettingsRowGroup title={t("settings.appearance")} hideTitle>
         <SettingsRow label={t("settings.appearance")}>
           <Selector
             label={t("settings.appearance")}
@@ -284,11 +285,13 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
             options={SUPPORTED_LOCALES.map((locale) => ({
               value: locale,
               label:
-                locale === "zh-CN"
-                  ? t("settings.chinese")
-                  : locale === "en-US"
-                    ? t("settings.english")
-                    : locale,
+                locale === "system"
+                  ? t("settings.auto")
+                  : locale === "zh-CN"
+                    ? t("settings.chinese")
+                    : locale === "en-US"
+                      ? t("settings.english")
+                      : locale,
             }))}
             onChange={(locale) =>
               setSettings((prev) => ({ ...prev, locale: locale as typeof prev.locale }))
@@ -297,7 +300,7 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
         </SettingsRow>
       </SettingsRowGroup>
 
-      <SettingsRowGroup title={t("settings.fontFamily")}>
+      <SettingsRowGroup title={t("settings.fontFamily")} hideTitle>
         <FormLayout direction="vertical">
           {fontFamilyFields.map(({ key, label }) => {
             const currentValue = settings.customSettings[key];
@@ -336,7 +339,7 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
         </FormLayout>
       </SettingsRowGroup>
 
-      <SettingsRowGroup title={t("settings.fontSize")}>
+      <SettingsRowGroup title={t("settings.fontSize")} hideTitle>
         {fontScaleZones.map((zone) => (
           <SettingsRow key={zone.key} label={zone.label}>
             <Selector
@@ -354,7 +357,7 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
         ))}
       </SettingsRowGroup>
 
-      <SettingsRowGroup title={t("settings.systemProxy")}>
+      <SettingsRowGroup title={t("settings.systemProxy")} hideTitle>
         <SettingsRow
           label={t("settings.systemProxy")}
           description={
@@ -415,9 +418,8 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
                 onBlur={commitProxyUsernameDraft}
                 onEnter={commitProxyUsernameDraft}
               />
-              <TextInput
+              <SecretTextInput
                 label={t("settings.systemProxyPassword")}
-                type="password"
                 value={proxyPasswordDraft ?? systemProxy.password}
                 isDisabled={browser}
                 disabledMessage={browser ? t("settings.desktopOnly") : undefined}
@@ -449,7 +451,7 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
         ) : null}
       </SettingsRowGroup>
 
-      <SettingsRowGroup title={t("settings.closeWindowBehavior")}>
+      <SettingsRowGroup title={t("settings.closeWindowBehavior")} hideTitle>
         <SettingsRow
           label={t("settings.closeWindowBehavior")}
           description={
@@ -481,7 +483,7 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
       </SettingsRowGroup>
 
       {!browser ? (
-        <SettingsRowGroup title={t("settings.trayTitle")}>
+        <SettingsRowGroup title={t("settings.trayTitle")} hideTitle>
           <SettingsRow
             label={t("settings.trayShowTitles")}
             description={t("settings.trayShowTitlesDesc")}

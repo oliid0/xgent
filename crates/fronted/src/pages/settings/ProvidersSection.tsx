@@ -109,6 +109,7 @@ import {
   sortModelsBySelection,
 } from "./providerUtils";
 import { RetryErrorSection } from "./RetryErrorSection";
+import { SecretTextInput } from "./SecretTextInput";
 import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmDeletePopover } from "./shared";
 import type { SettingsSectionProps } from "./types";
@@ -1023,13 +1024,11 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                   </AstryxStack>
 
                   {authMode !== "oauth-managed" ? (
-                    <TextInput
-                      type="password"
+                    <SecretTextInput
                       label={
                         authMode === "oauth-token" ? t("settings.providerOAuthToken") : "API Key"
                       }
                       value={apiKey}
-                      width="100%"
                       isDisabled={isBrowser}
                       onChange={setApiKey}
                       onFocus={(event) => {
@@ -1122,13 +1121,10 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                   className="mt-3 overflow-hidden rounded-xl border"
                 >
                   <AstryxStack
-                    direction="horizontal"
-                    className="flex items-center gap-2 border-b bg-muted/30 p-2.5 max-[720px]:flex-wrap"
+                    direction="vertical"
+                    className="flex gap-2 border-b bg-muted/30 p-2.5"
                   >
-                    <AstryxStack
-                      direction="vertical"
-                      className="relative min-w-0 flex-1 max-[720px]:basis-full"
-                    >
+                    <AstryxStack direction="vertical" className="relative min-w-0 w-full">
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         label={t("settings.searchModels")}
@@ -1158,37 +1154,41 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                         </AstryxButton>
                       ) : null}
                     </AstryxStack>
-                    <ToggleButton
-                      label={t("settings.skillsBulkSelect")}
-                      size="sm"
-                      isPressed={modelBulkMode}
-                      onPressedChange={(pressed) => {
-                        setModelBulkMode(pressed);
-                        if (!pressed) setModelBulkSelection(new Set());
-                      }}
-                    >
-                      {modelBulkMode
-                        ? t("settings.skillsBulkDone")
-                        : t("settings.skillsBulkSelect")}
-                    </ToggleButton>
-                    <Button
-                      label={fetchingModels ? t("settings.fetching") : t("settings.refreshModels")}
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="h-9 max-[720px]:h-10 max-[720px]:flex-1"
-                      onClick={handleRefresh}
-                      isLoading={fetchingModels}
-                      isDisabled={fetchingModels || (isBrowser && !canFetchModels)}
-                    />
-                    <Button
-                      label={t("settings.manualAddModel")}
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="h-9 max-[720px]:h-10 max-[720px]:flex-1"
-                      onClick={() => setAddingModel(true)}
-                    />
+                    <AstryxStack direction="horizontal" className="flex flex-wrap gap-2">
+                      <ToggleButton
+                        label={t("settings.skillsBulkSelect")}
+                        size="sm"
+                        isPressed={modelBulkMode}
+                        onPressedChange={(pressed) => {
+                          setModelBulkMode(pressed);
+                          if (!pressed) setModelBulkSelection(new Set());
+                        }}
+                      >
+                        {modelBulkMode
+                          ? t("settings.skillsBulkDone")
+                          : t("settings.skillsBulkSelect")}
+                      </ToggleButton>
+                      <Button
+                        label={
+                          fetchingModels ? t("settings.fetching") : t("settings.refreshModels")
+                        }
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-9 max-[720px]:h-10 max-[720px]:flex-1"
+                        onClick={handleRefresh}
+                        isLoading={fetchingModels}
+                        isDisabled={fetchingModels || !canFetchModels}
+                      />
+                      <Button
+                        label={t("settings.manualAddModel")}
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-9 max-[720px]:h-10 max-[720px]:flex-1"
+                        onClick={() => setAddingModel(true)}
+                      />
+                    </AstryxStack>
                   </AstryxStack>
 
                   {modelBulkMode ? (
@@ -2022,26 +2022,22 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                   width="100%"
                   onChange={(usageBaseUrl) => patchUsageQuery({ baseUrl: usageBaseUrl })}
                 />
-                <TextInput
+                <SecretTextInput
                   label="API Key"
-                  type="password"
                   value={usageQuery.apiKey}
                   placeholder={
                     usageQuery.apiKeyConfigured
                       ? t("settings.usage.secretSaved")
                       : t("settings.usage.providerCredential")
                   }
-                  width="100%"
                   onChange={(usageApiKey) => patchUsageQuery({ apiKey: usageApiKey })}
                 />
 
                 {usageQuery.mode === "newapi" ? (
                   <VStack gap={3}>
-                    <TextInput
+                    <SecretTextInput
                       label="Access Token"
-                      type="password"
                       value={usageQuery.accessToken}
-                      width="100%"
                       onChange={(accessToken) => patchUsageQuery({ accessToken })}
                     />
                     <TextInput
@@ -2080,11 +2076,9 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                       width="100%"
                       onChange={(accessKeyId) => patchUsageQuery({ accessKeyId })}
                     />
-                    <TextInput
+                    <SecretTextInput
                       label="Secret Access Key"
-                      type="password"
                       value={usageQuery.secretAccessKey}
-                      width="100%"
                       onChange={(secretAccessKey) => patchUsageQuery({ secretAccessKey })}
                     />
                   </VStack>
@@ -2864,9 +2858,18 @@ function ProviderList(props: {
   } = props;
   const [syncMenuOpen, setSyncMenuOpen] = useState(false);
   const [draggingProviderId, setDraggingProviderId] = useState("");
+  const [previewProviderOrder, setPreviewProviderOrder] = useState<string[] | null>(null);
   const providerListRef = useRef<HTMLUListElement | HTMLOListElement | null>(null);
   const providerOrderRef = useRef<CustomProvider[]>([]);
-  const filtered = providers.filter((provider) => provider.type === type);
+  const baseOrderRef = useRef<CustomProvider[]>([]);
+  const typeProviders = providers.filter((provider) => provider.type === type);
+  baseOrderRef.current = typeProviders;
+  const typeProvidersById = new Map(typeProviders.map((provider) => [provider.id, provider]));
+  const filtered = previewProviderOrder
+    ? previewProviderOrder
+        .map((id) => typeProvidersById.get(id))
+        .filter((provider): provider is CustomProvider => provider !== undefined)
+    : typeProviders;
   providerOrderRef.current = filtered;
   const ccsAll = ccsProviders?.providers ?? [];
   const cherryAll = cherryProviders?.providers ?? [];
@@ -2903,9 +2906,17 @@ function ProviderList(props: {
       const nextIds = next.map((provider) => provider.id);
       if (nextIds.every((id, index) => id === current[index]?.id)) return;
       providerOrderRef.current = next;
-      onReorder(type, nextIds);
+      setPreviewProviderOrder(nextIds);
     };
-    const finish = () => setDraggingProviderId("");
+    const finish = () => {
+      const nextIds = providerOrderRef.current.map((provider) => provider.id);
+      const previousIds = baseOrderRef.current.map((provider) => provider.id);
+      setDraggingProviderId("");
+      setPreviewProviderOrder(null);
+      if (!nextIds.every((id, index) => id === previousIds[index])) {
+        onReorder(type, nextIds);
+      }
+    };
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", finish, { once: true });
     window.addEventListener("pointercancel", finish, { once: true });
@@ -3072,12 +3083,10 @@ function ProviderList(props: {
                     usageSummary ||
                     `${provider.baseUrl || t("settings.noBaseUrl")} · ${provider.activeModels.length} ${t("settings.activeModels")}`
                   }
-                  startContent={<ProviderBrandIcon type={type} />}
-                  endContent={
+                  startContent={
                     <HStack gap={1} vAlign="center">
                       <IconButton
                         label={`${t("settings.reorderProvider")}: ${provider.name}`}
-                        tooltip={t("settings.reorderVerticalHint")}
                         variant="ghost"
                         size="sm"
                         isDisabled={filtered.length < 2}
@@ -3087,6 +3096,8 @@ function ProviderList(props: {
                         onPointerDown={(event) => {
                           event.stopPropagation();
                           if (event.button === 0 && filtered.length > 1) {
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            setPreviewProviderOrder(filtered.map((item) => item.id));
                             setDraggingProviderId(provider.id);
                           }
                         }}
@@ -3097,6 +3108,11 @@ function ProviderList(props: {
                           }
                         }}
                       />
+                      <ProviderBrandIcon type={type} />
+                    </HStack>
+                  }
+                  endContent={
+                    <HStack gap={1} vAlign="center">
                       {provider.usageQuery?.enabled ? (
                         <IconButton
                           label={t("settings.usage.refresh")}

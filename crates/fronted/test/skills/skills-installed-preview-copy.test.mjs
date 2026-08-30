@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+const clipboardSource = readFileSync(
+  new URL("../../src/lib/system/clipboardText.ts", import.meta.url),
+  "utf8",
+);
+
 const pageSources = [
   {
     label: "Unified frontend",
@@ -24,8 +29,9 @@ for (const { label, source } of pageSources) {
   });
 
   test(`${label} provides copy success feedback and a clipboard fallback`, () => {
-    assert.match(source, /navigator\.clipboard\?\.writeText/);
-    assert.match(source, /document\.execCommand\("copy"\)/);
+    assert.match(source, /writeClipboardText/);
+    assert.match(clipboardSource, /navigator\.clipboard\?\.writeText/);
+    assert.match(clipboardSource, /document\.execCommand\("copy"\)/);
     assert.match(source, /settings\.skillsInstalledPreviewCopied/);
   });
 }

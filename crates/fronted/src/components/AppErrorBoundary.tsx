@@ -5,6 +5,7 @@ import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Text } from "@astryxdesign/core/Text";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { useLocale } from "../i18n";
+import { writeClipboardText } from "../lib/system/clipboardText";
 
 type FallbackLabels = {
   title: string;
@@ -61,7 +62,7 @@ class ErrorBoundaryInner extends Component<ErrorBoundaryInnerProps, ErrorBoundar
                   label={this.props.labels.copy}
                   variant="ghost"
                   onClick={() => {
-                    void navigator.clipboard.writeText(
+                    void writeClipboardText(
                       `${error.stack ?? error.message}\n${this.state.componentStack}`,
                     );
                   }}

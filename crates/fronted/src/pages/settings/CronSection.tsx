@@ -28,7 +28,7 @@ import {
   useAutomation,
 } from "../../lib/automation";
 import { buildModelOptions } from "../../lib/chat/page/chatPageHelpers";
-import { isAgentExecutionMode, workspaceProjectPathKey } from "../../lib/settings";
+import { workspaceProjectPathKey } from "../../lib/settings";
 import { type CronTaskFormData, CronTaskModal } from "./CronTaskModal";
 import { CronTaskViewModal } from "./CronTaskViewModal";
 import { AgentActivationSwitch, ConfirmDeletePopover } from "./shared";
@@ -68,7 +68,6 @@ export function CronSection(props: SettingsSectionProps) {
   const [actionError, setActionError] = useState<string | null>(null);
   const { cron } = useAutomation();
   const tasks = cron.tasks;
-  const autoPromptSupported = isAgentExecutionMode(settings.system.executionMode);
   const modelOptions = useMemo(
     () =>
       buildModelOptions(settings).map((option) => ({
@@ -158,13 +157,6 @@ export function CronSection(props: SettingsSectionProps) {
         </Section>
       ) : null}
 
-      {!autoPromptSupported ? (
-        <Banner
-          status="warning"
-          title={t("settings.cronPromptAgentModeOnlyHint")}
-          collapsible={false}
-        />
-      ) : null}
       {actionError ? (
         <Banner
           status="error"

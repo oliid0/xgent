@@ -53,6 +53,7 @@ import {
   type SshScanResult,
   scanSshImportCandidates,
 } from "../../lib/ssh/scan";
+import { SecretTextInput } from "./SecretTextInput";
 import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmActionPopover, ConfirmDeletePopover } from "./shared";
 import type { SettingsSectionProps } from "./types";
@@ -85,14 +86,7 @@ function SshPasswordInput(props: {
 
   return (
     <VStack gap={1}>
-      <TextInput
-        label={label}
-        type="password"
-        value={value}
-        isDisabled={disabled}
-        width="100%"
-        onChange={onChange}
-      />
+      <SecretTextInput label={label} value={value} isDisabled={disabled} onChange={onChange} />
       {configuredMessage && !value.trim() ? (
         <Text type="supporting" color="secondary">
           {configuredMessage}

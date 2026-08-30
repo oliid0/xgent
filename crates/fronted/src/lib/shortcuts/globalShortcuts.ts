@@ -30,6 +30,7 @@ export interface GlobalShortcutFailure {
 }
 
 const STORAGE_KEY = "xagent.globalShortcuts.v1";
+let shortcutApplyQueue: Promise<void> = Promise.resolve();
 
 export const DEFAULT_GLOBAL_SHORTCUT_BINDINGS: Readonly<GlobalShortcutBindings> = {
   summon: { accelerator: "Ctrl+KeyK", enabled: false },
@@ -124,20 +125,40 @@ export async function applyGlobalShortcuts(
     const accelerator = binding?.accelerator.trim();
     return binding?.enabled && accelerator ? [{ action, accelerator }] : [];
   });
-  try {
-    const failures = await invoke<GlobalShortcutFailure[]>("app_set_global_shortcuts", {
-      bindings: payload,
-    });
-    return Array.isArray(failures) ? failures : [];
-  } catch {
-    // 非 Tauri 环境或旧版桌面壳：忽略。
-    return [];
-  }
+  const apply = async (): Promise<GlobalShortcutFailure[]> => {
+    try {
+      const failures = await invoke<GlobalShortcutFailure[]>("app_set_global_shortcuts", {
+        bindings: payload,
+      });
+      return Array.isArray(failures) ? failures : [];
+    } catch (error) {
+      return [
+        {
+          action: "runtime",
+          accelerator: "",
+          error: error instanceof Error ? error.message : String(error),
+        },
+      ];
+    }
+  };
+
+  // Recording temporarily unregisters every shortcut. Serialize that request
+  // with the subsequent save so a slower unregister cannot erase the binding
+  // that the user just confirmed.
+  const result = shortcutApplyQueue.then(apply, apply);
+  shortcutApplyQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
 }
 
 /** 应用启动时恢复本机保存的全局快捷键。 */
 export async function applyStoredGlobalShortcuts(): Promise<void> {
   const bindings = readGlobalShortcutBindings();
   if (GLOBAL_SHORTCUT_ACTIONS.every((action) => !bindings[action])) return;
-  await applyGlobalShortcuts(bindings);
+  const failures = await applyGlobalShortcuts(bindings);
+  if (failures.length > 0) {
+    throw new Error(failures.map((failure) => failure.error).join("; "));
+  }
 }

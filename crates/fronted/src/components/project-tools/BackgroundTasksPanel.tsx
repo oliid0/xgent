@@ -21,6 +21,7 @@ import {
   useManagedProcesses,
 } from "../../lib/managed-process/store";
 import type { ManagedProcessLog, ManagedProcessRecord } from "../../lib/managed-process/types";
+import { writeClipboardText } from "../../lib/system/clipboardText";
 import { AlertTriangle, FileText } from "../icons";
 
 type BackgroundTasksPanelProps = {
@@ -273,10 +274,11 @@ function BackgroundTaskRow(props: {
 
   const handleCopy = useCallback(() => {
     void runAction(async () => {
-      await navigator.clipboard.writeText(processCopyText(process));
+      const copied = await writeClipboardText(processCopyText(process));
+      if (!copied) throw new Error(t("git.branchSelector.copyFailed"));
       setCopied(true);
     });
-  }, [process, runAction]);
+  }, [process, runAction, t]);
 
   const handleClear = useCallback(() => {
     void runAction(() => clearManagedProcesses(process.id));

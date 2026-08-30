@@ -673,10 +673,11 @@ export function ChatPage(props: ChatPageProps) {
     onRunningConversationCountChange,
   } = props;
   const desktopCommandHostAvailable = desktopBridgeEnabled || lanPcCommandHostReady;
-  // Monaco reads NLS globals while the lazy editor module imports monaco-editor.
-  setPreferredMonacoNlsLocale(settings.locale);
   const effectiveTheme = resolveEffectiveTheme(settings.theme);
   const { t, locale } = useLocale();
+  // Monaco reads NLS globals while the lazy editor module imports
+  // monaco-editor, so pass the resolved locale when "system" is selected.
+  setPreferredMonacoNlsLocale(locale);
   const conversationSidebarResize = useResizable({
     defaultSize: 360,
     minSizePx: 280,
@@ -1547,7 +1548,9 @@ export function ChatPage(props: ChatPageProps) {
     currentConversationPersistedCwd ||
     currentConversationRuntimeWorkdir ||
     (isAgentMode ? activeWorkspaceProjectPath || workdir : "");
-  const terminalProjectPath = isAgentMode ? activeWorkspaceProjectPath.trim() : "";
+  // Execution mode controls which tools the model may call, not whether the user
+  // can inspect and operate the workspace UI directly.
+  const terminalProjectPath = activeWorkspaceProjectPath.trim();
   const terminalProjectPathKey = terminalProjectPath
     ? workspaceProjectPathKey(terminalProjectPath)
     : "";
@@ -1585,11 +1588,9 @@ export function ChatPage(props: ChatPageProps) {
     () => getSshProjectHostIds(settings.ssh, mobileWorkspacePathKey),
     [mobileWorkspacePathKey, settings.ssh],
   );
-  const terminalDisabledMessage = !isAgentMode
-    ? "Project tools require Agent project mode."
-    : !terminalProjectPath
-      ? "Select a project to use project tools."
-      : undefined;
+  const terminalDisabledMessage = !terminalProjectPath
+    ? "Select a project to use project tools."
+    : undefined;
   const ensureNativeMobileShellReady = useCallback(async () => {
     if (!nativeMobile) return true;
     try {
@@ -4334,7 +4335,7 @@ export function ChatPage(props: ChatPageProps) {
       onWarning: (warning) => {
         updateConversationRuntimeEntry(conversationId, (prev) => ({
           ...prev,
-          hookWarning: formatHookWarningMessage(settings.locale, t, warning),
+          hookWarning: formatHookWarningMessage(locale, t, warning),
         }));
       },
     });
@@ -4703,8 +4704,13 @@ export function ChatPage(props: ChatPageProps) {
   useEffect(() => {
     if (!mobileExperience) {
       setMobileWorkspaceDestination(null);
+      if (activeView === "skills-hub") {
+        showDesktopWorkspaceTool("skills");
+      } else if (activeView === "mcp-hub") {
+        showDesktopWorkspaceTool("mcp");
+      }
     }
-  }, [mobileExperience]);
+  }, [activeView, mobileExperience, showDesktopWorkspaceTool]);
 
   useEdgeSwipeNavigation({
     enabled:
@@ -5486,7 +5492,7 @@ export function ChatPage(props: ChatPageProps) {
         desktopWidth={conversationSidebarResize.size}
         fontScale={settings.customSettings.fontScale.sidebar}
         activeView={activeView}
-        showProjects={isAgentMode}
+        showProjects
         projects={workspaceProjects}
         workspaceProjectGroups={workspaceProjectGroups}
         activeProjectId={activeWorkspaceProject?.id}
