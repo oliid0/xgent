@@ -5,7 +5,7 @@ import { Switch } from "@astryxdesign/core/Switch";
 import { Heading } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { type FormEvent, useEffect, useState } from "react";
-import { Globe, Shield, Trash2 } from "../../../components/icons";
+import { Globe, Shield } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import {
   browserSessionController,
@@ -105,7 +105,6 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
             <Heading level={3}>{t("browser.privacy")}</Heading>
             <Button
               label={t("browser.clearSessions")}
-              icon={<Trash2 />}
               variant="destructive"
               size="lg"
               width="100%"

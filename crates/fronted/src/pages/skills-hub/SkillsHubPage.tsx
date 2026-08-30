@@ -1,26 +1,33 @@
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
-import {
-  Button as AstryxButton,
-  Button as AstryxCoreButton,
-  Button,
-} from "@astryxdesign/core/Button";
+import { BreadcrumbItem, Breadcrumbs } from "@astryxdesign/core/Breadcrumbs";
+import { Button as AstryxButton, Button as AstryxCoreButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
-import { Dialog } from "@astryxdesign/core/Dialog";
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Grid as AstryxGrid, Grid } from "@astryxdesign/core/Grid";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Item } from "@astryxdesign/core/Item";
-import { HStack, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
+import {
+  HStack,
+  Layout,
+  LayoutContent,
+  LayoutFooter,
+  Section,
+  StackItem,
+  VStack,
+} from "@astryxdesign/core/Layout";
 import { Link } from "@astryxdesign/core/Link";
 import { List, ListItem } from "@astryxdesign/core/List";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Heading as AstryxHeadingCore, Text as AstryxText, Text } from "@astryxdesign/core/Text";
@@ -50,13 +57,11 @@ import {
   House,
   Layers,
   ListChecks,
-  Loader2,
   Lock,
   MessageCircle,
   Package,
   Palette,
   Plug,
-  RefreshCw,
   Search,
   Server,
   Shield,
@@ -111,6 +116,13 @@ import {
 } from "../../lib/skills/installedSort";
 
 type SkillsHubView = "installed" | "store" | "import";
+
+type PrefetchedStorePage = {
+  cursor: string;
+  sort: ClawHubSort;
+  items: ClawHubSkillCard[];
+  nextCursor: string | null;
+};
 
 const EXTERNAL_TOOL_LABELS: Record<string, string> = {
   "claude-code": "Claude Code",
@@ -899,6 +911,8 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   const [storeCursor, setStoreCursor] = useState<string | null>(null);
   const [storeLoading, setStoreLoading] = useState(false);
   const [storeLoadingMore, setStoreLoadingMore] = useState(false);
+  const [prefetchedStorePage, setPrefetchedStorePage] = useState<PrefetchedStorePage | null>(null);
+  const storeLoadMoreInFlightRef = useRef(false);
   const [storeError, setStoreError] = useState<string | null>(null);
   const [installJobs, setInstallJobs] = useState<Record<string, SkillInstallJobSnapshot>>({});
   const [installingByStoreKey, setInstallingByStoreKey] = useState<Record<string, string>>({});
@@ -1391,6 +1405,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
       setStoreLoading(true);
       setStoreError(null);
       setStoreCursor(null);
+      setPrefetchedStorePage(null);
       try {
         if (query) {
           const results = await searchClawHubSkills({ query, limit: STORE_PAGE_LIMIT });
@@ -1426,6 +1441,31 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
       window.clearTimeout(timer);
     };
   }, [lockedByChatMode, storeQuery, storeSort, t, view]);
+
+  useEffect(() => {
+    const cursor = storeCursor;
+    if (view !== "store" || lockedByChatMode || storeQuery.trim() || !cursor) {
+      setPrefetchedStorePage(null);
+      return;
+    }
+    let cancelled = false;
+    void listClawHubSkills({ sort: storeSort, cursor, limit: STORE_PAGE_LIMIT })
+      .then((results) => {
+        if (cancelled) return;
+        setPrefetchedStorePage({
+          cursor,
+          sort: storeSort,
+          items: results.items,
+          nextCursor: results.items.length > 0 ? results.nextCursor : null,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setPrefetchedStorePage(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lockedByChatMode, storeCursor, storeQuery, storeSort, view]);
 
   useEffect(() => {
     if (view !== "store" || lockedByChatMode) return;
@@ -1510,27 +1550,35 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   }, [enableInstalledSkillsFromJob, installJobs, refresh, t]);
 
   async function loadMoreStore() {
-    if (!storeCursor || storeLoading || storeLoadingMore || storeQuery.trim()) return;
-    setStoreLoadingMore(true);
+    const cursor = storeCursor;
+    if (
+      !cursor ||
+      storeLoading ||
+      storeLoadingMore ||
+      storeLoadMoreInFlightRef.current ||
+      storeQuery.trim()
+    ) {
+      return;
+    }
+    storeLoadMoreInFlightRef.current = true;
     setStoreError(null);
     try {
-      const requestedLimit = Math.max(storeItems.length + STORE_PAGE_LIMIT, STORE_PAGE_LIMIT);
-      const results = await listClawHubSkills({
-        sort: storeSort,
-        limit: requestedLimit,
-      });
-      const nextItems = dedupeStoreItems(results.items);
-      if (nextItems.length > storeItems.length) {
-        setStoreItems(nextItems);
-        setStoreCursor(results.nextCursor);
-      } else {
-        setStoreCursor(null);
-      }
+      const cached =
+        prefetchedStorePage?.cursor === cursor && prefetchedStorePage.sort === storeSort
+          ? prefetchedStorePage
+          : null;
+      if (!cached) setStoreLoadingMore(true);
+      const results =
+        cached ?? (await listClawHubSkills({ sort: storeSort, cursor, limit: STORE_PAGE_LIMIT }));
+      setStoreItems((current) => dedupeStoreItems([...current, ...results.items]));
+      setStoreCursor(results.items.length > 0 ? results.nextCursor : null);
+      setPrefetchedStorePage(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setStoreError(msg || t("settings.skillsHubStoreLoadMoreFailed"));
     } finally {
       setStoreLoadingMore(false);
+      storeLoadMoreInFlightRef.current = false;
     }
   }
 
@@ -2021,7 +2069,6 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                   />
                   <AstryxCoreButton
                     label={loading ? t("settings.skillsScanning") : t("settings.skillsScan")}
-                    icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
                     variant="secondary"
                     size="sm"
                     isLoading={loading}
@@ -2078,7 +2125,6 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                     label={t("settings.skillsBulkSelect")}
                     isPressed={bulkMode}
                     size="sm"
-                    icon={<Icon icon={ListChecks} size="sm" color="inherit" />}
                     onPressedChange={() => {
                       if (bulkMode) exitBulkMode();
                       else enterBulkMode();
@@ -2227,7 +2273,6 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                       />
                       <AstryxCoreButton
                         label={t("settings.skillsRescan")}
-                        icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
                         variant="secondary"
                         size="sm"
                         onClick={() => void refresh()}
@@ -2391,7 +2436,6 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                     </ConfirmActionPopover>
                     <AstryxCoreButton
                       label={t("settings.skillsBulkDone")}
-                      icon={<Icon icon={X} size="sm" color="inherit" />}
                       size="sm"
                       onClick={exitBulkMode}
                     />
@@ -2629,7 +2673,7 @@ function SkillsImportView(props: {
         <Spinner size="md" label={t("settings.skillsImportScanning")} />
       ) : (
         <>
-          <HStack width="100%" gap={2} vAlign="center" hAlign="between" wrap="wrap">
+          <VStack width="100%" gap={2}>
             <TabList
               value={activeTool}
               onChange={(value) => {
@@ -2651,7 +2695,7 @@ function SkillsImportView(props: {
               ))}
             </TabList>
 
-            <HStack gap={1} vAlign="center" wrap="wrap">
+            <HStack width="100%" gap={1} vAlign="center" hAlign="end" wrap="wrap">
               <input
                 ref={folderInputRef}
                 type="file"
@@ -2667,7 +2711,6 @@ function SkillsImportView(props: {
               />
               <AstryxCoreButton
                 label={t("settings.skillsLocalImport")}
-                icon={<Icon icon={Folder} size="sm" color="inherit" />}
                 variant="secondary"
                 size="sm"
                 isLoading={localBundleImporting}
@@ -2676,7 +2719,6 @@ function SkillsImportView(props: {
               />
               <AstryxCoreButton
                 label={t("settings.skillsImportRescan")}
-                icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
                 variant="secondary"
                 size="sm"
                 isDisabled={loading || importing}
@@ -2688,7 +2730,6 @@ function SkillsImportView(props: {
                     t("settings.skillsImportButton") +
                     (importableSelectedCount > 0 ? " (" + importableSelectedCount + ")" : "")
                   }
-                  icon={<Icon icon={Download} size="sm" color="inherit" />}
                   size="sm"
                   isLoading={importing}
                   isDisabled={selected.size === 0 || importing || loading}
@@ -2696,7 +2737,7 @@ function SkillsImportView(props: {
                 />
               ) : null}
             </HStack>
-          </HStack>
+          </VStack>
 
           {bulkMode ? (
             <Banner
@@ -2800,11 +2841,9 @@ function SkillsImportView(props: {
                             }
                             endContent={
                               alreadyInstalled ? (
-                                <Token
+                                <StatusDot
+                                  variant="success"
                                   label={t("settings.skillsImportInstalledBadge")}
-                                  color="green"
-                                  size="sm"
-                                  icon={<Icon icon={Check} size="sm" color="inherit" />}
                                 />
                               ) : (
                                 <CheckboxInput
@@ -3330,6 +3369,8 @@ function SkillsStoreView(props: {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [storeCategory, setStoreCategory] = useState<StoreCategoryValue>("all");
+  const storeScrollRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
 
   const categorizedItems = useMemo(
     () =>
@@ -3367,6 +3408,19 @@ function SkillsStoreView(props: {
     if (filteredItems.length >= STORE_CATEGORY_FILL_TARGET) return;
     onLoadMore();
   }, [cursor, filteredItems.length, loading, loadingMore, onLoadMore, searching, storeCategory]);
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel || !cursor || searching || loading || loadingMore) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) onLoadMore();
+      },
+      { root: storeScrollRef.current, rootMargin: "640px 0px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [cursor, loading, loadingMore, onLoadMore, searching]);
 
   useEffect(() => {
     if (!previewSkill) {
@@ -3467,7 +3521,7 @@ function SkillsStoreView(props: {
         />
       ) : null}
 
-      <StackItem size="fill" isScrollable>
+      <StackItem ref={storeScrollRef} size="fill" isScrollable>
         <VStack gap={2}>
           {loading && items.length === 0 ? (
             <Section padding={3} variant="transparent">
@@ -3577,14 +3631,6 @@ function SkillsStoreView(props: {
                             color="gray"
                             size="sm"
                           />
-                          {done ? (
-                            <Token
-                              label={t("settings.skillsStoreInstalled")}
-                              color="green"
-                              size="sm"
-                              icon={<Icon icon={Check} size="sm" color="inherit" />}
-                            />
-                          ) : null}
                           {link ? (
                             <IconButton
                               href={link}
@@ -3619,7 +3665,6 @@ function SkillsStoreView(props: {
                           ) : null}
                           <AstryxCoreButton
                             label={installLabel}
-                            icon={<Icon icon={done ? Check : Cloud} size="sm" color="inherit" />}
                             variant={done ? "secondary" : "primary"}
                             size="sm"
                             isLoading={installing}
@@ -3646,20 +3691,14 @@ function SkillsStoreView(props: {
           ) : null}
 
           {cursor && !searching ? (
-            <HStack hAlign="center">
-              <AstryxCoreButton
-                label={
-                  loadingMore
-                    ? t("settings.skillsStoreLoadingMore")
-                    : t("settings.skillsStoreLoadMore")
-                }
-                icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
-                variant="secondary"
-                size="sm"
-                isLoading={loadingMore}
-                isDisabled={loadingMore}
-                onClick={onLoadMore}
-              />
+            <HStack ref={loadMoreSentinelRef} hAlign="center" padding={2}>
+              {loadingMore ? (
+                <Spinner size="sm" label={t("settings.skillsStoreLoadingMore")} />
+              ) : (
+                <Text type="supporting" color="secondary">
+                  {t("settings.skillsStoreLoadMore")}
+                </Text>
+              )}
             </HStack>
           ) : null}
         </VStack>
@@ -3728,393 +3767,169 @@ function SkillsStorePreviewDrawer(props: {
           : { borderRadius: "var(--radius-container) 0 0 var(--radius-container)" }),
       }}
     >
-      <AstryxStack direction="vertical" as="aside" className="flex h-full w-full flex-col">
-        <AstryxStack
-          direction="horizontal"
-          className="flex items-start gap-3 border-b border-border/40 px-5 py-4"
-        >
-          <AstryxStack
-            direction="horizontal"
-            className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-          >
-            {detail?.ownerImage ? (
-              <img
-                src={detail.ownerImage}
-                alt=""
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <SkillIcon className="h-7 w-7" />
-            )}
-          </AstryxStack>
-          <AstryxStack direction="vertical" className="min-w-0 flex-1">
-            <AstryxStack
-              direction="vertical"
-              className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80"
-            >
-              {t("settings.skillsStorePreviewTitle")}
-            </AstryxStack>
-            <AstryxHeadingCore
-              level={2}
-              className="mt-1 truncate text-base font-semibold tracking-tight text-foreground"
-            >
-              {data.displayName}
-            </AstryxHeadingCore>
-            <AstryxStack
-              direction="horizontal"
-              className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground"
-            >
-              {owner ? (
-                <AstryxText as="span" type="inherit" className="truncate">
-                  @{owner}
-                </AstryxText>
+      <Layout
+        height="fill"
+        header={
+          <DialogHeader
+            title={data.displayName}
+            subtitle={owner ? `@${owner} · v${version}` : `v${version}`}
+            startContent={<Icon icon={SkillIcon} size="md" color="secondary" />}
+            onOpenChange={(isOpen) => {
+              if (!isOpen) onClose();
+            }}
+          />
+        }
+        content={
+          <LayoutContent isScrollable>
+            <VStack gap={5}>
+              <Breadcrumbs variant="supporting" label={t("settings.skillsStorePreviewTitle")}>
+                <BreadcrumbItem onClick={onClose}>{t("settings.skillsHubStoreTab")}</BreadcrumbItem>
+                <BreadcrumbItem isCurrent>{data.displayName}</BreadcrumbItem>
+              </Breadcrumbs>
+
+              {data.summary ? <Text color="secondary">{data.summary}</Text> : null}
+
+              <MetadataList orientation="horizontal">
+                <MetadataListItem label={t("settings.skillsStorePreviewDownloads")}>
+                  {formatCompactNumber(data.downloads)}
+                </MetadataListItem>
+                <MetadataListItem label={t("settings.skillsStorePreviewStars")}>
+                  {formatCompactNumber(data.stars)}
+                </MetadataListItem>
+                <MetadataListItem label={t("settings.skillsStorePreviewInstalls")}>
+                  {formatCompactNumber(data.installsCurrent)}
+                </MetadataListItem>
+              </MetadataList>
+
+              {installState.done ? (
+                <StatusDot variant="success" label={t("settings.skillsStoreInstalled")} />
               ) : null}
-              <AstryxText as="span" type="inherit">
-                v{version}
-              </AstryxText>
-              {data.updatedAt ? (
-                <AstryxText as="span" type="inherit">
-                  {formatStoreDate(data.updatedAt)}
-                </AstryxText>
+
+              {installState.installing && !installState.done ? (
+                <ProgressBar
+                  label={installPhaseLabel(installState.pending ? undefined : installState.job, t)}
+                  value={installState.progress ?? 0}
+                  isIndeterminate={installState.progress === null}
+                  hasValueLabel={installState.progress !== null}
+                  variant="accent"
+                />
               ) : null}
-            </AstryxStack>
-          </AstryxStack>
-          <AstryxButton
-            variant="ghost"
-            label={t("settings.cronViewClose")}
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
-            tooltip={t("settings.cronViewClose")}
-          >
-            <X className="h-4 w-4" />
-          </AstryxButton>
-        </AstryxStack>
 
-        <AstryxStack direction="vertical" className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <AstryxStack direction="vertical" className="flex flex-col gap-4">
-            {data.summary ? (
-              <AstryxText
-                as="p"
-                type="inherit"
-                display="block"
-                className="text-[13px] leading-6 text-muted-foreground"
-              >
-                {data.summary}
-              </AstryxText>
-            ) : null}
+              {installState.job?.phase === "error" &&
+              installState.job.error &&
+              !installState.done &&
+              !installState.pending ? (
+                <Banner
+                  status="error"
+                  title={t("settings.skillsImportError")}
+                  description={installState.job.error}
+                  collapsible={false}
+                />
+              ) : null}
 
-            <AstryxGrid className="grid grid-cols-3 gap-2">
-              <StorePreviewMetric
-                label={t("settings.skillsStorePreviewDownloads")}
-                value={formatCompactNumber(data.downloads)}
-              />
-              <StorePreviewMetric
-                label={t("settings.skillsStorePreviewStars")}
-                value={formatCompactNumber(data.stars)}
-              />
-              <StorePreviewMetric
-                label={t("settings.skillsStorePreviewInstalls")}
-                value={formatCompactNumber(data.installsCurrent)}
-              />
-            </AstryxGrid>
+              {error ? (
+                <Banner
+                  status="warning"
+                  title={t("settings.skillsStorePreviewDetailUnavailable")}
+                  collapsible={false}
+                />
+              ) : null}
 
-            {installState.installing && !installState.done ? (
-              <AstryxStack
-                direction="vertical"
-                className="rounded-2xl border border-border/50 bg-background/75 p-3 backdrop-blur-md"
-              >
-                <AstryxStack
-                  direction="horizontal"
-                  className="flex items-center justify-between gap-3 text-[11px] text-foreground/85"
-                >
-                  <AstryxText as="span" type="inherit">
-                    {installPhaseLabel(installState.pending ? undefined : installState.job, t)}
-                  </AstryxText>
-                  {installState.job && !installState.pending ? (
-                    <AstryxText as="span" type="inherit">
-                      {formatInstallProgress(installState.job)}
-                    </AstryxText>
-                  ) : null}
-                </AstryxStack>
-                <AstryxStack
-                  direction="vertical"
-                  className="mt-2 h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]"
-                >
-                  {installState.progress === null ? (
-                    <AstryxStack
-                      direction="vertical"
-                      className="hub-loading-progress h-full rounded-full bg-foreground/55"
-                    />
-                  ) : (
-                    <AstryxStack
-                      direction="vertical"
-                      className="h-full rounded-full bg-foreground/65 transition-[width] duration-300"
-                      style={{ width: `${installState.progress}%` }}
-                    />
-                  )}
-                </AstryxStack>
-              </AstryxStack>
-            ) : null}
-
-            {installState.job?.phase === "error" &&
-            installState.job.error &&
-            !installState.done &&
-            !installState.pending ? (
-              <AstryxStack
-                direction="vertical"
-                className="rounded-2xl border border-destructive/25 bg-destructive/5 p-3 text-[12px] text-destructive"
-              >
-                {installState.job.error}
-              </AstryxStack>
-            ) : null}
-
-            {error ? (
-              <AstryxStack
-                direction="vertical"
-                className="rounded-2xl border border-border/40 bg-muted/35 p-3"
-              >
-                <AstryxStack
-                  direction="horizontal"
-                  className="flex items-start gap-2 text-[12px] text-muted-foreground"
-                >
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-foreground/65" />
-                  <AstryxText as="span" type="inherit">
-                    {t("settings.skillsStorePreviewDetailUnavailable")}
-                  </AstryxText>
-                </AstryxStack>
-              </AstryxStack>
-            ) : null}
-
-            {loading ? (
-              <StorePreviewSkeleton />
-            ) : (
-              <>
-                <AstryxStack
-                  direction="vertical"
-                  className="rounded-2xl border border-border/40 bg-background/60 p-3"
-                >
-                  <AstryxStack
-                    direction="vertical"
-                    className="mb-2 text-[12px] font-semibold text-foreground"
+              {loading ? (
+                <VStack gap={2} aria-busy="true">
+                  <Skeleton width="45%" height="var(--spacing-4)" radius="rounded" index={0} />
+                  <Skeleton width="100%" height="var(--spacing-10)" radius="rounded" index={1} />
+                  <Skeleton width="80%" height="var(--spacing-10)" radius="rounded" index={2} />
+                </VStack>
+              ) : (
+                <Section padding={0} variant="transparent">
+                  <MetadataList
+                    title={t("settings.skillsStorePreviewMetadata")}
+                    label={{ position: "start", width: "var(--spacing-28)" }}
                   >
-                    {t("settings.skillsStorePreviewMetadata")}
-                  </AstryxStack>
-                  <AstryxStack direction="vertical" className="divide-y divide-border/30">
-                    <StorePreviewField
-                      label={t("settings.skillsStorePreviewSlug")}
-                      value={data.slug}
-                    />
-                    <StorePreviewField
-                      label={t("settings.skillsStorePreviewOwner")}
-                      value={owner}
-                    />
-                    <StorePreviewField
-                      label={t("settings.skillsStorePreviewVersion")}
-                      value={version}
-                    />
-                    <StorePreviewField
-                      label={t("settings.skillsStorePreviewUpdated")}
-                      value={data.updatedAt ? formatFullStoreDate(data.updatedAt) : null}
-                    />
-                    <StorePreviewField
-                      label={t("settings.skillsStorePreviewCreated")}
-                      value={detail?.createdAt ? formatFullStoreDate(detail.createdAt) : null}
-                    />
-                    <StorePreviewField
-                      label={t("settings.skillsStorePreviewPublished")}
-                      value={
-                        detail?.latestVersionCreatedAt
-                          ? formatFullStoreDate(detail.latestVersionCreatedAt)
-                          : null
-                      }
-                    />
-                    <StorePreviewField
-                      label={t("settings.skillsStorePreviewLicense")}
-                      value={detail?.license}
-                    />
-                    <StorePreviewField
-                      label={t("settings.skillsStorePreviewOs")}
-                      value={supportedOs.length > 0 ? supportedOs.join(", ") : null}
-                    />
-                    <StorePreviewField
-                      label={t("settings.skillsStorePreviewSystems")}
-                      value={supportedSystems.length > 0 ? supportedSystems.join(", ") : null}
-                    />
-                    <StorePreviewField
-                      label={t("settings.skillsStorePreviewModeration")}
-                      value={detail?.moderationStatus}
-                    />
-                  </AstryxStack>
-                </AstryxStack>
+                    <MetadataListItem label={t("settings.skillsStorePreviewSlug")}>
+                      {data.slug}
+                    </MetadataListItem>
+                    {owner ? (
+                      <MetadataListItem label={t("settings.skillsStorePreviewOwner")}>
+                        {owner}
+                      </MetadataListItem>
+                    ) : null}
+                    <MetadataListItem label={t("settings.skillsStorePreviewVersion")}>
+                      {version}
+                    </MetadataListItem>
+                    {data.updatedAt ? (
+                      <MetadataListItem label={t("settings.skillsStorePreviewUpdated")}>
+                        {formatFullStoreDate(data.updatedAt)}
+                      </MetadataListItem>
+                    ) : null}
+                    {detail?.createdAt ? (
+                      <MetadataListItem label={t("settings.skillsStorePreviewCreated")}>
+                        {formatFullStoreDate(detail.createdAt)}
+                      </MetadataListItem>
+                    ) : null}
+                    {detail?.latestVersionCreatedAt ? (
+                      <MetadataListItem label={t("settings.skillsStorePreviewPublished")}>
+                        {formatFullStoreDate(detail.latestVersionCreatedAt)}
+                      </MetadataListItem>
+                    ) : null}
+                    {detail?.license ? (
+                      <MetadataListItem label={t("settings.skillsStorePreviewLicense")}>
+                        {detail.license}
+                      </MetadataListItem>
+                    ) : null}
+                    {supportedOs.length > 0 ? (
+                      <MetadataListItem label={t("settings.skillsStorePreviewOs")}>
+                        {supportedOs.join(", ")}
+                      </MetadataListItem>
+                    ) : null}
+                    {supportedSystems.length > 0 ? (
+                      <MetadataListItem label={t("settings.skillsStorePreviewSystems")}>
+                        {supportedSystems.join(", ")}
+                      </MetadataListItem>
+                    ) : null}
+                    {detail?.moderationStatus ? (
+                      <MetadataListItem label={t("settings.skillsStorePreviewModeration")}>
+                        {detail.moderationStatus}
+                      </MetadataListItem>
+                    ) : null}
+                  </MetadataList>
+                </Section>
+              )}
 
-                {detail?.latestVersionChangelog ? (
-                  <AstryxStack
-                    direction="vertical"
-                    className="rounded-2xl border border-border/40 bg-background/60 p-3"
-                  >
-                    <AstryxStack
-                      direction="vertical"
-                      className="mb-2 text-[12px] font-semibold text-foreground"
-                    >
-                      {t("settings.skillsStorePreviewChangelog")}
-                    </AstryxStack>
-                    <AstryxText
-                      as="p"
-                      type="inherit"
-                      display="block"
-                      className="whitespace-pre-wrap text-[12px] leading-5 text-muted-foreground"
-                    >
-                      {detail.latestVersionChangelog}
-                    </AstryxText>
-                  </AstryxStack>
-                ) : null}
-              </>
-            )}
-          </AstryxStack>
-        </AstryxStack>
-
-        <AstryxStack
-          direction="horizontal"
-          className="flex shrink-0 gap-2 border-t border-border/40 px-5 py-4"
-        >
-          {link ? (
-            <Link href={link} isExternalLink isStandalone weight="semibold">
-              {t("settings.skillsStoreOpenInClawHub")}
-            </Link>
-          ) : null}
-          <Button
-            label={actionLabel}
-            type="button"
-            variant={installState.done ? "secondary" : "primary"}
-            size="sm"
-            className={cn(
-              "h-9 flex-1 gap-1.5 rounded-xl",
-              installState.done &&
-                "border-border/55 bg-background/75 text-foreground/85 backdrop-blur-md",
-            )}
-            isDisabled={installState.done || installState.installing}
-            aria-busy={installState.installing}
-            onClick={onInstall}
-          >
-            {installState.installing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : installState.done ? (
-              <Check className="h-3.5 w-3.5" />
-            ) : (
-              <Cloud className="h-3.5 w-3.5" />
-            )}
-            {actionLabel}
-          </Button>
-        </AstryxStack>
-      </AstryxStack>
+              {detail?.latestVersionChangelog ? (
+                <Section padding={0} variant="transparent">
+                  <VStack gap={2}>
+                    <Text type="label">{t("settings.skillsStorePreviewChangelog")}</Text>
+                    <Markdown content={detail.latestVersionChangelog} renderMode="static" />
+                  </VStack>
+                </Section>
+              ) : null}
+            </VStack>
+          </LayoutContent>
+        }
+        footer={
+          <LayoutFooter hasDivider>
+            <HStack width="100%" gap={2} hAlign="end" vAlign="center" wrap="wrap">
+              {link ? (
+                <Link href={link} isExternalLink isStandalone weight="semibold">
+                  {t("settings.skillsStoreOpenInClawHub")}
+                </Link>
+              ) : null}
+              <AstryxCoreButton
+                label={actionLabel}
+                type="button"
+                variant={installState.done ? "secondary" : "primary"}
+                isLoading={installState.installing}
+                isDisabled={installState.done || installState.installing}
+                aria-busy={installState.installing}
+                onClick={onInstall}
+              />
+            </HStack>
+          </LayoutFooter>
+        }
+      />
     </Dialog>
-  );
-}
-
-function StorePreviewMetric(props: { label: string; value: string }) {
-  return (
-    <AstryxStack
-      direction="vertical"
-      className="rounded-2xl border border-border/35 bg-background/60 px-3 py-2.5"
-    >
-      <AstryxStack direction="vertical" className="text-[10.5px] text-muted-foreground">
-        {props.label}
-      </AstryxStack>
-      <AstryxStack
-        direction="vertical"
-        className="mt-1 text-sm font-semibold tabular-nums text-foreground"
-      >
-        {props.value}
-      </AstryxStack>
-    </AstryxStack>
-  );
-}
-
-const STORE_PREVIEW_FIELD_WIDTHS = ["82%", "66.666%", "55%", "75%", "45%", "60%"] as const;
-
-function StorePreviewSkeleton() {
-  return (
-    <>
-      <AstryxStack
-        direction="vertical"
-        className="rounded-2xl border border-border/40 bg-background/60 p-3"
-      >
-        <Skeleton
-          width="var(--spacing-12)"
-          height="calc(var(--spacing-2) + var(--spacing-0-5))"
-          radius="rounded"
-          index={0}
-        />
-        <AstryxStack direction="vertical" className="divide-y divide-border/30">
-          {STORE_PREVIEW_FIELD_WIDTHS.map((width, i) => (
-            <AstryxGrid
-              key={i}
-              className="grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-3 py-2.5"
-            >
-              <Skeleton
-                width="calc(var(--spacing-12) + var(--spacing-2))"
-                height="calc(var(--spacing-2) + var(--spacing-0-5))"
-                radius="rounded"
-                index={i * 2 + 1}
-              />
-              <Skeleton
-                width={width}
-                height="calc(var(--spacing-2) + var(--spacing-0-5))"
-                radius="rounded"
-                index={i * 2 + 2}
-              />
-            </AstryxGrid>
-          ))}
-        </AstryxStack>
-      </AstryxStack>
-      <AstryxStack
-        direction="vertical"
-        className="rounded-2xl border border-border/40 bg-background/60 p-3"
-      >
-        <Skeleton
-          width="calc(var(--spacing-12) + var(--spacing-4))"
-          height="calc(var(--spacing-2) + var(--spacing-0-5))"
-          radius="rounded"
-          index={13}
-        />
-        <AstryxStack direction="vertical" className="space-y-2">
-          <Skeleton
-            width="100%"
-            height="calc(var(--spacing-2) + var(--spacing-0-5))"
-            radius="rounded"
-            index={14}
-          />
-          <Skeleton
-            width="91.666%"
-            height="calc(var(--spacing-2) + var(--spacing-0-5))"
-            radius="rounded"
-            index={15}
-          />
-          <Skeleton
-            width="60%"
-            height="calc(var(--spacing-2) + var(--spacing-0-5))"
-            radius="rounded"
-            index={16}
-          />
-        </AstryxStack>
-      </AstryxStack>
-    </>
-  );
-}
-
-function StorePreviewField(props: { label: string; value?: string | null }) {
-  if (!props.value) return null;
-  return (
-    <AstryxGrid className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 py-2 text-[12px]">
-      <AstryxStack direction="vertical" className="text-muted-foreground">
-        {props.label}
-      </AstryxStack>
-      <AstryxStack direction="vertical" className="min-w-0 break-words text-foreground">
-        {props.value}
-      </AstryxStack>
-    </AstryxGrid>
   );
 }
 

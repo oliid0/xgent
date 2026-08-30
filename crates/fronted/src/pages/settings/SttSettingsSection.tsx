@@ -8,7 +8,7 @@ import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { useState } from "react";
-import { Check, Mic } from "../../components/icons";
+import { Mic } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   normalizeSettings,
@@ -172,7 +172,6 @@ export function SttSettingsSection({ settings, setSettings }: SettingsSectionPro
             <Button
               type="button"
               label={t("settings.stt.test")}
-              icon={<Check />}
               isLoading={testing}
               isDisabled={testing}
               onClick={() => void testConnection()}

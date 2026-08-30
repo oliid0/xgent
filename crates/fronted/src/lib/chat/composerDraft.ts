@@ -4,6 +4,7 @@ import type {
   MentionComposerGitFileMention,
   MentionComposerLargePaste,
 } from "../../components/chat/MentionComposer";
+import { normalizeLogicalLineEndings } from "./messages/composerText";
 import {
   escapeMarkdownReferenceLabel,
   formatCodeMentionToken,
@@ -42,44 +43,47 @@ export function buildTextFromComposerDraft(
   draft: MentionComposerDraft,
   pastedFileById?: Map<string, PendingUploadedFile>,
 ) {
-  return draft.segments
-    .map((segment) => {
-      switch (segment.type) {
-        case "text":
-          return segment.text;
-        case "fileMention":
-          return formatFileMentionToken(segment.reference);
-        case "skillMention":
-          return `$${segment.skill.name}`;
-        case "commitMention":
-          return formatCommitMention(segment.commit);
-        case "gitFileMention":
-          return formatGitFileMention(segment.file);
-        case "codeMention":
-          return formatCodeMentionToken(segment.reference);
-        case "largePaste": {
-          const file = pastedFileById?.get(segment.paste.id);
-          return file ? `[${segment.paste.label}: ${file.relativePath}]` : segment.paste.text;
+  return normalizeLogicalLineEndings(
+    draft.segments
+      .map((segment) => {
+        switch (segment.type) {
+          case "text":
+            return segment.text;
+          case "fileMention":
+            return formatFileMentionToken(segment.reference);
+          case "skillMention":
+            return `/${segment.skill.name}`;
+          case "commitMention":
+            return formatCommitMention(segment.commit);
+          case "gitFileMention":
+            return formatGitFileMention(segment.file);
+          case "codeMention":
+            return formatCodeMentionToken(segment.reference);
+          case "largePaste": {
+            const file = pastedFileById?.get(segment.paste.id);
+            return file ? `[${segment.paste.label}: ${file.relativePath}]` : segment.paste.text;
+          }
+          default:
+            return "";
         }
-        default:
-          return "";
-      }
-    })
-    .join("")
-    .replace(/\u00A0/g, " ");
+      })
+      .join("")
+      .replace(/\u00A0/g, " "),
+  );
 }
 
 export function createTextComposerDraft(text: string): MentionComposerDraft {
+  const normalizedText = normalizeLogicalLineEndings(text);
   return {
-    segments: text ? [{ type: "text", text }] : [],
-    text,
-    textWithoutLargePastes: text,
+    segments: normalizedText ? [{ type: "text", text: normalizedText }] : [],
+    text: normalizedText,
+    textWithoutLargePastes: normalizedText,
     largePastes: [],
     skillMentions: [],
     commitMentions: [],
     gitFileMentions: [],
     codeMentions: [],
-    isEmpty: !text.trim(),
+    isEmpty: !normalizedText.trim(),
   };
 }
 

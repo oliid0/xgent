@@ -14,7 +14,7 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { invoke, isBrowserRuntime } from "@xagent/runtime";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FolderOpen, RefreshCw, Terminal, Trash2, X } from "../../components/icons";
+import { FolderOpen, Terminal, Trash2 } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   cancelMobileExecution,
@@ -278,7 +278,6 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
               <Button
                 type="button"
                 label={t("settings.mobileRefresh")}
-                icon={<RefreshCw />}
                 variant="secondary"
                 isLoading={busy === "status"}
                 isDisabled={busy !== ""}
@@ -343,7 +342,6 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
                       <Button
                         type="button"
                         label={t("settings.mobileCancel")}
-                        icon={<X />}
                         variant="secondary"
                         isLoading={busy === "cancel"}
                         isDisabled={busy === "cancel"}
@@ -369,7 +367,6 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
                   <Button
                     type="button"
                     label={t("settings.mobileMountFolder")}
-                    icon={<FolderOpen />}
                     variant="secondary"
                     isDisabled={busy !== ""}
                     onClick={() => void chooseExternalWorkspace()}

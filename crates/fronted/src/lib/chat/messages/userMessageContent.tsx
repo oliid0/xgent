@@ -8,6 +8,7 @@ import { getFileTypeIcon } from "../../../components/chat/fileTypeIcons";
 import { mentionChipClassName } from "../../../components/chat/mentionChipStyles";
 import { SkillIcon } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
+import { normalizeLogicalLineEndings } from "./composerText";
 import {
   type CodeMentionReference,
   codeMentionDisplayName,
@@ -896,7 +897,11 @@ export const UserMessageContent = memo(function UserMessageContent({
   pastedTextFiles?: PendingUploadedFile[];
   loadCommitDetails?: CommitDetailsLoader;
 }) {
-  const parts = useMemo(() => tokenizeUserMessage(text, pastedTextFiles), [text, pastedTextFiles]);
+  const normalizedText = useMemo(() => normalizeLogicalLineEndings(text), [text]);
+  const parts = useMemo(
+    () => tokenizeUserMessage(normalizedText, pastedTextFiles),
+    [normalizedText, pastedTextFiles],
+  );
   const hasChip = parts.some(
     (part) =>
       part.type === "mention" ||
@@ -906,7 +911,17 @@ export const UserMessageContent = memo(function UserMessageContent({
       part.type === "codeRef" ||
       part.type === "pastedText",
   );
-  if (!hasChip) return <>{text}</>;
+  const trailingNewlineAnchor = normalizedText.endsWith("\n") ? (
+    <span aria-hidden="true" className="chat-user-trailing-newline-anchor" />
+  ) : null;
+  if (!hasChip) {
+    return (
+      <>
+        {normalizedText}
+        {trailingNewlineAnchor}
+      </>
+    );
+  }
 
   return (
     <>
@@ -942,6 +957,7 @@ export const UserMessageContent = memo(function UserMessageContent({
           </AstryxText>
         );
       })}
+      {trailingNewlineAnchor}
     </>
   );
 });

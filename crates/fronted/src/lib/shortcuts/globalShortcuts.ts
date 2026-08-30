@@ -31,6 +31,22 @@ export interface GlobalShortcutFailure {
 
 const STORAGE_KEY = "xagent.globalShortcuts.v1";
 
+export const DEFAULT_GLOBAL_SHORTCUT_BINDINGS: Readonly<GlobalShortcutBindings> = {
+  summon: { accelerator: "Ctrl+KeyK", enabled: false },
+  toggle: { accelerator: "Ctrl+Shift+KeyS", enabled: false },
+  newChat: { accelerator: "Ctrl+Shift+KeyO", enabled: false },
+  pin: { accelerator: "Ctrl+Period", enabled: false },
+};
+
+export function getDefaultGlobalShortcutBindings(): GlobalShortcutBindings {
+  return Object.fromEntries(
+    Object.entries(DEFAULT_GLOBAL_SHORTCUT_BINDINGS).map(([action, binding]) => [
+      action,
+      { ...binding },
+    ]),
+  ) as GlobalShortcutBindings;
+}
+
 export const SHORTCUT_MODIFIER_ORDER = ["Ctrl", "Shift", "Alt", "Super"] as const;
 export type ShortcutModifier = (typeof SHORTCUT_MODIFIER_ORDER)[number];
 
@@ -63,9 +79,9 @@ export function modifierFromEventCode(code: string): ShortcutModifier | null {
 export function readGlobalShortcutBindings(): GlobalShortcutBindings {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
+    if (!raw) return getDefaultGlobalShortcutBindings();
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return {};
+    if (!parsed || typeof parsed !== "object") return getDefaultGlobalShortcutBindings();
     const bindings: GlobalShortcutBindings = {};
     for (const action of GLOBAL_SHORTCUT_ACTIONS) {
       const value = (parsed as Record<string, unknown>)[action];
@@ -84,7 +100,7 @@ export function readGlobalShortcutBindings(): GlobalShortcutBindings {
     }
     return bindings;
   } catch {
-    return {};
+    return getDefaultGlobalShortcutBindings();
   }
 }
 

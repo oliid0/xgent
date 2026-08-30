@@ -5,6 +5,12 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 const loader = createTsModuleLoader();
 const settings = loader.loadModule("src/lib/settings/index.ts");
 const modelSelection = loader.loadModule("src/pages/chat/runtime/modelSelection.ts");
+const providerRuntimeConfig = loader.loadModule(
+  "src/lib/providers/runtime/providerRuntimeConfig.ts",
+);
+const chatProviderRuntimeConfig = loader.loadModule(
+  "src/pages/chat/runtime/providerRuntimeConfig.ts",
+);
 
 function provider(overrides = {}) {
   const id = overrides.id ?? "provider-1";
@@ -23,8 +29,8 @@ function provider(overrides = {}) {
   };
 }
 
-function appSettings(customProviders, selectedModel) {
-  return settings.normalizeSettings({ customProviders, selectedModel });
+function appSettings(customProviders, selectedModel, overrides = {}) {
+  return settings.normalizeSettings({ customProviders, selectedModel, ...overrides });
 }
 
 test("chat model selection resolves an enabled selected model", () => {
@@ -131,4 +137,64 @@ test("selected model json round-trips and rejects malformed payloads", () => {
   });
   assert.equal(settings.parseSelectedModelJson("not-json"), undefined);
   assert.equal(settings.parseSelectedModelJson('{"model":"m1"}'), undefined);
+});
+
+test("provider runtime preserves managed OAuth and complete request policy", () => {
+  const oauthProvider = settings.normalizeCustomProvider({
+    id: "openai-oauth",
+    name: "OpenAI OAuth",
+    type: "codex",
+    baseUrl: "https://api.openai.com/v1",
+    apiKey: "",
+    authMode: "oauth-managed",
+    oauthAccountId: "oauth-account-1",
+    models: ["gpt-5"],
+    activeModels: ["gpt-5"],
+    requestFormat: "openai-responses",
+    promptCacheHintMode: "openai-key",
+    retryPolicy: { mode: "custom", maxRetries: 4 },
+  });
+
+  const runtime = providerRuntimeConfig.createProviderRuntimeConfig(
+    oauthProvider,
+    "gpt-5",
+    undefined,
+  );
+
+  assert.equal(runtime.authMode, "oauth-managed");
+  assert.equal(runtime.oauthAccountId, "oauth-account-1");
+  assert.equal(runtime.promptCacheHintMode, "openai-key");
+  assert.deepEqual(runtime.retryPolicy, { mode: "custom", maxRetries: 4 });
+});
+
+test("managed OAuth providers remain eligible failover targets", () => {
+  const primaryProvider = provider({ id: "openai-primary", models: ["gpt-5"] });
+  const oauthFallback = {
+    ...provider({ id: "openai-oauth", models: ["gpt-5"], apiKey: "" }),
+    apiKey: "",
+    authMode: "oauth-managed",
+    oauthAccountId: "oauth-account-1",
+  };
+  const app = appSettings(
+    [primaryProvider, oauthFallback],
+    { customProviderId: "openai-primary", model: "gpt-5" },
+    {
+      modelFailover: {
+        codex: {
+          enabled: true,
+          queue: ["openai-oauth"],
+          maxSwitches: 2,
+          failureThreshold: 2,
+          cooldownSeconds: 30,
+        },
+      },
+    },
+  );
+  const primary = modelSelection.resolveEffectiveChatModelSelection({ settings: app });
+
+  const plan = chatProviderRuntimeConfig.buildModelFailoverPlan(app, primary);
+
+  assert.equal(plan?.fallbacks.length, 1);
+  assert.equal(plan?.fallbacks[0].runtime.authMode, "oauth-managed");
+  assert.equal(plan?.fallbacks[0].runtime.oauthAccountId, "oauth-account-1");
 });

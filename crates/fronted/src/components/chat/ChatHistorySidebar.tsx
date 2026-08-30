@@ -43,6 +43,7 @@ import {
   GitBranch,
   Key,
   Loader2,
+  MessageSquare,
   PanelLeftClose,
   PanelRightOpen,
   Pin,
@@ -2058,17 +2059,18 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               <AstryxStack
                 direction="horizontal"
                 ref={projectsHeaderRef}
-                className="group/workspace-header flex items-center justify-between px-2 pb-1 pt-2"
+                className="group/workspace-header flex min-w-0 items-center justify-between gap-1 px-2 pb-1 pt-2"
               >
                 <AstryxButton
                   variant="ghost"
                   label={t("chat.workspaceSection")}
                   type="button"
                   aria-expanded={!projectsCollapsed}
-                  className="group flex min-w-0 items-center gap-1 rounded-md px-3 py-1 text-xs font-semibold text-muted-foreground outline-hidden"
+                  className="group flex min-w-0 flex-1 items-center justify-start gap-1.5 rounded-md px-2 py-1 text-left text-[calc(11.5px*var(--zone-font-scale,1))] font-medium tracking-normal text-muted-foreground outline-hidden"
                   onClick={() => onProjectsCollapsedChange?.(!projectsCollapsed)}
                 >
-                  <AstryxText as="span" type="inherit">
+                  <AstryxIcon icon={FolderTree} size="xsm" color="secondary" />
+                  <AstryxText as="span" type="inherit" className="min-w-0 truncate">
                     {t("chat.workspaceSection")}
                   </AstryxText>
                   <ChevronRight
@@ -2434,7 +2436,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
           <AstryxGrid
             ref={recentHeaderRef}
             className={cn(
-              "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-2 pb-2",
+              "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-2 pb-1",
               showProjects ? "border-t border-border/35 pt-0.5" : "pt-3",
             )}
           >
@@ -2443,9 +2445,10 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               label={t("chat.recentConversation")}
               type="button"
               aria-expanded={!recentCollapsed}
-              className="group flex min-w-0 items-center gap-1 rounded-md px-3 py-1 text-xs font-semibold text-muted-foreground outline-hidden"
+              className="group flex min-w-0 items-center justify-start gap-1.5 rounded-md px-2 py-1 text-left text-[calc(11.5px*var(--zone-font-scale,1))] font-medium tracking-normal text-muted-foreground outline-hidden"
               onClick={() => onRecentCollapsedChange?.(!recentCollapsed)}
             >
+              <AstryxIcon icon={MessageSquare} size="xsm" color="secondary" />
               <AstryxText as="span" type="inherit" className="min-w-0 truncate">
                 {t("chat.recentConversation")}
               </AstryxText>

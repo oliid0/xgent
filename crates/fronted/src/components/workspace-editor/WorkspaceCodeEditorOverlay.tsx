@@ -1,5 +1,6 @@
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
@@ -16,10 +17,11 @@ import {
 } from "@astryxdesign/core/Layout";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Spinner } from "@astryxdesign/core/Spinner";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
-import * as stylex from "@stylexjs/stylex";
+import { invoke } from "@xagent/runtime";
 import * as monaco from "monaco-editor";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import CssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
@@ -42,10 +44,8 @@ import {
 import { invokeFs, isFsBackendError } from "../../lib/tools/fsBackend";
 import { AdaptiveDialog } from "../astryx/AdaptiveDialog";
 import {
-  AlertTriangle,
   ClipboardPaste,
   Copy,
-  Eye,
   FilePenLine,
   MessageSquareText,
   Redo2,
@@ -109,6 +109,25 @@ type WriteTextResponse = {
   totalLines: number;
 };
 
+type ShellRunResponse = {
+  exit_code?: number;
+  exitCode?: number;
+  stdout: string;
+  stderr: string;
+  timed_out?: boolean;
+  timedOut?: boolean;
+  cancelled: boolean;
+};
+
+type EditorRunResult = {
+  fileName: string;
+  command: string;
+  phase: "running" | "complete" | "failed";
+  output: string;
+  exitCode?: number;
+  error?: string;
+};
+
 type EditorTabStatus = "ready" | "saving" | "conflict";
 
 type EditorTab = {
@@ -133,15 +152,6 @@ type PendingDialog =
   | { kind: "reloadTab"; tabKey: string };
 
 const EDITOR_OVERLAY_ANIMATION_MS = 180;
-
-const editorStyles = stylex.create({
-  contextMenuTrigger: {
-    display: "flex",
-    width: "100%",
-    height: "100%",
-    minHeight: 0,
-  },
-});
 
 type WorkspaceCodeEditorOverlayProps = {
   openRequest: WorkspaceCodeEditorOpenRequest | null;
@@ -169,6 +179,23 @@ function dirname(path: string) {
   const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
   const index = normalized.lastIndexOf("/");
   return index > 0 ? normalized.slice(0, index) : "";
+}
+
+function runnableFile(path: string) {
+  const fileName = basename(path);
+  if (!/^[\p{L}\p{N} ._()-]+$/u.test(fileName)) return null;
+  const lowerName = fileName.toLowerCase();
+  const executable = lowerName.endsWith(".py")
+    ? "python"
+    : /\.(?:js|mjs|cjs)$/.test(lowerName)
+      ? "node"
+      : null;
+  if (!executable) return null;
+  return {
+    fileName,
+    command: `${executable} -- "${fileName}"`,
+    cwd: dirname(path) || null,
+  };
 }
 
 function formatBytes(bytes: number) {
@@ -338,6 +365,8 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
   const [openingPaths, setOpeningPaths] = useState<string[]>([]);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [pendingDialog, setPendingDialog] = useState<PendingDialog | null>(null);
+  const [isRunningFile, setIsRunningFile] = useState(false);
+  const [runResult, setRunResult] = useState<EditorRunResult | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   const activeTab = useMemo(
@@ -345,6 +374,7 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
     [activeKey, tabs],
   );
   const canPreviewActiveTab = Boolean(activeTab && isWorkspacePreviewPath(activeTab.path));
+  const activeRunnableFile = activeTab ? runnableFile(activeTab.path) : null;
   const dirtyTabs = useMemo(() => tabs.filter((tab) => tab.content !== tab.savedContent), [tabs]);
   const hasDirtyTabs = dirtyTabs.length > 0;
   const isOpening = openingPaths.length > 0;
@@ -460,6 +490,62 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
     },
     [t, tabs, updateTab],
   );
+
+  const runActiveFile = useCallback(async () => {
+    const tab = activeTab;
+    const runnable = tab ? runnableFile(tab.path) : null;
+    if (!tab || !runnable || isRunningFile) return;
+    setIsRunningFile(true);
+    if (tab.content !== tab.savedContent) {
+      const saved = await saveTab(tab.key);
+      if (!saved) {
+        setIsRunningFile(false);
+        return;
+      }
+    }
+
+    setRunResult({
+      fileName: runnable.fileName,
+      command: runnable.command,
+      phase: "running",
+      output: "",
+    });
+    try {
+      const runId = `workspace-editor-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
+      const response = await invoke<ShellRunResponse>("shell_run", {
+        workdir: tab.workdir,
+        command: runnable.command,
+        cwd: runnable.cwd,
+        timeout_ms: 120_000,
+        max_timeout_ms: 1_800_000,
+        provider_id: null,
+        run_id: runId,
+        sandbox: false,
+        sandbox_allow_network: true,
+      });
+      const exitCode = response.exitCode ?? response.exit_code;
+      const output = [response.stdout, response.stderr ? `[stderr]\n${response.stderr}` : ""]
+        .filter(Boolean)
+        .join("\n");
+      setRunResult({
+        fileName: runnable.fileName,
+        command: runnable.command,
+        phase: "complete",
+        output,
+        exitCode,
+      });
+    } catch (error) {
+      setRunResult({
+        fileName: runnable.fileName,
+        command: runnable.command,
+        phase: "failed",
+        output: "",
+        error: toMessage(error, t("workspaceEditor.runFailed")),
+      });
+    } finally {
+      setIsRunningFile(false);
+    }
+  }, [activeTab, isRunningFile, saveTab, t]);
 
   const readTab = useCallback(
     async (request: WorkspaceCodeEditorOpenRequest) => {
@@ -980,6 +1066,15 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
                       }
                       onClick={() => activeTab && void saveTab(activeTab.key)}
                     />
+                    <IconButton
+                      label={t("workspaceEditor.context.copy")}
+                      tooltip={t("workspaceEditor.context.copy")}
+                      icon={<Icon icon={Copy} size="sm" color="inherit" />}
+                      variant="ghost"
+                      size="sm"
+                      isDisabled={!activeTab}
+                      onClick={() => runEditorCommand("editor.action.clipboardCopyAction")}
+                    />
                     {isNarrow ? (
                       <MoreMenu
                         label={t("workspaceEditor.moreActions")}
@@ -1001,17 +1096,12 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
                             onClick: () => activeTab && requestReloadTab(activeTab.key),
                             isDisabled: !activeTab || isOpening,
                           },
-                          ...(canPreviewActiveTab && activeTab
+                          ...(activeRunnableFile
                             ? [
                                 {
-                                  label: t("workspaceEditor.preview"),
-                                  onClick: () =>
-                                    onPreviewFile({
-                                      id: Date.now(),
-                                      projectPathKey: activeTab.projectPathKey,
-                                      workdir: activeTab.workdir,
-                                      path: activeTab.path,
-                                    }),
+                                  label: t("workspaceEditor.run"),
+                                  onClick: () => void runActiveFile(),
+                                  isDisabled: isRunningFile,
                                 },
                               ]
                             : []),
@@ -1019,6 +1109,20 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
                       />
                     ) : (
                       <>
+                        {activeRunnableFile ? (
+                          <Button
+                            label={
+                              isRunningFile
+                                ? t("workspaceEditor.running")
+                                : t("workspaceEditor.run")
+                            }
+                            variant="secondary"
+                            size="sm"
+                            isLoading={isRunningFile}
+                            isDisabled={isRunningFile}
+                            onClick={() => void runActiveFile()}
+                          />
+                        ) : null}
                         <IconButton
                           label={t("workspaceEditor.find")}
                           tooltip={t("workspaceEditor.find")}
@@ -1047,23 +1151,6 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
                           isDisabled={!activeTab || isOpening}
                           onClick={() => activeTab && requestReloadTab(activeTab.key)}
                         />
-                        {canPreviewActiveTab && activeTab ? (
-                          <IconButton
-                            label={t("workspaceEditor.preview")}
-                            tooltip={t("workspaceEditor.preview")}
-                            icon={<Icon icon={Eye} size="sm" color="inherit" />}
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              onPreviewFile({
-                                id: Date.now(),
-                                projectPathKey: activeTab.projectPathKey,
-                                workdir: activeTab.workdir,
-                                path: activeTab.path,
-                              })
-                            }
-                          />
-                        ) : null}
                       </>
                     )}
                     <IconButton
@@ -1077,6 +1164,27 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
                   </HStack>
                 }
               />
+              {canPreviewActiveTab && activeTab ? (
+                <HStack width="100%" paddingInline={3}>
+                  <TabList
+                    value="source"
+                    onChange={(value) => {
+                      if (value !== "preview") return;
+                      onPreviewFile({
+                        id: Date.now(),
+                        projectPathKey: activeTab.projectPathKey,
+                        workdir: activeTab.workdir,
+                        path: activeTab.path,
+                      });
+                    }}
+                    size="sm"
+                    overflow="auto"
+                  >
+                    <Tab value="preview" label={t("workspaceFilePreview.preview")} />
+                    <Tab value="source" label={t("workspaceFilePreview.source")} />
+                  </TabList>
+                </HStack>
+              ) : null}
               {tabs.length > 0 ? (
                 <HStack
                   className="xagent-workspace-editor-tabs"
@@ -1092,13 +1200,6 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
                         <Button
                           label={basename(tab.path)}
                           tooltip={tab.path}
-                          icon={
-                            <Icon
-                              icon={tab.status === "conflict" ? AlertTriangle : FilePenLine}
-                              size="sm"
-                              color={tab.status === "conflict" ? "warning" : "inherit"}
-                            />
-                          }
                           endContent={
                             dirty ? (
                               <Token label={t("workspaceEditor.unsaved")} color="blue" size="sm" />
@@ -1150,14 +1251,13 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
                 }
               />
             ) : null}
-            <StackItem size="fill">
+            <StackItem className="xagent-workspace-editor-context-menu" size="fill">
               <ContextMenu
                 items={editorContextMenuItems}
                 label={t("workspaceEditor.context.copy")}
                 menuWidth="var(--xagent-editor-context-menu-width)"
                 size="sm"
                 isDisabled={!activeTab || Boolean(pendingDialog)}
-                triggerXstyle={editorStyles.contextMenuTrigger}
               >
                 <LayoutContent
                   ref={containerRef}
@@ -1237,6 +1337,62 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
           }
         >
           <Text color="secondary">{dialogDescription}</Text>
+        </AdaptiveDialog>
+      ) : null}
+
+      {runResult ? (
+        <AdaptiveDialog
+          isOpen
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen && !isRunningFile) setRunResult(null);
+          }}
+          title={`${t("workspaceEditor.runOutput")}: ${runResult.fileName}`}
+          purpose="info"
+          width="var(--xagent-dialog-width-lg)"
+          touchPresentation="bottom-sheet"
+          footer={
+            <Button
+              label={t("workspaceEditor.closeRunOutput")}
+              variant="secondary"
+              isDisabled={isRunningFile}
+              onClick={() => setRunResult(null)}
+            />
+          }
+        >
+          <VStack gap={3}>
+            {runResult.phase === "running" ? (
+              <Spinner size="lg" label={t("workspaceEditor.running")} />
+            ) : (
+              <Banner
+                status={
+                  runResult.phase === "failed" || runResult.exitCode !== 0 ? "error" : "success"
+                }
+                title={
+                  runResult.phase === "failed"
+                    ? t("workspaceEditor.runFailed")
+                    : runResult.exitCode === 0
+                      ? t("workspaceEditor.runSucceeded")
+                      : t("workspaceEditor.runFailed")
+                }
+                description={
+                  runResult.error ??
+                  `${runResult.command} · ${t("workspaceEditor.exitCode")} ${runResult.exitCode ?? "-"}`
+                }
+                collapsible={false}
+              />
+            )}
+            {runResult.phase !== "running" ? (
+              <CodeBlock
+                code={runResult.output || t("workspaceEditor.noRunOutput")}
+                language="plaintext"
+                title={t("workspaceEditor.runOutput")}
+                size="sm"
+                width="100%"
+                maxHeight="min(55dvh, 32rem)"
+                isWrapped
+              />
+            ) : null}
+          </VStack>
         </AdaptiveDialog>
       ) : null}
     </VStack>

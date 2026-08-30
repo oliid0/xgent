@@ -140,7 +140,11 @@ export function buildModelFailoverPlan(
     // entries, but re-check here so a stale persisted queue can never route
     // a Claude request to a Codex provider (or vice versa).
     if (provider.type !== primary.providerId) continue;
-    if (!provider.baseUrl.trim() || !provider.apiKey.trim()) continue;
+    const hasRequestAuth =
+      provider.authMode === "oauth-managed"
+        ? Boolean(provider.oauthAccountId?.trim())
+        : Boolean(provider.apiKey.trim());
+    if (!provider.baseUrl.trim() || !hasRequestAuth) continue;
     fallbacks.push({
       selectedModel: { customProviderId: provider.id, model: primary.model },
       providerId: provider.type,

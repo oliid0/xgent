@@ -21,7 +21,7 @@ import {
   useManagedProcesses,
 } from "../../lib/managed-process/store";
 import type { ManagedProcessLog, ManagedProcessRecord } from "../../lib/managed-process/types";
-import { AlertTriangle, Check, Copy, FileText, RefreshCw, Square, Trash2 } from "../icons";
+import { AlertTriangle, FileText } from "../icons";
 
 type BackgroundTasksPanelProps = {
   // Visibility contract from the workspace side panel: gates the per-second uptime
@@ -157,7 +157,6 @@ function BackgroundTaskLogDialog(props: {
               label={t("projectTools.bgTaskRefreshLog")}
               variant="ghost"
               size="sm"
-              icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
               isDisabled={actionsDisabled}
               isLoading={loading}
               onClick={() => refresh(false)}
@@ -339,7 +338,6 @@ function BackgroundTaskRow(props: {
               }
               variant={pendingStop ? "destructive" : "ghost"}
               size="sm"
-              icon={<Icon icon={pendingStop ? Check : Square} size="sm" color="inherit" />}
               isDisabled={actionsDisabled}
               isLoading={stopping}
               onClick={handleStop}
@@ -350,7 +348,6 @@ function BackgroundTaskRow(props: {
                 label={t("projectTools.bgTaskRetry")}
                 variant="ghost"
                 size="sm"
-                icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
                 isDisabled={actionsDisabled}
                 isLoading={retrying}
                 onClick={handleRetry}
@@ -359,7 +356,6 @@ function BackgroundTaskRow(props: {
                 label={t("projectTools.bgTaskClear")}
                 variant="ghost"
                 size="sm"
-                icon={<Icon icon={Trash2} size="sm" color="inherit" />}
                 isDisabled={actionsDisabled || retrying}
                 onClick={handleClear}
               />
@@ -369,7 +365,6 @@ function BackgroundTaskRow(props: {
             label={t("projectTools.bgTaskViewLog")}
             variant="ghost"
             size="sm"
-            icon={<Icon icon={FileText} size="sm" color="inherit" />}
             isDisabled={actionsDisabled}
             onClick={() => onViewLog(process)}
           />
@@ -377,7 +372,6 @@ function BackgroundTaskRow(props: {
             label={copied ? t("projectTools.bgTaskCopied") : t("projectTools.bgTaskCopy")}
             variant="ghost"
             size="sm"
-            icon={<Icon icon={copied ? Check : Copy} size="sm" color="inherit" />}
             onClick={handleCopy}
           />
         </HStack>
@@ -439,7 +433,6 @@ export const BackgroundTasksPanel = memo(function BackgroundTasksPanel(
               label={t("projectTools.bgTaskClearFinished")}
               variant="ghost"
               size="sm"
-              icon={<Icon icon={Trash2} size="sm" color="inherit" />}
               isDisabled={actionsDisabled}
               onClick={handleClearFinished}
             />

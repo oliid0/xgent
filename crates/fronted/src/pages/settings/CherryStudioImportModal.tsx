@@ -385,7 +385,6 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
                     label="选择数据目录"
                     variant="secondary"
                     size="sm"
-                    icon={<Icon icon={FolderOpen} size="sm" color="inherit" />}
                     onClick={() => setPathDialogOpen(true)}
                     isDisabled={importing}
                   />

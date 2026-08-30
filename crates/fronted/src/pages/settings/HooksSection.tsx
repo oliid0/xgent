@@ -14,7 +14,6 @@ import {
   Globe,
   MessageSquare,
   Pencil,
-  Plus,
   RefreshCw,
   Terminal,
   Trash2,
@@ -153,35 +152,36 @@ export function HooksSection(_props: SettingsSectionProps) {
 
   return (
     <VStack width="100%" gap={4}>
-      <Section variant="transparent" padding={0}>
-        <HStack width="100%" gap={3} vAlign="center" wrap="wrap">
-          <StackItem size="fill">
-            <Text type="supporting" color="secondary" wordBreak="break-word">
-              {t("settings.hooksDesc")}
-            </Text>
-          </StackItem>
-          <HStack gap={1} vAlign="center" wrap="wrap">
-            <Token
-              label={`${hooks.length} ${t("settings.hooksTotalHooks")}`}
-              color="gray"
-              size="sm"
-            />
-            <Token
-              label={`${enabledCount} ${t("settings.enable")}`}
-              color="green"
-              size="sm"
-              icon={<StatusDot variant="success" label={t("settings.enable")} />}
-            />
-            <Button
-              label={t("settings.hooksAdd")}
-              variant="secondary"
-              size="sm"
-              icon={<Icon icon={Plus} size="sm" color="inherit" />}
-              onClick={openAdd}
-            />
+      {hooks.length > 0 ? (
+        <Section variant="transparent" padding={0}>
+          <HStack width="100%" gap={3} vAlign="center" wrap="wrap">
+            <StackItem size="fill">
+              <Text type="supporting" color="secondary" wordBreak="break-word">
+                {t("settings.hooksDesc")}
+              </Text>
+            </StackItem>
+            <HStack gap={1} vAlign="center" wrap="wrap">
+              <Token
+                label={`${hooks.length} ${t("settings.hooksTotalHooks")}`}
+                color="gray"
+                size="sm"
+              />
+              <Token
+                label={`${enabledCount} ${t("settings.enable")}`}
+                color="green"
+                size="sm"
+                icon={<StatusDot variant="success" label={t("settings.enable")} />}
+              />
+              <Button
+                label={t("settings.hooksAdd")}
+                variant="secondary"
+                size="sm"
+                onClick={openAdd}
+              />
+            </HStack>
           </HStack>
-        </HStack>
-      </Section>
+        </Section>
+      ) : null}
 
       {actionError ? <Banner status="error" title={actionError} collapsible={false} /> : null}
 
@@ -197,7 +197,6 @@ export function HooksSection(_props: SettingsSectionProps) {
                 label={t("settings.hooksAdd")}
                 variant="secondary"
                 size="sm"
-                icon={<Icon icon={Plus} size="sm" color="inherit" />}
                 onClick={openAdd}
               />
             }

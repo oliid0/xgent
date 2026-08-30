@@ -71,9 +71,6 @@ export function AppUpdateButton({
     <Button
       type="button"
       label={actionLabel}
-      icon={
-        installed ? <RefreshCw className={iconClassName} /> : <Download className={iconClassName} />
-      }
       variant="primary"
       size="sm"
       tooltip={title}

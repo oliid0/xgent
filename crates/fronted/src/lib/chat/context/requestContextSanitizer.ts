@@ -1,4 +1,10 @@
-import type { Context, Message, TextContent, ToolResultMessage } from "@earendil-works/pi-ai";
+import type {
+  Context,
+  Message,
+  TextContent,
+  ToolResultMessage,
+  Usage,
+} from "@earendil-works/pi-ai";
 import { normalizeHostedSearchBlock } from "@/lib/chat/hostedSearch";
 import { isSubagentCardToolCall } from "../../subagents/card";
 import type { DisplayImageItemDetails, DisplayImageResultDetails } from "../../tools/builtinTypes";
@@ -148,12 +154,26 @@ function sanitizeTextBlocksForModelContext(message: Message): Message {
   return changed ? ({ ...message, content: content as Message["content"] } as Message) : message;
 }
 
+function zeroAggregatedHostedSearchUsage(previous?: Usage): Usage {
+  const keepPositiveInteger = (value: unknown): number =>
+    typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+  return {
+    input: 0,
+    output: keepPositiveInteger(previous?.output),
+    cacheRead: keepPositiveInteger(previous?.cacheRead),
+    cacheWrite: 0,
+    totalTokens: 0,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  };
+}
+
 export function sanitizeMessageForModelContext(message: Message): Message {
   let nextMessage = sanitizeTextBlocksForModelContext(message);
 
   if (nextMessage.role === "assistant") {
     const nextContent: unknown[] = [];
     let changed = false;
+    let strippedHostedSearch = false;
     for (const block of nextMessage.content as unknown[]) {
       if (isSubagentCardToolCall(block)) {
         changed = true;
@@ -163,6 +183,7 @@ export function sanitizeMessageForModelContext(message: Message): Message {
       const hostedSearch = normalizeHostedSearchBlock(block);
       if (hostedSearch) {
         changed = true;
+        strippedHostedSearch = true;
         continue;
       }
       nextContent.push(block);
@@ -171,6 +192,11 @@ export function sanitizeMessageForModelContext(message: Message): Message {
       nextMessage = {
         ...nextMessage,
         content: nextContent as Message["content"],
+        ...(strippedHostedSearch
+          ? {
+              usage: zeroAggregatedHostedSearchUsage((nextMessage as { usage?: Usage }).usage),
+            }
+          : {}),
       } as Message;
     }
   }

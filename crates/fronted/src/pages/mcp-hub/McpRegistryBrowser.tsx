@@ -1,4 +1,5 @@
 import { Banner } from "@astryxdesign/core/Banner";
+import { BreadcrumbItem, Breadcrumbs } from "@astryxdesign/core/Breadcrumbs";
 import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
@@ -29,13 +30,11 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Check,
   ExternalLink,
   Globe2,
   Key,
-  Plus,
   RefreshCw,
   Search,
   Server,
@@ -93,6 +92,14 @@ type McpRegistryCardGroup = {
   cards: McpRegistryCard[];
 };
 
+type PrefetchedMcpPage = {
+  cursor: string;
+  source: McpRegistrySource;
+  query: string;
+  items: McpRegistryCard[];
+  nextCursor?: string;
+};
+
 function versionLabelForCard(card: McpRegistryCard) {
   return card.versionLabel ?? (card.source === "official" ? card.scoreLabel : undefined);
 }
@@ -117,6 +124,12 @@ function groupMcpRegistryCards(cards: McpRegistryCard[]) {
   }
 
   return groups;
+}
+
+function mergeMcpRegistryCards(current: McpRegistryCard[], next: McpRegistryCard[]) {
+  const byId = new Map(current.map((card) => [card.id, card]));
+  for (const card of next) byId.set(card.id, card);
+  return Array.from(byId.values());
 }
 
 function installLabelKey(card: McpRegistryCard) {
@@ -589,7 +602,6 @@ function McpConfigureModal(props: {
                 <AstryxCoreButton
                   type="submit"
                   label={t("mcpHub.storeConfigureSubmit")}
-                  icon={<Icon icon={Plus} size="sm" color="inherit" />}
                   variant="primary"
                 />
               </HStack>
@@ -688,10 +700,7 @@ function RegistryCard(props: {
           />
           <AstryxCoreButton
             label={done ? t("mcpHub.storeInstalled") : t(installLabelKey(card))}
-            icon={<Icon icon={done ? Check : Sparkles} size="sm" color="inherit" />}
-            isIconOnly
-            tooltip={done ? t("mcpHub.storeInstalled") : t(installLabelKey(card))}
-            variant="ghost"
+            variant={done ? "secondary" : "primary"}
             size="sm"
             isDisabled={done || installing}
             isLoading={installing}
@@ -773,6 +782,10 @@ function McpRegistryPreviewDrawer(props: {
         content={
           <LayoutContent isScrollable>
             <VStack gap={5}>
+              <Breadcrumbs variant="supporting" label={t("mcpHub.storePreviewTitle")}>
+                <BreadcrumbItem onClick={onClose}>{t("mcpHub.tabStore")}</BreadcrumbItem>
+                <BreadcrumbItem isCurrent>{data.displayName}</BreadcrumbItem>
+              </Breadcrumbs>
               <Text color="secondary">{data.description || t("mcpHub.storeNoDescription")}</Text>
 
               <HStack gap={2} vAlign="center" wrap="wrap">
@@ -970,13 +983,11 @@ function McpRegistryPreviewDrawer(props: {
                   target="_blank"
                   rel="noreferrer"
                   label={t("mcpHub.storeOpenExternal")}
-                  icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
                   variant="secondary"
                 />
               ) : null}
               <AstryxCoreButton
                 label={actionLabel}
-                icon={<Icon icon={installed ? Check : Sparkles} size="sm" color="inherit" />}
                 variant={installed || draft?.status === "needs_config" ? "secondary" : "primary"}
                 isDisabled={installed || installing}
                 isLoading={installing}
@@ -995,10 +1006,15 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
   const { t } = useLocale();
   const [source, setSource] = useState<McpRegistrySource>("official");
   const [query, setQuery] = useState("");
+  const [activeQuery, setActiveQuery] = useState("");
   const [items, setItems] = useState<McpRegistryCard[]>([]);
   const [nextCursor, setNextCursor] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [prefetchedPage, setPrefetchedPage] = useState<PrefetchedMcpPage | null>(null);
+  const loadMoreInFlightRef = useRef(false);
+  const storeScrollRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [configuringCard, setConfiguringCard] = useState<McpRegistryCard | null>(null);
@@ -1052,22 +1068,38 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
   const runSearch = useCallback(
     async (mode: "replace" | "append" = "replace") => {
       const cursor = mode === "append" ? nextCursor : undefined;
-      if (mode === "append" && !cursor) return;
+      if (mode === "append" && (!cursor || loadMoreInFlightRef.current)) return;
+      const requestQuery = mode === "append" ? activeQuery : query;
+      const cached =
+        mode === "append" &&
+        prefetchedPage?.cursor === cursor &&
+        prefetchedPage.source === source &&
+        prefetchedPage.query === requestQuery
+          ? prefetchedPage
+          : null;
       if (mode === "append") {
-        setLoadingMore(true);
+        loadMoreInFlightRef.current = true;
+        if (!cached) setLoadingMore(true);
       } else {
         setLoading(true);
+        setActiveQuery(requestQuery);
+        setPrefetchedPage(null);
       }
       setError(null);
       try {
-        const result = await searchMcpRegistry({
-          source,
-          query,
-          cursor,
-          limit: STORE_PAGE_LIMIT,
-        });
-        setItems((prev) => (mode === "append" ? [...prev, ...result.items] : result.items));
-        setNextCursor(result.nextCursor);
+        const result =
+          cached ??
+          (await searchMcpRegistry({
+            source,
+            query: requestQuery,
+            cursor,
+            limit: STORE_PAGE_LIMIT,
+          }));
+        setItems((prev) =>
+          mode === "append" ? mergeMcpRegistryCards(prev, result.items) : result.items,
+        );
+        setNextCursor(result.items.length > 0 ? result.nextCursor : undefined);
+        if (mode === "append") setPrefetchedPage(null);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         setError(message || t("mcpHub.storeLoadFailed"));
@@ -1078,10 +1110,49 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
       } finally {
         setLoading(false);
         setLoadingMore(false);
+        if (mode === "append") loadMoreInFlightRef.current = false;
       }
     },
-    [nextCursor, query, source, t],
+    [activeQuery, nextCursor, prefetchedPage, query, source, t],
   );
+
+  useEffect(() => {
+    const cursor = nextCursor;
+    if (!cursor || loading) {
+      setPrefetchedPage(null);
+      return;
+    }
+    let cancelled = false;
+    void searchMcpRegistry({
+      source,
+      query: activeQuery,
+      cursor,
+      limit: STORE_PAGE_LIMIT,
+    })
+      .then((result) => {
+        if (cancelled) return;
+        setPrefetchedPage({ cursor, source, query: activeQuery, ...result });
+      })
+      .catch(() => {
+        if (!cancelled) setPrefetchedPage(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeQuery, loading, nextCursor, source]);
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel || !nextCursor || loading || loadingMore) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) void runSearch("append");
+      },
+      { root: storeScrollRef.current, rootMargin: "640px 0px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loading, loadingMore, nextCursor, runSearch]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: source changes reset the registry; query changes run only on explicit submit.
   useEffect(() => {
@@ -1179,7 +1250,6 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
         <AstryxCoreButton
           type="submit"
           label={t("mcpHub.storeSearch")}
-          icon={<Icon icon={Search} size="sm" color="inherit" />}
           variant="primary"
           isLoading={loading}
           isDisabled={loading}
@@ -1201,7 +1271,7 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
         height="fill"
         padding={0}
         content={
-          <LayoutContent padding={0} isScrollable>
+          <LayoutContent ref={storeScrollRef} padding={0} isScrollable>
             <VStack width="100%" gap={4} paddingBlock={2}>
               {loading && items.length === 0 ? (
                 <VStack gap={4} aria-busy="true">
@@ -1248,7 +1318,6 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
                     <AstryxCoreButton
                       label={t("mcpHub.storeRefresh")}
                       variant="secondary"
-                      icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
                       onClick={() => void runSearch("replace")}
                     />
                   }
@@ -1256,15 +1325,14 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
               )}
 
               {nextCursor && items.length > 0 ? (
-                <HStack width="100%" hAlign="center">
-                  <AstryxCoreButton
-                    label={t("mcpHub.storeLoadMore")}
-                    variant="secondary"
-                    size="sm"
-                    isLoading={loadingMore}
-                    isDisabled={loadingMore}
-                    onClick={() => void runSearch("append")}
-                  />
+                <HStack ref={loadMoreSentinelRef} width="100%" hAlign="center" padding={2}>
+                  {loadingMore ? (
+                    <Spinner size="sm" label={t("mcpHub.storeLoadMore")} />
+                  ) : (
+                    <Text type="supporting" color="secondary">
+                      {t("mcpHub.storeLoadMore")}
+                    </Text>
+                  )}
                 </HStack>
               ) : null}
             </VStack>

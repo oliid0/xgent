@@ -60,13 +60,24 @@ function pathAlias(path: string, used: ReadonlySet<string>) {
   return alias;
 }
 
-export function ProjectRootsSection({ settings, setSettings }: SettingsSectionProps) {
+type ProjectRootsSectionProps = SettingsSectionProps & {
+  selectedProjectId?: string;
+  showProjectSelector?: boolean;
+};
+
+export function ProjectRootsSection({
+  settings,
+  setSettings,
+  selectedProjectId,
+  showProjectSelector = true,
+}: ProjectRootsSectionProps) {
   const { t } = useLocale();
   const projects = useMemo(
     () => settings.system.workspaceProjects.filter((project) => project.path.trim()),
     [settings.system.workspaceProjects],
   );
   const initialProjectId =
+    projects.find((project) => project.id === selectedProjectId)?.id ??
     projects.find((project) => project.id === settings.system.activeWorkspaceProjectId)?.id ??
     projects[0]?.id ??
     "";
@@ -96,9 +107,13 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
   }, []);
 
   useEffect(() => {
+    if (selectedProjectId && projects.some((item) => item.id === selectedProjectId)) {
+      if (projectId !== selectedProjectId) setProjectId(selectedProjectId);
+      return;
+    }
     if (projects.some((item) => item.id === projectId)) return;
     setProjectId(initialProjectId);
-  }, [initialProjectId, projectId, projects]);
+  }, [initialProjectId, projectId, projects, selectedProjectId]);
 
   useEffect(() => {
     let active = true;
@@ -228,33 +243,35 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
 
   return (
     <VStack gap={4} width="100%">
-      <Section variant="transparent" padding={0}>
-        <VStack gap={3}>
-          <HStack gap={3} vAlign="center">
-            <Icon icon={FolderTree} size="md" color="accent" />
-            <StackItem size="fill">
-              <VStack gap={0.5}>
-                <Text type="label" weight="semibold">
-                  {t("settings.projectRoots.title")}
-                </Text>
-                <Text type="supporting" color="secondary">
-                  {t("settings.projectRoots.desc")}
-                </Text>
-              </VStack>
-            </StackItem>
-          </HStack>
-          <Selector
-            label={t("settings.projectRoots.project")}
-            value={projectId}
-            onChange={setProjectId}
-            options={projects.map((item) => ({
-              value: item.id,
-              label: `${item.name} — ${item.path}`,
-            }))}
-            width="100%"
-          />
-        </VStack>
-      </Section>
+      {showProjectSelector ? (
+        <Section variant="transparent" padding={0}>
+          <VStack gap={3}>
+            <HStack gap={3} vAlign="center">
+              <Icon icon={FolderTree} size="md" color="accent" />
+              <StackItem size="fill">
+                <VStack gap={0.5}>
+                  <Text type="label" weight="semibold">
+                    {t("settings.projectRoots.title")}
+                  </Text>
+                  <Text type="supporting" color="secondary">
+                    {t("settings.projectRoots.desc")}
+                  </Text>
+                </VStack>
+              </StackItem>
+            </HStack>
+            <Selector
+              label={t("settings.projectRoots.project")}
+              value={projectId}
+              onChange={setProjectId}
+              options={projects.map((item) => ({
+                value: item.id,
+                label: `${item.name} — ${item.path}`,
+              }))}
+              width="100%"
+            />
+          </VStack>
+        </Section>
+      ) : null}
 
       <Section variant="transparent" padding={0} dividers={["top"]}>
         <VStack gap={3}>
@@ -264,7 +281,6 @@ export function ProjectRootsSection({ settings, setSettings }: SettingsSectionPr
             </Text>
             <Button
               label={t("settings.projectRoots.add")}
-              icon={<Icon icon={FolderTree} size="sm" color="inherit" />}
               variant="secondary"
               size="sm"
               isDisabled={!project || loading || saving}

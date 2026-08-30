@@ -10,7 +10,6 @@ import { type SearchableItem, type SearchSource, Typeahead } from "@astryxdesign
 import { invoke } from "@xagent/runtime";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { AdaptiveDialog } from "../../../components/astryx/AdaptiveDialog";
-import { FolderOpen, GitBranch, Plus } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import { listGitRemoteBranches, startGitClone } from "../../../lib/git/tauriGitClient";
 
@@ -207,7 +206,6 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
                 />
                 <Button
                   label={t("chat.clone.loadBranches")}
-                  icon={<GitBranch />}
                   size="lg"
                   isLoading={loadingBranches}
                   isDisabled={!remoteUrl.trim() || loadingBranches}
@@ -242,7 +240,6 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
                   ? t("chat.clone.start")
                   : t("chat.mobileWorkspace.create")
             }
-            icon={mode === "clone" ? <GitBranch /> : <Plus />}
             variant="primary"
             size="lg"
             width="100%"
@@ -254,7 +251,6 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
           {cloneAvailable ? (
             <Button
               label={t("chat.clone.chooseDestination")}
-              icon={<FolderOpen />}
               size="lg"
               width="100%"
               isDisabled={busy}
@@ -266,7 +262,6 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
               <Divider label={t("chat.mobileWorkspace.or")} />
               <Button
                 label={t("chat.mobileWorkspace.chooseFolder")}
-                icon={<FolderOpen />}
                 size="lg"
                 width="100%"
                 isDisabled={busy}

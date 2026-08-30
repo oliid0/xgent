@@ -1,23 +1,20 @@
-import { Button as AstryxButton, Button } from "@astryxdesign/core/Button";
-import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
-import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
-import { Text as AstryxText } from "@astryxdesign/core/Text";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { FileInput } from "@astryxdesign/core/FileInput";
+import { Icon } from "@astryxdesign/core/Icon";
+import { HStack, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
+import { Text } from "@astryxdesign/core/Text";
+import { Token } from "@astryxdesign/core/Token";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { HubPanel, HubSegmentedButton, HubSegmentedControl } from "../../components/hub/HubChrome";
-import {
-  AlertTriangle,
-  Check,
-  Download,
-  FileText,
-  Folder,
-  Globe2,
-  Loader2,
-  RefreshCw,
-  Terminal,
-} from "../../components/icons";
+import { FileText, Folder, Globe2, Server, Terminal } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
-import { cn } from "../../lib/shared/utils";
 import {
   type ExternalMcpServerEntry,
   type ExternalMcpToolScan,
@@ -32,9 +29,7 @@ const EXTERNAL_MCP_TOOL_LABELS: Record<string, string> = {
   codebuddy: "CodeBuddy",
 };
 
-/** 与后端 `LOCAL_FILE_MCP_TOOL` 对齐的「从文件导入」来源标识 */
 const LOCAL_FILE_TOOL = "local-file";
-
 const DEFAULT_IMPORT_TIMEOUT_MS = 60_000;
 const MAX_MCP_CONFIG_FILE_BYTES = 16 * 1024 * 1024;
 
@@ -73,24 +68,22 @@ export function McpImportView(props: {
 }) {
   const { settings, setSettings, allowStdio = true } = props;
   const { t } = useLocale();
-
   const [scans, setScans] = useState<ExternalMcpToolScan[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileScan, setFileScan] = useState<ExternalMcpToolScan | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePicking, setFilePicking] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [importedCount, setImportedCount] = useState<number | null>(null);
   const [activeTool, setActiveTool] = useState<string>("claude-code");
   const userChoseToolRef = useRef(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const allScans = useMemo(
     () => (fileScan ? [...(scans ?? []), fileScan] : (scans ?? [])),
-    [scans, fileScan],
+    [fileScan, scans],
   );
-
   const installedIds = useMemo(
     () => new Set(settings.mcp.servers.map((server) => server.id.trim().toLowerCase())),
     [settings.mcp.servers],
@@ -102,42 +95,36 @@ export function McpImportView(props: {
     try {
       const result = await scanExternalMcpServers();
       setScans(result);
-      // 清掉扫描结果中已不存在的选择项（「从文件导入」的选择项不受重扫影响）
-      setSelected((prev) => {
+      setSelected((previous) => {
         const valid = new Set(
           result.flatMap((scan) =>
             scan.servers.map((server) => externalServerKey(scan.tool, server)),
           ),
         );
         const next = new Set(
-          [...prev].filter((key) => valid.has(key) || key.startsWith(`${LOCAL_FILE_TOOL}:`)),
+          [...previous].filter((key) => valid.has(key) || key.startsWith(`${LOCAL_FILE_TOOL}:`)),
         );
-        return next.size === prev.size ? prev : next;
+        return next.size === previous.size ? previous : next;
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch (scanError) {
+      setError(scanError instanceof Error ? scanError.message : String(scanError));
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (scans === null && !loading) {
-      void rescan();
-    }
-  }, [scans, loading, rescan]);
+    if (scans === null && !loading) void rescan();
+  }, [loading, rescan, scans]);
 
-  // 扫描结果就绪后自动定位到第一个有配置的工具；用户手动切换后不再干预
   useEffect(() => {
     if (userChoseToolRef.current || !scans || scans.length === 0) return;
     const preferred =
       scans.find((scan) => scan.servers.length > 0) ??
       scans.find((scan) => scan.exists) ??
       scans[0];
-    if (preferred && preferred.tool !== activeTool) {
-      setActiveTool(preferred.tool);
-    }
-  }, [scans, activeTool]);
+    if (preferred && preferred.tool !== activeTool) setActiveTool(preferred.tool);
+  }, [activeTool, scans]);
 
   const scanSelectedFile = useCallback(async (file: File) => {
     setFileError(null);
@@ -147,19 +134,18 @@ export function McpImportView(props: {
         throw new Error(`File is larger than ${MAX_MCP_CONFIG_FILE_BYTES / 1024 / 1024} MiB`);
       }
       const scan = await scanMcpConfigContent(file.name, await file.text());
-      // 换文件后清掉上一个文件遗留的选择项，避免按 id 误选到新文件的同名条目
-      setSelected((prev) => {
-        const next = new Set([...prev].filter((key) => !key.startsWith(`${LOCAL_FILE_TOOL}:`)));
-        return next.size === prev.size ? prev : next;
+      setSelected((previous) => {
+        const next = new Set([...previous].filter((key) => !key.startsWith(`${LOCAL_FILE_TOOL}:`)));
+        return next.size === previous.size ? previous : next;
       });
       setFileScan(scan);
       userChoseToolRef.current = true;
       setActiveTool(LOCAL_FILE_TOOL);
-    } catch (err) {
-      setFileError(err instanceof Error ? err.message : String(err));
+    } catch (scanError) {
+      setFileError(scanError instanceof Error ? scanError.message : String(scanError));
     } finally {
       setFilePicking(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setSelectedFile(null);
     }
   }, []);
 
@@ -182,8 +168,8 @@ export function McpImportView(props: {
   function toggleServer(tool: string, server: ExternalMcpServerEntry) {
     if (!allowStdio && server.transport === "stdio") return;
     const key = externalServerKey(tool, server);
-    setSelected((prev) => {
-      const next = new Set(prev);
+    setSelected((previous) => {
+      const next = new Set(previous);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
@@ -191,16 +177,12 @@ export function McpImportView(props: {
   }
 
   function toggleAllActive() {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (allActiveSelected) {
-        for (const server of importableInActive) {
-          next.delete(externalServerKey(activeTool, server));
-        }
-      } else {
-        for (const server of importableInActive) {
-          next.add(externalServerKey(activeTool, server));
-        }
+    setSelected((previous) => {
+      const next = new Set(previous);
+      for (const server of importableInActive) {
+        const key = externalServerKey(activeTool, server);
+        if (allActiveSelected) next.delete(key);
+        else next.add(key);
       }
       return next;
     });
@@ -215,10 +197,11 @@ export function McpImportView(props: {
       ),
     );
     if (targets.length === 0) return;
-
     let added = 0;
-    setSettings((prev) => {
-      const existing = new Set(prev.mcp.servers.map((server) => server.id.trim().toLowerCase()));
+    setSettings((previous) => {
+      const existing = new Set(
+        previous.mcp.servers.map((server) => server.id.trim().toLowerCase()),
+      );
       const fresh: McpServerConfig[] = [];
       for (const entry of targets) {
         const id = entry.id.trim().toLowerCase();
@@ -227,415 +210,241 @@ export function McpImportView(props: {
         fresh.push(toMcpServerConfig(entry));
       }
       added = fresh.length;
-      if (fresh.length === 0) return prev;
-      return updateMcp(prev, { servers: [...prev.mcp.servers, ...fresh] });
+      return fresh.length === 0
+        ? previous
+        : updateMcp(previous, { servers: [...previous.mcp.servers, ...fresh] });
     });
     setSelected(new Set());
     setImportedCount(added);
   }
 
   return (
-    <AstryxStack
-      direction="vertical"
-      className="h-full min-h-0 overflow-y-auto px-0.5 pb-4 pr-1 pt-1.5"
-    >
-      <AstryxStack direction="vertical" className="flex flex-col gap-4">
-        {error ? (
-          <HubPanel tone="error" className="hub-panel-enter">
-            <AstryxStack direction="horizontal" className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-              <AstryxText as="span" type="inherit" className="text-xs text-destructive">
-                {t("mcpHub.importScanFailed")}: {error}
-              </AstryxText>
-            </AstryxStack>
-          </HubPanel>
-        ) : null}
+    <VStack height="100%" minHeight={0} gap={3}>
+      {error ? (
+        <Banner
+          status="error"
+          title={t("mcpHub.importScanFailed")}
+          description={error}
+          collapsible={false}
+        />
+      ) : null}
+      {!allowStdio ? (
+        <Banner status="warning" title={t("mcpHub.mobileNetworkOnly")} collapsible={false} />
+      ) : null}
+      {fileError ? (
+        <Banner
+          status="error"
+          title={t("mcpHub.importFileFailed")}
+          description={fileError}
+          collapsible={false}
+        />
+      ) : null}
+      {importedCount !== null && importedCount > 0 ? (
+        <Banner
+          status="success"
+          title={t("mcpHub.importDone").replace("{count}", String(importedCount))}
+          collapsible={false}
+        />
+      ) : null}
 
-        {!allowStdio ? (
-          <HubPanel tone="muted" className="hub-panel-enter">
-            <AstryxStack direction="horizontal" className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <AstryxText
-                as="span"
-                type="inherit"
-                className="text-xs leading-5 text-muted-foreground"
-              >
-                {t("mcpHub.mobileNetworkOnly")}
-              </AstryxText>
-            </AstryxStack>
-          </HubPanel>
-        ) : null}
-
-        {fileError ? (
-          <HubPanel tone="error" className="hub-panel-enter">
-            <AstryxStack direction="horizontal" className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-              <AstryxText as="span" type="inherit" className="text-xs text-destructive">
-                {t("mcpHub.importFileFailed")}: {fileError}
-              </AstryxText>
-            </AstryxStack>
-          </HubPanel>
-        ) : null}
-
-        {importedCount !== null && importedCount > 0 ? (
-          <HubPanel tone="muted" className="hub-panel-enter">
-            <AstryxStack direction="horizontal" className="flex items-center gap-2">
-              <Check className="h-4 w-4 shrink-0 text-success" />
-              <AstryxText as="span" type="inherit" className="text-xs text-muted-foreground">
-                {t("mcpHub.importDone").replace("{count}", String(importedCount))}
-              </AstryxText>
-            </AstryxStack>
-          </HubPanel>
-        ) : null}
-
-        {loading && !scans ? (
-          <HubPanel className="hub-panel-enter">
-            <AstryxStack direction="horizontal" className="flex items-center gap-3 py-4">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              <AstryxText as="span" type="inherit" className="text-xs text-muted-foreground">
-                {t("mcpHub.importScanning")}
-              </AstryxText>
-            </AstryxStack>
-          </HubPanel>
-        ) : (
-          <>
-            <AstryxStack
-              direction="horizontal"
-              className="hub-panel-enter flex flex-wrap items-center justify-between gap-3"
+      {loading && !scans ? (
+        <Spinner size="md" label={t("mcpHub.importScanning")} />
+      ) : (
+        <>
+          <VStack width="100%" gap={2}>
+            <TabList
+              value={activeTool}
+              overflow="scroll"
+              onChange={(value) => {
+                userChoseToolRef.current = true;
+                setActiveTool(String(value));
+              }}
             >
-              <HubSegmentedControl className="shrink-0 max-w-full overflow-x-auto">
-                {allScans.map((scan) => {
-                  const isLocalFile = scan.tool === LOCAL_FILE_TOOL;
-                  const toolLabel = isLocalFile
-                    ? fileScanLabel(scan, t("mcpHub.importFileTab"))
-                    : (EXTERNAL_MCP_TOOL_LABELS[scan.tool] ?? scan.tool);
-                  const active = scan.tool === activeTool;
-                  return (
-                    <HubSegmentedButton
-                      key={scan.tool}
-                      active={active}
-                      title={isLocalFile ? scan.configPath : undefined}
-                      onClick={() => {
-                        userChoseToolRef.current = true;
-                        setActiveTool(scan.tool);
-                      }}
-                      className="px-4"
-                    >
-                      {isLocalFile ? (
-                        <FileText className="h-3.5 w-3.5" />
-                      ) : (
-                        <Folder className="h-3.5 w-3.5" />
-                      )}
-                      <AstryxText as="span" type="inherit" className="max-w-[10rem] truncate">
-                        {toolLabel}
-                      </AstryxText>
-                      {scan.exists ? (
-                        <AstryxStack
-                          as="span"
-                          direction="horizontal"
-                          className={cn(
-                            "ml-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums",
-                            active
-                              ? "bg-foreground/[0.08] text-foreground/85"
-                              : "bg-muted/70 text-muted-foreground",
-                          )}
-                        >
-                          {scan.servers.length}
-                        </AstryxStack>
-                      ) : (
-                        <AstryxText
-                          as="span"
-                          type="inherit"
-                          className="ml-0.5 text-[10px] text-muted-foreground/70"
-                        >
-                          {t("mcpHub.importNotDetected")}
-                        </AstryxText>
-                      )}
-                    </HubSegmentedButton>
-                  );
-                })}
-              </HubSegmentedControl>
-
-              <AstryxStack direction="horizontal" className="flex shrink-0 items-center gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
+              {allScans.map((scan) => {
+                const localFile = scan.tool === LOCAL_FILE_TOOL;
+                return (
+                  <Tab
+                    key={scan.tool}
+                    value={scan.tool}
+                    panelId={`mcp-import-${scan.tool}`}
+                    label={
+                      localFile
+                        ? fileScanLabel(scan, t("mcpHub.importFileTab"))
+                        : (EXTERNAL_MCP_TOOL_LABELS[scan.tool] ?? scan.tool)
+                    }
+                    icon={<Icon icon={localFile ? FileText : Folder} size="sm" color="inherit" />}
+                    endContent={
+                      scan.exists ? (
+                        <Token label={String(scan.servers.length)} size="sm" />
+                      ) : undefined
+                    }
+                  />
+                );
+              })}
+            </TabList>
+            <HStack width="100%" gap={2} hAlign="end" vAlign="end" wrap="wrap">
+              <StackItem size="fill">
+                <FileInput
+                  label={t("mcpHub.importFromFile")}
+                  isLabelHidden
+                  mode="input"
+                  width="100%"
+                  value={selectedFile}
                   accept=".json,.toml,application/json,text/plain"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.currentTarget.files?.[0];
+                  maxSize={MAX_MCP_CONFIG_FILE_BYTES}
+                  isLoading={filePicking}
+                  isDisabled={filePicking || loading}
+                  placeholder={t("mcpHub.importFromFileHint")}
+                  onChange={(files) => {
+                    const file = Array.isArray(files) ? files[0] : files;
+                    setSelectedFile(file ?? null);
                     if (file) void scanSelectedFile(file);
                   }}
                 />
-                <Button
-                  label={t("mcpHub.importFromFileHint")}
-                  variant="secondary"
-                  size="sm"
-                  className="gap-1.5 rounded-full"
-                  isDisabled={filePicking}
-                  tooltip={t("mcpHub.importFromFileHint")}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {filePicking ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <FileText className="h-3.5 w-3.5" />
-                  )}
-                  {t("mcpHub.importFromFile")}
-                </Button>
-                <Button
-                  label={t("mcpHub.importRescan")}
-                  variant="secondary"
-                  size="sm"
-                  className="gap-1.5 rounded-full"
-                  isDisabled={loading}
-                  onClick={() => void rescan()}
-                >
-                  <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-                  {t("mcpHub.importRescan")}
-                </Button>
-                <Button
-                  variant="primary"
-                  label={`${t("mcpHub.importButton")}${selected.size > 0 ? ` (${selected.size})` : ""}`}
-                  size="sm"
-                  className="gap-1.5 rounded-full"
-                  isDisabled={selected.size === 0 || loading}
-                  onClick={importSelected}
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {`${t("mcpHub.importButton")}${selected.size > 0 ? ` (${selected.size})` : ""}`}
-                </Button>
-              </AstryxStack>
-            </AstryxStack>
+              </StackItem>
+              <Button
+                label={t("mcpHub.importRescan")}
+                variant="secondary"
+                size="sm"
+                isLoading={loading}
+                isDisabled={loading}
+                onClick={() => void rescan()}
+              />
+              <Button
+                label={`${t("mcpHub.importButton")}${selected.size > 0 ? ` (${selected.size})` : ""}`}
+                variant="primary"
+                size="sm"
+                isDisabled={selected.size === 0 || loading}
+                onClick={importSelected}
+              />
+            </HStack>
+          </VStack>
 
-            {activeScan ? (
-              <AstryxStack
-                direction="vertical"
-                key={activeScan.tool}
-                className="hub-panel-enter flex flex-col gap-3"
-              >
-                <AstryxStack
-                  direction="horizontal"
-                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"
-                >
-                  <AstryxText
-                    as="p"
-                    type="inherit"
-                    display="block"
-                    className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground/70"
-                  >
-                    <AstryxText as="span" type="inherit" className="font-mono">
+          {activeScan ? (
+            <Section
+              id={`mcp-import-${activeScan.tool}`}
+              role="tabpanel"
+              variant="transparent"
+              padding={0}
+              height="100%"
+            >
+              <VStack height="100%" minHeight={0} gap={2}>
+                <HStack width="100%" gap={2} hAlign="between" vAlign="center" wrap="wrap">
+                  <VStack gap={0.5}>
+                    <Text type="code" color="secondary" wordBreak="break-all">
                       {activeScan.configPath}
-                    </AstryxText>
+                    </Text>
                     {activeScan.errors.length > 0 ? (
-                      <>
-                        <AstryxText as="span" type="inherit" aria-hidden="true">
-                          ·
-                        </AstryxText>
-                        <AstryxText
-                          as="span"
-                          type="inherit"
-                          className="cursor-help underline decoration-dotted underline-offset-2"
-                          aria-label={activeScan.errors.join("\n")}
-                        >
-                          {t("mcpHub.importUnparsable").replace(
-                            "{count}",
-                            String(activeScan.errors.length),
-                          )}
-                        </AstryxText>
-                      </>
+                      <Text type="supporting" color="secondary">
+                        {t("mcpHub.importUnparsable").replace(
+                          "{count}",
+                          String(activeScan.errors.length),
+                        )}
+                      </Text>
                     ) : null}
-                  </AstryxText>
+                  </VStack>
                   {importableInActive.length > 0 ? (
-                    <AstryxStack
-                      direction="horizontal"
-                      className="flex items-center gap-2 text-[11px] text-muted-foreground"
-                    >
-                      <AstryxText as="span" type="inherit" className="tabular-nums">
-                        {t("mcpHub.importSelectedCount")
-                          .replace("{selected}", String(selectedInActive))
-                          .replace("{total}", String(importableInActive.length))}
-                      </AstryxText>
-                      <AstryxButton
-                        variant="ghost"
-                        label={
-                          allActiveSelected
-                            ? t("mcpHub.importDeselectAll")
-                            : t("mcpHub.importSelectAll")
-                        }
-                        type="button"
-                        onClick={toggleAllActive}
-                        className="rounded-full border border-border/45 bg-background/70 px-2 py-0.5 text-[11px] font-medium text-foreground/80 transition-colors hover:bg-background/90"
-                      >
-                        {allActiveSelected
-                          ? t("mcpHub.importDeselectAll")
-                          : t("mcpHub.importSelectAll")}
-                      </AstryxButton>
-                    </AstryxStack>
+                    <CheckboxInput
+                      label={t("mcpHub.importSelectedCount")
+                        .replace("{selected}", String(selectedInActive))
+                        .replace("{total}", String(importableInActive.length))}
+                      value={allActiveSelected}
+                      onChange={toggleAllActive}
+                      size="sm"
+                    />
                   ) : null}
-                </AstryxStack>
+                </HStack>
 
                 {!activeScan.exists ? (
-                  <HubPanel tone="muted">
-                    <AstryxText
-                      as="p"
-                      type="inherit"
-                      display="block"
-                      className="py-2 text-center text-xs text-muted-foreground"
-                    >
-                      {t("mcpHub.importNotDetected")} · {activeScan.configPath}
-                    </AstryxText>
-                  </HubPanel>
+                  <EmptyState
+                    title={t("mcpHub.importNotDetected")}
+                    description={activeScan.configPath}
+                    icon={<Icon icon={Folder} size="lg" color="secondary" />}
+                    isCompact
+                  />
                 ) : activeScan.servers.length === 0 ? (
-                  <HubPanel tone="muted">
-                    <AstryxText
-                      as="p"
-                      type="inherit"
-                      display="block"
-                      className="py-2 text-center text-xs text-muted-foreground"
-                    >
-                      {t("mcpHub.importEmpty")}
-                    </AstryxText>
-                  </HubPanel>
+                  <EmptyState
+                    title={t("mcpHub.importEmpty")}
+                    icon={<Icon icon={Server} size="lg" color="secondary" />}
+                    isCompact
+                  />
                 ) : (
-                  <AstryxGrid className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {activeScan.servers.map((server) => {
-                      const key = externalServerKey(activeScan.tool, server);
-                      const alreadyImported = installedIds.has(server.id.trim().toLowerCase());
-                      const unsupported = !allowStdio && server.transport === "stdio";
-                      const checked = selected.has(key);
-                      const isStdio = server.transport === "stdio";
-                      const preview = isStdio
-                        ? [server.command, ...server.args].join(" ")
-                        : server.url;
-                      const extras = [
-                        server.args.length > 0 ? `args ${server.args.length}` : null,
-                        Object.keys(server.env).length > 0
-                          ? `env ${Object.keys(server.env).length}`
-                          : null,
-                        Object.keys(server.headers).length > 0
-                          ? `headers ${Object.keys(server.headers).length}`
-                          : null,
-                      ].filter((item): item is string => Boolean(item));
-                      return (
-                        <AstryxButton
-                          variant="ghost"
-                          label={preview}
-                          key={key}
-                          type="button"
-                          isDisabled={alreadyImported || unsupported}
-                          onClick={() => toggleServer(activeScan.tool, server)}
-                          className={cn(
-                            "group flex items-start gap-2.5 rounded-xl border p-3 text-left transition-all",
-                            alreadyImported || unsupported
-                              ? "cursor-not-allowed border-border/35 bg-muted/30 opacity-70"
-                              : checked
-                                ? "border-primary/60 bg-primary/5 shadow-sm shadow-primary/10"
-                                : "border-border/40 bg-background/60 hover:border-border/70 hover:bg-background/85",
-                          )}
-                        >
-                          <AstryxStack
-                            as="span"
-                            direction="horizontal"
-                            className={cn(
-                              "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-                              checked && !alreadyImported
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-border/70 bg-background",
-                            )}
-                          >
-                            {checked && !alreadyImported ? <Check className="h-3 w-3" /> : null}
-                          </AstryxStack>
-                          <AstryxText as="span" type="inherit" className="min-w-0 flex-1">
-                            <AstryxStack
-                              as="span"
-                              direction="horizontal"
-                              className="flex flex-wrap items-center gap-1.5"
-                            >
-                              <AstryxText
-                                as="span"
-                                type="inherit"
-                                className="truncate text-[13px] font-medium text-foreground"
-                              >
-                                {server.id}
-                              </AstryxText>
-                              <AstryxStack
-                                as="span"
-                                direction="horizontal"
-                                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground"
-                              >
-                                {isStdio ? (
-                                  <Terminal className="h-2.5 w-2.5" />
-                                ) : (
-                                  <Globe2 className="h-2.5 w-2.5" />
-                                )}
-                                {server.transport}
-                              </AstryxStack>
-                              {server.origin !== "user" ? (
-                                <AstryxStack
-                                  as="span"
-                                  direction="horizontal"
-                                  className="inline-flex max-w-[10rem] shrink-0 items-center truncate rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                                  aria-label={server.origin}
-                                >
-                                  {t("mcpHub.importOriginProject")}
-                                </AstryxStack>
-                              ) : null}
-                              {alreadyImported ? (
-                                <AstryxStack
-                                  as="span"
-                                  direction="horizontal"
-                                  className="inline-flex shrink-0 items-center rounded-full bg-foreground/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-foreground/70 ring-1 ring-border/45"
-                                >
-                                  {t("mcpHub.importAlreadyImported")}
-                                </AstryxStack>
-                              ) : null}
-                              {unsupported ? (
-                                <AstryxStack
-                                  as="span"
-                                  direction="horizontal"
-                                  className="inline-flex shrink-0 rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                                >
-                                  {t("mcpHub.mobileNetworkOnly")}
-                                </AstryxStack>
-                              ) : null}
-                            </AstryxStack>
-                            <AstryxText
-                              as="span"
-                              type="inherit"
-                              className="mt-1 block truncate font-mono text-[11px] text-muted-foreground"
-                            >
-                              {preview}
-                            </AstryxText>
-                            {extras.length > 0 ? (
-                              <AstryxStack
-                                as="span"
-                                direction="horizontal"
-                                className="mt-1 flex flex-wrap gap-1"
-                              >
-                                {extras.map((extra) => (
-                                  <AstryxText
-                                    as="span"
-                                    type="inherit"
-                                    key={extra}
-                                    className="rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground"
-                                  >
-                                    {extra}
-                                  </AstryxText>
-                                ))}
-                              </AstryxStack>
-                            ) : null}
-                          </AstryxText>
-                        </AstryxButton>
-                      );
-                    })}
-                  </AstryxGrid>
+                  <StackItem size="fill" isScrollable>
+                    <List density="balanced" hasDividers>
+                      {activeScan.servers.map((server) => {
+                        const key = externalServerKey(activeScan.tool, server);
+                        const alreadyImported = installedIds.has(server.id.trim().toLowerCase());
+                        const unsupported = !allowStdio && server.transport === "stdio";
+                        const checked = selected.has(key);
+                        const preview =
+                          server.transport === "stdio"
+                            ? [server.command, ...server.args].join(" ")
+                            : server.url;
+                        const metadata = [
+                          server.args.length > 0 ? `args ${server.args.length}` : null,
+                          Object.keys(server.env).length > 0
+                            ? `env ${Object.keys(server.env).length}`
+                            : null,
+                          Object.keys(server.headers).length > 0
+                            ? `headers ${Object.keys(server.headers).length}`
+                            : null,
+                        ].filter((value): value is string => Boolean(value));
+                        return (
+                          <ListItem
+                            key={key}
+                            label={server.id}
+                            startContent={
+                              <Icon
+                                icon={server.transport === "stdio" ? Terminal : Globe2}
+                                size="md"
+                                color={checked ? "accent" : "secondary"}
+                              />
+                            }
+                            description={
+                              <VStack gap={1}>
+                                <Text type="code" color="secondary" maxLines={1}>
+                                  {preview}
+                                </Text>
+                                <HStack gap={1} wrap="wrap">
+                                  <Token label={server.transport.toUpperCase()} size="sm" />
+                                  {server.origin !== "user" ? (
+                                    <Token label={t("mcpHub.importOriginProject")} size="sm" />
+                                  ) : null}
+                                  {metadata.map((value) => (
+                                    <Token key={value} label={value} size="sm" />
+                                  ))}
+                                </HStack>
+                              </VStack>
+                            }
+                            endContent={
+                              alreadyImported ? (
+                                <StatusDot
+                                  variant="success"
+                                  label={t("mcpHub.importAlreadyImported")}
+                                />
+                              ) : unsupported ? (
+                                <Token label={t("mcpHub.mobileNetworkOnly")} size="sm" />
+                              ) : (
+                                <CheckboxInput
+                                  label={server.id}
+                                  isLabelHidden
+                                  value={checked}
+                                  onChange={() => toggleServer(activeScan.tool, server)}
+                                  size="sm"
+                                />
+                              )
+                            }
+                          />
+                        );
+                      })}
+                    </List>
+                  </StackItem>
                 )}
-              </AstryxStack>
-            ) : null}
-          </>
-        )}
-      </AstryxStack>
-    </AstryxStack>
+              </VStack>
+            </Section>
+          ) : null}
+        </>
+      )}
+    </VStack>
   );
 }

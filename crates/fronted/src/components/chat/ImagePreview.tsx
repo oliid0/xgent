@@ -11,7 +11,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { memo, useCallback, useEffect, useRef, useState, type WheelEvent } from "react";
 
 import { useLocale } from "../../i18n";
-import { ArrowLeft, ChevronRight, Copy, Download, ExternalLink, X } from "../icons";
+import { ArrowLeft, ChevronRight, X } from "../icons";
 
 export type ImagePreviewSlide = {
   src: string;
@@ -132,7 +132,6 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
         <Button
           label={t("chat.image.copy")}
           tooltip={t("chat.image.copy")}
-          icon={<Icon icon={Copy} size="sm" color="inherit" />}
           variant="ghost"
           isLoading={pendingAction === "copy"}
           isDisabled={pendingAction !== null && pendingAction !== "copy"}
@@ -143,7 +142,6 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
         <Button
           label={t("chat.image.save")}
           tooltip={t("chat.image.save")}
-          icon={<Icon icon={Download} size="sm" color="inherit" />}
           variant="ghost"
           isLoading={pendingAction === "save"}
           isDisabled={pendingAction !== null && pendingAction !== "save"}
@@ -154,7 +152,6 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
         <Button
           label={t("chat.image.openSystem")}
           tooltip={t("chat.image.openSystem")}
-          icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
           variant="ghost"
           isLoading={pendingAction === "open"}
           isDisabled={pendingAction !== null && pendingAction !== "open"}

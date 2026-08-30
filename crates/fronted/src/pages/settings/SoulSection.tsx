@@ -3,7 +3,6 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { FormLayout } from "@astryxdesign/core/FormLayout";
 import { HStack } from "@astryxdesign/core/HStack";
-import { Icon } from "@astryxdesign/core/Icon";
 import { Selector } from "@astryxdesign/core/Selector";
 import { StackItem } from "@astryxdesign/core/Stack";
 import { Heading, Text } from "@astryxdesign/core/Text";
@@ -11,7 +10,6 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, Save, Trash2 } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { DEFAULT_SOUL_METADATA, type SoulDraft, useSoul, validateSoulDraft } from "../../lib/soul";
 
@@ -151,7 +149,6 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
             label={soul.saving ? t("settings.saving") : t("settings.soulSave")}
             variant="primary"
             size="sm"
-            icon={<Icon icon={Save} size="sm" />}
             onClick={() => void handleSave()}
             isLoading={soul.saving}
             isDisabled={!changed || !validation.valid}
@@ -186,7 +183,6 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
                 label={t("settings.soulAddPreset")}
                 variant="secondary"
                 size="sm"
-                icon={<Icon icon={Plus} size="sm" />}
                 onClick={beginCreate}
                 isDisabled={soul.saving}
               />
@@ -195,7 +191,6 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
               label={t("settings.soulDeletePreset")}
               variant="ghost"
               size="sm"
-              icon={<Icon icon={Trash2} size="sm" />}
               onClick={() => setPresetToDelete(soul.activeId)}
               isDisabled={soul.saving || creating || soul.presets.length <= 1}
             />
@@ -282,7 +277,6 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
             label={t("settings.soulReload")}
             variant="ghost"
             size="sm"
-            icon={<Icon icon={RefreshCw} size="sm" />}
             onClick={() => void soul.reload()}
             isLoading={soul.loading}
             isDisabled={soul.saving}

@@ -80,7 +80,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
         columns={3}
         width="100%"
         align="center"
-        style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)" }}
+        style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(max-content, 1fr)" }}
       >
         <HStack gap={1} vAlign="center" hAlign="start">
           {mobileExperience && !sidebarOpen && !macOsTauri ? (
@@ -108,7 +108,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
           </SegmentedControl>
         </HStack>
 
-        <HStack gap={1} vAlign="center" hAlign="end">
+        <HStack gap={1} vAlign="center" hAlign="end" style={{ minWidth: "max-content" }}>
           {!mobileExperience ? preThemeActions : null}
           {!mobileExperience ? (
             <IconButton

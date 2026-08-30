@@ -17,6 +17,7 @@ import {
   type GlobalShortcutAction,
   type GlobalShortcutBindings,
   type GlobalShortcutFailure,
+  getDefaultGlobalShortcutBindings,
   isShortcutModifierToken,
   modifierFromEventCode,
   readGlobalShortcutBindings,
@@ -299,9 +300,20 @@ export function GlobalShortcutsSection() {
 
   return (
     <VStack width="100%" gap={4}>
-      <Text type="supporting" color="secondary">
-        {t("settings.globalShortcutsDesc")}
-      </Text>
+      <HStack width="100%" gap={3} hAlign="between" vAlign="center" wrap="wrap">
+        <Text type="supporting" color="secondary">
+          {t("settings.globalShortcutsDesc")}
+        </Text>
+        <Button
+          label={t("settings.shortcutRestoreDefaults")}
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            commit(getDefaultGlobalShortcutBindings());
+            setStatus({ kind: "success", text: t("settings.shortcutSaved") });
+          }}
+        />
+      </HStack>
 
       <List density="compact" hasDividers header={t("settings.globalShortcuts")}>
         {actionMeta.map((action) => {

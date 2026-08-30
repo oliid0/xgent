@@ -1162,7 +1162,6 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                       label={t("settings.skillsBulkSelect")}
                       size="sm"
                       isPressed={modelBulkMode}
-                      icon={<Icon icon={List} size="sm" color="inherit" />}
                       onPressedChange={(pressed) => {
                         setModelBulkMode(pressed);
                         if (!pressed) setModelBulkSelection(new Set());
@@ -1177,24 +1176,19 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                       type="button"
                       variant="secondary"
                       size="sm"
-                      className="h-9 gap-1.5 max-[720px]:h-10 max-[720px]:flex-1"
+                      className="h-9 max-[720px]:h-10 max-[720px]:flex-1"
                       onClick={handleRefresh}
+                      isLoading={fetchingModels}
                       isDisabled={fetchingModels || (isBrowser && !canFetchModels)}
-                    >
-                      <RefreshCw className={cn("h-3.5 w-3.5", fetchingModels && "animate-spin")} />
-                      {fetchingModels ? t("settings.fetching") : t("settings.refreshModels")}
-                    </Button>
+                    />
                     <Button
                       label={t("settings.manualAddModel")}
                       type="button"
                       variant="secondary"
                       size="sm"
-                      className="h-9 gap-1.5 max-[720px]:h-10 max-[720px]:flex-1"
+                      className="h-9 max-[720px]:h-10 max-[720px]:flex-1"
                       onClick={() => setAddingModel(true)}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      {t("settings.manualAddModel")}
-                    </Button>
+                    />
                   </AstryxStack>
 
                   {modelBulkMode ? (
@@ -2118,7 +2112,6 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                   <AstryxNativeButton
                     label={t("settings.usage.test")}
                     variant="secondary"
-                    icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
                     isLoading={usageTest.loading}
                     isDisabled={!initialData?.id || usageTest.loading}
                     onClick={() => void runUsageQueryTest()}
@@ -2696,7 +2689,6 @@ function CcsImportModal(props: {
                     label={t("settings.refreshLocalProviderConfigs")}
                     variant="secondary"
                     size="sm"
-                    icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
                     onClick={onRefresh}
                     isDisabled={submitting}
                   />
@@ -2992,7 +2984,6 @@ function ProviderList(props: {
             label={t("settings.addProvider")}
             variant="primary"
             size="sm"
-            icon={<Icon icon={Plus} size="sm" color="inherit" />}
             onClick={onAdd}
           />
           {thirdPartyImportEnabled ? (
@@ -3001,7 +2992,6 @@ function ProviderList(props: {
                 label: t("settings.thirdPartySync"),
                 variant: "secondary",
                 size: "sm",
-                icon: <Icon icon={Download} size="sm" color="inherit" />,
                 isLoading: thirdPartyImporting,
                 isDisabled: thirdPartyImporting,
               }}
@@ -3051,7 +3041,6 @@ function ProviderList(props: {
                 label={t("settings.addProvider")}
                 variant="primary"
                 size="sm"
-                icon={<Icon icon={Plus} size="sm" color="inherit" />}
                 onClick={onAdd}
               />
             }

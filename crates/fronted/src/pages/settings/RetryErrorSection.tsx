@@ -9,7 +9,7 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { useState } from "react";
 
-import { Plus, RefreshCw, X } from "../../components/icons";
+import { RefreshCw, X } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { RETRYABLE_PRESET_HTTP_STATUS_CODES } from "../../lib/settings";
 import type { SettingsSectionProps } from "./types";
@@ -140,7 +140,6 @@ export function RetryErrorSection({ settings, setSettings }: SettingsSectionProp
             <Button
               label={t("settings.retryErrorAddPattern")}
               variant="secondary"
-              icon={<Plus />}
               isDisabled={!patternDraft.trim()}
               onClick={addPattern}
             />

@@ -8,19 +8,7 @@ import { TextInput as Input } from "@astryxdesign/core/TextInput";
 import { listen } from "@xagent/runtime";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirmDialog } from "../../components/astryx/useConfirmDialog";
-import {
-  AlertTriangle,
-  Archive,
-  ArchiveRestore,
-  Cloud,
-  CloudDownload,
-  Download,
-  Loader2,
-  Plug,
-  Save,
-  Shield,
-  Upload,
-} from "../../components/icons";
+import { AlertTriangle, Archive, ArchiveRestore, Cloud, Shield } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   applyBackupImport,
@@ -433,30 +421,18 @@ export function BackupSyncSection(props: SettingsSectionProps) {
             label={t("settings.backupExport")}
             variant="secondary"
             size="sm"
+            isLoading={busy === "export"}
             isDisabled={busy !== null}
             onClick={() => void handleExport()}
-          >
-            {busy === "export" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Download className="h-3.5 w-3.5" />
-            )}
-            {t("settings.backupExport")}
-          </Button>
+          />
           <Button
             label={t("settings.backupImport")}
             variant="secondary"
             size="sm"
+            isLoading={busy === "import"}
             isDisabled={busy !== null}
             onClick={() => void handleImport()}
-          >
-            {busy === "import" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Upload className="h-3.5 w-3.5" />
-            )}
-            {t("settings.backupImport")}
-          </Button>
+          />
         </AstryxStack>
 
         <AstryxStack
@@ -649,58 +625,34 @@ export function BackupSyncSection(props: SettingsSectionProps) {
             variant="primary"
             label={t("settings.backupSyncSave")}
             size="sm"
+            isLoading={syncBusy === "save"}
             isDisabled={syncLocked}
             onClick={() => void handleSaveSync()}
-          >
-            {syncBusy === "save" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Save className="h-3.5 w-3.5" />
-            )}
-            {t("settings.backupSyncSave")}
-          </Button>
+          />
           <Button
             label={t("settings.backupSyncTest")}
             variant="secondary"
             size="sm"
+            isLoading={syncBusy === "test"}
             isDisabled={syncLocked || dirty}
             onClick={() => void handleTestSync()}
-          >
-            {syncBusy === "test" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Plug className="h-3.5 w-3.5" />
-            )}
-            {t("settings.backupSyncTest")}
-          </Button>
+          />
           <Button
             label={t("settings.backupSyncUpload")}
             variant="secondary"
             size="sm"
+            isLoading={syncBusy === "upload"}
             isDisabled={syncLocked || dirty}
             onClick={() => void handleUpload()}
-          >
-            {syncBusy === "upload" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Cloud className="h-3.5 w-3.5" />
-            )}
-            {t("settings.backupSyncUpload")}
-          </Button>
+          />
           <Button
             label={t("settings.backupSyncDownload")}
             variant="secondary"
             size="sm"
+            isLoading={syncBusy === "download"}
             isDisabled={syncLocked || dirty}
             onClick={() => void handleDownload()}
-          >
-            {syncBusy === "download" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <CloudDownload className="h-3.5 w-3.5" />
-            )}
-            {t("settings.backupSyncDownload")}
-          </Button>
+          />
         </AstryxStack>
 
         {dirty && !syncLocked ? (

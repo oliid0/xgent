@@ -14,6 +14,7 @@ import {
 } from "@astryxdesign/core/Layout";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Text as AstryxText, Heading, Text } from "@astryxdesign/core/Text";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { renderAsync } from "docx-preview";
@@ -24,9 +25,10 @@ import { cn } from "../../lib/shared/utils";
 import { invokeFs } from "../../lib/tools/fsBackend";
 import { type FileTypeIconComponent, getFileTypeIcon } from "../chat/fileTypeIcons";
 import {
+  Check,
   ChevronRight,
+  Copy,
   ExternalLink,
-  FilePenLine,
   FileText,
   Loader2,
   Minus,
@@ -354,6 +356,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [sourceCopied, setSourceCopied] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
   const replacePreview = useCallback((next: LoadedPreview | null) => {
@@ -363,6 +366,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     previewBlobUrlRef.current = next?.blobUrl ?? null;
     previewRef.current = next;
     setActiveSheetName("");
+    setSourceCopied(false);
     setPreview(next);
   }, []);
 
@@ -489,6 +493,17 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
   const canOpenEditor = Boolean(activePreviewRequest && isWorkspaceEditablePreviewPath(activePath));
   const canOpenExternal = Boolean(activePreviewRequest && activePath && !canOpenEditor);
 
+  const copyPreviewSource = useCallback(async () => {
+    if (preview?.text === null || preview?.text === undefined) return;
+    try {
+      await navigator.clipboard.writeText(preview.text);
+      setSourceCopied(true);
+      window.setTimeout(() => setSourceCopied(false), 1600);
+    } catch (copyError) {
+      setError(toMessage(copyError, t("workspaceFilePreview.copyFailed")));
+    }
+  }, [preview?.text, t]);
+
   const openImagePath = useCallback(
     (path: string, transitionDirection: ImagePreviewTransitionDirection = 0) => {
       if (!activePreviewRequest || !path || path === activePath) return;
@@ -534,72 +549,96 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
         height="fill"
         header={
           <LayoutHeader hasDivider padding={0}>
-            <Toolbar
-              label={t("workspaceFilePreview.title")}
-              size="sm"
-              startContent={
-                <HStack gap={2} vAlign="center">
-                  <Icon icon={PreviewIcon} size="sm" color="accent" />
-                  <StackItem size="fill">
-                    <VStack gap={0.5}>
-                      <Heading level={4}>{t("workspaceFilePreview.title")}</Heading>
-                      <Text type="supporting" color="secondary" maxLines={1}>
-                        {activePath}
-                      </Text>
-                    </VStack>
-                  </StackItem>
-                </HStack>
-              }
-              endContent={
-                <HStack gap={1} vAlign="center">
-                  {canOpenEditor && activePreviewRequest ? (
+            <VStack gap={0} width="100%">
+              <Toolbar
+                label={t("workspaceFilePreview.title")}
+                size="sm"
+                startContent={
+                  <HStack gap={2} vAlign="center">
+                    <Icon icon={PreviewIcon} size="sm" color="accent" />
+                    <StackItem size="fill">
+                      <VStack gap={0.5}>
+                        <Heading level={4}>{t("workspaceFilePreview.title")}</Heading>
+                        <Text type="supporting" color="secondary" maxLines={1}>
+                          {activePath}
+                        </Text>
+                      </VStack>
+                    </StackItem>
+                  </HStack>
+                }
+                endContent={
+                  <HStack gap={1} vAlign="center">
+                    {preview?.text !== null && preview?.text !== undefined ? (
+                      <IconButton
+                        label={
+                          sourceCopied
+                            ? t("workspaceFilePreview.copied")
+                            : t("workspaceFilePreview.copySource")
+                        }
+                        tooltip={
+                          sourceCopied
+                            ? t("workspaceFilePreview.copied")
+                            : t("workspaceFilePreview.copySource")
+                        }
+                        icon={<Icon icon={sourceCopied ? Check : Copy} size="sm" color="inherit" />}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void copyPreviewSource()}
+                      />
+                    ) : null}
+                    {canOpenExternal ? (
+                      <IconButton
+                        label={t("workspaceFilePreview.openExternal")}
+                        tooltip={t("workspaceFilePreview.openExternal")}
+                        icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void openExternal()}
+                      />
+                    ) : null}
                     <IconButton
-                      label={t("workspaceFilePreview.edit")}
-                      tooltip={t("workspaceFilePreview.edit")}
-                      icon={<Icon icon={FilePenLine} size="sm" color="inherit" />}
+                      label={t("workspaceFilePreview.reload")}
+                      tooltip={t("workspaceFilePreview.reload")}
+                      icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
                       variant="ghost"
                       size="sm"
+                      isLoading={loading}
+                      isDisabled={!activePreviewRequest || loading}
                       onClick={() =>
-                        onOpenEditor({
-                          ...activePreviewRequest,
-                          path: activePath || activePreviewRequest.path,
-                        })
+                        activePreviewRequest && void loadPreview(activePreviewRequest, 0)
                       }
                     />
-                  ) : null}
-                  {canOpenExternal ? (
                     <IconButton
-                      label={t("workspaceFilePreview.openExternal")}
-                      tooltip={t("workspaceFilePreview.openExternal")}
-                      icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
+                      label={t("workspaceFilePreview.close")}
+                      tooltip={t("workspaceFilePreview.close")}
+                      icon={<Icon icon={X} size="sm" color="inherit" />}
                       variant="ghost"
                       size="sm"
-                      onClick={() => void openExternal()}
+                      onClick={onRequestClose}
                     />
-                  ) : null}
-                  <IconButton
-                    label={t("workspaceFilePreview.reload")}
-                    tooltip={t("workspaceFilePreview.reload")}
-                    icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
-                    variant="ghost"
+                  </HStack>
+                }
+              />
+              {canOpenEditor && activePreviewRequest ? (
+                <HStack width="100%" paddingInline={3}>
+                  <TabList
+                    value="preview"
+                    onChange={(value) => {
+                      if (value !== "source") return;
+                      onOpenEditor({
+                        ...activePreviewRequest,
+                        path: activePath || activePreviewRequest.path,
+                      });
+                    }}
                     size="sm"
-                    isLoading={loading}
-                    isDisabled={!activePreviewRequest || loading}
-                    onClick={() =>
-                      activePreviewRequest && void loadPreview(activePreviewRequest, 0)
-                    }
-                  />
-                  <IconButton
-                    label={t("workspaceFilePreview.close")}
-                    tooltip={t("workspaceFilePreview.close")}
-                    icon={<Icon icon={X} size="sm" color="inherit" />}
-                    variant="ghost"
-                    size="sm"
-                    onClick={onRequestClose}
-                  />
+                    overflow="auto"
+                  >
+                    <Tab value="preview" label={t("workspaceFilePreview.preview")} />
+                    <Tab value="source" label={t("workspaceFilePreview.source")} />
+                  </TabList>
                 </HStack>
-              }
-            />
+              ) : null}
+            </VStack>
           </LayoutHeader>
         }
         content={

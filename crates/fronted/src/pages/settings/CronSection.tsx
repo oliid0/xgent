@@ -17,7 +17,6 @@ import {
   Globe,
   MessageSquare,
   Pencil,
-  Plus,
   Terminal,
   Trash2,
 } from "../../components/icons";
@@ -145,18 +144,19 @@ export function CronSection(props: SettingsSectionProps) {
 
   return (
     <VStack width="100%" gap={4}>
-      <Section variant="transparent" padding={0}>
-        <HStack width="100%" gap={2} vAlign="center" hAlign="end" wrap="wrap">
-          <Badge label={tasks.length} variant="neutral" />
-          <Button
-            label={t("settings.cronAdd")}
-            variant="secondary"
-            size="sm"
-            icon={<Icon icon={Plus} size="sm" color="inherit" />}
-            onClick={() => setDetail({ open: true, mode: "add" })}
-          />
-        </HStack>
-      </Section>
+      {tasks.length > 0 ? (
+        <Section variant="transparent" padding={0}>
+          <HStack width="100%" gap={2} vAlign="center" hAlign="end" wrap="wrap">
+            <Badge label={tasks.length} variant="neutral" />
+            <Button
+              label={t("settings.cronAdd")}
+              variant="secondary"
+              size="sm"
+              onClick={() => setDetail({ open: true, mode: "add" })}
+            />
+          </HStack>
+        </Section>
+      ) : null}
 
       {!autoPromptSupported ? (
         <Banner
@@ -185,7 +185,6 @@ export function CronSection(props: SettingsSectionProps) {
               label={t("settings.cronAdd")}
               variant="secondary"
               size="sm"
-              icon={<Icon icon={Plus} size="sm" color="inherit" />}
               onClick={() => setDetail({ open: true, mode: "add" })}
             />
           }

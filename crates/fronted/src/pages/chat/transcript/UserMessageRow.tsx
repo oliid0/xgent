@@ -1,6 +1,7 @@
 import { ChatMessage, ChatMessageBubble } from "@astryxdesign/core/Chat";
+import { VStack } from "@astryxdesign/core/Layout";
 import { memo } from "react";
-
+import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { HistoryMessageRef } from "../../../lib/chat/conversation/conversationState";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
 import {
@@ -22,6 +23,7 @@ export type UserMessageRowProps = {
   loadCommitDetails: CommitDetailsLoader;
   onStartEdit: (key: string) => void;
   onCancelEdit: () => void;
+  onOpenFileLink?: (link: ChatFileLink) => void;
   onResendFromEdit: (
     messageRef: HistoryMessageRef,
     text: string,
@@ -38,6 +40,7 @@ export const UserMessageRow = memo(function UserMessageRow(props: UserMessageRow
     loadCommitDetails,
     onStartEdit,
     onCancelEdit,
+    onOpenFileLink,
     onResendFromEdit,
   } = props;
   const item = row.item;
@@ -69,20 +72,32 @@ export const UserMessageRow = memo(function UserMessageRow(props: UserMessageRow
     <ChatMessage
       sender="user"
       density="compact"
-      className={`chat-user-bubble-wrap group relative ml-auto max-w-[min(85%,calc(50em+2rem))] ${compactedClass}`}
+      className={`chat-user-bubble-wrap group relative ml-auto w-full ${compactedClass}`}
     >
-      <ChatMessageBubble
-        className={`${animateEntrance ? "chat-bubble-enter " : ""}chat-user-bubble font-openai-chat`}
-      >
-        <UserAttachmentCards files={visibleFiles} workspaceRoot={workspaceRoot} />
+      <VStack width="100%" gap={1} hAlign="end">
+        <UserAttachmentCards
+          files={visibleFiles}
+          workspaceRoot={workspaceRoot}
+          onOpen={(file) => {
+            const absolutePath = file.absolutePath?.trim();
+            onOpenFileLink?.({
+              path: absolutePath || file.relativePath,
+              source: absolutePath ? "absolute" : "relative",
+            });
+          }}
+        />
         {item.text ? (
-          <UserMessageContent
-            text={item.text}
-            pastedTextFiles={pastedTextFiles}
-            loadCommitDetails={loadCommitDetails}
-          />
+          <ChatMessageBubble
+            className={`${animateEntrance ? "chat-bubble-enter " : ""}chat-user-bubble max-w-[min(70%,40rem)] font-openai-chat`}
+          >
+            <UserMessageContent
+              text={item.text}
+              pastedTextFiles={pastedTextFiles}
+              loadCommitDetails={loadCommitDetails}
+            />
+          </ChatMessageBubble>
         ) : null}
-      </ChatMessageBubble>
+      </VStack>
       <UserRowFooter
         itemKey={item.key}
         text={item.text}

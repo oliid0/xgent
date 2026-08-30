@@ -45,16 +45,7 @@ import {
   selectedTitle,
   strongestQuotaLevel,
 } from "./panelModel";
-import {
-  ArrowLeft,
-  buildModelOptions,
-  Check,
-  Folder,
-  Plus,
-  RefreshCw,
-  Settings2,
-  Trash2,
-} from "./platform";
+import { ArrowLeft, buildModelOptions, Folder, Plus, Settings2 } from "./platform";
 import { type MemoryCreateDraft, useMemoryPanelData } from "./useMemoryPanelData";
 
 const EMPTY_CREATE_DRAFT: MemoryCreateDraft = {
@@ -279,7 +270,6 @@ export function MemoryPanel(props: {
                 label={t("settings.memoryRefresh")}
                 variant="ghost"
                 size="sm"
-                icon={<RefreshCw />}
                 isLoading={loading}
                 isDisabled={loading}
                 onClick={() => void reload()}
@@ -644,7 +634,6 @@ export function MemoryPanel(props: {
                           label={t("settings.memoryAccept")}
                           variant="secondary"
                           size="sm"
-                          icon={<Check />}
                           onClick={() => void acceptSelected()}
                           isDisabled={saving}
                         />
@@ -653,7 +642,6 @@ export function MemoryPanel(props: {
                         label={t("settings.memoryDelete")}
                         variant="secondary"
                         size="sm"
-                        icon={<Trash2 />}
                         onClick={() => void deleteSelected()}
                         isDisabled={saving}
                       />

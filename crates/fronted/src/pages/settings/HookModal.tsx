@@ -18,7 +18,7 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
 import { type FormEvent, useState } from "react";
-import { ArrowLeft, Globe, Plus, Terminal } from "../../components/icons";
+import { ArrowLeft, Globe, Terminal } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   HOOK_EVENT_TRANSLATION_KEYS,
@@ -271,7 +271,6 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
                           label={t("settings.add")}
                           variant="secondary"
                           size="sm"
-                          icon={<Icon icon={Plus} size="sm" color="inherit" />}
                           onClick={() => {
                             clearError();
                             const draft = createEmptyRequestDraft();

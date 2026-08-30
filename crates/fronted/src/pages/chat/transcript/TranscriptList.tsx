@@ -495,6 +495,7 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
                 loadCommitDetails={loadCommitDetails}
                 onStartEdit={handleStartEdit}
                 onCancelEdit={handleCancelEdit}
+                onOpenFileLink={onOpenFileLink}
                 onResendFromEdit={onResendFromEdit}
               />
             </AstryxStack>

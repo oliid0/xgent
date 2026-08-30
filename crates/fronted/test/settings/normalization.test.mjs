@@ -69,6 +69,20 @@ test("custom provider routing strips endpoint suffixes and filters inactive mode
   assert.deepEqual(provider.activeModels, ["gpt-a"]);
 });
 
+test("provider reasoning is clamped to a model's supported level", () => {
+  const value = settings.normalizeChatRuntimeControlsForProvider(
+    { reasoning: "high", reasoningByProvider: { codex_openai_responses: "high" } },
+    {
+      providerId: "codex",
+      requestFormat: "openai-responses",
+      modelId: "gpt-5.2-chat-latest",
+    },
+  );
+
+  assert.equal(value.reasoning, "medium");
+  assert.equal(value.reasoningByProvider.codex_openai_responses, "medium");
+});
+
 test("provider retry policy and retry-error settings normalize persisted input", () => {
   const provider = settings.normalizeCustomProvider({
     id: "retry-provider",

@@ -1,10 +1,10 @@
 import { Collapsible } from "@astryxdesign/core/Collapsible";
-import { HStack } from "@astryxdesign/core/Layout";
+import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Lightbulb, RefreshCw } from "../../../../components/icons";
+import { RefreshCw } from "../../../../components/icons";
 import { Markdown } from "../../../../components/Markdown";
 import { useLocale } from "../../../../i18n";
 import type { ChatFileLink } from "../../../../lib/chat/chatFileLinks";
@@ -50,24 +50,19 @@ const ThinkingBlock = memo(function ThinkingBlock({
         setIsOpen(nextOpen);
       }}
       trigger={
-        isRunning ? (
-          <AssistantStatus>{t("chat.thinking")}</AssistantStatus>
-        ) : (
-          <HStack gap={2} vAlign="center">
-            <Lightbulb className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-            <Text type="supporting" color="secondary">
-              {t("chat.thinkingProcess")}
-            </Text>
-          </HStack>
-        )
+        <Text type="body" color="secondary" weight="medium">
+          {isRunning ? t("chat.thinking") : t("chat.thinkingProcess")}
+        </Text>
       }
     >
-      <Markdown
-        content={text}
-        className="thinking-markdown"
-        renderMode={renderMode}
-        showCaret={false}
-      />
+      <VStack paddingBlockStart={2} paddingInlineStart={2} width="100%">
+        <Markdown
+          content={text}
+          className="thinking-markdown"
+          renderMode={renderMode}
+          showCaret={false}
+        />
+      </VStack>
     </Collapsible>
   );
 });

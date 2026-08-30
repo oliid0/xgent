@@ -47,12 +47,9 @@ import {
 import {
   ArrowLeft,
   canRunOrganizerLocally,
-  History,
   ModelPicker,
   parseModelValue,
   pokeMemoryOrganizer,
-  RefreshCw,
-  Trash2,
   toModelValue,
 } from "./platform";
 
@@ -482,7 +479,6 @@ export function MemorySettingsDrawer(props: {
                   label={t("settings.memoryOrganizerHistory")}
                   variant="secondary"
                   size="sm"
-                  icon={<History />}
                   width="100%"
                   onClick={() => setHistoryOpen(true)}
                 />
@@ -490,7 +486,6 @@ export function MemorySettingsDrawer(props: {
                   label={t("settings.memoryOrganizerRunNow")}
                   variant="primary"
                   size="sm"
-                  icon={<RefreshCw />}
                   width="100%"
                   isLoading={organizerSubmitting}
                   isDisabled={!settings.memory.organizerModel || organizerSubmitting}
@@ -509,7 +504,6 @@ export function MemorySettingsDrawer(props: {
                   label={t("settings.memoryWipeAll")}
                   variant="destructive"
                   size="sm"
-                  icon={<Trash2 />}
                   width="100%"
                   onClick={() => setDrawerWipeConfirmOpen(true)}
                   isDisabled={saving}

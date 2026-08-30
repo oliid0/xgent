@@ -2,7 +2,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { useState } from "react";
-import { Cable, Plus } from "../../components/icons";
+import { Cable } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { type McpServerConfig, updateMcp } from "../../lib/settings";
 import { McpServerEditModal, McpServersForm } from "../mcp-hub/McpServersForm";
@@ -43,7 +43,6 @@ export function McpSettingsSection(props: SettingsSectionProps & { allowStdio: b
           type="button"
           size="sm"
           label={t("mcpHub.add")}
-          icon={<Plus />}
           className="settings-section-action"
           onClick={() => setEditing({ mode: "add" })}
         />

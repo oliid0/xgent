@@ -26,7 +26,6 @@ import {
   FolderOpen,
   Globe,
   MessageSquare,
-  Plus,
   Terminal,
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
@@ -471,7 +470,6 @@ export function CronTaskModal({
                         label={t("settings.add")}
                         variant="secondary"
                         size="sm"
-                        icon={<Plus aria-hidden="true" />}
                         onClick={() => {
                           setFormError(null);
                           const draft = createEmptyRequestDraft();

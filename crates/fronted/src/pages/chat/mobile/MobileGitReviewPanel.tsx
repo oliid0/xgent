@@ -522,7 +522,6 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
                   <Button
                     key={operation}
                     label={t(`projectTools.gitReview.${operation}`)}
-                    icon={<Icon />}
                     size="sm"
                     isDisabled={Boolean(busy)}
                     onClick={() => void remoteOperation(operation)}
@@ -633,7 +632,6 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
             <Button
               type="submit"
               label={t("projectTools.gitReview.commit")}
-              icon={<GitCommitHorizontal />}
               variant="primary"
               size="lg"
               isLoading={busy === "commit"}

@@ -137,7 +137,6 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
               actions={
                 <Button
                   label={t("mcpHub.add")}
-                  icon={<Plus />}
                   variant="primary"
                   onClick={() => setEditing({ mode: "add" })}
                 />

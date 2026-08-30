@@ -342,6 +342,48 @@ test("model request sanitizer drops assistant rounds that only contain hosted se
   assert.equal(serialized.includes("example.com/source"), false);
 });
 
+test("model request sanitizer excludes provider-hosted search aggregation from context usage", () => {
+  const context = requestContextSanitizer.sanitizeContextForModelRequest({
+    messages: [
+      user("search", 1),
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Search complete." },
+          {
+            type: "hostedSearch",
+            id: "search-with-usage",
+            provider: "openai",
+            status: "completed",
+            queries: ["current docs"],
+            sources: [],
+          },
+        ],
+        usage: {
+          input: 105_000,
+          output: 700,
+          cacheRead: 31_000,
+          cacheWrite: 12_000,
+          totalTokens: 105_700,
+          cost: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1, total: 4 },
+        },
+        stopReason: "stop",
+        timestamp: 2,
+      },
+    ],
+  });
+
+  assert.deepEqual(context.messages[1].content, [{ type: "text", text: "Search complete." }]);
+  assert.deepEqual(context.messages[1].usage, {
+    input: 0,
+    output: 700,
+    cacheRead: 31_000,
+    cacheWrite: 0,
+    totalTokens: 0,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  });
+});
+
 test("model request sanitizer removes persisted synthetic subagent cards", () => {
   const parentId = "call-parent|fc_parent";
   const cardId = `${parentId}:agent:1`;

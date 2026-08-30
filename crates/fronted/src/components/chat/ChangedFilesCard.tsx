@@ -135,7 +135,6 @@ export const ChangedFilesCard = memo(function ChangedFilesCard({
           {actions?.onOpenDiff ? (
             <Button
               label={t("chat.changedFiles.review")}
-              icon={<Icon icon={GitCommitHorizontal} size="sm" color="inherit" />}
               size="sm"
               variant="ghost"
               onClick={() => actions.onOpenDiff?.(null)}

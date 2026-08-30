@@ -110,7 +110,11 @@ export type RunTextConversationTurnParams = {
   buildPreparedContext: (
     state: ConversationViewState,
     tools?: Context["tools"],
-    options?: { includeAbortedMessages?: boolean; includeUploadedFilesMetadata?: boolean },
+    options?: {
+      includeAbortedMessages?: boolean;
+      includeUploadedFilesMetadata?: boolean;
+      includeMemoryTurnUpdates?: boolean;
+    },
   ) => Context;
   compaction: CompactionController;
   cancellation: TurnCancellation;
@@ -478,6 +482,10 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
       } catch (streamErr) {
         nativeWebSearchStatusController.finish();
         if (compactionRequested) {
+          trajectory.stepEnd(textRound, {
+            status: "aborted",
+            error: "Provider request restarted after mid-stream compaction.",
+          });
           hookLifecycle.ensureMessageEnded();
           hookLifecycle.endTurn(textRound);
           resetLiveTranscript(transcriptStore);
@@ -552,16 +560,11 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
   const shouldRunMemoryExtraction =
     finalAssistant.stopReason !== "error" && finalAssistant.stopReason !== "aborted";
   commitAssistantRoundMeta(finalAssistant, textRound);
+  applyConversationState(finalState);
   settleLiveTranscript(transcriptStore);
-  updateConversationRuntimeEntry(conversationId, (prev) => ({
-    ...prev,
-    state: finalState,
-  }));
   hookLifecycle.ensureMessageEnded();
   hookLifecycle.endAgent();
-  trajectory.endTurn(trajectoryTerminalInfo(finalAssistant));
-  await trajectory.flush();
-  void persistConversationWithHistorySync({
+  const historyPersisted = await persistConversationWithHistorySync({
     conversationId,
     sessionId,
     providerId,
@@ -572,12 +575,14 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
     createdAt,
     titlePromise,
   });
+  trajectory.endTurn(trajectoryTerminalInfo(finalAssistant));
+  await trajectory.flush();
   conversationEvents.queueEvent({
     type: "done",
     conversation_id: conversationId,
   });
   conversationEvents.close();
-  if (shouldRunMemoryExtraction) {
+  if (historyPersisted && shouldRunMemoryExtraction) {
     const currentMemoryExtractionModel: MemoryExtractionModelConfig = {
       providerId,
       model,
@@ -595,7 +600,9 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
       workdir: conversationCwd,
       // 抽取子模型看到的必须是用户真正说的话:memory 增量块只服务主模型的缓存,
       // 混进来会把索引行当成用户发言,既撑破短消息门控又诱发重复写入。
-      messages: buildPreparedContext(finalState).messages,
+      messages: buildPreparedContext(finalState, undefined, {
+        includeMemoryTurnUpdates: false,
+      }).messages,
       statusText: memoryExtractionStatusText,
       signal: cancellation.userStop.signal,
       debugLogger: conversationDebugLogger,

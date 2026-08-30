@@ -21,7 +21,6 @@ import {
   Globe2,
   Pencil,
   Plug,
-  Plus,
   Search,
   Server,
   Terminal,
@@ -537,12 +536,7 @@ export function McpServerEditModal(props: {
                   variant="secondary"
                   onClick={onClose}
                 />
-                <Button
-                  type="submit"
-                  label={submitLabel}
-                  variant="primary"
-                  icon={<Icon icon={mode === "add" ? Plus : Pencil} size="sm" color="inherit" />}
-                />
+                <Button type="submit" label={submitLabel} variant="primary" />
               </HStack>
             </LayoutFooter>
           }
@@ -604,12 +598,7 @@ export function McpServersForm(props: McpServersFormProps) {
                 icon={<Icon icon={Server} size="lg" color="secondary" />}
                 actions={
                   onAddServer ? (
-                    <Button
-                      label={t("mcpHub.add")}
-                      icon={<Icon icon={Plus} size="sm" color="inherit" />}
-                      variant="secondary"
-                      onClick={onAddServer}
-                    />
+                    <Button label={t("mcpHub.add")} variant="secondary" onClick={onAddServer} />
                   ) : undefined
                 }
               />

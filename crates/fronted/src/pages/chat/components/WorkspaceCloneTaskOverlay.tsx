@@ -115,7 +115,6 @@ export function WorkspaceCloneTaskOverlay(props: { onOpenWorkspace: (path: strin
                 <Button
                   type="button"
                   label={t("chat.clone.open")}
-                  icon={<FolderOpen />}
                   variant="primary"
                   width="100%"
                   onClick={() => onOpenWorkspace(task.targetPath)}

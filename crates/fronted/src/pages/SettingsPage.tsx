@@ -424,7 +424,7 @@ export function SettingsPage(props: SettingsPageProps) {
               <LayoutContent
                 key={section}
                 data-settings-section={section}
-                padding={4}
+                padding={3}
                 isScrollable={!sectionManagesScroll}
                 className="settings-section-enter"
               >
@@ -440,7 +440,7 @@ export function SettingsPage(props: SettingsPageProps) {
                 </VStack>
               </LayoutContent>
             ) : (
-              <LayoutContent padding={4} label={t("settings.title")}>
+              <LayoutContent padding={3} label={t("settings.title")}>
                 <VStack
                   width="100%"
                   maxWidth="var(--xagent-content-width-md)"
@@ -534,9 +534,16 @@ export function SettingsPage(props: SettingsPageProps) {
         content={
           <VStack height="100%" minHeight={0} gap={0}>
             {detailLayerDepth === 0 ? (
-              <LayoutHeader hasDivider height="var(--xagent-settings-header-height)">
-                <HStack height="100%" vAlign="center">
-                  <Heading level={3}>{sectionLabels[section]}</Heading>
+              <LayoutHeader hasDivider height="var(--xagent-settings-header-height)" padding={0}>
+                <HStack
+                  width="100%"
+                  maxWidth="var(--xagent-settings-content-max-width)"
+                  height="100%"
+                  paddingInline={3}
+                  vAlign="center"
+                  style={{ marginInline: "auto" }}
+                >
+                  <Heading level={2}>{sectionLabels[section]}</Heading>
                 </HStack>
               </LayoutHeader>
             ) : null}
@@ -548,7 +555,7 @@ export function SettingsPage(props: SettingsPageProps) {
                 maxWidth="var(--xagent-settings-content-max-width)"
                 height="100%"
                 minHeight={sectionManagesScroll ? 0 : "100%"}
-                padding={sectionManagesScroll ? 0 : 4}
+                padding={sectionManagesScroll ? 0 : 3}
                 className="settings-section-shell settings-section-enter"
                 style={{ marginInline: "auto" }}
               >

@@ -6,7 +6,7 @@ import { Heading } from "@astryxdesign/core/Text";
 import type { ReactNode } from "react";
 
 import iconSimpleUrl from "../../../../src-tauri/icons/icon-simple.png";
-import { FolderTree, Lightbulb, Settings, Wrench } from "../../../components/icons";
+import { FolderTree, Lightbulb, Wrench } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import type { SectionId } from "../../settings/types";
 
@@ -74,7 +74,6 @@ export function ChatEmptyState({
           onOpenSettings ? (
             <Button
               label={t("chat.goToSettings")}
-              icon={<Settings />}
               variant="primary"
               onClick={() => onOpenSettings("providers")}
             />

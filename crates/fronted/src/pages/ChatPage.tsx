@@ -1,5 +1,5 @@
-import { Button } from "@astryxdesign/core/Button";
 import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import { Section } from "@astryxdesign/core/Layout";
 import { Overlay } from "@astryxdesign/core/Overlay";
 import { ResizeHandle, useResizable } from "@astryxdesign/core/Resizable";
@@ -96,6 +96,7 @@ import {
 import { memoryExtraction } from "../lib/chat/memory/extractionController";
 import type { MemoryExtractionStatusKey } from "../lib/chat/memory/extractionEngine";
 import { memoryTurnInjection } from "../lib/chat/memory/injectionController";
+import { normalizeLogicalLineEndings } from "../lib/chat/messages/composerText";
 import {
   type CodeMentionReference,
   escapeMarkdownReferenceLabel,
@@ -136,6 +137,7 @@ import {
   isThinkingAlwaysOnForModel,
   toModelValue,
 } from "../lib/providers/llm";
+import { createProviderRuntimeConfig } from "../lib/providers/runtime/providerRuntimeConfig";
 import { isCompactViewport, useCompactViewport } from "../lib/responsive/compactViewport";
 import { useEdgeSwipeNavigation } from "../lib/responsive/useEdgeSwipeNavigation";
 import {
@@ -287,6 +289,7 @@ import { CurrentTaskProgress } from "./chat/components/CurrentTaskProgress";
 import { DesktopCheckpointRewindProvider } from "./chat/components/DesktopCheckpointRewindProvider";
 import { SplitConversationPane } from "./chat/components/SplitConversationPane";
 import { WorkspaceCloneTaskOverlay } from "./chat/components/WorkspaceCloneTaskOverlay";
+import { WorkspaceProjectSettingsDialog } from "./chat/components/WorkspaceProjectSettingsDialog";
 import {
   isNativeDropInsideUploadZone,
   nativeDropPositionScaleFactor,
@@ -492,31 +495,33 @@ function buildTextFromComposerDraft(
   draft: MentionComposerDraft,
   pastedFileById?: Map<string, PendingUploadedFile>,
 ) {
-  return draft.segments
-    .map((segment) => {
-      if (segment.type === "text") {
-        return segment.text;
-      }
-      if (segment.type === "fileMention") {
-        return formatFileMentionToken(segment.reference);
-      }
-      if (segment.type === "skillMention") {
-        return `$${segment.skill.name}`;
-      }
-      if (segment.type === "commitMention") {
-        return formatComposerCommitMention(segment.commit);
-      }
-      if (segment.type === "gitFileMention") {
-        return formatComposerGitFileMention(segment.file);
-      }
-      if (segment.type === "codeMention") {
-        return formatCodeMentionToken(segment.reference);
-      }
-      const file = pastedFileById?.get(segment.paste.id);
-      return file ? `[${segment.paste.label}: ${file.relativePath}]` : segment.paste.text;
-    })
-    .join("")
-    .replace(/\u00A0/g, " ");
+  return normalizeLogicalLineEndings(
+    draft.segments
+      .map((segment) => {
+        if (segment.type === "text") {
+          return segment.text;
+        }
+        if (segment.type === "fileMention") {
+          return formatFileMentionToken(segment.reference);
+        }
+        if (segment.type === "skillMention") {
+          return `/${segment.skill.name}`;
+        }
+        if (segment.type === "commitMention") {
+          return formatComposerCommitMention(segment.commit);
+        }
+        if (segment.type === "gitFileMention") {
+          return formatComposerGitFileMention(segment.file);
+        }
+        if (segment.type === "codeMention") {
+          return formatCodeMentionToken(segment.reference);
+        }
+        const file = pastedFileById?.get(segment.paste.id);
+        return file ? `[${segment.paste.label}: ${file.relativePath}]` : segment.paste.text;
+      })
+      .join("")
+      .replace(/\u00A0/g, " "),
+  );
 }
 
 async function importPastedTextsAsFiles(workdir: string, pastes: MentionComposerLargePaste[]) {
@@ -612,36 +617,7 @@ function buildProviderRuntimeConfig(
   model: string,
   controlsInput?: ChatRuntimeControls,
 ) {
-  const modelConfig = findProviderModelConfig(provider, model);
-  const reasoningParams = {
-    providerId: provider.type,
-    requestFormat: provider.requestFormat,
-    modelId: model,
-    baseUrl: provider.baseUrl,
-    modelConfig,
-  };
-  const controls = normalizeChatRuntimeControlsForProvider(controlsInput, reasoningParams);
-  const reasoningSupported = getChatRuntimeReasoningLevelsForProvider(reasoningParams).length > 0;
-  return {
-    baseUrl: provider.baseUrl,
-    apiKey: provider.apiKey,
-    authMode: provider.authMode,
-    oauthAccountId: provider.oauthAccountId,
-    customHeaders: provider.customHeaders,
-    isFullUrl: provider.isFullUrl,
-    requestFormat: provider.requestFormat,
-    reasoning: reasoningSupported
-      ? controls.thinkingEnabled
-        ? controls.reasoning
-        : "off"
-      : undefined,
-    promptCachingEnabled: provider.promptCachingEnabled,
-    promptCacheHintMode: provider.promptCacheHintMode,
-    promptCacheRetention: provider.promptCacheRetention,
-    nativeWebSearchEnabled: controls.nativeWebSearchEnabled,
-    useSystemProxy: provider.useSystemProxy,
-    modelConfig,
-  };
+  return createProviderRuntimeConfig(provider, model, controlsInput);
 }
 
 function selectedModelsMatch(left: SelectedModel | undefined, right: SelectedModel | undefined) {
@@ -898,6 +874,9 @@ export function ChatPage(props: ChatPageProps) {
     mobileWorkspaceDestination?.kind === "terminal" ? mobileWorkspaceDestination : null;
   const mobileTerminalOpen = mobileTerminalDestination !== null;
   const [mobileWorkspaceCreateOpen, setMobileWorkspaceCreateOpen] = useState(false);
+  const [workspaceSettingsProject, setWorkspaceSettingsProject] = useState<WorkspaceProject | null>(
+    null,
+  );
   const previousWorkspaceFileTreeOpenRef = useRef(false);
   const [workspaceEditorMounted, setWorkspaceEditorMounted] = useState(false);
   const [workspaceEditorOpen, setWorkspaceEditorOpen] = useState(false);
@@ -1085,15 +1064,9 @@ export function ChatPage(props: ChatPageProps) {
       if (!(await checkWorkspaceProjectDirectory(project))) return;
       activateWorkspaceProject(project);
       if (mobileExperience) setSidebarOpen(false);
-      onOpenSettings(nativeMobile ? "mobileExecution" : "projectRoots");
+      setWorkspaceSettingsProject(project);
     },
-    [
-      activateWorkspaceProject,
-      checkWorkspaceProjectDirectory,
-      mobileExperience,
-      nativeMobile,
-      onOpenSettings,
-    ],
+    [activateWorkspaceProject, checkWorkspaceProjectDirectory, mobileExperience],
   );
 
   const handleNewConversationForProject = useCallback(
@@ -3774,14 +3747,15 @@ export function ChatPage(props: ChatPageProps) {
     const composerDraft = hasTextOverride
       ? null
       : (overrides?.composerDraftOverride ?? composerRef.current?.getDraft() ?? null);
-    let text = hasTextOverride
-      ? textOverride.trim()
-      : composerDraft
-        ? (effectiveIsAgentMode && composerDraft.largePastes.length > 0
+    let text = normalizeLogicalLineEndings(
+      hasTextOverride
+        ? textOverride
+        : composerDraft
+          ? effectiveIsAgentMode && composerDraft.largePastes.length > 0
             ? composerDraft.textWithoutLargePastes
             : buildTextFromComposerDraft(composerDraft)
-          ).trim()
-        : "";
+          : "",
+    );
     let uploadedFiles = overrides?.uploadedFilesOverride ?? pendingUploadedFiles;
 
     if (
@@ -3797,7 +3771,7 @@ export function ChatPage(props: ChatPageProps) {
           effectiveWorkdir,
           composerDraft.largePastes,
         );
-        text = buildTextFromComposerDraft(composerDraft, imported.fileByPasteId).trim();
+        text = buildTextFromComposerDraft(composerDraft, imported.fileByPasteId);
         uploadedFiles = mergePendingUploadedFiles(uploadedFiles, imported.files);
       } catch (error) {
         const message = asErrorMessage(error, "大段粘贴内容导入工作区失败");
@@ -3859,7 +3833,7 @@ export function ChatPage(props: ChatPageProps) {
       providerId,
       model,
     });
-    const baseConversationState = runtimeEntry.state;
+    const baseConversationState = clearTaskListState(runtimeEntry.state);
     const isFirstTurn = baseConversationState.meta.totalMessageCount === 0;
     const existingHistoryItem = sidebarStore.peek(conversationId);
     // Branched conversations start with the placeholder title; the first
@@ -3892,20 +3866,7 @@ export function ChatPage(props: ChatPageProps) {
       titlePromise = startConversationTitleJob({
         providerId: titleModelSelection.providerId,
         model: titleModelSelection.model,
-        runtime: {
-          baseUrl: titleProviderConfig.baseUrl,
-          isFullUrl: titleProviderConfig.isFullUrl,
-          apiKey: titleProviderConfig.apiKey,
-          authMode: titleProviderConfig.authMode,
-          oauthAccountId: titleProviderConfig.oauthAccountId,
-          customHeaders: titleProviderConfig.customHeaders,
-          requestFormat: titleProviderConfig.requestFormat,
-          reasoning: titleProviderConfig.reasoning,
-          promptCachingEnabled: titleProviderConfig.promptCachingEnabled,
-          nativeWebSearchEnabled: titleProviderConfig.nativeWebSearchEnabled,
-          useSystemProxy: titleProviderConfig.useSystemProxy,
-          modelConfig: titleProviderConfig.modelConfig,
-        },
+        runtime: titleProviderConfig,
         signal: cancellation.deriveScope().controller.signal,
         conversationId,
         titleSourceText,
@@ -4225,21 +4186,7 @@ export function ChatPage(props: ChatPageProps) {
     compaction.bindTurn({
       providerId,
       model,
-      runtime: {
-        baseUrl: providerConfig.baseUrl,
-        apiKey: providerConfig.apiKey,
-        authMode: providerConfig.authMode,
-        oauthAccountId: providerConfig.oauthAccountId,
-        customHeaders: providerConfig.customHeaders,
-        isFullUrl: providerConfig.isFullUrl,
-        requestFormat: providerConfig.requestFormat,
-        reasoning: providerConfig.reasoning,
-        promptCachingEnabled: providerConfig.promptCachingEnabled,
-        promptCacheHintMode: providerConfig.promptCacheHintMode,
-        nativeWebSearchEnabled: providerConfig.nativeWebSearchEnabled,
-        useSystemProxy: providerConfig.useSystemProxy,
-        modelConfig: providerConfig.modelConfig,
-      },
+      runtime: providerConfig,
       cancellation,
       debugLogger: compactionDebugLogger,
       buildPreparedContext,
@@ -4525,21 +4472,7 @@ export function ChatPage(props: ChatPageProps) {
           params: {
             providerId,
             model,
-            runtime: {
-              baseUrl: providerConfig.baseUrl,
-              apiKey: providerConfig.apiKey,
-              authMode: providerConfig.authMode,
-              oauthAccountId: providerConfig.oauthAccountId,
-              customHeaders: providerConfig.customHeaders,
-              isFullUrl: providerConfig.isFullUrl,
-              requestFormat: providerConfig.requestFormat,
-              reasoning: providerConfig.reasoning,
-              promptCachingEnabled: providerConfig.promptCachingEnabled,
-              promptCacheHintMode: providerConfig.promptCacheHintMode,
-              nativeWebSearchEnabled: providerConfig.nativeWebSearchEnabled,
-              useSystemProxy: providerConfig.useSystemProxy,
-              modelConfig: providerConfig.modelConfig,
-            },
+            runtime: providerConfig,
             failover: failoverParams,
             runtimeModel,
             selectedModel,
@@ -4634,21 +4567,7 @@ export function ChatPage(props: ChatPageProps) {
           params: {
             providerId,
             model,
-            runtime: {
-              baseUrl: providerConfig.baseUrl,
-              apiKey: providerConfig.apiKey,
-              authMode: providerConfig.authMode,
-              oauthAccountId: providerConfig.oauthAccountId,
-              customHeaders: providerConfig.customHeaders,
-              isFullUrl: providerConfig.isFullUrl,
-              requestFormat: providerConfig.requestFormat,
-              reasoning: providerConfig.reasoning,
-              promptCachingEnabled: providerConfig.promptCachingEnabled,
-              promptCacheHintMode: providerConfig.promptCacheHintMode,
-              nativeWebSearchEnabled: providerConfig.nativeWebSearchEnabled,
-              useSystemProxy: providerConfig.useSystemProxy,
-              modelConfig: providerConfig.modelConfig,
-            },
+            runtime: providerConfig,
             failover: failoverParams,
             runtimeModel,
             selectedModel,
@@ -5892,16 +5811,14 @@ export function ChatPage(props: ChatPageProps) {
                           />
                         </>
                       ) : (
-                        <Button
+                        <IconButton
                           label={t("browser.open")}
+                          icon={<Icon icon={Globe} size="sm" color="inherit" />}
                           variant="ghost"
                           size="md"
                           onClick={handleOpenBrowser}
                           tooltip={t("browser.open")}
-                          className="relative h-8 w-8 rounded-lg text-muted-foreground transition-[background-color,color,transform] duration-150 hover:text-foreground active:scale-95"
-                        >
-                          <Globe className="h-4 w-4" />
-                        </Button>
+                        />
                       )
                     }
                   />
@@ -6188,6 +6105,14 @@ export function ChatPage(props: ChatPageProps) {
           }}
           onCloneStarted={() => setMobileWorkspaceCreateOpen(false)}
           onClose={() => setMobileWorkspaceCreateOpen(false)}
+        />
+      ) : null}
+      {workspaceSettingsProject ? (
+        <WorkspaceProjectSettingsDialog
+          project={workspaceSettingsProject}
+          settings={settings}
+          setSettings={setSettings}
+          onClose={() => setWorkspaceSettingsProject(null)}
         />
       ) : null}
       {desktopBridgeEnabled ? (

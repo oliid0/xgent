@@ -29,7 +29,7 @@ import { useLocale } from "../../../i18n";
 import type { WorkspaceFileTreeStatePatch } from "../../../lib/settings";
 import { useConfirmDialog } from "../../astryx/useConfirmDialog";
 import { getFileTypeIcon } from "../../chat/fileTypeIcons";
-import { Check, Edit3, FolderClosed, FolderOpen, Plus, RefreshCw, Trash2, X } from "../../icons";
+import { Check, FolderOpen, RefreshCw, Trash2, X } from "../../icons";
 import { isWorkspaceImagePath } from "../../workspace-editor/workspaceImagePreview";
 import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
 import { FileTreeContextMenu } from "./ContextMenu";
@@ -539,7 +539,6 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
               variant="ghost"
               size="sm"
               width="100%"
-              icon={<Plus />}
               isDisabled={!canMutate || busyAction}
               onClick={() => startAction("file", selectedPath)}
             />
@@ -548,7 +547,6 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
               variant="ghost"
               size="sm"
               width="100%"
-              icon={<FolderClosed />}
               isDisabled={!canMutate || busyAction}
               onClick={() => startAction("folder", selectedPath)}
             />
@@ -557,7 +555,6 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
               variant="ghost"
               size="sm"
               width="100%"
-              icon={<Edit3 />}
               isDisabled={!canMutate || !selectedPath || busyAction}
               onClick={() => startAction("rename", selectedPath)}
             />
@@ -566,7 +563,6 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
               variant="destructive"
               size="sm"
               width="100%"
-              icon={<Trash2 />}
               isDisabled={!canMutate || !selectedPath || busyAction}
               onClick={() => void deletePath(selectedPath)}
             />

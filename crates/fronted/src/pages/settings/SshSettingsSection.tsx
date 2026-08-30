@@ -34,12 +34,10 @@ import {
   Key,
   Lock,
   Pencil,
-  Plus,
   Server,
   Shield,
   Terminal,
   Trash2,
-  Upload,
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
@@ -846,34 +844,25 @@ export function SshSettingsSection(props: SettingsSectionProps) {
 
   return (
     <VStack width="100%" gap={4}>
-      <Section variant="transparent" padding={0}>
-        <HStack width="100%" gap={2} vAlign="center" hAlign="end" wrap="wrap">
-          <Badge label={hosts.length} variant="neutral" />
-          <DropdownMenu
-            button={{
-              label: t("settings.sshAdd"),
-              variant: "primary",
-              size: "sm",
-              icon: <AstryxIcon icon={Plus} size="sm" color="inherit" />,
-            }}
-            alignment="end"
-            items={[
-              {
-                id: "add",
-                label: t("settings.sshAdd"),
-                icon: <AstryxIcon icon={Server} size="sm" color="inherit" />,
-                onClick: openAdd,
-              },
-              {
-                id: "import",
-                label: t("settings.sshImport"),
-                icon: <AstryxIcon icon={Upload} size="sm" color="inherit" />,
-                onClick: () => setImportOpen(true),
-              },
-            ]}
-          />
-        </HStack>
-      </Section>
+      {hosts.length > 0 ? (
+        <Section variant="transparent" padding={0}>
+          <HStack width="100%" gap={2} vAlign="center" hAlign="end" wrap="wrap">
+            <Badge label={hosts.length} variant="neutral" />
+            <DropdownMenu
+              button={{ label: t("settings.sshAdd"), variant: "primary", size: "sm" }}
+              alignment="end"
+              items={[
+                { id: "add", label: t("settings.sshAdd"), onClick: openAdd },
+                {
+                  id: "import",
+                  label: t("settings.sshImport"),
+                  onClick: () => setImportOpen(true),
+                },
+              ]}
+            />
+          </HStack>
+        </Section>
+      ) : null}
 
       {hosts.length === 0 ? (
         <EmptyState
@@ -881,6 +870,20 @@ export function SshSettingsSection(props: SettingsSectionProps) {
           icon={<AstryxIcon icon={Key} size="lg" color="secondary" />}
           title={t("settings.sshNoHosts")}
           description={t("settings.sshNoHostsHint")}
+          actions={
+            <DropdownMenu
+              button={{ label: t("settings.sshAdd"), variant: "primary", size: "sm" }}
+              alignment="center"
+              items={[
+                { id: "add", label: t("settings.sshAdd"), onClick: openAdd },
+                {
+                  id: "import",
+                  label: t("settings.sshImport"),
+                  onClick: () => setImportOpen(true),
+                },
+              ]}
+            />
+          }
         />
       ) : (
         <AstryxList density="balanced" hasDividers>

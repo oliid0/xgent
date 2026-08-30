@@ -4,6 +4,7 @@ import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import { VStack } from "@astryxdesign/core/Layout";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Text as AstryxText } from "@astryxdesign/core/Text";
@@ -54,7 +55,7 @@ import {
   organizerTriggerLabel,
   rejectionBucketEntries,
 } from "./panelModel";
-import { ArrowLeft, BrushCleaning, Button, Check, DrawerSelect, RefreshCw } from "./platform";
+import { ArrowLeft, BrushCleaning, Button, DrawerSelect } from "./platform";
 import { useOrganizeRunHistory } from "./useMemoryPanelData";
 
 export function OrganizerHistoryModal(props: {
@@ -270,14 +271,13 @@ export function OrganizerHistoryModal(props: {
                       ]}
                     />
                   </AstryxStack>
-                  <Button
+                  <IconButton
                     type="button"
                     variant="secondary"
                     size="md"
                     className="shrink-0 text-muted-foreground hover:text-destructive"
                     label={t("settings.memoryOrganizerClearHistory")}
                     tooltip={t("settings.memoryOrganizerClearHistory")}
-                    isIconOnly
                     icon={<BrushCleaning className="h-3.5 w-3.5" />}
                     onClick={() => setClearConfirmOpen(true)}
                     isDisabled={loading || clearingHistory || runs.length === 0}
@@ -289,7 +289,7 @@ export function OrganizerHistoryModal(props: {
                   size="sm"
                   className="w-full"
                   label={t("settings.memoryRefresh")}
-                  icon={<RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />}
+                  isLoading={loading}
                   onClick={() => reload()}
                   isDisabled={loading}
                 />
@@ -526,7 +526,6 @@ export function OrganizerHistoryModal(props: {
                             type="button"
                             size="sm"
                             label={t("settings.memoryOrganizerApplySelected")}
-                            icon={<Check className="h-3.5 w-3.5" />}
                             onClick={applyManualPreview}
                             isDisabled={applyingPreview}
                           />

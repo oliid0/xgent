@@ -1,20 +1,22 @@
-import { Button as AstryxButton } from "@astryxdesign/core/Button";
-import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { Grid } from "@astryxdesign/core/Grid";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
-import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
-import {
-  Heading as AstryxHeadingCore,
-  Text as AstryxLabel,
-  Text as AstryxText,
-} from "@astryxdesign/core/Text";
-import { TextInput as Input } from "@astryxdesign/core/TextInput";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
 import { invoke, isBrowserRuntime, listen } from "@xagent/runtime";
-import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
-  ChevronDown,
   Cloud,
   Copy,
   GitBranch,
@@ -26,7 +28,6 @@ import {
   Shield,
   Terminal,
   Wifi,
-  WifiOff,
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
@@ -34,7 +35,6 @@ import {
   normalizeBrowserAddress,
 } from "../../lib/browser/browserSessionController";
 import type { AppSettings } from "../../lib/settings";
-import { AgentActivationSwitch } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 type LocalAccessStatus = {
@@ -70,17 +70,10 @@ const EMPTY_LOCAL_STATUS: LocalAccessStatus = {
   pairedDevices: 0,
 };
 
-const EMPTY_VAULT_STATUS: CloudSecretVaultStatus = {
-  githubTokenConfigured: false,
-};
+const EMPTY_VAULT_STATUS: CloudSecretVaultStatus = { githubTokenConfigured: false };
+const EMPTY_LAN_PC_STATUS: LanPcClientStatus = { paired: false };
 
-const EMPTY_LAN_PC_STATUS: LanPcClientStatus = {
-  paired: false,
-};
-
-type AccessSectionProps = SettingsSectionProps & {
-  nativeMobile: boolean;
-};
+type AccessSectionProps = SettingsSectionProps & { nativeMobile: boolean };
 
 function updateAccess(
   setSettings: SettingsSectionProps["setSettings"],
@@ -92,14 +85,15 @@ function updateAccess(
   }));
 }
 
-function CopyButton({ value }: { value: string }) {
+function CopyButton({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <AstryxButton
+    <IconButton
       variant="ghost"
-      label="Copy"
-      type="button"
-      tooltip="Copy"
+      size="sm"
+      label={label}
+      tooltip={label}
+      icon={<Icon icon={copied ? Check : Copy} size="sm" color="inherit" />}
       isDisabled={!value}
       onClick={() => {
         if (!value) return;
@@ -107,61 +101,7 @@ function CopyButton({ value }: { value: string }) {
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1_500);
       }}
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
-    >
-      {copied ? (
-        <Check className="h-3.5 w-3.5 text-emerald-500" />
-      ) : (
-        <Copy className="h-3.5 w-3.5" />
-      )}
-    </AstryxButton>
-  );
-}
-
-function ToggleCard({
-  icon,
-  title,
-  hint,
-  checked,
-  disabled = false,
-  onToggle,
-}: {
-  icon: ReactNode;
-  title: string;
-  hint: string;
-  checked: boolean;
-  disabled?: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <AstryxStack
-      direction="horizontal"
-      className="flex items-center justify-between gap-4 rounded-lg bg-muted/30 px-4 py-3"
-    >
-      <AstryxStack direction="vertical" className="min-w-0 flex-1">
-        <AstryxStack
-          direction="horizontal"
-          className="flex items-center gap-1.5 text-sm font-medium"
-        >
-          {icon}
-          {title}
-        </AstryxStack>
-        <AstryxText
-          as="p"
-          type="inherit"
-          display="block"
-          className="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-        >
-          {hint}
-        </AstryxText>
-      </AstryxStack>
-      <AgentActivationSwitch
-        checked={checked}
-        title={title}
-        disabled={disabled}
-        onToggle={onToggle}
-      />
-    </AstryxStack>
+    />
   );
 }
 
@@ -176,6 +116,15 @@ function normalizeLanControlUrl(value: string) {
   url.search = "";
   url.hash = "";
   return url.toString();
+}
+
+function normalizeComparableLanUrl(value?: string | null) {
+  if (!value?.trim()) return "";
+  try {
+    return normalizeLanControlUrl(value).replace(/\/$/, "");
+  } catch {
+    return "";
+  }
 }
 
 export function AccessSection({ settings, setSettings, nativeMobile }: AccessSectionProps) {
@@ -226,8 +175,13 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
 
   const refreshLanPcStatus = useCallback(async () => {
     if (browser || !nativeMobile) return;
-    setLanPcStatus(await invoke<LanPcClientStatus>("lan_pc_status"));
-  }, [browser, nativeMobile]);
+    const next = await invoke<LanPcClientStatus>("lan_pc_status");
+    setLanPcStatus(next);
+    const authoritativeUrl = normalizeComparableLanUrl(next.baseUrl);
+    if (next.paired && authoritativeUrl) {
+      updateAccess(setSettings, { lanControlUrl: `${authoritativeUrl}/` });
+    }
+  }, [browser, nativeMobile, setSettings]);
 
   useEffect(() => {
     if (browser) return;
@@ -244,10 +198,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
       if (!disposed) setLocalStatus(event.payload);
     })
       .then((unlisten) => {
-        if (disposed) {
-          unlisten();
-          return;
-        }
+        if (disposed) return unlisten();
         stopListening = unlisten;
         return refreshLocalStatus();
       })
@@ -268,20 +219,8 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
     () => localStatus.urls[0] ?? `http://127.0.0.1:${settings.access.webUiPort}`,
     [localStatus.urls, settings.access.webUiPort],
   );
-  const normalizedConfiguredLanUrl = useMemo(() => {
-    try {
-      return settings.access.lanControlUrl.trim()
-        ? normalizeLanControlUrl(settings.access.lanControlUrl).replace(/\/$/, "")
-        : "";
-    } catch {
-      return "";
-    }
-  }, [settings.access.lanControlUrl]);
-  const pairedLanUrl = (lanPcStatus.baseUrl ?? "").replace(/\/$/, "");
-  const lanPcReady =
-    lanPcStatus.paired &&
-    Boolean(normalizedConfiguredLanUrl) &&
-    normalizedConfiguredLanUrl === pairedLanUrl;
+  const pairedLanUrl = normalizeComparableLanUrl(lanPcStatus.baseUrl);
+  const lanPcReady = lanPcStatus.paired && Boolean(pairedLanUrl);
   const localStatusPhase = localStatus.running
     ? "running"
     : localStatus.lastError
@@ -289,6 +228,14 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
       : localStatus.enabled || settings.access.webUiEnabled
         ? "starting"
         : "stopped";
+  const localStatusLabel =
+    localStatusPhase === "running"
+      ? t("settings.accessRunning")
+      : localStatusPhase === "starting"
+        ? t("settings.accessStarting")
+        : localStatusPhase === "failed"
+          ? t("settings.accessFailed")
+          : t("settings.accessStopped");
 
   async function runAction(name: string, action: () => Promise<void>) {
     setActionError("");
@@ -302,363 +249,308 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
     }
   }
 
-  return (
-    <AstryxStack
-      direction="vertical"
-      className="settings-access-section space-y-6"
-      data-native-mobile={nativeMobile}
-    >
-      {nativeMobile ? (
-        <AstryxStack
-          direction="vertical"
-          as="section"
-          className="settings-access-card space-y-4 rounded-xl border border-border/60 bg-card p-5"
-        >
-          <AstryxStack direction="horizontal" className="flex items-start gap-3">
-            <AstryxStack
-              direction="horizontal"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/10"
-            >
-              <Wifi className="h-[18px] w-[18px] text-sky-500" />
-            </AstryxStack>
-            <AstryxStack direction="vertical" className="min-w-0">
-              <AstryxStack direction="vertical" className="text-sm font-semibold">
-                {t("settings.accessLanControl")}
-              </AstryxStack>
-              <AstryxText
-                as="p"
-                type="inherit"
-                display="block"
-                className="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-              >
-                {t("settings.accessLanControlHint")}
-              </AstryxText>
-            </AstryxStack>
-          </AstryxStack>
+  const cloudDetails = (
+    <VStack gap={3}>
+      <Grid columns={{ minWidth: 240, max: 2, repeat: "fit" }} gap={3} width="100%">
+        <TextInput
+          label={t("settings.accessGithubOwner")}
+          value={settings.access.githubOwner}
+          isDisabled={browser}
+          onChange={(value) => updateAccess(setSettings, { githubOwner: value })}
+          placeholder="github-user"
+        />
+        <TextInput
+          label={t("settings.accessGithubRepository")}
+          value={settings.access.githubRepository}
+          isDisabled={browser}
+          onChange={(value) => updateAccess(setSettings, { githubRepository: value })}
+          placeholder="agent-temp"
+        />
+      </Grid>
+      <Banner status="warning" title={t("settings.accessCloudPublicWarning")} collapsible={false} />
+      <Text type="supporting" color="secondary">
+        {t("settings.accessCloudEnvironmentHint")}
+      </Text>
+      <Section variant="muted" padding={3}>
+        <VStack gap={3}>
+          <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
+            <HStack gap={2} vAlign="center">
+              <Icon icon={Key} size="sm" color="secondary" />
+              <Text type="label">{t("settings.accessSecureVault")}</Text>
+            </HStack>
+            <StatusDot
+              variant={vaultStatus.githubTokenConfigured ? "success" : "neutral"}
+              label={
+                vaultStatus.githubTokenConfigured
+                  ? t("settings.accessTokenConfigured")
+                  : t("settings.accessTokenMissing")
+              }
+            />
+          </HStack>
+          <TextInput
+            label={t("settings.accessGithubToken")}
+            type="password"
+            autoComplete="new-password"
+            value={githubToken}
+            onChange={setGithubToken}
+            placeholder={t("settings.accessGithubToken")}
+            isDisabled={browser}
+          />
+          <HStack gap={2} hAlign="end" wrap="wrap">
+            {vaultStatus.githubTokenConfigured ? (
+              <Button
+                label={t("settings.accessRemoveToken")}
+                variant="secondary"
+                isDisabled={browser || busyAction !== ""}
+                onClick={() =>
+                  void runAction("remove-token", async () => {
+                    setVaultStatus(
+                      await invoke<CloudSecretVaultStatus>(
+                        "cloud_secret_vault_remove_github_token",
+                      ),
+                    );
+                    setGithubToken("");
+                  })
+                }
+              />
+            ) : null}
+            <Button
+              label={t("settings.accessSaveToken")}
+              variant="primary"
+              isLoading={busyAction === "save-token"}
+              isDisabled={
+                browser ||
+                !settings.access.githubOwner.trim() ||
+                !githubToken.trim() ||
+                busyAction !== ""
+              }
+              onClick={() =>
+                void runAction("save-token", async () => {
+                  setVaultStatus(
+                    await invoke<CloudSecretVaultStatus>("cloud_secret_vault_set_github_token", {
+                      username: settings.access.githubOwner,
+                      token: githubToken,
+                    }),
+                  );
+                  setGithubToken("");
+                })
+              }
+            />
+          </HStack>
+          {vaultStatus.githubUsername ? (
+            <Text type="supporting" color="secondary">
+              {t("settings.accessTokenOwner").replace("{username}", vaultStatus.githubUsername)}
+            </Text>
+          ) : null}
+          <Text type="supporting" color="secondary">
+            {t("settings.accessVaultHint")}
+          </Text>
+        </VStack>
+      </Section>
+    </VStack>
+  );
 
-          <AstryxLabel
-            as="label"
-            type="label"
-            weight="medium"
-            className="block space-y-1.5 text-xs font-medium text-muted-foreground"
-          >
-            <AstryxText as="span" type="inherit">
-              {t("settings.accessComputerAddress")}
-            </AstryxText>
-            <Input
-              label="http://192.168.1.10:28367"
-              isLabelHidden
+  return (
+    <VStack width="100%" gap={3}>
+      {browser ? (
+        <Banner status="warning" title={t("settings.accessNativeOnly")} collapsible={false} />
+      ) : null}
+
+      {nativeMobile ? (
+        <Section variant="section" padding={3}>
+          <VStack gap={3}>
+            <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
+              <HStack gap={2} vAlign="center">
+                <Icon icon={Wifi} size="md" color="secondary" />
+                <VStack gap={0.5}>
+                  <Heading level={4}>{t("settings.accessLanControl")}</Heading>
+                  <Text type="supporting" color="secondary">
+                    {t("settings.accessLanControlHint")}
+                  </Text>
+                </VStack>
+              </HStack>
+              <StatusDot
+                variant={lanPcReady ? "success" : "neutral"}
+                label={
+                  lanPcReady
+                    ? t("settings.accessComputerPaired")
+                    : t("settings.accessComputerNotPaired")
+                }
+              />
+            </HStack>
+            <TextInput
+              label={t("settings.accessComputerAddress")}
               {...({
                 inputMode: "url",
                 autoCapitalize: "none",
                 autoCorrect: "off",
                 spellCheck: false,
               } as const)}
-              type="text"
               value={settings.access.lanControlUrl}
               placeholder="http://192.168.1.10:28367"
-              onChange={(nextValue) => updateAccess(setSettings, { lanControlUrl: nextValue })}
+              onChange={(value) => updateAccess(setSettings, { lanControlUrl: value })}
               onBlur={() => {
                 const value = settings.access.lanControlUrl.trim();
                 if (!value) return;
                 try {
                   updateAccess(setSettings, { lanControlUrl: normalizeLanControlUrl(value) });
                 } catch {
-                  // Preserve the draft so the user can correct it.
+                  // Keep the draft visible so it can be corrected.
                 }
               }}
-              className="h-11 font-mono text-[13px]"
             />
-          </AstryxLabel>
-
-          <AstryxGrid className="grid gap-2 sm:grid-cols-[1fr_8rem]">
-            <AstryxLabel
-              as="label"
-              type="label"
-              weight="medium"
-              className="block space-y-1.5 text-xs font-medium text-muted-foreground"
-            >
-              <AstryxText as="span" type="inherit">
-                {t("settings.accessLanPairingCode")}
-              </AstryxText>
-              <Input
-                label="000000"
-                isLabelHidden
+            <Grid columns={{ minWidth: 220, max: 2, repeat: "fit" }} gap={3} width="100%">
+              <TextInput
+                label={t("settings.accessLanPairingCode")}
+                type="password"
                 {...({
                   inputMode: "numeric",
                   autoComplete: "one-time-code",
                   maxLength: 6,
                 } as const)}
-                type="text"
                 value={lanPairingCode}
                 placeholder="000000"
-                onChange={(nextValue) =>
-                  setLanPairingCode(nextValue.replace(/\D/g, "").slice(0, 6))
-                }
-                className="h-11 font-mono text-center text-base tracking-[0.2em]"
+                onChange={(value) => setLanPairingCode(value.replace(/\D/g, "").slice(0, 6))}
               />
-            </AstryxLabel>
-            <AstryxLabel
-              as="label"
-              type="label"
-              weight="medium"
-              className="block space-y-1.5 text-xs font-medium text-muted-foreground"
-            >
-              <AstryxText as="span" type="inherit">
-                {t("settings.accessLanDeviceName")}
-              </AstryxText>
-              <Input
+              <TextInput
                 label={t("settings.accessLanDeviceName")}
-                isLabelHidden
                 {...({ maxLength: 64 } as const)}
-                type="text"
                 value={lanDeviceName}
-                onChange={(nextValue) => setLanDeviceName(nextValue)}
-                className="h-11 text-[13px]"
+                onChange={setLanDeviceName}
               />
-            </AstryxLabel>
-          </AstryxGrid>
-
-          <AstryxStack direction="horizontal" className="flex gap-2">
-            <AstryxButton
-              variant="ghost"
+            </Grid>
+            <HStack gap={2} wrap="wrap">
+              <Button
+                label={
+                  busyAction === "lan-pair"
+                    ? t("settings.accessConnecting")
+                    : t("settings.accessPairComputer")
+                }
+                variant="primary"
+                isLoading={busyAction === "lan-pair"}
+                isDisabled={
+                  !settings.access.lanControlUrl.trim() ||
+                  lanPairingCode.length !== 6 ||
+                  !lanDeviceName.trim() ||
+                  busyAction !== ""
+                }
+                onClick={() =>
+                  void runAction("lan-pair", async () => {
+                    const url = normalizeLanControlUrl(settings.access.lanControlUrl);
+                    updateAccess(setSettings, { lanControlUrl: url });
+                    const next = await invoke<LanPcClientStatus>("lan_pc_pair", {
+                      baseUrl: url,
+                      code: lanPairingCode,
+                      deviceName: lanDeviceName.trim(),
+                    });
+                    setLanPcStatus(next);
+                    setLanPairingCode("");
+                  })
+                }
+              />
+              {lanPcStatus.paired ? (
+                <Button
+                  label={t("settings.accessDisconnectComputer")}
+                  variant="secondary"
+                  isDisabled={busyAction !== ""}
+                  onClick={() =>
+                    void runAction("lan-disconnect", async () => {
+                      setLanPcStatus(await invoke<LanPcClientStatus>("lan_pc_disconnect"));
+                      updateAccess(setSettings, { preferLanPcExecution: false });
+                    })
+                  }
+                />
+              ) : null}
+              {lanPcStatus.paired ? (
+                <Button
+                  label={t("settings.accessCheckComputer")}
+                  variant="secondary"
+                  isLoading={busyAction === "lan-refresh"}
+                  isDisabled={busyAction !== "" || !pairedLanUrl}
+                  onClick={() => void runAction("lan-refresh", refreshLanPcStatus)}
+                />
+              ) : null}
+            </HStack>
+            <Switch
+              label={t("settings.accessPreferLanPc")}
+              description={t("settings.accessPreferLanPcHint")}
+              value={settings.access.preferLanPcExecution}
+              labelIcon={MonitorSmartphone}
+              labelPosition="start"
+              labelSpacing="spread"
+              width="100%"
+              isDisabled={!lanPcReady}
+              onChange={(value) => updateAccess(setSettings, { preferLanPcExecution: value })}
+            />
+            <Button
               label={
-                busyAction === "lan-pair"
+                busyAction === "lan-control"
                   ? t("settings.accessConnecting")
-                  : t("settings.accessPairComputer")
+                  : t("settings.accessOpenComputer")
               }
-              type="button"
-              isDisabled={
-                !settings.access.lanControlUrl.trim() ||
-                lanPairingCode.length !== 6 ||
-                !lanDeviceName.trim() ||
-                busyAction !== ""
-              }
+              variant="primary"
+              isLoading={busyAction === "lan-control"}
+              isDisabled={!settings.access.lanControlUrl.trim() || busyAction !== ""}
               onClick={() =>
-                void runAction("lan-pair", async () => {
+                void runAction("lan-control", async () => {
                   const url = normalizeLanControlUrl(settings.access.lanControlUrl);
                   updateAccess(setSettings, { lanControlUrl: url });
-                  const next = await invoke<LanPcClientStatus>("lan_pc_pair", {
-                    baseUrl: url,
-                    code: lanPairingCode,
-                    deviceName: lanDeviceName.trim(),
+                  await browserSessionController.ensureSession({
+                    sessionId: "lan-control",
+                    url,
+                    visible: false,
                   });
-                  setLanPcStatus(next);
-                  setLanPairingCode("");
+                  browserSessionController.openPanel("lan-control");
                 })
               }
-              className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-border px-3 text-sm font-medium transition-colors hover:bg-muted/50 disabled:opacity-40"
-            >
-              <Wifi className="h-4 w-4" />
-              {busyAction === "lan-pair"
-                ? t("settings.accessConnecting")
-                : t("settings.accessPairComputer")}
-            </AstryxButton>
-            {lanPcStatus.paired ? (
-              <AstryxButton
-                variant="ghost"
-                label={t("settings.accessDisconnectComputer")}
-                type="button"
-                isDisabled={busyAction !== ""}
-                onClick={() =>
-                  void runAction("lan-disconnect", async () => {
-                    setLanPcStatus(await invoke<LanPcClientStatus>("lan_pc_disconnect"));
-                    updateAccess(setSettings, { preferLanPcExecution: false });
-                  })
-                }
-                className="h-10 rounded-xl border border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground disabled:opacity-40"
-              >
-                {t("settings.accessDisconnectComputer")}
-              </AstryxButton>
-            ) : null}
-          </AstryxStack>
-
-          <AstryxStack
-            direction="vertical"
-            className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-xs ${
-              lanPcReady
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                : "bg-muted/40 text-muted-foreground"
-            }`}
-          >
-            <AstryxText as="span" type="inherit">
-              {lanPcReady
-                ? t("settings.accessComputerPaired")
-                : t("settings.accessComputerNotPaired")}
-            </AstryxText>
-            {lanPcStatus.paired ? (
-              <AstryxButton
-                variant="ghost"
-                label={t("settings.accessCheckComputer")}
-                type="button"
-                isDisabled={busyAction !== "" || !normalizedConfiguredLanUrl}
-                onClick={() =>
-                  void runAction("lan-refresh", async () => {
-                    setLanPcStatus(
-                      await invoke<LanPcClientStatus>("lan_pc_refresh", {
-                        baseUrl: normalizeLanControlUrl(settings.access.lanControlUrl),
-                      }),
-                    );
-                  })
-                }
-                className="flex h-7 items-center gap-1 rounded-lg px-2 font-medium hover:bg-background/70 disabled:opacity-40"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                {t("settings.accessCheckComputer")}
-              </AstryxButton>
-            ) : null}
-          </AstryxStack>
-
-          <ToggleCard
-            icon={<MonitorSmartphone className="h-3.5 w-3.5 text-muted-foreground" />}
-            title={t("settings.accessPreferLanPc")}
-            hint={t("settings.accessPreferLanPcHint")}
-            checked={settings.access.preferLanPcExecution}
-            disabled={!lanPcReady}
-            onToggle={() =>
-              updateAccess(setSettings, {
-                preferLanPcExecution: !settings.access.preferLanPcExecution,
-              })
-            }
-          />
-
-          <AstryxButton
-            variant="ghost"
-            label={
-              busyAction === "lan-control"
-                ? t("settings.accessConnecting")
-                : t("settings.accessOpenComputer")
-            }
-            type="button"
-            isDisabled={!settings.access.lanControlUrl.trim() || busyAction !== ""}
-            onClick={() =>
-              void runAction("lan-control", async () => {
-                const url = normalizeLanControlUrl(settings.access.lanControlUrl);
-                updateAccess(setSettings, { lanControlUrl: url });
-                await browserSessionController.ensureSession({
-                  sessionId: "lan-control",
-                  url,
-                  visible: false,
-                });
-                browserSessionController.openPanel("lan-control");
-              })
-            }
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-transform active:scale-[0.99] disabled:opacity-40"
-          >
-            <MonitorSmartphone className="h-4 w-4" />
-            {busyAction === "lan-control"
-              ? t("settings.accessConnecting")
-              : t("settings.accessOpenComputer")}
-          </AstryxButton>
-
-          <AstryxText
-            as="p"
-            type="inherit"
-            display="block"
-            className="text-[11px] leading-relaxed text-muted-foreground"
-          >
-            {t("settings.accessLanPairingHint")}
-          </AstryxText>
-        </AstryxStack>
+            />
+            <Text type="supporting" color="secondary">
+              {t("settings.accessLanPairingHint")}
+            </Text>
+          </VStack>
+        </Section>
       ) : (
-        <>
-          <AstryxStack direction="horizontal" className="flex items-center justify-between gap-4">
-            <AstryxStack direction="horizontal" className="flex items-center gap-3">
-              <AstryxStack
-                direction="horizontal"
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/10"
-              >
-                <MonitorSmartphone className="h-[18px] w-[18px] text-sky-500" />
-              </AstryxStack>
-              <AstryxStack direction="vertical">
-                <AstryxHeadingCore level={3} className="text-sm font-semibold">
-                  {t("settings.accessTitle")}
-                </AstryxHeadingCore>
-                <AstryxText
-                  as="p"
-                  type="inherit"
-                  display="block"
-                  className="text-xs text-muted-foreground"
-                >
-                  {t("settings.accessDesc")}
-                </AstryxText>
-              </AstryxStack>
-            </AstryxStack>
-            <AstryxStack
-              direction="vertical"
-              className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
-                localStatusPhase === "running"
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  : localStatusPhase === "failed"
-                    ? "bg-destructive/10 text-destructive"
-                    : "bg-muted/50 text-muted-foreground"
-              }`}
-              aria-label={localStatus.lastError ?? undefined}
-            >
-              {localStatusPhase === "running" ? (
-                <Wifi className="h-3.5 w-3.5" />
-              ) : (
-                <WifiOff className="h-3.5 w-3.5" />
-              )}
-              {localStatusPhase === "running"
-                ? t("settings.accessRunning")
-                : localStatusPhase === "starting"
-                  ? t("settings.accessStarting")
-                  : localStatusPhase === "failed"
-                    ? t("settings.accessFailed")
-                    : t("settings.accessStopped")}
-            </AstryxStack>
-          </AstryxStack>
-
-          {browser ? (
-            <AstryxStack
-              direction="vertical"
-              className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs leading-relaxed text-amber-700 dark:text-amber-300"
-            >
-              {t("settings.accessNativeOnly")}
-            </AstryxStack>
-          ) : null}
-
-          <AstryxStack
-            direction="vertical"
-            as="section"
-            className="space-y-4 rounded-xl border border-border/60 bg-card p-5"
-          >
-            <AstryxStack direction="horizontal" className="flex items-center justify-between gap-4">
-              <AstryxStack direction="horizontal" className="flex items-center gap-2">
-                <Server className="h-4 w-4 text-muted-foreground" />
-                <AstryxStack direction="vertical">
-                  <AstryxStack direction="vertical" className="text-sm font-medium">
-                    {t("settings.accessWebUi")}
-                  </AstryxStack>
-                  <AstryxText
-                    as="p"
-                    type="inherit"
-                    display="block"
-                    className="text-xs text-muted-foreground"
-                  >
+        <Section variant="section" padding={3}>
+          <VStack gap={3}>
+            <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
+              <HStack gap={2} vAlign="center">
+                <Icon icon={MonitorSmartphone} size="md" color="secondary" />
+                <VStack gap={0.5}>
+                  <Heading level={4}>{t("settings.accessWebUi")}</Heading>
+                  <Text type="supporting" color="secondary">
                     {t("settings.accessWebUiHint")}
-                  </AstryxText>
-                </AstryxStack>
-              </AstryxStack>
-              <AgentActivationSwitch
-                checked={settings.access.webUiEnabled}
-                title={t("settings.accessWebUi")}
-                disabled={browser}
-                onToggle={() =>
-                  updateAccess(setSettings, { webUiEnabled: !settings.access.webUiEnabled })
-                }
-              />
-            </AstryxStack>
-
-            <AstryxGrid className="grid gap-3 sm:grid-cols-[1fr_140px]">
+                  </Text>
+                </VStack>
+              </HStack>
+              <HStack gap={2} vAlign="center">
+                <StatusDot
+                  variant={
+                    localStatusPhase === "running"
+                      ? "success"
+                      : localStatusPhase === "failed"
+                        ? "error"
+                        : localStatusPhase === "starting"
+                          ? "warning"
+                          : "neutral"
+                  }
+                  label={localStatusLabel}
+                  isPulsing={localStatusPhase === "starting"}
+                />
+                <Switch
+                  label={t("settings.accessWebUi")}
+                  isLabelHidden
+                  value={settings.access.webUiEnabled}
+                  isDisabled={browser}
+                  onChange={(value) => updateAccess(setSettings, { webUiEnabled: value })}
+                />
+              </HStack>
+            </HStack>
+            <Grid columns={{ minWidth: 220, max: 2, repeat: "fit" }} gap={3} width="100%">
               <Selector
                 label={t("settings.accessScope")}
                 value={settings.access.webUiScope}
                 isDisabled={browser}
-                disabledMessage={browser ? t("settings.accessWebUiHint") : undefined}
                 width="100%"
-                size="sm"
                 options={[
                   { value: "lan", label: t("settings.accessScopeLan") },
                   { value: "loopback", label: t("settings.accessScopeLoopback") },
@@ -669,366 +561,182 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                   })
                 }
               />
-              <AstryxLabel
-                as="label"
-                type="label"
-                weight="medium"
-                className="space-y-1.5 text-xs font-medium text-muted-foreground"
-              >
-                <AstryxText as="span" type="inherit">
-                  {t("settings.accessPort")}
-                </AstryxText>
-                <NumberInput
-                  label={t("settings.accessPort")}
-                  isLabelHidden
-                  min={1}
-                  max={65_535}
-                  value={settings.access.webUiPort}
-                  isDisabled={browser}
-                  onChange={(value) =>
-                    updateAccess(setSettings, {
-                      webUiPort: Math.min(65_535, Math.max(1, value ?? 28_367)),
-                    })
-                  }
-                  className="font-mono text-[13px]"
-                />
-              </AstryxLabel>
-            </AstryxGrid>
-
-            <AstryxStack
-              direction="horizontal"
-              className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 text-xs"
-            >
-              <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <AstryxText as="span" type="inherit" className="min-w-0 flex-1 truncate font-mono">
-                {endpoint}
-              </AstryxText>
-              <CopyButton value={endpoint} />
-              <AstryxButton
-                variant="ghost"
-                label={t("projectTools.gitReview.refresh")}
-                type="button"
-                isDisabled={busyAction !== "" || browser}
-                onClick={() => void runAction("refresh", refreshLocalStatus)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/60 disabled:opacity-40"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-              </AstryxButton>
-            </AstryxStack>
-
-            <AstryxGrid className="grid gap-3 sm:grid-cols-2">
-              <ToggleCard
-                icon={<Terminal className="h-3.5 w-3.5 text-muted-foreground" />}
-                title={t("settings.accessAllowTerminal")}
-                hint={t("settings.accessAllowTerminalHint")}
-                checked={settings.access.allowTerminal}
-                disabled={browser}
-                onToggle={() =>
-                  updateAccess(setSettings, { allowTerminal: !settings.access.allowTerminal })
-                }
-              />
-              <ToggleCard
-                icon={<Globe className="h-3.5 w-3.5 text-muted-foreground" />}
-                title={t("settings.accessAllowBrowserAutomation")}
-                hint={t("settings.accessAllowBrowserAutomationHint")}
-                checked={settings.access.allowBrowserAutomation}
-                disabled={browser}
-                onToggle={() =>
+              <NumberInput
+                label={t("settings.accessPort")}
+                min={1}
+                max={65_535}
+                value={settings.access.webUiPort}
+                isDisabled={browser}
+                onChange={(value) =>
                   updateAccess(setSettings, {
-                    allowBrowserAutomation: !settings.access.allowBrowserAutomation,
+                    webUiPort: Math.min(65_535, Math.max(1, value ?? 28_367)),
                   })
                 }
               />
-              <ToggleCard
-                icon={<Server className="h-3.5 w-3.5 text-muted-foreground" />}
-                title={t("settings.accessAllowSsh")}
-                hint={t("settings.accessAllowSshHint")}
-                checked={settings.access.allowSsh}
-                disabled={browser}
-                onToggle={() => updateAccess(setSettings, { allowSsh: !settings.access.allowSsh })}
+            </Grid>
+            <HStack width="100%" gap={2} vAlign="center">
+              <Icon icon={Globe} size="sm" color="secondary" />
+              <StackItem size="fill">
+                <Text type="code" color="secondary" maxLines={1}>
+                  {endpoint}
+                </Text>
+              </StackItem>
+              <CopyButton value={endpoint} label={t("workspaceEditor.context.copy")} />
+              <IconButton
+                label={t("projectTools.gitReview.refresh")}
+                tooltip={t("projectTools.gitReview.refresh")}
+                icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
+                variant="ghost"
+                size="sm"
+                isLoading={busyAction === "refresh"}
+                isDisabled={busyAction !== "" || browser}
+                onClick={() => void runAction("refresh", refreshLocalStatus)}
               />
-              <ToggleCard
-                icon={<GitBranch className="h-3.5 w-3.5 text-muted-foreground" />}
-                title={t("settings.accessAllowGit")}
-                hint={t("settings.accessAllowGitHint")}
-                checked={settings.access.allowGit}
-                disabled={browser}
-                onToggle={() => updateAccess(setSettings, { allowGit: !settings.access.allowGit })}
-              />
-              <ToggleCard
-                icon={<Shield className="h-3.5 w-3.5 text-muted-foreground" />}
-                title={t("settings.accessAllowFileWrite")}
-                hint={t("settings.accessAllowFileWriteHint")}
-                checked={settings.access.allowFileWrite}
-                disabled={browser}
-                onToggle={() =>
-                  updateAccess(setSettings, { allowFileWrite: !settings.access.allowFileWrite })
+            </HStack>
+            <List density="compact" hasDividers>
+              <ListItem
+                label={t("settings.accessAllowTerminal")}
+                description={t("settings.accessAllowTerminalHint")}
+                startContent={<Icon icon={Terminal} size="sm" color="secondary" />}
+                endContent={
+                  <Switch
+                    label={t("settings.accessAllowTerminal")}
+                    isLabelHidden
+                    value={settings.access.allowTerminal}
+                    isDisabled={browser}
+                    onChange={(value) => updateAccess(setSettings, { allowTerminal: value })}
+                  />
                 }
               />
-            </AstryxGrid>
-
-            <AstryxStack
-              direction="horizontal"
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/50 px-3 py-3 text-xs"
-            >
-              <AstryxStack direction="vertical">
-                <AstryxStack direction="vertical" className="font-medium">
-                  {t("settings.accessPairing")}
-                </AstryxStack>
-                <AstryxStack direction="vertical" className="mt-0.5 text-muted-foreground">
+              <ListItem
+                label={t("settings.accessAllowBrowserAutomation")}
+                description={t("settings.accessAllowBrowserAutomationHint")}
+                startContent={<Icon icon={Globe} size="sm" color="secondary" />}
+                endContent={
+                  <Switch
+                    label={t("settings.accessAllowBrowserAutomation")}
+                    isLabelHidden
+                    value={settings.access.allowBrowserAutomation}
+                    isDisabled={browser}
+                    onChange={(value) =>
+                      updateAccess(setSettings, { allowBrowserAutomation: value })
+                    }
+                  />
+                }
+              />
+              <ListItem
+                label={t("settings.accessAllowSsh")}
+                description={t("settings.accessAllowSshHint")}
+                startContent={<Icon icon={Server} size="sm" color="secondary" />}
+                endContent={
+                  <Switch
+                    label={t("settings.accessAllowSsh")}
+                    isLabelHidden
+                    value={settings.access.allowSsh}
+                    isDisabled={browser}
+                    onChange={(value) => updateAccess(setSettings, { allowSsh: value })}
+                  />
+                }
+              />
+              <ListItem
+                label={t("settings.accessAllowGit")}
+                description={t("settings.accessAllowGitHint")}
+                startContent={<Icon icon={GitBranch} size="sm" color="secondary" />}
+                endContent={
+                  <Switch
+                    label={t("settings.accessAllowGit")}
+                    isLabelHidden
+                    value={settings.access.allowGit}
+                    isDisabled={browser}
+                    onChange={(value) => updateAccess(setSettings, { allowGit: value })}
+                  />
+                }
+              />
+              <ListItem
+                label={t("settings.accessAllowFileWrite")}
+                description={t("settings.accessAllowFileWriteHint")}
+                startContent={<Icon icon={Shield} size="sm" color="secondary" />}
+                endContent={
+                  <Switch
+                    label={t("settings.accessAllowFileWrite")}
+                    isLabelHidden
+                    value={settings.access.allowFileWrite}
+                    isDisabled={browser}
+                    onChange={(value) => updateAccess(setSettings, { allowFileWrite: value })}
+                  />
+                }
+              />
+            </List>
+            <HStack gap={3} hAlign="between" vAlign="center" wrap="wrap">
+              <MetadataList orientation="horizontal">
+                <MetadataListItem label={t("settings.accessPairing")}>
                   {t("settings.accessPairedDevices").replace(
                     "{count}",
                     String(localStatus.pairedDevices),
                   )}
-                </AstryxStack>
-              </AstryxStack>
-              <AstryxStack direction="horizontal" className="flex items-center gap-2">
+                </MetadataListItem>
                 {localStatus.pairingCode ? (
-                  <code className="rounded-md bg-muted px-3 py-2 text-sm font-semibold tracking-[0.2em]">
+                  <MetadataListItem label={t("settings.accessLanPairingCode")}>
                     {localStatus.pairingCode}
-                  </code>
+                  </MetadataListItem>
                 ) : null}
-                <AstryxButton
-                  variant="ghost"
-                  label={t("settings.accessNewPairingCode")}
-                  type="button"
-                  isDisabled={!settings.access.webUiEnabled || busyAction !== "" || browser}
-                  onClick={() =>
-                    void runAction("pair", async () => {
-                      setLocalStatus(
-                        await invoke<LocalAccessStatus>("local_access_rotate_pairing_code"),
-                      );
-                    })
-                  }
-                  className="rounded-lg border border-border px-3 py-2 font-medium hover:bg-muted/50 disabled:opacity-40"
-                >
-                  {t("settings.accessNewPairingCode")}
-                </AstryxButton>
-              </AstryxStack>
-            </AstryxStack>
-          </AstryxStack>
-        </>
+              </MetadataList>
+              <Button
+                label={t("settings.accessNewPairingCode")}
+                variant="secondary"
+                isLoading={busyAction === "pair"}
+                isDisabled={!settings.access.webUiEnabled || busyAction !== "" || browser}
+                onClick={() =>
+                  void runAction("pair", async () => {
+                    setLocalStatus(
+                      await invoke<LocalAccessStatus>("local_access_rotate_pairing_code"),
+                    );
+                  })
+                }
+              />
+            </HStack>
+          </VStack>
+        </Section>
       )}
 
-      <AstryxStack
-        direction="vertical"
-        as="section"
-        className="settings-access-card space-y-4 rounded-xl border border-border/60 bg-card p-5"
-      >
-        <AstryxStack direction="horizontal" className="flex items-center justify-between gap-4">
-          <AstryxButton
-            variant="ghost"
-            label={t("settings.accessCloudExecutionHint")}
-            type="button"
-            isDisabled={!nativeMobile}
-            onClick={() => setCloudDetailsOpen((open) => !open)}
-            aria-expanded={!nativeMobile || cloudDetailsOpen}
-            className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
-          >
-            <Cloud className="h-4 w-4 text-muted-foreground" />
-            <AstryxStack direction="vertical" className="min-w-0 flex-1">
-              <AstryxStack direction="vertical" className="text-sm font-medium">
-                {t("settings.accessCloudExecution")}
-              </AstryxStack>
-              <AstryxText
-                as="p"
-                type="inherit"
-                display="block"
-                className="text-xs text-muted-foreground"
-              >
-                {t("settings.accessCloudExecutionHint")}
-              </AstryxText>
-            </AstryxStack>
-            {nativeMobile ? (
-              <ChevronDown
-                className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
-                  cloudDetailsOpen ? "rotate-180" : ""
-                }`}
-              />
-            ) : null}
-          </AstryxButton>
-          <AgentActivationSwitch
-            checked={settings.access.cloudExecutionEnabled}
-            title={t("settings.accessCloudExecution")}
-            disabled={browser}
-            onToggle={() => {
-              const enabled = !settings.access.cloudExecutionEnabled;
-              updateAccess(setSettings, { cloudExecutionEnabled: enabled });
-              if (nativeMobile && enabled) setCloudDetailsOpen(true);
-            }}
-          />
-        </AstryxStack>
-
-        {!nativeMobile || cloudDetailsOpen ? (
-          <AstryxStack direction="vertical" className="settings-cloud-details space-y-4">
-            <AstryxGrid className="grid gap-3 sm:grid-cols-2">
-              <AstryxLabel
-                as="label"
-                type="label"
-                weight="medium"
-                className="space-y-1.5 text-xs font-medium text-muted-foreground"
-              >
-                <AstryxText as="span" type="inherit">
-                  {t("settings.accessGithubOwner")}
-                </AstryxText>
-                <Input
-                  label="github-user"
-                  isLabelHidden
-                  value={settings.access.githubOwner}
-                  isDisabled={browser}
-                  onChange={(nextValue) => updateAccess(setSettings, { githubOwner: nextValue })}
-                  placeholder="github-user"
-                />
-              </AstryxLabel>
-              <AstryxLabel
-                as="label"
-                type="label"
-                weight="medium"
-                className="space-y-1.5 text-xs font-medium text-muted-foreground"
-              >
-                <AstryxText as="span" type="inherit">
-                  {t("settings.accessGithubRepository")}
-                </AstryxText>
-                <Input
-                  label="agent-temp"
-                  isLabelHidden
-                  value={settings.access.githubRepository}
-                  isDisabled={browser}
-                  onChange={(nextValue) =>
-                    updateAccess(setSettings, { githubRepository: nextValue })
-                  }
-                  placeholder="agent-temp"
-                />
-              </AstryxLabel>
-            </AstryxGrid>
-
-            <AstryxStack
-              direction="vertical"
-              className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300"
+      <Section variant="section" padding={3}>
+        <VStack gap={3}>
+          <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
+            <HStack gap={2} vAlign="center">
+              <Icon icon={Cloud} size="md" color="secondary" />
+              <VStack gap={0.5}>
+                <Heading level={4}>{t("settings.accessCloudExecution")}</Heading>
+                <Text type="supporting" color="secondary">
+                  {t("settings.accessCloudExecutionHint")}
+                </Text>
+              </VStack>
+            </HStack>
+            <Switch
+              label={t("settings.accessCloudExecution")}
+              isLabelHidden
+              value={settings.access.cloudExecutionEnabled}
+              isDisabled={browser}
+              onChange={(value) => {
+                updateAccess(setSettings, { cloudExecutionEnabled: value });
+                if (nativeMobile && value) setCloudDetailsOpen(true);
+              }}
+            />
+          </HStack>
+          {nativeMobile ? (
+            <Collapsible
+              trigger={t("settings.accessCloudEnvironmentHint")}
+              isOpen={cloudDetailsOpen}
+              onOpenChange={setCloudDetailsOpen}
             >
-              {t("settings.accessCloudPublicWarning")}
-            </AstryxStack>
+              {cloudDetails}
+            </Collapsible>
+          ) : (
+            cloudDetails
+          )}
+        </VStack>
+      </Section>
 
-            <AstryxStack
-              direction="vertical"
-              className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
-            >
-              {t("settings.accessCloudEnvironmentHint")}
-            </AstryxStack>
-
-            <AstryxStack
-              direction="vertical"
-              className="settings-cloud-vault rounded-lg border border-border/50 p-4"
-            >
-              <AstryxStack
-                direction="horizontal"
-                className="mb-3 flex items-center justify-between gap-3"
-              >
-                <AstryxStack
-                  direction="horizontal"
-                  className="flex items-center gap-2 text-sm font-medium"
-                >
-                  <Key className="h-4 w-4 text-emerald-500" />
-                  {t("settings.accessSecureVault")}
-                </AstryxStack>
-                <AstryxText as="span" type="inherit" className="text-xs text-muted-foreground">
-                  {vaultStatus.githubTokenConfigured
-                    ? t("settings.accessTokenConfigured")
-                    : t("settings.accessTokenMissing")}
-                </AstryxText>
-              </AstryxStack>
-              <AstryxGrid className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-                <Input
-                  label={t("settings.accessGithubToken")}
-                  isLabelHidden
-                  {...({ autoComplete: "new-password" } as const)}
-                  type="password"
-                  value={githubToken}
-                  onChange={(nextValue) => setGithubToken(nextValue)}
-                  placeholder={t("settings.accessGithubToken")}
-                  isDisabled={browser}
-                />
-                <AstryxButton
-                  variant="ghost"
-                  label={t("settings.accessSaveToken")}
-                  type="button"
-                  isDisabled={
-                    browser ||
-                    !settings.access.githubOwner.trim() ||
-                    !githubToken.trim() ||
-                    busyAction !== ""
-                  }
-                  onClick={() =>
-                    void runAction("save-token", async () => {
-                      setVaultStatus(
-                        await invoke<CloudSecretVaultStatus>(
-                          "cloud_secret_vault_set_github_token",
-                          {
-                            username: settings.access.githubOwner,
-                            token: githubToken,
-                          },
-                        ),
-                      );
-                      setGithubToken("");
-                    })
-                  }
-                  className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
-                >
-                  {t("settings.accessSaveToken")}
-                </AstryxButton>
-                {vaultStatus.githubTokenConfigured ? (
-                  <AstryxButton
-                    variant="ghost"
-                    label={t("settings.accessRemoveToken")}
-                    type="button"
-                    isDisabled={browser || busyAction !== ""}
-                    onClick={() =>
-                      void runAction("remove-token", async () => {
-                        setVaultStatus(
-                          await invoke<CloudSecretVaultStatus>(
-                            "cloud_secret_vault_remove_github_token",
-                          ),
-                        );
-                        setGithubToken("");
-                      })
-                    }
-                    className="rounded-lg border border-border px-4 py-2 text-xs font-medium hover:bg-muted/50 disabled:opacity-40"
-                  >
-                    {t("settings.accessRemoveToken")}
-                  </AstryxButton>
-                ) : null}
-              </AstryxGrid>
-              {vaultStatus.githubUsername ? (
-                <AstryxText
-                  as="p"
-                  type="inherit"
-                  display="block"
-                  className="mt-2 text-[11px] text-muted-foreground"
-                >
-                  {t("settings.accessTokenOwner").replace("{username}", vaultStatus.githubUsername)}
-                </AstryxText>
-              ) : null}
-              <AstryxText
-                as="p"
-                type="inherit"
-                display="block"
-                className="mt-2 text-[11px] leading-relaxed text-muted-foreground"
-              >
-                {t("settings.accessVaultHint")}
-              </AstryxText>
-            </AstryxStack>
-          </AstryxStack>
-        ) : null}
-      </AstryxStack>
-
-      {actionError ? (
-        <AstryxStack
-          direction="vertical"
-          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-        >
-          {actionError}
-        </AstryxStack>
-      ) : null}
-    </AstryxStack>
+      {actionError ? <Banner status="error" title={actionError} collapsible={false} /> : null}
+    </VStack>
   );
 }

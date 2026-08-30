@@ -13,7 +13,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { invoke, openUrl } from "@xagent/runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CheckCircle2, Plus, Trash2 } from "../../components/icons";
+import { CheckCircle2, Trash2 } from "../../components/icons";
 import { useLocale } from "../../i18n";
 
 type CodexOAuthAccount = {
@@ -224,7 +224,6 @@ export function CodexOAuthAccounts({ value, onChange, browserRuntime }: Props) {
 
       <Button
         label={t("settings.providerOAuthAddAccount")}
-        icon={<Icon icon={Plus} size="sm" color="inherit" />}
         variant="secondary"
         width="100%"
         isLoading={starting}

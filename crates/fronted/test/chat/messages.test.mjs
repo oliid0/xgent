@@ -4,6 +4,7 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 const loader = createTsModuleLoader();
 const uploadedFiles = loader.loadModule("src/lib/chat/messages/uploadedFiles.ts");
+const composerDraft = loader.loadModule("src/lib/chat/composerDraft.ts");
 const conversationState = loader.loadModule("src/lib/chat/conversation/conversationState.ts");
 const uiMessages = loader.loadModule("src/lib/chat/messages/uiMessages.ts");
 const hostedSearch = loader.loadModule("src/lib/chat/messages/hostedSearch.ts");
@@ -21,12 +22,14 @@ const fileA = {
 };
 const fileB = {
   relativePath: "assets/diagram.png",
+  absolutePath: "/workspace/assets/diagram.png",
   fileName: "diagram.png",
   kind: "image",
   sizeBytes: 3 * 1024 * 1024,
 };
 const fileC = {
   relativePath: "uploads/report.docx",
+  absolutePath: "/workspace/uploads/report.docx",
   fileName: "report.docx",
   kind: "word",
   sizeBytes: 4096,
@@ -206,10 +209,10 @@ test("uploaded file helpers preserve display text and strip model-hidden metadat
   assert.ok(message);
   assert.equal(message.role, "user");
   assert.equal(message.timestamp, 1234);
-  assert.equal(uploadedFiles.getUserMessageDisplayText(message), "Please review");
+  assert.equal(uploadedFiles.getUserMessageDisplayText(message), " Please review ");
   assert.deepEqual(uploadedFiles.getUserMessageAttachments(message), [fileA]);
-  assert.match(message.content, /Selected files are available in the workspace/);
-  assert.match(message.content, /src\/App\.tsx \(text\)/);
+  assert.match(message.content, /The user attached the files below/);
+  assert.match(message.content, /\/workspace\/src\/App\.tsx \(text\)/);
 
   const stripped = uploadedFiles.stripUploadedFilesMessageMetadata(message);
   assert.equal(uploadedFiles.getUserMessageDisplayText(stripped), message.content);
@@ -245,25 +248,44 @@ test("uploaded file helpers preserve office and archive attachment kinds", () =>
     fileC,
     {
       relativePath: "uploads/workbook.xlsx",
+      absolutePath: "/workspace/uploads/workbook.xlsx",
       fileName: "workbook.xlsx",
       kind: "spreadsheet",
       sizeBytes: 8192,
     },
     {
       relativePath: "uploads/assets.zip",
+      absolutePath: "/workspace/uploads/assets.zip",
       fileName: "assets.zip",
       kind: "archive",
       sizeBytes: 16384,
     },
   ]);
   assert.ok(message);
-  assert.match(message.content, /uploads\/report\.docx \(word\)/);
-  assert.match(message.content, /uploads\/workbook\.xlsx \(spreadsheet\)/);
-  assert.match(message.content, /uploads\/assets\.zip \(archive\)/);
+  assert.match(message.content, /\/workspace\/uploads\/report\.docx \(word\)/);
+  assert.match(message.content, /\/workspace\/uploads\/workbook\.xlsx \(spreadsheet\)/);
+  assert.match(message.content, /\/workspace\/uploads\/assets\.zip \(archive\)/);
   assert.deepEqual(
     uploadedFiles.getUserMessageAttachments(message).map((file) => file.kind),
     ["word", "spreadsheet", "archive"],
   );
+});
+
+test("composer messages preserve whitespace, normalize line endings, and serialize skills as slash mentions", () => {
+  const draft = {
+    segments: [
+      { type: "text", text: " first\r\n" },
+      { type: "skillMention", skill: { name: "code-review" } },
+      { type: "text", text: "\rlast " },
+    ],
+  };
+
+  assert.equal(composerDraft.buildTextFromComposerDraft(draft), " first\n/code-review\nlast ");
+
+  const message = uploadedFiles.createUserMessageWithUploads(" line 1\r\nline 2\r ", [fileA], 20);
+  assert.ok(message);
+  assert.equal(uploadedFiles.getUserMessageDisplayText(message), " line 1\nline 2\n ");
+  assert.match(message.content, /^ line 1\nline 2\n \n\nThe user attached/);
 });
 
 test("attachment-only messages instruct the model to inspect selected files first", () => {

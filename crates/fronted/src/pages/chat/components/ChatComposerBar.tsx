@@ -7,6 +7,7 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Popover } from "@astryxdesign/core/Popover";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { Section } from "@astryxdesign/core/Section";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Switch } from "@astryxdesign/core/Switch";
@@ -160,13 +161,8 @@ function ContextUsageIndicator(props: {
       : 0;
   const usedTokens = Math.max(0, tokens ?? 0);
   const ratio = contextUsageRatio(usedTokens, contextWindow);
-  const compactAvailable =
-    canManualCompact(ratio) && !props.manualCompactionDisabled && Boolean(props.onManualCompact);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-
-  useEffect(() => {
-    if (!compactAvailable) setConfirmOpen(false);
-  }, [compactAvailable]);
+  const canOfferCompaction = canManualCompact(ratio) && Boolean(props.onManualCompact);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   if (contextWindow <= 0 || usedTokens <= 0) return null;
 
@@ -178,11 +174,12 @@ function ContextUsageIndicator(props: {
       : ratio >= 0.5
         ? "var(--color-warning)"
         : "var(--color-success)";
+  const progressVariant = ratio >= 0.8 ? "error" : ratio >= 0.5 ? "warning" : "success";
   const usageLabel = `${t("chat.contextUsage")}: ${formatCompactTokens(usedTokens)} / ${formatCompactTokens(contextWindow)} tokens (${percent}%)`;
 
   const ring = (
-    <svg aria-hidden="true" viewBox="0 0 24 24" width="28" height="28">
-      <circle cx="12" cy="12" r="9.5" fill="none" stroke="var(--color-border)" strokeWidth="2.25" />
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="34" height="34">
+      <circle cx="12" cy="12" r="9.5" fill="none" stroke="var(--color-border)" strokeWidth="2.5" />
       <circle
         cx="12"
         cy="12"
@@ -190,7 +187,7 @@ function ContextUsageIndicator(props: {
         fill="none"
         pathLength="100"
         stroke={ringColor}
-        strokeWidth="2.25"
+        strokeWidth="2.5"
         strokeLinecap="round"
         strokeDasharray="100"
         strokeDashoffset={100 - ringPercent}
@@ -203,8 +200,8 @@ function ContextUsageIndicator(props: {
         textAnchor="middle"
         dominantBaseline="middle"
         fill="currentColor"
-        fontSize="5.5"
-        fontWeight="600"
+        fontSize="6"
+        fontWeight="650"
       >
         {percent}%
       </text>
@@ -213,47 +210,60 @@ function ContextUsageIndicator(props: {
 
   const trigger = (
     <IconButton
-      label={compactAvailable ? t("chat.manualCompact") : usageLabel}
+      label={canOfferCompaction ? t("chat.manualCompact") : usageLabel}
       tooltip={usageLabel}
       icon={ring}
       variant="ghost"
-      size="md"
-      isDisabled={props.manualCompactionDisabled}
+      size="lg"
     />
   );
 
-  if (!compactAvailable) return trigger;
-
   return (
     <Popover
-      isOpen={confirmOpen}
-      onOpenChange={setConfirmOpen}
+      isOpen={detailsOpen}
+      onOpenChange={setDetailsOpen}
       placement="above"
       alignment="end"
-      label={t("chat.manualCompactTitle")}
+      label={t("chat.contextUsage")}
       width="min(20rem, calc(100dvw - var(--spacing-4)))"
       content={
         <VStack gap={3}>
-          <Heading level={4}>{t("chat.manualCompactTitle")}</Heading>
+          <Heading level={4}>{t("chat.contextUsage")}</Heading>
           <Text type="supporting" color="secondary">
-            {t("chat.manualCompactDescription")}
+            {usageLabel}
           </Text>
+          <ProgressBar
+            label={usageLabel}
+            value={ringPercent}
+            max={100}
+            variant={progressVariant}
+            hasValueLabel
+            formatValueLabel={() => `${percent}%`}
+          />
+          {canOfferCompaction ? (
+            <Text type="supporting" color="secondary">
+              {t("chat.manualCompactDescription")}
+            </Text>
+          ) : null}
           <HStack gap={2} hAlign="end">
             <Button
               label={t("chat.cancel")}
               variant="ghost"
               size="sm"
-              onClick={() => setConfirmOpen(false)}
+              onClick={() => setDetailsOpen(false)}
             />
-            <Button
-              label={t("chat.manualCompactConfirm")}
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                setConfirmOpen(false);
-                props.onManualCompact?.();
-              }}
-            />
+            {canOfferCompaction ? (
+              <Button
+                label={t("chat.manualCompactConfirm")}
+                variant="primary"
+                size="sm"
+                isDisabled={props.manualCompactionDisabled}
+                onClick={() => {
+                  setDetailsOpen(false);
+                  props.onManualCompact?.();
+                }}
+              />
+            ) : null}
           </HStack>
         </VStack>
       }
@@ -394,7 +404,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const uploadDisabled = isInputDisabled || isUploadingFiles || !isAgentMode || !workdir;
   const controlsDisabled = isInputDisabled;
   const hasSendableDraft = !composerIsEmpty || pendingUploadedFiles.length > 0;
-  const thinkingSupported = reasoningOptions.length > 0;
+  const thinkingSupported = reasoningOptions.length > 0 || thinkingAlwaysOn;
   const sendDisabled = isInputDisabled || isUploadingFiles || !hasSendableDraft;
   const canQueueDraftWhileSending = isSending && !sendDisabled;
   const imageUploads = pendingUploadedFiles.filter((file) => file.kind === "image");
@@ -916,15 +926,22 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                         label={
                           !thinkingSupported
                             ? t("chat.runtime.thinkingUnavailable")
-                            : chatRuntimeControls.thinkingEnabled
+                            : chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn
                               ? t("chat.runtime.thinkingOn")
                               : t("chat.runtime.thinkingOff")
                         }
-                        value={chatRuntimeControls.thinkingEnabled && thinkingSupported}
+                        value={
+                          thinkingSupported &&
+                          (chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn)
+                        }
                         onChange={(value) =>
                           onChatRuntimeControlsChange({ thinkingEnabled: value })
                         }
-                        labelIcon={chatRuntimeControls.thinkingEnabled ? Lightbulb : LightbulbOff}
+                        labelIcon={
+                          chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn
+                            ? Lightbulb
+                            : LightbulbOff
+                        }
                         labelPosition="start"
                         labelSpacing="spread"
                         size="sm"

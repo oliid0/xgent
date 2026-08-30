@@ -1,4 +1,3 @@
-import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import "@xterm/xterm/css/xterm.css";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal as XTerm } from "@xterm/xterm";
@@ -27,6 +26,8 @@ type XTermViewportProps = {
 
 const SNAPSHOT_ATTACH_RETRY_MIN_MS = 500;
 const SNAPSHOT_ATTACH_RETRY_MAX_MS = 5_000;
+const FIT_THROTTLE_MS = 80;
+const PTY_RESIZE_DEBOUNCE_MS = 100;
 
 function terminalTheme(theme: "light" | "dark") {
   if (theme === "dark") {
@@ -40,7 +41,7 @@ function terminalTheme(theme: "light" | "dark") {
       scrollbarSliderBackground: "rgba(148, 163, 184, 0.18)",
       scrollbarSliderHoverBackground: "rgba(148, 163, 184, 0.3)",
       scrollbarSliderActiveBackground: "rgba(148, 163, 184, 0.42)",
-      overviewRulerBorder: "transparent",
+      overviewRulerBorder: "#00000000",
       black: "#1b2733",
       red: "#ef4444",
       green: "#22c55e",
@@ -69,7 +70,7 @@ function terminalTheme(theme: "light" | "dark") {
     scrollbarSliderBackground: "rgba(100, 116, 139, 0.16)",
     scrollbarSliderHoverBackground: "rgba(100, 116, 139, 0.26)",
     scrollbarSliderActiveBackground: "rgba(100, 116, 139, 0.36)",
-    overviewRulerBorder: "transparent",
+    overviewRulerBorder: "#00000000",
     black: "#1f2933",
     red: "#dc2626",
     green: "#16a34a",
@@ -195,15 +196,31 @@ export function XTermViewport({
       focusTerminal();
     };
 
-    const fitAndResize = () => {
+    let ptyResizeTimer: number | null = null;
+    let lastVisualFitAt = 0;
+
+    const fitVisual = () => {
       if (disposed) return;
       if (!terminalContainerHasSize(container)) return;
+      lastVisualFitAt = Date.now();
       try {
         fit.fit();
-        streamHandle?.resize(term.cols, term.rows);
       } catch {
         // xterm fit can throw while the panel is hidden or measuring at zero size.
       }
+    };
+
+    const schedulePtyResize = () => {
+      if (ptyResizeTimer !== null) window.clearTimeout(ptyResizeTimer);
+      ptyResizeTimer = window.setTimeout(() => {
+        ptyResizeTimer = null;
+        if (!disposed) streamHandle?.resize(term.cols, term.rows);
+      }, PTY_RESIZE_DEBOUNCE_MS);
+    };
+
+    const fitAndResize = () => {
+      fitVisual();
+      schedulePtyResize();
     };
     fitAndResizeRef.current = fitAndResize;
 
@@ -216,10 +233,11 @@ export function XTermViewport({
     window.addEventListener(CODE_FONT_FAMILY_CHANGE_EVENT, handleCodeFontFamilyChange);
 
     const resizeObserver = new ResizeObserver(() => {
+      if (Date.now() - lastVisualFitAt >= FIT_THROTTLE_MS) fitVisual();
       if (resizeTimerRef.current !== null) {
         window.clearTimeout(resizeTimerRef.current);
       }
-      resizeTimerRef.current = window.setTimeout(fitAndResize, 40);
+      resizeTimerRef.current = window.setTimeout(fitAndResize, PTY_RESIZE_DEBOUNCE_MS);
     });
     resizeObserver.observe(container);
     window.setTimeout(fitAndResize, 0);
@@ -491,6 +509,10 @@ export function XTermViewport({
         window.clearTimeout(resizeTimerRef.current);
         resizeTimerRef.current = null;
       }
+      if (ptyResizeTimer !== null) {
+        window.clearTimeout(ptyResizeTimer);
+        ptyResizeTimer = null;
+      }
       clearSnapshotRetryTimer();
       container.removeEventListener("pointerdown", handlePointerDown);
       container.removeEventListener("touchstart", handleTouchStart);
@@ -506,8 +528,7 @@ export function XTermViewport({
   }, [client, session.id, session.projectPathKey]);
 
   return (
-    <AstryxStack
-      direction="vertical"
+    <div
       ref={containerRef}
       style={viewportStyle}
       className={cn("project-terminal-viewport h-full min-h-0 w-full overflow-hidden", className)}

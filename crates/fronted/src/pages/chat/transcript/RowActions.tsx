@@ -146,7 +146,7 @@ export function UserRowFooter(props: UserRowFooterProps) {
     <HStack gap={1.5} vAlign="center" hAlign="end" paddingBlockStart={1}>
       <HStack
         gap={0.5}
-        className="chat-message-actions opacity-0 transition-opacity group-hover:opacity-100"
+        className="chat-message-actions opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
       >
         <IconButton
           label={t("chat.copy")}

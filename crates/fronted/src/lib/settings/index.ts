@@ -8,6 +8,7 @@ import {
   resolveModelLimits,
   resolveModelLimitsAcrossProviders,
 } from "../models/modelCatalog";
+import { clampThinkingLevelToList, type ThinkingLevel } from "../models/modelThinking";
 import {
   ANTHROPIC_LONG_CONTEXT_WINDOW,
   ANTHROPIC_STANDARD_CONTEXT_WINDOW,
@@ -1231,7 +1232,11 @@ function normalizeChatRuntimeReasoningForLevels(
     return DEFAULT_CHAT_RUNTIME_CONTROLS.reasoning;
   }
   const reasoning = normalizeChatRuntimeReasoning(input);
-  return levels.includes(reasoning) ? reasoning : DEFAULT_CHAT_RUNTIME_CONTROLS.reasoning;
+  if (levels.includes(reasoning)) return reasoning;
+  const fallback = DEFAULT_CHAT_RUNTIME_CONTROLS.reasoning;
+  if (levels.includes(fallback)) return fallback;
+  const clampSource = (reasoning === "off" ? fallback : reasoning) as ThinkingLevel;
+  return clampThinkingLevelToList(clampSource, levels as ThinkingLevel[]) ?? fallback;
 }
 
 function normalizeChatRuntimeReasoningByProvider(

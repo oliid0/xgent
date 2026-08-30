@@ -1,6 +1,7 @@
 import type { Message, UserMessage } from "@earendil-works/pi-ai";
 
 import { createUuid } from "../../shared/id";
+import { normalizeLogicalLineEndings } from "./composerText";
 
 export type UploadedReadableFileKind =
   | "text"
@@ -113,21 +114,24 @@ export function parsePastedTextDisplayReferences(text: string): PastedTextDispla
 }
 
 export function buildUploadedFilesInstruction(files: PendingUploadedFile[]) {
-  if (files.length === 0) return "";
-  const lines = files.map((file) => `- ${file.relativePath} (${file.kind})`);
+  const lines = files
+    .filter((file) => typeof file.absolutePath === "string" && file.absolutePath.trim())
+    .map((file) => `- ${file.absolutePath} (${file.kind})`);
+  if (lines.length === 0) return "";
   return [
-    "Selected files are available in the workspace at these relative paths.",
-    "Use Read with the paths below before analyzing or modifying them:",
+    "The user attached the files below to this message.",
+    "Use Read with these exact paths before analyzing or modifying them:",
     ...lines,
   ].join("\n");
 }
 
 export function buildUserMessageContentWithUploads(userText: string, files: PendingUploadedFile[]) {
-  const normalizedText = userText.trim();
+  const normalizedText = normalizeLogicalLineEndings(userText);
   if (files.length === 0) return normalizedText;
 
   const instruction = buildUploadedFilesInstruction(files);
-  if (!normalizedText) {
+  if (!instruction) return normalizedText;
+  if (!normalizedText.trim()) {
     return `Please inspect the selected files first.\n\n${instruction}`;
   }
   return `${normalizedText}\n\n${instruction}`;
@@ -148,7 +152,7 @@ export function createUserMessageWithUploads(
     timestamp,
   };
   if (files.length > 0) {
-    message[DISPLAY_CONTENT_FIELD] = userText.trim();
+    message[DISPLAY_CONTENT_FIELD] = normalizeLogicalLineEndings(userText);
     message[ATTACHMENTS_FIELD] = clonePendingUploadedFiles(files);
   }
   return message;

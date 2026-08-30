@@ -1,4 +1,5 @@
-import { Button as AstryxButton, Button } from "@astryxdesign/core/Button";
+import { Button } from "@astryxdesign/core/Button";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Link } from "@astryxdesign/core/Link";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
@@ -17,7 +18,6 @@ import {
   type ReactElement,
   type ReactNode,
   useMemo,
-  useState,
 } from "react";
 import remarkBreaks from "remark-breaks";
 import {
@@ -29,16 +29,11 @@ import {
   Streamdown,
   type StreamdownTranslations,
 } from "streamdown";
-import { useLocale } from "../i18n";
 import { type ChatFileLink, parseChatFileLink } from "../lib/chat/chatFileLinks";
-import {
-  getCollapsedCodeBlockPreview,
-  resolveCodeBlockRenderPolicy,
-} from "../lib/markdownCodeBlockPolicy";
 import { normalizeLatexDelimiters } from "../lib/normalizeLatexDelimiters";
 import { cn } from "../lib/shared/utils";
 import { AdaptiveDialog } from "./astryx/AdaptiveDialog";
-import { Check, ChevronDown, ChevronUp, Copy, ExternalLink } from "./icons";
+import { ExternalLink } from "./icons";
 
 type MarkdownProps = {
   content: string;
@@ -155,16 +150,6 @@ export const markdownReadOnlyComponents: Components = {
   a: MarkdownReadOnlyLink,
 };
 
-async function copyCodeBlockText(text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch (error) {
-    console.error("Failed to copy code block", error);
-    return false;
-  }
-}
-
 function getCodeTextFromChild(child: ReactElement<StreamdownCodeChildProps>) {
   const raw = child.props.children;
   if (typeof raw === "string") return raw;
@@ -178,130 +163,28 @@ function getCodeLanguage(className?: string) {
   return className?.match(/language-([^\s]+)/)?.[1] ?? "";
 }
 
-function ensureCodeBlockLanguage(child: ReactElement<StreamdownCodeChildProps>) {
-  if (getCodeLanguage(child.props.className)) return child;
-  return cloneElement(child, {
-    className: cn(child.props.className, `language-${DEFAULT_CODE_BLOCK_LANGUAGE}`),
-  });
-}
-
-function CodeBlockActions({ code }: { code: string }) {
-  const { t } = useLocale();
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    if (!(await copyCodeBlockText(code))) return;
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
-  };
-
-  return (
-    <AstryxStack
-      direction="horizontal"
-      className="pointer-events-none absolute right-0 top-0 z-20 flex h-8 items-center justify-end"
-    >
-      <AstryxStack
-        direction="horizontal"
-        className="pointer-events-auto flex shrink-0 items-center gap-2 rounded-md bg-background/95 px-1.5 py-1"
-      >
-        <AstryxButton
-          variant="ghost"
-          label={copied ? t("chat.markdown.copied") : t("chat.markdown.copyCode")}
-          type="button"
-          aria-label={copied ? t("chat.markdown.copied") : t("chat.markdown.copyCode")}
-          tooltip={copied ? t("chat.markdown.copied") : t("chat.markdown.copyCode")}
-          className="inline-flex h-6 w-6 items-center justify-center rounded-md p-1 text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
-          onClick={() => void handleCopy()}
-        >
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-        </AstryxButton>
-      </AstryxStack>
-    </AstryxStack>
-  );
-}
-
 function CollapsibleCodePre({ children }: MarkdownPreProps) {
-  const { t } = useLocale();
-  const childElement = isValidElement<StreamdownCodeChildProps>(children)
-    ? ensureCodeBlockLanguage(children)
-    : null;
+  const childElement = isValidElement<StreamdownCodeChildProps>(children) ? children : null;
   const codeContent = childElement ? getCodeTextFromChild(childElement) : "";
-  const language = childElement ? getCodeLanguage(childElement.props.className) : "";
-  const { lineCount, shouldCollapse } = resolveCodeBlockRenderPolicy(codeContent);
+  const language = childElement
+    ? getCodeLanguage(childElement.props.className) || DEFAULT_CODE_BLOCK_LANGUAGE
+    : DEFAULT_CODE_BLOCK_LANGUAGE;
   const isMermaid = language === "mermaid" || language === "mmd";
-  const isCollapsible = Boolean(childElement && !isMermaid && shouldCollapse);
-  const [expanded, setExpanded] = useState(false);
 
   if (!childElement) return children;
+  if (isMermaid) return cloneElement(childElement, { "data-block": "true" });
 
-  if (!isCollapsible) {
-    const codeBlock = cloneElement(childElement, { "data-block": "true" });
-    return (
-      <AstryxStack direction="vertical" className="relative w-full">
-        {isMermaid ? null : <CodeBlockActions code={codeContent} />}
-        {codeBlock}
-      </AstryxStack>
-    );
-  }
-
-  const previewContent = getCollapsedCodeBlockPreview(codeContent);
   return (
-    <AstryxStack direction="vertical" className="relative w-full">
-      <CodeBlockActions code={codeContent} />
-      {expanded ? (
-        <AstryxStack direction="vertical" className="w-full">
-          {cloneElement(childElement, { "data-block": "true" })}
-        </AstryxStack>
-      ) : (
-        <AstryxStack
-          direction="vertical"
-          className="mt-2 w-full overflow-hidden rounded-xl bg-muted/40"
-          data-xagent-code-preview="collapsed"
-        >
-          <AstryxStack
-            direction="horizontal"
-            className="flex h-8 items-center px-3 text-[11px] font-medium tracking-[0.06em] text-muted-foreground/85"
-          >
-            {language || DEFAULT_CODE_BLOCK_LANGUAGE}
-          </AstryxStack>
-          <pre className="!m-0 !overflow-x-auto !pb-2">
-            <code className="block w-max min-w-full whitespace-pre py-4 font-mono text-[13px] leading-5 text-foreground/90">
-              {previewContent}
-            </code>
-          </pre>
-        </AstryxStack>
-      )}
-      {expanded ? null : (
-        <AstryxStack
-          direction="vertical"
-          className="pointer-events-none absolute inset-x-0 bottom-7 h-20 bg-gradient-to-b from-transparent via-background/70 to-background"
-        />
-      )}
-      <AstryxStack direction="horizontal" className="flex justify-center">
-        <AstryxButton
-          variant="ghost"
-          label={
-            expanded
-              ? t("chat.markdown.collapseCode")
-              : t("chat.markdown.expandCode").replace("{count}", String(lineCount))
-          }
-          type="button"
-          onClick={() => setExpanded((current) => !current)}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
-        >
-          {expanded ? (
-            <ChevronUp className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5" />
-          )}
-          <AstryxText as="span" type="inherit">
-            {expanded
-              ? t("chat.markdown.collapseCode")
-              : t("chat.markdown.expandCode").replace("{count}", String(lineCount))}
-          </AstryxText>
-        </AstryxButton>
-      </AstryxStack>
-    </AstryxStack>
+    <CodeBlock
+      code={codeContent}
+      language={language}
+      size="sm"
+      width="100%"
+      maxHeight="min(60dvh, 36rem)"
+      hasCopyButton
+      isCollapsible
+      collapsibleThreshold={12}
+    />
   );
 }
 
@@ -378,19 +261,13 @@ export function ExternalLinkModal({ isOpen, onClose, onConfirm, url }: LinkSafet
             type="button"
             variant="ghost"
             onClick={handleCopyLink}
-          >
-            <Copy className="size-4" />
-            {streamdownTranslations.copyLink}
-          </Button>
+          />
           <Button
             label={streamdownTranslations.openLink}
             type="button"
             variant="secondary"
             onClick={handleOpenLink}
-          >
-            <ExternalLink className="size-4" />
-            {streamdownTranslations.openLink}
-          </Button>
+          />
         </HStack>
       }
     >

@@ -7,7 +7,7 @@ import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { useState } from "react";
 
 import { HubHeader } from "../../components/hub/HubChrome";
-import { Cable, Cloud, Download, Plus, Server } from "../../components/icons";
+import { Cable, Cloud, Download, Server } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
 import { McpImportView } from "./McpImportView";
@@ -125,7 +125,6 @@ export function McpHubPage(props: McpHubPageProps) {
                 endContent={
                   <Button
                     label={t("mcpHub.add")}
-                    icon={<Icon icon={Plus} size="sm" color="inherit" />}
                     variant={ready ? "secondary" : "primary"}
                     size="md"
                     onClick={openAdd}
