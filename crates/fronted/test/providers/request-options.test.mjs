@@ -100,6 +100,19 @@ test("proxy base URL builder validates upstream URLs and carries origin separate
       upstreamOrigin: "https://api.openai.com",
     },
   );
+  assert.deepEqual(
+    proxy.buildProxyBaseUrl(
+      "codex",
+      "https://relay.example.com/custom/final?region=cn",
+      "http://127.0.0.1:18080/",
+      { isFullUrl: true },
+    ),
+    {
+      baseUrl: "http://127.0.0.1:18080/proxy/codex",
+      upstreamOrigin: "https://relay.example.com",
+      upstreamUrl: "https://relay.example.com/custom/final?region=cn",
+    },
+  );
 
   assert.throws(
     () => proxy.buildProxyBaseUrl("codex", "https://user:pass@example.com/v1", "http://proxy"),
@@ -728,6 +741,7 @@ test("gemini model list normalization uses models array metadata", () => {
       id: "gemini-3.5-flash",
       contextWindow: 1_048_576,
       maxOutputToken: 65_536,
+      limitsSource: "provider",
     },
   ]);
 });

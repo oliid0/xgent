@@ -1,8 +1,16 @@
-import type { KnownProvider, ModelThinkingLevel } from "@earendil-works/pi-ai";
-import { getBuiltinModels } from "@earendil-works/pi-ai/providers/all";
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { DEFAULT_LOCALE, type Locale, normalizeLocale } from "../../i18n/config";
 import {
+  extractProviderDeclaredLimits,
+  getProviderFallbackLimits,
+  type ModelLimits,
+  normalizeModelLimits,
+  resolveModelLimits,
+  resolveModelLimitsAcrossProviders,
+} from "../models/modelCatalog";
+import {
   ANTHROPIC_LONG_CONTEXT_WINDOW,
+  ANTHROPIC_STANDARD_CONTEXT_WINDOW,
   hasAnthropicLongContextSuffix,
   isAnthropicAdaptiveModelId,
   resolveAnthropicContextWindow,
@@ -258,12 +266,15 @@ export type ProviderModelCost = {
   cacheWrite: number;
 };
 
+export type ModelLimitsSource = "catalog" | "provider" | "fallback" | "user";
+
 export type ProviderModelConfig = {
   id: string;
   /** Optional vendor metadata returned by OpenAI-compatible /models endpoints. */
   ownedBy?: string;
   contextWindow: number;
   maxOutputToken: number;
+  limitsSource?: ModelLimitsSource;
   /** 用户自填单价：目录外模型（中转/改名）没有官方定价时用于成本展示。 */
   cost?: ProviderModelCost;
   promptCacheHintMode?: PromptCacheHintMode;
@@ -564,16 +575,6 @@ const CODEX_RESPONSES_SUFFIX = "/responses";
 const CODEX_RESPONSE_SUFFIX = "/response";
 const CODEX_CHAT_COMPLETIONS_SUFFIX = "/chat/completions";
 const DEFAULT_MCP_TIMEOUT_MS = 60_000;
-const DEFAULT_CLAUDE_CONTEXT_WINDOW = 200_000;
-const DEFAULT_CLAUDE_MAX_OUTPUT_TOKEN = 32_000;
-const DEFAULT_CODEX_CONTEXT_WINDOW = 258_000;
-const DEFAULT_CODEX_MAX_OUTPUT_TOKEN = 142_000;
-const DEFAULT_GEMINI_CONTEXT_WINDOW = 1_048_576;
-const DEFAULT_GEMINI_MAX_OUTPUT_TOKEN = 65_536;
-const DEFAULT_XAI_CONTEXT_WINDOW = 2_000_000;
-const DEFAULT_XAI_MAX_OUTPUT_TOKEN = 131_072;
-const DEFAULT_DEEPSEEK_CONTEXT_WINDOW = 128_000;
-const DEFAULT_DEEPSEEK_MAX_OUTPUT_TOKEN = 8_192;
 export const DEFAULT_CHAT_RUNTIME_CONTROLS: ChatRuntimeControls = {
   thinkingEnabled: true,
   nativeWebSearchEnabled: true,
@@ -1453,14 +1454,6 @@ export function normalizeAccessSettings(input: unknown): AccessSettings {
   };
 }
 
-function toKnownProvider(providerId: ProviderId): KnownProvider {
-  if (providerId === "codex" || providerId === "xai" || providerId === "deepseek") {
-    return "openai";
-  }
-  if (providerId === "gemini") return "google";
-  return "anthropic";
-}
-
 function getKnownModelLimits(
   providerId: ProviderId,
   modelId: string | undefined,
@@ -1468,53 +1461,21 @@ function getKnownModelLimits(
 ): Pick<ProviderModelConfig, "contextWindow" | "maxOutputToken"> | undefined {
   const trimmedId = modelId?.trim();
   if (!trimmedId) return undefined;
-  // Anthropic 走规范化目录回查（装饰 id/[1m] 后缀也能继承默认值），并对旧世代
-  // 钳出退役后的有效窗口；contextWindow > 200K 即请求侧启用 1M beta 的开关。
-  if (toKnownProvider(providerId) === "anthropic") {
+  if (providerId === "claude_code") {
     return resolveAnthropicKnownModelLimits(trimmedId, baseUrl);
   }
-  const known = getBuiltinModels(toKnownProvider(providerId)).find(
-    (model) => model.id === trimmedId,
-  );
-  if (!known) return undefined;
-  return { contextWindow: known.contextWindow, maxOutputToken: known.maxTokens };
+  return resolveModelLimits(providerId, trimmedId);
 }
 
 export function getProviderModelDefaults(
   providerId: ProviderId,
   modelId?: string,
   baseUrl?: string,
-): Pick<ProviderModelConfig, "contextWindow" | "maxOutputToken"> {
+): Pick<ProviderModelConfig, "contextWindow" | "maxOutputToken"> & {
+  source: ModelLimitsSource;
+} {
   const known = getKnownModelLimits(providerId, modelId, baseUrl);
-  if (known) return known;
-
-  if (providerId === "codex") {
-    return {
-      contextWindow: DEFAULT_CODEX_CONTEXT_WINDOW,
-      maxOutputToken: DEFAULT_CODEX_MAX_OUTPUT_TOKEN,
-    };
-  }
-
-  if (providerId === "gemini") {
-    return {
-      contextWindow: DEFAULT_GEMINI_CONTEXT_WINDOW,
-      maxOutputToken: DEFAULT_GEMINI_MAX_OUTPUT_TOKEN,
-    };
-  }
-
-  if (providerId === "xai") {
-    return {
-      contextWindow: DEFAULT_XAI_CONTEXT_WINDOW,
-      maxOutputToken: DEFAULT_XAI_MAX_OUTPUT_TOKEN,
-    };
-  }
-
-  if (providerId === "deepseek") {
-    return {
-      contextWindow: DEFAULT_DEEPSEEK_CONTEXT_WINDOW,
-      maxOutputToken: DEFAULT_DEEPSEEK_MAX_OUTPUT_TOKEN,
-    };
-  }
+  if (known) return { ...known, source: "catalog" };
 
   if (modelId && (hasAnthropicLongContextSuffix(modelId) || isAnthropicAdaptiveModelId(modelId))) {
     return {
@@ -1522,16 +1483,17 @@ export function getProviderModelDefaults(
         hasAnthropicLongContextSuffix(modelId) &&
         baseUrl &&
         !shouldSendAnthropicLongContextHeader(baseUrl)
-          ? DEFAULT_CLAUDE_CONTEXT_WINDOW
+          ? ANTHROPIC_STANDARD_CONTEXT_WINDOW
           : ANTHROPIC_LONG_CONTEXT_WINDOW,
-      maxOutputToken: DEFAULT_CLAUDE_MAX_OUTPUT_TOKEN,
+      maxOutputToken: getProviderFallbackLimits(providerId).maxOutputToken,
+      source: "catalog",
     };
   }
 
-  return {
-    contextWindow: DEFAULT_CLAUDE_CONTEXT_WINDOW,
-    maxOutputToken: DEFAULT_CLAUDE_MAX_OUTPUT_TOKEN,
-  };
+  const crossProvider = resolveModelLimitsAcrossProviders(modelId);
+  if (crossProvider) return { ...crossProvider, source: "catalog" };
+
+  return { ...getProviderFallbackLimits(providerId), source: "fallback" };
 }
 
 export function createProviderModelConfig(
@@ -1544,7 +1506,21 @@ export function createProviderModelConfig(
     id,
     contextWindow: defaults.contextWindow,
     maxOutputToken: defaults.maxOutputToken,
+    limitsSource: defaults.source,
   };
+}
+
+const VALID_LIMITS_SOURCES: readonly ModelLimitsSource[] = [
+  "catalog",
+  "provider",
+  "fallback",
+  "user",
+];
+
+function normalizeLimitsSource(value: unknown): ModelLimitsSource | undefined {
+  return typeof value === "string" && (VALID_LIMITS_SOURCES as readonly string[]).includes(value)
+    ? (value as ModelLimitsSource)
+    : undefined;
 }
 
 function normalizeNonNegativeNumber(input: unknown): number {
@@ -1587,20 +1563,70 @@ export function normalizeProviderModelConfig(
         : "";
   if (!id) return null;
 
-  const defaults = getProviderModelDefaults(providerId, id);
   const ownedBy =
     (typeof obj.ownedBy === "string" ? obj.ownedBy.trim() : "") ||
     (typeof obj.owned_by === "string" ? obj.owned_by.trim() : "");
+  const providerDeclared = extractProviderDeclaredLimits(obj);
+  const catalogDefaults = getProviderModelDefaults(providerId, id);
+
+  let limits: ModelLimits;
+  let limitsSource: ModelLimitsSource;
+  if (providerDeclared) {
+    limits = providerDeclared;
+    limitsSource = "provider";
+  } else {
+    const storedSource = normalizeLimitsSource(obj.limitsSource);
+    const storedLimits = normalizeModelLimits({
+      contextWindow: normalizePositiveInteger(obj.contextWindow, catalogDefaults.contextWindow),
+      maxOutputToken: normalizePositiveInteger(
+        obj.maxOutputToken ?? obj.maxTokens,
+        catalogDefaults.maxOutputToken,
+      ),
+    });
+    const hasStoredNumbers =
+      obj.contextWindow != null || obj.maxOutputToken != null || obj.maxTokens != null;
+    const fallbackPair = getProviderFallbackLimits(providerId);
+    const resolvedSource: ModelLimitsSource =
+      storedSource ??
+      (!hasStoredNumbers
+        ? catalogDefaults.source
+        : storedLimits.contextWindow === catalogDefaults.contextWindow &&
+            storedLimits.maxOutputToken === catalogDefaults.maxOutputToken
+          ? "catalog"
+          : storedLimits.contextWindow === fallbackPair.contextWindow &&
+              storedLimits.maxOutputToken === fallbackPair.maxOutputToken
+            ? "fallback"
+            : "user");
+
+    if (resolvedSource === "catalog" || resolvedSource === "fallback") {
+      limits = {
+        contextWindow: catalogDefaults.contextWindow,
+        maxOutputToken: catalogDefaults.maxOutputToken,
+      };
+      limitsSource = catalogDefaults.source;
+    } else {
+      limits = storedLimits;
+      limitsSource = resolvedSource;
+    }
+  }
+
   const cost = normalizeProviderModelCost(obj.cost);
+  const promptCacheHintMode =
+    providerId === "codex" &&
+    (obj.promptCacheHintMode === "auto" ||
+      obj.promptCacheHintMode === "openai-key" ||
+      obj.promptCacheHintMode === "openrouter-session" ||
+      obj.promptCacheHintMode === "none")
+      ? obj.promptCacheHintMode
+      : undefined;
   return {
     id,
     ...(ownedBy ? { ownedBy } : {}),
-    contextWindow: normalizePositiveInteger(obj.contextWindow, defaults.contextWindow),
-    maxOutputToken: normalizePositiveInteger(
-      obj.maxOutputToken ?? obj.maxTokens,
-      defaults.maxOutputToken,
-    ),
+    contextWindow: limits.contextWindow,
+    maxOutputToken: limits.maxOutputToken,
+    limitsSource,
     ...(cost !== undefined ? { cost } : {}),
+    ...(promptCacheHintMode ? { promptCacheHintMode } : {}),
   };
 }
 
@@ -1635,6 +1661,7 @@ export function findProviderModelConfig(
       id: normalizedId,
       contextWindow: defaults.contextWindow,
       maxOutputToken: defaults.maxOutputToken,
+      limitsSource: defaults.source,
     };
   }
   if (provider.type !== "claude_code") return matched;

@@ -571,6 +571,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
       ...editingModel.model,
       contextWindow: editingModelContextWindow,
       maxOutputToken: editingModelMaxOutputToken,
+      limitsSource: "user",
       cost: hasCost ? cost : undefined,
     };
     setModels((prev) => prev.map((item) => (item.id === nextModel.id ? nextModel : item)));

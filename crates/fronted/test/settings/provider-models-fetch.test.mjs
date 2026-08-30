@@ -56,7 +56,7 @@ test("buildProviderModelsUrl defaults to /v1/models and falls back to official e
       "https://generativelanguage.googleapis.com/v1beta",
       "default",
     ),
-    "https://generativelanguage.googleapis.com/v1beta/models",
+    "https://generativelanguage.googleapis.com/v1/models",
   );
   assert.equal(
     providerUtils.buildProviderModelsUrl("claude_code", "https://relay.example.com", "default"),
@@ -69,6 +69,33 @@ test("buildProviderModelsUrl defaults to /v1/models and falls back to official e
   assert.equal(
     providerUtils.buildProviderModelsUrl("codex", "https://relay.example.com/v1", "default"),
     "https://relay.example.com/v1/models",
+  );
+  assert.equal(
+    providerUtils.buildProviderModelsUrl(
+      "codex",
+      "https://relay.example.com/v1/models",
+      "default",
+    ),
+    "https://relay.example.com/v1/models",
+  );
+});
+
+test("normalizeProviderModelsBaseUrl derives discovery roots from complete inference URLs", () => {
+  assert.equal(
+    providerUtils.normalizeProviderModelsBaseUrl(
+      "codex",
+      "https://relay.example.com/custom/v1/responses?region=cn",
+      true,
+    ),
+    "https://relay.example.com/custom/v1",
+  );
+  assert.equal(
+    providerUtils.normalizeProviderModelsBaseUrl(
+      "claude_code",
+      "https://relay.example.com/anthropic/v1/messages",
+      true,
+    ),
+    "https://relay.example.com/anthropic/v1",
   );
 });
 
@@ -84,7 +111,7 @@ test("buildProviderModelsAttempts orders default before official with provider h
     ["default", "official"],
   );
   assert.equal(gemini[0].headers.Authorization, "Bearer test-key");
-  assert.equal(gemini[0].headers["x-goog-api-key"], "test-key");
+  assert.equal(gemini[0].headers["x-goog-api-key"], undefined);
   assert.equal(gemini[1].headers.Authorization, undefined);
   assert.equal(gemini[1].headers["x-goog-api-key"], "test-key");
 
@@ -95,7 +122,8 @@ test("buildProviderModelsAttempts orders default before official with provider h
   );
   assert.equal(claude.length, 2);
   assert.equal(claude[0].headers.Authorization, "Bearer test-key");
-  assert.equal(claude[0].headers["anthropic-version"], "2023-06-01");
+  assert.equal(claude[0].headers["x-api-key"], undefined);
+  assert.equal(claude[0].headers["anthropic-version"], undefined);
   assert.equal(claude[1].headers.Authorization, undefined);
   assert.equal(claude[1].headers["x-api-key"], "test-key");
   assert.equal(claude[1].headers["anthropic-version"], "2023-06-01");
@@ -105,10 +133,9 @@ test("buildProviderModelsAttempts orders default before official with provider h
     "https://relay.example.com",
     "test-key",
   );
-  assert.equal(codex.length, 2);
-  assert.equal(codex[0].headers["x-api-key"], "test-key");
-  assert.equal(codex[1].headers["x-api-key"], undefined);
-  assert.equal(codex[1].headers.Authorization, "Bearer test-key");
+  assert.equal(codex.length, 1);
+  assert.equal(codex[0].headers["x-api-key"], undefined);
+  assert.equal(codex[0].headers.Authorization, "Bearer test-key");
 
   const inferenceOnlyHeaders = [
     "x-app",
@@ -268,4 +295,87 @@ test("fetchModelsFromApi retries claude_code with official anthropic headers", a
       );
     },
   );
+});
+
+test("fetchModelsFromApi derives model discovery from a complete inference URL", async () => {
+  await withFetchStub(
+    () => jsonResponse(200, { data: [{ id: "gpt-5" }] }),
+    async (calls) => {
+      await providerUtils.fetchModelsFromApi(
+        "codex",
+        "https://relay.example.com/custom/v1/responses?region=cn",
+        "test-key",
+        { isFullUrl: true },
+      );
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, "http://proxy.local:9999/proxy/codex/custom/v1/models");
+    },
+  );
+});
+
+test("fetchModelsFromApi preserves an exact model-list URL through the proxy", async () => {
+  await withFetchStub(
+    () => jsonResponse(200, { data: [{ id: "relay-model" }] }),
+    async (calls) => {
+      await providerUtils.fetchModelsFromApi("codex", "https://relay.example.com/v1", "test-key", {
+        modelsUrl: "https://models.example.com/catalog?channel=stable",
+      });
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, "http://proxy.local:9999/proxy/codex");
+      assert.equal(
+        calls[0].options.headers["x-xagent-upstream-url"],
+        "https://models.example.com/catalog?channel=stable",
+      );
+    },
+  );
+});
+
+test("provider-declared limits refresh automatic values but preserve user edits", () => {
+  const [fetched] = providerUtils.normalizeFetchedModels(
+    [
+      {
+        id: "relay-model",
+        context_length: 128_000,
+        top_provider: { max_completion_tokens: 16_000 },
+      },
+    ],
+    "codex",
+  );
+  assert.deepEqual(
+    {
+      contextWindow: fetched.contextWindow,
+      maxOutputToken: fetched.maxOutputToken,
+      limitsSource: fetched.limitsSource,
+    },
+    { contextWindow: 128_000, maxOutputToken: 16_000, limitsSource: "provider" },
+  );
+
+  const refreshed = providerUtils.mergeFetchedModels(
+    [fetched],
+    [
+      {
+        id: "relay-model",
+        contextWindow: 64_000,
+        maxOutputToken: 8_000,
+        limitsSource: "fallback",
+      },
+    ],
+  );
+  assert.equal(refreshed[0].contextWindow, 128_000);
+  assert.equal(refreshed[0].limitsSource, "provider");
+
+  const preserved = providerUtils.mergeFetchedModels(
+    [fetched],
+    [
+      {
+        id: "relay-model",
+        contextWindow: 96_000,
+        maxOutputToken: 12_000,
+        limitsSource: "user",
+      },
+    ],
+  );
+  assert.equal(preserved[0].contextWindow, 96_000);
+  assert.equal(preserved[0].maxOutputToken, 12_000);
+  assert.equal(preserved[0].limitsSource, "user");
 });

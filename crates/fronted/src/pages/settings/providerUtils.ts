@@ -19,7 +19,33 @@ const ANTHROPIC_API_VERSION = "2023-06-01";
 // Re-export the shared runtime predicate for the provider dialog.
 export { isBrowserRuntime };
 
-function normalizeModelBaseUrl(type: ProviderId, baseUrl: string) {
+function deriveModelsBaseUrlFromFullUrl(baseUrl: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl.trim());
+  } catch {
+    return normalizeBaseUrl(baseUrl);
+  }
+  parsed.search = "";
+  parsed.hash = "";
+
+  const path = parsed.pathname.replace(/\/+$/, "");
+  const versionIndex = path.toLowerCase().indexOf("/v1/");
+  if (versionIndex >= 0) {
+    parsed.pathname = path.slice(0, versionIndex + "/v1".length);
+  } else {
+    const separatorIndex = path.lastIndexOf("/");
+    parsed.pathname = separatorIndex > 0 ? path.slice(0, separatorIndex) : "/";
+  }
+  return normalizeBaseUrl(parsed.toString());
+}
+
+export function normalizeProviderModelsBaseUrl(
+  type: ProviderId,
+  baseUrl: string,
+  isFullUrl = false,
+) {
+  if (isFullUrl) return deriveModelsBaseUrlFromFullUrl(baseUrl);
   let normalizedUrl = normalizeBaseUrl(baseUrl);
 
   if (type !== "codex" && type !== "xai" && type !== "deepseek" && type !== "gemini") {
@@ -66,11 +92,11 @@ export type ProviderModelsFailure = {
   message: string;
 };
 
-function buildGeminiModelsUrl(baseUrl: string, versionPath: string) {
-  const normalizedUrl = normalizeBaseUrl(baseUrl);
-  if (normalizedUrl.toLowerCase().endsWith("/models")) return normalizedUrl;
-  if (/\/v\d+(?:beta)?$/i.test(normalizedUrl)) return `${normalizedUrl}/models`;
-  return `${normalizedUrl}/${versionPath}/models`;
+function buildVersionedModelsUrl(baseUrl: string, versionPath: string) {
+  const apiRoot = normalizeBaseUrl(baseUrl)
+    .replace(/\/models$/i, "")
+    .replace(/\/v\d+(?:beta)?$/i, "");
+  return `${apiRoot}/${versionPath}/models`;
 }
 
 export function buildProviderModelsUrl(
@@ -78,11 +104,8 @@ export function buildProviderModelsUrl(
   baseUrl: string,
   kind: ProviderModelsAttemptKind,
 ) {
-  if (type === "gemini") {
-    return buildGeminiModelsUrl(baseUrl, kind === "official" ? "v1beta" : "v1");
-  }
-
-  return baseUrl.endsWith("/v1") ? `${baseUrl}/models` : `${baseUrl}/v1/models`;
+  const versionPath = kind === "official" && type === "gemini" ? "v1beta" : "v1";
+  return buildVersionedModelsUrl(baseUrl, versionPath);
 }
 
 type ProviderModelsAuthOptions = {
@@ -94,23 +117,14 @@ type ProviderModelsAuthOptions = {
 };
 
 function buildDefaultModelsHeaders(
-  type: ProviderId,
+  _type: ProviderId,
   apiKey: string,
   authMode: ProviderAuthMode,
 ): Record<string, string> {
-  const headers: Record<string, string> = {
+  return {
     "Content-Type": "application/json",
+    ...(authMode === "oauth-managed" ? {} : { Authorization: `Bearer ${apiKey}` }),
   };
-  if (authMode !== "oauth-managed") headers.Authorization = `Bearer ${apiKey}`;
-  if (type === "gemini") {
-    headers["x-goog-api-key"] = apiKey;
-    return headers;
-  }
-  if (authMode === "api-key") headers["x-api-key"] = apiKey;
-  if (type === "claude_code") {
-    headers["anthropic-version"] = ANTHROPIC_API_VERSION;
-  }
-  return headers;
 }
 
 function buildOfficialModelsHeaders(
@@ -235,7 +249,24 @@ export function normalizeFetchedModels(
   if (providerType === "gemini") {
     return normalizeGeminiFetchedModels(items);
   }
-  return normalizeProviderModelConfigs(items, providerType);
+  return normalizeApiFetchedModels(items, providerType);
+}
+
+function normalizeApiFetchedModels(
+  items: unknown,
+  providerType: ProviderId,
+): ProviderModelConfig[] {
+  const models = normalizeProviderModelConfigs(items, providerType);
+  if (providerType !== "claude_code") return models;
+
+  return models.map((model) => {
+    const defaults = createProviderModelConfig(providerType, model.id);
+    const roundsToOneMillion =
+      model.contextWindow < 1_000_000 && Math.round(model.contextWindow / 1_000) === 1_000;
+    return defaults.contextWindow === 1_000_000 && roundsToOneMillion
+      ? { ...model, contextWindow: defaults.contextWindow }
+      : model;
+  });
 }
 
 function normalizePositiveInteger(value: unknown): number | undefined {
@@ -273,11 +304,14 @@ function normalizeGeminiFetchedModels(items: unknown): ProviderModelConfig[] {
     const ownedBy =
       (typeof obj.ownedBy === "string" ? obj.ownedBy.trim() : "") ||
       (typeof obj.owned_by === "string" ? obj.owned_by.trim() : "");
+    const contextWindow = normalizePositiveInteger(obj.inputTokenLimit);
+    const maxOutputToken = normalizePositiveInteger(obj.outputTokenLimit);
     out.push({
       id,
       ...(ownedBy ? { ownedBy } : {}),
-      contextWindow: normalizePositiveInteger(obj.inputTokenLimit) ?? draft.contextWindow,
-      maxOutputToken: normalizePositiveInteger(obj.outputTokenLimit) ?? draft.maxOutputToken,
+      contextWindow: contextWindow ?? draft.contextWindow,
+      maxOutputToken: maxOutputToken ?? draft.maxOutputToken,
+      limitsSource: contextWindow && maxOutputToken ? "provider" : draft.limitsSource,
     });
   }
 
@@ -296,10 +330,27 @@ export function mergeFetchedModels(
     if (seen.has(model.id)) continue;
     seen.add(model.id);
     const existingModel = existingById.get(model.id);
+    const shouldNormalizeOneMillion =
+      existingModel !== undefined &&
+      model.contextWindow === 1_000_000 &&
+      existingModel.contextWindow < 1_000_000 &&
+      Math.round(existingModel.contextWindow / 1_000) === 1_000;
+    const shouldAdoptFreshProviderLimits =
+      existingModel !== undefined &&
+      model.limitsSource === "provider" &&
+      existingModel.limitsSource !== "user";
     merged.push(
       existingModel
         ? {
             ...existingModel,
+            ...(shouldNormalizeOneMillion ? { contextWindow: model.contextWindow } : {}),
+            ...(shouldAdoptFreshProviderLimits
+              ? {
+                  contextWindow: model.contextWindow,
+                  maxOutputToken: model.maxOutputToken,
+                  limitsSource: "provider" as const,
+                }
+              : {}),
             ...(model.ownedBy ? { ownedBy: model.ownedBy } : {}),
           }
         : model,
@@ -352,7 +403,7 @@ export async function fetchModelsFromApi(
   apiKey: string,
   options?: ProviderModelsAuthOptions & { useSystemProxy?: boolean },
 ): Promise<ProviderModelConfig[]> {
-  const normalizedUrl = normalizeModelBaseUrl(type, baseUrl);
+  const normalizedUrl = normalizeProviderModelsBaseUrl(type, baseUrl, options?.isFullUrl === true);
   const exactModelsUrl = options?.modelsUrl?.trim();
   const normalizedApiKey = apiKey.trim();
   const attempts = buildProviderModelsAttempts(type, normalizedUrl, normalizedApiKey, options);
@@ -367,6 +418,7 @@ export async function fetchModelsFromApi(
       {
         useSystemProxy: options?.useSystemProxy === true,
         oauthAccountId: options?.authMode === "oauth-managed" ? options.oauthAccountId : undefined,
+        isFullUrl: Boolean(exactModelsUrl),
       },
     );
     const modelsUrl = exactModelsUrl

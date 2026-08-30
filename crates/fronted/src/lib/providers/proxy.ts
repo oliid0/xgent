@@ -5,6 +5,7 @@ import { readHeaderValue } from "./customHeaders";
 
 export const XAGENT_PROXY_TOKEN_HEADER = "x-xagent-proxy-token";
 export const XAGENT_UPSTREAM_ORIGIN_HEADER = "x-xagent-upstream-origin";
+export const XAGENT_UPSTREAM_URL_HEADER = "x-xagent-upstream-url";
 export const XAGENT_UPSTREAM_USER_AGENT_HEADER = "x-xagent-upstream-user-agent";
 export const XAGENT_UPSTREAM_CONTENT_TYPE_HEADER = "x-xagent-upstream-content-type";
 export const XAGENT_OAUTH_ACCOUNT_ID_HEADER = "x-xagent-oauth-account-id";
@@ -92,7 +93,8 @@ export function buildProxyBaseUrl(
   providerId: ProviderId,
   upstreamBaseUrl: string,
   proxyServerBaseUrl: string,
-): { baseUrl: string; upstreamOrigin: string } {
+  options?: { isFullUrl?: boolean },
+): { baseUrl: string; upstreamOrigin: string; upstreamUrl?: string } {
   const normalizedUpstream = upstreamBaseUrl.trim();
   if (!normalizedUpstream) {
     throw new Error("Base URL cannot be empty");
@@ -110,11 +112,21 @@ export function buildProxyBaseUrl(
   if (parsed.username || parsed.password) {
     throw new Error("Base URL cannot include embedded username or password");
   }
-  if (parsed.search || parsed.hash) {
+  if (parsed.hash) {
+    throw new Error("Base URL cannot include a fragment");
+  }
+  if (!options?.isFullUrl && parsed.search) {
     throw new Error("Base URL cannot include query parameters or fragments");
   }
 
   const normalizedProxyServerBaseUrl = proxyServerBaseUrl.trim().replace(/\/+$/, "");
+  if (options?.isFullUrl) {
+    return {
+      baseUrl: `${normalizedProxyServerBaseUrl}/proxy/${providerId}`,
+      upstreamOrigin: parsed.origin,
+      upstreamUrl: parsed.toString(),
+    };
+  }
   const pathname = parsed.pathname.replace(/\/+$/, "");
 
   return {
@@ -184,13 +196,14 @@ export async function prepareProxyRequest(
   providerId: ProviderId,
   upstreamBaseUrl: string,
   headers: Record<string, string>,
-  options?: { useSystemProxy?: boolean; oauthAccountId?: string },
+  options?: { useSystemProxy?: boolean; oauthAccountId?: string; isFullUrl?: boolean },
 ): Promise<PreparedProxyRequest> {
   const proxyServerInfo = await getProxyServerInfo();
-  const { baseUrl, upstreamOrigin } = buildProxyBaseUrl(
+  const { baseUrl, upstreamOrigin, upstreamUrl } = buildProxyBaseUrl(
     providerId,
     upstreamBaseUrl,
     proxyServerInfo.baseUrl,
+    { isFullUrl: options?.isFullUrl },
   );
 
   return {
@@ -199,6 +212,7 @@ export async function prepareProxyRequest(
       ...headers,
       ...buildUpstreamHeaderOverrideHeaders(headers),
       [XAGENT_UPSTREAM_ORIGIN_HEADER]: upstreamOrigin,
+      ...(upstreamUrl ? { [XAGENT_UPSTREAM_URL_HEADER]: upstreamUrl } : {}),
       [XAGENT_PROXY_TOKEN_HEADER]: proxyServerInfo.token,
       ...(options?.useSystemProxy ? { [XAGENT_USE_SYSTEM_PROXY_HEADER]: "1" } : {}),
       ...(options?.oauthAccountId?.trim()
