@@ -3,6 +3,11 @@ const COMMANDS: &[&str] = &[
     "start_voice_input",
     "check_permissions",
     "request_permissions",
+    "list_calendar_events",
+    "list_reminders",
+    "create_calendar_event",
+    "create_reminder",
+    "compose_message",
 ];
 
 fn main() {

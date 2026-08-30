@@ -482,6 +482,7 @@ macro_rules! app_invoke_handler {
             commands::shell::shell_cancel,
             commands::shell::mobile_ssh_exec,
             commands::app::app_runtime_platform,
+            commands::app::app_mobile_startup_status,
             commands::system::system_pick_folder,
             commands::system::system_home_dir,
             commands::system::system_create_project_folder,
@@ -1077,6 +1078,194 @@ pub fn run() {
 }
 
 #[cfg(mobile)]
+fn record_mobile_startup_failure(
+    failures: &mut Vec<String>,
+    context: &str,
+    error: impl std::fmt::Display,
+) {
+    let failure = format!("{context}: {error}");
+    eprintln!("mobile startup degraded: {failure}");
+    failures.push(failure);
+}
+
+#[cfg(mobile)]
+fn initialize_mobile_services(app: tauri::AppHandle) -> Vec<String> {
+    let mut failures = Vec::new();
+
+    let app_data_dir = match app.path().app_data_dir() {
+        Ok(path) => path,
+        Err(error) => {
+            record_mobile_startup_failure(
+                &mut failures,
+                "resolve app data directory failed",
+                error,
+            );
+            return failures;
+        }
+    };
+    if let Err(error) = services::app_paths::initialize(services::app_paths::mobile_root(&app_data_dir))
+    {
+        record_mobile_startup_failure(
+            &mut failures,
+            "initialize XAgent mobile data directory failed",
+            error,
+        );
+        return failures;
+    }
+    let app_data_dir = match services::app_paths::app_storage_dir() {
+        Ok(path) => path,
+        Err(error) => {
+            record_mobile_startup_failure(
+                &mut failures,
+                "resolve XAgent app storage directory failed",
+                error,
+            );
+            return failures;
+        }
+    };
+
+    if let Err(error) = commands::history_db::initialize_history_db() {
+        record_mobile_startup_failure(
+            &mut failures,
+            "initialize chat history database failed",
+            error,
+        );
+    }
+    if let Err(error) = commands::settings::initialize_system_proxy_from_db() {
+        record_mobile_startup_failure(
+            &mut failures,
+            "initialize system proxy state failed",
+            error,
+        );
+    }
+
+    match services::memory::MemoryStore::open() {
+        Ok(store) => {
+            app.manage(Arc::new(store));
+        }
+        Err(error) => record_mobile_startup_failure(
+            &mut failures,
+            "initialize XAgent memory store failed",
+            error,
+        ),
+    }
+
+    let automation_store = match services::automation::AutomationStore::open() {
+        Ok(store) => {
+            let store = Arc::new(store);
+            app.manage(Arc::clone(&store));
+            Some(store)
+        }
+        Err(error) => {
+            record_mobile_startup_failure(
+                &mut failures,
+                "initialize XAgent automation store failed",
+                error,
+            );
+            None
+        }
+    };
+
+    let cloud_secret_vault = match services::cloud_secret_vault::CloudSecretVault::new(
+        app_data_dir.clone(),
+    ) {
+        Ok(vault) => {
+            let vault = Arc::new(vault);
+            app.manage(Arc::clone(&vault));
+            Some(vault)
+        }
+        Err(error) => {
+            record_mobile_startup_failure(
+                &mut failures,
+                "initialize cloud secret vault failed",
+                error,
+            );
+            None
+        }
+    };
+
+    match services::cloud_execution::CloudExecutionService::new(app_data_dir) {
+        Ok(service) => {
+            app.manage(Arc::new(service));
+        }
+        Err(error) => record_mobile_startup_failure(
+            &mut failures,
+            "initialize cloud execution service failed",
+            error,
+        ),
+    }
+
+    let provider_oauth = cloud_secret_vault.as_ref().and_then(|vault| {
+        match services::provider_oauth::ProviderOAuthService::new(Arc::clone(vault)) {
+            Ok(service) => {
+                let service = Arc::new(service);
+                app.manage(Arc::clone(&service));
+                Some(service)
+            }
+            Err(error) => {
+                record_mobile_startup_failure(
+                    &mut failures,
+                    "initialize provider OAuth service failed",
+                    error,
+                );
+                None
+            }
+        }
+    });
+
+    let lan_pc_client = cloud_secret_vault.as_ref().and_then(|vault| {
+        match services::lan_pc_client::LanPcClient::new(Arc::clone(vault)) {
+            Ok(client) => {
+                let client = Arc::new(client);
+                app.manage(Arc::clone(&client));
+                Some(client)
+            }
+            Err(error) => {
+                record_mobile_startup_failure(
+                    &mut failures,
+                    "initialize LAN computer client failed",
+                    error,
+                );
+                None
+            }
+        }
+    });
+
+    if let Some(provider_oauth) = provider_oauth {
+        match services::proxy::start_proxy_server(provider_oauth) {
+            Ok(proxy_server) => {
+                app.manage(proxy_server);
+            }
+            Err(error) => record_mobile_startup_failure(
+                &mut failures,
+                "start local proxy server failed",
+                error,
+            ),
+        }
+    }
+
+    if let (Some(automation_store), Some(lan_pc_client)) = (automation_store, lan_pc_client) {
+        let automation_scheduler = Arc::new(services::automation::AutomationScheduler::new(
+            Arc::clone(&automation_store),
+            app.clone(),
+            lan_pc_client,
+        ));
+        automation_store.set_notifier(services::automation::AutomationNotifier {
+            app_handle: app.clone(),
+            scheduler: Arc::downgrade(&automation_scheduler),
+        });
+        app.manage(Arc::clone(&automation_scheduler));
+        automation_scheduler.start();
+    }
+
+    if let Err(error) = services::skills::ensure_builtin_agent_skills_sync() {
+        record_mobile_startup_failure(&mut failures, "seed builtin skills failed", error);
+    }
+
+    failures
+}
+
+#[cfg(mobile)]
 #[tauri::mobile_entry_point]
 pub fn run() {
     tauri::Builder::default()
@@ -1086,61 +1275,16 @@ pub fn run() {
         .plugin(tauri_plugin_mobile_execution::init())
         .manage(Arc::new(commands::mcp::McpRuntimeManager::default()))
         .manage(Arc::new(commands::hook::MobileHookScopeRegistry::default()))
+        .manage(Arc::new(commands::app::MobileStartupState::default()))
         .setup(|app| {
-            let app_data_dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|error| format!("resolve app data directory failed: {error}"))?;
-            services::app_paths::initialize(services::app_paths::mobile_root(&app_data_dir))?;
-            let app_data_dir = services::app_paths::app_storage_dir()?;
-            commands::history_db::initialize_history_db()?;
-            if let Err(error) = commands::settings::initialize_system_proxy_from_db() {
-                eprintln!("failed to initialize system proxy state: {error}");
-            }
-            let memory_store = Arc::new(
-                services::memory::MemoryStore::open()
-                    .map_err(|error| format!("initialize XAgent memory store failed: {error}"))?,
-            );
-            app.manage(memory_store);
-            let automation_store = Arc::new(
-                services::automation::AutomationStore::open()
-                    .map_err(|error| format!("initialize XAgent automation store failed: {error}"))?,
-            );
-            let cloud_secret_vault = Arc::new(
-                services::cloud_secret_vault::CloudSecretVault::new(app_data_dir.clone())?,
-            );
-            let provider_oauth = Arc::new(
-                services::provider_oauth::ProviderOAuthService::new(Arc::clone(
-                    &cloud_secret_vault,
-                ))?,
-            );
-            let lan_pc_client = Arc::new(services::lan_pc_client::LanPcClient::new(
-                Arc::clone(&cloud_secret_vault),
-            )?);
-            let automation_scheduler = Arc::new(
-                services::automation::AutomationScheduler::new(
-                    Arc::clone(&automation_store),
-                    app.handle().clone(),
-                    Arc::clone(&lan_pc_client),
-                ),
-            );
-            automation_store.set_notifier(services::automation::AutomationNotifier {
-                app_handle: app.handle().clone(),
-                scheduler: Arc::downgrade(&automation_scheduler),
+            let app_handle = app.handle().clone();
+            let startup_state = app
+                .state::<Arc<commands::app::MobileStartupState>>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                startup_state.finish(initialize_mobile_services(app_handle));
             });
-            app.manage(Arc::clone(&automation_store));
-            app.manage(Arc::clone(&automation_scheduler));
-            app.manage(Arc::clone(&cloud_secret_vault));
-            app.manage(Arc::clone(&provider_oauth));
-            app.manage(Arc::clone(&lan_pc_client));
-            app.manage(Arc::new(
-                services::cloud_execution::CloudExecutionService::new(app_data_dir)?,
-            ));
-            app.manage(services::proxy::start_proxy_server(provider_oauth)?);
-            if let Err(error) = services::skills::ensure_builtin_agent_skills_sync() {
-                eprintln!("failed to seed builtin skills: {error}");
-            }
-            Arc::clone(&automation_scheduler).start();
             Ok(())
         })
         .invoke_handler(app_invoke_handler!())

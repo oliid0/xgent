@@ -2,6 +2,7 @@ import AVFoundation
 import CoreLocation
 import EventKit
 import Foundation
+import MessageUI
 import Photos
 import Speech
 import Tauri
@@ -14,6 +15,39 @@ private struct PermissionRequestArgs: Decodable {
     let permissions: [String]?
 }
 
+private struct CalendarRangeArgs: Decodable {
+    let startMs: Int64
+    let endMs: Int64
+    let limit: UInt16
+}
+
+private struct ReminderListArgs: Decodable {
+    let incompleteOnly: Bool
+    let limit: UInt16
+}
+
+private struct CreateCalendarEventArgs: Decodable {
+    let title: String
+    let startMs: Int64
+    let endMs: Int64
+    let allDay: Bool
+    let location: String?
+    let notes: String?
+}
+
+private struct CreateReminderArgs: Decodable {
+    let title: String
+    let dueMs: Int64?
+    let notes: String?
+}
+
+private struct ComposeMessageArgs: Decodable {
+    let kind: String
+    let recipients: [String]
+    let subject: String?
+    let body: String?
+}
+
 private enum PermissionAlias {
     static let microphone = "microphone"
     static let calendar = "calendar"
@@ -22,7 +56,9 @@ private enum PermissionAlias {
     static let location = "location"
 }
 
-final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate {
+final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
+    MFMailComposeViewControllerDelegate, MFMessageComposeViewControllerDelegate
+{
     private let eventStore = EKEventStore()
     private let locationManager = CLLocationManager()
     private var locationPermissionInvokes: [Invoke] = []
@@ -130,6 +166,212 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate {
                 locale: effectiveLocale.identifier
             )
         }
+    }
+
+    @objc func listCalendarEvents(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(CalendarRangeArgs.self)
+        guard canReadEvents(.event) else {
+            invoke.reject("Full calendar access is required before reading events")
+            return
+        }
+        let start = date(milliseconds: args.startMs)
+        let end = date(milliseconds: args.endMs)
+        guard end > start else {
+            invoke.reject("Calendar range end must be after start")
+            return
+        }
+        let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: nil)
+        let events = eventStore.events(matching: predicate)
+            .sorted { $0.startDate < $1.startDate }
+            .prefix(clampedLimit(args.limit))
+            .map { event in
+                [
+                    "id": event.eventIdentifier ?? "",
+                    "title": event.title ?? "Untitled event",
+                    "startMs": milliseconds(event.startDate),
+                    "endMs": milliseconds(event.endDate),
+                    "allDay": event.isAllDay,
+                    "location": event.location.map { $0 as Any } ?? NSNull(),
+                    "notes": event.notes.map { $0 as Any } ?? NSNull(),
+                    "calendar": event.calendar?.title.map { $0 as Any } ?? NSNull(),
+                ] as [String: Any]
+            }
+        invoke.resolve(Array(events))
+    }
+
+    @objc func listReminders(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(ReminderListArgs.self)
+        guard canReadEvents(.reminder) else {
+            invoke.reject("Full reminders access is required before reading reminders")
+            return
+        }
+        let predicate = eventStore.predicateForReminders(in: nil)
+        eventStore.fetchReminders(matching: predicate) { [weak self] reminders in
+            guard let self else {
+                invoke.reject("The reminders service is unavailable")
+                return
+            }
+            let payload = (reminders ?? [])
+                .filter { !args.incompleteOnly || !$0.isCompleted }
+                .sorted { lhs, rhs in
+                    let left = self.reminderDueDate(lhs) ?? .distantFuture
+                    let right = self.reminderDueDate(rhs) ?? .distantFuture
+                    if left == right { return (lhs.title ?? "") < (rhs.title ?? "") }
+                    return left < right
+                }
+                .prefix(self.clampedLimit(args.limit))
+                .map { reminder in
+                    [
+                        "id": reminder.calendarItemIdentifier,
+                        "title": reminder.title ?? "Untitled reminder",
+                        "dueMs": self.reminderDueDate(reminder)
+                            .map { self.milliseconds($0) as Any } ?? NSNull(),
+                        "completed": reminder.isCompleted,
+                        "notes": reminder.notes.map { $0 as Any } ?? NSNull(),
+                        "list": reminder.calendar?.title.map { $0 as Any } ?? NSNull(),
+                    ] as [String: Any]
+                }
+            invoke.resolve(Array(payload))
+        }
+    }
+
+    @objc func createCalendarEvent(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(CreateCalendarEventArgs.self)
+        let title = args.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let start = date(milliseconds: args.startMs)
+        let end = date(milliseconds: args.endMs)
+        guard !title.isEmpty, end > start else {
+            invoke.reject("A title and an end after the start are required")
+            return
+        }
+        guard canWriteEvents(.event), let calendar = eventStore.defaultCalendarForNewEvents else {
+            invoke.reject("Calendar write access and a writable default calendar are required")
+            return
+        }
+        let event = EKEvent(eventStore: eventStore)
+        event.calendar = calendar
+        event.title = title
+        event.startDate = start
+        event.endDate = end
+        event.isAllDay = args.allDay
+        event.location = normalized(args.location)
+        event.notes = normalized(args.notes)
+        do {
+            try eventStore.save(event, span: .thisEvent, commit: true)
+            invoke.resolve([
+                "id": event.eventIdentifier.map { $0 as Any } ?? NSNull(),
+                "presented": false,
+                "detail": "Calendar event saved to \(calendar.title)",
+            ])
+        } catch {
+            invoke.reject("Unable to save calendar event: \(error.localizedDescription)")
+        }
+    }
+
+    @objc func createReminder(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(CreateReminderArgs.self)
+        let title = args.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else {
+            invoke.reject("A reminder title is required")
+            return
+        }
+        guard canWriteEvents(.reminder), let calendar = eventStore.defaultCalendarForNewReminders()
+        else {
+            invoke.reject("Reminders write access and a writable default list are required")
+            return
+        }
+        let reminder = EKReminder(eventStore: eventStore)
+        reminder.calendar = calendar
+        reminder.title = title
+        reminder.notes = normalized(args.notes)
+        if let dueMs = args.dueMs {
+            reminder.dueDateComponents = Calendar.current.dateComponents(
+                [.calendar, .timeZone, .year, .month, .day, .hour, .minute, .second],
+                from: date(milliseconds: dueMs)
+            )
+        }
+        do {
+            try eventStore.save(reminder, commit: true)
+            invoke.resolve([
+                "id": reminder.calendarItemIdentifier,
+                "presented": false,
+                "detail": "Reminder saved to \(calendar.title)",
+            ])
+        } catch {
+            invoke.reject("Unable to save reminder: \(error.localizedDescription)")
+        }
+    }
+
+    @objc func composeMessage(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(ComposeMessageArgs.self)
+        let recipients = args.recipients
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard let presenter = Self.topViewController() else {
+            invoke.reject("Could not present the system composer")
+            return
+        }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                invoke.reject("The system composer is unavailable")
+                return
+            }
+            if args.kind == "email" {
+                guard MFMailComposeViewController.canSendMail() else {
+                    invoke.reject("No configured mail account can present the iOS mail composer")
+                    return
+                }
+                let composer = MFMailComposeViewController()
+                composer.mailComposeDelegate = self
+                composer.setToRecipients(recipients)
+                if let subject = self.normalized(args.subject) { composer.setSubject(subject) }
+                if let body = self.normalized(args.body) {
+                    composer.setMessageBody(body, isHTML: false)
+                }
+                presenter.present(composer, animated: true) {
+                    invoke.resolve([
+                        "id": NSNull(),
+                        "presented": true,
+                        "detail": "Mail draft opened for review; the user must send or cancel it",
+                    ])
+                }
+                return
+            }
+            guard args.kind == "sms" else {
+                invoke.reject("Message kind must be email or sms")
+                return
+            }
+            guard MFMessageComposeViewController.canSendText() else {
+                invoke.reject("SMS composition is unavailable on this device")
+                return
+            }
+            let composer = MFMessageComposeViewController()
+            composer.messageComposeDelegate = self
+            composer.recipients = recipients
+            composer.body = self.normalized(args.body)
+            presenter.present(composer, animated: true) {
+                invoke.resolve([
+                    "id": NSNull(),
+                    "presented": true,
+                    "detail": "SMS draft opened for review; the user must send or cancel it",
+                ])
+            }
+        }
+    }
+
+    func mailComposeController(
+        _ controller: MFMailComposeViewController,
+        didFinishWith result: MFMailComposeResult,
+        error: Error?
+    ) {
+        controller.dismiss(animated: true)
+    }
+
+    func messageComposeViewController(
+        _ controller: MFMessageComposeViewController,
+        didFinishWith result: MessageComposeResult
+    ) {
+        controller.dismiss(animated: true)
     }
 
     private func beginVoiceInput(
@@ -316,6 +558,62 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate {
         case .notDetermined: return "prompt"
         @unknown default: return "prompt"
         }
+    }
+
+    private func canReadEvents(_ entity: EKEntityType) -> Bool {
+        let state = EKEventStore.authorizationStatus(for: entity)
+        if #available(iOS 17.0, *) {
+            return state == .authorized || state == .fullAccess
+        }
+        return state == .authorized
+    }
+
+    private func canWriteEvents(_ entity: EKEntityType) -> Bool {
+        let state = EKEventStore.authorizationStatus(for: entity)
+        if #available(iOS 17.0, *) {
+            return state == .authorized || state == .fullAccess || state == .writeOnly
+        }
+        return state == .authorized
+    }
+
+    private func date(milliseconds: Int64) -> Date {
+        Date(timeIntervalSince1970: TimeInterval(milliseconds) / 1_000)
+    }
+
+    private func milliseconds(_ date: Date) -> Int64 {
+        Int64((date.timeIntervalSince1970 * 1_000).rounded())
+    }
+
+    private func clampedLimit(_ value: UInt16) -> Int {
+        min(200, max(1, Int(value)))
+    }
+
+    private func reminderDueDate(_ reminder: EKReminder) -> Date? {
+        reminder.dueDateComponents.flatMap { Calendar.current.date(from: $0) }
+    }
+
+    private func normalized(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func topViewController() -> UIViewController? {
+        let root = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .rootViewController
+        var current = root
+        while let presented = current?.presentedViewController {
+            current = presented
+        }
+        if let navigation = current as? UINavigationController {
+            return navigation.visibleViewController ?? navigation
+        }
+        if let tabs = current as? UITabBarController {
+            return tabs.selectedViewController ?? tabs
+        }
+        return current
     }
 
     private func photoPermissionState() -> String {

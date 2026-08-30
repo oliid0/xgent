@@ -7,4 +7,9 @@ permissions = [
   "allow-start-voice-input",
   "allow-check-permissions",
   "allow-request-permissions",
+  "allow-list-calendar-events",
+  "allow-list-reminders",
+  "allow-create-calendar-event",
+  "allow-create-reminder",
+  "allow-compose-message",
 ]

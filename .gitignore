@@ -54,7 +54,8 @@ yy/*
 .ci-artifacts/*
 cc/*
 cc/
-
+*.html
+history.md
 crates/fronted/artifacts/
 crates/fronted/test-results/
 

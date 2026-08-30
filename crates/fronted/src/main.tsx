@@ -2,6 +2,7 @@ import { invoke } from "@xagent/runtime";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { LocalAccessPairingGate } from "./components/local-access/LocalAccessPairingGate";
 import "./index.css";
 import "katex/dist/katex.min.css";
@@ -30,9 +31,11 @@ if (import.meta.env.DEV) {
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <LocalAccessPairingGate>
-      <App />
-    </LocalAccessPairingGate>
+    <AppErrorBoundary>
+      <LocalAccessPairingGate>
+        <App />
+      </LocalAccessPairingGate>
+    </AppErrorBoundary>
   </React.StrictMode>,
 );
 

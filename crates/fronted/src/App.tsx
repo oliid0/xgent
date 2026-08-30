@@ -1,6 +1,8 @@
+import { Center } from "@astryxdesign/core/Center";
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { Spinner } from "@astryxdesign/core/Spinner";
 import { StackItem, VStack } from "@astryxdesign/core/Stack";
 import { ToastViewport } from "@astryxdesign/core/Toast";
 import { Theme } from "@astryxdesign/core/theme";
@@ -27,6 +29,7 @@ import {
 } from "./i18n";
 import { useAppUpdateController } from "./lib/appUpdates";
 import { initAutomation } from "./lib/automation";
+import { type MobileStartupStatus, readMobileStartupStatus } from "./lib/mobileStartup";
 import { setRetryErrorExtension } from "./lib/providers/runtime/streamRetry";
 import {
   inferRuntimePlatform,
@@ -115,6 +118,51 @@ export default function App() {
     !browserRuntime && (runtimePlatform === "android" || runtimePlatform === "ios");
   const compactSettingsDialog = useMediaQuery("(max-width: 768px)") || nativeMobile;
   const desktopBridgeEnabled = browserRuntime || (platformResolved && !nativeMobile);
+  const [mobileStartup, setMobileStartup] = useState<MobileStartupStatus>({
+    phase: "starting",
+    failures: [],
+  });
+
+  useEffect(() => {
+    if (!nativeMobile) return;
+    let cancelled = false;
+    let retryTimer: number | undefined;
+    const deadline = Date.now() + 30_000;
+
+    const poll = async () => {
+      try {
+        const status = await readMobileStartupStatus();
+        if (cancelled) return;
+        if (status.phase !== "starting") {
+          if (status.failures.length > 0) {
+            console.warn("Mobile services started in degraded mode", status.failures);
+          }
+          setMobileStartup(status);
+          return;
+        }
+        if (Date.now() >= deadline) {
+          const failures = ["Native service initialization did not finish within 30 seconds"];
+          console.warn("Mobile services started in degraded mode", failures);
+          setMobileStartup({ phase: "degraded", failures });
+          return;
+        }
+        retryTimer = window.setTimeout(() => void poll(), 100);
+      } catch (error) {
+        if (cancelled) return;
+        console.warn("Unable to read native mobile startup status", error);
+        setMobileStartup({
+          phase: "degraded",
+          failures: [error instanceof Error ? error.message : String(error)],
+        });
+      }
+    };
+
+    void poll();
+    return () => {
+      cancelled = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
+  }, [nativeMobile]);
 
   useEffect(() => {
     if (browserRuntime || !platformResolved || nativeMobile) return;
@@ -327,6 +375,7 @@ export default function App() {
   }, [browserRuntime, desktopBridgeEnabled, settingsReady, settings.closeWindowBehavior]);
 
   useEffect(() => {
+    if (nativeMobile && mobileStartup.phase === "starting") return;
     let cancelled = false;
 
     async function hydrateSettings() {
@@ -365,7 +414,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [mobileStartup.phase, nativeMobile]);
 
   const queueSettingsSave = useCallback(
     (prev: AppSettings, next: AppSettings, fallback: string) => {
@@ -516,6 +565,7 @@ export default function App() {
     messages: appUpdateMessages,
     beforeRestart: beforeAppRestart,
   });
+  const mobileStartupPending = nativeMobile && mobileStartup.phase === "starting";
 
   useEffect(() => {
     if (!desktopBridgeEnabled || nativeMobile || browserRuntime) return;
@@ -569,60 +619,66 @@ export default function App() {
     <Theme theme={xgentChatTheme} mode={effectiveTheme}>
       <ToastViewport position="topEnd" maxVisible={4}>
         <LocaleContext.Provider value={localeContextValue}>
-          <SoulProvider>
-            <AppChrome nativeMobile={nativeMobile}>
-              {settingsReady ? <CronPromptRunner settings={settings} /> : null}
-              {settingsReady ? (
-                <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
-              ) : null}
-              <AppErrorBoundary>
-                <ChatPage
-                  settings={settings}
-                  setSettings={setSettings}
-                  getMcpSettings={getMcpSettings}
-                  getToolPolicies={getToolPolicies}
-                  context={context}
-                  setContext={setContext}
-                  onOpenSettings={openSettings}
-                  onToggleTheme={toggleTheme}
-                  appUpdate={appUpdate}
-                  desktopBridgeEnabled={desktopBridgeEnabled}
-                  lanPcCommandHostReady={lanPcCommandHostReady}
-                  nativeMobile={nativeMobile}
-                  onRunningConversationCountChange={handleRunningConversationCountChange}
-                />
-              </AppErrorBoundary>
-              <Dialog
-                isOpen={settingsOpen}
-                onOpenChange={(isOpen) => {
-                  if (!isOpen) closeSettings();
-                }}
-                purpose="form"
-                variant={compactSettingsDialog ? "fullscreen" : "standard"}
-                width="var(--xagent-settings-dialog-width)"
-                maxHeight={
-                  compactSettingsDialog ? "100dvh" : "var(--xagent-settings-dialog-height)"
-                }
-                padding={0}
-                aria-label={translate("settings.title", settings.locale)}
-              >
+          <AppChrome nativeMobile={nativeMobile}>
+            {mobileStartupPending ? (
+              <Center width="100%" height="100%" padding={8}>
+                <Spinner size="lg" label={translate("chat.loading", effectiveLocale)} />
+              </Center>
+            ) : (
+              <SoulProvider>
+                {settingsReady ? <CronPromptRunner settings={settings} /> : null}
+                {settingsReady ? (
+                  <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
+                ) : null}
                 <AppErrorBoundary>
-                  <SettingsPage
+                  <ChatPage
                     settings={settings}
                     setSettings={setSettings}
-                    reloadSettings={reloadPersistedSettings}
-                    saveState={settingsSaveState}
-                    onBack={closeSettings}
-                    initialSection={settingsSection}
-                    soulCreateRequestId={soulCreateRequestId}
-                    nativeMobile={nativeMobile}
+                    getMcpSettings={getMcpSettings}
+                    getToolPolicies={getToolPolicies}
+                    context={context}
+                    setContext={setContext}
+                    onOpenSettings={openSettings}
+                    onToggleTheme={toggleTheme}
                     appUpdate={appUpdate}
+                    desktopBridgeEnabled={desktopBridgeEnabled}
+                    lanPcCommandHostReady={lanPcCommandHostReady}
+                    nativeMobile={nativeMobile}
+                    onRunningConversationCountChange={handleRunningConversationCountChange}
                   />
                 </AppErrorBoundary>
-              </Dialog>
-              {restartConfirmDialog}
-            </AppChrome>
-          </SoulProvider>
+                <Dialog
+                  isOpen={settingsOpen}
+                  onOpenChange={(isOpen) => {
+                    if (!isOpen) closeSettings();
+                  }}
+                  purpose="form"
+                  variant={compactSettingsDialog ? "fullscreen" : "standard"}
+                  width="var(--xagent-settings-dialog-width)"
+                  maxHeight={
+                    compactSettingsDialog ? "100dvh" : "var(--xagent-settings-dialog-height)"
+                  }
+                  padding={0}
+                  aria-label={translate("settings.title", settings.locale)}
+                >
+                  <AppErrorBoundary>
+                    <SettingsPage
+                      settings={settings}
+                      setSettings={setSettings}
+                      reloadSettings={reloadPersistedSettings}
+                      saveState={settingsSaveState}
+                      onBack={closeSettings}
+                      initialSection={settingsSection}
+                      soulCreateRequestId={soulCreateRequestId}
+                      nativeMobile={nativeMobile}
+                      appUpdate={appUpdate}
+                    />
+                  </AppErrorBoundary>
+                </Dialog>
+                {restartConfirmDialog}
+              </SoulProvider>
+            )}
+          </AppChrome>
         </LocaleContext.Provider>
       </ToastViewport>
     </Theme>

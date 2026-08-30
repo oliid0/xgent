@@ -1,8 +1,10 @@
 use tauri::{command, AppHandle, Runtime};
 
 use crate::models::{
-    MobileAssistantStatus, MobilePermissionRequest, MobilePermissionStates, VoiceInputRequest,
-    VoiceInputResult,
+    CalendarRangeRequest, ComposeMessageRequest, CreateCalendarEventRequest,
+    CreateReminderRequest, MobileActionResult, MobileAssistantStatus, MobileCalendarEvent,
+    MobilePermissionRequest, MobilePermissionStates, MobileReminder, ReminderListRequest,
+    VoiceInputRequest, VoiceInputResult,
 };
 use crate::{MobileAssistantExt, Result};
 
@@ -32,4 +34,44 @@ pub(crate) async fn request_permissions<R: Runtime>(
     request: MobilePermissionRequest,
 ) -> Result<MobilePermissionStates> {
     app.mobile_assistant().request_permissions(request)
+}
+
+#[command]
+pub(crate) async fn list_calendar_events<R: Runtime>(
+    app: AppHandle<R>,
+    request: CalendarRangeRequest,
+) -> Result<Vec<MobileCalendarEvent>> {
+    app.mobile_assistant().list_calendar_events(request)
+}
+
+#[command]
+pub(crate) async fn list_reminders<R: Runtime>(
+    app: AppHandle<R>,
+    request: ReminderListRequest,
+) -> Result<Vec<MobileReminder>> {
+    app.mobile_assistant().list_reminders(request)
+}
+
+#[command]
+pub(crate) async fn create_calendar_event<R: Runtime>(
+    app: AppHandle<R>,
+    request: CreateCalendarEventRequest,
+) -> Result<MobileActionResult> {
+    app.mobile_assistant().create_calendar_event(request)
+}
+
+#[command]
+pub(crate) async fn create_reminder<R: Runtime>(
+    app: AppHandle<R>,
+    request: CreateReminderRequest,
+) -> Result<MobileActionResult> {
+    app.mobile_assistant().create_reminder(request)
+}
+
+#[command]
+pub(crate) async fn compose_message<R: Runtime>(
+    app: AppHandle<R>,
+    request: ComposeMessageRequest,
+) -> Result<MobileActionResult> {
+    app.mobile_assistant().compose_message(request)
 }

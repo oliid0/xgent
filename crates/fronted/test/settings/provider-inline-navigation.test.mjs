@@ -6,6 +6,10 @@ const providersSource = await readFile(
   new URL("../../src/pages/settings/ProvidersSection.tsx", import.meta.url),
   "utf8",
 );
+const secretTextInputSource = await readFile(
+  new URL("../../src/pages/settings/SecretTextInput.tsx", import.meta.url),
+  "utf8",
+);
 const settingsPageSource = await readFile(
   new URL("../../src/pages/SettingsPage.tsx", import.meta.url),
   "utf8",
@@ -51,10 +55,11 @@ test("provider editor and advanced settings drill into the existing settings con
   );
 });
 
-test("provider API key uses one native Astryx password field", () => {
-  assert.match(providersSource, /<TextInput\s+type="password"\s+label=\{/);
-  assert.doesNotMatch(providersSource, /setShowApiKey/);
-  assert.doesNotMatch(providersSource, /type=\{showApiKey \? "text" : "password"\}/);
+test("provider API key uses the shared Astryx secret-field composition", () => {
+  assert.match(providersSource, /<SecretTextInput\s+label=\{/);
+  assert.match(secretTextInputSource, /<InputGroup[\s\S]*?<TextInput[\s\S]*?<IconButton/);
+  assert.match(secretTextInputSource, /type=\{visible \? "text" : "password"\}/);
+  assert.match(secretTextInputSource, /label=\{visibilityLabel\}/);
 });
 
 test("settings navigation is flat and hides removed project, skill, and MCP entries", () => {

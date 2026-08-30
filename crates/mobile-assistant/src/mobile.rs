@@ -5,8 +5,10 @@ use tauri::{
 };
 
 use crate::models::{
-    MobileAssistantStatus, MobilePermissionRequest, MobilePermissionStates, VoiceInputRequest,
-    VoiceInputResult,
+    CalendarRangeRequest, ComposeMessageRequest, CreateCalendarEventRequest,
+    CreateReminderRequest, MobileActionResult, MobileAssistantStatus, MobileCalendarEvent,
+    MobilePermissionRequest, MobilePermissionStates, MobileReminder, ReminderListRequest,
+    VoiceInputRequest, VoiceInputResult,
 };
 
 #[cfg(target_os = "ios")]
@@ -95,6 +97,51 @@ impl<R: Runtime> MobileAssistant<R> {
             native,
             &status.permission_aliases,
         ))
+    }
+
+    pub fn list_calendar_events(
+        &self,
+        request: CalendarRangeRequest,
+    ) -> crate::Result<Vec<MobileCalendarEvent>> {
+        self.0
+            .run_mobile_plugin("listCalendarEvents", request)
+            .map_err(Into::into)
+    }
+
+    pub fn list_reminders(
+        &self,
+        request: ReminderListRequest,
+    ) -> crate::Result<Vec<MobileReminder>> {
+        self.0
+            .run_mobile_plugin("listReminders", request)
+            .map_err(Into::into)
+    }
+
+    pub fn create_calendar_event(
+        &self,
+        request: CreateCalendarEventRequest,
+    ) -> crate::Result<MobileActionResult> {
+        self.0
+            .run_mobile_plugin("createCalendarEvent", request)
+            .map_err(Into::into)
+    }
+
+    pub fn create_reminder(
+        &self,
+        request: CreateReminderRequest,
+    ) -> crate::Result<MobileActionResult> {
+        self.0
+            .run_mobile_plugin("createReminder", request)
+            .map_err(Into::into)
+    }
+
+    pub fn compose_message(
+        &self,
+        request: ComposeMessageRequest,
+    ) -> crate::Result<MobileActionResult> {
+        self.0
+            .run_mobile_plugin("composeMessage", request)
+            .map_err(Into::into)
     }
 }
 

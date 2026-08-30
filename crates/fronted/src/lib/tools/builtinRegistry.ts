@@ -31,6 +31,7 @@ import { createFsTools } from "./fsTools";
 import { createMcpManagerTools } from "./mcpManagerTools";
 import { createMcpTools } from "./mcpTools";
 import { createMemoryTools } from "./memoryTools";
+import { createMobilePersonalAssistantTools } from "./mobilePersonalAssistantTools";
 import { createExitPlanModeTools, isPlanModeAllowedTool } from "./planModeTools";
 import { resolveRuntimeToolCapabilities, resolveRuntimeToolHost } from "./runtimeToolCapabilities";
 import { createShellTools, type ShellSandboxSettings } from "./shellTools";
@@ -272,6 +273,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       workdir: params.workdir,
       mode: params.memoryToolMode ?? "rw",
     }),
+    ...(runtimeToolHost === "native-mobile" ? [createMobilePersonalAssistantTools()] : []),
     createBrowserUseTools({
       delegateToLanPc: {
         enabled:

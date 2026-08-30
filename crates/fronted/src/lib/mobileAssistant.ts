@@ -31,6 +31,32 @@ export type VoiceInputResult = {
   confidence?: number | null;
 };
 
+export type MobileCalendarEvent = {
+  id: string;
+  title: string;
+  startMs: number;
+  endMs: number;
+  allDay: boolean;
+  location?: string | null;
+  notes?: string | null;
+  calendar?: string | null;
+};
+
+export type MobileReminder = {
+  id: string;
+  title: string;
+  dueMs?: number | null;
+  completed: boolean;
+  notes?: string | null;
+  list?: string | null;
+};
+
+export type MobileActionResult = {
+  id?: string | null;
+  presented: boolean;
+  detail: string;
+};
+
 const PLUGIN_COMMAND = "plugin:mobile-assistant|";
 
 export function mobileAssistantStatus() {
@@ -69,4 +95,50 @@ export function startMobileVoiceInput(locale?: string) {
   return invoke<VoiceInputResult>(`${PLUGIN_COMMAND}start_voice_input`, {
     request: { locale: locale || null },
   });
+}
+
+export function listMobileCalendarEvents(request: {
+  startMs: number;
+  endMs: number;
+  limit?: number;
+}) {
+  return invoke<MobileCalendarEvent[]>(`${PLUGIN_COMMAND}list_calendar_events`, {
+    request: { ...request, limit: request.limit ?? 50 },
+  });
+}
+
+export function listMobileReminders(request: { incompleteOnly?: boolean; limit?: number } = {}) {
+  return invoke<MobileReminder[]>(`${PLUGIN_COMMAND}list_reminders`, {
+    request: { incompleteOnly: request.incompleteOnly ?? true, limit: request.limit ?? 50 },
+  });
+}
+
+export function createMobileCalendarEvent(request: {
+  title: string;
+  startMs: number;
+  endMs: number;
+  allDay?: boolean;
+  location?: string | null;
+  notes?: string | null;
+}) {
+  return invoke<MobileActionResult>(`${PLUGIN_COMMAND}create_calendar_event`, {
+    request: { ...request, allDay: request.allDay ?? false },
+  });
+}
+
+export function createMobileReminder(request: {
+  title: string;
+  dueMs?: number | null;
+  notes?: string | null;
+}) {
+  return invoke<MobileActionResult>(`${PLUGIN_COMMAND}create_reminder`, { request });
+}
+
+export function composeMobileMessage(request: {
+  kind: "email" | "sms";
+  recipients: string[];
+  subject?: string | null;
+  body?: string | null;
+}) {
+  return invoke<MobileActionResult>(`${PLUGIN_COMMAND}compose_message`, { request });
 }

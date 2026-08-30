@@ -38,6 +38,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::start_voice_input,
             commands::check_permissions,
             commands::request_permissions,
+            commands::list_calendar_events,
+            commands::list_reminders,
+            commands::create_calendar_event,
+            commands::create_reminder,
+            commands::compose_message,
         ])
         .setup(|app, api| {
             #[cfg(mobile)]

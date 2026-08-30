@@ -3,8 +3,10 @@ use std::marker::PhantomData;
 use tauri::{plugin::PluginApi, AppHandle, Runtime};
 
 use crate::models::{
-    MobileAssistantBackend, MobileAssistantStatus, MobilePermissionRequest,
-    MobilePermissionStates, VoiceInputRequest, VoiceInputResult,
+    CalendarRangeRequest, ComposeMessageRequest, CreateCalendarEventRequest,
+    CreateReminderRequest, MobileActionResult, MobileAssistantBackend, MobileAssistantStatus,
+    MobileCalendarEvent, MobilePermissionRequest, MobilePermissionStates, MobileReminder,
+    ReminderListRequest, VoiceInputRequest, VoiceInputResult,
 };
 use crate::{Error, Result};
 
@@ -52,5 +54,40 @@ impl<R: Runtime> MobileAssistant<R> {
         Err(Error::Unavailable(
             "native permissions are only available on Android and iOS".into(),
         ))
+    }
+
+    pub fn list_calendar_events(
+        &self,
+        _request: CalendarRangeRequest,
+    ) -> Result<Vec<MobileCalendarEvent>> {
+        Err(Error::Unavailable("calendar access is only available on mobile".into()))
+    }
+
+    pub fn list_reminders(
+        &self,
+        _request: ReminderListRequest,
+    ) -> Result<Vec<MobileReminder>> {
+        Err(Error::Unavailable("reminder access is only available on mobile".into()))
+    }
+
+    pub fn create_calendar_event(
+        &self,
+        _request: CreateCalendarEventRequest,
+    ) -> Result<MobileActionResult> {
+        Err(Error::Unavailable("calendar access is only available on mobile".into()))
+    }
+
+    pub fn create_reminder(
+        &self,
+        _request: CreateReminderRequest,
+    ) -> Result<MobileActionResult> {
+        Err(Error::Unavailable("reminder access is only available on mobile".into()))
+    }
+
+    pub fn compose_message(
+        &self,
+        _request: ComposeMessageRequest,
+    ) -> Result<MobileActionResult> {
+        Err(Error::Unavailable("system composers are only available on mobile".into()))
     }
 }
