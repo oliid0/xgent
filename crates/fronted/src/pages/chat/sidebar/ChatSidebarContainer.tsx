@@ -14,7 +14,7 @@ import {
   searchChatHistory,
 } from "../../../lib/chat/history/chatHistory";
 import { normalizeConversationTitle } from "../../../lib/chat/page/chatPageHelpers";
-import type { WorkspaceProject, WorkspaceProjectGroup } from "../../../lib/settings";
+import type { ExecutionMode, WorkspaceProject, WorkspaceProjectGroup } from "../../../lib/settings";
 import {
   selectConversations,
   selectListState,
@@ -75,6 +75,8 @@ type ChatSidebarContainerProps = {
   onConversationDeleted: (id: string) => void;
   onConversationCwdChanged: (id: string, cwd: string) => void;
   onCloseSidebar: () => void;
+  executionMode: ExecutionMode;
+  onSelectExecutionMode: (mode: ExecutionMode) => void;
   onOpenSettings: () => void;
   onCreateSoul: () => void;
   appUpdate?: AppUpdateController;
@@ -345,6 +347,8 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         onDeleteConversations={handleDeleteConversations}
         onLoadMore={handleLoadMore}
         onCloseSidebar={props.onCloseSidebar}
+        executionMode={props.executionMode}
+        onSelectExecutionMode={props.onSelectExecutionMode}
         onOpenSettings={props.onOpenSettings}
         onCreateSoul={props.onCreateSoul}
         appUpdate={props.appUpdate}

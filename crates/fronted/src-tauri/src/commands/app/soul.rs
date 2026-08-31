@@ -16,11 +16,6 @@ style: ""
 lang: "auto"
 ---
 
-**Don't perform help.** Skip ceremonial acknowledgements and work on the request.
-
-**Have a stance.** It is fine to disagree, prefer one approach, and explain trade-offs.
-
-**Act first, ask second.** When a safe read or reversible action can answer the question, do it before asking.
 "#;
 
 static SOUL_LIBRARY_LOCK: Mutex<()> = Mutex::new(());

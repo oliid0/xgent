@@ -16,6 +16,14 @@ const composerSource = readFileSync(
 );
 const chatPageSource = readFileSync(new URL("../../src/pages/ChatPage.tsx", import.meta.url), "utf8");
 const appStyles = readFileSync(new URL("../../src/index.css", import.meta.url), "utf8");
+const sidebarSource = readFileSync(
+  new URL("../../src/components/chat/ChatHistorySidebar.tsx", import.meta.url),
+  "utf8",
+);
+const railSource = readFileSync(
+  new URL("../../src/components/workspace-tools/WorkspaceNavigationRail.tsx", import.meta.url),
+  "utf8",
+);
 
 const visibleExecutionModes = ["text", "tools"];
 
@@ -45,6 +53,34 @@ test("execution mode switchers use Astryx single-select semantics", () => {
     assert.match(headerSource, new RegExp(`<SegmentedControlItem value="${mode}"`));
   }
   assert.match(headerSource, /onChange=\{\(value\) => onSelectExecutionMode/);
+});
+
+test("expanded sidebar owns mode, search, and collapse controls", () => {
+  assert.match(sidebarSource, /className="chat-sidebar-mode-bar/);
+  assert.match(sidebarSource, /<SegmentedControl/);
+  assert.match(sidebarSource, /label=\{t\("chat\.history\.search"\)\}/);
+  assert.match(sidebarSource, /label=\{t\("sidebar\.closeSidebar"\)\}/);
+  assert.match(chatPageSource, /className="workspace-navigation-rail-shell"/);
+  assert.match(appStyles, /\.workspace-navigation-rail-shell\[data-panel-open="true"\]/);
+});
+
+test("permanent rail keeps hubs and files while duplicate workspace tools stay in the Soul menu", () => {
+  const railItems = railSource.slice(
+    railSource.indexOf("const items: RailItem[]"),
+    railSource.indexOf("const selectFromSoulMenu"),
+  );
+  assert.match(railItems, /target: "conversations"/);
+  assert.match(railItems, /target: "mcp"/);
+  assert.match(railItems, /target: "skills"/);
+  assert.match(railItems, /target: "fileTree"/);
+  for (const target of ["terminal", "gitReview", "sshConnection", "backgroundTasks"]) {
+    assert.doesNotMatch(railItems, new RegExp(`target: "${target}"`));
+    if (target === "terminal") {
+      assert.match(railSource, /selectFromSoulMenu\("terminal"\)/);
+    } else {
+      assert.match(railSource, new RegExp(`target: "${target}"`));
+    }
+  }
 });
 
 test("popover interactions preserve mode changes and close after model selection", () => {

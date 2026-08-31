@@ -34,7 +34,7 @@ test("AskUserQuestion pauses until the matching conversation submits an answer",
     ask.answerAskUserQuestion(
       "ask-answer",
       [{ questionId: "style", selectedLabel: "活泼" }],
-      "conversation-1",
+      { conversationId: "conversation-1" },
     ),
     { ok: true },
   );
@@ -43,7 +43,7 @@ test("AskUserQuestion pauses until the matching conversation submits an answer",
   assert.equal(result.isError, false);
   assert.equal(result.details.kind, "ask_user_question");
   assert.equal(result.details.answers[0].selectedLabel, "活泼");
-  assert.match(result.content[0].text, /Treat these selections as authoritative/);
+  assert.match(result.content[0].text, /Their selections are final .* proceed accordingly/);
 });
 
 test("AskUserQuestion rejects an answer from another conversation without settling", async () => {
@@ -56,7 +56,7 @@ test("AskUserQuestion rejects an answer from another conversation without settli
   const rejected = ask.answerAskUserQuestion(
     "ask-scope",
     [{ questionId: "style", selectedLabel: "简洁" }],
-    "conversation-other",
+    { conversationId: "conversation-other" },
   );
   assert.equal(rejected.ok, false);
 
@@ -64,7 +64,7 @@ test("AskUserQuestion rejects an answer from another conversation without settli
     ask.answerAskUserQuestion(
       "ask-scope",
       [{ questionId: "style", selectedLabel: "简洁" }],
-      "conversation-2",
+      { conversationId: "conversation-2" },
     ).ok,
     true,
   );
@@ -94,4 +94,40 @@ test("AskUserQuestion abort releases the pending execution as cancelled", async 
   const result = await pending;
   assert.equal(result.isError, true);
   assert.equal(result.details.cancelled, true);
+  assert.equal(
+    result.content[0].text,
+    "The user stopped the turn without answering. Do not assume any selection.",
+  );
+});
+
+test("AskUserQuestion accepts different option counts for independent questions like xx", () => {
+  const loader = createTsModuleLoader();
+  const askModel = loader.loadModule("src/lib/chat/askUserQuestion.ts");
+  const questions = askModel.parseAskUserQuestionItems([
+    {
+      prompt: "Choose a platform",
+      options: [{ label: "Web" }, { label: "Desktop" }],
+    },
+    {
+      prompt: "Choose a tone",
+      options: [{ label: "Quiet" }, { label: "Bold" }, { label: "Playful" }],
+    },
+  ]);
+  assert.deepEqual(questions.map((question) => question.options.length), [2, 3]);
+});
+
+test("AskUserQuestion validation feedback matches xx exactly", () => {
+  const loader = createTsModuleLoader();
+  const askModel = loader.loadModule("src/lib/chat/askUserQuestion.ts");
+  assert.throws(
+    () =>
+      askModel.parseAskUserQuestionItems([
+        { prompt: "One", options: [{ label: "A" }, { label: "B" }] },
+        { prompt: "Two", options: [{ label: "A" }, { label: "B" }] },
+        { prompt: "Three", options: [{ label: "A" }, { label: "B" }] },
+        { prompt: "Four", options: [{ label: "A" }, { label: "B" }] },
+        { prompt: "Five", options: [{ label: "A" }, { label: "B" }] },
+      ]),
+    /supports at most 4 questions per call; got 5\./,
+  );
 });

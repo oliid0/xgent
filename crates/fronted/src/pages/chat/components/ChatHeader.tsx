@@ -2,6 +2,7 @@ import { Grid } from "@astryxdesign/core/Grid";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { HStack } from "@astryxdesign/core/Stack";
+import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { memo, type ReactNode } from "react";
 
 import { MonitorSmartphone, Moon, PanelLeft, Sun } from "../../../components/icons";
@@ -26,6 +27,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
   onSelectExecutionMode: (mode: ExecutionMode) => void;
   onToggleTheme: () => void;
   onOpenSidebar: () => void;
+  showExecutionMode?: boolean;
   mobileExperience?: boolean;
   preThemeActions?: ReactNode;
   trailingActions?: ReactNode;
@@ -36,6 +38,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
     onSelectExecutionMode,
     onToggleTheme,
     onOpenSidebar,
+    showExecutionMode = true,
     mobileExperience = false,
     preThemeActions,
     trailingActions,
@@ -62,55 +65,80 @@ export const ChatHeader = memo(function ChatHeader(props: {
       gap={0}
       style={{
         paddingBlockStart: mobileExperience
-          ? "calc(var(--spacing-2) + env(safe-area-inset-top, 0px))"
+          ? "env(safe-area-inset-top, 0px)"
           : "var(--spacing-2-5)",
-        paddingBlockEnd: mobileExperience ? "var(--spacing-2)" : "var(--spacing-2-5)",
-        paddingInlineEnd: mobileExperience
-          ? "max(var(--spacing-3), env(safe-area-inset-right, 0px))"
-          : "var(--spacing-4)",
+        paddingBlockEnd: mobileExperience ? 0 : "var(--spacing-2-5)",
+        paddingInlineEnd: mobileExperience ? "env(safe-area-inset-right, 0px)" : "var(--spacing-4)",
         paddingInlineStart:
           !sidebarOpen && macOsTauri
             ? "var(--xagent-macos-titlebar-inset)"
             : mobileExperience
-              ? "max(var(--spacing-3), env(safe-area-inset-left, 0px))"
+              ? "env(safe-area-inset-left, 0px)"
               : "var(--spacing-4)",
       }}
     >
-      <Grid
-        columns={3}
-        width="100%"
-        align="center"
-        style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(max-content, 1fr)" }}
-      >
-        <HStack gap={1} vAlign="center" hAlign="start">
-          {mobileExperience && !sidebarOpen && !macOsTauri ? (
-            <IconButton
-              label={t("tooltip.openSidebar")}
-              tooltip={t("tooltip.openSidebar")}
-              icon={<PanelLeft size={20} />}
-              variant="ghost"
-              size="lg"
-              onClick={onOpenSidebar}
-            />
-          ) : null}
-        </HStack>
-
-        <HStack hAlign="center" vAlign="center">
-          <SegmentedControl
-            value={visibleExecutionMode}
-            onChange={(value) => onSelectExecutionMode(value as "text" | "tools")}
-            label={t("settings.executionMode")}
-            layout="fill"
-            size={mobileExperience ? "sm" : "md"}
-          >
-            <SegmentedControlItem value="text" label={t("chat.mode.chat")} />
-            <SegmentedControlItem value="tools" label={t("chat.mode.agent")} />
-          </SegmentedControl>
-        </HStack>
-
-        <HStack gap={1} vAlign="center" hAlign="end" style={{ minWidth: "max-content" }}>
-          {!mobileExperience ? preThemeActions : null}
-          {!mobileExperience ? (
+      {mobileExperience ? (
+        <Toolbar
+          label={t("settings.executionMode")}
+          size="lg"
+          gap={1}
+          className="w-full"
+          startContent={
+            <HStack gap={1} vAlign="center" hAlign="start">
+              {!sidebarOpen && !macOsTauri ? (
+                <IconButton
+                  label={t("tooltip.openSidebar")}
+                  tooltip={t("tooltip.openSidebar")}
+                  icon={<PanelLeft size={20} />}
+                  variant="ghost"
+                  onClick={onOpenSidebar}
+                />
+              ) : null}
+            </HStack>
+          }
+          centerContent={
+            showExecutionMode ? (
+              <SegmentedControl
+                value={visibleExecutionMode}
+                onChange={(value) => onSelectExecutionMode(value as "text" | "tools")}
+                label={t("settings.executionMode")}
+                layout="fill"
+              >
+                <SegmentedControlItem value="text" label={t("chat.mode.chat")} />
+                <SegmentedControlItem value="tools" label={t("chat.mode.agent")} />
+              </SegmentedControl>
+            ) : null
+          }
+          endContent={
+            <HStack gap={1} vAlign="center" hAlign="end">
+              {trailingActions}
+            </HStack>
+          }
+        />
+      ) : (
+        <Grid
+          columns={3}
+          width="100%"
+          align="center"
+          style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(max-content, 1fr)" }}
+        >
+          <HStack gap={1} vAlign="center" hAlign="start" />
+          <HStack hAlign="center" vAlign="center">
+            {showExecutionMode ? (
+              <SegmentedControl
+                value={visibleExecutionMode}
+                onChange={(value) => onSelectExecutionMode(value as "text" | "tools")}
+                label={t("settings.executionMode")}
+                layout="fill"
+                size="md"
+              >
+                <SegmentedControlItem value="text" label={t("chat.mode.chat")} />
+                <SegmentedControlItem value="tools" label={t("chat.mode.agent")} />
+              </SegmentedControl>
+            ) : null}
+          </HStack>
+          <HStack gap={1} vAlign="center" hAlign="end" style={{ minWidth: "max-content" }}>
+            {preThemeActions}
             <IconButton
               label={themeToggleTitle}
               tooltip={themeToggleTitle}
@@ -119,10 +147,10 @@ export const ChatHeader = memo(function ChatHeader(props: {
               size="md"
               onClick={onToggleTheme}
             />
-          ) : null}
-          {trailingActions}
-        </HStack>
-      </Grid>
+            {trailingActions}
+          </HStack>
+        </Grid>
+      )}
     </HStack>
   );
 });

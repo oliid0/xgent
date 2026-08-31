@@ -153,7 +153,7 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
       bottomSheetHeight="tall"
     >
       <form onSubmit={(event) => void submit(event)} style={{ minWidth: 0 }}>
-        <VStack gap={4} width="100%" minWidth={0}>
+        <VStack gap={4} className="min-w-0 w-full">
           {cloneAvailable ? (
             <SegmentedControl
               value={mode}

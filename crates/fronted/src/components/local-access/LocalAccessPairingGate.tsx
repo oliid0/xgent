@@ -3,6 +3,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Center } from "@astryxdesign/core/Center";
 import { FormLayout } from "@astryxdesign/core/FormLayout";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { VStack } from "@astryxdesign/core/Layout";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Heading, Text } from "@astryxdesign/core/Text";
@@ -11,7 +12,7 @@ import { Theme } from "@astryxdesign/core/theme";
 import { isBrowserRuntime } from "@xagent/runtime";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { LOCAL_ACCESS_CSRF_KEY, LOCAL_ACCESS_SESSION_CHANGED_EVENT } from "../../runtime/browser";
-import { xgentChatTheme } from "../../theme/xgent-chat";
+import { xgentCompactTheme, xgentTheme } from "../../theme/xgentTheme";
 
 type SessionResponse = {
   authenticated?: boolean;
@@ -29,6 +30,8 @@ async function readJson(response: Response): Promise<SessionResponse> {
 
 export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
   const browser = isBrowserRuntime();
+  const compactViewport = useMediaQuery("(max-width: 768px)");
+  const theme = compactViewport ? xgentCompactTheme : xgentTheme;
   const [state, setState] = useState<"checking" | "pairing" | "ready">(
     browser ? "checking" : "ready",
   );
@@ -101,7 +104,7 @@ export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
   if (!browser || state === "ready") return children;
   if (state === "checking") {
     return (
-      <Theme theme={xgentChatTheme} mode="system">
+      <Theme theme={theme} mode="system">
         <Center minHeight="100dvh" width="100%">
           <VStack gap={3} hAlign="center">
             <Spinner aria-label="正在验证设备" />
@@ -114,7 +117,7 @@ export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
     );
   }
   return (
-    <Theme theme={xgentChatTheme} mode="system">
+    <Theme theme={theme} mode="system">
       <Center
         minHeight="100dvh"
         width="100%"

@@ -4,6 +4,17 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 const loader = createTsModuleLoader();
 const settings = loader.loadModule("src/lib/settings/index.ts");
+const soul = loader.loadModule("src/lib/soul/model.ts");
+
+test("the bundled default Soul contributes no system prompt", () => {
+  const document = soul.parseSoulDocument(
+    soul.serializeSoulDocument({ metadata: soul.DEFAULT_SOUL_METADATA, body: "" }),
+  );
+  assert.equal(soul.buildSoulSystemPrompt(document), "");
+
+  const customized = { ...document, metadata: { ...document.metadata, style: "Concise" } };
+  assert.match(soul.buildSoulSystemPrompt(customized), /Concise/);
+});
 
 test("default settings keep external access and mobile sandboxes closed", () => {
   const value = settings.getDefaultSettings();
@@ -100,7 +111,7 @@ test("provider retry policy and retry-error settings normalize persisted input",
     presetStatusCodes: [520, 520, 524, 527, "bad"],
     customPatterns: [" SSL handshake ", "ssl HANDSHAKE", "", "upstream reset"],
   });
-  assert.deepEqual(retryErrors.presetStatusCodes, [520, 527]);
+  assert.deepEqual(retryErrors.presetStatusCodes, [520, 524, 527]);
   assert.deepEqual(retryErrors.customPatterns, ["ssl HANDSHAKE", "upstream reset"]);
 });
 

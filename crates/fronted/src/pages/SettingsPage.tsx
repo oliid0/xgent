@@ -12,6 +12,7 @@ import {
   VStack,
 } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
+import { Section } from "@astryxdesign/core/Section";
 import { StatusDot, type StatusDotVariant } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -388,85 +389,87 @@ export function SettingsPage(props: SettingsPageProps) {
   if (compactSettings) {
     return (
       <SettingsDetailLayerProvider onLayerChange={handleDetailLayerChange}>
-        <Layout
-          height="fill"
-          padding={0}
-          className="settings-page settings-page-compact"
-          data-edge-swipe-ignore
-          header={
-            detailLayerDepth > 0 ? undefined : (
-              <DialogHeader
-                title={mobileDetailOpen ? sectionLabels[section] : t("settings.title")}
-                hasDivider
-                startContent={
-                  <IconButton
-                    label={
-                      mobileDetailOpen
-                        ? t("settings.mobile.backToSettings")
-                        : t("settings.backToChat")
-                    }
-                    tooltip={
-                      mobileDetailOpen
-                        ? t("settings.mobile.backToSettings")
-                        : t("settings.backToChat")
-                    }
-                    icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
-                    variant="ghost"
-                    onClick={mobileDetailOpen ? () => setMobileDetailOpen(false) : onBack}
-                  />
-                }
-                endContent={<SaveStatus indicator={saveIndicator} />}
-              />
-            )
-          }
-          content={
-            mobileDetailOpen ? (
-              <LayoutContent
-                key={section}
-                data-settings-section={section}
-                padding={3}
-                isScrollable={!sectionManagesScroll}
-                className="settings-section-enter"
-              >
-                <VStack
-                  width="100%"
-                  maxWidth="var(--xagent-settings-content-max-width)"
-                  height="100%"
-                  minHeight={sectionManagesScroll ? 0 : "100%"}
-                  className="settings-section-shell"
-                  style={{ marginInline: "auto" }}
+        <Section variant="muted" width="100%" height="100%" padding={0}>
+          <Layout
+            height="fill"
+            padding={0}
+            className="settings-page settings-page-compact"
+            data-edge-swipe-ignore
+            header={
+              detailLayerDepth > 0 ? undefined : (
+                <DialogHeader
+                  title={mobileDetailOpen ? sectionLabels[section] : t("settings.title")}
+                  hasDivider
+                  startContent={
+                    <IconButton
+                      label={
+                        mobileDetailOpen
+                          ? t("settings.mobile.backToSettings")
+                          : t("settings.backToChat")
+                      }
+                      tooltip={
+                        mobileDetailOpen
+                          ? t("settings.mobile.backToSettings")
+                          : t("settings.backToChat")
+                      }
+                      icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
+                      variant="ghost"
+                      onClick={mobileDetailOpen ? () => setMobileDetailOpen(false) : onBack}
+                    />
+                  }
+                  endContent={<SaveStatus indicator={saveIndicator} />}
+                />
+              )
+            }
+            content={
+              mobileDetailOpen ? (
+                <LayoutContent
+                  key={section}
+                  data-settings-section={section}
+                  padding={4}
+                  isScrollable={!sectionManagesScroll}
+                  className="settings-section-enter"
                 >
-                  {sectionContent}
-                </VStack>
-              </LayoutContent>
-            ) : (
-              <LayoutContent padding={3} label={t("settings.title")}>
-                <VStack
-                  width="100%"
-                  maxWidth="var(--xagent-content-width-md)"
-                  gap={4}
-                  style={{ marginInline: "auto" }}
-                >
-                  <List density="spacious" hasDividers>
-                    {navItems.map((item) => (
-                      <ListItem
-                        key={item.id}
-                        label={item.label}
-                        description={item.description}
-                        startContent={<Icon icon={item.icon} size="md" color="secondary" />}
-                        endContent={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
-                        onClick={() => {
-                          setSection(item.id);
-                          setMobileDetailOpen(true);
-                        }}
-                      />
-                    ))}
-                  </List>
-                </VStack>
-              </LayoutContent>
-            )
-          }
-        />
+                  <VStack
+                    width="100%"
+                    maxWidth="var(--xagent-settings-content-max-width)"
+                    height="100%"
+                    minHeight={sectionManagesScroll ? 0 : "100%"}
+                    className="settings-section-shell"
+                    style={{ marginInline: "auto" }}
+                  >
+                    {sectionContent}
+                  </VStack>
+                </LayoutContent>
+              ) : (
+                <LayoutContent padding={4} label={t("settings.title")}>
+                  <VStack
+                    width="100%"
+                    maxWidth="var(--xagent-content-width-md)"
+                    gap={4}
+                    style={{ marginInline: "auto" }}
+                  >
+                    <List density="spacious" hasDividers>
+                      {navItems.map((item) => (
+                        <ListItem
+                          key={item.id}
+                          label={item.label}
+                          description={item.description}
+                          startContent={<Icon icon={item.icon} size="md" color="secondary" />}
+                          endContent={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
+                          onClick={() => {
+                            setSection(item.id);
+                            setMobileDetailOpen(true);
+                          }}
+                        />
+                      ))}
+                    </List>
+                  </VStack>
+                </LayoutContent>
+              )
+            }
+          />
+        </Section>
       </SettingsDetailLayerProvider>
     );
   }

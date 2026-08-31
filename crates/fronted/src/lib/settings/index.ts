@@ -372,7 +372,9 @@ export const PROVIDER_RETRY_MAX_RETRIES_LIMITS = {
 
 export const PROVIDER_RETRY_DEFAULT_MAX_RETRIES = 5;
 
-export const RETRYABLE_PRESET_HTTP_STATUS_CODES = [520, 521, 522, 523, 525, 526, 527] as const;
+export const RETRYABLE_PRESET_HTTP_STATUS_CODES = [
+  520, 521, 522, 523, 524, 525, 526, 527, 528, 529,
+] as const;
 
 export type RetryErrorSettings = {
   presetStatusCodes: number[];

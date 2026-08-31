@@ -5461,18 +5461,25 @@ export function ChatPage(props: ChatPageProps) {
   return (
     <HStack height="100%" width="100%" gap={0} style={{ position: "relative", overflow: "hidden" }}>
       {!mobileExperience ? (
-        <WorkspaceNavigationRail
-          activeTarget={desktopNavigationTarget}
-          panelOpen={sidebarOpen}
-          workspaceToolsAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
-          fileTreeAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
-          appUpdate={appUpdate}
-          onTogglePanel={handleToggleSidebar}
-          onNewConversation={handleDesktopNewConversation}
-          onSelect={handleDesktopNavigationSelect}
-          onOpenSettings={() => onOpenSettings()}
-          onCreateSoul={() => onOpenSettings("soul", { createSoul: true })}
-        />
+        <HStack
+          data-panel-open={sidebarOpen ? "true" : "false"}
+          aria-hidden={sidebarOpen}
+          inert={sidebarOpen}
+          className="workspace-navigation-rail-shell"
+        >
+          <WorkspaceNavigationRail
+            activeTarget={desktopNavigationTarget}
+            panelOpen={sidebarOpen}
+            workspaceToolsAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
+            fileTreeAvailable={desktopCommandHostAvailable && !terminalDisabledMessage}
+            appUpdate={appUpdate}
+            onTogglePanel={handleToggleSidebar}
+            onNewConversation={handleDesktopNewConversation}
+            onSelect={handleDesktopNavigationSelect}
+            onOpenSettings={() => onOpenSettings()}
+            onCreateSoul={() => onOpenSettings("soul", { createSoul: true })}
+          />
+        </HStack>
       ) : null}
       <MacOsTitleBarToggle
         sidebarOpen={sidebarOpen}
@@ -5543,6 +5550,14 @@ export function ChatPage(props: ChatPageProps) {
         onConversationDeleted={handleConversationDeleted}
         onConversationCwdChanged={handleConversationCwdChanged}
         onCloseSidebar={handleCloseSidebar}
+        executionMode={settings.system.executionMode}
+        onSelectExecutionMode={(mode) =>
+          setSettings((previous) =>
+            previous.system.executionMode === mode
+              ? previous
+              : updateSystem(previous, { executionMode: mode }),
+          )
+        }
         onOpenSettings={() => {
           if (mobileExperience) setSidebarOpen(false);
           onOpenSettings();
@@ -5748,6 +5763,12 @@ export function ChatPage(props: ChatPageProps) {
                     sidebarOpen={sidebarOpen}
                     onToggleTheme={onToggleTheme}
                     onOpenSidebar={handleOpenSidebar}
+                    showExecutionMode={
+                      !(
+                        sidebarOpen &&
+                        (mobileExperience || desktopNavigationTarget === "conversations")
+                      )
+                    }
                     mobileExperience={mobileExperience}
                     preThemeActions={
                       canShowTrajectory ? (

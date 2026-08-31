@@ -983,7 +983,7 @@ pub fn run() {
                     services::local_access::LocalAccessController::new(
                         app.handle().clone(),
                         proxy_server.info(),
-                    ),
+                    )?,
                 );
                 app.manage(Arc::clone(&local_access_controller));
                 let workspace_watch = Arc::new(

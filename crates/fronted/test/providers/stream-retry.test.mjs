@@ -17,6 +17,16 @@ test("retry extension recognizes configured status codes and keywords only", () 
   );
   assert.equal(
     isExtensionRetryableError(
+      createAssistant(undefined, "error", { errorMessage: "bad_response_status_code" }),
+    ),
+    true,
+  );
+  assert.equal(
+    isExtensionRetryableError(createAssistant(undefined, "error", { errorMessage: "HTTP 529" })),
+    true,
+  );
+  assert.equal(
+    isExtensionRetryableError(
       createAssistant(undefined, "error", { errorMessage: "UPSTREAM socket reset" }),
       { statusCodes: [], patterns: ["socket reset"] },
     ),
@@ -28,6 +38,20 @@ test("retry extension recognizes configured status codes and keywords only", () 
       { statusCodes: [525], patterns: [] },
     ),
     false,
+  );
+  assert.equal(
+    isExtensionRetryableError(
+      createAssistant(undefined, "error", { errorMessage: "bad_response_status_code" }),
+      { statusCodes: [], patterns: [] },
+    ),
+    true,
+  );
+  assert.equal(
+    isExtensionRetryableError(
+      createAssistant(undefined, "error", { errorMessage: "HTTP 529" }),
+      { statusCodes: [], patterns: [] },
+    ),
+    true,
   );
 });
 

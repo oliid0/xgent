@@ -6,6 +6,8 @@ export type FloorEntry = {
   messageId: string;
   /** 消息开头若干字符，空白折叠后截断。 */
   preview: string;
+  /** 紧随该用户消息的助手文本预览。 */
+  responsePreview?: string;
 };
 
 /**
@@ -17,6 +19,9 @@ export type FloorSourceItem = {
   key: string;
   text?: string;
   messageRef?: { messageId: string };
+  rounds?: readonly {
+    blocks: readonly { kind: string; text?: string }[];
+  }[];
 };
 
 const PREVIEW_MAX_CHARS = 24;
@@ -37,12 +42,24 @@ export function buildFloorPreview(text: string): string {
  */
 export function buildFloorEntries(items: readonly FloorSourceItem[]): FloorEntry[] {
   const entries: FloorEntry[] = [];
-  for (const item of items) {
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    if (!item) continue;
     if (item.kind !== "user") continue;
+    const assistant = items.slice(index + 1).find((candidate) => candidate.kind !== "summary");
+    const responseText =
+      assistant?.kind === "assistant"
+        ? (assistant.rounds ?? [])
+            .flatMap((round) => round.blocks)
+            .filter((block) => block.kind === "text")
+            .map((block) => block.text ?? "")
+            .join("")
+        : "";
     entries.push({
       rowKey: item.key,
       messageId: item.messageRef?.messageId ?? item.key,
       preview: buildFloorPreview(item.text ?? ""),
+      ...(responseText.trim() ? { responsePreview: buildFloorPreview(responseText) } : {}),
     });
   }
   return entries;

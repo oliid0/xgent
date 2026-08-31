@@ -1,6 +1,7 @@
 import { IconButton } from "@astryxdesign/core/IconButton";
-import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Heading, Text } from "@astryxdesign/core/Text";
+import { Toolbar } from "@astryxdesign/core/Toolbar";
 import type { ReactNode } from "react";
 import { ArrowLeft } from "../../../components/icons";
 import { cn } from "../../../lib/shared/utils";
@@ -47,24 +48,25 @@ export function MobilePanelHeader(props: {
   backLabel: string;
 }) {
   return (
-    <HStack
-      as="header"
-      gap={3}
-      vAlign="center"
-      paddingInline={3}
-      className="mobile-panel-header shrink-0 border-b border-border/55 bg-background/90 backdrop-blur-xl"
-    >
-      <IconButton
-        label={props.backLabel}
-        tooltip={props.backLabel}
-        icon={<ArrowLeft size={20} />}
-        variant="ghost"
-        size="lg"
-        onClick={props.onBack}
-      />
-      {props.leading}
-      <StackItem size="fill">
-        <VStack gap={0.5}>
+    <Toolbar
+      label={props.title}
+      size="lg"
+      dividers={["bottom"]}
+      className="mobile-panel-header shrink-0"
+      startContent={
+        <HStack gap={1} vAlign="center">
+          <IconButton
+            label={props.backLabel}
+            tooltip={props.backLabel}
+            icon={<ArrowLeft size={20} />}
+            variant="ghost"
+            onClick={props.onBack}
+          />
+          {props.leading}
+        </HStack>
+      }
+      centerContent={
+        <VStack gap={0.5} hAlign="center">
           <Heading level={2} maxLines={1}>
             {props.title}
           </Heading>
@@ -74,8 +76,8 @@ export function MobilePanelHeader(props: {
             </Text>
           ) : null}
         </VStack>
-      </StackItem>
-      {props.actions}
-    </HStack>
+      }
+      endContent={props.actions ? <HStack gap={1}>{props.actions}</HStack> : undefined}
+    />
   );
 }

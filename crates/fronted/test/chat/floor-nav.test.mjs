@@ -44,6 +44,18 @@ test("buildFloorEntries keeps only user items and builds previews", () => {
   assert.equal(floors[2].messageId, "u3");
 });
 
+test("buildFloorEntries attaches the following assistant text preview", () => {
+  const floors = floorModel.buildFloorEntries([
+    userItem("u1", "question", "user-1"),
+    {
+      kind: "assistant",
+      key: "a1",
+      rounds: [{ blocks: [{ kind: "text", text: "answer with useful context" }] }],
+    },
+  ]);
+  assert.equal(floors[0].responsePreview, floorModel.buildFloorPreview("answer with useful context"));
+});
+
 test("sampleFloorEntries keeps bookmarked floors and stays continuous at the cap", () => {
   const floors = Array.from({ length: 100 }, (_, i) =>
     floorModel.buildFloorEntries([userItem(`u${i}`, `msg ${i}`, `user-${i}`)])[0],

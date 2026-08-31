@@ -97,16 +97,10 @@ export function parseAskUserQuestionItems(raw: unknown): AskUserQuestionItem[] {
   }
   if (raw.length > ASK_USER_QUESTION_MAX_QUESTIONS) {
     throw new Error(
-      `AskUserQuestion supports at most ${ASK_USER_QUESTION_MAX_QUESTIONS} questions per call.`,
+      `AskUserQuestion supports at most ${ASK_USER_QUESTION_MAX_QUESTIONS} questions per call; got ${raw.length}.`,
     );
   }
 
-  const expectedOptionCount =
-    raw[0] &&
-    typeof raw[0] === "object" &&
-    Array.isArray((raw[0] as Record<string, unknown>).options)
-      ? ((raw[0] as Record<string, unknown>).options as unknown[]).length
-      : 0;
   const questionIds = new Set<string>();
   return raw.map((value, questionIndex) => {
     if (!value || typeof value !== "object") {
@@ -127,15 +121,9 @@ export function parseAskUserQuestionItems(raw: unknown): AskUserQuestionItem[] {
       candidate.options.length > ASK_USER_QUESTION_MAX_OPTIONS
     ) {
       throw new Error(
-        `AskUserQuestion questions[${questionIndex}] needs ${ASK_USER_QUESTION_MIN_OPTIONS}-${ASK_USER_QUESTION_MAX_OPTIONS} options.`,
+        `AskUserQuestion questions[${questionIndex}] needs ${ASK_USER_QUESTION_MIN_OPTIONS}-${ASK_USER_QUESTION_MAX_OPTIONS} options; got ${candidate.options.length}.`,
       );
     }
-    if (candidate.options.length !== expectedOptionCount) {
-      throw new Error(
-        `AskUserQuestion requires every question in one call to have the same number of options; questions[0] has ${expectedOptionCount} while questions[${questionIndex}] has ${candidate.options.length}.`,
-      );
-    }
-
     const labels = new Set<string>();
     let recommendedCount = 0;
     const options = candidate.options.map((value, optionIndex) => {
@@ -148,7 +136,7 @@ export function parseAskUserQuestionItems(raw: unknown): AskUserQuestionItem[] {
       const label = normalizeText(option.label);
       if (!label) {
         throw new Error(
-          `AskUserQuestion questions[${questionIndex}].options[${optionIndex}].label must be non-empty.`,
+          `AskUserQuestion questions[${questionIndex}].options[${optionIndex}].label must be a non-empty string.`,
         );
       }
       if (labels.has(label)) {
@@ -169,7 +157,7 @@ export function parseAskUserQuestionItems(raw: unknown): AskUserQuestionItem[] {
     });
     if (recommendedCount > 1) {
       throw new Error(
-        `AskUserQuestion questions[${questionIndex}] may recommend at most one option.`,
+        `AskUserQuestion questions[${questionIndex}] may mark at most one option as recommended; got ${recommendedCount}.`,
       );
     }
 
@@ -212,10 +200,10 @@ export function resolveAskUserQuestionAnswers(
     const candidate = value as Record<string, unknown>;
     const questionId = normalizeText(candidate.questionId);
     const custom = candidate.custom === true;
-    const selectedLabel = normalizeText(candidate.selectedLabel).slice(
-      0,
-      ASK_USER_QUESTION_CUSTOM_MAX_LENGTH,
-    );
+    const selectedLabel =
+      candidate.custom === true
+        ? normalizeText(candidate.selectedLabel).slice(0, ASK_USER_QUESTION_CUSTOM_MAX_LENGTH)
+        : normalizeText(candidate.selectedLabel);
     if (questionId && selectedLabel) {
       byQuestionId.set(questionId, { selectedLabel, custom });
     }
@@ -245,16 +233,31 @@ export function parseAskUserQuestionResultDetails(
   details: unknown,
 ): AskUserQuestionResultDetails | null {
   if (!details || typeof details !== "object") return null;
-  const candidate = details as Record<string, unknown>;
-  if (candidate.kind !== "ask_user_question") return null;
-  const questions = sanitizeAskUserQuestionItems(candidate.questions);
-  const answers = resolveAskUserQuestionAnswers(questions, candidate.answers) ?? [];
+  const record = details as Record<string, unknown>;
+  if (record.kind !== "ask_user_question") return null;
+  const questions = sanitizeAskUserQuestionItems(record.questions);
+  const answers: AskUserQuestionAnswer[] = [];
+  if (Array.isArray(record.answers)) {
+    for (const value of record.answers) {
+      if (!value || typeof value !== "object") continue;
+      const answerRecord = value as Record<string, unknown>;
+      const questionId = normalizeText(answerRecord.questionId);
+      const selectedLabel = normalizeText(answerRecord.selectedLabel);
+      if (!questionId || !selectedLabel) continue;
+      answers.push({
+        questionId,
+        prompt: normalizeText(answerRecord.prompt),
+        selectedLabel,
+        ...(answerRecord.custom === true ? { custom: true } : {}),
+      });
+    }
+  }
   return {
     kind: "ask_user_question",
     questions,
     answers,
-    ...(candidate.cancelled === true ? { cancelled: true } : {}),
-    ...(candidate.timedOut === true ? { timedOut: true } : {}),
+    cancelled: record.cancelled === true,
+    timedOut: record.timedOut === true,
   };
 }
 
@@ -263,14 +266,14 @@ export function buildAskUserQuestionResultText(
   options?: { timedOut?: boolean },
 ) {
   const heading = options?.timedOut
-    ? "The user did not answer before the deadline. Recommended or first options were selected:"
-    : "The user answered the questions. Treat these selections as authoritative:";
+    ? "The user did not answer within the time limit; the recommended (or first) option was auto-selected for every question. Proceed accordingly:"
+    : "The user answered every question. Their selections are final — proceed accordingly:";
   return [
     heading,
     ...answers.map(
       (answer, index) =>
-        `${index + 1}. ${answer.prompt}\n   -> ${answer.selectedLabel}${
-          answer.custom ? " (user-provided answer)" : ""
+        `${index + 1}. ${answer.prompt}\n   → ${answer.selectedLabel}${
+          answer.custom ? ' (user-typed answer via "Other", not a listed option)' : ""
         }`,
     ),
   ].join("\n");

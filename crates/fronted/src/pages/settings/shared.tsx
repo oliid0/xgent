@@ -1,7 +1,7 @@
-import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
-import { Section } from "@astryxdesign/core/Section";
+import { HStack, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
 import { Switch } from "@astryxdesign/core/Switch";
-import { Heading, Text } from "@astryxdesign/core/Text";
+import { Heading } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import type { ReactNode } from "react";
 
@@ -27,11 +27,9 @@ export function SettingsRowGroup(props: {
           {props.title}
         </Heading>
       )}
-      <Section padding={0} variant="transparent" width="100%">
-        <VStack width="100%" gap={2}>
-          {props.children}
-        </VStack>
-      </Section>
+      <List density="spacious" hasDividers>
+        {props.children}
+      </List>
     </VStack>
   );
 }
@@ -43,31 +41,15 @@ export function SettingsRow(props: {
   align?: "center" | "start";
 }) {
   return (
-    <Section variant="transparent" padding={0} dividers={["bottom"]} width="100%">
-      <HStack
-        width="100%"
-        gap={4}
-        padding={3}
-        wrap="wrap"
-        vAlign={props.align === "start" ? "start" : "center"}
-      >
-        <StackItem size="fill">
-          <VStack gap={0.5}>
-            <Text type="body" weight="medium" wordBreak="break-word">
-              {props.label}
-            </Text>
-            {props.description ? (
-              <Text type="supporting" color="secondary" wordBreak="break-word">
-                {props.description}
-              </Text>
-            ) : null}
-          </VStack>
-        </StackItem>
-        <HStack hAlign="end" vAlign="center" wrap="wrap">
+    <ListItem
+      label={props.label}
+      description={props.description}
+      endContent={
+        <HStack hAlign="end" vAlign={props.align === "start" ? "start" : "center"} wrap="wrap">
           {props.children}
         </HStack>
-      </HStack>
-    </Section>
+      }
+    />
   );
 }
 

@@ -56,7 +56,7 @@ import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { SectionId, SettingsOpenOptions } from "./pages/settings/types";
 import { startLocalAccessHostBridge } from "./runtime/localAccessHostBridge";
-import { xgentChatTheme } from "./theme/xgent-chat";
+import { xgentCompactTheme, xgentTheme } from "./theme/xgentTheme";
 
 function getDefaultContext(): Context {
   return {
@@ -612,7 +612,7 @@ export default function App() {
   }, [desktopBridgeEnabled, lanPcCommandHostReady, nativeMobile, settingsReady]);
 
   return (
-    <Theme theme={xgentChatTheme} mode={effectiveTheme}>
+    <Theme theme={compactSettingsDialog ? xgentCompactTheme : xgentTheme} mode={effectiveTheme}>
       <ToastViewport position="topEnd" maxVisible={4}>
         <LocaleContext.Provider value={localeContextValue}>
           <AppChrome nativeMobile={nativeMobile}>

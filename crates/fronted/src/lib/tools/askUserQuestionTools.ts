@@ -50,29 +50,37 @@ export function ensureAskUserQuestionDeadlineAt(toolCallId: string) {
   return deadlineAt;
 }
 
-export function getAskUserQuestionDeadlineAt(toolCallId: string) {
+export function getAskUserQuestionDeadlineAt(toolCallId: string): number | null {
   const id = toolCallId.trim();
-  return pendingByToolCallId.get(id)?.deadlineAt ?? presetDeadlineByToolCallId.get(id) ?? undefined;
+  return pendingByToolCallId.get(id)?.deadlineAt ?? presetDeadlineByToolCallId.get(id) ?? null;
 }
 
 export function answerAskUserQuestion(
   toolCallId: string,
   rawAnswers: unknown,
-  expectedConversationId?: string,
-) {
+  options?: { conversationId?: string },
+): { ok: boolean; message?: string } {
   const pending = pendingByToolCallId.get(toolCallId.trim());
   if (!pending) {
-    return { ok: false, message: "This question is no longer waiting for an answer." };
+    return { ok: false, message: "Question is not pending (already answered or cancelled)." };
   }
-  if (expectedConversationId?.trim() && pending.conversationId !== expectedConversationId.trim()) {
-    return { ok: false, message: "This question belongs to another conversation." };
+  const expectedConversationId = options?.conversationId?.trim();
+  if (expectedConversationId && pending.conversationId !== expectedConversationId) {
+    return { ok: false, message: "Question belongs to a different conversation." };
   }
   const answers = resolveAskUserQuestionAnswers(pending.questions, rawAnswers);
   if (!answers) {
-    return { ok: false, message: "Answer every question before submitting." };
+    return {
+      ok: false,
+      message: "Every question needs a listed option selected or a non-empty custom answer.",
+    };
   }
   pending.settle({ kind: "answered", answers });
   return { ok: true };
+}
+
+export function hasPendingAskUserQuestion(toolCallId: string) {
+  return pendingByToolCallId.has(toolCallId.trim());
 }
 
 export function cancelPendingAskUserQuestionsForConversation(conversationId: string) {
@@ -88,7 +96,7 @@ const description = `Ask the user up to ${ASK_USER_QUESTION_MAX_QUESTIONS} multi
 The questions render as an interactive card; execution pauses until the user answers every question, then the selections come back as the tool result. If the user does not answer within ${ASK_USER_QUESTION_TIMEOUT_MINUTES} minutes, the recommended (or first) option of every question is auto-selected and execution continues — the result text tells you which happened.
 
 Rules:
-- Ask 1-${ASK_USER_QUESTION_MAX_QUESTIONS} focused questions per call; each question needs ${ASK_USER_QUESTION_MIN_OPTIONS}-${ASK_USER_QUESTION_MAX_OPTIONS} options (3-4 is ideal), and every question in one call must have the SAME number of options.
+- Ask 1-${ASK_USER_QUESTION_MAX_QUESTIONS} focused questions per call; each question needs ${ASK_USER_QUESTION_MIN_OPTIONS}-${ASK_USER_QUESTION_MAX_OPTIONS} options (3-4 is ideal); different questions may have different option counts.
 - Options must be short, concrete, and mutually exclusive. Set recommended=true on your suggested choice (at most one per question) — it is shown first and becomes the timeout fallback.
 - The UI automatically appends an "Other" free-text option to every question, so the user can always type their own answer. Do NOT add your own catch-all option (e.g. "Other", "Custom", "其他", "自定义"). When the user types an answer, the result marks it as user-typed and returns their exact words instead of a listed label — treat it as authoritative.
 - Give each question a short header (2-6 chars works best) — it becomes the tab label when several questions show at once.
@@ -118,7 +126,7 @@ const parameters = Type.Object({
           ),
         }),
         {
-          description: `${ASK_USER_QUESTION_MIN_OPTIONS}-${ASK_USER_QUESTION_MAX_OPTIONS} mutually exclusive options (3-4 is ideal). Every question in one call must have the same number of options.`,
+          description: `${ASK_USER_QUESTION_MIN_OPTIONS}-${ASK_USER_QUESTION_MAX_OPTIONS} mutually exclusive options (3-4 is ideal).`,
         },
       ),
     }),
@@ -217,7 +225,10 @@ export function createAskUserQuestionTools(params: {
         cancelled: true,
       };
       return {
-        ...errorResult(toolCall, "The turn stopped before the user answered."),
+        ...errorResult(
+          toolCall,
+          "The user stopped the turn without answering. Do not assume any selection.",
+        ),
         details,
       };
     }

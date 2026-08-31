@@ -127,3 +127,138 @@ export const xgentTheme = defineTheme({
     },
   },
 });
+
+/**
+ * Compact presentation for narrow WebUI viewports and native mobile shells.
+ * It inherits the desktop product theme, then changes only Astryx tokens and
+ * documented component targets. Responsive layout remains owned by Astryx
+ * components such as MobileNav, Toolbar, List, Layout and BottomSheet.
+ */
+export const xgentCompactTheme = defineTheme({
+  name: "xgent-chat-compact",
+  extends: xgentTheme,
+  tokens: {
+    "--color-background-body": ["#f5f5f7", "#171717"],
+    "--color-background-surface": ["#ffffff", "#212121"],
+    "--color-background-card": ["#ffffff", "#2a2a2a"],
+    "--color-background-popover": ["#ffffff", "#2a2a2a"],
+    "--color-background-muted": ["#eeeeef", "#303030"],
+    "--color-text-secondary": ["#6e6e73", "#b4b4b4"],
+    "--color-border": ["#0000001a", "#ffffff1f"],
+    "--size-element-sm": "40px",
+    "--size-element-md": "44px",
+    "--size-element-lg": "48px",
+    "--radius-inner": "12px",
+    "--radius-element": "16px",
+    "--radius-container": "24px",
+    "--radius-page": "30px",
+    "--radius-chat": "28px",
+    "--shadow-low":
+      "0 1px 2px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 24%)), 0 10px 28px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 34%))",
+    "--shadow-med":
+      "0 4px 12px light-dark(rgb(0 0 0 / 9%), rgb(0 0 0 / 30%)), 0 20px 48px light-dark(rgb(0 0 0 / 12%), rgb(0 0 0 / 46%))",
+    "--shadow-high":
+      "0 10px 28px light-dark(rgb(0 0 0 / 12%), rgb(0 0 0 / 42%)), 0 28px 72px light-dark(rgb(0 0 0 / 14%), rgb(0 0 0 / 58%))",
+  },
+  components: {
+    button: {
+      base: { borderRadius: "var(--radius-full)" },
+    },
+    card: {
+      base: {
+        borderRadius: "var(--radius-container)",
+        padding: "var(--spacing-4)",
+      },
+    },
+    section: {
+      "variant:section": {
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-container)",
+        boxShadow: "var(--shadow-low)",
+      },
+    },
+    list: {
+      base: {
+        overflow: "hidden",
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-container)",
+        backgroundColor: "var(--color-background-card)",
+        boxShadow: "var(--shadow-low)",
+      },
+    },
+    "list-item": {
+      base: {
+        minHeight: "64px",
+        padding: "var(--spacing-3) var(--spacing-4)",
+        borderRadius: "0",
+      },
+    },
+    "side-nav-item": {
+      base: {
+        minHeight: "44px",
+        borderRadius: "var(--radius-element)",
+      },
+    },
+    "segmented-control": {
+      base: {
+        minHeight: "44px",
+        padding: "3px",
+        borderRadius: "var(--radius-full)",
+        backgroundColor: "var(--color-background-muted)",
+      },
+    },
+    "segmented-control-item": {
+      base: {
+        minHeight: "36px",
+        borderRadius: "var(--radius-full)",
+      },
+      selected: {
+        backgroundColor: "var(--color-background-surface)",
+        boxShadow: "var(--shadow-low)",
+      },
+    },
+    "chat-composer": {
+      base: {
+        backgroundColor: "var(--color-background-surface)",
+        borderRadius: "var(--radius-chat)",
+        boxShadow: "var(--shadow-med)",
+      },
+    },
+    dialog: {
+      base: {
+        borderRadius: "var(--radius-page)",
+        boxShadow: "var(--shadow-high)",
+      },
+      "variant:fullscreen": { borderRadius: "0" },
+    },
+    "bottom-sheet": {
+      base: {
+        borderRadius: "var(--radius-page) var(--radius-page) 0 0",
+        backgroundColor: "var(--color-background-popover)",
+        boxShadow: "var(--shadow-high)",
+      },
+    },
+    "dropdown-menu": {
+      base: {
+        borderRadius: "var(--radius-container)",
+        boxShadow: "var(--shadow-med)",
+        padding: "var(--spacing-2)",
+      },
+    },
+    "dropdown-menu-item": {
+      base: {
+        minHeight: "48px",
+        borderRadius: "var(--radius-element)",
+      },
+    },
+    "popover-surface": {
+      base: {
+        borderRadius: "var(--radius-container)",
+        boxShadow: "var(--shadow-med)",
+      },
+    },
+    "text-input": {
+      base: { borderRadius: "var(--radius-element)" },
+    },
+  },
+});

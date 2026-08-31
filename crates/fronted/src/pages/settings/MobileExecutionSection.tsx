@@ -217,7 +217,7 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
   }
 
   return (
-    <Section padding={5} width="100%" className="settings-mobile-execution-card">
+    <Section padding={5} width="100%">
       <VStack gap={4}>
         <HStack gap={3} hAlign="between" vAlign="start">
           <Terminal />

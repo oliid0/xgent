@@ -19,13 +19,22 @@ export type RetryErrorExtension = {
 
 const DEFAULT_RETRY_ERROR_EXTENSION: RetryErrorExtension = {
   statusCodes: [...RETRYABLE_PRESET_HTTP_STATUS_CODES],
-  patterns: [],
+  // Tauri/WebKit can collapse a transient non-2xx fetch into this opaque
+  // transport code, leaving no numeric status for the normal classifier.
+  patterns: ["bad_response_status_code"],
 };
+
+const REQUIRED_RETRY_STATUS_CODES = [529];
+const REQUIRED_RETRY_PATTERNS = ["bad_response_status_code"];
 
 let currentRetryErrorExtension: RetryErrorExtension = DEFAULT_RETRY_ERROR_EXTENSION;
 
 export function setRetryErrorExtension(extension: RetryErrorExtension | null): void {
-  currentRetryErrorExtension = extension ?? DEFAULT_RETRY_ERROR_EXTENSION;
+  const next = extension ?? DEFAULT_RETRY_ERROR_EXTENSION;
+  currentRetryErrorExtension = {
+    statusCodes: Array.from(new Set([...REQUIRED_RETRY_STATUS_CODES, ...(next.statusCodes ?? [])])),
+    patterns: Array.from(new Set([...REQUIRED_RETRY_PATTERNS, ...(next.patterns ?? [])])),
+  };
 }
 
 export function isExtensionRetryableError(
@@ -34,13 +43,15 @@ export function isExtensionRetryableError(
 ): boolean {
   const errorMessage = message?.errorMessage ?? "";
   if (!errorMessage) return false;
-  const codes = extension.statusCodes ?? [];
+  const codes = Array.from(
+    new Set([...REQUIRED_RETRY_STATUS_CODES, ...(extension.statusCodes ?? [])]),
+  );
   if (codes.length > 0) {
     const statusPattern = new RegExp(`(?:^|\\D)(?:${codes.join("|")})(?:\\D|$)`);
     if (statusPattern.test(errorMessage)) return true;
   }
   const normalizedMessage = errorMessage.toLocaleLowerCase();
-  return (extension.patterns ?? []).some((pattern) => {
+  return [...REQUIRED_RETRY_PATTERNS, ...(extension.patterns ?? [])].some((pattern) => {
     const normalizedPattern = pattern.trim().toLocaleLowerCase();
     return normalizedPattern.length > 0 && normalizedMessage.includes(normalizedPattern);
   });

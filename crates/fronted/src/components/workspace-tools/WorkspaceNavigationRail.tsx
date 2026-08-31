@@ -64,30 +64,6 @@ export function WorkspaceNavigationRail(props: WorkspaceNavigationRailProps) {
       icon: FolderTree,
       enabled: props.fileTreeAvailable,
     },
-    {
-      target: "terminal",
-      label: t("sidebar.terminal"),
-      icon: Terminal,
-      enabled: props.workspaceToolsAvailable,
-    },
-    {
-      target: "gitReview",
-      label: t("sidebar.gitReview"),
-      icon: GitBranch,
-      enabled: props.workspaceToolsAvailable,
-    },
-    {
-      target: "sshConnection",
-      label: t("sidebar.sshConnection"),
-      icon: Key,
-      enabled: props.workspaceToolsAvailable,
-    },
-    {
-      target: "backgroundTasks",
-      label: t("sidebar.backgroundTasks"),
-      icon: Cpu,
-      enabled: props.workspaceToolsAvailable,
-    },
   ];
 
   const selectFromSoulMenu = (target: WorkspaceToolTarget, shell?: string) => {

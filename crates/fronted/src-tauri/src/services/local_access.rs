@@ -169,12 +169,19 @@ struct LocalBrowserEvent {
 }
 
 impl LocalAccessController {
-    pub fn new(app_handle: tauri::AppHandle, proxy_info: ProxyServerInfo) -> Self {
+    pub fn new(app_handle: tauri::AppHandle, proxy_info: ProxyServerInfo) -> Result<Self, String> {
         let (event_tx, _) = broadcast::channel(512);
-        Self {
+        let proxy_client = reqwest::Client::builder()
+            // This client only reaches XAgent's loopback proxy. Inheriting
+            // HTTP(S)_PROXY here can send that local hop to an upstream proxy
+            // and turn otherwise valid WebUI requests into 502/CORS failures.
+            .no_proxy()
+            .build()
+            .map_err(|error| format!("initialize local WebUI proxy client failed: {error}"))?;
+        Ok(Self {
             app_handle,
             proxy_info,
-            proxy_client: reqwest::Client::new(),
+            proxy_client,
             config: Mutex::new(AccessSettingsPayload::default()),
             status: Mutex::new(LocalAccessStatus {
                 enabled: false,
@@ -194,7 +201,7 @@ impl LocalAccessController {
             event_tx,
             shutdown: Mutex::new(None),
             server_task: Mutex::new(None),
-        }
+        })
     }
 
     pub async fn reload_from_db(self: &Arc<Self>) -> Result<(), String> {
@@ -1148,6 +1155,13 @@ fn authorize_local_command(
         "git_compare_commit_with_remote",
         "git_commit_diff",
     ];
+    // A paired browser with every local permission deliberately enabled is a
+    // full XAgent control surface. Keep cloud execution behind its separate
+    // feature switch, but do not maintain a second incomplete command allowlist
+    // for the rest of the desktop experience.
+    if has_full_local_permissions(config) && !command.starts_with("cloud_task_") {
+        return Ok(());
+    }
     if command == "settings_load_all"
         || command == "workspace_watch_set"
         || command == "system_home_dir"
@@ -1205,6 +1219,9 @@ fn authorize_local_command(
 }
 
 fn authorize_local_event(event: &str, config: &AccessSettingsPayload) -> Result<(), String> {
+    if has_full_local_permissions(config) {
+        return Ok(());
+    }
     const SAFE_EVENTS: &[&str] = &[
         "automation:cron-changed",
         "automation:hooks-changed",
@@ -1231,6 +1248,14 @@ fn authorize_local_event(event: &str, config: &AccessSettingsPayload) -> Result<
         return Ok(());
     }
     Err(format!("local access event is not allowed: {event}"))
+}
+
+fn has_full_local_permissions(config: &AccessSettingsPayload) -> bool {
+    config.allow_terminal
+        && config.allow_browser_automation
+        && config.allow_ssh
+        && config.allow_git
+        && config.allow_file_write
 }
 
 async fn index_asset(
@@ -1579,5 +1604,22 @@ mod tests {
         assert!(is_allowed_host_for_addresses("localhost:28367", 28_367, &addresses));
         assert!(!is_allowed_host_for_addresses("192.168.1.20:8080", 28_367, &addresses));
         assert!(!is_allowed_host_for_addresses("192.168.1.99:28367", 28_367, &addresses));
+    }
+
+    #[test]
+    fn all_local_permissions_expose_the_full_non_cloud_command_surface() {
+        let mut config = AccessSettingsPayload::default();
+        config.allow_terminal = true;
+        config.allow_browser_automation = true;
+        config.allow_ssh = true;
+        config.allow_git = true;
+        config.allow_file_write = true;
+
+        assert!(authorize_local_command("system_clipboard_read_text", &config).is_ok());
+        assert!(authorize_local_event("custom:desktop-event", &config).is_ok());
+        assert!(authorize_local_command("cloud_task_start", &config).is_err());
+
+        config.cloud_execution_enabled = true;
+        assert!(authorize_local_command("cloud_task_start", &config).is_ok());
     }
 }
