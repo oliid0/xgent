@@ -1,4 +1,4 @@
-import { invoke, isTauriRuntime } from "@xagent/runtime";
+import { invoke, isTauriRuntime } from "@xgent/runtime";
 
 export type RuntimePlatform = "windows" | "macos" | "linux" | "android" | "ios";
 

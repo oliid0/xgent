@@ -262,7 +262,7 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
           subtitle={
             dataPath
               ? "当前使用手动指定的数据目录"
-              : "XAgent 会自动读取 Cherry Studio 的数据目录设置"
+              : "Xgent 会自动读取 Cherry Studio 的数据目录设置"
           }
           startContent={
             <IconButton
@@ -321,7 +321,7 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
       <VStack width="100%" height="100%" minHeight={0} gap={0}>
         <DialogHeader
           title="从 Cherry Studio 同步"
-          subtitle="仅同步 Base URL 和 API Key；模型由 XAgent 获取并激活。左侧可切换供应商类型。"
+          subtitle="仅同步 Base URL 和 API Key；模型由 Xgent 获取并激活。左侧可切换供应商类型。"
           startContent={
             <IconButton
               label="返回"

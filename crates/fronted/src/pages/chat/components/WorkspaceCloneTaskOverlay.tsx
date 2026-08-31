@@ -45,7 +45,7 @@ export function WorkspaceCloneTaskOverlay(props: { onOpenWorkspace: (path: strin
     <VStack
       gap={2}
       data-edge-swipe-ignore
-      className="fixed bottom-[calc(var(--spacing-3)+env(safe-area-inset-bottom,0px))] left-[var(--spacing-3)] right-[var(--spacing-3)] z-[var(--xagent-z-task-overlay)] md:left-auto md:right-[var(--spacing-4)] md:w-[var(--xagent-task-overlay-width)]"
+      className="fixed bottom-[calc(var(--spacing-3)+env(safe-area-inset-bottom,0px))] left-[var(--spacing-3)] right-[var(--spacing-3)] z-[var(--xgent-z-task-overlay)] md:left-auto md:right-[var(--spacing-4)] md:w-[var(--xgent-task-overlay-width)]"
     >
       {tasks.map((task) => {
         const running = task.status === "running" || task.status === "cancelling";

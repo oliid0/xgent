@@ -1,6 +1,6 @@
 // Dirty-flag driven workspace invalidation hook.
 //
-// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// Shared by every frontend runtime; only relative or @xgent/runtime imports
 // are allowed here.
 //
 // Semantics:

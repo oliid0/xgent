@@ -1,7 +1,7 @@
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack } from "@astryxdesign/core/Layout";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { useLocale } from "../i18n";
@@ -94,7 +94,7 @@ export function MacOsTitleBarSpacer({ className }: { className?: string }) {
   return (
     <HStack
       data-tauri-drag-region
-      height="var(--xagent-macos-titlebar-spacer-height)"
+      height="var(--xgent-macos-titlebar-spacer-height)"
       className={className}
     />
   );
@@ -135,7 +135,7 @@ export function MacOsTitleBarToggle({
       style={
         {
           position: "fixed",
-          zIndex: "var(--xagent-z-titlebar-actions)",
+          zIndex: "var(--xgent-z-titlebar-actions)",
           top: toggleTop,
           left: toggleLeft,
           height: MAC_OS_TITLEBAR_TOGGLE_BUTTON_SIZE,
@@ -195,7 +195,7 @@ export function MacOsTitleBarLeadingInset({ className }: { className?: string })
   return (
     <HStack
       data-tauri-drag-region
-      width="var(--xagent-macos-titlebar-leading-inset)"
+      width="var(--xgent-macos-titlebar-leading-inset)"
       className={className}
     />
   );

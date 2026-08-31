@@ -394,8 +394,8 @@ impl StdioTransport {
             .stderr(Stdio::piped());
         maybe_augment_macos_path(&mut command);
         configure_child_process_group(&mut command);
-        // 应用代理 env 先注入（含 NO_PROXY 环回豁免），server 配置的 env 后写保持更高优先级；
-        // 代理配置异常时 fail fast，不静默直连。
+        
+        
         for (key, value) in crate::services::system_proxy::shell_proxy_envs()? {
             command.env(key, value);
         }
@@ -592,7 +592,7 @@ impl HttpTransport {
 
         let headers = build_header_map(&config.headers)?;
 
-        // 经 system_proxy 构建：应用代理启用时走代理（环回地址豁免），异常配置 fail fast。
+        
         let client = crate::services::system_proxy::blocking_client_builder()
             .map_err(|e| format!("创建 HTTP client 失败：{e}"))?
             .connect_timeout(Duration::from_secs(10))
@@ -797,7 +797,7 @@ impl SseTransport {
             }
         };
 
-        // 两个 client 均经 system_proxy 构建（GET 长连接不设总超时），语义同 HttpTransport。
+        
         let client_get = crate::services::system_proxy::blocking_client_builder()
             .map_err(|e| format!("创建 SSE http client 失败：{e}"))?
             .connect_timeout(Duration::from_secs(10))
@@ -1127,10 +1127,7 @@ impl McpTransport {
 #[derive(Debug)]
 struct McpClient {
     config: McpServerConfig,
-    /// spawn 时的应用代理配置 revision。transport 的 reqwest client 与
-    /// stdio 子进程 env 都在 spawn 时固化，ensure_client 据此在代理配置
-    /// 变更后重建连接。
-    proxy_revision: u64,
+                proxy_revision: u64,
     transport: McpTransport,
     next_id: u64,
     initialized: bool,
@@ -1138,8 +1135,8 @@ struct McpClient {
 
 impl McpClient {
     fn spawn(config: McpServerConfig) -> Result<Self, String> {
-        // 在建 transport 之前取 revision：若 spawn 期间代理配置变更，
-        // 记录的旧值会在下次 ensure_client 触发重建，宁可多建一次。
+        
+        
         let proxy_revision = crate::services::system_proxy::revision();
         let transport = match config.transport().trim() {
             "http" => McpTransport::Http(HttpTransport::spawn(&config)?),
@@ -1179,7 +1176,7 @@ impl McpClient {
         for v in candidates {
             let init_params = json!({
                 "protocolVersion": v,
-                "clientInfo": { "name": "XAgent", "version": crate::app_version() },
+                "clientInfo": { "name": "Xgent", "version": crate::app_version() },
                 "capabilities": {}
             });
 
@@ -1533,7 +1530,7 @@ impl McpRuntimeManager {
         if let Some(existing) = existing.as_ref() {
             // Restart if config changed. Same-id calls serialize on the client
             // lock (protocol streams cannot be shared), other servers do not.
-            // 应用代理配置变更（revision 变化）同样视作配置变化重建连接。
+            
             let proxy_revision = crate::services::system_proxy::revision();
             let same_config = existing
                 .lock()
@@ -1547,10 +1544,10 @@ impl McpRuntimeManager {
         let client = match McpClient::spawn(cfg) {
             Ok(client) => client,
             Err(error) => {
-                // 重建失败必须逐出已判定过期的旧 client：mcp_call_tool 直读 map
-                // 不经本函数，留着旧 client 会让失效配置（如无效应用代理）下的
-                // 调用继续走旧通道，违背 fail fast 不静默直连的语义。
-                // 仅在 map 里仍是同一个 Arc 时移除，避免误杀并发换上的新 client。
+                
+                
+                
+                
                 if let Some(stale) = existing {
                     if let Ok(mut map) = self.clients.lock() {
                         if map
@@ -1741,8 +1738,8 @@ pub async fn mcp_list_tools(
             }
         }
 
-        // 部分失败沿用跳过语义；全军覆没（如应用代理配置异常一次性击毁全部
-        // server）必须让前端可见（onLoadError/throw），否则工具静默消失无从排查。
+        
+        
         if succeeded == 0 && !failures.is_empty() {
             return Err(format!(
                 "所有已启用的 MCP server 都不可用：\n{}",
@@ -2020,8 +2017,8 @@ mod tests {
             .ensure_client(offline_http_config("srv"))
             .expect("initial ensure");
 
-        // 换成必然 spawn 失败的配置（URL 通过存在性校验但解析失败）：
-        // 旧 client 必须被逐出，否则 mcp_call_tool 直读 map 会继续走失效通道。
+        
+        
         manager
             .ensure_client(url_config("srv", "http", Some("::not-a-url::")))
             .expect_err("respawn must fail");
@@ -2102,7 +2099,7 @@ mod tests {
 
     #[test]
     fn windows_cmd_quote_arg_doubles_embedded_quotes() {
-        // cmd.exe 不认 `\"` 转义，翻倍才能保持引号配对。
+        
         assert_eq!(windows_cmd_quote_arg("-y"), r#""-y""#);
         assert_eq!(windows_cmd_quote_arg(r#"a"b"#), r#""a""b""#);
         assert_eq!(windows_cmd_quote_arg("with space"), r#""with space""#);
@@ -2110,18 +2107,18 @@ mod tests {
 
     #[test]
     fn windows_cmd_quote_arg_doubles_backslashes_before_quotes() {
-        // 内嵌引号前的反斜杠须补齐至 2n，重解析后还原为 n 个反斜杠 + 字面引号。
+        
         assert_eq!(windows_cmd_quote_arg(r#"a\"b"#), r#""a\\""b""#);
-        // 尾部反斜杠若不翻倍会把闭合引号转义掉，与后一个参数粘连。
+        
         assert_eq!(windows_cmd_quote_arg(r"C:\data\"), r#""C:\data\\""#);
-        // 非贴引号的反斜杠保持原样（路径分隔符不受影响）。
+        
         assert_eq!(windows_cmd_quote_arg(r"C:\a\b"), r#""C:\a\b""#);
         assert_eq!(windows_cmd_quote_arg(""), r#""""#);
     }
 
     #[test]
     fn windows_cmd_quote_arg_neutralizes_percent_expansion() {
-        // `%%cd:~,` no-op 打断 %VAR% 配对，cmd 展开后子进程仍收到原文。
+        
         assert_eq!(windows_cmd_quote_arg("%PATH%"), r#""%%cd:~,%PATH%%cd:~,%""#);
         assert_eq!(windows_cmd_quote_arg("100%"), r#""100%%cd:~,%""#);
         assert_eq!(windows_cmd_quote_arg("a\rb"), "\"a%%cd:~,\rb\"");
@@ -2129,7 +2126,7 @@ mod tests {
 
     #[test]
     fn windows_cmd_c_argument_wraps_whole_line_for_slash_s() {
-        // `/S` 语义：cmd 剥掉首尾引号后必须还原出可执行的完整命令行。
+        
         let program = Path::new(r"C:\Program Files\nodejs\npx.cmd");
         let args = vec!["-y".to_string(), "@playwright/mcp".to_string()];
         assert_eq!(
@@ -2149,7 +2146,7 @@ mod tests {
 
     #[test]
     fn windows_cmd_c_argument_survives_trailing_backslash_arg() {
-        // filesystem 类 MCP server 常见传法：目录参数带尾部反斜杠。
+        
         let program = Path::new(r"C:\Program Files\nodejs\npx.cmd");
         let args = vec![
             "-y".to_string(),

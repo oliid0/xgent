@@ -66,18 +66,18 @@ fn current_version(app: &AppHandle) -> String {
 }
 
 fn update_repository() -> String {
-    std::env::var("XAGENT_UPDATE_REPOSITORY")
+    std::env::var("XGENT_UPDATE_REPOSITORY")
         .ok()
-        .or_else(|| option_env!("XAGENT_UPDATE_REPOSITORY").map(str::to_string))
+        .or_else(|| option_env!("XGENT_UPDATE_REPOSITORY").map(str::to_string))
         .map(|value| value.trim().trim_matches('/').to_string())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| DEFAULT_UPDATE_REPOSITORY.to_string())
 }
 
 fn updater_public_key_override() -> Option<String> {
-    std::env::var("XAGENT_UPDATER_PUBLIC_KEY")
+    std::env::var("XGENT_UPDATER_PUBLIC_KEY")
         .ok()
-        .or_else(|| option_env!("XAGENT_UPDATER_PUBLIC_KEY").map(str::to_string))
+        .or_else(|| option_env!("XGENT_UPDATER_PUBLIC_KEY").map(str::to_string))
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
 }
@@ -292,8 +292,8 @@ fn selected_release_candidates_from_entries(
 }
 
 fn github_client() -> Result<reqwest::Client, String> {
-    // 应用代理启用时更新检查随之走应用代理；未启用时回退 reqwest 默认代理探测
-    // （OS 代理环境变量/系统代理设置），无系统代理即直连，尽可能保证 GitHub 可达。
+    
+    
     crate::services::system_proxy::client_builder_with_os_proxy_fallback()?
         .timeout(Duration::from_secs(20))
         .build()
@@ -303,7 +303,7 @@ fn github_client() -> Result<reqwest::Client, String> {
 async fn manifest_exists(client: &reqwest::Client, manifest_url: &str) -> Result<bool, String> {
     let response = client
         .head(manifest_url)
-        .header(USER_AGENT, "XAgent-Updater")
+        .header(USER_AGENT, "Xgent-Updater")
         .send()
         .await
         .map_err(|error| format!("failed to probe updater manifest: {error}"))?;
@@ -315,7 +315,7 @@ async fn manifest_exists(client: &reqwest::Client, manifest_url: &str) -> Result
     if status == StatusCode::METHOD_NOT_ALLOWED {
         let response = client
             .get(manifest_url)
-            .header(USER_AGENT, "XAgent-Updater")
+            .header(USER_AGENT, "Xgent-Updater")
             .header(RANGE, "bytes=0-0")
             .send()
             .await
@@ -406,7 +406,7 @@ async fn select_release_manifest(
     let feed_url = release_feed_url(repository)?;
     let response = client
         .get(feed_url)
-        .header(USER_AGENT, "XAgent-Updater")
+        .header(USER_AGENT, "Xgent-Updater")
         .header(
             ACCEPT,
             "application/atom+xml, application/xml;q=0.9, */*;q=0.8",
@@ -453,9 +453,9 @@ fn build_updater(
         builder = builder.pubkey(public_key);
     }
 
-    // 更新下载/安装与 github_client() 的探测请求保持同一份代理语义：应用代理
-    // 启用时显式走应用代理；未启用时不调 no_proxy()，让插件内部 client 走
-    // reqwest 默认代理探测（OS 代理环境变量/系统代理设置），无系统代理即直连。
+    
+    
+    
     if let Some(proxy_url) = crate::services::system_proxy::current_proxy_url()? {
         builder = builder.proxy(proxy_url);
     }
@@ -602,7 +602,7 @@ mod tests {
     fn feed_entry(tag_name: &str) -> ReleaseFeedEntry {
         ReleaseFeedEntry {
             tag_name: tag_name.to_string(),
-            title: Some(format!("XAgent {tag_name}")),
+            title: Some(format!("Xgent {tag_name}")),
             html_url: Some(format!(
                 "https://github.com/oliid0/xgent/releases/tag/{tag_name}"
             )),
@@ -618,7 +618,7 @@ mod tests {
   <entry>
     <updated>2026-05-25T16:00:34Z</updated>
     <link rel="alternate" type="text/html" href="https://github.com/oliid0/xgent/releases/tag/v0.1.2"/>
-    <title>XAgent v0.1.2</title>
+    <title>Xgent v0.1.2</title>
   </entry>
 </feed>"#,
         )
@@ -628,7 +628,7 @@ mod tests {
             entries,
             vec![ReleaseFeedEntry {
                 tag_name: "v0.1.2".to_string(),
-                title: Some("XAgent v0.1.2".to_string()),
+                title: Some("Xgent v0.1.2".to_string()),
                 html_url: Some(
                     "https://github.com/oliid0/xgent/releases/tag/v0.1.2".to_string()
                 ),

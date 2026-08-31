@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import {
   createContext,
   type ReactNode,

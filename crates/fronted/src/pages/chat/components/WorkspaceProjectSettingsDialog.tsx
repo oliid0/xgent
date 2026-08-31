@@ -24,8 +24,8 @@ export function WorkspaceProjectSettingsDialog(props: {
         if (!isOpen) onClose();
       }}
       title={t("chat.workspaceSettings")}
-      width="var(--xagent-dialog-width-md)"
-      maxHeight="var(--xagent-dialog-height-md)"
+      width="var(--xgent-dialog-width-md)"
+      maxHeight="var(--xgent-dialog-height-md)"
       touchPresentation="bottom-sheet"
       bottomSheetHeight="tall"
     >

@@ -631,12 +631,7 @@ fn logical_rel_path(rel: &Path) -> String {
     rel.to_string_lossy().replace('\\', "/")
 }
 
-/// 检查点记录用的相对路径:必须相对于 canonicalize **之后**的真实目标。
-///
-/// `resolve_target` 会解析工作区内部的符号链接,所以请求路径(`link/a.txt`)
-/// 和实际落盘路径(`real/a.txt`)可能分叉。按请求路径记有两个后果:前像挂在
-/// 一个根本没被改动的路径上;回退时逐级拒符号链接又会把它判成不可解析,于是
-/// 这条改动永远回退不了。取不到前缀(理论上不该发生)时退回请求路径。
+
 fn checkpoint_rel(workdir: &Path, target: &Path, requested: &Path) -> PathBuf {
     target
         .strip_prefix(workdir)
@@ -668,10 +663,6 @@ fn resolve_existing_file_target(workdir: &Path, rel: &Path) -> Result<PathBuf, F
     Ok(resolved)
 }
 
-/// 建好目标的父目录并返回其 canonical 形态。返回值不是锦上添花:新建文件
-/// 没有 canonicalize 入口,父目录若经由工作区内部符号链接(`link/new.txt`),
-/// 未解析的原始路径会被当作落盘目标记进检查点,而回退侧逐级拒符号链接,
-/// 这条记录就永远回退不了。调用方必须用返回的真实父目录拼接目标。
 fn ensure_parent_dir(workdir: &Path, target: &Path) -> Result<PathBuf, FsError> {
     let parent = target
         .parent()
@@ -1103,7 +1094,7 @@ fn soffice_candidate_names() -> &'static [&'static str] {
 
 #[cfg(not(target_os = "macos"))]
 fn find_soffice_binary() -> Option<PathBuf> {
-    if let Ok(raw) = std::env::var("XAGENT_SOFFICE_PATH") {
+    if let Ok(raw) = std::env::var("XGENT_SOFFICE_PATH") {
         let trimmed = raw.trim().trim_matches('"');
         if !trimmed.is_empty() {
             let path = expand_tilde_path(trimmed);
@@ -1235,7 +1226,7 @@ fn run_soffice_document_conversion(
 #[cfg(not(target_os = "macos"))]
 fn convert_document_to_html_preview(target: &Path) -> Result<Vec<u8>, String> {
     let soffice = find_soffice_binary().ok_or_else(|| {
-        "Legacy Word/RTF preview conversion requires LibreOffice; install it or set XAGENT_SOFFICE_PATH to the soffice binary".to_string()
+        "Legacy Word/RTF preview conversion requires LibreOffice; install it or set XGENT_SOFFICE_PATH to the soffice binary".to_string()
     })?;
 
     let nanos = std::time::SystemTime::now()
@@ -1243,7 +1234,7 @@ fn convert_document_to_html_preview(target: &Path) -> Result<Vec<u8>, String> {
         .map(|duration| duration.as_nanos())
         .unwrap_or(0);
     let out_dir = std::env::temp_dir()
-        .join("xagent")
+        .join("xgent")
         .join("workspace-preview-convert")
         .join(format!("{}-{}", std::process::id(), nanos));
     fs::create_dir_all(&out_dir)
@@ -1256,7 +1247,7 @@ fn convert_document_to_html_preview(target: &Path) -> Result<Vec<u8>, String> {
 
 fn document_preview_cache_dir() -> PathBuf {
     std::env::temp_dir()
-        .join("xagent")
+        .join("xgent")
         .join("workspace-preview-cache")
 }
 
@@ -1672,7 +1663,7 @@ fn build_pdf_window(
 }
 
 fn decode_xml_entities(input: &str) -> String {
-    // 办公文档 XML 由软件生成，正常都能解码；遇到非法实体时保留原文降级。
+    
     match quick_xml::escape::unescape(input) {
         Ok(decoded) => decoded.into_owned(),
         Err(_) => input.to_string(),
@@ -2482,8 +2473,8 @@ fn read_url_image_source(source: &str) -> Result<ReadResponse, FsError> {
         }
     }
 
-    // Image.url 供模型读取远程图片：与聊天图片反代同语义，应用代理启用时
-    // 经代理出网，代理配置异常时 fail fast，不静默直连。
+    
+    
     let client = crate::services::system_proxy::blocking_client_builder()
         .map_err(|e| FsError::Other(format!("Failed to create the HTTP client: {e}")))?
         .timeout(Duration::from_secs(IMAGE_SOURCE_HTTP_TIMEOUT_SECS))
@@ -3092,9 +3083,9 @@ fn fs_write_text_impl(
             )
         }
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
-            // 用 canonical 父目录拼接目标:请求路径可能经由工作区内部符号
-            // 链接(`link/new.txt`),原始拼接会让检查点记下链接路径,回退侧
-            // 逐级拒符号链接后这个新建文件永远删不掉。
+            
+            
+            
             let parent = ensure_parent_dir(&path.root, &raw_target)?;
             let file_name = raw_target
                 .file_name()
@@ -3111,8 +3102,8 @@ fn fs_write_text_impl(
         ensure_expected_version_matches(&target, &logical_path, &expected)?;
     }
 
-    // 落盘前捕获前像(root + 相对路径):不存在则记删除标记,存在则拷贝原
-    // 字节。失败不阻断写入。
+    
+    
     capture_pre_image(
         checkpoint.as_ref(),
         &path.root,
@@ -3272,7 +3263,7 @@ fn fs_edit_text_impl(
     };
     let next = apply_edit_replacements(&text, applied);
 
-    // 落盘前捕获前像:直接复用上面已读入内存的原字节。失败不阻断写入。
+    
     capture_pre_image(
         checkpoint.as_ref(),
         wd,
@@ -3367,16 +3358,16 @@ fn fs_delete_impl(
     let meta = fs::symlink_metadata(&target)?;
     let ckpt_rel = checkpoint_rel(wd, &target, &rel);
     let kind = if meta.file_type().is_symlink() {
-        // 符号链接不做前像捕获:链接目标不属于本文件的内容,恢复语义不明确。
+        
         remove_symlink_path(&target)?;
         "symlink"
     } else if meta.is_file() {
-        // 删除前捕获整个文件内容,回退即可原样恢复。失败不阻断删除。
+        
         capture_pre_image(checkpoint.as_ref(), wd, &ckpt_rel, PreImage::File(None));
         fs::remove_file(&target)?;
         "file"
     } else if meta.is_dir() {
-        // 目录是递归删除,只能记不可恢复的标记,由 diff 统计如实呈现。
+        
         capture_pre_image(checkpoint.as_ref(), wd, &ckpt_rel, PreImage::Dir);
         fs::remove_dir_all(&target)?;
         "dir"
@@ -4732,7 +4723,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("system time should be after epoch")
             .as_nanos();
-        std::env::temp_dir().join(format!("xagent-{name}-{suffix}"))
+        std::env::temp_dir().join(format!("xgent-{name}-{suffix}"))
     }
 
     fn list_test_entries(workdir: &Path, show_hidden: Option<bool>) -> Vec<ListEntry> {
@@ -4755,7 +4746,7 @@ mod tests {
     }
 
     fn png_like_bytes() -> Vec<u8> {
-        b"\x89PNG\r\n\x1a\nxagent-test".to_vec()
+        b"\x89PNG\r\n\x1a\nxgent-test".to_vec()
     }
 
     fn svg_text() -> &'static str {
@@ -5054,7 +5045,7 @@ mod tests {
             Some(BASE64_STANDARD.encode(&bytes).as_str())
         );
 
-        for path in ["/tmp/xagent-outside.png", "../outside.png", ""] {
+        for path in ["/tmp/xgent-outside.png", "../outside.png", ""] {
             let error =
                 fs_read_workspace_image_sync(workdir.display().to_string(), path.to_string())
                     .expect_err("out-of-bounds workspace image path should fail");
@@ -5191,7 +5182,7 @@ mod tests {
             "a & b <c> \"d\" 'e'"
         );
         assert_eq!(decode_xml_entities("&#65;&#x4E2D;"), "A中");
-        // 非法实体走宽容降级：保留原文。
+        
         assert_eq!(
             decode_xml_entities("keep &bogus; text"),
             "keep &bogus; text"
@@ -5543,7 +5534,7 @@ mod tests {
             large_error.message
         );
 
-        for path in ["", "/tmp/xagent-outside", "../outside"] {
+        for path in ["", "/tmp/xgent-outside", "../outside"] {
             let error = fs_read_editable_text_sync(workdir.display().to_string(), path.to_string())
                 .expect_err("invalid path should fail");
             assert!(
@@ -5567,7 +5558,7 @@ mod tests {
         assert_eq!(response.kind, "dir");
         assert!(workdir.join("src").is_dir());
 
-        for path in ["", "/tmp/xagent-outside", "../outside", "src"] {
+        for path in ["", "/tmp/xgent-outside", "../outside", "src"] {
             let error = fs_create_dir_sync(workdir.display().to_string(), path.to_string())
                 .expect_err("invalid or existing target should fail");
             assert!(
@@ -6162,8 +6153,8 @@ mod tests {
         std::os::unix::fs::symlink(workdir.join("real"), workdir.join("link"))
             .expect("create dir symlink");
 
-        // 经由工作区内部符号链接新建文件:落盘目标必须是解析后的真实路径,
-        // 否则检查点会记下链接路径,回退侧逐级拒符号链接后永远删不掉它。
+        
+        
         let write = fs_write_text_sync(
             workdir.display().to_string(),
             "link/new.txt".to_string(),
@@ -6176,7 +6167,7 @@ mod tests {
         .expect("write through symlinked parent should succeed");
         assert!(write.file_id.is_some());
         assert!(workdir.join("real/new.txt").is_file());
-        // checkpoint_rel 拿到的必须是真实相对路径 real/new.txt。
+        
         let resolved = resolve_existing_file_target(&workdir, Path::new("link/new.txt"))
             .expect("resolve through symlink");
         assert_eq!(

@@ -261,8 +261,8 @@ function createStatusAssistant(params: {
     ...(params.template ?? {}),
     role: "assistant",
     content: [{ type: "text", text: params.text }],
-    api: params.template?.api ?? "xagent-memory",
-    provider: params.template?.provider ?? "xagent",
+    api: params.template?.api ?? "xgent-memory",
+    provider: params.template?.provider ?? "xgent",
     model: params.template?.model ?? params.model,
     usage: params.template?.usage ?? createSyntheticUsage(),
     stopReason: "stop",
@@ -393,10 +393,7 @@ async function runExtractionRound(params: {
     runtime: params.model.runtime,
     context,
     workdir: params.workdir,
-    // 稳定 sessionId:codex 路径上它就是 prompt_cache_key(缓存分片路由)。同一
-    // 会话的多次抽取共享 system prompt / 工具定义 / 对话前缀,带时间戳会每次换
-    // 分片、全量 miss;去掉后后续抽取直接吃前一次的前缀。诊断侧的 prefixShape
-    // LRU 也不再被一次性键挤占(prompt-cache-stability.md 残留风险 #2)。
+
     sessionId: `${params.sessionId}:memory:${params.conversationId}`,
     tools,
     executeToolCall,
@@ -465,10 +462,7 @@ export async function runMemoryExtraction(
 
   const workspaceMutations = deriveWorkspaceMutations(params.messages, workdir || undefined);
   const summaryBlock = buildConversationSummaryBlock(params.conversationSummary);
-  // 块序按「稳定 → 易变」排:指令 prompt(约 4KB,会话内静态)打头,对话窗口
-  // (每轮必变)垫底。前缀缓存是字节级匹配,最易变的块排前面会让同会话的多次
-  // 抽取在第一行就分叉 —— sessionId 已稳定(见 runExtractionRound),块序对了
-  // 才真能吃到前一次抽取的前缀。指令里的方位措辞(above/below)与此序同步。
+
   const hiddenPromptText = [
     buildExtractionInstructionPrompt({
       localDate,
@@ -531,8 +525,8 @@ export async function runMemoryExtraction(
               {
                 role: "assistant",
                 content: [{ type: "text", text: priorAssistant }],
-                api: "xagent-memory",
-                provider: "xagent",
+                api: "xgent-memory",
+                provider: "xgent",
                 model: model.model,
                 usage: createSyntheticUsage(),
                 stopReason: "stop",

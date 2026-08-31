@@ -1,8 +1,8 @@
-//! 安装编排：stage-then-swap 原子安装、备份与 install payload 处理。
+
 //!
-//! 写入纪律：新内容先在 `<root>/.staging/` 下完整构建（同一文件系统，`.` 前缀
-//! 对发现/list 不可见），最后在 [`skills_write_guard`] 保护下用 `fs::rename`
-//! 原子入位。读者永远只会看到旧目录或新目录，不存在半成品窗口。
+
+
+
 
 use chrono::Utc;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
@@ -492,7 +492,7 @@ pub(crate) fn install_uploaded_bundle_from_payload(
         ));
     }
 
-    let temp = TempDir::new("xagent-skill-picker")?;
+    let temp = TempDir::new("xgent-skill-picker")?;
     let mut total_bytes = 0u64;
     for (index, file) in files.iter().enumerate() {
         let file = file
@@ -563,7 +563,7 @@ where
         return Err(INSTALL_CANCELLED_ERROR.to_string());
     }
 
-    let tmp = TempDir::new("xagent-skill-install")?;
+    let tmp = TempDir::new("xgent-skill-install")?;
     let stage_root = if is_github_source(source) {
         on_progress(SkillInstallProgressUpdate {
             phase: "downloading",

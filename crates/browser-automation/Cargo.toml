@@ -1,8 +1,8 @@
 [package]
 name = "tauri-plugin-browser-automation"
 version = "0.1.0"
-authors = ["XAgent contributors"]
-description = "Shared desktop, Android, and iOS browser automation sessions for XAgent"
+authors = ["Xgent contributors"]
+description = "Shared desktop, Android, and iOS browser automation sessions for Xgent"
 edition = "2021"
 license = "MIT"
 links = "tauri-plugin-browser-automation"

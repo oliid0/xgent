@@ -2,7 +2,7 @@ import { Button as AstryxButton } from "@astryxdesign/core/Button";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Text as AstryxLabel, Text as AstryxText } from "@astryxdesign/core/Text";
 import { TextInput as AstryxInput } from "@astryxdesign/core/TextInput";
-import { isTauriRuntime } from "@xagent/runtime";
+import { isTauriRuntime } from "@xgent/runtime";
 import {
   type FormEvent,
   useCallback,

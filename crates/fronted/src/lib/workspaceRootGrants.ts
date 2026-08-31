@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import type { WorkspaceProject } from "./settings";
 import { isWindowsDrivePath, normalizeComparablePath } from "./tools/pathNormalization";
 

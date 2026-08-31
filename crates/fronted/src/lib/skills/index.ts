@@ -1,9 +1,9 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 
 import { sortSkillsForDisplay } from "./builtin";
 import type { ClawHubSkillCard } from "./clawHub";
 
-const SKILLS_DISCOVERY_UPDATED_EVENT = "xagent:skills-discovery-updated";
+const SKILLS_DISCOVERY_UPDATED_EVENT = "xgent:skills-discovery-updated";
 
 export {
   isAlwaysEnabledSkillName,
@@ -22,7 +22,7 @@ export type SkillSummary = {
   skillFile: string;
   /** relative directory of the skill (from app skills root) */
   baseDir: string;
-  /** true only when the backend verified XAgent ownership metadata */
+  /** true only when the backend verified Xgent ownership metadata */
   builtIn?: boolean;
   /** skill directory creation/modification time in epoch milliseconds */
   installedAt?: number | null;
@@ -158,7 +158,7 @@ type SystemManageSkillResponse = {
 export type ExternalSkillEntry = {
   name: string;
   description: string;
-  /** 技能目录绝对路径，可直接作为 install 动作的 source */
+
   baseDir: string;
   skillFile: string;
 };
@@ -181,7 +181,7 @@ export type ExternalMcpServerEntry = {
   headers: Record<string, string>;
   cwd?: string | null;
   timeoutMs?: number | null;
-  /** 来源作用域："user" 或项目路径（Claude Code 的项目级配置） */
+
   origin: string;
 };
 
@@ -547,7 +547,6 @@ export async function scanExternalMcpServers(): Promise<ExternalMcpToolScan[]> {
   return response.externalMcp ?? [];
 }
 
-/** 解析用户手选的本地 MCP 配置文件（mcpServers JSON 或 Codex config.toml） */
 export async function scanMcpConfigFile(path: string): Promise<ExternalMcpToolScan> {
   const response = await manageSkill({ action: "scan_mcp_file", path });
   const scan = response.externalMcp?.[0];

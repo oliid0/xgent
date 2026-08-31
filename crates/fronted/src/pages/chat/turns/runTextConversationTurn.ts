@@ -606,8 +606,7 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
       sessionId,
       conversationId,
       workdir: conversationCwd,
-      // 抽取子模型看到的必须是用户真正说的话:memory 增量块只服务主模型的缓存,
-      // 混进来会把索引行当成用户发言,既撑破短消息门控又诱发重复写入。
+
       messages: buildPreparedContext(finalState, undefined, {
         includeMemoryTurnUpdates: false,
       }).messages,

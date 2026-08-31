@@ -165,7 +165,7 @@ private func iosToolchains(
             installed: false,
             installable: false,
             version: nil,
-            detail: "The signed XAgent extension catalog is not installed in this build yet"
+            detail: "The signed Xgent extension catalog is not installed in this build yet"
         ),
     ]
 }
@@ -178,18 +178,18 @@ private func iosToolchainPayload(
 }
 
 final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
-    private let installationPreferenceKey = "xagent.mobileExecution.iosShellInstalled"
-    private let installationVerificationKey = "xagent.mobileExecution.iosShellVerification"
+    private let installationPreferenceKey = "xgent.mobileExecution.iosShellInstalled"
+    private let installationVerificationKey = "xgent.mobileExecution.iosShellVerification"
     private let installationVerificationVersion = "ios-a-shell-v1"
-    private let installationProbeToken = "xagent-ios-shell-ready"
-    private let executionQueue = DispatchQueue(label: "com.ohi.xagent.mobile-execution")
+    private let installationProbeToken = "xgent-ios-shell-ready"
+    private let executionQueue = DispatchQueue(label: "com.ohi.xgent.mobile-execution")
     private let stateLock = NSLock()
     private let initializationLock = NSLock()
     private var activeCommand: ActiveCommand?
     private var scheduledRuns = Set<String>()
     private var cancelledRuns = Set<String>()
     private var initialized = false
-    private let sessionIdentifier = strdup("xagent-mobile-execution")!
+    private let sessionIdentifier = strdup("xgent-mobile-execution")!
     private let externalWorkspaces = IOSExternalWorkspaceStore()
     private var pendingWorkspaceInvoke: Invoke?
     private var pendingWorkspaceAllowWrite = true
@@ -223,7 +223,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 "packageManagement": false,
             ],
             "toolchains": iosToolchainPayload(available: installed, resources: resources),
-            "environmentVersion": "XAgent iOS shell core 1",
+            "environmentVersion": "Xgent iOS shell core 1",
             "diskUsageBytes": NSNull(),
         ])
     }
@@ -730,7 +730,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                   FileManager.default.fileExists(atPath: target.path, isDirectory: &isDirectory),
                   isDirectory.boolValue else {
                 throw MobileExecutionError.invalidRequest(
-                    "absolute cwd must be an existing directory inside the XAgent application sandbox"
+                    "absolute cwd must be an existing directory inside the Xgent application sandbox"
                 )
             }
             return target
@@ -792,7 +792,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
 
     private func configureCommandEnvironment(workspace: URL) {
         let resources = Bundle.module.resourceURL
-        let temporary = workspace.appendingPathComponent(".xagent-tmp", isDirectory: true)
+        let temporary = workspace.appendingPathComponent(".xgent-tmp", isDirectory: true)
         try? FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
         setenv("HOME", workspace.path, 1)
         setenv("TMPDIR", temporary.path, 1)

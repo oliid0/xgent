@@ -1,4 +1,4 @@
-//! Skill 元数据：frontmatter / skill.json 解析、README 回退与元数据文件定位。
+
 
 use serde_json::Value;
 use std::fs;

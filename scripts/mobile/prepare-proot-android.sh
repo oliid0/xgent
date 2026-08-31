@@ -12,7 +12,7 @@ readonly SHMEM_ARCHIVE_URL="https://github.com/termux/libandroid-shmem/archive/r
 readonly SHMEM_ARCHIVE_SHA256="1e5ff8459bc0a8c229dd8a94b27d119987e09ef3414331c2b5ebfff20b98e867"
 readonly ANDROID_API="26"
 readonly OUTPUT_ROOT="${1:-crates/mobile-execution/android/src/main/jniLibs}"
-readonly MANIFEST_PATH="${2:-crates/mobile-execution/android/src/main/assets/xagent-proot-manifest.json}"
+readonly MANIFEST_PATH="${2:-crates/mobile-execution/android/src/main/assets/xgent-proot-manifest.json}"
 
 case "$OUTPUT_ROOT" in
   ""|"/"|".")
@@ -129,8 +129,8 @@ install_official_abi() {
   test -f "$proot_loader"
   test -f "$talloc_library"
   test -f "$shmem_library"
-  install -Dm755 "$proot_binary" "$OUTPUT_ROOT/$android_abi/libxagent_proot.so"
-  install -Dm755 "$proot_loader" "$OUTPUT_ROOT/$android_abi/libxagent_proot_loader.so"
+  install -Dm755 "$proot_binary" "$OUTPUT_ROOT/$android_abi/libxgent_proot.so"
+  install -Dm755 "$proot_loader" "$OUTPUT_ROOT/$android_abi/libxgent_proot_loader.so"
   install -Dm755 "$talloc_library" "$OUTPUT_ROOT/$android_abi/libtalloc.so"
   install -Dm755 "$shmem_library" "$OUTPUT_ROOT/$android_abi/libandroid-shmem.so"
   printf '%s' "$proot_version"
@@ -188,12 +188,12 @@ fi
 
 echo "Official PRoot packages were unavailable; falling back to an NDK source build" >&2
 rm -f -- \
-  "$OUTPUT_ROOT/arm64-v8a/libxagent_proot.so" \
-  "$OUTPUT_ROOT/arm64-v8a/libxagent_proot_loader.so" \
+  "$OUTPUT_ROOT/arm64-v8a/libxgent_proot.so" \
+  "$OUTPUT_ROOT/arm64-v8a/libxgent_proot_loader.so" \
   "$OUTPUT_ROOT/arm64-v8a/libtalloc.so" \
   "$OUTPUT_ROOT/arm64-v8a/libandroid-shmem.so" \
-  "$OUTPUT_ROOT/x86_64/libxagent_proot.so" \
-  "$OUTPUT_ROOT/x86_64/libxagent_proot_loader.so" \
+  "$OUTPUT_ROOT/x86_64/libxgent_proot.so" \
+  "$OUTPUT_ROOT/x86_64/libxgent_proot_loader.so" \
   "$OUTPUT_ROOT/x86_64/libtalloc.so" \
   "$OUTPUT_ROOT/x86_64/libandroid-shmem.so"
 
@@ -390,8 +390,8 @@ EOF
     echo "Built PRoot unexpectedly depends on an unpackaged native library" >&2
     exit 1
   fi
-  install -Dm755 "$built_binary" "$OUTPUT_ROOT/$android_abi/libxagent_proot.so"
-  install -Dm755 "$built_loader" "$OUTPUT_ROOT/$android_abi/libxagent_proot_loader.so"
+  install -Dm755 "$built_binary" "$OUTPUT_ROOT/$android_abi/libxgent_proot.so"
+  install -Dm755 "$built_loader" "$OUTPUT_ROOT/$android_abi/libxgent_proot_loader.so"
 }
 
 PROOT_RESOLVED_COMMIT=""

@@ -3,7 +3,7 @@ import type {
   RuntimeFileDropEvent,
   RuntimeInvokeArgs,
   RuntimeUnlisten,
-  XAgentRuntime,
+  XgentRuntime,
 } from "./types";
 
 type TauriWindow = Window & {
@@ -21,9 +21,9 @@ export function isBrowserRuntime() {
   return typeof window !== "undefined" && !isTauriRuntime();
 }
 
-let runtimePromise: Promise<XAgentRuntime> | undefined;
+let runtimePromise: Promise<XgentRuntime> | undefined;
 
-function loadRuntime(): Promise<XAgentRuntime> {
+function loadRuntime(): Promise<XgentRuntime> {
   runtimePromise ??= isTauriRuntime()
     ? import("./tauri").then(({ tauriRuntime }) => tauriRuntime)
     : import("./browser").then(({ browserRuntime }) => browserRuntime);

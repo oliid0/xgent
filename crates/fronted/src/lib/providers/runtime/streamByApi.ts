@@ -88,11 +88,9 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
         baseUrl: model.baseUrl,
         model,
       });
-      // Anthropic：需要我们自己调用 streamAnthropic()，以便显式传 toolChoice（以及启用/禁用 thinking）。
+
       const anthropicThinking = resolveAnthropicThinkingRuntime(model, effectiveOptions);
-      // Anthropic 拒绝 extended thinking 与强制工具（"any"/{type:"tool"}）同请求
-      // （400）。降级为 auto：有界强制的调用方（plan mode 补提交轮）同时注入了
-      // 消息级提醒，语义仍然成立；直接 400 反而会进重试/failover 循环。
+
       const requestedToolChoice = effectiveOptions.toolChoice ?? "none";
       const anthropicToolChoice =
         anthropicThinking.thinkingEnabled &&
@@ -134,10 +132,7 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
         baseUrl: model.baseUrl,
         model,
       });
-      // 严格校验的 OpenAI 兼容端点（xAI/各类中转网关）对「带 tool_choice 但没带
-      // tools」的请求直接 400（"A tool_choice was set on the request but no tools
-      // were specified"）——compaction 摘要、标题生成等 text-only 请求没有工具，
-      // 会踩中。tool_choice 在无工具时本就无意义，只在请求真正携带 tools 时下发。
+
       const openAIOptions: OpenAICompletionsOptions = {
         ...buildOpenAIBaseOptions(model, effectiveOptions),
         reasoningEffort: clampOpenAIReasoningEffort(model, effectiveOptions.reasoning),

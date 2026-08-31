@@ -9,7 +9,7 @@ function usage() {
     "Usage: prepare-app-version-from-tag.mjs <release-tag> [options]",
     "",
     "Options:",
-    "  --github-env <path>      Append XAGENT_* variables for later workflow steps.",
+    "  --github-env <path>      Append XGENT_* variables for later workflow steps.",
     "  --github-output <path>   Append release metadata as GitHub Action step outputs.",
     "  --tauri-config <path>    Write a generated Tauri config overlay with the app version.",
     "  --tauri-platform <name>  Version rules for default or windows bundlers.",
@@ -98,7 +98,7 @@ function writeTauriConfig(path, appVersion, platform) {
 try {
   const options = parseArgs(process.argv.slice(2));
   const metadata = parseReleaseVersion(
-    options.releaseTag || process.env.XAGENT_RELEASE_TAG || process.env.RELEASE_TAG,
+    options.releaseTag || process.env.XGENT_RELEASE_TAG || process.env.RELEASE_TAG,
   );
 
   if (options.tauriConfigPath) {
@@ -107,12 +107,12 @@ try {
 
   if (options.githubEnvPath) {
     const envLines = [
-      `XAGENT_RELEASE_TAG=${metadata.releaseTag}`,
-      `XAGENT_APP_VERSION=${metadata.appVersion}`,
-      `XAGENT_IS_PRERELEASE=${metadata.isPrerelease}`,
+      `XGENT_RELEASE_TAG=${metadata.releaseTag}`,
+      `XGENT_APP_VERSION=${metadata.appVersion}`,
+      `XGENT_IS_PRERELEASE=${metadata.isPrerelease}`,
     ];
     if (options.tauriConfigPath) {
-      envLines.push(`XAGENT_TAURI_VERSION_CONFIG=${options.tauriConfigPath}`);
+      envLines.push(`XGENT_TAURI_VERSION_CONFIG=${options.tauriConfigPath}`);
     }
     appendLines(options.githubEnvPath, envLines);
   }
@@ -146,7 +146,7 @@ try {
       ? ` Wrote Tauri version config: ${options.tauriConfigPath}.`
       : "";
     console.log(
-      `Prepared XAgent ${metadata.releaseTag} (app version ${metadata.appVersion}, prerelease ${metadata.isPrerelease}).${configSuffix}`,
+      `Prepared Xgent ${metadata.releaseTag} (app version ${metadata.appVersion}, prerelease ${metadata.isPrerelease}).${configSuffix}`,
     );
   }
 } catch (error) {

@@ -192,7 +192,7 @@ test("ToolPathResolver resolves enabled Skill paths and gates external paths by 
   const resolver = new pathUtils.ToolPathResolver({
     workdir: "/workspace/project",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
     skillAccessPolicy: {
       allowedSkillNames: ["skills-creator"],
       allowedSkillBaseDirs: ["skills-creator"],
@@ -206,13 +206,13 @@ test("ToolPathResolver resolves enabled Skill paths and gates external paths by 
   });
   assert.equal(skillUrl.scope, "skill");
   assert.equal(skillUrl.relativePath, "skills-creator/SKILL.md");
-  assert.equal(skillUrl.absolutePath, "/Users/me/.xagent/skills/skills-creator/SKILL.md");
+  assert.equal(skillUrl.absolutePath, "/Users/me/.xgent/skills/skills-creator/SKILL.md");
   assert.equal(skillUrl.displayPath, "skill://skills-creator/SKILL.md");
-  assert.equal(skillUrl.root, "/Users/me/.xagent/skills");
+  assert.equal(skillUrl.root, "/Users/me/.xgent/skills");
   assert.ok(!("pathRef" in skillUrl));
 
   const absoluteSkill = await resolver.resolvePath(
-    "/Users/me/.xagent/skills/skills-creator/SKILL.md",
+    "/Users/me/.xgent/skills/skills-creator/SKILL.md",
     {
       label: "Read.path",
       intent: "read",
@@ -257,7 +257,7 @@ test("ToolPathResolver teaches the skill:// shape when the skill path is empty",
   const resolver = new pathUtils.ToolPathResolver({
     workdir: "/workspace/project",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
   });
 
   await assert.rejects(
@@ -278,18 +278,18 @@ test("ToolPathResolver teaches the skill:// shape when the skill path is empty",
   });
   assert.equal(skillsRoot.scope, "skill");
   assert.equal(skillsRoot.relativePath, undefined);
-  assert.equal(skillsRoot.root, "/Users/me/.xagent/skills");
+  assert.equal(skillsRoot.root, "/Users/me/.xgent/skills");
 });
 
 test("ToolPathResolver prefers the skill scope when the skills root nests inside the workspace", async () => {
   const resolver = new pathUtils.ToolPathResolver({
     workdir: "/workspace/project",
     skillsRootEnabled: true,
-    skillsRootDir: "/workspace/project/.xagent/skills",
+    skillsRootDir: "/workspace/project/.xgent/skills",
   });
 
   const nestedSkill = await resolver.resolvePath(
-    "/workspace/project/.xagent/skills/demo/SKILL.md",
+    "/workspace/project/.xgent/skills/demo/SKILL.md",
     {
       label: "Read.path",
       intent: "read",
@@ -298,7 +298,7 @@ test("ToolPathResolver prefers the skill scope when the skills root nests inside
   );
   assert.equal(nestedSkill.scope, "skill");
   assert.equal(nestedSkill.relativePath, "demo/SKILL.md");
-  assert.equal(nestedSkill.root, "/workspace/project/.xagent/skills");
+  assert.equal(nestedSkill.root, "/workspace/project/.xgent/skills");
   assert.equal(nestedSkill.displayPath, "skill://demo/SKILL.md");
 
   const workspaceFile = await resolver.resolvePath("/workspace/project/src/App.tsx", {
@@ -354,9 +354,9 @@ test("ToolPathResolver expands ~ only with an injected home directory", async ()
   const fixedSkills = new pathUtils.ToolPathResolver({
     workdir: "/workspace/project",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
   });
-  const skillViaHome = await fixedSkills.resolvePath("~/.xagent/skills/demo/SKILL.md", {
+  const skillViaHome = await fixedSkills.resolvePath("~/.xgent/skills/demo/SKILL.md", {
     label: "Read.path",
     intent: "read",
     required: true,
@@ -370,7 +370,7 @@ test("ToolPathResolver still accepts legacy workspace:/skill: prefixed inputs", 
   const resolver = new pathUtils.ToolPathResolver({
     workdir: "/workspace/project",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
   });
 
   const workspaceRef = await resolver.resolvePath("workspace:src/App.tsx", {
@@ -398,7 +398,7 @@ test("builtin agent skills stay selected and sort first", () => {
   assert.deepEqual(skillBuiltinHelpers.mergeAlwaysEnabledSkillNames(["demo-skill"]), [
     "skills-creator",
     "skills-installer",
-    "xagent-cloud-execution",
+    "xgent-cloud-execution",
     "demo-skill",
   ]);
   assert.deepEqual(
@@ -406,14 +406,14 @@ test("builtin agent skills stay selected and sort first", () => {
       { name: "z-skill" },
       { name: "skills-installer" },
       { name: "a-skill" },
-      { name: "xagent-code-review" },
+      { name: "xgent-code-review" },
       { name: "skills-creator" },
     ]).map((skill) => skill.name),
-    ["skills-creator", "skills-installer", "a-skill", "xagent-code-review", "z-skill"],
+    ["skills-creator", "skills-installer", "a-skill", "xgent-code-review", "z-skill"],
   );
-  assert.equal(skillBuiltinHelpers.isUserSelectableSkillName("xagent-code-review"), true);
+  assert.equal(skillBuiltinHelpers.isUserSelectableSkillName("xgent-code-review"), true);
   assert.equal(skillBuiltinHelpers.isUserSelectableSkillName("skills-creator"), false);
-  assert.equal(skillBuiltinHelpers.isUserSelectableSkillName("xagent-cloud-execution"), false);
+  assert.equal(skillBuiltinHelpers.isUserSelectableSkillName("xgent-cloud-execution"), false);
   assert.equal(skillBuiltinHelpers.isUserSelectableSkillName("workflow-skill"), true);
 });
 
@@ -447,7 +447,7 @@ test("file tools can read enabled Skill files via skill URLs", async () => {
   const bundle = fsTools.createFsTools({
     workdir: "/workspace",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
     fileState: fileToolState.createFileToolState(),
   });
 
@@ -478,7 +478,7 @@ test("file tools can read enabled Skill files via skill URLs", async () => {
     {
       command: "fs_read_text",
       args: {
-        workdir: "/Users/me/.xagent/skills",
+        workdir: "/Users/me/.xgent/skills",
         path: "skills-creator/SKILL.md",
         start_line: undefined,
         limit: 20,
@@ -547,7 +547,7 @@ test("file tools enforce enabled Skill allowlist for skill URLs", async () => {
   const bundle = fsTools.createFsTools({
     workdir: "/workspace",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
     skillAccessPolicy: {
       allowedSkillNames: ["skills-creator"],
       allowedSkillBaseDirs: ["skills-creator"],
@@ -616,7 +616,7 @@ test("file tools allow direct mutations inside enabled Skills when mutation is g
   const bundle = fsTools.createFsTools({
     workdir: "/workspace",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
     skillAccessPolicy: {
       allowedSkillNames: ["demo"],
       allowedSkillBaseDirs: ["demo"],
@@ -642,14 +642,14 @@ test("file tools allow direct mutations inside enabled Skills when mutation is g
     {
       command: "fs_path_status",
       args: {
-        workdir: "/Users/me/.xagent/skills",
+        workdir: "/Users/me/.xgent/skills",
         path: "demo/SKILL.md",
       },
     },
     {
       command: "fs_write_text",
       args: {
-        workdir: "/Users/me/.xagent/skills",
+        workdir: "/Users/me/.xgent/skills",
         path: "demo/SKILL.md",
         content: "---\nname: demo\ndescription: Demo\n---\n",
         mode: "rewrite",
@@ -1182,12 +1182,12 @@ test("file tools block direct mutations inside backend-verified built-in Skills"
   const bundle = fsTools.createFsTools({
     workdir: "/workspace",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
     skillAccessPolicy: {
-      allowedSkillNames: ["xagent-code-review"],
-      allowedSkillBaseDirs: ["xagent-code-review"],
-      protectedSkillNames: ["xagent-code-review"],
-      protectedSkillBaseDirs: ["xagent-code-review"],
+      allowedSkillNames: ["xgent-code-review"],
+      allowedSkillBaseDirs: ["xgent-code-review"],
+      protectedSkillNames: ["xgent-code-review"],
+      protectedSkillBaseDirs: ["xgent-code-review"],
       allowSkillMutation: true,
     },
     fileState: fileToolState.createFileToolState(),
@@ -1198,13 +1198,13 @@ test("file tools block direct mutations inside backend-verified built-in Skills"
     id: "blocked-builtin-skill-write",
     name: "Write",
     arguments: {
-      path: "skill://xagent-code-review/SKILL.md",
-      content: "---\nname: xagent-code-review\ndescription: Changed\n---\n",
+      path: "skill://xgent-code-review/SKILL.md",
+      content: "---\nname: xgent-code-review\ndescription: Changed\n---\n",
     },
   });
 
   assert.equal(result.isError, true);
-  assert.match(result.content[0].text, /built-in Skill "xagent-code-review" is protected/);
+  assert.match(result.content[0].text, /built-in Skill "xgent-code-review" is protected/);
   assert.match(result.content[0].text, /cannot be modified by the model/);
   assert.deepEqual(invocations, []);
 });
@@ -1238,7 +1238,7 @@ test("file tools normalize absolute enabled Skill paths", async () => {
   const bundle = fsTools.createFsTools({
     workdir: "/workspace",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
     fileState: fileToolState.createFileToolState(),
   });
 
@@ -1247,7 +1247,7 @@ test("file tools normalize absolute enabled Skill paths", async () => {
     id: "absolute-skill-read",
     name: "Read",
     arguments: {
-      path: "/Users/me/.xagent/skills/skills-installer/SKILL.md",
+      path: "/Users/me/.xgent/skills/skills-installer/SKILL.md",
     },
   });
 
@@ -1259,7 +1259,7 @@ test("file tools normalize absolute enabled Skill paths", async () => {
     {
       command: "fs_read_text",
       args: {
-        workdir: "/Users/me/.xagent/skills",
+        workdir: "/Users/me/.xgent/skills",
         path: "skills-installer/SKILL.md",
         start_line: undefined,
         limit: undefined,
@@ -1289,7 +1289,7 @@ test("file tool runtime string errors surface the backend message with the displ
   const bundle = fsTools.createFsTools({
     workdir: "/workspace",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
     fileState: fileToolState.createFileToolState(),
   });
 
@@ -1312,7 +1312,7 @@ test("file tool runtime string errors surface the backend message with the displ
     {
       command: "fs_read_text",
       args: {
-        workdir: "/Users/me/.xagent/skills",
+        workdir: "/Users/me/.xgent/skills",
         path: "demo/missing.md",
         start_line: undefined,
         limit: undefined,
@@ -1616,7 +1616,7 @@ test("SkillsManager read accepts explicit skill entry paths", async () => {
           assert.equal(command, "system_manage_skill");
           return {
             action: "read",
-            rootDir: "/Users/me/.xagent/skills",
+            rootDir: "/Users/me/.xgent/skills",
             path: args.payload.path,
             content: "line one\nline two\n",
             truncated: false,
@@ -1650,7 +1650,7 @@ test("SkillsManager read accepts explicit skill entry paths", async () => {
   assert.equal(result.details.path, "skills-installer/SKILL.md");
   assert.equal(result.details.startLine, 3);
   assert.equal(result.details.numLines, 2);
-  assert.match(result.content[0].text, /<XAgentSkillFileRules>/);
+  assert.match(result.content[0].text, /<XgentSkillFileRules>/);
   assert.match(result.content[0].text, /skill:\/\/skills-installer\/\.\.\./);
   assert.match(result.content[0].text, /path="skill:\/\/skills-installer\/\.\.\."/);
   assert.match(result.content[0].text, /Do not use Bash/);
@@ -1679,11 +1679,11 @@ test("SkillsManager install resolves local relative sources against the workspac
           assert.equal(command, "system_manage_skill");
           return {
             action: "install",
-            rootDir: "/Users/me/.xagent/skills",
+            rootDir: "/Users/me/.xgent/skills",
             installed: [
               {
                 name: "chart-image",
-                target: "/Users/me/.xagent/skills/chart-image",
+                target: "/Users/me/.xgent/skills/chart-image",
                 backup: null,
                 skillFile: "chart-image/SKILL.md",
               },
@@ -1730,14 +1730,14 @@ test("SkillsManager clawhub_install forwards owner handle for slug disambiguatio
           assert.equal(command, "system_manage_skill");
           return {
             action: "clawhub_install",
-            rootDir: "/Users/me/.xagent/skills",
+            rootDir: "/Users/me/.xgent/skills",
             clawhubSlug: "example-skill",
             clawhubDownloadUrl:
               "https://clawhub.ai/api/v1/download?slug=example-skill&tag=latest&ownerHandle=acme",
             installed: [
               {
                 name: "example-skill",
-                target: "/Users/me/.xagent/skills/example-skill",
+                target: "/Users/me/.xgent/skills/example-skill",
                 backup: null,
                 skillFile: "example-skill/SKILL.md",
               },
@@ -1858,10 +1858,10 @@ test("SkillsManager blocks built-in Skill create/install targets before backend 
   const skillTools = skillLoader.loadModule("src/lib/tools/skillTools.ts");
   const bundle = skillTools.createSkillTools({
     skillAccessPolicy: {
-      allowedSkillNames: ["skills-creator", "skills-installer", "xagent-code-review"],
-      allowedSkillBaseDirs: ["skills-creator", "skills-installer", "xagent-code-review"],
-      protectedSkillNames: ["xagent-code-review"],
-      protectedSkillBaseDirs: ["xagent-code-review"],
+      allowedSkillNames: ["skills-creator", "skills-installer", "xgent-code-review"],
+      allowedSkillBaseDirs: ["skills-creator", "skills-installer", "xgent-code-review"],
+      protectedSkillNames: ["xgent-code-review"],
+      protectedSkillBaseDirs: ["xgent-code-review"],
       allowSkillManagement: true,
     },
   });
@@ -1901,11 +1901,11 @@ test("SkillsManager blocks built-in Skill create/install targets before backend 
     name: "SkillsManager",
     arguments: {
       action: "delete",
-      name: "xagent-code-review",
+      name: "xgent-code-review",
     },
   });
   assert.equal(deleteResult.isError, true);
-  assert.match(deleteResult.content[0].text, /built-in Skill "xagent-code-review" is protected/);
+  assert.match(deleteResult.content[0].text, /built-in Skill "xgent-code-review" is protected/);
   assert.deepEqual(invocations, []);
 });
 
@@ -1923,11 +1923,11 @@ test("SkillsManager management can auto-enable installed Skills without exposing
           if (action === "install") {
             return {
               action: "install",
-              rootDir: "/Users/me/.xagent/skills",
+              rootDir: "/Users/me/.xgent/skills",
               installed: [
                 {
                   name: "new-skill",
-                  target: "/Users/me/.xagent/skills/new-skill",
+                  target: "/Users/me/.xgent/skills/new-skill",
                   backup: null,
                   skillFile: "new-skill/SKILL.md",
                 },
@@ -1938,7 +1938,7 @@ test("SkillsManager management can auto-enable installed Skills without exposing
             assert.equal(args.payload.path, "new-skill/SKILL.md");
             return {
               action: "read",
-              rootDir: "/Users/me/.xagent/skills",
+              rootDir: "/Users/me/.xgent/skills",
               path: "new-skill/SKILL.md",
               content: "---\nname: new-skill\ndescription: New Skill\n---\n",
               truncated: false,
@@ -1949,33 +1949,33 @@ test("SkillsManager management can auto-enable installed Skills without exposing
           if (action === "list") {
             return {
               action: "list",
-              rootDir: "/Users/me/.xagent/skills",
+              rootDir: "/Users/me/.xgent/skills",
               skills: [
                 {
                   name: "skills-creator",
                   description: "Create Skills",
-                  target: "/Users/me/.xagent/skills/skills-creator",
+                  target: "/Users/me/.xgent/skills/skills-creator",
                   skillFile: "skills-creator/SKILL.md",
                   baseDir: "skills-creator",
                 },
                 {
                   name: "skills-installer",
                   description: "Install Skills",
-                  target: "/Users/me/.xagent/skills/skills-installer",
+                  target: "/Users/me/.xgent/skills/skills-installer",
                   skillFile: "skills-installer/SKILL.md",
                   baseDir: "skills-installer",
                 },
                 {
                   name: "new-skill",
                   description: "New Skill",
-                  target: "/Users/me/.xagent/skills/new-skill",
+                  target: "/Users/me/.xgent/skills/new-skill",
                   skillFile: "new-skill/SKILL.md",
                   baseDir: "new-skill",
                 },
                 {
                   name: "hidden-skill",
                   description: "Hidden Skill",
-                  target: "/Users/me/.xagent/skills/hidden-skill",
+                  target: "/Users/me/.xgent/skills/hidden-skill",
                   skillFile: "hidden-skill/SKILL.md",
                   baseDir: "hidden-skill",
                 },
@@ -2068,7 +2068,7 @@ test("SkillsManager management can auto-enable installed Skills without exposing
     });
     assert.equal(readResult.isError, false);
     assert.equal(readResult.details.path, "new-skill/SKILL.md");
-    assert.deepEqual(events, ["xagent:skills-discovery-updated"]);
+    assert.deepEqual(events, ["xgent:skills-discovery-updated"]);
   } finally {
     if (typeof previousWindow === "undefined") {
       delete globalThis.window;
@@ -2086,7 +2086,7 @@ test("SkillsManager list filters installed Skills when inventory is explicitly a
           assert.equal(command, "system_manage_skill");
           return {
             action: "list",
-            rootDir: "/Users/me/.xagent/skills",
+            rootDir: "/Users/me/.xgent/skills",
             skills: [
               {
                 name: "skills-creator",
@@ -2176,10 +2176,10 @@ test("SkillsManager create action builds payload and refreshes skill discovery",
           if (action === "create") {
             return {
               action,
-              rootDir: "/Users/me/.xagent/skills",
+              rootDir: "/Users/me/.xgent/skills",
               created: {
                 name: "workflow-skill",
-                target: "/Users/me/.xagent/skills/workflow-skill",
+                target: "/Users/me/.xgent/skills/workflow-skill",
                 backup: null,
                 skillFile: "workflow-skill/SKILL.md",
               },
@@ -2188,10 +2188,10 @@ test("SkillsManager create action builds payload and refreshes skill discovery",
           if (action === "validate") {
             return {
               action,
-              rootDir: "/Users/me/.xagent/skills",
+              rootDir: "/Users/me/.xgent/skills",
               validation: {
                 name: "workflow-skill",
-                target: "/Users/me/.xagent/skills/workflow-skill",
+                target: "/Users/me/.xgent/skills/workflow-skill",
                 ok: true,
                 errors: [],
               },
@@ -2200,11 +2200,11 @@ test("SkillsManager create action builds payload and refreshes skill discovery",
           if (action === "package") {
             return {
               action,
-              rootDir: "/Users/me/.xagent/skills",
+              rootDir: "/Users/me/.xgent/skills",
               package: {
                 name: "workflow-skill",
-                target: "/Users/me/.xagent/skills/workflow-skill",
-                archive: "/Users/me/.xagent/skills/.packages/workflow-skill.skill",
+                target: "/Users/me/.xgent/skills/workflow-skill",
+                archive: "/Users/me/.xgent/skills/.packages/workflow-skill.skill",
               },
             };
           }
@@ -2252,12 +2252,12 @@ test("SkillsManager create action builds payload and refreshes skill discovery",
     assert.equal(result.details.kind, "manage_skill");
     assert.equal(result.details.action, "create");
     assert.equal(result.details.createdName, "workflow-skill");
-    assert.equal(result.details.target, "/Users/me/.xagent/skills/workflow-skill");
+    assert.equal(result.details.target, "/Users/me/.xgent/skills/workflow-skill");
     assert.match(result.content[0].text, /pathScheme=skill:\/\/<baseDir>\/\.\.\./);
     assert.match(result.content[0].text, /target=skill:\/\/workflow-skill/);
     assert.match(result.content[0].text, /skillFile=workflow-skill\/SKILL\.md/);
     assert.match(result.content[0].text, /enabled=true/);
-    assert.doesNotMatch(result.content[0].text, /\/Users\/me\/\.xagent\/skills/);
+    assert.doesNotMatch(result.content[0].text, /\/Users\/me\/\.xgent\/skills/);
     assert.deepEqual(policy.allowedSkillNames, [
       "skills-creator",
       "skills-installer",
@@ -2299,7 +2299,7 @@ test("SkillsManager create action builds payload and refreshes skill discovery",
     });
     assert.equal(packageResult.isError, false);
     assert.match(packageResult.content[0].text, /archive=skill:\/\/\.packages\/workflow-skill\.skill/);
-    assert.deepEqual(events, ["xagent:skills-discovery-updated"]);
+    assert.deepEqual(events, ["xgent:skills-discovery-updated"]);
     assert.deepEqual(invocations, [
       {
         command: "system_manage_skill",
@@ -2442,7 +2442,7 @@ test("Image file tool reads installed Skill images through skill URLs", async ()
   const bundle = fsTools.createFsTools({
     workdir: "/workspace",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
     fileState: fileToolState.createFileToolState(),
   });
 
@@ -2469,7 +2469,7 @@ test("Image file tool reads installed Skill images through skill URLs", async ()
     {
       command: "fs_read_image_source",
       args: {
-        workdir: "/Users/me/.xagent/skills",
+        workdir: "/Users/me/.xgent/skills",
         source: "demo/assets/logo.png",
         source_type: "path",
         mime_type: undefined,
@@ -2503,7 +2503,7 @@ test("Image file tool normalizes absolute workspace and Skill image paths", asyn
   const bundle = fsTools.createFsTools({
     workdir: "/workspace",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
     fileState: fileToolState.createFileToolState(),
   });
 
@@ -2521,7 +2521,7 @@ test("Image file tool normalizes absolute workspace and Skill image paths", asyn
     type: "toolCall",
     id: "absolute-skill-image",
     name: "Image",
-    arguments: { path: "/Users/me/.xagent/skills/demo/assets/logo.png" },
+    arguments: { path: "/Users/me/.xgent/skills/demo/assets/logo.png" },
   });
   assert.equal(skillsResult.isError, false);
   assert.equal(skillsResult.details.images[0].scope, "skill");
@@ -2531,7 +2531,7 @@ test("Image file tool normalizes absolute workspace and Skill image paths", asyn
     type: "toolCall",
     id: "home-skill-image",
     name: "Image",
-    arguments: { path: "~/.xagent/skills/demo/assets/logo.png" },
+    arguments: { path: "~/.xgent/skills/demo/assets/logo.png" },
   });
   assert.equal(homeSkillsResult.isError, false);
   assert.equal(homeSkillsResult.details.images[0].scope, "skill");
@@ -2540,8 +2540,8 @@ test("Image file tool normalizes absolute workspace and Skill image paths", asyn
     invocations.map((call) => [call.args.workdir, call.args.source]),
     [
       ["/workspace", "uploads/logo.png"],
-      ["/Users/me/.xagent/skills", "demo/assets/logo.png"],
-      ["/Users/me/.xagent/skills", "demo/assets/logo.png"],
+      ["/Users/me/.xgent/skills", "demo/assets/logo.png"],
+      ["/Users/me/.xgent/skills", "demo/assets/logo.png"],
     ],
   );
 });
@@ -2569,7 +2569,7 @@ test("Image file tool blocks fixed Skills root paths when Skills are disabled", 
     type: "toolCall",
     id: "blocked-disabled-skill-image",
     name: "Image",
-    arguments: { path: "~/.xagent/skills/demo/assets/logo.png" },
+    arguments: { path: "~/.xgent/skills/demo/assets/logo.png" },
   });
 
   assert.equal(result.isError, true);
@@ -2595,7 +2595,7 @@ test("Image runtime errors surface the backend message for resolved local paths"
   const bundle = fsTools.createFsTools({
     workdir: "/workspace",
     skillsRootEnabled: true,
-    skillsRootDir: "/Users/me/.xagent/skills",
+    skillsRootDir: "/Users/me/.xgent/skills",
     fileState: fileToolState.createFileToolState(),
   });
 
@@ -2616,7 +2616,7 @@ test("Image runtime errors surface the backend message for resolved local paths"
     {
       command: "fs_read_image_source",
       args: {
-        workdir: "/Users/me/.xagent/skills",
+        workdir: "/Users/me/.xgent/skills",
         source: "demo/assets/missing.png",
         source_type: "path",
         mime_type: undefined,

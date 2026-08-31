@@ -1,5 +1,5 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { Type } from "typebox";
 
 import {
@@ -699,23 +699,6 @@ export function createMcpManagerTools(params: {
     return params.applyMcpOps;
   }
 
-  /**
-   * 沙箱围栏的对称性守卫(P1#1)。
-   *
-   * `transport: "stdio"` 的运行时探测最终走到 Rust `build_stdio_command` 的裸
-   * `Command::new`,不带任何 SandboxSpec;而 `action: "test"` 允许模型传入自由格式的
-   * `command`/`args`,既不写配置也不持久化 —— 等于在"选了最严格模式"的会话里留下一个
-   * 与 Bash 同样通用、却完全无围栏的进程 spawn 入口(sandboxOffline 下尤其矛盾:
-   * 该模式的全部意义就是内核级断网)。MCP 运行时是进程级共享池,且 http/sse 传输根本
-   * 不落到 shell funnel 上,无法复用同一套沙箱包装,故在沙箱模式下一律 fail-closed 拒绝。
-   *
-   * create / update / enable 同样会把 stdio `command`/`args` 写入设置,下一轮
-   * registry 构建(或同轮 subagent)经 `createMcpTools` → `mcp_list_tools` 自动拉起
-   * 该进程,所以配置写入路径必须走同一守卫,不能只拦运行时探测。
-   *
-   * 非 stdio 传输不 spawn 进程,不在本守卫范围内;用户在设置界面里手动测试 MCP 服务器
-   * 也不受影响(那是显式用户操作,与 hooks / 用户自建 Cron 脚本同一豁免)。
-   */
   function assertRuntimeSpawnAllowed(action: McpManagerAction, server: McpServerConfig) {
     if (!params.sandbox?.enabled) return;
     if (server.transport !== "stdio") return;
@@ -1001,7 +984,7 @@ export function createMcpManagerTools(params: {
   const toolMcpManager: Tool = {
     name: "McpManager",
     description:
-      "Manage XAgent MCP Server configuration. Use this built-in tool for MCP server CRUD, enable/disable, static validation, connection tests, diagnostics, restart/stop, and tools/list. Enabled MCP servers are automatically loaded as dynamic mcp_* tools. It does not call arbitrary MCP business tools; use the dynamically loaded mcp_* tools for actual MCP tool execution.",
+      "Manage Xgent MCP Server configuration. Use this built-in tool for MCP server CRUD, enable/disable, static validation, connection tests, diagnostics, restart/stop, and tools/list. Enabled MCP servers are automatically loaded as dynamic mcp_* tools. It does not call arbitrary MCP business tools; use the dynamically loaded mcp_* tools for actual MCP tool execution.",
     parameters: MCP_MANAGER_PARAMETERS,
   };
 

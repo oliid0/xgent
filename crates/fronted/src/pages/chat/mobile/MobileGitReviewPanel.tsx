@@ -11,7 +11,7 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -340,7 +340,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
         gap={2}
         vAlign="center"
         paddingInline={3}
-        className="mobile-panel-header min-h-[var(--xagent-mobile-header-height)] shrink-0 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/90 backdrop-blur-xl"
+        className="mobile-panel-header min-h-[var(--xgent-mobile-header-height)] shrink-0 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/90 backdrop-blur-xl"
       >
         {showingDetail ? (
           <IconButton

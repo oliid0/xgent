@@ -136,14 +136,14 @@ export function WorkspaceImagePreviewOverlay(props: WorkspaceImagePreviewOverlay
 
   return (
     <VStack
-      className="xagent-workspace-preview-overlay"
+      className="xgent-workspace-preview-overlay"
       data-visible={isVisible ? "true" : "false"}
       width="100%"
       height="100%"
       style={{
         position: "absolute",
         inset: 0,
-        zIndex: "var(--xagent-z-workspace-overlay)",
+        zIndex: "var(--xgent-z-workspace-overlay)",
         minWidth: 0,
         minHeight: 0,
         overflow: "hidden",
@@ -201,7 +201,7 @@ export function WorkspaceImagePreviewOverlay(props: WorkspaceImagePreviewOverlay
               ) : null}
               <Center
                 style={{
-                  minHeight: "var(--xagent-workspace-image-stage-min-height)",
+                  minHeight: "var(--xgent-workspace-image-stage-min-height)",
                   flex: 1,
                   overflow: "auto",
                   backgroundColor: "var(--color-background-muted)",

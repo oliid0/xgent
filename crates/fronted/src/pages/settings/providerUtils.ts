@@ -1,7 +1,7 @@
-import { isBrowserRuntime } from "@xagent/runtime";
+import { isBrowserRuntime } from "@xgent/runtime";
 import { mergeCustomHeaders } from "../../lib/providers/customHeaders";
 import { sortModelsByActiveStateAndVendor } from "../../lib/providers/modelVendor";
-import { prepareProxyRequest, XAGENT_UPSTREAM_URL_HEADER } from "../../lib/providers/proxy";
+import { prepareProxyRequest, XGENT_UPSTREAM_URL_HEADER } from "../../lib/providers/proxy";
 import {
   type CustomProvider,
   createProviderModelConfig,
@@ -508,7 +508,7 @@ export async function fetchModelsFromApi(
       if (exactModelsUrl) {
         requestHeaders = {
           ...requestHeaders,
-          [XAGENT_UPSTREAM_URL_HEADER]: withModelPageCursor(exactModelsUrl, cursor),
+          [XGENT_UPSTREAM_URL_HEADER]: withModelPageCursor(exactModelsUrl, cursor),
         };
       } else {
         requestUrl = withModelPageCursor(modelsUrl, cursor);

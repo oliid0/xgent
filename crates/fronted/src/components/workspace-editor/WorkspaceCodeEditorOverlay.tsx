@@ -20,7 +20,7 @@ import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import * as monaco from "monaco-editor";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import CssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
@@ -293,7 +293,7 @@ function editorModelUri(tabKey: string) {
     hexKey += byte.toString(16).padStart(2, "0");
   }
   return monaco.Uri.from({
-    scheme: "xagent-editor",
+    scheme: "xgent-editor",
     authority: "model",
     path: `/${hexKey}`,
   });
@@ -719,7 +719,6 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
     editor.trigger("contextMenu", commandId, null);
   }, []);
 
-  // 选区扩展到整行后作为代码引用（仅路径+行号）交给输入框；空选区退化为光标所在行。
   const insertSelectionAsCodeMention = useCallback(() => {
     const editor = editorRef.current;
     const tab = activeTab;
@@ -913,14 +912,14 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
   return (
     <VStack
       ref={overlayRef}
-      className="xagent-workspace-preview-overlay"
+      className="xgent-workspace-preview-overlay"
       data-visible={isVisible ? "true" : "false"}
       width="100%"
       height="100%"
       style={{
         position: "absolute",
         inset: 0,
-        zIndex: "var(--xagent-z-workspace-overlay)",
+        zIndex: "var(--xgent-z-workspace-overlay)",
         minWidth: 0,
         minHeight: 0,
         overflow: "hidden",
@@ -1099,7 +1098,7 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
               ) : null}
               {tabs.length > 0 ? (
                 <HStack
-                  className="xagent-workspace-editor-tabs"
+                  className="xgent-workspace-editor-tabs"
                   gap={1}
                   vAlign="center"
                   role="tablist"
@@ -1163,10 +1162,10 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
                 }
               />
             ) : null}
-            <StackItem className="xagent-workspace-editor-context-menu" size="fill">
+            <StackItem className="xgent-workspace-editor-context-menu" size="fill">
               <LayoutContent
                 ref={containerRef}
-                className="xagent-workspace-editor-stage"
+                className="xgent-workspace-editor-stage"
                 padding={0}
                 isScrollable={false}
               >
@@ -1214,7 +1213,7 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
           }}
           title={dialogTitle}
           purpose="info"
-          width="var(--xagent-dialog-width-sm)"
+          width="var(--xgent-dialog-width-sm)"
           touchPresentation="bottom-sheet"
           footer={
             <HStack gap={2} hAlign="end">
@@ -1251,7 +1250,7 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
           }}
           title={`${t("workspaceEditor.runOutput")}: ${runResult.fileName}`}
           purpose="info"
-          width="var(--xagent-dialog-width-lg)"
+          width="var(--xgent-dialog-width-lg)"
           touchPresentation="bottom-sheet"
           footer={
             <Button

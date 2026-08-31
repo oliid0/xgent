@@ -10,7 +10,7 @@ import {
   StackItem,
   VStack,
 } from "@astryxdesign/core/Layout";
-import { openUrl } from "@xagent/runtime";
+import { openUrl } from "@xgent/runtime";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import type { GitClient } from "../../lib/git/types";

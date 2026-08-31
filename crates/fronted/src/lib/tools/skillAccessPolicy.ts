@@ -147,7 +147,7 @@ export function buildSkillAccessDeniedMessage(params: {
     `${params.operation} is blocked: ${target} is not enabled for this conversation.`,
     allowedText,
     "Enable the Skill in the chat Skills selector before reading, searching, or running files from it.",
-    "Do not bypass this with Bash, absolute paths, find /, or ~/.xagent/skills.",
+    "Do not bypass this with Bash, absolute paths, find /, or ~/.xgent/skills.",
   ].join(" ");
 }
 
@@ -235,7 +235,7 @@ export function assertSkillMutationAllowed(
     throw new Error(
       [
         `${operation} is blocked: built-in Skill "${baseDir}" is protected and cannot be modified by the model.`,
-        "Built-in Skills may be read and used, but their files are managed by XAgent.",
+        "Built-in Skills may be read and used, but their files are managed by Xgent.",
         "Create or update a separate user Skill instead.",
       ].join(" "),
     );

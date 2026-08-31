@@ -1,6 +1,6 @@
 // GitReview transient overlay scrollbar system.
 //
-// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// Shared by every frontend runtime; only relative or @xgent/runtime imports
 // are allowed here.
 //
 // Scroll containers opt in via GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS plus the

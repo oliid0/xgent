@@ -1,5 +1,5 @@
 import type { ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import { homeDir } from "@xagent/runtime";
+import { homeDir } from "@xgent/runtime";
 import type { RuntimePlatform } from "../runtimePlatform";
 import {
   type AccessSettings,
@@ -53,23 +53,10 @@ export type BuiltinToolRegistry = {
   ) => Promise<ToolResultMessage>;
   metadataByName: Map<string, BuiltinToolMetadata>;
   hasTool: (toolName: string) => boolean;
-  /** MCP 懒加载已启用:调用方应给 runner 挂 requestToolFilter(未激活的 MCP
-   * 工具不进模型请求)。工具仍全量在 tools 里——执行层必须找得到它们。 */
   mcpToolDeferralActive?: boolean;
 };
 
-// 第三方来源(MCP server / 插件)的工具名不受我们控制,可能撞车。撞车时不能像
-// 内置工具那样 throw 打断整轮——那等于让一个坏插件废掉整个对话。改为:先到先
-// 得、跳过后来者并告警;仅当两侧都是可信内置组时才 throw(那是编译期的开发 bug)。
 const UNTRUSTED_TOOL_GROUPS: ReadonlySet<BuiltinToolBundle["groupId"]> = new Set(["mcp"]);
-// 不再给内置工具声明 JSON-schema 约束采样(strict)。曾经声明过 "prefer"
-// (pi 0.84.2 升级时引入),但部分 OpenAI 兼容 provider(如 Moonshot/Kimi)在
-// strict 模式下按白名单校验 schema 关键字,内置工具常用的 minimum / maxItems
-// 等一律 400,一个工具的 schema 就打死整轮请求;而 pi-ai 的本地预检
-// (makeStrictJsonSchema)只拦结构性问题,拦不住这类关键字白名单差异,
-// "prefer" 的降级判定在这里完全失效。v1.2.4 及之前不声明 strict,各家都能用
-// ——回到那个行为。约束采样能消灭的"参数名写错、必填漏传"坏调用,由工具
-// 实现自身的参数校验兜底。
 
 function createBuiltinToolRegistry(bundles: BuiltinToolBundle[]): BuiltinToolRegistry {
   const tools: BuiltinToolBundle["tools"] = [];
@@ -104,10 +91,9 @@ function createBuiltinToolRegistry(bundles: BuiltinToolBundle[]): BuiltinToolReg
           existingGroup !== undefined &&
           !UNTRUSTED_TOOL_GROUPS.has(existingGroup);
         if (bothTrusted) {
-          // 两个内置工具同名:编译期就该修的开发 bug,继续保持强失败。
           throw new Error(`Duplicate builtin tool name detected: ${tool.name}`);
         }
-        // 涉及 MCP/插件的撞车:先到先得,跳过后来者,绝不打断整轮。
+
         console.warn(
           `[tools] Tool name "${tool.name}" from group "${bundle.groupId}" collides with an ` +
             `already-registered tool (group "${existingGroup ?? "unknown"}"); skipping the newcomer.`,

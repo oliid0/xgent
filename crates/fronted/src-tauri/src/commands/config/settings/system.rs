@@ -489,29 +489,19 @@ fn system_value_with_defaults(raw: Option<Value>, default_workdir: &str) -> Valu
     Value::Object(system)
 }
 
-/// 命令安全模式的合法取值,与前端 COMMAND_SAFETY_MODES 一致。
 const COMMAND_SAFETY_MODES: [&str; 4] = ["ask", "auto", "sandbox", "sandboxOffline"];
-/// 键缺失(全新配置/旧快照)时的默认值。
 const COMMAND_SAFETY_MODE_DEFAULT: &str = "auto";
-/// 存在但无法识别时收敛到的最严格值(逐次人工放行)。
 const COMMAND_SAFETY_MODE_FAIL_CLOSED: &str = "ask";
 
 /// "ask" | "auto" | "sandbox" | "sandboxOffline"。
-///
-/// - 键缺失 / null / 空串:沿用默认 "auto"(全新配置与旧快照的正常形态)。
-/// - **存在但无法识别:收敛到最严格的 "ask"**(P2#6)。该设置全部意义在于约束,而
-///   `save_system` 会先删除全部 system key 再按白名单重插,故此处的默认值不只是读取
-///   期兜底,而是会被破坏性地持久化。未来新增的模式值、回退到旧版本、手改配置的
-///   笔误若静默降级成最宽松的非 ask 值,等于悄悄放宽用户的约束选择;与 sandbox.rs
-///   自述的 fail-closed 原则一致,一律向严格侧收敛并留下告警。
-///
-/// 与前端 normalizeCommandSafetyMode 保持同一套语义。
+
+
 fn normalize_command_safety_mode_value(raw: Option<&Value>) -> Value {
     let Some(value) = raw.filter(|value| !value.is_null()) else {
         return Value::String(COMMAND_SAFETY_MODE_DEFAULT.to_string());
     };
     let Some(text) = value.as_str().map(str::trim) else {
-        // 非字符串(类型损坏)同样是"存在但无法识别"。
+        
         eprintln!(
             "[settings] non-string commandSafetyMode {value}; failing closed to \
 \"{COMMAND_SAFETY_MODE_FAIL_CLOSED}\""
@@ -531,11 +521,7 @@ fn normalize_command_safety_mode_value(raw: Option<&Value>) -> Value {
     Value::String(COMMAND_SAFETY_MODE_FAIL_CLOSED.to_string())
 }
 
-/// 沙箱下限的唯一权威来源(P2#3):后端自行回查持久化的 commandSafetyMode,不采信
-/// 调用方(渲染进程 / 网关 / Cron 调度器)声明的布尔。与 `load_runtime_ssh_host`
-/// 同一范式——服务端重新解析持久化配置,而不是信任请求参数。
-///
-/// 读取失败时返回 Err:调用方据此 fail-closed(报错),绝不静默降级成无沙箱执行。
+
 pub(crate) fn load_runtime_command_safety_mode() -> Result<String, String> {
     let conn = open_db()?;
     let system = load_system(&conn)?;
@@ -614,7 +600,6 @@ fn save_system_with_default_workdir(
     Ok(())
 }
 
-/// 把 DB 中的 systemProxy 配置刷进全局代理状态（shell env 注入与 reqwest 出网共用）。
 fn refresh_system_proxy_state(conn: &Connection) -> Result<(), String> {
     let system = load_system(conn)?;
     crate::services::system_proxy::set_config(
@@ -625,7 +610,6 @@ fn refresh_system_proxy_state(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
-/// 启动时初始化系统代理状态；失败不阻断启动（调用方仅记录日志）。
 pub fn initialize_system_proxy_from_db() -> Result<(), String> {
     let conn = open_db()?;
     refresh_system_proxy_state(&conn)

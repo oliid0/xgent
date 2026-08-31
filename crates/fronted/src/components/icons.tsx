@@ -136,7 +136,7 @@ type IconProps = SVGProps<SVGSVGElement> & {
 export type IconComponent = ComponentType<IconProps>;
 
 function createIcon(Source: IconSource): IconComponent {
-  return function XagentIcon({ className, color, height, size, style, width, ...props }) {
+  return function XgentIcon({ className, color, height, size, style, width, ...props }) {
     const numericSize = typeof size === "number" ? size : Number.parseFloat(String(size ?? ""));
     const astryxSize = Number.isFinite(numericSize)
       ? numericSize <= 12
@@ -151,7 +151,7 @@ function createIcon(Source: IconSource): IconComponent {
       <Icon
         icon={Source}
         size={astryxSize}
-        className={["xagent-icon", className].filter(Boolean).join(" ")}
+        className={["xgent-icon", className].filter(Boolean).join(" ")}
         width={width ?? size}
         height={height ?? size}
         style={{ ...style, color }}

@@ -74,10 +74,6 @@ function takeLatest(messages: SubagentMessageRecord[], limit: number) {
   return messages.slice(messages.length - limit);
 }
 
-/**
- * 快照与增量共用的可见性口径：按 seq 升序，过滤掉空消息，只保留发给本 agent、
- * 广播给全体、或由本 agent 发出的消息。两处必须同口径，否则增量会漏投或重投。
- */
 function visibleBusMessages(messages: SubagentMessageRecord[], currentAgentId: string) {
   return sortBySeq(messages).filter(
     (message) =>
@@ -95,16 +91,6 @@ export function displayRecipientLabel(recipientId: string) {
   return recipientId;
 }
 
-/**
- * Render a bounded Markdown snapshot of the conversation-level message bus
- * for one agent. Delivery is pull-based: this snapshot is injected into the
- * agent's context at turn boundaries.
- *
- * 快照最多渲染 maxMessages 条，可见消息超限时会有消息未被渲染。返回值里的
- * `renderedSeq` 是「可见消息按 seq 升序的连续已渲染前缀」的最大 seq——冻结
- * 游标必须用它而不是全体可见消息的最大 seq，否则被配额挤掉的消息会被游标
- * 跳过、静默丢失。未渲染的消息留给后续 `renderMessageBusDelta` 增量补投。
- */
 export function renderMessageBusSnapshot(params: {
   messages: SubagentMessageRecord[];
   currentAgentId: string;
@@ -144,13 +130,11 @@ export function renderMessageBusSnapshot(params: {
   );
   const recentMessages = consume(takeLatest(messages, maxMessages));
 
-  // 真正渲染进快照的集合是四个 selected 的并集；usedSeqs 会被 consume 标记
-  // 到未入选的 fresh 消息上，不能当渲染集用。
   const renderedSeqs = new Set<number>();
   for (const bucket of [directInbox, sharedDecisions, openQuestions, recentMessages]) {
     for (const message of bucket) renderedSeqs.add(message.seq);
   }
-  // 连续已渲染前缀：从最小 seq 起逐条推进，遇到第一条未渲染的可见消息即停。
+
   let renderedSeq = 0;
   for (const message of messages) {
     if (!renderedSeqs.has(message.seq)) break;
@@ -159,7 +143,7 @@ export function renderMessageBusSnapshot(params: {
   const omittedCount = messages.length - renderedSeqs.size;
 
   const sections: string[] = [
-    "## XAgent Message Bus",
+    "## Xgent Message Bus",
     "",
     `Current agent: ${displayAgentLabel(currentAgentId, params.currentAgentName)}`,
     "Messages below are a Markdown snapshot of the conversation-level bus. Use the SendMessage tool for new cross-agent messages; do not write temporary files for communication.",
@@ -184,7 +168,6 @@ export function renderMessageBusSnapshot(params: {
   appendSection("Recent Messages", recentMessages);
 
   if (omittedCount > 0) {
-    // 诚实标注省略，避免读者把快照误当全量；未渲染的消息由 delta 按 renderedSeq 补投。
     sections.push(
       "",
       `(${omittedCount} messages omitted; unrendered messages will be re-delivered via delta)`,
@@ -194,16 +177,6 @@ export function renderMessageBusSnapshot(params: {
   return { text: sections.join("\n").trim(), renderedSeq, omittedCount };
 }
 
-/**
- * 渲染 seq 大于 sinceSeq 的增量消息。
- *
- * systemPrompt 里的快照按压缩纪元冻结，run 内新到的消息不回头改写 systemPrompt，
- * 而是由本函数渲染成一段增量文本挂到消息尾部投递——尾部本就在缓存断点之后、
- * 每轮重读，追加不额外损失命中率。
- *
- * 纯函数：不含时间量、不含随机量，同样输入恒等输出。无新增时返回
- * `{ text: "", lastSeq: sinceSeq }`，调用方据此完全不产生额外内容。
- */
 export function renderMessageBusDelta(params: {
   messages: SubagentMessageRecord[];
   sinceSeq: number;
@@ -222,7 +195,7 @@ export function renderMessageBusDelta(params: {
   if (fresh.length === 0) return { text: "", lastSeq: sinceSeq };
 
   const text = [
-    "## XAgent Message Bus (new messages)",
+    "## Xgent Message Bus (new messages)",
     "",
     `Current agent: ${displayAgentLabel(currentAgentId, params.currentAgentName)}`,
     "Messages below arrived after the snapshot in the system prompt. Use the SendMessage tool for new cross-agent messages; do not write temporary files for communication.",

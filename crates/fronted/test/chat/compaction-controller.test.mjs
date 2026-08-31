@@ -73,7 +73,7 @@ function summaryResponse() {
   };
 }
 
-// 3 个用户消息绕开 MIN_COMPACTION_USER_MESSAGES 冷却窗，方便连续压缩场景。
+
 function bigState(extraMessages = []) {
   return conversationState.createConversationStateFromContext({
     systemPrompt: "sys",
@@ -170,7 +170,7 @@ test("pre-send compaction: checkpoint, persist, re-appended user message, paired
   const statuses = recorder.byKind("publishStatus").map(([, status]) => status.phase);
   assert.deepEqual(statuses, ["running", "completed"]);
 
-  // persist 的是 checkpoint 状态（新 segment、无待发送消息）；apply 的是补回用户消息的状态。
+  
   const [, persistedState] = recorder.byKind("persist")[0];
   assert.equal(persistedState.segments.length, 2);
   assert.equal(persistedState.segments[1].messages.length, 0);
@@ -272,20 +272,20 @@ test("user stop chains into the summarizer; handleTurnAbort rolls back and persi
 
   const [, restoredState] = recorder.byKind("applyStateMidRun")[0];
   assert.equal(restoredState, state);
-  // mid-run 回滚必须补持久化（旧 persistOnRollback 语义）。
+  
   assert.equal(recorder.byKind("persistRollback").length, 1);
   const statuses = recorder.byKind("publishStatus").map(([, status]) => status.phase);
   assert.deepEqual(statuses, ["running", "idle"]);
   // Rollback clears the live tool status and does not leave compaction active.
   assert.equal(recorder.byKind("liveToolStatus").at(-1)[1], null);
 
-  // 快照消费后再次调用不再回滚。
+  
   assert.equal(await controller.handleTurnAbort(), false);
 });
 
 test("summarizer failure degrades to prune and still returns a usable context", async () => {
   const controller = new CompactionController();
-  // 大工具输出（200k 字符 ≈ 50k tokens > 40k 保护额度）必须在"最近 2 个用户轮次"之前才可被裁剪。
+  
   const state = conversationState.createConversationStateFromContext({
     systemPrompt: "sys",
     messages: [
@@ -415,7 +415,7 @@ test("escalation ladder: consecutive ineffective compactions advise but never ha
       completeCalls += 1;
       return summaryResponse();
     },
-    // 压缩后的恢复上下文仍然巨大 → 判定为低效压缩，推动压力升级。
+    
     buildResumeContext: () => ({
       systemPrompt: "sys",
       messages: [assistantWithUsage("still huge", 190_000, 99)],
@@ -439,7 +439,7 @@ test("escalation ladder: consecutive ineffective compactions advise but never ha
     .map(([, text]) => text);
   assert.equal(runningTexts.length, 3);
   assert.doesNotMatch(runningTexts[0], /建议适时开启新会话/);
-  // 连续两次低效后顶格，第三次给出建议性提示但仍执行压缩。
+  
   assert.match(runningTexts[2], /建议适时开启新会话/);
 });
 

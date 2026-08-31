@@ -32,14 +32,14 @@ const MAX_PAIR_ATTEMPTS_PER_MINUTE: usize = 10;
 const MAX_PAIRING_BODY_BYTES: usize = 4 * 1024;
 const MAX_RPC_BODY_BYTES: usize = 16 * 1024 * 1024;
 const RPC_TIMEOUT: Duration = Duration::from_secs(5 * 60);
-const SESSION_COOKIE: &str = "xagent_session";
-const CSRF_HEADER: &str = "x-xagent-csrf";
-const PROVIDER_CONFIG_ID_HEADER: &str = "x-xagent-provider-config-id";
+const SESSION_COOKIE: &str = "xgent_session";
+const CSRF_HEADER: &str = "x-xgent-csrf";
+const PROVIDER_CONFIG_ID_HEADER: &str = "x-xgent-provider-config-id";
 const LOCAL_ACCESS_STATUS_EVENT: &str = "local-access:status";
 const LOCAL_ACCESS_RPC_REQUEST_EVENT: &str = "local-access:rpc-request";
 const LOCAL_ACCESS_SUBSCRIBE_EVENT: &str = "local-access:event-subscribe";
 const LOCAL_ACCESS_UNSUBSCRIBE_EVENT: &str = "local-access:event-unsubscribe";
-const LOCAL_ACCESS_SECRET_SENTINEL: &str = "__XAGENT_LOCAL_ACCESS_SECRET__";
+const LOCAL_ACCESS_SECRET_SENTINEL: &str = "__XGENT_LOCAL_ACCESS_SECRET__";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -172,7 +172,7 @@ impl LocalAccessController {
     pub fn new(app_handle: tauri::AppHandle, proxy_info: ProxyServerInfo) -> Result<Self, String> {
         let (event_tx, _) = broadcast::channel(512);
         let proxy_client = reqwest::Client::builder()
-            // This client only reaches XAgent's loopback proxy. Inheriting
+            // This client only reaches Xgent's loopback proxy. Inheriting
             // HTTP(S)_PROXY here can send that local hop to an upstream proxy
             // and turn otherwise valid WebUI requests into 502/CORS failures.
             .no_proxy()
@@ -455,12 +455,12 @@ impl LocalAccessController {
             .and_then(|value| value.to_str().ok())
             .ok_or_else(|| "missing Host header".to_string())?;
         if !is_allowed_host(host, self.status()?.port) {
-            return Err("Host is not a local XAgent address".to_string());
+            return Err("Host is not a local Xgent address".to_string());
         }
         let expected_origin = format!("http://{host}");
         if let Some(origin) = headers.get(ORIGIN).and_then(|value| value.to_str().ok()) {
             if origin != expected_origin {
-                return Err("Origin does not match the local XAgent host".to_string());
+                return Err("Origin does not match the local Xgent host".to_string());
             }
             return Ok(());
         }
@@ -773,7 +773,7 @@ async fn local_provider_proxy(
         let value = replace_secret_sentinel(name.as_str(), value, provider_secrets.as_ref());
         request = request.header(name, value);
     }
-    request = request.header("x-xagent-proxy-token", &controller.proxy_info.token);
+    request = request.header("x-xgent-proxy-token", &controller.proxy_info.token);
     if !body.is_empty() {
         request = request.body(body);
     }
@@ -1017,7 +1017,7 @@ async fn public_status(
         Err(error) => return error_response(StatusCode::INTERNAL_SERVER_ERROR, error),
     };
     Json(json!({
-        "service": "xagent-local-access",
+        "service": "xgent-local-access",
         "protocolVersion": 1,
         "running": status.running,
         "pairingRequired": true
@@ -1156,7 +1156,7 @@ fn authorize_local_command(
         "git_commit_diff",
     ];
     // A paired browser with every local permission deliberately enabled is a
-    // full XAgent control surface. Keep cloud execution behind its separate
+    // full Xgent control surface. Keep cloud execution behind its separate
     // feature switch, but do not maintain a second incomplete command allowlist
     // for the rest of the desktop experience.
     if has_full_local_permissions(config) && !command.starts_with("cloud_task_") {
@@ -1227,9 +1227,9 @@ fn authorize_local_event(event: &str, config: &AccessSettingsPayload) -> Result<
         "automation:hooks-changed",
         "chat-history:changed",
         "workspace:activity",
-        "xagent:chat-queue",
-        "xagent:chat-runtime",
-        "xagent:conversation-event",
+        "xgent:chat-queue",
+        "xgent:chat-runtime",
+        "xgent:conversation-event",
     ];
     if SAFE_EVENTS.contains(&event) {
         return Ok(());

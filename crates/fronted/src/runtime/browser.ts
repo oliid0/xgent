@@ -3,11 +3,11 @@ import type {
   RuntimeFileDropEvent,
   RuntimeInvokeArgs,
   RuntimeUnlisten,
-  XAgentRuntime,
+  XgentRuntime,
 } from "./types";
 
-export const LOCAL_ACCESS_CSRF_KEY = "xagent.local-access.csrf.v1";
-export const LOCAL_ACCESS_SESSION_CHANGED_EVENT = "xagent:local-access-session-changed";
+export const LOCAL_ACCESS_CSRF_KEY = "xgent.local-access.csrf.v1";
+export const LOCAL_ACCESS_SESSION_CHANGED_EVENT = "xgent:local-access-session-changed";
 
 type RpcResponse<T> = {
   ok?: boolean;
@@ -66,7 +66,7 @@ async function invokeLocal<T>(command: string, args?: RuntimeInvokeArgs): Promis
     credentials: "same-origin",
     headers: {
       "content-type": "application/json",
-      "x-xagent-csrf": csrf,
+      "x-xgent-csrf": csrf,
     },
     body: JSON.stringify({ command, args: args ?? {} }),
   });
@@ -112,7 +112,7 @@ async function listenBrowser<T>(
     credentials: "same-origin",
     headers: {
       "content-type": "application/json",
-      "x-xagent-csrf": csrf,
+      "x-xgent-csrf": csrf,
     },
     body: JSON.stringify({ event }),
   });
@@ -129,7 +129,7 @@ async function listenBrowser<T>(
     void fetch(`/api/local-access/subscriptions/${encodeURIComponent(subscriptionId)}`, {
       method: "DELETE",
       credentials: "same-origin",
-      headers: { "x-xagent-csrf": csrfToken() },
+      headers: { "x-xgent-csrf": csrfToken() },
     });
   };
 }
@@ -138,7 +138,7 @@ function unsupported(command: string): never {
   throw new Error(`Runtime command is unavailable in a browser: ${command}`);
 }
 
-export const browserRuntime: XAgentRuntime = {
+export const browserRuntime: XgentRuntime = {
   invoke: invokeBrowser,
   listen: listenBrowser,
 

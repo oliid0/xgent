@@ -3,7 +3,7 @@
   "app": {
     "windows": [
       {
-        "title": "XAgent",
+        "title": "Xgent",
         "width": 390,
         "height": 844,
         "minWidth": 320,

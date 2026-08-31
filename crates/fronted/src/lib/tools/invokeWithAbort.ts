@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 
 type InvokeWithAbortOptions<T> = {
   onAbort?: () => Promise<void> | void;

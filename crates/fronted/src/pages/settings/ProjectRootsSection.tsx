@@ -14,7 +14,7 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { useEffect, useMemo, useState } from "react";
 import { FolderTree, Trash2 } from "../../components/icons";
 import { useLocale } from "../../i18n";

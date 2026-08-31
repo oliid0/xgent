@@ -1,5 +1,5 @@
 import type { Message } from "@earendil-works/pi-ai";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { parseTaskListState } from "../../tools/taskState";
 import { normalizeConversationSystemPrompt } from "../context/systemPrompt";
 import {
@@ -651,14 +651,10 @@ export async function setChatHistoryCwd(id: string, cwd: string) {
 export async function deleteChatHistory(id: string) {
   return withConversationWriteLock(id, async () => {
     await invoke<void>("chat_history_delete", { id });
-    // 检查点数据(索引 + blobs)以会话为单位存放，没有独立的 GC。会话都删了
-    // 还留着，单个会话最多能压着 512MB blob 永不回收。尽力而为：清理失败不能
-    // 反过来让删除会话报错。
+
     try {
       await invoke<void>("checkpoint_clear", { conversation_id: id });
-    } catch {
-      // 忽略：残留的检查点目录不影响任何功能，只是占盘。
-    }
+    } catch {}
   });
 }
 
@@ -773,7 +769,7 @@ async function writeConversationRuntime(
 
   // Catch up one segment at a time when the in-memory active segment jumped
   // ahead of the durable cursor (e.g. multiple compactions between persists).
-  // Previously this threw "不支持的历史分段跳变" and left the DB on the
+
   // user-only snapshot after a long agent turn.
   let workingCursor: ConversationPersistenceCursor = { ...cursor };
   let summary: ChatHistorySummary | null = null;

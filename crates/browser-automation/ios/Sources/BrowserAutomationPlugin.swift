@@ -195,7 +195,7 @@ final class BrowserAutomationPlugin: Plugin {
         invoke.resolve([
             "backend": "ios-wk-webview",
             "available": true,
-            "detail": "Private WKWebView sessions with an isolated XAgent automation bridge",
+            "detail": "Private WKWebView sessions with an isolated Xgent automation bridge",
             "capabilities": [
                 "visibleSessions": true,
                 "domAutomation": true,

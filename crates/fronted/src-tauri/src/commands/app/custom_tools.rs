@@ -16,8 +16,8 @@ pub struct SystemHttpGetResponse {
 #[tauri::command]
 pub async fn system_http_get_test() -> Result<SystemHttpGetResponse, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        // 网络自检需反映应用真实出网路径：应用代理启用时经代理请求，
-        // 配置异常 fail fast；未启用则直连（忽略环境代理）。
+        
+        
         let client = crate::services::system_proxy::blocking_client_builder()
             .map_err(|e| format!("Failed to create the HTTP client: {e}"))?
             .timeout(Duration::from_secs(10))

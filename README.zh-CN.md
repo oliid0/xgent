@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/images/banner.webp" alt="XAgent" />
+  <img src="docs/images/banner.webp" alt="Xgent" />
 </p>
 
-<h1 align="center">XAgent</h1>
+<h1 align="center">Xgent</h1>
 
 <p align="center">
   <strong>Your Local-First AI Agent Desktop</strong><br/>
@@ -65,20 +65,20 @@
 ## 🤝 一起来开发吧！
 
 <p align="center">
-  <img src="docs/images/QQ.png" alt="XAgent QQ 交流群" width="300" />
+  <img src="docs/images/QQ.png" alt="Xgent QQ 交流群" width="300" />
 </p>
 
 <p align="center">
-  欢迎扫码进群，一起推进 XAgent 的开发！<br/>
+  欢迎扫码进群，一起推进 Xgent 的开发！<br/>
   （至于为什么是QQ群，感觉功能比微信群多一些～）
 </p>
 
 
 ---
 
-## 为什么是 XAgent?
+## 为什么是 Xgent?
 
-XAgent 是一个覆盖 Web、桌面和移动端的 **本地优先** AI Agent。它将大语言模型推理与本地系统工具深度整合，让 AI 能够操作文件、执行命令、调用 MCP 与 Skills，并管理定时任务。
+Xgent 是一个覆盖 Web、桌面和移动端的 **本地优先** AI Agent。它将大语言模型推理与本地系统工具深度整合，让 AI 能够操作文件、执行命令、调用 MCP 与 Skills，并管理定时任务。
 
 - **真正动手的 Agent** — 不止于对话:读写文件、精确编辑、执行 Bash、托管长驻进程
 - **生态完全开放** — MCP 协议桥接任意外部工具,Skills 技能包按需加载
@@ -139,12 +139,12 @@ XAgent 是一个覆盖 Web、桌面和移动端的 **本地优先** AI Agent。�
 
 ### macOS 用户
 
-从 [Releases](https://github.com/oliid0/xgent/releases/latest) 下载对应芯片的 DMG,打开后将 XAgent 拖入「应用程序」:
+从 [Releases](https://github.com/oliid0/xgent/releases/latest) 下载对应芯片的 DMG,打开后将 Xgent 拖入「应用程序」:
 
-- Apple Silicon(M 系列):`XAgent-<版本>-macOS-aarch64.dmg`
-- Intel:`XAgent-<版本>-macOS-x64.dmg`
+- Apple Silicon(M 系列):`Xgent-<版本>-macOS-aarch64.dmg`
+- Intel:`Xgent-<版本>-macOS-x64.dmg`
 
-> 无 Developer ID 的版本首次打开时，macOS 会阻止直接启动。请在 Finder 中按住 Control 点击 XAgent 并选择“打开”，或前往“系统设置 → 隐私与安全性”选择仍要打开；授权后可正常使用。带签名/公证的版本不需要此操作。
+> 无 Developer ID 的版本首次打开时，macOS 会阻止直接启动。请在 Finder 中按住 Control 点击 Xgent 并选择“打开”，或前往“系统设置 → 隐私与安全性”选择仍要打开；授权后可正常使用。带签名/公证的版本不需要此操作。
 
 ### Windows 用户
 
@@ -152,9 +152,9 @@ XAgent 是一个覆盖 Web、桌面和移动端的 **本地优先** AI Agent。�
 
 | 方式 | 文件 | 适合 |
 |---|---|---|
-| 安装向导 | `XAgent-<版本>-Windows-x64-Setup.exe` | 大多数用户 |
-| MSI 包 | `XAgent-<版本>-Windows-x64.msi` | 企业分发 / 静默安装 |
-| 便携版 | `XAgent-<版本>-Windows-x64-portable.zip` | 免安装,解压即用 |
+| 安装向导 | `Xgent-<版本>-Windows-x64-Setup.exe` | 大多数用户 |
+| MSI 包 | `Xgent-<版本>-Windows-x64.msi` | 企业分发 / 静默安装 |
+| 便携版 | `Xgent-<版本>-Windows-x64-portable.zip` | 免安装,解压即用 |
 
 ### Linux 用户
 
@@ -163,8 +163,8 @@ XAgent 是一个覆盖 Web、桌面和移动端的 **本地优先** AI Agent。�
 | 格式 | 适用发行版 | 安装方式 |
 |---|---|---|
 | AppImage | 任意发行版 | `chmod +x` 后直接运行 |
-| DEB | Debian / Ubuntu 系 | `sudo dpkg -i XAgent-<版本>-Linux-x86_64.deb` |
-| RPM | Fedora / openSUSE 系 | `sudo rpm -i XAgent-<版本>-Linux-x86_64.rpm` |
+| DEB | Debian / Ubuntu 系 | `sudo dpkg -i Xgent-<版本>-Linux-x86_64.deb` |
+| RPM | Fedora / openSUSE 系 | `sudo rpm -i Xgent-<版本>-Linux-x86_64.rpm` |
 
 ### 在局域网使用 WebUI
 
@@ -190,7 +190,7 @@ XAgent 是一个覆盖 Web、桌面和移动端的 **本地优先** AI Agent。�
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│               XAgent 统一 React 前端源码                      │
+│               Xgent 统一 React 前端源码                      │
 │              Web · 桌面端 · Android · iOS                    │
 └────────────────────────────┬─────────────────────────────────┘
                              │ Tauri IPC 或配对 HTTP/SSE
@@ -241,7 +241,7 @@ XAgent 是一个覆盖 Web、桌面和移动端的 **本地优先** AI Agent。�
 <summary><b>项目结构</b> — 目录树</summary>
 
 ```
-XAgent/
+Xgent/
 ├── crates/
 │   ├── fronted/                  # Web/PC/移动端统一应用
 │   │   ├── src/                  # React 前端
@@ -324,7 +324,7 @@ XAgent/
 
 ## 👥 贡献者
 
-感谢所有为 XAgent 做出贡献的朋友们！
+感谢所有为 Xgent 做出贡献的朋友们！
 
 <a href="https://github.com/oliid0/xgent/graphs/contributors">
   <img src="docs/images/contributors.svg" alt="Contributors" />

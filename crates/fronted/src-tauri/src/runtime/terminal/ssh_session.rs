@@ -199,7 +199,7 @@ impl TerminalSessionRegistry {
         host_config: RuntimeSshHostConfig,
         title: String,
         size: TerminalSize,
-        handle: client::Handle<XAgentSshClient>,
+        handle: client::Handle<XgentSshClient>,
     ) -> Result<TerminalSshCreateResponse, String> {
         let channel = open_ssh_shell_channel(&handle, size).await?;
 
@@ -546,7 +546,7 @@ impl TerminalSessionRegistry {
         host_config: RuntimeSshHostConfig,
         title: String,
         size: TerminalSize,
-        mut handle: client::Handle<XAgentSshClient>,
+        mut handle: client::Handle<XgentSshClient>,
         response: client::KeyboardInteractiveAuthResponse,
         auto_password: Option<String>,
     ) -> Result<TerminalSshCreateResponse, String> {
@@ -576,7 +576,7 @@ impl TerminalSessionRegistry {
         host_config: RuntimeSshHostConfig,
         title: String,
         size: TerminalSize,
-        mut handle: client::Handle<XAgentSshClient>,
+        mut handle: client::Handle<XgentSshClient>,
         password: String,
     ) -> Result<TerminalSshCreateResponse, String> {
         let result = handle
@@ -638,7 +638,7 @@ impl TerminalSessionRegistry {
         host_config: RuntimeSshHostConfig,
         title: String,
         size: TerminalSize,
-        handle: client::Handle<XAgentSshClient>,
+        handle: client::Handle<XgentSshClient>,
         prompt_data: KeyboardInteractivePromptData,
     ) -> Result<TerminalSshCreateResponse, String> {
         let prompt_id = uuid::Uuid::new_v4().to_string();

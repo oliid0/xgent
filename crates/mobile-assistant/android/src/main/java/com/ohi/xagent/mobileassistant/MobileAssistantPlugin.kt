@@ -1,4 +1,4 @@
-package com.ohi.xagent.mobileassistant
+package com.ohi.xgent.mobileassistant
 
 import android.Manifest
 import android.app.Activity

@@ -11,7 +11,7 @@ import { ToggleButton, ToggleButtonGroup } from "@astryxdesign/core/ToggleButton
 // mode/pane switchers) plus the modal dialogs and the operation toast shared
 // by the status and history views.
 //
-// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// Shared by every frontend runtime; only relative or @xgent/runtime imports
 // are allowed here.
 
 import { Button } from "@astryxdesign/core/Button";
@@ -86,7 +86,7 @@ export function GitRemoteSetupModal(props: {
       title={t("projectTools.gitReview.remoteSetupTitle")}
       subtitle={t(remoteSetupDescriptionKey(action))}
       purpose="form"
-      width="var(--xagent-dialog-width-sm)"
+      width="var(--xgent-dialog-width-sm)"
       touchPresentation="bottom-sheet"
       bottomSheetHeight="tall"
       footer={
@@ -228,7 +228,7 @@ export function GitBranchFromCommitModal(props: {
         .replace("{sha}", target.shortSha)
         .replace("{subject}", target.subject || target.shortSha)}
       purpose="form"
-      width="var(--xagent-dialog-width-sm)"
+      width="var(--xgent-dialog-width-sm)"
       touchPresentation="bottom-sheet"
       bottomSheetHeight="tall"
       footer={
@@ -462,8 +462,8 @@ function GitWorktreeModal(props: { data: GitReviewData; open: boolean; onClose: 
       title={t("projectTools.gitReview.worktrees")}
       subtitle={state.repoRoot}
       purpose="form"
-      width="var(--xagent-dialog-width-md)"
-      maxHeight="var(--xagent-dialog-height-lg)"
+      width="var(--xgent-dialog-width-md)"
+      maxHeight="var(--xgent-dialog-height-lg)"
       touchPresentation="bottom-sheet"
       bottomSheetHeight="tall"
     >

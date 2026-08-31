@@ -1,11 +1,11 @@
-//! 扫描本机其他 AI 工具（Claude Code / Codex / Claude Desktop / CodeBuddy）已配置的 MCP
-//! Server，并支持解析用户手选的本地配置文件（[`scan_mcp_config_file`]），供
-//! MCP Hub「本地导入」页展示后由用户勾选导入。导入本身是纯前端设置写入
-//! （追加进 `AppSettings.mcp.servers`），这里只负责读取与解析配置。
+
+
+
+
 //!
-//! 固定路径扫描全容错：单个文件 / 单个条目解析失败只记入 `errors`，绝不让整个
-//! 扫描失败；手选文件（[`scan_mcp_config_file`]）则在整个文件不可用时直接报错。
-//! 凡是值里带 `${VAR}` 展开语法的按原样保留，由用户导入后自行调整。
+
+
+
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -20,10 +20,8 @@ const TRANSPORT_STDIO: &str = "stdio";
 const TRANSPORT_HTTP: &str = "http";
 const TRANSPORT_SSE: &str = "sse";
 
-/// 「从文件导入」的来源标识，前端据此与固定工具扫描区分展示。
 pub(crate) const LOCAL_FILE_MCP_TOOL: &str = "local-file";
 
-/// 手选配置文件的体积上限，防止误选大文件把整份内容读进内存。
 pub(crate) const MAX_MCP_CONFIG_FILE_BYTES: usize = 16 * 1024 * 1024;
 
 pub(crate) fn scan_external_mcp_servers() -> Vec<SystemExternalMcpToolScan> {
@@ -35,15 +33,8 @@ pub(crate) fn scan_external_mcp_servers() -> Vec<SystemExternalMcpToolScan> {
     ]
 }
 
-/// 解析用户手选的本地 MCP 配置文件，供 MCP Hub「本地导入」的「从文件导入」使用。
-///
-/// 按扩展名区分两类格式：
-/// - `.toml`：Codex 风格 `[mcp_servers.*]` 段
-/// - 其余按 JSON：顶层 `mcpServers` 对象（含 `projects.<路径>.mcpServers`），或整个
-///   根对象就是 server map 的裸格式 `{ "<id>": { ... } }`
-///
-/// 与固定路径扫描的容错策略不同：文件不可读、语法错误或找不到任何 server 定义时
-/// 直接返回 `Err` 让前端明确报错；单条目解析失败仍记入 `errors` 跳过。
+
+
 pub(crate) fn scan_mcp_config_file(path: &str) -> Result<SystemExternalMcpToolScan, String> {
     let file = expand_tilde_path(path.trim());
     let metadata = std::fs::metadata(&file)
@@ -96,7 +87,7 @@ pub(crate) fn scan_mcp_config_content(
     }
     if servers.is_empty() {
         let mut message = format!("No MCP server definitions found in {display}");
-        // 误选无关 JSON（如大体量 locale 文件）时条目错误可能上千条，只展示前几条。
+        
         if !errors.is_empty() {
             const MAX_SHOWN_ERRORS: usize = 3;
             let shown = errors
@@ -144,7 +135,7 @@ fn parse_mcp_config_json(
             }
         }
     } else {
-        // 没有 `mcpServers` 包装时按裸 server map 解析。
+        
         collect_json_server_map(Some(&root), "user", servers, errors);
     }
     Ok(())
@@ -156,8 +147,8 @@ fn parse_mcp_config_toml(
     servers: &mut Vec<SystemExternalMcpServerEntry>,
     errors: &mut Vec<String>,
 ) -> Result<(), String> {
-    // 只取 message() 不用 Display：Display 会把出错的原文行渲染进错误信息，
-    // 误选敏感文件时会把文件内容回显给调用方（包括已配对的局域网设备）。
+    
+    
     let root: toml::Value = toml::from_str(strip_utf8_bom(text))
         .map_err(|err| format!("Failed to parse {display}: {}", err.message()))?;
     let Some(map) = root.get("mcp_servers").and_then(toml::Value::as_table) else {
@@ -173,9 +164,9 @@ fn parse_mcp_config_toml(
 }
 
 fn scan_claude_code() -> SystemExternalMcpToolScan {
-    // Claude Code 的 MCP 配置分布在两处：
-    // - ~/.claude.json：顶层 `mcpServers`（用户级）+ `projects.<路径>.mcpServers`（项目本地级）
-    // - ~/.mcp.json：项目共享级配置（在 home 启动会话时生效）
+    
+    
+    
     let mut servers = Vec::new();
     let mut errors = Vec::new();
     let mut scanned_paths = Vec::new();
@@ -246,7 +237,7 @@ fn scan_codex() -> SystemExternalMcpToolScan {
 
 fn scan_claude_desktop() -> SystemExternalMcpToolScan {
     // Windows: %APPDATA%/Claude；macOS: ~/Library/Application Support/Claude；
-    // Linux: ~/.config/Claude。dirs::config_dir 与三者一一对应。
+    
     let mut servers = Vec::new();
     let mut errors = Vec::new();
     let mut scanned_paths = Vec::new();
@@ -287,7 +278,7 @@ fn claude_desktop_config_path() -> Option<PathBuf> {
 }
 
 fn scan_codebuddy() -> SystemExternalMcpToolScan {
-    // CodeBuddy Code 的用户级 MCP 配置：~/.codebuddy/mcp.json，标准 `mcpServers` 对象。
+    
     let mut servers = Vec::new();
     let mut errors = Vec::new();
     let mut scanned_paths = Vec::new();
@@ -320,7 +311,7 @@ fn finish_scan(
     errors: Vec<String>,
 ) -> SystemExternalMcpToolScan {
     let exists = !scanned_paths.is_empty();
-    // 同名条目（多作用域声明同一 server）保留先出现的：用户级先扫，优先级更直观。
+    
     let mut seen = std::collections::HashSet::new();
     servers.retain(|server| seen.insert(server.id.to_lowercase()));
     servers.sort_by(|a, b| a.id.to_lowercase().cmp(&b.id.to_lowercase()));
@@ -343,7 +334,6 @@ fn read_json(path: &std::path::Path) -> Result<Value, String> {
     serde_json::from_str(&text).map_err(|err| format!("Failed to parse {}: {err}", path.display()))
 }
 
-/// 解析 Claude Code / Claude Desktop 风格的 `mcpServers` JSON 对象。
 pub(crate) fn collect_json_server_map(
     map: Option<&Value>,
     origin: &str,
@@ -380,7 +370,7 @@ fn json_entry_to_server(
         TRANSPORT_HTTP | "streamable-http" | "streamable_http" => TRANSPORT_HTTP,
         TRANSPORT_SSE => TRANSPORT_SSE,
         TRANSPORT_STDIO => TRANSPORT_STDIO,
-        // type 缺省时按字段推断：command → stdio；url → http。
+        
         "" if !command.is_empty() => TRANSPORT_STDIO,
         "" if !url.is_empty() => TRANSPORT_HTTP,
         other => {
@@ -413,7 +403,6 @@ fn json_entry_to_server(
     })
 }
 
-/// 解析 Codex `config.toml` 的 `[mcp_servers.*]` 段。
 pub(crate) fn parse_codex_toml(
     text: &str,
     servers: &mut Vec<SystemExternalMcpServerEntry>,
@@ -563,7 +552,7 @@ mod tests {
 
     #[test]
     fn scan_mcp_config_file_parses_claude_style_json() {
-        let tmp = TempDir::new("xagent-mcp-file-claude-test").expect("temp dir");
+        let tmp = TempDir::new("xgent-mcp-file-claude-test").expect("temp dir");
         let path = write_config(
             &tmp,
             "config.json",
@@ -590,7 +579,7 @@ mod tests {
 
     #[test]
     fn scan_mcp_config_file_parses_bare_server_map_json() {
-        let tmp = TempDir::new("xagent-mcp-file-bare-test").expect("temp dir");
+        let tmp = TempDir::new("xgent-mcp-file-bare-test").expect("temp dir");
         let path = write_config(
             &tmp,
             "servers.json",
@@ -606,7 +595,7 @@ mod tests {
 
     #[test]
     fn scan_mcp_config_file_parses_codex_toml() {
-        let tmp = TempDir::new("xagent-mcp-file-toml-test").expect("temp dir");
+        let tmp = TempDir::new("xgent-mcp-file-toml-test").expect("temp dir");
         let path = write_config(
             &tmp,
             "config.toml",
@@ -631,7 +620,7 @@ url = "https://mcp.example.com"
 
     #[test]
     fn scan_mcp_config_file_rejects_empty_server_names() {
-        let tmp = TempDir::new("xagent-mcp-file-empty-id-test").expect("temp dir");
+        let tmp = TempDir::new("xgent-mcp-file-empty-id-test").expect("temp dir");
         let path = write_config(
             &tmp,
             "servers.json",
@@ -647,7 +636,7 @@ url = "https://mcp.example.com"
 
     #[test]
     fn scan_mcp_config_file_caps_joined_errors_in_no_server_message() {
-        let tmp = TempDir::new("xagent-mcp-file-error-cap-test").expect("temp dir");
+        let tmp = TempDir::new("xgent-mcp-file-error-cap-test").expect("temp dir");
         let entries = (0..10)
             .map(|index| format!("\"key{index}\": \"value\""))
             .collect::<Vec<_>>()
@@ -661,7 +650,7 @@ url = "https://mcp.example.com"
 
     #[test]
     fn scan_mcp_config_file_rejects_invalid_and_empty_sources() {
-        let tmp = TempDir::new("xagent-mcp-file-invalid-test").expect("temp dir");
+        let tmp = TempDir::new("xgent-mcp-file-invalid-test").expect("temp dir");
 
         let missing = tmp.path().join("missing.json").to_string_lossy().into_owned();
         assert!(scan_mcp_config_file(&missing)
@@ -678,7 +667,7 @@ url = "https://mcp.example.com"
             .unwrap_err()
             .contains("must be a JSON object"));
 
-        // package.json 之类的普通 JSON：条目全部解析失败 → 整体报错并带上原因。
+        
         let unrelated = write_config(&tmp, "package.json", r#"{ "name": "x", "version": "1" }"#);
         let err = scan_mcp_config_file(&unrelated).unwrap_err();
         assert!(err.contains("No MCP server definitions found"));

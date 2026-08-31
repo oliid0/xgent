@@ -5,41 +5,41 @@ use std::sync::OnceLock;
 const APP_ROOT_NAME: &str = ".xgent";
 const DATA_DIR_NAME: &str = "data";
 const WEBVIEW_PROFILE_DIR_NAME: &str = "EBWebView";
-const LEGACY_APP_IDENTIFIERS: &[&str] = &["com.ohi.xagent", "com.ohi.agent"];
+const LEGACY_APP_IDENTIFIERS: &[&str] = &["com.ohi.xgent", "com.ohi.agent"];
 
 static APP_ROOT: OnceLock<PathBuf> = OnceLock::new();
 
-/// Initializes the one writable XAgent root before databases and services open.
+/// Initializes the one writable Xgent root before databases and services open.
 /// Desktop uses `~/.xgent`; mobile passes an OS-sandboxed `.xgent` root.
 pub fn initialize(root: PathBuf) -> Result<(), String> {
     validate_root(&root)?;
     fs::create_dir_all(root.join(DATA_DIR_NAME))
-        .map_err(|error| format!("Failed to create the XAgent data directory: {error}"))?;
+        .map_err(|error| format!("Failed to create the Xgent data directory: {error}"))?;
     let canonical = fs::canonicalize(&root)
-        .map_err(|error| format!("Failed to resolve the XAgent root directory: {error}"))?;
+        .map_err(|error| format!("Failed to resolve the Xgent root directory: {error}"))?;
     if let Some(existing) = APP_ROOT.get() {
         if existing == &canonical {
             return Ok(());
         }
-        return Err("The XAgent root directory was already initialized".to_string());
+        return Err("The Xgent root directory was already initialized".to_string());
     }
     APP_ROOT
         .set(canonical)
-        .map_err(|_| "The XAgent root directory was already initialized".to_string())
+        .map_err(|_| "The Xgent root directory was already initialized".to_string())
 }
 
 pub fn initialize_desktop() -> Result<Vec<String>, String> {
     let root = desktop_root_dir()?;
     validate_root(&root)?;
     fs::create_dir_all(&root)
-        .map_err(|error| format!("Failed to create the XAgent root directory: {error}"))?;
+        .map_err(|error| format!("Failed to create the Xgent root directory: {error}"))?;
 
     let mut warnings = Vec::new();
     let data_dir = root.join(DATA_DIR_NAME);
     let webview_profile_dir = root.join(WEBVIEW_PROFILE_DIR_NAME);
     let home = dirs::home_dir()
         .ok_or_else(|| "Failed to locate the user home directory".to_string())?;
-    migrate_directory(&home.join(".xagent"), &data_dir, &mut warnings);
+    migrate_directory(&home.join(".xgent"), &data_dir, &mut warnings);
 
     if let Some(roaming) = dirs::data_dir() {
         for identifier in LEGACY_APP_IDENTIFIERS {
@@ -79,7 +79,7 @@ pub fn app_root_dir() -> Result<PathBuf, String> {
 pub fn app_storage_dir() -> Result<PathBuf, String> {
     let directory = app_root_dir()?.join(DATA_DIR_NAME);
     fs::create_dir_all(&directory)
-        .map_err(|error| format!("Failed to create the XAgent data directory: {error}"))?;
+        .map_err(|error| format!("Failed to create the Xgent data directory: {error}"))?;
     Ok(directory)
 }
 
@@ -88,7 +88,7 @@ pub fn app_storage_dir() -> Result<PathBuf, String> {
 pub fn webview_user_data_root() -> Result<PathBuf, String> {
     let root = app_root_dir()?;
     fs::create_dir_all(&root)
-        .map_err(|error| format!("Failed to create the XAgent root directory: {error}"))?;
+        .map_err(|error| format!("Failed to create the Xgent root directory: {error}"))?;
     Ok(root)
 }
 
@@ -100,7 +100,7 @@ fn desktop_root_dir() -> Result<PathBuf, String> {
 
 fn validate_root(root: &Path) -> Result<(), String> {
     if root.as_os_str().is_empty() || root == Path::new("/") || root.parent().is_none() {
-        return Err("Refusing an unsafe XAgent root directory".to_string());
+        return Err("Refusing an unsafe Xgent root directory".to_string());
     }
     Ok(())
 }
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn legacy_webview_contents_move_directly_into_the_profile() {
         let temp = tempfile::tempdir().expect("temp dir");
-        let legacy_app_dir = temp.path().join("com.ohi.xagent");
+        let legacy_app_dir = temp.path().join("com.ohi.xgent");
         let legacy_webview_dir = legacy_app_dir.join("EBWebView");
         let destination = temp.path().join(".xgent/EBWebView");
         fs::create_dir_all(&legacy_webview_dir).expect("create legacy webview");

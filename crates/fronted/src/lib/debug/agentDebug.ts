@@ -1,5 +1,5 @@
 import type { Context } from "@earendil-works/pi-ai";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 
 import type { CodexRequestFormat, ExecutionMode, ProviderId, ReasoningLevel } from "../settings";
 import type { PrefixCacheDiagnostics } from "./prefixCacheShape";

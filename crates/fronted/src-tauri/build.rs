@@ -4,9 +4,9 @@ fn main() {
         .join("..")
         .join("package.json");
     println!("cargo:rerun-if-changed={}", package_json.display());
-    println!("cargo:rerun-if-env-changed=XAGENT_APP_VERSION");
+    println!("cargo:rerun-if-env-changed=XGENT_APP_VERSION");
 
-    let app_version = std::env::var("XAGENT_APP_VERSION")
+    let app_version = std::env::var("XGENT_APP_VERSION")
         .ok()
         .map(|version| version.trim().to_owned())
         .filter(|version| !version.is_empty())
@@ -23,7 +23,7 @@ fn main() {
                 .trim()
                 .to_owned()
         });
-    println!("cargo:rustc-env=XAGENT_APP_VERSION={app_version}");
+    println!("cargo:rustc-env=XGENT_APP_VERSION={app_version}");
 
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let is_windows_msvc = target_os == "windows"

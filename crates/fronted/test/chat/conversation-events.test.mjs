@@ -255,9 +255,9 @@ test("conversation checkpoint emits compaction summary payload", () => {
       event: {
         type: "token",
         text: "Compacted facts",
-        provider: "xagent",
+        provider: "xgent",
         model: "summary",
-        api: "xagent-compaction",
+        api: "xgent-compaction",
         conversation_id: "conversation-1",
         checkpoint: {
           summaryId: "summary-1",

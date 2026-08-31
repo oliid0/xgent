@@ -3,7 +3,7 @@
 // buckets, workspace-activity driven invalidation, search, and fs mutations.
 //
 // Shared by every frontend runtime; only relative, npm-package, or
-// @xagent/runtime imports are allowed here.
+// @xgent/runtime imports are allowed here.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../../i18n";

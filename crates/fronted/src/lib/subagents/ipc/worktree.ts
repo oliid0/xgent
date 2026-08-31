@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 
 import type {
   SubagentWorktreeApplyResult,
@@ -16,7 +16,7 @@ export type SubagentWorktreeIpc = {
   apply: (input: {
     parentWorkdir: string;
     worktreeRoot: string;
-    /** 父对话检查点上下文;后端在改写父工作区前对 apply 路径捕获前像。 */
+
     checkpoint?: { conversationId: string; turnId: string };
   }) => Promise<SubagentWorktreeApplyResult>;
   cleanup: (input: {

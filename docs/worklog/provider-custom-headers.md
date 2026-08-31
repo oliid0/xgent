@@ -7,7 +7,7 @@ Add ordered custom HTTP headers to `CustomProvider` in the unified TypeScript fr
 ## Constraints
 
 - Branch: `feat/provider-custom-headers`, based on `upstream/main` at `b11a0a5`.
-- Keep runtime differences behind `@xagent/runtime`.
+- Keep runtime differences behind `@xgent/runtime`.
 - Do not commit, push, or create a PR before manual Tauri validation.
 - Do not change Rust unless the gateway model-discovery path proves it is required and the user approves.
 

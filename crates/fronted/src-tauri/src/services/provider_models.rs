@@ -30,8 +30,8 @@ pub async fn fetch_provider_models(
     models_url: Option<&str>,
     is_full_url: bool,
 ) -> Result<String, String> {
-    // 与本地反代的 x-xagent-use-system-proxy 语义一致：勾选时代理配置异常
-    // fail fast，绝不静默降级；未勾选一律直连（忽略环境代理）。
+    
+    
     let client = if use_system_proxy {
         crate::services::system_proxy::cached_client()
             .map_err(|error| format!("App proxy unavailable: {error}"))?
@@ -303,7 +303,7 @@ fn build_provider_models_attempts_with_override(
             .unwrap_or_else(|| build_provider_models_url(provider_type, &base_url, official)),
         headers: build_provider_models_headers(provider_type, api_key, official),
     });
-    // codex/xai/deepseek 的官方形式与统一首次尝试完全一致，重复请求同一端点没有意义，收敛为一次。
+    
     let mut attempts = vec![default_attempt];
     if official_attempt.url != attempts[0].url || official_attempt.headers != attempts[0].headers {
         attempts.push(official_attempt);
@@ -311,8 +311,8 @@ fn build_provider_models_attempts_with_override(
     Ok(attempts)
 }
 
-// 完整端点模式：从聊天端点推导 models API 根。与前端
-// deriveModelsBaseUrlFromFullUrl 逻辑一致（优先截到 /v1/，否则去掉末段）。
+
+
 fn normalize_provider_full_url(raw: &str) -> Result<Url, String> {
     let mut url = parse_http_url(raw, "Base URL")?;
     url.set_query(None);
@@ -334,8 +334,8 @@ fn normalize_provider_full_url(raw: &str) -> Result<Url, String> {
     Ok(url)
 }
 
-// 首次尝试统一 /v1/models + authorization Bearer；失败后回退到各家官方形式
-// （gemini v1beta + x-goog-api-key、claude_code x-api-key）。每次请求仍只带单一鉴权头。
+
+
 fn build_provider_models_headers(
     provider_type: &str,
     api_key: &str,
@@ -434,14 +434,14 @@ mod tests {
             "https://relay.example.com/v1beta/models"
         );
 
-        // claude_code URL 不随 official 变化，但官方鉴权头不同，保留重试。
+        
         let claude =
             build_provider_models_attempts("claude_code", "https://relay.example.com", "key")
                 .expect("claude attempts");
         assert_eq!(claude.len(), 2);
         assert_eq!(claude[0].url, claude[1].url);
 
-        // codex/xai/deepseek 官方形式与统一首次尝试完全一致，收敛为一次请求。
+        
         let codex = build_provider_models_attempts(
             "codex",
             "https://relay.example.com/v1/responses",

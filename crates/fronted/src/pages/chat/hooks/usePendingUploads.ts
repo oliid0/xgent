@@ -1,4 +1,4 @@
-import { invoke, isTauriRuntime } from "@xagent/runtime";
+import { invoke, isTauriRuntime } from "@xgent/runtime";
 import { type MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
 
 import type { MentionComposerHandle } from "../../../components/chat/MentionComposer";

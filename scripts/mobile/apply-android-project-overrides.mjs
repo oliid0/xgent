@@ -46,8 +46,8 @@ try {
   const overrideSource = resolve(tauriRoot, "android/app/src/main");
 
   requireDirectory(generatedMain, "Generated Android project");
-  requireDirectory(iconSource, "XAgent Android icon resources");
-  requireDirectory(overrideSource, "XAgent Android project overrides");
+  requireDirectory(iconSource, "Xgent Android icon resources");
+  requireDirectory(overrideSource, "Xgent Android project overrides");
 
   copyTree(iconSource, resolve(generatedMain, "res"));
   copyTree(overrideSource, generatedMain);
@@ -66,7 +66,7 @@ try {
   writeFileSync(manifestPath, withRoundIcon);
 
   console.log(
-    `Applied XAgent Android icons and WebView theme overrides to ${relative(process.cwd(), generatedMain) || generatedMain}.`,
+    `Applied Xgent Android icons and WebView theme overrides to ${relative(process.cwd(), generatedMain) || generatedMain}.`,
   );
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));

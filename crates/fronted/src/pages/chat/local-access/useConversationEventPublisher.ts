@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { useCallback, useEffect, useRef } from "react";
 
 type BatchableConversationEvent = {
@@ -116,7 +116,7 @@ export function useConversationEventPublisher(enabled = true) {
         .catch(() => undefined)
         .then(() =>
           invoke("local_access_broadcast_event", {
-            event: "xagent:conversation-event",
+            event: "xgent:conversation-event",
             payload: {
               requestId,
               event,

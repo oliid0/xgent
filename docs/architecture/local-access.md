@@ -2,7 +2,7 @@
 
 ## 产品边界
 
-XAgent 只有一份 React 前端（`crates/fronted`）。桌面、配对浏览器、Android 与 iOS 使用同一套页面、对话逻辑、工具注册和设置模型；平台差异只存在于 `src/runtime`、Tauri 命令和 `crates/mobile-execution`。
+Xgent 只有一份 React 前端（`crates/fronted`）。桌面、配对浏览器、Android 与 iOS 使用同一套页面、对话逻辑、工具注册和设置模型；平台差异只存在于 `src/runtime`、Tauri 命令和 `crates/mobile-execution`。
 
 桌面 Tauri 宿主持有 SQLite、模型凭据、MCP 进程、Skills 和完整电脑能力。独立网关、Remote 设置、公网隧道与公开历史分享不属于当前架构。
 
@@ -56,7 +56,7 @@ GitHub PAT 保存在 Tauri Stronghold 保险库中，不进入 SQLite、React st
 - 任务脚本、输入和托管 workflow 通过 Git Data API 原子提交；
 - Linux/macOS 使用 Bash，Windows 使用 PowerShell；
 - 所有返回文件必须写入 `../output`；
-- XAgent 轮询对应 workflow run，失败时提供裁剪后的日志，成功时流式下载 artifact 到临时文件后原子改名；
+- Xgent 轮询对应 workflow run，失败时提供裁剪后的日志，成功时流式下载 artifact 到临时文件后原子改名；
 - 重试创建新 task，不修改失败 task。
 
-公开仓库中的任务源码与输入对任何人可见。运行时凭据通过仓库 Actions Variable/Secret `XAGENT_CLOUD_ENV` 注入，格式为每行一个 `NAME=value`，Secret 覆盖 Variable。
+公开仓库中的任务源码与输入对任何人可见。运行时凭据通过仓库 Actions Variable/Secret `XGENT_CLOUD_ENV` 注入，格式为每行一个 `NAME=value`，Secret 覆盖 Variable。

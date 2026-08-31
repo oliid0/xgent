@@ -31,20 +31,20 @@ const ORIGIN: &str = "origin";
 const PROXY_AUTHENTICATE: &str = "proxy-authenticate";
 const PROXY_AUTHORIZATION: &str = "proxy-authorization";
 const PROXY_CONNECTION: &str = "proxy-connection";
-const PROXY_PREFIX: &str = "x-xagent-";
-const PROXY_TOKEN_HEADER: &str = "x-xagent-proxy-token";
-const OAUTH_ACCOUNT_ID_HEADER: &str = "x-xagent-oauth-account-id";
+const PROXY_PREFIX: &str = "x-xgent-";
+const PROXY_TOKEN_HEADER: &str = "x-xgent-proxy-token";
+const OAUTH_ACCOUNT_ID_HEADER: &str = "x-xgent-oauth-account-id";
 const REFERER: &str = "referer";
 const TE: &str = "te";
 const TRAILER: &str = "trailer";
 const TRANSFER_ENCODING: &str = "transfer-encoding";
 const UPGRADE: &str = "upgrade";
-const UPSTREAM_ORIGIN_HEADER: &str = "x-xagent-upstream-origin";
-const UPSTREAM_URL_HEADER: &str = "x-xagent-upstream-url";
-const UPSTREAM_USER_AGENT_HEADER: &str = "x-xagent-upstream-user-agent";
-const UPSTREAM_CONTENT_TYPE_HEADER: &str = "x-xagent-upstream-content-type";
-const USE_SYSTEM_PROXY_HEADER: &str = "x-xagent-use-system-proxy";
-const DEFAULT_ALLOW_HEADERS: &str = "authorization,content-type,x-api-key,x-goog-api-key,anthropic-version,x-xagent-upstream-origin,x-xagent-upstream-url,x-xagent-upstream-user-agent,x-xagent-upstream-content-type,x-xagent-proxy-token,x-xagent-use-system-proxy,x-xagent-oauth-account-id";
+const UPSTREAM_ORIGIN_HEADER: &str = "x-xgent-upstream-origin";
+const UPSTREAM_URL_HEADER: &str = "x-xgent-upstream-url";
+const UPSTREAM_USER_AGENT_HEADER: &str = "x-xgent-upstream-user-agent";
+const UPSTREAM_CONTENT_TYPE_HEADER: &str = "x-xgent-upstream-content-type";
+const USE_SYSTEM_PROXY_HEADER: &str = "x-xgent-use-system-proxy";
+const DEFAULT_ALLOW_HEADERS: &str = "authorization,content-type,x-api-key,x-goog-api-key,anthropic-version,x-xgent-upstream-origin,x-xgent-upstream-url,x-xgent-upstream-user-agent,x-xgent-upstream-content-type,x-xgent-proxy-token,x-xgent-use-system-proxy,x-xgent-oauth-account-id";
 const ALLOW_METHODS_VALUE: &str = "GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD";
 const VARY_VALUE: &str = "Origin, Access-Control-Request-Method, Access-Control-Request-Headers";
 const IMAGE_PROXY_MAX_BYTES: usize = 25 * 1024 * 1024;
@@ -146,8 +146,8 @@ async fn handle_image_proxy(Query(query): Query<ImageProxyQuery>, headers: Heade
         Err(message) => return error_response(StatusCode::BAD_REQUEST, &message, &headers),
     };
 
-    // 图片外链与商店链路同语义：恒随应用代理出网（未启用=直连，配置异常
-    // 502 fail fast）。<img> 请求无法携带自定义头，因此不走 per-request 开关。
+    
+    
     let client = match crate::services::system_proxy::cached_client() {
         Ok(client) => client,
         Err(error) => {
@@ -404,8 +404,8 @@ async fn handle_proxy(
         .get(USE_SYSTEM_PROXY_HEADER)
         .and_then(|value| value.to_str().ok())
         .is_some_and(|value| value == "1");
-    // 系统代理未启用时 cached_client 返回直连 client（勾选但全局关闭 = 直连）；
-    // 代理配置异常则 fail fast，绝不静默降级为直连。
+    
+    
     let client = if use_system_proxy {
         match crate::services::system_proxy::cached_client() {
             Ok(client) => client,
@@ -525,8 +525,8 @@ fn build_target_url(
         .strip_prefix(&prefix)
         .ok_or_else(|| "Invalid proxy path prefix".to_string())?;
     let resolved = if suffix.is_empty() { "/" } else { suffix };
-    // “//” 开头的后缀会被 Url::join 当作 scheme-relative 引用改写目标主机，
-    // 显式拒绝，防止请求被重定向到 upstream origin 之外的主机。
+    
+    
     if resolved.starts_with("//") {
         return Err("Proxy request path must not begin with //".to_string());
     }
@@ -820,12 +820,12 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(
             HeaderName::from_static(ACCESS_CONTROL_REQUEST_HEADERS),
-            HeaderValue::from_static("authorization,x-api-key,x-xagent-proxy-token"),
+            HeaderValue::from_static("authorization,x-api-key,x-xgent-proxy-token"),
         );
 
         assert_eq!(
             build_allow_headers_value(&headers),
-            HeaderValue::from_static("authorization,x-api-key,x-xagent-proxy-token")
+            HeaderValue::from_static("authorization,x-api-key,x-xgent-proxy-token")
         );
     }
 

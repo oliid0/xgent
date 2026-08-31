@@ -1705,8 +1705,8 @@ mod tests {
         input.run.active_segment_index = 1;
         input.run.total_segment_count = 2;
         input.run.total_message_count = 5;
-        input.run.worktree_root = Some("/tmp/.xagent-subagents/repo/agent-a".to_string());
-        input.run.branch_name = Some("xagent/subagent/agent-a".to_string());
+        input.run.worktree_root = Some("/tmp/.xgent-subagents/repo/agent-a".to_string());
+        input.run.branch_name = Some("xgent/subagent/agent-a".to_string());
         input.run.mode = "worktree".to_string();
         input.run.status = "completed".to_string();
         input.run.summary = Some("done".to_string());
@@ -1730,11 +1730,11 @@ mod tests {
         assert_eq!(state.run.workdir.as_deref(), Some("/tmp/work"));
         assert_eq!(
             state.run.worktree_root.as_deref(),
-            Some("/tmp/.xagent-subagents/repo/agent-a")
+            Some("/tmp/.xgent-subagents/repo/agent-a")
         );
         assert_eq!(
             state.run.branch_name.as_deref(),
-            Some("xagent/subagent/agent-a")
+            Some("xgent/subagent/agent-a")
         );
         assert_eq!(state.run.context_schema_version, 1);
         assert_eq!(state.run.active_segment_index, 1);
@@ -1993,8 +1993,8 @@ mod tests {
         let mut stale = sample_save_input("run-stale", "call-stale");
         stale.run.agent_id = "agent-stale".to_string();
         stale.run.mode = "worktree".to_string();
-        stale.run.worktree_root = Some("/tmp/.xagent-subagents/repo/agent-stale".to_string());
-        stale.run.branch_name = Some("xagent/subagent/agent-stale".to_string());
+        stale.run.worktree_root = Some("/tmp/.xgent-subagents/repo/agent-stale".to_string());
+        stale.run.branch_name = Some("xgent/subagent/agent-stale".to_string());
         save_subagent_run_sync(&mut conn, &stale).expect("save stale run");
 
         let mut kept_identity = sample_identity_input();
@@ -2038,11 +2038,11 @@ mod tests {
         assert_eq!(result.cleanup_targets.len(), 1);
         assert_eq!(
             result.cleanup_targets[0].worktree_root,
-            "/tmp/.xagent-subagents/repo/agent-stale"
+            "/tmp/.xgent-subagents/repo/agent-stale"
         );
         assert_eq!(
             result.cleanup_targets[0].branch_name.as_deref(),
-            Some("xagent/subagent/agent-stale")
+            Some("xgent/subagent/agent-stale")
         );
         assert_eq!(
             result.cleanup_targets[0].run_id.as_deref(),
@@ -2121,8 +2121,8 @@ mod tests {
     fn delete_for_parent_conversation_removes_everything() {
         let mut conn = open_test_db();
         let mut run = sample_save_input("run-1", "call-1");
-        run.run.worktree_root = Some("/tmp/.xagent-subagents/repo/agent-a".to_string());
-        run.run.branch_name = Some("xagent/subagent/agent-a".to_string());
+        run.run.worktree_root = Some("/tmp/.xgent-subagents/repo/agent-a".to_string());
+        run.run.branch_name = Some("xgent/subagent/agent-a".to_string());
         save_subagent_run_sync(&mut conn, &run).expect("save run");
         upsert_subagent_identity_sync(&conn, &sample_identity_input()).expect("insert identity");
         append_subagent_message_sync(

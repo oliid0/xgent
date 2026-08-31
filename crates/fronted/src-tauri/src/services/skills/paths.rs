@@ -1,4 +1,4 @@
-//! Skills 根目录解析、路径回显与路径 / 名称清洗。
+
 
 use std::fs;
 use std::path::{Component, Path, PathBuf};

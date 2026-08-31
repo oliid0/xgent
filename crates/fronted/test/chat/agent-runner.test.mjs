@@ -12,7 +12,7 @@ const powerActivityModulePath = path.join(rootDir, "src/lib/system/powerActivity
 const streamQueue = [];
 const streamSideEffects = [];
 const observedStreamContexts = [];
-const HOSTED_SEARCH_PROBE_HEADER = "x-xagent-hosted-search-probe";
+const HOSTED_SEARCH_PROBE_HEADER = "x-xgent-hosted-search-probe";
 
 function createUsage() {
   return {
@@ -284,7 +284,7 @@ const llmMock = {
       headers: {
         Authorization: `Bearer ${runtime.apiKey}`,
         "x-api-key": runtime.apiKey,
-        "x-xagent-test": "1",
+        "x-xgent-test": "1",
       },
     };
   },
@@ -336,7 +336,7 @@ const loader = createTsModuleLoader({
     [llmModulePath]: llmMock,
     [proxyModulePath]: {
       async prepareProxyRequest(_providerId, baseUrl) {
-        return { baseUrl, headers: { "x-xagent-test": "1" } };
+        return { baseUrl, headers: { "x-xgent-test": "1" } };
       },
     },
     [powerActivityModulePath]: {
@@ -403,7 +403,7 @@ function createBaseParams(overrides = {}) {
           },
         ],
       },
-      workdir: "/tmp/xagent-test",
+      workdir: "/tmp/xgent-test",
       sessionId: "session-1",
       tools: [
         {
@@ -1746,7 +1746,7 @@ test("runAssistantWithTools bridges recovered DSML provider web_search without a
 
 test("runAssistantWithTools silently bridges structured DSML web_search tool calls", async () => {
   const webSearchCall = createToolCall("dsml-tool-call-structured-search", "web_search", {
-    query: "XAgent DeepSeek structured DSML search",
+    query: "Xgent DeepSeek structured DSML search",
   });
   resetFakeStreams(
     createAssistant(
@@ -1789,7 +1789,7 @@ test("runAssistantWithTools silently bridges structured DSML web_search tool cal
   assert.equal(beforeNextTurnSnapshots[0].toolResults[0].isError, false);
   assert.match(
     beforeNextTurnSnapshots[0].toolResults[0].content[0].text,
-    /XAgent DeepSeek structured DSML search/,
+    /Xgent DeepSeek structured DSML search/,
   );
   assert.deepEqual(
     result.emittedMessages.map((message) => message.role),

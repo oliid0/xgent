@@ -36,7 +36,7 @@ function isWindowsTauriRuntime() {
 }
 
 function reportWindowChromeError(action: string, error: unknown) {
-  console.error(`failed to ${action} XAgent window`, error);
+  console.error(`failed to ${action} Xgent window`, error);
 }
 
 export function WindowsTitleBar() {
@@ -185,21 +185,21 @@ export function WindowsTitleBar() {
     <HStack
       as="header"
       width="100%"
-      height="var(--xagent-windows-titlebar-height)"
+      height="var(--xgent-windows-titlebar-height)"
       vAlign="center"
       style={
         {
           position: "relative",
-          zIndex: "var(--xagent-z-window-chrome)",
+          zIndex: "var(--xgent-z-window-chrome)",
           flexShrink: 0,
           userSelect: "none",
           color: "var(--color-text-primary)",
-          opacity: isFocused ? 1 : "var(--xagent-window-chrome-opacity-inactive)",
-          backgroundColor: "var(--xagent-window-chrome-background)",
+          opacity: isFocused ? 1 : "var(--xgent-window-chrome-opacity-inactive)",
+          backgroundColor: "var(--xgent-window-chrome-background)",
           borderBlockEnd: "var(--border-width) solid var(--color-border)",
           boxShadow: "var(--shadow-low)",
           backdropFilter:
-            "blur(var(--xagent-window-chrome-blur)) saturate(var(--xagent-window-chrome-saturation))",
+            "blur(var(--xgent-window-chrome-blur)) saturate(var(--xgent-window-chrome-saturation))",
           transitionProperty: "opacity, background-color",
           transitionDuration: "var(--duration-fast)",
           transitionTimingFunction: "var(--ease-standard)",
@@ -221,8 +221,8 @@ export function WindowsTitleBar() {
             src={iconSimpleUrl}
             alt=""
             style={{
-              width: "var(--xagent-window-app-icon-size)",
-              height: "var(--xagent-window-app-icon-size)",
+              width: "var(--xgent-window-app-icon-size)",
+              height: "var(--xgent-window-app-icon-size)",
               flexShrink: 0,
               borderRadius: "var(--radius-element)",
             }}
@@ -243,7 +243,7 @@ export function WindowsTitleBar() {
           variant="ghost"
           onClick={minimizeWindow}
           style={{
-            width: "var(--xagent-window-control-width)",
+            width: "var(--xgent-window-control-width)",
             height: "100%",
           }}
         />
@@ -255,7 +255,7 @@ export function WindowsTitleBar() {
           variant="ghost"
           onClick={toggleMaximize}
           style={{
-            width: "var(--xagent-window-control-width)",
+            width: "var(--xgent-window-control-width)",
             height: "100%",
           }}
         />
@@ -267,7 +267,7 @@ export function WindowsTitleBar() {
           variant="destructive"
           onClick={closeWindow}
           style={{
-            width: "var(--xagent-window-close-control-width)",
+            width: "var(--xgent-window-close-control-width)",
             height: "100%",
           }}
         />

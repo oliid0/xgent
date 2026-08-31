@@ -65,7 +65,7 @@ test("artifact lines must follow the [kind] ref | status format", () => {
     /no valid artifact lines/,
   );
 
-  // 混有合法行时放行（宽收严教）。
+  
   validateCompactionSummary(
     summaryXml({ artifacts: "- odd line\n- [file] src/app.ts | modified" }),
     10_000,
@@ -78,7 +78,7 @@ test("a large source must not produce a trivially short summary", () => {
 - [file] a.ts | read
 </artifacts><next_steps>1. x</next_steps></summary>`;
   assert.throws(() => validateCompactionSummary(short, 10_000, EMPTY_PAYLOAD), /summary too short/);
-  // 小会话不受最短长度约束。
+  
   validateCompactionSummary(short, 200, EMPTY_PAYLOAD);
 });
 

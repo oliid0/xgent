@@ -94,7 +94,7 @@ function ModelPickerContent(props: {
   };
 
   return (
-    <VStack gap={3} width="var(--xagent-model-selector-width)">
+    <VStack gap={3} width="var(--xgent-model-selector-width)">
       <TextInput
         label={t("chat.searchModel")}
         isLabelHidden
@@ -106,11 +106,7 @@ function ModelPickerContent(props: {
         startIcon={<Search size={16} />}
         onKeyDown={(event) => event.stopPropagation()}
       />
-      <VStack
-        gap={1}
-        isScrollable
-        style={{ maxHeight: "var(--xagent-model-selector-list-height)" }}
-      >
+      <VStack gap={1} isScrollable style={{ maxHeight: "var(--xgent-model-selector-list-height)" }}>
         {props.noneLabel && !normalizedSearch ? (
           <List density="compact">
             <ListItem

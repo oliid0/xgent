@@ -6,7 +6,7 @@ use std::time::Duration;
 use super::*;
 
 pub(crate) async fn open_ssh_shell_channel(
-    handle: &client::Handle<XAgentSshClient>,
+    handle: &client::Handle<XgentSshClient>,
     size: TerminalSize,
 ) -> Result<russh::Channel<client::Msg>, String> {
     let channel = handle

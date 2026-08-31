@@ -1,4 +1,4 @@
-package com.ohi.xagent.mobileexecution
+package com.ohi.xgent.mobileexecution
 
 import java.io.File
 import java.nio.file.Files
@@ -16,7 +16,7 @@ internal data class MobileEnvironmentSnapshot(
  * Stores values that are expensive to derive from a populated rootfs.
  *
  * Capability probes remain live, while the recursive disk usage scan only runs after
- * XAgent-managed install operations. A corrupt or missing cache is treated as unknown.
+ * Xgent-managed install operations. A corrupt or missing cache is treated as unknown.
  */
 internal class MobileEnvironmentInventory(
     private val backendDir: File,

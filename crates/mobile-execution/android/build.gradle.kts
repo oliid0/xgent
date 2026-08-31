@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.ohi.xagent.mobileexecution"
+    namespace = "com.ohi.xgent.mobileexecution"
     compileSdk = 36
 
     defaultConfig {
@@ -26,8 +26,8 @@ android {
 
     packaging {
         jniLibs.keepDebugSymbols += setOf(
-            "**/libxagent_proot.so",
-            "**/libxagent_proot_loader.so",
+            "**/libxgent_proot.so",
+            "**/libxgent_proot_loader.so",
         )
     }
 

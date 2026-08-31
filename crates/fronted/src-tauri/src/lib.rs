@@ -61,7 +61,7 @@ struct AppActionFeedbackEvent {
 }
 
 pub fn app_version() -> &'static str {
-    env!("XAGENT_APP_VERSION")
+    env!("XGENT_APP_VERSION")
 }
 
 #[cfg(desktop)]
@@ -533,7 +533,7 @@ fn request_app_exit(
     let running_count = terminal_registry.running_session_count();
     if running_count > 0 {
         if let Err(error) = show_main_window(app) {
-            eprintln!("failed to show XAgent window before terminal exit confirm: {error}");
+            eprintln!("failed to show Xgent window before terminal exit confirm: {error}");
         }
         if let Err(error) = app.emit(
             TERMINAL_EXIT_REQUESTED_EVENT,
@@ -556,7 +556,7 @@ fn toggle_main_window(app: &tauri::AppHandle) {
         if visible && focused {
             let _ = window.hide();
         } else if let Err(error) = show_main_window(app) {
-            eprintln!("failed to show XAgent window from global shortcut: {error}");
+            eprintln!("failed to show Xgent window from global shortcut: {error}");
         }
     }
 }
@@ -577,7 +577,7 @@ pub(crate) fn toggle_main_window_pin(app: &tauri::AppHandle) {
                     handles.set_pin_checked(next);
                 }
             }
-            Err(error) => eprintln!("failed to toggle XAgent window pin: {error}"),
+            Err(error) => eprintln!("failed to toggle Xgent window pin: {error}"),
         }
     }
 }
@@ -643,7 +643,7 @@ fn forward_app_action(
 ) {
     if show_window {
         if let Err(error) = show_main_window(app) {
-            eprintln!("failed to show XAgent window for action {action}: {error}");
+            eprintln!("failed to show Xgent window for action {action}: {error}");
         }
     }
     if let Err(error) = app.emit(APP_ACTION_EVENT, AppActionEvent { action, id, value }) {
@@ -690,7 +690,7 @@ fn dispatch_app_action(app: &tauri::AppHandle, action: AppAction) {
     match action {
         AppAction::Summon => {
             if let Err(error) = show_main_window(app) {
-                eprintln!("failed to show XAgent window: {error}");
+                eprintln!("failed to show Xgent window: {error}");
             }
         }
         AppAction::ToggleWindow => toggle_main_window(app),
@@ -751,10 +751,10 @@ fn dispatch_app_action(app: &tauri::AppHandle, action: AppAction) {
                         .opener()
                         .open_path(dir.to_string_lossy().to_string(), None::<&str>)
                     {
-                        eprintln!("failed to open XAgent data directory: {error}");
+                        eprintln!("failed to open Xgent data directory: {error}");
                     }
                 }
-                Err(error) => eprintln!("failed to resolve XAgent data directory: {error}"),
+                Err(error) => eprintln!("failed to resolve Xgent data directory: {error}"),
             }
         }
         AppAction::Quit => {
@@ -769,7 +769,7 @@ fn configure_system_tray(app: &tauri::App) -> tauri::Result<()> {
     let skeleton = services::tray::build_tray_menu_skeleton(app, app_version())?;
     let menu = skeleton.menu.clone();
     let mut tray_builder = TrayIconBuilder::new()
-        .tooltip("XAgent")
+        .tooltip("Xgent")
         .menu(&menu)
         .show_menu_on_left_click(TRAY_SHOW_MENU_ON_LEFT_CLICK)
         .on_menu_event(|app, event| {
@@ -783,7 +783,7 @@ fn configure_system_tray(app: &tauri::App) -> tauri::Result<()> {
                 ..
             } => {
                 if let Err(error) = show_main_window(tray.app_handle()) {
-                    eprintln!("failed to show XAgent window from tray double-click: {error}");
+                    eprintln!("failed to show Xgent window from tray double-click: {error}");
                 }
             }
             TrayIconEvent::Click {
@@ -792,7 +792,7 @@ fn configure_system_tray(app: &tauri::App) -> tauri::Result<()> {
                 ..
             } if !TRAY_SHOW_MENU_ON_LEFT_CLICK => {
                 if let Err(error) = show_main_window(tray.app_handle()) {
-                    eprintln!("failed to show XAgent window from tray click: {error}");
+                    eprintln!("failed to show Xgent window from tray click: {error}");
                 }
             }
             _ => {}
@@ -844,26 +844,26 @@ pub fn run() {
     runtime::windows_sandbox::run_sandbox_launcher_if_requested();
 
     for warning in services::app_paths::initialize_desktop()
-        .expect("failed to initialize the unified XAgent data directory")
+        .expect("failed to initialize the unified Xgent data directory")
     {
         eprintln!("{warning}");
     }
     #[cfg(target_os = "windows")]
     {
         let webview_user_data_root = services::app_paths::webview_user_data_root()
-            .expect("failed to initialize the XAgent WebView2 user-data root");
+            .expect("failed to initialize the Xgent WebView2 user-data root");
         std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", webview_user_data_root);
     }
 
     let automation_store = Arc::new(
         services::automation::AutomationStore::open()
-            .expect("failed to initialize XAgent automation store"),
+            .expect("failed to initialize Xgent automation store"),
     );
     let automation_scheduler = Arc::new(services::automation::AutomationScheduler::new(
         Arc::clone(&automation_store),
     ));
     let memory_store = Arc::new(
-        services::memory::MemoryStore::open().expect("failed to initialize XAgent memory store"),
+        services::memory::MemoryStore::open().expect("failed to initialize Xgent memory store"),
     );
     let power_activity = Arc::new(services::power_activity::PowerActivityManager::default());
     let managed_process_registry =
@@ -887,7 +887,7 @@ pub fn run() {
     #[cfg(not(debug_assertions))]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
         if let Err(error) = show_main_window(app) {
-            eprintln!("failed to focus existing XAgent instance: {error}");
+            eprintln!("failed to focus existing Xgent instance: {error}");
         }
     }));
 
@@ -1030,7 +1030,7 @@ pub fn run() {
                     if commands::app::is_close_window_exit(&close_window_behavior) {
                         request_app_exit(window.app_handle(), &allow_exit, &terminal_registry);
                     } else if let Err(error) = window.hide() {
-                        eprintln!("failed to hide XAgent window on close: {error}");
+                        eprintln!("failed to hide Xgent window on close: {error}");
                     }
                 }
             }
@@ -1043,7 +1043,7 @@ pub fn run() {
         #[cfg(target_os = "macos")]
         tauri::RunEvent::Reopen { .. } => {
             if let Err(error) = show_main_window(_app) {
-                eprintln!("failed to show XAgent window from dock reopen: {error}");
+                eprintln!("failed to show Xgent window from dock reopen: {error}");
             }
         }
         tauri::RunEvent::ExitRequested { api, .. } => {
@@ -1052,7 +1052,7 @@ pub fn run() {
                 if running_count > 0 {
                     if let Err(error) = show_main_window(_app) {
                         eprintln!(
-                            "failed to show XAgent window before terminal exit confirm: {error}"
+                            "failed to show Xgent window before terminal exit confirm: {error}"
                         );
                     }
                     if let Err(error) = _app.emit(
@@ -1107,7 +1107,7 @@ fn initialize_mobile_services(app: tauri::AppHandle) -> Vec<String> {
     {
         record_mobile_startup_failure(
             &mut failures,
-            "initialize XAgent mobile data directory failed",
+            "initialize Xgent mobile data directory failed",
             error,
         );
         return failures;
@@ -1117,7 +1117,7 @@ fn initialize_mobile_services(app: tauri::AppHandle) -> Vec<String> {
         Err(error) => {
             record_mobile_startup_failure(
                 &mut failures,
-                "resolve XAgent app storage directory failed",
+                "resolve Xgent app storage directory failed",
                 error,
             );
             return failures;
@@ -1145,7 +1145,7 @@ fn initialize_mobile_services(app: tauri::AppHandle) -> Vec<String> {
         }
         Err(error) => record_mobile_startup_failure(
             &mut failures,
-            "initialize XAgent memory store failed",
+            "initialize Xgent memory store failed",
             error,
         ),
     }
@@ -1159,7 +1159,7 @@ fn initialize_mobile_services(app: tauri::AppHandle) -> Vec<String> {
         Err(error) => {
             record_mobile_startup_failure(
                 &mut failures,
-                "initialize XAgent automation store failed",
+                "initialize Xgent automation store failed",
                 error,
             );
             None
@@ -1289,5 +1289,5 @@ pub fn run() {
         })
         .invoke_handler(app_invoke_handler!())
         .run(tauri::generate_context!())
-        .expect("error while running XAgent mobile application");
+        .expect("error while running Xgent mobile application");
 }

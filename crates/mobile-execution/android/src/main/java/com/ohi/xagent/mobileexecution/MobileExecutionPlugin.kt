@@ -1,4 +1,4 @@
-package com.ohi.xagent.mobileexecution
+package com.ohi.xgent.mobileexecution
 
 import android.app.Activity
 import android.content.Intent
@@ -60,7 +60,7 @@ class RemoveExternalWorkspaceArgs {
 @TauriPlugin
 class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
     private val worker = Executors.newSingleThreadExecutor { task ->
-        Thread(task, "xagent-mobile-execution").apply { isDaemon = true }
+        Thread(task, "xgent-mobile-execution").apply { isDaemon = true }
     }
     private val activeProcesses = ConcurrentHashMap<String, Process>()
     private val scheduledRuns = ConcurrentHashMap.newKeySet<String>()
@@ -75,7 +75,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
         ProotRunner(
             nativeLibraryDir = File(activity.applicationInfo.nativeLibraryDir),
             rootfsDir = rootfsDir,
-            tempDir = File(activity.cacheDir, "xagent-proot"),
+            tempDir = File(activity.cacheDir, "xgent-proot"),
             allowedHostRoots = {
                 listOf(activity.filesDir) + externalWorkspaces.allowedRoots()
             },
@@ -329,7 +329,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
             put("toolchains", toolchainStatusPayload())
             put(
                 "environmentVersion",
-                File(rootfsDir, "etc/xagent-environment")
+                File(rootfsDir, "etc/xgent-environment")
                     .takeIf { it.isFile }
                     ?.readText()
                     ?.trim()
@@ -487,7 +487,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     companion object {
-        private const val TAG = "XAgentMobileExecution"
+        private const val TAG = "XgentMobileExecution"
         private const val BACKEND = "android-proot"
         private const val DEFAULT_TIMEOUT_MS = 120_000L
         private const val MIN_TIMEOUT_MS = 1_000L
@@ -496,9 +496,9 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
         private const val MAX_TOOLCHAIN_INSTALL_TIMEOUT_MS = 1_800_000L
         private const val MAX_STDIN_BYTES = 1024 * 1024
         private const val MAX_COMMAND_CHARS = 256 * 1024
-        private const val READINESS_MARKER = ".xagent-runtime-ready"
+        private const val READINESS_MARKER = ".xgent-runtime-ready"
         private const val READINESS_VERSION = "android-proot-alpine-v1"
-        private const val READINESS_TOKEN = "xagent-android-shell-ready"
+        private const val READINESS_TOKEN = "xgent-android-shell-ready"
         private const val INSTALL_PROBE_TIMEOUT_MS = 15_000L
         private val RUN_ID_PATTERN = Regex("[A-Za-z0-9._-]{1,128}")
     }

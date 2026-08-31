@@ -2,7 +2,7 @@
 
 ## 总体模型
 
-XAgent 的记忆系统由 Rust `MemoryStore` 作为本地真相源；前端 TypeScript 记忆域集中在 `src/lib/memory/`，提供 Settings 管理、Chat prompt 注入、`MemoryManager` 工具、回合后静默提取与离线组织器。配对浏览器不拥有独立记忆库，而是通过本地访问 RPC 调用桌面宿主；Web、PC 和移动端共享同一套前端逻辑。
+Xgent 的记忆系统由 Rust `MemoryStore` 作为本地真相源；前端 TypeScript 记忆域集中在 `src/lib/memory/`，提供 Settings 管理、Chat prompt 注入、`MemoryManager` 工具、回合后静默提取与离线组织器。配对浏览器不拥有独立记忆库，而是通过本地访问 RPC 调用桌面宿主；Web、PC 和移动端共享同一套前端逻辑。
 
 | 层 | 路径 | 职责 |
 |---|---|---|
@@ -22,8 +22,8 @@ XAgent 的记忆系统由 Rust `MemoryStore` 作为本地真相源；前端 Type
 
 | 数据 | 位置 | 说明 |
 |---|---|---|
-| Markdown 事实源 | `~/.xagent/memory/...` | 记忆正文和 frontmatter 的 canonical source。 |
-| SQLite index | `~/.xagent/memory/memory-index.sqlite3` | `memory_meta`、`memory_fts`、`memory_fts_tri`、`memory_audit_log`、`memory_organize_runs`（schema v4，v3→v4 增量迁移保留历史）。 |
+| Markdown 事实源 | `~/.xgent/memory/...` | 记忆正文和 frontmatter 的 canonical source。 |
+| SQLite index | `~/.xgent/memory/memory-index.sqlite3` | `memory_meta`、`memory_fts`、`memory_fts_tri`、`memory_audit_log`、`memory_organize_runs`（schema v4，v3→v4 增量迁移保留历史）。 |
 | Settings | `settings_save_memory` 持久化 | summary model、organizer schedule/scope/mode 等。 |
 | Organize run 记录 | `memory_organize_runs` | v4 列含 `phase/final_count/compression_ratio/token_usage_total/quota_headroom_at_start`；`report` 字段存类型化 v4 报告（只经 `runRecord.ts` 解析）。 |
 

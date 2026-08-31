@@ -786,10 +786,10 @@ fn execute_bash(task: &CronTask, workdir: String) -> CompletedRun {
         Ok(cwd) => cwd,
         Err(error) => return failed_run(&task.id, error, true),
     };
-    // P1#2:Cron bash 脚本此前恒以 sandbox_options=None 执行,于是"模型建一个 bash
-    // 任务 → 调度器无沙箱触发"成为绕过沙箱围栏的持久化通道(还能跨应用重启存活)。
-    // 现在与 Bash / ManagedProcess 共用同一个后端下限:回查持久化的
-    // commandSafetyMode,读不出来则直接失败,绝不无沙箱执行。
+    
+    
+    
+    
     let sandbox_options = match sandbox::resolve_effective_options(None) {
         Ok(options) => options,
         Err(error) => return failed_run(&task.id, error, true),

@@ -16,9 +16,9 @@ use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
 const API_ROOT: &str = "https://api.github.com";
-const REPOSITORY_MARKER_PATH: &str = ".xagent-cloud.json";
-const WORKFLOW_FILE_NAME: &str = "xagent-cloud-task.yml";
-const WORKFLOW_PATH: &str = ".github/workflows/xagent-cloud-task.yml";
+const REPOSITORY_MARKER_PATH: &str = ".xgent-cloud.json";
+const WORKFLOW_FILE_NAME: &str = "xgent-cloud-task.yml";
+const WORKFLOW_PATH: &str = ".github/workflows/xgent-cloud-task.yml";
 const MAX_TASK_FILES: usize = 100;
 const MAX_TASK_FILE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_TASK_TOTAL_BYTES: usize = 20 * 1024 * 1024;
@@ -28,20 +28,20 @@ const MAX_FAILURE_LOG_TAIL_BYTES: usize = 96 * 1024;
 const MAX_ARTIFACT_BYTES: u64 = 1024 * 1024 * 1024;
 
 const REPOSITORY_MARKER: &str = r#"{
-  "product": "xagent-cloud",
+  "product": "xgent-cloud",
   "schemaVersion": 2,
-  "managedPaths": [".github/workflows/xagent-cloud-task.yml", "scripts/xagent-cloud-entry.sh", "scripts/xagent-cloud-entry.ps1", "tasks/"]
+  "managedPaths": [".github/workflows/xgent-cloud-task.yml", "scripts/xgent-cloud-entry.sh", "scripts/xgent-cloud-entry.ps1", "tasks/"]
 }
 "#;
 
-const CLOUD_WORKFLOW: &str = r#"name: XAgent Cloud Task
-run-name: XAgent cloud task ${{ inputs.task_id }}
+const CLOUD_WORKFLOW: &str = r#"name: Xgent Cloud Task
+run-name: Xgent cloud task ${{ inputs.task_id }}
 
 on:
   workflow_dispatch:
     inputs:
       task_id:
-        description: Validated XAgent task identifier
+        description: Validated Xgent task identifier
         required: true
         type: string
       runner:
@@ -66,23 +66,23 @@ jobs:
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 360
     env:
-      XAGENT_CLOUD_PUBLIC_ENV: ${{ vars.XAGENT_CLOUD_ENV }}
-      XAGENT_CLOUD_SECRET_ENV: ${{ secrets.XAGENT_CLOUD_ENV }}
+      XGENT_CLOUD_PUBLIC_ENV: ${{ vars.XGENT_CLOUD_ENV }}
+      XGENT_CLOUD_SECRET_ENV: ${{ secrets.XGENT_CLOUD_ENV }}
     steps:
       - uses: actions/checkout@v6
       - name: Execute task on Linux or macOS
         if: runner.os != 'Windows'
         shell: bash
-        run: bash scripts/xagent-cloud-entry.sh "${{ inputs.task_id }}"
+        run: bash scripts/xgent-cloud-entry.sh "${{ inputs.task_id }}"
       - name: Execute task on Windows
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./scripts/xagent-cloud-entry.ps1 -TaskId "${{ inputs.task_id }}"
+        run: ./scripts/xgent-cloud-entry.ps1 -TaskId "${{ inputs.task_id }}"
       - name: Upload task outputs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: xagent-${{ inputs.task_id }}
+          name: xgent-${{ inputs.task_id }}
           path: tasks/${{ inputs.task_id }}/output
           if-no-files-found: warn
           include-hidden-files: true
@@ -107,15 +107,15 @@ load_env_block() {
     key="${line%%=*}"
     value="${line#*=}"
     if [[ "$line" != *=* || ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-      echo "Invalid XAgent cloud environment entry" >&2
+      echo "Invalid Xgent cloud environment entry" >&2
       exit 65
     fi
     export "$key=$value"
   done <<< "$block"
 }
-load_env_block "${XAGENT_CLOUD_PUBLIC_ENV:-}"
-load_env_block "${XAGENT_CLOUD_SECRET_ENV:-}"
-unset XAGENT_CLOUD_PUBLIC_ENV XAGENT_CLOUD_SECRET_ENV
+load_env_block "${XGENT_CLOUD_PUBLIC_ENV:-}"
+load_env_block "${XGENT_CLOUD_SECRET_ENV:-}"
+unset XGENT_CLOUD_PUBLIC_ENV XGENT_CLOUD_SECRET_ENV
 cd "$task_root/workspace"
 bash ../run.sh
 "#;
@@ -128,21 +128,21 @@ $RunScript = Join-Path $TaskRoot "run.ps1"
 if (-not (Test-Path -LiteralPath $RunScript)) { throw "Task script is missing" }
 New-Item -ItemType Directory -Force -Path (Join-Path $TaskRoot "workspace") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $TaskRoot "output") | Out-Null
-function Import-XAgentEnvBlock([string]$Block) {
+function Import-XgentEnvBlock([string]$Block) {
     if ([string]::IsNullOrEmpty($Block)) { return }
     foreach ($Line in ($Block -split "`r?`n")) {
         if ([string]::IsNullOrWhiteSpace($Line) -or $Line.TrimStart().StartsWith("#")) { continue }
         $Parts = $Line.Split('=', 2)
         if ($Parts.Count -ne 2 -or $Parts[0] -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
-            throw "Invalid XAgent cloud environment entry"
+            throw "Invalid Xgent cloud environment entry"
         }
         [Environment]::SetEnvironmentVariable($Parts[0], $Parts[1], "Process")
     }
 }
-Import-XAgentEnvBlock $env:XAGENT_CLOUD_PUBLIC_ENV
-Import-XAgentEnvBlock $env:XAGENT_CLOUD_SECRET_ENV
-Remove-Item Env:XAGENT_CLOUD_PUBLIC_ENV -ErrorAction SilentlyContinue
-Remove-Item Env:XAGENT_CLOUD_SECRET_ENV -ErrorAction SilentlyContinue
+Import-XgentEnvBlock $env:XGENT_CLOUD_PUBLIC_ENV
+Import-XgentEnvBlock $env:XGENT_CLOUD_SECRET_ENV
+Remove-Item Env:XGENT_CLOUD_PUBLIC_ENV -ErrorAction SilentlyContinue
+Remove-Item Env:XGENT_CLOUD_SECRET_ENV -ErrorAction SilentlyContinue
 Push-Location (Join-Path $TaskRoot "workspace")
 try { & (Join-Path ".." "run.ps1") } finally { Pop-Location }
 "##;
@@ -322,7 +322,7 @@ impl CloudExecutionService {
         fs::create_dir_all(&artifact_root)
             .map_err(|error| format!("create cloud artifact directory failed: {error}"))?;
         let client = Client::builder()
-            .user_agent("XAgent-Cloud-Execution/2")
+            .user_agent("Xgent-Cloud-Execution/2")
             .connect_timeout(Duration::from_secs(20))
             .timeout(Duration::from_secs(120))
             .build()
@@ -449,7 +449,7 @@ impl CloudExecutionService {
     ) -> Result<CloudTaskStatus, String> {
         let task_id = validate_task_id(&locator.task_id)?;
         let repository = self.resolve_managed_repository(token, locator).await?;
-        let expected_title = format!("XAgent cloud task {task_id}");
+        let expected_title = format!("Xgent cloud task {task_id}");
         let mut run = None;
         for page in 1..=10 {
             let endpoint = format!(
@@ -586,7 +586,7 @@ impl CloudExecutionService {
             .map_err(|error| format!("list cloud task artifacts failed: {error}"))?;
         let artifacts: WorkflowArtifacts =
             decode_json(response, "list cloud task artifacts").await?;
-        let expected_name = format!("xagent-{}", status.task_id);
+        let expected_name = format!("xgent-{}", status.task_id);
         let artifact = artifacts
             .artifacts
             .into_iter()
@@ -685,7 +685,7 @@ impl CloudExecutionService {
             .request(Method::POST, endpoint, token)
             .json(&json!({
                 "name": repository,
-                "description": "Public XAgent cloud execution workspace with Actions environment injection",
+                "description": "Public Xgent cloud execution workspace with Actions environment injection",
                 "private": false,
                 "auto_init": true
             }))
@@ -746,7 +746,7 @@ impl CloudExecutionService {
     ) -> Result<(), String> {
         if repository.private {
             return Err(format!(
-                "GitHub repository {}/{} is private; make the XAgent cloud task repository public before using hosted Actions",
+                "GitHub repository {}/{} is private; make the Xgent cloud task repository public before using hosted Actions",
                 repository.owner.login, repository.name
             ));
         }
@@ -756,14 +756,14 @@ impl CloudExecutionService {
             .and_then(|(_, content)| content)
             .ok_or_else(|| {
                 format!(
-                    "refusing to use {}/{} because it is not an XAgent-managed repository",
+                    "refusing to use {}/{} because it is not an Xgent-managed repository",
                     repository.owner.login, repository.name
                 )
             })?;
         let value: Value = serde_json::from_slice(&marker)
-            .map_err(|_| "XAgent cloud repository marker is invalid".to_string())?;
-        if value.get("product").and_then(Value::as_str) != Some("xagent-cloud") {
-            return Err("XAgent cloud repository marker has an unexpected product".to_string());
+            .map_err(|_| "Xgent cloud repository marker is invalid".to_string())?;
+        if value.get("product").and_then(Value::as_str) != Some("xgent-cloud") {
+            return Err("Xgent cloud repository marker has an unexpected product".to_string());
         }
         Ok(())
     }
@@ -776,7 +776,7 @@ impl CloudExecutionService {
     ) -> Result<(), String> {
         if repository.private {
             return Err(format!(
-                "GitHub repository {}/{} is private; make the XAgent cloud task repository public before using hosted Actions",
+                "GitHub repository {}/{} is private; make the Xgent cloud task repository public before using hosted Actions",
                 repository.owner.login, repository.name
             ));
         }
@@ -801,11 +801,11 @@ impl CloudExecutionService {
                     content: CLOUD_WORKFLOW.as_bytes().to_vec(),
                 },
                 CloudRepositoryFile {
-                    path: "scripts/xagent-cloud-entry.sh".to_string(),
+                    path: "scripts/xgent-cloud-entry.sh".to_string(),
                     content: CLOUD_ENTRY_SH.as_bytes().to_vec(),
                 },
                 CloudRepositoryFile {
-                    path: "scripts/xagent-cloud-entry.ps1".to_string(),
+                    path: "scripts/xgent-cloud-entry.ps1".to_string(),
                     content: CLOUD_ENTRY_PS1.as_bytes().to_vec(),
                 },
             ],

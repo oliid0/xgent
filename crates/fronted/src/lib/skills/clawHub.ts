@@ -6,7 +6,7 @@ export type ClawHubSkillCard = {
   slug: string;
   displayName: string;
   summary: string;
-  /** ClawHub 上的自由标签，用于本地分类与卡片标签展示。 */
+
   topics: string[];
   latestVersion: string | null;
   downloads: number;
@@ -159,7 +159,6 @@ export class ClawHubHttpError extends Error {
 }
 
 async function fetchClawHubJson(url: URL): Promise<unknown> {
-  // 经 hubFetch 出网：原生端走本地反代，WebUI 走已配对的同源反代入口。
   const response = await hubFetch(url.toString(), {
     headers: { Accept: "application/json" },
   });
@@ -287,7 +286,7 @@ export async function getClawHubSkillDetail(
   ownerHandle?: string | null,
 ): Promise<ClawHubSkillDetail> {
   const url = new URL(`/api/v1/skills/${encodeURIComponent(slug)}`, CLAWHUB_API_BASE);
-  // ClawHub 对重名 slug 返回 409，须带 ownerHandle 消歧。
+
   if (ownerHandle) {
     url.searchParams.set("ownerHandle", ownerHandle);
   }

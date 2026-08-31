@@ -137,7 +137,7 @@ export function parseSubagentBatch(
   options: {
     identities: Map<string, SubagentIdentity>;
     templates: SubagentTemplate[];
-    /** Plan mode:强制一切子代理 readonly(worktree 请求成为错误而非静默降级)。 */
+
     forceReadonly?: boolean;
   },
 ): ParseBatchResult {
@@ -283,8 +283,6 @@ export function parseSubagentBatch(
         );
         mode = "readonly";
       } else if (options.forceReadonly && rawMode === "worktree") {
-        // Plan mode 下 worktree 是明确冲突,按仓库取向报错而非静默降级:
-        // 模型应改用 readonly 调研,文件改动留到计划批准后的执行轮。
         issues.push(
           issue(
             "invalid_arguments",
@@ -297,7 +295,6 @@ export function parseSubagentBatch(
         mode = rawMode as SubagentMode;
       }
     } else if (options.forceReadonly) {
-      // 缺省也强制 readonly:复用的 worktree 身份在 plan mode 里同样只读。
       mode = "readonly";
     } else {
       mode = existingIdentity?.lastMode ?? "readonly";

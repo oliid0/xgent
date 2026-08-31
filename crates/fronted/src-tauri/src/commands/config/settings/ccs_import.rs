@@ -27,7 +27,7 @@ pub async fn settings_list_ccswitch_providers() -> Result<CcsProvidersResponse, 
         let candidates = ccswitch_db_candidates();
         let path = candidates.iter().find(|path| path.exists());
         let providers = match path {
-            Some(path) => list_ccswitch_xagent_providers_from_db(path)?,
+            Some(path) => list_ccswitch_xgent_providers_from_db(path)?,
             None => Vec::new(),
         };
         let message = if providers.is_empty() {
@@ -36,9 +36,9 @@ pub async fn settings_list_ccswitch_providers() -> Result<CcsProvidersResponse, 
                 .map(|path| path.display().to_string())
                 .collect::<Vec<_>>()
                 .join("；");
-            format!("未发现 ccswitch XAgent 供应商，已检查：{checked}")
+            format!("未发现 ccswitch Xgent 供应商，已检查：{checked}")
         } else {
-            format!("发现 {} 个 ccswitch XAgent 供应商", providers.len())
+            format!("发现 {} 个 ccswitch Xgent 供应商", providers.len())
         };
         Ok(CcsProvidersResponse {
             status: "success".to_string(),
@@ -50,10 +50,6 @@ pub async fn settings_list_ccswitch_providers() -> Result<CcsProvidersResponse, 
     .map_err(|e| format!("settings_list_ccswitch_providers join 失败：{e}"))?
 }
 
-/// ccswitch (Tauri 应用 id `com.ccswitch.desktop`) 允许用户把数据目录整体迁移到
-/// 自定义路径（例如同步到 OneDrive），迁移后真正使用的数据库不再位于默认的
-/// `~/.cc-switch/` 下，而是记录在其自身配置目录的 `app_paths.json` 里
-/// （`app_config_dir_override` 字段）。这里优先用该 override 目录，找不到再回退默认目录。
 fn ccswitch_db_candidates() -> Vec<PathBuf> {
     let filename = format!("{}-{}.db", "cc", "switch");
     let mut candidates = Vec::new();
@@ -61,9 +57,9 @@ fn ccswitch_db_candidates() -> Vec<PathBuf> {
         candidates.push(override_dir.join(&filename));
     }
     candidates.push(ccswitch_legacy_config_dir().join(&filename));
-    // Windows 上 `HOME` 可能被 Git/MSYS 等注入且不等于真实用户目录，ccswitch
-    // v3.10.3 曾据此把数据库写到 `%HOME%\.cc-switch\`，上游至今保留该位置作读取
-    // 兜底（见其 config.rs get_app_config_dir），这里同样纳入候选。
+    
+    
+    
     #[cfg(windows)]
     if let Ok(home_env) = std::env::var("HOME") {
         let trimmed = home_env.trim();
@@ -98,8 +94,6 @@ fn ccswitch_override_config_dir() -> Option<PathBuf> {
     Some(expand_home_prefix(override_dir))
 }
 
-/// 与上游 ccswitch 的 `resolve_path` 对齐：支持 `~`、`~/`、`~\` 三种写法
-/// （Windows 用户习惯用反斜杠书写迁移路径，ccswitch 自身能解析这些形式）。
 fn expand_home_prefix(path: &str) -> PathBuf {
     if path == "~" {
         if let Some(home) = dirs::home_dir() {
@@ -113,7 +107,7 @@ fn expand_home_prefix(path: &str) -> PathBuf {
     PathBuf::from(path)
 }
 
-fn list_ccswitch_xagent_providers_from_db(
+fn list_ccswitch_xgent_providers_from_db(
     path: &std::path::Path,
 ) -> Result<Vec<CcsProviderImportItem>, String> {
     if !path.exists() {
@@ -217,7 +211,7 @@ fn ccs_provider_from_value(
         request_format: if provider_type == "deepseek" {
             "openai-completions".to_string()
         } else if provider_type == "xai" {
-            // Grok / xAI 在 xgent 固定 Responses。
+            
             "openai-responses".to_string()
         } else if provider_type == "codex" && ccs_is_chat_protocol(config) {
             "openai-completions".to_string()
@@ -234,7 +228,7 @@ fn ccs_provider_type_from_app_type(app_type: &str) -> Option<&'static str> {
         "claude" | "claude-code" | "claude_code" => Some("claude_code"),
         "gemini" => Some("gemini"),
         "deepseek" => Some("deepseek"),
-        // CC-Switch Grok Build 应用桶（与上游 AppType::GrokBuild 别名对齐）。
+        
         "grokbuild" | "grok-build" | "grok_build" | "grok" | "xai" => Some("xai"),
         _ => None,
     }
@@ -284,8 +278,8 @@ fn ccs_extract_models(provider_type: &str, config: &Value) -> Vec<String> {
             }
         }
         "xai" => {
-            // Grok Build：settings_config.config 为 TOML，[models].default 与
-            // [model."<id>"].model 为模型 id。
+            
+            
             if let Some(config_text) = config.get("config").and_then(Value::as_str) {
                 if let Some(model) = ccs_extract_toml_string_value(config_text, "default") {
                     push_model(model);
@@ -345,7 +339,7 @@ fn ccs_extract_base_url(provider_type: &str, config: &Value) -> Option<String> {
                     .and_then(|value| ccs_string_at(value, &["base_url", "baseURL"]))
             })
             .or_else(|| {
-                // Grok Build：config 字段是完整 TOML 文本。
+                
                 config
                     .get("config")
                     .and_then(Value::as_str)

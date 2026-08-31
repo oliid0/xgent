@@ -1,11 +1,11 @@
-# XAgent mobile execution plugin
+# Xgent mobile execution plugin
 
 This local Tauri 2 plugin keeps the React and Rust call sites platform-neutral:
 
 - Android installs a bundled, verified Alpine minirootfs through the separately
   shipped PRoot executable, then adds audited toolchain profiles on demand.
 - iOS/iPadOS runs sandboxed BSD utilities through the a-Shell-derived backend. WasmKit is linked for a future verified-extension catalog, but arbitrary WASI execution remains disabled until it can enforce timeout and cancellation.
-- Desktop returns `Unavailable`; desktop execution remains owned by XAgent's native runner.
+- Desktop returns `Unavailable`; desktop execution remains owned by Xgent's native runner.
 
 The plugin does not read from the repository-local `xx` or `a-shell` reference directories.
 All incorporated or downloaded components are pinned and documented in

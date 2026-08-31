@@ -1,4 +1,4 @@
-package com.ohi.xagent.mobileexecution
+package com.ohi.xgent.mobileexecution
 
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -37,8 +37,8 @@ internal data class ProotBinaries(
 
     companion object {
         fun resolve(nativeLibraryDir: File): ProotBinaries = ProotBinaries(
-            executable = File(nativeLibraryDir, "libxagent_proot.so"),
-            loader = File(nativeLibraryDir, "libxagent_proot_loader.so"),
+            executable = File(nativeLibraryDir, "libxgent_proot.so"),
+            loader = File(nativeLibraryDir, "libxgent_proot_loader.so"),
         )
     }
 }
@@ -60,7 +60,7 @@ internal class ProotRunner(
         val workdir = File(request.workdir).canonicalFile
         require(workdir.isDirectory) { "workdir must be an existing directory" }
         require(isAllowedHostPath(workdir)) {
-            "workdir must be inside XAgent storage or a mounted external workspace"
+            "workdir must be inside Xgent storage or a mounted external workspace"
         }
         val resolvedCwd = resolveCwd(request.cwd, workdir)
 
@@ -90,7 +90,7 @@ internal class ProotRunner(
         val stdout = BoundedStreamCollector(process.inputStream)
         val stderr = BoundedStreamCollector(process.errorStream)
         val stdinWriter = request.stdin?.let { bytes ->
-            thread(name = "xagent-proot-stdin", isDaemon = true) {
+            thread(name = "xgent-proot-stdin", isDaemon = true) {
                 runCatching {
                     process.outputStream.use { stream ->
                         stream.write(bytes)
@@ -170,7 +170,7 @@ internal class ProotRunner(
             "/bin/sh",
             "-c",
             "cd -- \"\$1\" && if [ -x /bin/bash ]; then exec /bin/bash -lc \"\$2\"; else exec /bin/sh -c \"\$2\"; fi",
-            "xagent",
+            "xgent",
             cwd.guestPath,
             request.command,
         )
@@ -186,7 +186,7 @@ internal class ProotRunner(
             val target = File(value).canonicalFile
             require(target.isDirectory) { "cwd must be an existing directory" }
             require(isAllowedHostPath(target)) {
-                "absolute cwd must be inside XAgent storage or a mounted external workspace"
+                "absolute cwd must be inside Xgent storage or a mounted external workspace"
             }
             if (target.isWithin(workdir)) {
                 val relative = workdir.toPath().relativize(target.toPath()).toString()
@@ -231,7 +231,7 @@ internal class ProotRunner(
 
     companion object {
         private const val WORKSPACE_PATH = "/workspace"
-        private const val EXTERNAL_CWD_PATH = "/xagent-cwd"
+        private const val EXTERNAL_CWD_PATH = "/xgent-cwd"
         private const val TERMINATION_GRACE_MS = 300L
         private const val STREAM_JOIN_MS = 1_000L
     }
@@ -252,7 +252,7 @@ private class BoundedStreamCollector(
     var truncated: Boolean = false
         private set
 
-    private val reader = thread(name = "xagent-proot-output", isDaemon = true) {
+    private val reader = thread(name = "xgent-proot-output", isDaemon = true) {
         stream.use { input ->
             val buffer = ByteArray(8 * 1024)
             while (true) {

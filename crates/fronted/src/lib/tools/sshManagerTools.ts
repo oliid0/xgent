@@ -1,5 +1,5 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { Type } from "typebox";
 
 import type { SshHostConfig } from "../settings";
@@ -127,7 +127,7 @@ type ResolvedSshSession = {
 const SSH_MANAGER_TOOL: Tool = {
   name: "SSHManager",
   description:
-    'Manage SSH sessions and remote SFTP files for SSH hosts explicitly associated with the current project. Use host_id from list_hosts. If list_hosts reports credential=saved, XAgent already has the configured password/private key/passphrase; do not ask the user to paste credentials into chat, and call create_session, exec, or SFTP actions directly. If list_hosts reports credential=missing, ask the user to configure credentials in Settings > SSH instead of requesting secrets in chat. If list_hosts reports credential=interactive, the host uses keyboard-interactive login: SSHManager never connects such hosts itself — create_session fails, and exec/SFTP only reuse a session the user already opened; if none is running, ask the user to connect in the SSH Connection tab first. Default session strategy is reuse_or_create: exec and SFTP reuse the same running session for that host before XAgent creates a visible session. To intentionally run multiple SSH sessions, call create_session or set session_strategy="new", then use the returned session_id for follow-up operations. Use session_strategy="require_existing" when you want to fail instead of implicitly creating a session. Do not combine session_id with session_strategy="new". Authentication prompts, unknown host keys, changed host keys, and MFA must be completed by the user in the SSH Connection tab before retrying.',
+    'Manage SSH sessions and remote SFTP files for SSH hosts explicitly associated with the current project. Use host_id from list_hosts. If list_hosts reports credential=saved, Xgent already has the configured password/private key/passphrase; do not ask the user to paste credentials into chat, and call create_session, exec, or SFTP actions directly. If list_hosts reports credential=missing, ask the user to configure credentials in Settings > SSH instead of requesting secrets in chat. If list_hosts reports credential=interactive, the host uses keyboard-interactive login: SSHManager never connects such hosts itself — create_session fails, and exec/SFTP only reuse a session the user already opened; if none is running, ask the user to connect in the SSH Connection tab first. Default session strategy is reuse_or_create: exec and SFTP reuse the same running session for that host before Xgent creates a visible session. To intentionally run multiple SSH sessions, call create_session or set session_strategy="new", then use the returned session_id for follow-up operations. Use session_strategy="require_existing" when you want to fail instead of implicitly creating a session. Do not combine session_id with session_strategy="new". Authentication prompts, unknown host keys, changed host keys, and MFA must be completed by the user in the SSH Connection tab before retrying.',
   parameters: Type.Object({
     action: Type.Union(
       [
@@ -616,7 +616,7 @@ async function executeSSHManager(
         text: hosts.length
           ? [
               "Authorized SSH hosts:",
-              "credential=saved means XAgent already has the configured SSH credential; use create_session directly and do not ask the user for that password/key.",
+              "credential=saved means Xgent already has the configured SSH credential; use create_session directly and do not ask the user for that password/key.",
               "credential=interactive means the host logs in via keyboard-interactive prompts: SSHManager will not connect it itself; ask the user to open the session in the SSH Connection tab, then reuse the running session for exec and SFTP.",
               ...hosts.map(formatHostLine),
             ].join("\n")
@@ -1145,7 +1145,7 @@ export function createSSHManagerTools(params: {
             ? {
                 ...SSH_MANAGER_TOOL,
                 description:
-                  "Run non-interactive commands on SSH hosts explicitly associated with the current project. Call list_hosts first when the host id is unknown, then exec with host_id and command. Credentials remain in XAgent secure storage. Native mobile mode does not expose persistent sessions or SFTP; use a paired desktop command host for those actions.",
+                  "Run non-interactive commands on SSH hosts explicitly associated with the current project. Call list_hosts first when the host id is unknown, then exec with host_id and command. Credentials remain in Xgent secure storage. Native mobile mode does not expose persistent sessions or SFTP; use a paired desktop command host for those actions.",
               }
             : SSH_MANAGER_TOOL,
         ]

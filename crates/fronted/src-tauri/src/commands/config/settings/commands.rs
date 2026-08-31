@@ -72,7 +72,7 @@ pub async fn settings_save_system(
     tauri::async_runtime::spawn_blocking(move || {
         let mut conn = open_db()?;
         save_system(&mut conn, payload)?;
-        // 保存成功后刷新全局代理状态，让 shell env 注入与出网代理即时生效。
+        
         refresh_system_proxy_state(&conn)
     })
     .await

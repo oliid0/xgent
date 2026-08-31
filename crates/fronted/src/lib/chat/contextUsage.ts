@@ -115,7 +115,7 @@ export function deriveContextUsageTokens(items: readonly unknown[]): number | un
       if (observed !== undefined) return observed;
     }
     const legacyUsageField = ["live", "AgentContextUsage"].join("");
-    const metadata = record.xagentContextUsage ?? record[legacyUsageField];
+    const metadata = record.xgentContextUsage ?? record[legacyUsageField];
     if (metadata !== null && typeof metadata === "object") {
       const stamped = positiveTokenCount((metadata as Record<string, unknown>).totalTokens);
       if (stamped !== undefined) return stamped;

@@ -342,7 +342,7 @@ export function useNativeInputContextMenu(options: { enabled?: boolean } = {}) {
     contextMenuProps: {
       label: t("inputContextMenu.copy"),
       size: "sm" as const,
-      menuWidth: "var(--xagent-context-menu-width)",
+      menuWidth: "var(--xgent-context-menu-width)",
       isDisabled: !enabled,
       onOpenChange: (isOpen: boolean) => {
         if (!isOpen) closeMenu();

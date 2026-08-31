@@ -90,8 +90,6 @@ function extractVerificationSignalsFromText(text: string, out: string[], seen: S
   }
 }
 
-// 从 payload 的近期消息中抽取路径/命令等技术引用；摘要若一个都没保留，
-// 视为幻觉性丢失，触发校验失败（self-repair 会带着错误原因重试）。
 export function buildVerificationSignals(payload: CompactionPayload) {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -171,8 +169,6 @@ export function validateCompactionSummary(
     }
   }
 
-  // 用 CJK 感知的估算做"过短"下限：中文摘要每字符 token 密度更高，
-  // 按纯字符数会把信息量足够的 CJK 摘要误判为过短。
   const totalTokens = estimateTextTokens(Object.values(parsed).join(""));
   if (sourceTokens >= 400 && totalTokens < MIN_SUMMARY_TOKENS) {
     errors.push("summary too short");

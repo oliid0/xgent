@@ -11,7 +11,7 @@ export type RuntimeFileDropEvent =
   | { type: "leave" }
   | { type: "drop"; paths: string[]; position: { x: number; y: number } };
 
-export interface XAgentRuntime {
+export interface XgentRuntime {
   invoke<T>(command: string, args?: RuntimeInvokeArgs): Promise<T>;
   listen<T>(event: string, handler: (event: RuntimeEvent<T>) => void): Promise<RuntimeUnlisten>;
   openUrl(url: string): Promise<void>;

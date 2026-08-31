@@ -1,13 +1,3 @@
-/**
- * 对话运行时的轨迹埋点。
- *
- * 全部方法同步、不抛错：轨迹是诊断视图，任何自身故障都不该打断对话。内部一律
- * try/catch 吞掉并 `console.warn`。
- *
- * 事件走两条路：立即经可选的 `publish` 通知观察者，并按批经 `persist`
- * 落到当前 segment。两条路同源，所以实时状态和最终落盘保持一致。
- */
-
 import { type DebugLineType, sanitizeDebugValue } from "@/lib/debug/agentDebug";
 import { buildTrajectoryHeader, type TrajectorySectionInput } from "@/lib/trajectory/sections";
 import type {
@@ -19,7 +9,6 @@ import type {
 } from "@/lib/trajectory/types";
 import { createTrajectoryPersistenceQueue } from "./persistenceQueue";
 
-/** 工具参数在事件里的截断长度：实时通道要小，详情由正文索引另行提供。 */
 const TOOL_ARGS_PREVIEW_CHARS = 200;
 const CONTEXT_PREVIEW_CHARS = 512;
 const MODEL_DIAGNOSTIC_CHARS = 48_000;
@@ -27,14 +16,13 @@ const DEFAULT_FLUSH_INTERVAL_MS = 2_000;
 const DISPOSE_FLUSH_ATTEMPTS = 3;
 
 export type TrajectoryRecorderPorts = {
-  /** 把一批事件追加到指定 segment。 */
   persist: (conversationId: string, segmentIndex: number, eventsJson: string) => Promise<unknown>;
-  /** 幂等写入新出现的 prompt 分段。 */
+
   persistSections: (
     conversationId: string,
     sections: readonly TrajectorySection[],
   ) => Promise<unknown>;
-  /** 可选的实时观察回调。 */
+
   publish?: (events: readonly TrajectoryEvent[]) => void;
 };
 
@@ -49,22 +37,14 @@ export type TrajectoryStepEndInfo = {
 };
 
 export type TrajectoryRecorder = {
-  /**
-   * 一轮开始（用户消息落定）。同时把 `turn` 记为当前轮，后续调用不再重复传——
-   * 让每个埋点点自己传 turn 号，多一个参数就多一处传错的机会。
-   */
   beginTurn: (info: {
     turn: number;
     messageIndex?: number;
     messageId?: string;
     text?: string;
   }) => void;
-  /** 上下文注入。 */
+
   noteContext: (info: { source?: string; text?: string }) => void;
-  /**
-   * 记录一次请求头。内容未变时复用既有 headerId 且不产生事件。
-   * @returns 本次请求应引用的 headerId；埋点失败时为 undefined。
-   */
   captureHeader: (input: TrajectorySectionInput) => string | undefined;
   stepStart: (step: number, headerId?: string) => void;
   firstToken: (step: number) => void;
@@ -106,7 +86,7 @@ export type TrajectoryRecorder = {
     callId: string,
     info: { isError?: boolean; summary?: string; subagentRunIds?: readonly string[] },
   ) => void;
-  /** 压缩开始。`standalone` 表示发生在两轮之间，不属于任何 turn。 */
+
   compactionStart: (options?: { standalone?: boolean }) => void;
   compactionEnd: (info: {
     status: TrajectoryStatus;
@@ -116,11 +96,11 @@ export type TrajectoryRecorder = {
     standalone?: boolean;
   }) => void;
   endTurn: (info: { status: TrajectoryStatus; error?: string }) => void;
-  /** 立即落盘缓冲区；turn 边界与会话切换时调用。 */
+
   flush: () => Promise<void>;
-  /** 停止定时器并做最后一次落盘。 */
+
   dispose: () => Promise<void>;
-  /** 会话已被删除/截断时丢弃尚未落盘的诊断数据并停止定时器。 */
+
   discard: () => void;
 };
 
@@ -154,7 +134,6 @@ function serializeModelDiagnostic(payload: unknown): string {
   }
 }
 
-/** 一个不做任何事的 recorder，供 text 模式与测试替身使用。 */
 export const NOOP_TRAJECTORY_RECORDER: TrajectoryRecorder = {
   beginTurn: () => {},
   noteContext: () => {},
@@ -176,12 +155,6 @@ export const NOOP_TRAJECTORY_RECORDER: TrajectoryRecorder = {
   discard: () => {},
 };
 
-/**
- * 创建会话级 recorder。
- *
- * @param params - 会话标识、当前活动 segment 的读取器与落盘/下发端口。
- * @returns 埋点接口。
- */
 export function createTrajectoryRecorder(params: {
   conversationId: string;
   getSegmentIndex: () => number;

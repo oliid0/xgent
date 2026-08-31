@@ -1,10 +1,10 @@
-//! 系统代理单一真源：设置保存/启动初始化时写入，shell env 注入与
-//! 各 reqwest 出网点（本地反代、图片反代、更新检查、技能下载、
-//! MCP http/sse transport、Hook / Cron HTTP、网络自检、Image.url 读取）按需读取。
-//! reqwest 侧与 shell env 共用 NO_PROXY_DEFAULT：环回地址永不走代理。
-//! 凭据绝不进入日志与错误信息（只输出 host:port）。
-//! 例外：GitHub 更新链路在应用代理未启用时不做 no_proxy() 收口，而是回退
-//! reqwest 默认代理探测（OS 代理环境变量/系统代理设置），见
+
+
+
+
+
+
+
 //! `client_builder_with_os_proxy_fallback()`。
 
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
@@ -158,8 +158,8 @@ pub fn set_config(raw: Option<&Value>) {
         .snapshot
         .write()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    // 设置保存每次都会刷新代理状态；只有配置真实变化才 bump revision，
-    // 否则按 revision 重建的消费方（client 缓存、MCP 运行时）会被无关保存误伤。
+    
+    
     if snapshot.mode == mode {
         return;
     }
@@ -172,9 +172,6 @@ pub fn set_config(raw: Option<&Value>) {
         .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
 }
 
-/// 当前代理配置的变更计数。长驻连接（如 MCP client）在建立时记录，
-/// 复用前与当前值比较即可感知代理配置变更并重建。
-/// 直接在读锁下拷贝 u64，不克隆整个快照（本函数在 MCP 命令路径上高频调用）。
 pub fn revision() -> u64 {
     state()
         .snapshot
@@ -221,8 +218,8 @@ pub fn shell_proxy_envs() -> Result<Vec<(String, String)>, String> {
 
 fn build_proxy(config: &SystemProxyConfig) -> Result<reqwest::Proxy, String> {
     reqwest::Proxy::all(config.proxy_url())
-        // 环回地址豁免须与 shell env 注入的 NO_PROXY 一致，
-        // 否则本地上游（如 127.0.0.1 的 MCP server）会被错误送进代理。
+        
+        
         .map(|proxy| proxy.no_proxy(reqwest::NoProxy::from_string(NO_PROXY_DEFAULT)))
         .map_err(|_| format!("应用代理地址无效：{}", config.display_target()))
 }
@@ -279,17 +276,13 @@ pub fn cached_client() -> Result<reqwest::Client, String> {
 
 fn os_proxy_fallback_builder_for_mode(mode: &ProxyMode) -> Result<reqwest::ClientBuilder, String> {
     match mode {
-        // 不调 no_proxy()：保留 reqwest 默认代理探测（OS 代理环境变量与
-        // macOS/Windows 系统代理设置，system-proxy 默认特性），无系统代理即直连。
+        
+        
         ProxyMode::Disabled => Ok(reqwest::Client::builder()),
         mode => async_client_builder_for_mode(mode),
     }
 }
 
-/// GitHub 更新链路专用：应用代理启用时与其他出网点一致走应用代理（配置无效
-/// 同样 fail fast）；未启用时回退 OS 系统代理探测而不是强制直连，尽可能保证
-/// GitHub 更新地址可达。其余出网点仍用 `cached_client()`/
-/// `blocking_client_builder()` 的显式 no_proxy 语义。
 pub fn client_builder_with_os_proxy_fallback() -> Result<reqwest::ClientBuilder, String> {
     os_proxy_fallback_builder_for_mode(&current_snapshot().mode)
 }
@@ -298,8 +291,6 @@ pub fn blocking_client_builder() -> Result<reqwest::blocking::ClientBuilder, Str
     blocking_client_builder_for_mode(&current_snapshot().mode)
 }
 
-/// 供自建 TCP 隧道（如 SSH 传输）复用应用代理：`Ok(None)` 表示未启用（直连），
-/// `Err` 表示已启用但配置无效（调用方 fail fast），`Ok(Some)` 返回配置副本。
 pub fn current_config() -> Result<Option<SystemProxyConfig>, String> {
     match current_snapshot().mode {
         ProxyMode::Disabled => Ok(None),
@@ -308,8 +299,6 @@ pub fn current_config() -> Result<Option<SystemProxyConfig>, String> {
     }
 }
 
-/// 异步版 `blocking_client_builder()`：显式 no_proxy 语义,供需要自定义
-/// 超时/重定向等选项、无法直接复用 `cached_client()` 的出网点使用。
 pub fn async_client_builder() -> Result<reqwest::ClientBuilder, String> {
     async_client_builder_for_mode(&current_snapshot().mode)
 }
@@ -398,7 +387,7 @@ mod tests {
             assert!(matches!(mode, ProxyMode::Invalid(_)));
             assert!(async_client_builder_for_mode(&mode).is_err());
             assert!(blocking_client_builder_for_mode(&mode).is_err());
-            // 更新链路的回退 builder 同样不许把 Invalid 静默降级为直连/系统代理。
+            
             assert!(os_proxy_fallback_builder_for_mode(&mode).is_err());
             assert!(shell_proxy_envs_for_mode(&mode).is_err());
         }
@@ -419,8 +408,8 @@ mod tests {
         let config = json!({
             "enabled": true, "type": "http", "host": "proxy.local", "port": 8080
         });
-        // set_config 以 ProxyMode 相等与否决定是否 bump revision：
-        // 同配置重复保存必须判等，任一字段变化必须判不等。
+        
+        
         assert_eq!(
             parse_proxy_mode(Some(&config)),
             parse_proxy_mode(Some(&config))

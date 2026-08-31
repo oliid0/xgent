@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows XAgent to create isolated browser sessions and operate them on the user's behalf."
+description = "Allows Xgent to create isolated browser sessions and operate them on the user's behalf."
 permissions = [
   "allow-status",
   "allow-open-session",

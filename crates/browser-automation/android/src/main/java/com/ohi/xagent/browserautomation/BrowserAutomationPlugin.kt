@@ -1,4 +1,4 @@
-package com.ohi.xagent.browserautomation
+package com.ohi.xgent.browserautomation
 
 import android.app.Activity
 import android.graphics.Bitmap
@@ -148,7 +148,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
             JSObject().apply {
                 put("backend", "android-webview")
                 put("available", true)
-                put("detail", "Android System WebView sessions in XAgent's app-owned browser profile")
+                put("detail", "Android System WebView sessions in Xgent's app-owned browser profile")
                 put(
                     "capabilities",
                     JSObject().apply {

@@ -31,7 +31,7 @@ export function createSyntheticContinueUserMessage(
   return {
     role: "user",
     id: `user-${createUuid()}`,
-    // 必须与 conversationState 的常量逐字节一致：normalizeSegment 依赖它过滤持久化。
+
     content: INTERNAL_RESUME_MESSAGE_TEXT,
     timestamp,
   };
@@ -48,16 +48,15 @@ function buildCheckpointMessage(params: {
 }): CompactionCheckpointMessage {
   return {
     role: "assistant",
-    api: "xagent-compaction",
+    api: "xgent-compaction",
     provider: params.providerId,
     model: params.model,
     promptVersion: COMPACTION_PROMPT_VERSION,
     content: [{ type: "text", text: params.summaryText }],
     stopReason: "stop",
     timestamp: params.timestamp,
-    responseId: params.responseId || `xagent-compaction-${params.timestamp}-${createUuid()}`,
-    // checkpoint 消息自身的 usage 恒为零：summarizer 请求的真实用量走 compactionStats，
-    // 绝不冒充会话上下文规模（旧实现的 usage 污染即源于此）。
+    responseId: params.responseId || `xgent-compaction-${params.timestamp}-${createUuid()}`,
+
     usage: {
       input: 0,
       output: 0,
@@ -73,11 +72,6 @@ function buildCheckpointMessage(params: {
   } as CompactionCheckpointMessage;
 }
 
-/**
- * 执行一次完整压缩：payload 构建 → 预算裁剪 → 摘要（含恢复）→ 校验 →
- * 零 usage checkpoint 消息 → 追加新 segment。无决策、无状态标记、无持久化——
- * 那些属于 controller。
- */
 export async function runCompaction(params: {
   state: ConversationViewState;
   incomingUserText?: string;

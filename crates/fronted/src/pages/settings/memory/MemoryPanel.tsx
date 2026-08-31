@@ -290,7 +290,7 @@ export function MemoryPanel(props: {
             hasDividers
             header={
               <Text type="supporting" color="secondary" maxLines={1}>
-                {pathsInfo?.root ?? "~/.xagent/memory"}
+                {pathsInfo?.root ?? "~/.xgent/memory"}
               </Text>
             }
           >

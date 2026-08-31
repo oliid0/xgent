@@ -1,6 +1,6 @@
 # Authoring Patterns
 
-Use these patterns when shaping a XAgent skill.
+Use these patterns when shaping a Xgent skill.
 
 ## Workflow Skill
 
@@ -32,7 +32,7 @@ Use this when the skill branches by source type, file type, provider, or project
 
 ## Managed Skill
 
-Use `SkillsManager` for XAgent skill operations instead of bundling helper scripts.
+Use `SkillsManager` for Xgent skill operations instead of bundling helper scripts.
 
 - Use `SkillsManager(action=create)` for runtime skill creation.
 - Use `SkillsManager(action=install)` for local, archive, HTTP, or GitHub imports.

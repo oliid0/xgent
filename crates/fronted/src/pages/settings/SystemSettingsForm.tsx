@@ -4,7 +4,7 @@ import { VStack } from "@astryxdesign/core/Layout";
 import { Section } from "@astryxdesign/core/Section";
 import { Selector } from "@astryxdesign/core/Selector";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { isBrowserRuntime } from "@xagent/runtime";
+import { isBrowserRuntime } from "@xgent/runtime";
 import { useEffect, useMemo, useState } from "react";
 import { SUPPORTED_LOCALES, useLocale } from "../../i18n";
 import { inferRuntimePlatform } from "../../lib/runtimePlatform";
@@ -38,7 +38,7 @@ import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 const FONT_SCALE_OPTIONS = [0.9, 1, 1.1, 1.2] as const;
-const CONTROL_WIDTH = "min(100%, var(--xagent-settings-control-width))";
+const CONTROL_WIDTH = "min(100%, var(--xgent-settings-control-width))";
 
 type SystemSettingsFormProps = SettingsSectionProps & {
   compact?: boolean;

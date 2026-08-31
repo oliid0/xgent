@@ -1,5 +1,5 @@
-// 分支会话：从源会话按锚点（用户消息）截取前缀——含该轮完整的助手回复——
-// 复制为一条全新会话。所有写入都在同一个 SQLite 事务内完成。
+
+
 
 /// Must match BRANCH_CONVERSATION_DEFAULT_TITLE in src/lib/chat/page/chatPageHelpers.ts.
 pub(crate) const BRANCH_DEFAULT_TITLE: &str = "新分支";
@@ -49,8 +49,6 @@ fn branch_message_role_is_user(message: &Value) -> bool {
         == Some("user")
 }
 
-/// 镜像前端 getMessageStableId（conversationState.ts）：优先取消息 id /
-/// assistant responseId，否则用新分段索引 + 段内消息索引 + 时间戳兜底。
 fn branch_stable_message_id(message: &Value, segment_index: i64, message_index: usize) -> String {
     history_message_id_for_ref(message).unwrap_or_else(|| {
         format!(
@@ -60,8 +58,6 @@ fn branch_stable_message_id(message: &Value, segment_index: i64, message_index: 
     })
 }
 
-/// 镜像前端 normalizeSegment（conversationState.ts）：裁剪后重算
-/// message_count/start/end/updated_at，保留 segment_id、summary_json、created_at。
 fn build_branch_sliced_segment(
     record: &ChatHistorySegmentRecord,
     kept_messages: &[Value],
@@ -94,8 +90,6 @@ fn build_branch_sliced_segment(
     })
 }
 
-/// 从锚点用户消息开始向前扫描下一条 role=="user" 的消息作为独占切点，
-/// 返回复制到新会话的分段列表（已按 0..n-1 重编号）与消息总数。
 pub(crate) fn build_branch_segments(
     segments: &[ChatHistorySegmentRecord],
     anchor: &ChatHistoryBranchAnchor,
@@ -114,9 +108,9 @@ pub(crate) fn build_branch_segments(
     let anchor_messages = location.messages;
     let anchor_position = location.message_index;
 
-    // 独占切点：锚点之后（跨分段）的第一条 user 消息；没有则整会话复制。
-    // 顺带记录切点前是否存在非 user 消息：桌面 done 先于落盘（persist-lag），
-    // 助手回复还没写进历史时不允许分支，否则会静默复制出缺少该回复的前缀。
+    
+    
+    
     let mut cut: Option<(usize, usize)> = None;
     let mut saw_reply_after_anchor = false;
     'scan: for (segment_pos, segment) in segments.iter().enumerate().skip(anchor_segment_pos) {
@@ -147,7 +141,7 @@ pub(crate) fn build_branch_segments(
     let mut kept: Vec<ChatHistorySegmentInput> = Vec::new();
     match cut {
         Some((cut_segment_pos, cut_message_index)) if cut_segment_pos == anchor_segment_pos => {
-            // 切点仍在锚点段内：锚点段裁剪，后续分段全部丢弃。
+            
             for segment in &segments[..anchor_segment_pos] {
                 kept.push(record_to_segment_input(segment));
             }
@@ -159,8 +153,8 @@ pub(crate) fn build_branch_segments(
             )?);
         }
         Some((cut_segment_pos, cut_message_index)) => {
-            // 切点在后续分段：之前的分段整段复制；切点段按 [..j] 裁剪，
-            // j == 0 时整段（含 summary）丢弃；再往后的分段全部丢弃。
+            
+            
             for segment in &segments[..cut_segment_pos] {
                 kept.push(record_to_segment_input(segment));
             }
@@ -191,8 +185,6 @@ pub(crate) fn build_branch_segments(
     Ok((kept, total_message_count))
 }
 
-/// context_meta_json 是前端 StoredChatContextMeta 的序列化：只覆写三个计数
-/// 字段，其余键保持原样；无法解析时原样保留。
 fn patch_branch_context_meta(
     raw: &str,
     active_segment_index: i64,

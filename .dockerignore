@@ -3,7 +3,7 @@
 .codex
 .claude
 .codex-artifacts
-.xagent
+.xgent
 
 **/node_modules
 **/dist

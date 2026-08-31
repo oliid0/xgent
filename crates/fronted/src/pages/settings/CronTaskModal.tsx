@@ -153,7 +153,7 @@ export function CronTaskModal({
     initialData?.remainingExecutions ?? null,
   );
   // Prefilled with the effective value: tasks saved before the field existed
-  // run with the default, so showing it is truthful 鈥?and clearing the input
+
   // simply falls back to the same default on save.
   const [timeoutSeconds, setTimeoutSeconds] = useState(
     initialData?.timeoutSeconds ?? DEFAULT_CRON_TIMEOUT_SECONDS,
@@ -276,7 +276,7 @@ export function CronTaskModal({
         // other kinds clear the field.
         reasoning: type === "prompt" ? reasoning : "",
         // Always carried: an empty string is the explicit "follow the active
-        // workspace" signal 鈥?omitting the key would make merge_patch keep a
+
         // stale pin forever.
         workdir: type === "http" ? "" : workdir.trim(),
       };

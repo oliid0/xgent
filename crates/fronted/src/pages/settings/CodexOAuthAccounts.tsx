@@ -10,7 +10,7 @@ import { List, ListItem } from "@astryxdesign/core/List";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
-import { invoke, openUrl } from "@xagent/runtime";
+import { invoke, openUrl } from "@xgent/runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { CheckCircle2, Trash2 } from "../../components/icons";
@@ -153,7 +153,7 @@ export function CodexOAuthAccounts({ value, onChange, browserRuntime }: Props) {
   return (
     <VStack gap={3}>
       {loading ? (
-        <Center style={{ minHeight: "var(--xagent-oauth-list-min-height)" }}>
+        <Center style={{ minHeight: "var(--xgent-oauth-list-min-height)" }}>
           <Spinner label={t("settings.loading")} />
         </Center>
       ) : status.accounts.length > 0 ? (

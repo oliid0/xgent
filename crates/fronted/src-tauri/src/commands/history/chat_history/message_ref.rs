@@ -1,5 +1,5 @@
-// 稳定消息引用（HistoryMessageRef）的纯 JSON 工具：与前端 chatHistory.ts 的
-// contentHash/stableId 算法逐字节对齐，供 history.prefix 与分支会话共用。
+
+
 
 pub(crate) fn read_json_trimmed_string(object: &Map<String, Value>, key: &str) -> Option<String> {
     object
@@ -48,12 +48,12 @@ pub(crate) fn history_message_content_hash(message: &Value) -> String {
         .and_then(|object| object.get("role"))
         .and_then(Value::as_str)
         .unwrap_or_default();
-    let mut parts = vec!["xagent-history-ref-v1".to_string()];
+    let mut parts = vec!["xgent-history-ref-v1".to_string()];
     append_hash_part(&mut parts, role);
 
     if role == "user" {
         let display_text = object
-            .and_then(|object| object.get("xagentDisplayContent"))
+            .and_then(|object| object.get("xgentDisplayContent"))
             .and_then(Value::as_str)
             .map(str::to_string)
             .unwrap_or_else(|| {
@@ -62,7 +62,7 @@ pub(crate) fn history_message_content_hash(message: &Value) -> String {
         append_hash_part(&mut parts, display_text);
 
         let attachments = object
-            .and_then(|object| object.get("xagentAttachments"))
+            .and_then(|object| object.get("xgentAttachments"))
             .and_then(Value::as_array);
         let valid_attachments = attachments
             .map(|attachments| {
@@ -161,9 +161,9 @@ pub(crate) fn validate_user_history_message_ref(
 }
 
 fn history_message_timestamp_for_ref(message: &Value) -> i64 {
-    // stable-id 兜底必须确定性（前端 buildHistoryMessageRef 不会为缺 id 的
-    // 消息发 ref，server 端合成后经 xgentHistoryRef 回显），因此缺失
-    // 时间戳固定取 0，不取当前时间。
+    
+    
+    
     read_message_timestamp_with_fallback(message, 0)
 }
 

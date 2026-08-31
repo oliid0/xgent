@@ -432,7 +432,7 @@ export function SettingsPage(props: SettingsPageProps) {
                 >
                   <VStack
                     width="100%"
-                    maxWidth="var(--xagent-settings-content-max-width)"
+                    maxWidth="var(--xgent-settings-content-max-width)"
                     height="100%"
                     minHeight={sectionManagesScroll ? 0 : "100%"}
                     className="settings-section-shell"
@@ -445,7 +445,7 @@ export function SettingsPage(props: SettingsPageProps) {
                 <LayoutContent padding={4} label={t("settings.title")}>
                   <VStack
                     width="100%"
-                    maxWidth="var(--xagent-content-width-md)"
+                    maxWidth="var(--xgent-content-width-md)"
                     gap={4}
                     style={{ marginInline: "auto" }}
                   >
@@ -480,11 +480,11 @@ export function SettingsPage(props: SettingsPageProps) {
         height="fill"
         padding={0}
         className="settings-page settings-page-desktop"
-        style={{ height: "var(--xagent-settings-dialog-height)" }}
+        style={{ height: "var(--xgent-settings-dialog-height)" }}
         data-edge-swipe-ignore
         start={
           <LayoutPanel
-            width="var(--xagent-settings-sidebar-width)"
+            width="var(--xgent-settings-sidebar-width)"
             padding={3}
             hasDivider
             isScrollable={false}
@@ -537,7 +537,7 @@ export function SettingsPage(props: SettingsPageProps) {
         content={
           <VStack height="100%" minHeight={0} gap={0}>
             {detailLayerDepth === 0 ? (
-              <LayoutHeader hasDivider height="var(--xagent-settings-header-height)" padding={0}>
+              <LayoutHeader hasDivider height="var(--xgent-settings-header-height)" padding={0}>
                 <HStack
                   width="100%"
                   height="100%"
@@ -547,7 +547,7 @@ export function SettingsPage(props: SettingsPageProps) {
                 >
                   <HStack
                     width="100%"
-                    maxWidth="var(--xagent-settings-content-max-width)"
+                    maxWidth="var(--xgent-settings-content-max-width)"
                     style={{ marginInline: "auto" }}
                   >
                     <Heading level={2}>{sectionLabels[section]}</Heading>
@@ -560,7 +560,7 @@ export function SettingsPage(props: SettingsPageProps) {
                 key={section}
                 data-settings-section={section}
                 width="100%"
-                maxWidth="var(--xagent-settings-content-max-width)"
+                maxWidth="var(--xgent-settings-content-max-width)"
                 height="100%"
                 minHeight={sectionManagesScroll ? 0 : "100%"}
                 padding={3}

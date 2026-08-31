@@ -109,7 +109,7 @@ export function McpHubPage(props: McpHubPageProps) {
               width="100%"
               height="100%"
               minHeight={0}
-              maxWidth="var(--xagent-hub-content-max-width)"
+              maxWidth="var(--xgent-hub-content-max-width)"
               gap={embedded ? 3 : 4}
               style={{ marginInline: "auto" }}
             >

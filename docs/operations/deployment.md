@@ -38,6 +38,6 @@ WebUI 不需要部署服务器或容器。桌面客户端在用户明确开启�
 
 ## 云端任务
 
-云端执行使用用户自有公开 `agent-temp` 仓库。XAgent 原子写入一个不可变任务目录和统一 workflow，触发后等待 run，成功时下载 Actions artifact，失败时返回经过裁剪的失败日志。
+云端执行使用用户自有公开 `agent-temp` 仓库。Xgent 原子写入一个不可变任务目录和统一 workflow，触发后等待 run，成功时下载 Actions artifact，失败时返回经过裁剪的失败日志。
 
-任务源码和输入在公开仓库中可读。敏感运行时值应配置在仓库 **Settings → Secrets and variables → Actions** 的 `XAGENT_CLOUD_ENV` 中，每行一个 `NAME=value`；Secret 覆盖同名 Variable。GitHub PAT 本身不得进入 workflow。
+任务源码和输入在公开仓库中可读。敏感运行时值应配置在仓库 **Settings → Secrets and variables → Actions** 的 `XGENT_CLOUD_ENV` 中，每行一个 `NAME=value`；Secret 覆盖同名 Variable。GitHub PAT 本身不得进入 workflow。

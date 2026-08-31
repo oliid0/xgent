@@ -7,7 +7,7 @@ import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/Segme
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { type SearchableItem, type SearchSource, Typeahead } from "@astryxdesign/core/Typeahead";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { AdaptiveDialog } from "../../../components/astryx/AdaptiveDialog";
 import { useLocale } from "../../../i18n";
@@ -148,7 +148,7 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
       subtitle={t("chat.mobileWorkspace.hint")}
       purpose="form"
       width="min(32rem, calc(100dvw - (var(--spacing-4) * 2)))"
-      maxHeight="var(--xagent-dialog-height-md)"
+      maxHeight="var(--xgent-dialog-height-md)"
       touchPresentation="bottom-sheet"
       bottomSheetHeight="tall"
     >

@@ -54,7 +54,7 @@ function writeMessages(paths, startTs = 1) {
 function checkpoint(text, timestamp) {
   return {
     role: "assistant",
-    api: "xagent-compaction",
+    api: "xgent-compaction",
     provider: "anthropic",
     model: "claude",
     content: [{ type: "text", text }],

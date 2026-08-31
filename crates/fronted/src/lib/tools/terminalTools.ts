@@ -1,5 +1,5 @@
 import type { ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { Type } from "typebox";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
 

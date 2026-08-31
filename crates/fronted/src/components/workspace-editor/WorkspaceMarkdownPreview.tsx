@@ -87,7 +87,7 @@ function MarkdownImageUnavailable(props: { alt?: string; title?: string }) {
       as="span"
       type="inherit"
       className="text-xs italic text-muted-foreground"
-      data-xagent-markdown-image="text-fallback"
+      data-xgent-markdown-image="text-fallback"
       aria-label={label ? reason : undefined}
     >
       {label || reason}
@@ -104,7 +104,7 @@ function PreviewImage(props: { url: string; alt?: string; title?: string }) {
   return (
     <img
       className="my-1 inline-block h-auto max-w-full rounded-md"
-      data-xagent-markdown-image="preview"
+      data-xgent-markdown-image="preview"
       src={url}
       alt={alt ?? ""}
       title={title}
@@ -128,7 +128,7 @@ function WorkspacePreviewImage(props: {
         as="span"
         direction="vertical"
         className="inline-block h-4 w-20 animate-pulse rounded bg-muted align-middle"
-        data-xagent-markdown-image="loading"
+        data-xgent-markdown-image="loading"
       />
     );
   }

@@ -680,7 +680,7 @@ mod tests {
             .as_nanos();
         let unique_id = NEXT_TEMP_WORKSPACE_ID.fetch_add(1, Ordering::Relaxed);
         let root = std::env::temp_dir().join(format!(
-            "xagent-chat-file-links-{}-{suffix}-{unique_id}",
+            "xgent-chat-file-links-{}-{suffix}-{unique_id}",
             std::process::id()
         ));
         fs::create_dir_all(root.join("src")).expect("create temp workspace");
@@ -786,7 +786,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let home_dir_name = format!("xagent-chat-file-links-home-{suffix}");
+        let home_dir_name = format!("xgent-chat-file-links-home-{suffix}");
         let home_target_dir = home.join(&home_dir_name);
         if fs::create_dir_all(&home_target_dir).is_err() {
             return;

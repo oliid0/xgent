@@ -11,24 +11,11 @@ import {
 import { isCompactionAssistantMessage } from "../conversation/conversationState";
 import { readMessageContextUsage, writeAssistantContextUsage } from "./contextUsageMetadata";
 
-// CJK 感知的文本估算、消息包裹常量与非文本值序列化估算全部取自共享层
-//（用量环的检查点估值与历史倒扫复用同一口径，调参只改共享层）；
-// 这里 re-export 文本估算保持既有调用方与测试不动。
 export { estimateTextTokens, estimateTextTokenUnits };
 
-// 兼容上下文用量印章的不变量：totalTokens 只记录 usage 派生的权威值
-//（fixedTokens 随印章携带，供跨端 rebase 补偿 system/tools 开销变化），绝不写
-// 估算——印章随会话持久化且读取侧优先于 usage，一旦写入估算便永久遮蔽后到的
-// 真实读数，且没有任何纠正路径。
-
-// 消息在本代码库中是不可变值对象（状态变更只新建数组），因此估算结果可跨
-// state/segment/临时 state 按对象身份缓存，热路径不再重复序列化。
 const messageTokenCache = new WeakMap<object, number>();
 const toolsTokenCache = new WeakMap<object, number>();
 
-// 统一走共享层的内容块口径（文本 CJK 感知、二进制块按计价常量、小结构兜底
-// 序列化）。toolResult 的 details 是 UI/记账负载，provider 转换只发送 content，
-// 一律不计——shell 全量输出、文件读取元数据都挂在 details 上，计入即双算。
 function estimateMessageTokenUnits(message: Message): number {
   if (message.role === "assistant") {
     let units = 0;
@@ -81,7 +68,6 @@ export function getUsageTotalTokens(usage: Usage | undefined): number | undefine
     return Math.max(0, Math.floor(totalTokens));
   }
 
-  // usage.reasoning 是 output 的子集（pi-ai types.d.ts），推导时绝不能单独累加。
   const parts = [usage.input, usage.output, usage.cacheRead, usage.cacheWrite];
   const derivedTotal = parts.reduce<number>((sum, value) => {
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return sum;
@@ -92,8 +78,7 @@ export function getUsageTotalTokens(usage: Usage | undefined): number | undefine
 
 export function getMessageObservedTokens(message: Message): number | undefined {
   if (message.role !== "assistant") return undefined;
-  // 压缩 checkpoint 消息带的是 summarizer 请求的规模，不代表当前会话上下文。
-  // （布尔化避免类型谓词在 else 分支把 AssistantMessage 收窄成 never。）
+
   const isCheckpoint: boolean = isCompactionAssistantMessage(message);
   if (isCheckpoint) return undefined;
   return readMessageContextUsage(message)?.totalTokens ?? getUsageTotalTokens(message.usage);
@@ -103,20 +88,13 @@ export type TokenLedgerSnapshot = {
   fixedTokens: number;
   observedTokens: number;
   trailingTokens: number;
-  // 仅在无 usage 锚点时维护（total() 也只在该情形读取）；有锚点时恒为 fixedTokens。
+
   estimatedTotalTokens: number;
   hasObservedUsage: boolean;
   hasFixedTokenAnchor: boolean;
   totalTokens: number;
 };
 
-/**
- * 每会话上下文规模账本：observed（最近一次真实 usage，已含 system/tools/全部历史）
- * + trailing（其后消息的估算增量）。有 usage 锚点时读数恒为 observed + trailing——
- * 估算口径有意偏保守（高估），绝不允许覆盖真实读数；仅在完全没有 usage 锚点时
- * 退回 fixed（system+tools 估算）+ 逐消息估算。所有读数 O(1)，重建仅在每次请求
- * 开始时执行一次。
- */
 export class TokenLedger {
   private fixedTokens = 0;
   private observedTokens = 0;
@@ -156,8 +134,7 @@ export class TokenLedger {
         break;
       }
     }
-    // estimatedTotalTokens 仅在无锚点时维护：有锚点时 total() 不读它，跳过
-    // 全量估算循环让重建成本随锚点后的消息数而非全历史增长。
+
     if (anchorIndex < 0) {
       for (const message of messages) {
         this.estimatedTotalTokens += estimateMessageTokens(message);
@@ -180,14 +157,12 @@ export class TokenLedger {
           !isCompactionAssistantMessage(message) &&
           readMessageContextUsage(message) === undefined
         ) {
-          // 印章只盖 usage 派生的权威值（见文件头部不变量）；无 usage 的
-          // assistant 消息不盖章，走下方 trailing 估算路径。
           writeAssistantContextUsage(message, {
             totalTokens: observed,
             fixedTokens: this.fixedTokens,
           });
         }
-        // 新 usage 已覆盖它之前的全部上下文，trailing 归零重新累计。
+
         this.observedTokens = observed;
         this.hasObservedUsage = true;
         this.hasFixedTokenAnchor = readMessageContextUsage(message) !== undefined;
@@ -199,17 +174,10 @@ export class TokenLedger {
   }
 
   total(): number {
-    // 有 usage 锚点时恒信 observed + trailing：估算口径偏保守（CJK 0.7 tok/char、
-    // 二进制块按计价量级常量），与真实读数取 max 会让环读数与自动压缩被估算
-    // 劫持。估算只在完全没有 usage 锚点时兜底。
     if (!this.hasObservedUsage) return this.estimatedTotalTokens;
     return this.observedTokens + this.trailingTokens;
   }
 
-  /**
-   * pendingTokenUnits 是流式增量的分数 token 估算（调用方按 delta 用
-   * estimateTextTokenUnits 累加），避免每次判定重扫全文。
-   */
   totalWithPendingTokens(pendingTokenUnits: number): number {
     if (!Number.isFinite(pendingTokenUnits) || pendingTokenUnits <= 0) return this.total();
     return this.total() + Math.ceil(pendingTokenUnits);

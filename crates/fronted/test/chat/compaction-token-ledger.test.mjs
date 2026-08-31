@@ -60,17 +60,17 @@ test("estimateTextTokens is ceil(chars/4) of trimmed text for non-CJK content", 
 });
 
 test("estimateTextTokens weighs CJK characters at 0.7 tokens each", () => {
-  // 100 个汉字按 chars/4 只算 25 token，真实 tokenizer 约 60~70：必须显著高于 25。
+  
   assert.equal(estimateTextTokens("你".repeat(100)), Math.ceil(100 * 0.7));
-  // 假名与谚文同样按 CJK 密度估算。
+  
   assert.equal(estimateTextTokens("あ".repeat(50)), Math.ceil(50 * 0.7));
   assert.equal(estimateTextTokens("한".repeat(50)), Math.ceil(50 * 0.7));
-  // 中英混排：各按各的密度累加。
+  
   assert.equal(
     estimateTextTokens(`${"你".repeat(40)}${"a".repeat(40)}`),
     Math.ceil(40 * 0.7 + 40 / 4),
   );
-  // 全角标点计入 CJK 密度。
+  
   assert.equal(estimateTextTokens("。".repeat(10)), Math.ceil(10 * 0.7));
 });
 
@@ -111,13 +111,13 @@ test("estimateMessageTokens memoizes by object identity", () => {
   const message = user("a".repeat(4000));
   const first = estimateMessageTokens(message);
   message.content = "";
-  // 同一对象命中缓存（消息按不可变值对象使用）；内容被原地篡改也不重算。
+  
   assert.equal(estimateMessageTokens(message), first);
 });
 
 test("getUsageTotalTokens derives from parts without double-counting reasoning", () => {
   assert.equal(getUsageTotalTokens(usage(5000)), 5000);
-  // reasoning 是 output 的子集：从分项推导时不得单独累加。
+  
   assert.equal(
     getUsageTotalTokens(usage(0, { input: 100, output: 50, reasoning: 30 })),
     150,
@@ -127,11 +127,11 @@ test("getUsageTotalTokens derives from parts without double-counting reasoning",
 });
 
 test("compaction checkpoint messages are never observed-usage anchors", () => {
-  const checkpoint = assistant("summary body", usage(99_999), { api: "xagent-compaction" });
+  const checkpoint = assistant("summary body", usage(99_999), { api: "xgent-compaction" });
   assert.equal(getMessageObservedTokens(checkpoint), undefined);
 
   const legacyCheckpoint = assistant("summary body", usage(99_999), {
-    provider: "xagent",
+    provider: "xgent",
     model: "summary",
   });
   assert.equal(getMessageObservedTokens(legacyCheckpoint), undefined);
@@ -153,7 +153,7 @@ test("rebase anchors on the latest real usage and estimates the trailing message
   assert.equal(snapshot.hasObservedUsage, true);
   assert.equal(snapshot.observedTokens, 5000);
   assert.equal(snapshot.trailingTokens, expectedTrailing);
-  // observed usage 已含 system prompt，fixed 不再叠加。
+  
   assert.equal(snapshot.totalTokens, snapshot.observedTokens + snapshot.trailingTokens);
 });
 
@@ -198,7 +198,7 @@ test("totalWithPendingTokens adds the streamed token-unit estimate in O(1)", () 
   ledger.rebase({ systemPrompt: "", messages: [assistant("w", usage(4000))] });
   assert.equal(ledger.totalWithPendingTokens(0), 4000);
   assert.equal(ledger.totalWithPendingTokens(estimateTextTokenUnits("a".repeat(401))), 4000 + 101);
-  // 中文流按 CJK 密度累计：400 字远高于 400/4=100。
+  
   assert.equal(
     ledger.totalWithPendingTokens(estimateTextTokenUnits("好".repeat(400))),
     4000 + Math.ceil(400 * 0.7),

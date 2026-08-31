@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";

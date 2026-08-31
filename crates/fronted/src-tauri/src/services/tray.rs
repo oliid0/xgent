@@ -167,7 +167,7 @@ pub fn build_tray_menu_skeleton(
         MenuItem::with_id(app, TRAY_CHECK_UPDATES_ID, "检查更新…", true, None::<&str>)?;
     let open_data_dir =
         MenuItem::with_id(app, TRAY_OPEN_DATA_DIR_ID, "打开数据目录", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, TRAY_QUIT_ID, "退出 XAgent", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, TRAY_QUIT_ID, "退出 Xgent", true, None::<&str>)?;
 
     let menu = Menu::with_items(
         app,
@@ -370,7 +370,7 @@ pub fn apply_tray_menu(
 
     if let Err(error) = handles
         .tray_icon
-        .set_tooltip(Some(model.tooltip.as_deref().unwrap_or("XAgent")))
+        .set_tooltip(Some(model.tooltip.as_deref().unwrap_or("Xgent")))
     {
         eprintln!("failed to set tray tooltip: {error}");
     }
@@ -383,7 +383,7 @@ pub fn apply_tray_menu(
 }
 
 fn compose_status_line(app_version: &str, status_suffix: Option<&str>) -> String {
-    let base = format!("XAgent {app_version}");
+    let base = format!("Xgent {app_version}");
     match status_suffix {
         Some(suffix) if !suffix.trim().is_empty() => format!("{base} · {}", suffix.trim()),
         _ => base,

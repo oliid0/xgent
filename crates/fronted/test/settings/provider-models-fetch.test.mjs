@@ -416,7 +416,7 @@ test("fetchModelsFromApi preserves an exact model-list URL through the proxy", a
       assert.equal(calls.length, 1);
       assert.equal(calls[0].url, "http://proxy.local:9999/proxy/codex");
       assert.equal(
-        calls[0].options.headers["x-xagent-upstream-url"],
+        calls[0].options.headers["x-xgent-upstream-url"],
         "https://models.example.com/catalog?channel=stable",
       );
     },

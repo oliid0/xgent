@@ -561,7 +561,7 @@ fn websocket_endpoint(
         .is_some_and(|authority| authority.as_str().contains('@'));
     if request.uri().scheme_str() != Some("wss") || request.uri().host().is_none() || has_user_info
     {
-        return Err("STT WebSocket 地址必须是完整的 wss:// 地址".to_string());
+        return Err("STT WebSocket 地址必须是完整的 wss:
     }
     Ok(endpoint)
 }
@@ -661,7 +661,7 @@ mod tests {
     use super::*;
 
     fn live_audio_pcm() -> Vec<u8> {
-        let Ok(path) = std::env::var("XAGENT_STT_LIVE_AUDIO_FILE") else {
+        let Ok(path) = std::env::var("XGENT_STT_LIVE_AUDIO_FILE") else {
             return vec![0; 30_720];
         };
         let wave = std::fs::read(path).expect("read live STT WAVE fixture");
@@ -767,7 +767,7 @@ mod tests {
 
     #[tokio::test]
     async fn configured_desktop_providers_live() {
-        if std::env::var("XAGENT_STT_LIVE").as_deref() != Ok("1") {
+        if std::env::var("XGENT_STT_LIVE").as_deref() != Ok("1") {
             return;
         }
         let app = tauri::test::mock_app();
@@ -806,13 +806,13 @@ mod tests {
 
     #[tokio::test]
     async fn configured_desktop_providers_audio_roundtrip_live() {
-        if std::env::var("XAGENT_STT_LIVE_AUDIO").as_deref() != Ok("1") {
+        if std::env::var("XGENT_STT_LIVE_AUDIO").as_deref() != Ok("1") {
             return;
         }
         let app = tauri::test::mock_app();
         let manager = SttManager::default();
         let pcm = live_audio_pcm();
-        let require_transcript = std::env::var_os("XAGENT_STT_LIVE_AUDIO_FILE").is_some();
+        let require_transcript = std::env::var_os("XGENT_STT_LIVE_AUDIO_FILE").is_some();
         let mut tested = 0;
         for provider in [
             "aliyun_dashscope",

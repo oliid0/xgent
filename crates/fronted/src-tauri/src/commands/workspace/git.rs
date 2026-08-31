@@ -1765,7 +1765,7 @@ fn validate_start_point(repo_root: &str, value: &str) -> Result<String, String> 
         repo_root,
         &["rev-parse", "--verify", "--end-of-options", &rev],
     )?;
-    // 返回原始 ref（而非解析后的 SHA），保留 switch -c 对远程 ref 的自动 tracking。
+    
     Ok(start_point.to_string())
 }
 
@@ -2797,16 +2797,16 @@ mod tests {
         assert!(validate_repo_relative_path("../secret").is_err());
         assert!(validate_repo_relative_path("/tmp/secret").is_err());
         assert!(looks_like_windows_drive_path(
-            "C:/Users/xagent/secret.txt"
+            "C:/Users/xgent/secret.txt"
         ));
         assert!(looks_like_windows_drive_path(
-            "C:\\Users\\xagent\\secret.txt"
+            "C:\\Users\\xgent\\secret.txt"
         ));
         assert!(looks_like_windows_drive_path("C:relative\\secret.txt"));
         #[cfg(windows)]
         {
-            assert!(validate_repo_relative_path("C:/Users/xagent/secret.txt").is_err());
-            assert!(validate_repo_relative_path("C:\\Users\\xagent\\secret.txt").is_err());
+            assert!(validate_repo_relative_path("C:/Users/xgent/secret.txt").is_err());
+            assert!(validate_repo_relative_path("C:\\Users\\xgent\\secret.txt").is_err());
             assert!(validate_repo_relative_path("C:relative\\secret.txt").is_err());
             assert!(validate_repo_relative_path("\\\\server\\share\\secret.txt").is_err());
         }
@@ -2895,7 +2895,7 @@ mod tests {
         let temp = tempfile::tempdir().expect("temp repo");
         run_temp_git(temp.path(), &["init"]);
         run_temp_git(temp.path(), &["config", "core.autocrlf", "false"]);
-        run_temp_git(temp.path(), &["config", "user.name", "XAgent Test"]);
+        run_temp_git(temp.path(), &["config", "user.name", "Xgent Test"]);
         run_temp_git(temp.path(), &["config", "user.email", "test@example.com"]);
         fs::write(temp.path().join("README.md"), "initial\n").expect("write readme");
         run_temp_git(temp.path(), &["add", "README.md"]);
@@ -2979,7 +2979,7 @@ mod tests {
         let initialized = git_init_sync(
             workdir.clone(),
             "trunk".to_string(),
-            Some("XAgent Test".to_string()),
+            Some("Xgent Test".to_string()),
             Some("test@example.com".to_string()),
         )
         .expect("init repo");
@@ -2991,7 +2991,7 @@ mod tests {
             git_success(&workdir, &["config", "--get", "user.name"]).expect("user.name");
         let user_email =
             git_success(&workdir, &["config", "--get", "user.email"]).expect("user.email");
-        assert_eq!(user_name.stdout, "XAgent Test");
+        assert_eq!(user_name.stdout, "Xgent Test");
         assert_eq!(user_email.stdout, "test@example.com");
 
         let duplicate = git_init_sync(workdir, "main".to_string(), None, None)

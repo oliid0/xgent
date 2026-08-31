@@ -14,12 +14,12 @@ endif
 DESKTOP_WINDOWS_TARGET ?= x86_64-pc-windows-msvc
 DESKTOP_LINUX_TARGET ?= x86_64-unknown-linux-gnu
 DESKTOP_LINUX_BUNDLES ?= appimage deb rpm
-DESKTOP_MACOS_APP_NAME ?= XAgent
-DESKTOP_MACOS_NOTARY_PROFILE ?= xagent-notary
+DESKTOP_MACOS_APP_NAME ?= Xgent
+DESKTOP_MACOS_NOTARY_PROFILE ?= xgent-notary
 DESKTOP_MACOS_TAURI_CONFIG ?= src-tauri/tauri.macos.conf.json
 DESKTOP_WINDOWS_TAURI_CONFIG ?= src-tauri/tauri.windows.conf.json
 DESKTOP_RELEASE_TAURI_CONFIG ?= src-tauri/tauri.macos.release.conf.json
-DESKTOP_RELEASE_TAURI_CONFIG_FLAGS ?= --config $(DESKTOP_RELEASE_TAURI_CONFIG) $(if $(XAGENT_TAURI_VERSION_CONFIG),--config $(XAGENT_TAURI_VERSION_CONFIG))
+DESKTOP_RELEASE_TAURI_CONFIG_FLAGS ?= --config $(DESKTOP_RELEASE_TAURI_CONFIG) $(if $(XGENT_TAURI_VERSION_CONFIG),--config $(XGENT_TAURI_VERSION_CONFIG))
 
 RELEASE_TAG ?=
 
@@ -91,7 +91,7 @@ github-release-main: check-github-release-tag
 	pnpm --dir $(FRONTEND_DIR) test:release
 	cargo check --manifest-path $(FRONTEND_DIR)/src-tauri/Cargo.toml --tests
 	node scripts/release/prepare-app-version-from-tag.mjs "$(RELEASE_TAG)" --json
-	git tag -a "$(RELEASE_TAG)" -m "XAgent $(RELEASE_TAG)"
+	git tag -a "$(RELEASE_TAG)" -m "Xgent $(RELEASE_TAG)"
 	git push origin "$(RELEASE_TAG)"
 
 check-github-release-tag:

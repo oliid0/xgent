@@ -28,7 +28,7 @@ test -f "$appimage_path" || fail "AppImage not found: $appimage_path"
 test -x "$appimage_path" || fail "AppImage is not executable: $appimage_path"
 
 appimage_dir="$(dirname "$appimage_path")"
-work_dir="$(mktemp -d "$appimage_dir/.xagent-appimage.XXXXXX")"
+work_dir="$(mktemp -d "$appimage_dir/.xgent-appimage.XXXXXX")"
 cleanup() {
   rm -rf -- "$work_dir"
 }

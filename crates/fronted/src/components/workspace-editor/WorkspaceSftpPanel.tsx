@@ -90,8 +90,8 @@ type RenameEntryDialogState = {
   currentName: string;
 };
 
-const SFTP_DRAG_MIME = "application/x-xagent-sftp";
-const SFTP_DRAG_TEXT_PREFIX = "xagent-sftp:";
+const SFTP_DRAG_MIME = "application/x-xgent-sftp";
+const SFTP_DRAG_TEXT_PREFIX = "xgent-sftp:";
 const INITIAL_LOCAL_PATH = "";
 const INITIAL_REMOTE_PATH = ".";
 const TERMINAL_TRANSFER_STATUSES = new Set(["completed", "failed", "cancelled"]);
@@ -540,7 +540,7 @@ function PathNavigator(props: {
           }}
           placement="below"
           alignment="start"
-          width="var(--xagent-sftp-path-popover-width)"
+          width="var(--xgent-sftp-path-popover-width)"
           label={t("workspaceSftp.pathSuggestions")}
           role="none"
           hasAutoFocus={false}
@@ -1569,7 +1569,7 @@ export function WorkspaceSftpPanel(props: WorkspaceSftpPanelProps) {
     <ContextMenu
       items={sftpContextMenuItems}
       label={t("workspaceSftp.copyPath")}
-      menuWidth="var(--xagent-sftp-context-menu-width)"
+      menuWidth="var(--xgent-sftp-context-menu-width)"
       size="sm"
       onOpenChange={(isOpen) => {
         if (!isOpen) setContextMenu(null);
@@ -2058,7 +2058,7 @@ function CreateFolderDialog(props: {
       title={title}
       subtitle={path || undefined}
       purpose="form"
-      width="var(--xagent-dialog-width-sm)"
+      width="var(--xgent-dialog-width-sm)"
       touchPresentation="bottom-sheet"
       bottomSheetHeight="hug"
       footer={
@@ -2118,7 +2118,7 @@ function CopyPathDialog(props: {
       title={title}
       subtitle={prompt}
       purpose="info"
-      width="var(--xagent-dialog-width-sm)"
+      width="var(--xgent-dialog-width-sm)"
       touchPresentation="bottom-sheet"
       bottomSheetHeight="hug"
       footer={
@@ -2178,7 +2178,7 @@ function RenameEntryDialog(props: {
       title={title}
       subtitle={path || undefined}
       purpose="form"
-      width="var(--xagent-dialog-width-sm)"
+      width="var(--xgent-dialog-width-sm)"
       touchPresentation="bottom-sheet"
       bottomSheetHeight="hug"
       footer={

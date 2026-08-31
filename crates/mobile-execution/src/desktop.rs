@@ -18,7 +18,7 @@ impl<R: Runtime> MobileExecution<R> {
             backend: MobileExecutionBackend::Unavailable,
             available: false,
             installed: false,
-            detail: Some("desktop commands use the native XAgent runner".to_string()),
+            detail: Some("desktop commands use the native Xgent runner".to_string()),
             capabilities: MobileExecutionCapabilities::default(),
             toolchains: Vec::new(),
             environment_version: None,

@@ -172,7 +172,7 @@ export const CloudArtifactsCard = memo(function CloudArtifactsCard({
           hasDividers
           aria-label={title}
           style={{
-            maxHeight: "var(--xagent-artifacts-list-max-height)",
+            maxHeight: "var(--xgent-artifacts-list-max-height)",
             overflowY: "auto",
             overscrollBehavior: "contain",
           }}

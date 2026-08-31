@@ -1,11 +1,4 @@
-import { invoke } from "@xagent/runtime";
-
-/**
- * 全局快捷键（桌面端专属能力）。
- * 绑定只存本机 localStorage —— 快捷键是设备偏好，不进入设置同步/网关。
- * accelerator 采用 `Ctrl+Shift+KeyA` 形式：修饰键用 Ctrl/Shift/Alt/Super，
- * 主键用 W3C KeyboardEvent.code 名称，两端（前端录制 & Rust global_hotkey 解析）天然一致。
- */
+import { invoke } from "@xgent/runtime";
 
 export type GlobalShortcutAction = "summon" | "toggle" | "newChat" | "pin";
 
@@ -29,7 +22,7 @@ export interface GlobalShortcutFailure {
   error: string;
 }
 
-const STORAGE_KEY = "xagent.globalShortcuts.v1";
+const STORAGE_KEY = "xgent.globalShortcuts.v1";
 let shortcutApplyQueue: Promise<void> = Promise.resolve();
 
 export const DEFAULT_GLOBAL_SHORTCUT_BINDINGS: Readonly<GlobalShortcutBindings> = {
@@ -57,7 +50,6 @@ export function isShortcutModifierToken(token: string): token is ShortcutModifie
   return MODIFIER_SET.has(token);
 }
 
-/** KeyboardEvent.code -> 修饰键 token；非修饰键返回 null。 */
 export function modifierFromEventCode(code: string): ShortcutModifier | null {
   switch (code) {
     case "ControlLeft":
@@ -86,7 +78,7 @@ export function readGlobalShortcutBindings(): GlobalShortcutBindings {
     const bindings: GlobalShortcutBindings = {};
     for (const action of GLOBAL_SHORTCUT_ACTIONS) {
       const value = (parsed as Record<string, unknown>)[action];
-      // 早期版本直接存 accelerator 字符串，读取时迁移为 {accelerator, enabled}。
+
       if (typeof value === "string" && value.trim()) {
         bindings[action] = { accelerator: value.trim(), enabled: true };
         continue;
@@ -108,15 +100,9 @@ export function readGlobalShortcutBindings(): GlobalShortcutBindings {
 export function writeGlobalShortcutBindings(bindings: GlobalShortcutBindings): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bindings));
-  } catch {
-    // localStorage 不可用时静默忽略（例如隐私模式）。
-  }
+  } catch {}
 }
 
-/**
- * 把绑定应用到 Tauri 端（全量替换式注册，仅注册已启用的绑定）。
- * 返回注册失败的条目；非 Tauri 环境（纯浏览器 dev）返回空数组。
- */
 export async function applyGlobalShortcuts(
   bindings: GlobalShortcutBindings,
 ): Promise<GlobalShortcutFailure[]> {
@@ -153,7 +139,6 @@ export async function applyGlobalShortcuts(
   return result;
 }
 
-/** 应用启动时恢复本机保存的全局快捷键。 */
 export async function applyStoredGlobalShortcuts(): Promise<void> {
   const bindings = readGlobalShortcutBindings();
   if (GLOBAL_SHORTCUT_ACTIONS.every((action) => !bindings[action])) return;

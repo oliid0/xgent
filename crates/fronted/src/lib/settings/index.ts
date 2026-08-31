@@ -180,8 +180,6 @@ export type UpdateSettings = {
 export type SystemProxyType = "socks5" | "http";
 export type TerminalShellPreference = "auto" | "powershell" | "cmd" | "bash";
 
-// 系统级出站代理：注入本地 shell 命令 env，并供勾选了 useSystemProxy 的
-// 供应商模型请求走代理（代理连接由桌面 Rust 侧完成，凭据不进前端请求）。
 export type SystemProxyConfig = {
   enabled: boolean;
   type: SystemProxyType;
@@ -259,7 +257,6 @@ export type SelectedModel = {
   model: string;
 };
 
-/** 单价均为 USD / 百万 token，与 pi-ai 模型目录的 cost 字段同单位。 */
 export type ProviderModelCost = {
   input: number;
   output: number;
@@ -276,7 +273,7 @@ export type ProviderModelConfig = {
   contextWindow: number;
   maxOutputToken: number;
   limitsSource?: ModelLimitsSource;
-  /** 用户自填单价：目录外模型（中转/改名）没有官方定价时用于成本展示。 */
+
   cost?: ProviderModelCost;
   promptCacheHintMode?: PromptCacheHintMode;
 };
@@ -466,7 +463,7 @@ export type CustomProvider = {
   reasoning: ReasoningLevel;
   promptCachingEnabled: boolean;
   promptCacheHintMode?: PromptCacheHintMode;
-  /** 仅 Anthropic：ephemeral 缓存保留档位；long 在官方 API 上映射为 1h TTL。 */
+
   promptCacheRetention?: "short" | "long";
   nativeWebSearchEnabled: boolean;
   useSystemProxy: boolean;
@@ -1545,7 +1542,7 @@ function normalizeProviderModelCost(input: unknown): ProviderModelCost | undefin
     cacheRead: normalizeNonNegativeNumber(obj.cacheRead),
     cacheWrite: normalizeNonNegativeNumber(obj.cacheWrite),
   };
-  // 全零视为未配置，避免把"没填"持久化成显式的零单价。
+
   if (cost.input <= 0 && cost.output <= 0 && cost.cacheRead <= 0 && cost.cacheWrite <= 0) {
     return undefined;
   }
@@ -1758,8 +1755,7 @@ export function normalizeCustomProvider(input: unknown): CustomProvider {
     ),
     requestFormat: type === "xai" ? "openai-responses" : codexRouting?.requestFormat,
     reasoning: normalizeReasoningLevel(obj.reasoning),
-    // Anthropic/OpenAI 默认开启提示词缓存（OpenAI 侧体现为稳定的
-    // prompt_cache_key 路由提示）；Gemini 的隐式缓存由服务端自动处理。
+
     promptCachingEnabled:
       type === "gemini" || type === "xai" || type === "deepseek"
         ? false
@@ -3017,7 +3013,7 @@ export function updateCustomSettings(
   });
 }
 
-const WORKSPACE_TOOLS_WRITER_ID_STORAGE_KEY = "xagent.client-id";
+const WORKSPACE_TOOLS_WRITER_ID_STORAGE_KEY = "xgent.client-id";
 
 let cachedWorkspaceToolsWriterId = "";
 

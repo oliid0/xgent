@@ -11,7 +11,7 @@
 | `src/runtime/tauri.ts` | Tauri IPC、事件与窗口能力 |
 | `src/runtime/browser.ts` | 配对会话、HTTP RPC 与 SSE |
 
-组件不得直接引入 Tauri 包；除原生标题栏等明确例外外，系统访问统一通过 `@xagent/runtime`。
+组件不得直接引入 Tauri 包；除原生标题栏等明确例外外，系统访问统一通过 `@xgent/runtime`。
 
 ## 构建目标
 

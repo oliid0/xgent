@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import type { Locale } from "../../i18n/config";
 import { t } from "../../i18n/config";
 import type { CronTask } from "../automation/types";
@@ -163,8 +163,8 @@ export function buildTrayMenuModel(input: BuildTrayMenuModelInput): TrayMenuMode
     newChatAccelerator: enabledAccelerator("newChat"),
     tooltip:
       runningCount > 0
-        ? `XAgent · ${withCount(t("tray.tooltipRunning", input.locale), runningCount)}`
-        : "XAgent",
+        ? `Xgent · ${withCount(t("tray.tooltipRunning", input.locale), runningCount)}`
+        : "Xgent",
     badgeText: input.prefs.showRunningBadge && runningCount > 0 ? String(runningCount) : null,
   };
 }

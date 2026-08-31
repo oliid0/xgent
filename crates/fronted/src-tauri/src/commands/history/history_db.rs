@@ -109,8 +109,8 @@ fn migrate_to_v1(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
-// v2: chatHistory 新增 selected_model_json（每会话模型选择）。schema ensure
-// 本身幂等，重跑即补齐缺失列。
+
+
 fn migrate_to_v2(conn: &Connection) -> Result<(), String> {
     ensure_chat_history_schema(conn)?;
     Ok(())
@@ -568,7 +568,7 @@ fn seed_existing_chat_history_fts_index(conn: &Connection) -> Result<(), String>
 const SUBAGENT_SCHEMA_VERSION: &str = "2";
 
 /// Versioned bootstrap for the subagent store schema (v2).
-///
+
 /// The subagent tables are versioned independently of the chat-history
 /// `user_version` via the `subagentMeta` table. When the recorded version is
 /// missing or different from the current one, every subagent table (including

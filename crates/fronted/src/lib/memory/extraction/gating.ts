@@ -94,7 +94,7 @@ export function extractionSkipReason(input: ExtractionGateInput): ExtractionSkip
   if (stripped.length === 0) return "punctuation-only-user-message";
 
   // CJK has no ASCII word boundary; rely on prefix match plus a grapheme cap
-  // so that "谢谢你，请以后默认用中文" still reaches the LLM.
+
   const shortEnough = graphemes < GATING_SHORT_ACK_GRAPHEME_LIMIT;
   if (shortEnough && hasPrefix(text, GATING_GREETING_PREFIXES)) return "greeting";
   if (shortEnough && hasPrefix(text, GATING_THANKS_PREFIXES)) return "acknowledgement-thanks";

@@ -1,4 +1,4 @@
-//! ClawHub 注册表集成：搜索、卡片归一化、下载 URL 与安装。
+
 
 use serde_json::Value;
 use std::path::Path;
@@ -67,7 +67,7 @@ pub(crate) fn clawhub_download_url_for_slug(
     url.query_pairs_mut()
         .append_pair("slug", slug)
         .append_pair("tag", tag);
-    // ClawHub 对重名 slug 返回 409，必须带 ownerHandle 消歧。
+    
     if let Some(owner) = owner_handle
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -138,7 +138,7 @@ pub(crate) fn fetch_clawhub_json(path: &str, params: &[(&str, String)]) -> Resul
     let client = crate::services::system_proxy::blocking_client_builder()
         .map_err(|e| format!("Failed to create ClawHub HTTP client: {e}"))?
         .timeout(Duration::from_secs(30))
-        .user_agent("xagent-skillsmanager")
+        .user_agent("xgent-skillsmanager")
         .build()
         .map_err(|e| format!("Failed to create ClawHub HTTP client: {e}"))?;
     let response = client

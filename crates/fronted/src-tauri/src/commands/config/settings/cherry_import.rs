@@ -441,7 +441,7 @@ fn cherry_append_v1_provider(
         } else if group.base_url.is_empty() {
             "未配置 Base URL".to_string()
         } else if models_only_unsupported {
-            "仅包含 XAgent 不支持的非聊天模型".to_string()
+            "仅包含 Xgent 不支持的非聊天模型".to_string()
         } else {
             String::new()
         };
@@ -617,7 +617,7 @@ fn cherry_read_v2(
             } else if group.base_url.is_empty() {
                 "未配置当前协议的 Base URL".to_string()
             } else if models_only_unsupported {
-                "仅包含 XAgent 不支持的非聊天模型".to_string()
+                "仅包含 Xgent 不支持的非聊天模型".to_string()
             } else {
                 String::new()
             };

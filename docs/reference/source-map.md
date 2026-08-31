@@ -49,4 +49,4 @@
 |---|---|
 | `crates/fronted/src/lib/tools/builtinRegistry.ts` | 内置工具注册 |
 | `crates/fronted/src/lib/tools/cloudTaskTools.ts` | Agent 可调用的云端任务工具 |
-| `crates/fronted/src-tauri/prompt/skills/xagent-cloud-execution` | 云端任务决策与 artifact 返回协议 |
+| `crates/fronted/src-tauri/prompt/skills/xgent-cloud-execution` | 云端任务决策与 artifact 返回协议 |

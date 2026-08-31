@@ -1,21 +1,9 @@
-/**
- * recorder 的本机落盘端口与可选实时观察端口。
- *
- * 落盘失败一律吞掉：轨迹是诊断视图，宁可缺一段记录也不该影响对话。
- */
-
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import type { TrajectoryEvent, TrajectorySection } from "@/lib/trajectory/types";
 import type { TrajectoryRecorderPorts } from "./recorder";
 
 export type TrajectoryPublish = (events: readonly TrajectoryEvent[]) => void;
 
-/**
- * 构造桌面端 recorder 端口。
- *
- * @param publish - 可选的本地实时观察回调。
- * @returns 落盘与下发端口。
- */
 export function createTauriTrajectoryPorts(publish?: TrajectoryPublish): TrajectoryRecorderPorts {
   return {
     persist: (conversationId, segmentIndex, eventsJson) =>

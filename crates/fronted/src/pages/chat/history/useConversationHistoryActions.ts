@@ -159,8 +159,7 @@ export function useConversationHistoryActions(params: UseConversationHistoryActi
   } = params;
 
   // The sequence claimed by the latest openInitial. hydrateFull validates
-  // against this (not the live counter) so any bump in between 閳?a new
-  // conversation, another open 閳?turns the idle hydration into a no-op.
+
   const openLoadSequenceRef = useRef(0);
   const earlierPageLoadsRef = useRef(new Map<string, Promise<void>>());
 

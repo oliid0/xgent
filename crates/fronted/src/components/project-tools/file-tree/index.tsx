@@ -2,7 +2,7 @@
 // layer, reading its wiring from the workspace-tools context.
 //
 // Shared by every frontend runtime; only relative, npm-package, or
-// @xagent/runtime imports are allowed here.
+// @xgent/runtime imports are allowed here.
 
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -628,7 +628,7 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
           variant="transparent"
           padding={2}
           dividers={["bottom"]}
-          style={{ maxHeight: "var(--xagent-file-tree-search-results-height)", overflowY: "auto" }}
+          style={{ maxHeight: "var(--xgent-file-tree-search-results-height)", overflowY: "auto" }}
         >
           {search.loading ? (
             <HStack gap={2} vAlign="center">

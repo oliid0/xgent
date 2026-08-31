@@ -1,7 +1,7 @@
 import type { RuntimeInvokeArgs } from "./types";
 
-export const LAN_PC_SESSION_CHANGED_EVENT = "xagent:lan-pc-session-changed";
-export const LAN_PC_RELAY_EVENT = "xagent:lan-pc-event";
+export const LAN_PC_SESSION_CHANGED_EVENT = "xgent:lan-pc-session-changed";
+export const LAN_PC_RELAY_EVENT = "xgent:lan-pc-event";
 
 export type LanPcCommandHostConfig = {
   enabled: boolean;

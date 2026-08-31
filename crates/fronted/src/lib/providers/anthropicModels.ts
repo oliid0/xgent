@@ -2,22 +2,12 @@ import type { Model } from "@earendil-works/pi-ai";
 import { getBuiltinModels } from "@earendil-works/pi-ai/providers/all";
 
 // ---------------------------------------------------------------------------
-// Anthropic 模型目录回查与 1M 长上下文限额（单一真源）
+
 // ---------------------------------------------------------------------------
-// 官方 2026-03-13 起 1M 上下文在 adaptive 世代（Opus/Sonnet 4.6+、Claude 5）GA，
-// 无需 beta 头；2026-04-30 起旧世代（Sonnet 4/4.5）的 `context-1m-2025-08-07`
-// beta 退役——头仍被接受但无效，超过 200K 的请求必 400。pi-ai 目录仍给
-// claude-sonnet-4-5 标 1M，这里以"是否 adaptive 世代"钳出线上真实的有效窗口，
-// 供 settings 默认值与请求侧 beta 头判定共用，预算与信号永不漂移。
 
 export const ANTHROPIC_STANDARD_CONTEXT_WINDOW = 200_000;
 export const ANTHROPIC_LONG_CONTEXT_WINDOW = 1_000_000;
 
-// 中转/网关常给官方 Anthropic 模型 id 加装饰（日期后缀、@版本、大小写变化、
-// AnyRouter 系的 [1m] 长上下文后缀），逐字匹配会漏检；漏检后模型丢失目录元数据
-// （compat.forceAdaptiveThinking、1M 窗口默认值），思考档位与长上下文双双失效。
-// 先精确查，再按规范化候选回查目录；命中方默认保留用户配置的原始 id，只有官方/
-// Vertex 等不接受 [1m] suffix 的端点会在 modelFactory 中剥离该后缀。
 export function normalizeAnthropicModelIdCandidates(modelId: string): string[] {
   const candidates: string[] = [];
   const push = (value: string) => {
@@ -174,8 +164,6 @@ export function resolveAnthropicContextWindow(
   return known ? effectiveAnthropicContextWindow(known, modelId, baseUrl) : configuredContextWindow;
 }
 
-// adaptive 世代（forceAdaptiveThinking）即 1M GA 世代；旧世代目录里的 1M 是
-// 退役前的历史数值，按 200K 报有效窗口。
 export function resolveAnthropicKnownModelLimits(
   modelId: string | undefined,
   baseUrl?: string,

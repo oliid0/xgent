@@ -386,8 +386,7 @@ export function useScrollFollow(args: UseScrollFollowArgs): {
 
   const breakFollow = useCallback(() => {
     cancelJumpAnimation();
-    // 与键盘 historyKey 路径同构：溢出与否取实测值（无溢出时 reducer 不解除
-    // 跟随，避免「视觉在底部却被搁浅为 off」），时间基与其余事件一致用 Date.now()。
+
     const el = boundViewportRef.current;
     const hasOverflow =
       el !== null && el.scrollHeight - el.clientHeight > SCROLLABLE_OVERFLOW_MIN_PX;

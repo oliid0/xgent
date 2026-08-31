@@ -90,7 +90,7 @@ export function ChatEmptyState({
       </Heading>
       {composer}
       {onSuggestionSelect ? (
-        <VStack width="100%" maxWidth="var(--xagent-chat-landing-suggestions-width)">
+        <VStack width="100%" maxWidth="var(--xgent-chat-landing-suggestions-width)">
           <List density="balanced">
             {SUGGESTION_CARDS.map((card) => (
               <ListItem

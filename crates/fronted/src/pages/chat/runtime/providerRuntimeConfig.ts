@@ -114,7 +114,7 @@ export function failoverTargetLabel(providerName: string, model: string) {
  * cross-vendor. Each fallback re-sends the conversation's *own model id* to
  * the queued provider (cc-switch semantics: switch provider, keep model);
  * queued providers that don't have that model active are skipped for this
- * turn. The active selection stays first (XAgent keeps the user's
+ * turn. The active selection stays first (Xgent keeps the user's
  * per-conversation choice, unlike cc-switch's always-P1 routing); queue
  * entries that duplicate the active provider are dropped. Returns undefined
  * when failover is off for this vendor or nothing remains to fail over to.

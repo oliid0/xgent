@@ -67,7 +67,7 @@ export function ToolApprovalBar(props: {
     <Section
       padding={3}
       width="calc(100% - var(--spacing-6))"
-      maxWidth="var(--xagent-content-width-lg)"
+      maxWidth="var(--xgent-content-width-lg)"
       dividers={["top", "start", "end"]}
       className="mx-auto overflow-hidden backdrop-blur-2xl"
     >
@@ -113,7 +113,7 @@ export function ToolApprovalBar(props: {
                     code={item.summary}
                     language="plaintext"
                     size="sm"
-                    maxHeight="var(--xagent-approval-summary-max-height)"
+                    maxHeight="var(--xgent-approval-summary-max-height)"
                     width="100%"
                     isWrapped
                     container="section"

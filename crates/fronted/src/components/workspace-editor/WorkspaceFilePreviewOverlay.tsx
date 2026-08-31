@@ -200,7 +200,7 @@ function hashString(value: string) {
 }
 
 const SANDBOXED_HTML_PREVIEW_BOOTSTRAP = [
-  "<script data-xagent-html-preview-bootstrap>",
+  "<script data-xgent-html-preview-bootstrap>",
   "(() => {",
   "  function createStorage() {",
   "    const values = new Map();",
@@ -529,14 +529,14 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
 
   return (
     <VStack
-      className="xagent-workspace-preview-overlay"
+      className="xgent-workspace-preview-overlay"
       data-visible={isVisible ? "true" : "false"}
       width="100%"
       height="100%"
       style={{
         position: "absolute",
         inset: 0,
-        zIndex: "var(--xagent-z-workspace-overlay)",
+        zIndex: "var(--xgent-z-workspace-overlay)",
         minWidth: 0,
         minHeight: 0,
         overflow: "hidden",
@@ -652,7 +652,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
               />
             ) : null}
             <StackItem size="fill">
-              <LayoutContent padding={0} className="xagent-workspace-file-preview-stage">
+              <LayoutContent padding={0} className="xgent-workspace-file-preview-stage">
                 {preview ? (
                   <PreviewBody
                     preview={preview}

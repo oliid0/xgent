@@ -128,7 +128,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
           gap={3}
           vAlign="center"
           paddingInline={3}
-          minHeight="var(--xagent-mobile-header-height)"
+          minHeight="var(--xgent-mobile-header-height)"
           className="shrink-0 border-b border-border/40 pt-[env(safe-area-inset-top,0)]"
         >
           <IconButton

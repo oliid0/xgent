@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 const VAULT_FILENAME: &str = "cloud-secrets.device.hold";
 const DEVICE_KEY_FILENAME: &str = "cloud-secrets.device.key";
-const VAULT_CLIENT_ID: &[u8] = b"xagent.cloud-execution";
+const VAULT_CLIENT_ID: &[u8] = b"xgent.cloud-execution";
 const GITHUB_TOKEN_KEY: &[u8] = b"github.personal-access-token";
 const GITHUB_USERNAME_KEY: &[u8] = b"github.username";
 const DEVICE_KEY_BYTES: usize = 32;
@@ -288,9 +288,9 @@ mod tests {
         {
             let vault = CloudSecretVault::new(directory.path().to_path_buf()).expect("new vault");
             let status = vault
-                .set_github_token("xagent-user", "github_pat_test")
+                .set_github_token("xgent-user", "github_pat_test")
                 .expect("save token");
-            assert_eq!(status.github_username.as_deref(), Some("xagent-user"));
+            assert_eq!(status.github_username.as_deref(), Some("xgent-user"));
             assert!(status.github_token_configured);
         }
 

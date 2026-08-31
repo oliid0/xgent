@@ -1,5 +1,5 @@
 import type { Context, UserMessage } from "@earendil-works/pi-ai";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import {
   getUserMessageAttachments,
   type PendingUploadedFile,

@@ -17,10 +17,6 @@ export type PruneConversationResult = {
   releasedTokens: number;
 };
 
-/**
- * 非 LLM 降级：从旧到新裁剪工具输出正文（保留最近 N 个用户轮次与一段保护额度），
- * 直到释放到 minimumReleasedTokens。裁剪力度由 policy 的压力阶梯给出。
- */
 export function pruneConversationState(
   state: ConversationViewState,
   options: PruneOptions,
@@ -50,8 +46,7 @@ export function pruneConversationState(
     if (userTurnsSeen < protectedRecentUserTurns) continue;
 
     const modelMessage = sanitizeMessageForModelContext(message) as ToolResultMessage;
-    // 释放量与账本同口径：只按模型可见的 content 计（details 不发给模型）。
-    // 计入 details 会高报释放量而提前停手，实际上下文并未降到位。
+
     const estimated = Math.ceil(estimateContentTokenUnits(modelMessage.content));
     if (estimated <= 0) continue;
     traversedToolTokens += estimated;

@@ -1,4 +1,4 @@
-//! 内置 Agent Skill：内嵌文件定义、修改保护与启动时种子写入。
+
 
 use std::fs;
 use std::io;
@@ -18,11 +18,11 @@ pub(crate) struct BuiltinSkill {
     pub(crate) ownership_marker: Option<(&'static str, &'static str)>,
 }
 
-const CODE_REVIEW_OWNERSHIP_MARKER_PATH: &str = "_xagent_builtin.json";
+const CODE_REVIEW_OWNERSHIP_MARKER_PATH: &str = "_xgent_builtin.json";
 const CODE_REVIEW_OWNERSHIP_MARKER_CONTENT: &str =
-    "{\"schemaVersion\":1,\"owner\":\"XAgent\",\"skill\":\"xagent-code-review\"}\n";
+    "{\"schemaVersion\":1,\"owner\":\"Xgent\",\"skill\":\"xgent-code-review\"}\n";
 const CLOUD_EXECUTION_OWNERSHIP_MARKER_CONTENT: &str =
-    "{\"schemaVersion\":1,\"owner\":\"XAgent\",\"skill\":\"xagent-cloud-execution\"}\n";
+    "{\"schemaVersion\":1,\"owner\":\"Xgent\",\"skill\":\"xgent-cloud-execution\"}\n";
 
 const SKILLS_INSTALLER_FILES: &[BuiltinSkillFile] = &[
     BuiltinSkillFile {
@@ -65,7 +65,7 @@ const SKILLS_CREATOR_FILES: &[BuiltinSkillFile] = &[
 const CODE_REVIEW_FILES: &[BuiltinSkillFile] = &[
     BuiltinSkillFile {
         path: "SKILL.md",
-        content: include_str!("../../../prompt/skills/xagent-code-review/SKILL.md"),
+        content: include_str!("../../../prompt/skills/xgent-code-review/SKILL.md"),
     },
     BuiltinSkillFile {
         path: CODE_REVIEW_OWNERSHIP_MARKER_PATH,
@@ -76,12 +76,12 @@ const CODE_REVIEW_FILES: &[BuiltinSkillFile] = &[
 const CLOUD_EXECUTION_FILES: &[BuiltinSkillFile] = &[
     BuiltinSkillFile {
         path: "SKILL.md",
-        content: include_str!("../../../prompt/skills/xagent-cloud-execution/SKILL.md"),
+        content: include_str!("../../../prompt/skills/xgent-cloud-execution/SKILL.md"),
     },
     BuiltinSkillFile {
         path: "references/execution-contract.md",
         content: include_str!(
-            "../../../prompt/skills/xagent-cloud-execution/references/execution-contract.md"
+            "../../../prompt/skills/xgent-cloud-execution/references/execution-contract.md"
         ),
     },
     BuiltinSkillFile {
@@ -92,7 +92,7 @@ const CLOUD_EXECUTION_FILES: &[BuiltinSkillFile] = &[
 
 pub(crate) const BUILTIN_AGENT_SKILLS: &[BuiltinSkill] = &[
     BuiltinSkill {
-        name: "xagent-code-review",
+        name: "xgent-code-review",
         files: CODE_REVIEW_FILES,
         ownership_marker: Some((
             CODE_REVIEW_OWNERSHIP_MARKER_PATH,
@@ -100,7 +100,7 @@ pub(crate) const BUILTIN_AGENT_SKILLS: &[BuiltinSkill] = &[
         )),
     },
     BuiltinSkill {
-        name: "xagent-cloud-execution",
+        name: "xgent-cloud-execution",
         files: CLOUD_EXECUTION_FILES,
         ownership_marker: Some((
             CODE_REVIEW_OWNERSHIP_MARKER_PATH,
@@ -159,7 +159,7 @@ pub(crate) fn ensure_not_builtin_skill_management_target(
     let is_protected = !target.exists() || builtin_skill_owns_target(&target, builtin)?;
     if is_protected {
         return Err(format!(
-            "SkillsManager action={action} cannot modify built-in Skill \"{name}\". Built-in Skills are managed by XAgent; create or update a separate user Skill instead."
+            "SkillsManager action={action} cannot modify built-in Skill \"{name}\". Built-in Skills are managed by Xgent; create or update a separate user Skill instead."
         ));
     }
     Ok(())

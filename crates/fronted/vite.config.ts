@@ -10,7 +10,7 @@ const packageJson = JSON.parse(
 
 // @ts-expect-error process is a nodejs global
 const env = process.env as Record<string, string | undefined>;
-const appVersion = env.XAGENT_APP_VERSION?.trim() || packageJson.version || "0.0.0";
+const appVersion = env.XGENT_APP_VERSION?.trim() || packageJson.version || "0.0.0";
 const host = env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
@@ -19,11 +19,11 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
-      "@xagent/runtime": fileURLToPath(new URL("./src/runtime/index.ts", import.meta.url)),
+      "@xgent/runtime": fileURLToPath(new URL("./src/runtime/index.ts", import.meta.url)),
     },
   },
   define: {
-    __XAGENT_APP_VERSION__: JSON.stringify(appVersion),
+    __XGENT_APP_VERSION__: JSON.stringify(appVersion),
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

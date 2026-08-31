@@ -1,7 +1,7 @@
 // Workspace activity invalidation types.
 //
 // Shared by every frontend runtime. Keep it transport-agnostic; only relative
-// or @xagent/runtime imports are allowed here.
+// or @xgent/runtime imports are allowed here.
 
 export type WorkspaceActivity = {
   workdir: string;

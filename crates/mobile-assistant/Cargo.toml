@@ -1,8 +1,8 @@
 [package]
 name = "tauri-plugin-mobile-assistant"
 version = "0.1.0"
-authors = ["XAgent contributors"]
-description = "Native personal-assistant permissions and voice input for XAgent mobile"
+authors = ["Xgent contributors"]
+description = "Native personal-assistant permissions and voice input for Xgent mobile"
 edition = "2021"
 license = "MIT"
 links = "tauri-plugin-mobile-assistant"

@@ -31,7 +31,7 @@ export function MobileHubHeader(props: MobileHubHeaderProps) {
       <HStack
         gap={3}
         vAlign="center"
-        minHeight="var(--xagent-mobile-header-action-size)"
+        minHeight="var(--xgent-mobile-header-action-size)"
         width="100%"
       >
         <IconButton
@@ -48,8 +48,8 @@ export function MobileHubHeader(props: MobileHubHeaderProps) {
           </Heading>
         </StackItem>
         <Center
-          width="var(--xagent-mobile-header-action-size)"
-          height="var(--xagent-mobile-header-action-size)"
+          width="var(--xgent-mobile-header-action-size)"
+          height="var(--xgent-mobile-header-action-size)"
         >
           {props.trailing}
         </Center>

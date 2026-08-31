@@ -2,7 +2,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Heading as AstryxHeadingCore, Text as AstryxText } from "@astryxdesign/core/Text";
-import { openUrl } from "@xagent/runtime";
+import { openUrl } from "@xgent/runtime";
 import iconSimpleUrl from "../../../src-tauri/icons/icon-simple.png";
 import {
   AlertTriangle,
@@ -86,7 +86,7 @@ export function AboutSection(props: AboutSectionProps) {
     latestResult?.channel === "prerelease"
       ? t("settings.aboutChannelPrerelease")
       : t("settings.aboutChannelStable");
-  const currentVersion = latestResult?.currentVersion || __XAGENT_APP_VERSION__;
+  const currentVersion = latestResult?.currentVersion || __XGENT_APP_VERSION__;
   const nextVersion = latestResult?.version || latestResult?.releaseTag || "";
   const releaseDate = formatReleaseDate(latestResult?.date);
   const checking = checkState.status === "checking";

@@ -1,6 +1,6 @@
 // GitReview model: pure types and helpers shared by the git-review modules.
 //
-// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// Shared by every frontend runtime; only relative or @xgent/runtime imports
 // are allowed here.
 
 import type { GraphRow } from "../../../lib/git/gitGraph";

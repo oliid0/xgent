@@ -65,7 +65,7 @@ test("topic matches outweigh summary matches", () => {
   const result = classify({
     slug: "mixed",
     displayName: "Mixed",
-    // summary 命中 research(search)，topics 命中 finance(stocks)——finance 应排前。
+    
     summary: "Search helper.",
     topics: ["stocks"],
   });

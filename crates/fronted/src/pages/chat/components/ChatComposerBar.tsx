@@ -390,7 +390,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const [isComposerExpanded, setIsComposerExpanded] = useState(false);
   const isComposerExpandedRef = useRef(false);
   const glassCardRef = useRef<HTMLDivElement | null>(null);
-  /** 切换瞬间记录的卡片旧高度，供 FLIP 动画用；消费后立即置空。 */
+
   const expandFromHeightRef = useRef<number | null>(null);
   const expandAnimationRef = useRef<Animation | null>(null);
   const scheduleHeightMeasureRef = useRef<(() => void) | null>(null);
@@ -510,9 +510,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     ? t("chat.composer.collapse")
     : t("chat.composer.expand");
 
-  // ref 与 state 同步更新：高度上报的 RO/rAF 回调可能先于 effect 执行，
-  // 必须在布局变化前就能读到最新展开态。切换前记录卡片当前高度，
-  // 布局翻转后由 FLIP effect 从旧高度平滑过渡到新高度。
   const setComposerExpanded = useCallback((next: boolean) => {
     if (next === isComposerExpandedRef.current) return;
     expandFromHeightRef.current = glassCardRef.current?.getBoundingClientRect().height ?? null;
@@ -520,10 +517,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     setIsComposerExpanded(next);
   }, []);
 
-  // FLIP：布局已按目标态落定，把卡片高度用 min/max 双钳制钉在动画值上，
-  // 从旧高度平滑过渡到新高度。不能直接动 height——展开态卡片是 flex-1
-  // (basis 0)，height 会被 flex 忽略；min/max 约束则两种布局都尊重。
-  // biome-ignore lint/correctness/useExhaustiveDependencies(isComposerExpanded): 函数体不读它，但它正是"布局已翻转"的触发信号。
   useLayoutEffect(() => {
     const card = glassCardRef.current;
     const fromHeight = expandFromHeightRef.current;
@@ -547,7 +540,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
       if (expandAnimationRef.current === animation) {
         expandAnimationRef.current = null;
       }
-      // 还原方向的高度上报在动画期间被冻结，落定后补测一次。
+
       scheduleHeightMeasureRef.current?.();
     };
     animation.onfinish = clear;
@@ -561,7 +554,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     composerRef.current?.focus();
   }, [composerRef, setComposerExpanded]);
 
-  /** 发送（含排队）后退出全高编辑态，让路给回复内容。 */
   const handleComposerSend = useCallback(() => {
     setComposerExpanded(false);
     onSend();
@@ -605,8 +597,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     let animationFrame: number | null = null;
     const measure = () => {
       animationFrame = null;
-      // 展开态占满聊天区，保留最近一次常规高度，避免底部预留跟着跳动；
-      // 展开/还原动画期间高度是中间值，同样不上报，动画结束后补测。
+
       if (isComposerExpandedRef.current || expandAnimationRef.current) return;
       const rootHeight = root.getBoundingClientRect().height;
       const queueHeight = queuePanelRef.current?.getBoundingClientRect().height ?? 0;
@@ -650,15 +641,15 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
         pointerEvents: "none",
         position: isComposerExpanded ? "absolute" : "relative",
         insetInline: isComposerExpanded ? 0 : undefined,
-        insetBlockStart: isComposerExpanded ? "var(--xagent-mobile-header-height)" : undefined,
+        insetBlockStart: isComposerExpanded ? "var(--xgent-mobile-header-height)" : undefined,
         insetBlockEnd: isComposerExpanded ? 0 : undefined,
-        zIndex: "var(--xagent-z-chat-composer)",
+        zIndex: "var(--xgent-z-chat-composer)",
         flexShrink: 0,
       }}
     >
       <VStack
         width="100%"
-        maxWidth="var(--xagent-composer-width)"
+        maxWidth="var(--xgent-composer-width)"
         gap={0}
         style={{
           pointerEvents: "auto",
@@ -673,9 +664,9 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           <VStack
             ref={queuePanelRef}
             width="calc(100% - (var(--spacing-3) * 2))"
-            maxWidth="var(--xagent-chat-queue-width)"
+            maxWidth="var(--xgent-chat-queue-width)"
             gap={0}
-            style={{ position: "relative", zIndex: "var(--xagent-z-chat-queue)" }}
+            style={{ position: "relative", zIndex: "var(--xgent-z-chat-queue)" }}
           >
             <Section variant="muted" width="100%" padding={0} dividers={["bottom"]}>
               <Collapsible
@@ -694,7 +685,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                   width="100%"
                   isScrollable
                   padding={1}
-                  style={{ maxHeight: "var(--xagent-chat-queue-height)" }}
+                  style={{ maxHeight: "var(--xgent-chat-queue-height)" }}
                 >
                   <List
                     density="compact"
@@ -773,14 +764,13 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           onKeyDown={
             isComposerExpanded
               ? (event) => {
-                  // mention 弹层消费 Escape 时会 preventDefault，此处让路。
                   if (event.key === "Escape" && !event.defaultPrevented) {
                     setComposerExpanded(false);
                   }
                 }
               : undefined
           }
-          className="xagent-chat-composer"
+          className="xgent-chat-composer"
           style={isComposerExpanded ? { minHeight: 0, flex: 1 } : undefined}
           drawer={
             pendingUploadedFiles.length > 0 ? (
@@ -859,8 +849,8 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 preferNativeContextMenu={mobileExperience}
                 className={
                   isComposerExpanded
-                    ? "xagent-chat-mention-composer xagent-chat-mention-composer-expanded"
-                    : "xagent-chat-mention-composer"
+                    ? "xgent-chat-mention-composer xgent-chat-mention-composer-expanded"
+                    : "xgent-chat-mention-composer"
                 }
               />
             </VStack>
@@ -870,7 +860,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
               <Popover
                 placement="above"
                 alignment="start"
-                width="var(--xagent-composer-add-menu-width)"
+                width="var(--xgent-composer-add-menu-width)"
                 label={addMenuTooltip}
                 isOpen={isAddMenuOpen}
                 onOpenChange={setIsAddMenuOpen}

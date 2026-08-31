@@ -1,3 +1,3 @@
--keepclassmembers class com.ohi.xagent.browserautomation.BrowserAutomationPlugin {
+-keepclassmembers class com.ohi.xgent.browserautomation.BrowserAutomationPlugin {
     @app.tauri.annotation.Command <methods>;
 }

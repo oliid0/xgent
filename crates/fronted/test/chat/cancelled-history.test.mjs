@@ -74,7 +74,7 @@ test("persistable cancelled snapshot keeps visible provider hosted search blocks
     id: "search-1",
     provider: "codex",
     status: "searching",
-    queries: ["XAgent web search"],
+    queries: ["Xgent web search"],
     sources: [],
   };
   const messages = chatAbort.buildPersistableMessagesFromSnapshot({

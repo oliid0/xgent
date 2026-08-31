@@ -29,9 +29,9 @@ export function MobileFullscreenPanel(props: MobileFullscreenPanelProps) {
       aria-label={props.label}
       aria-hidden={!props.open}
       className={cn(
-        "mobile-fullscreen-panel app-safe-area fixed inset-0 z-[var(--xagent-z-mobile-panel)] min-h-0 overflow-hidden bg-background text-foreground transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--ease-standard)] motion-reduce:transition-none",
+        "mobile-fullscreen-panel app-safe-area fixed inset-0 z-[var(--xgent-z-mobile-panel)] min-h-0 overflow-hidden bg-background text-foreground transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--ease-standard)] motion-reduce:transition-none",
         !props.open &&
-          "pointer-events-none translate-x-[var(--xagent-mobile-panel-hidden-offset)] opacity-0",
+          "pointer-events-none translate-x-[var(--xgent-mobile-panel-hidden-offset)] opacity-0",
       )}
     >
       {props.children}

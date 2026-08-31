@@ -169,7 +169,6 @@ const INSTALLED_SORT_OPTIONS: Array<{ value: InstalledSkillSort; labelKey: strin
 
 type StoreCategoryValue = "all" | ClawHubCategorySlug;
 
-// 图标与 ClawHub 官网分类侧边栏一一对应（layers/plug/zap/globe/wrench/…）。
 const STORE_CATEGORY_ICONS: Record<StoreCategoryValue, typeof Layers> = {
   all: Layers,
   integrations: Plug,
@@ -192,7 +191,6 @@ function storeCategoryLabelKey(value: StoreCategoryValue): string {
   return `settings.skillsStoreCategory${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }
 
-// 已安装技能没有 ClawHub 的 topics 字段，用名称+描述做启发式分类。
 function classifyInstalledSkill(skill: SkillSummary): ClawHubCategorySlug[] {
   return classifyClawHubSkill({
     slug: skill.name,
@@ -204,7 +202,6 @@ function classifyInstalledSkill(skill: SkillSummary): ClawHubCategorySlug[] {
 
 const STORE_CATEGORY_OPTIONS: readonly StoreCategoryValue[] = ["all", ...CLAWHUB_CATEGORY_SLUGS];
 
-/** 选中分类后若本地过滤结果少于该值且还有下一页，自动继续拉取补齐。 */
 const STORE_CATEGORY_FILL_TARGET = 12;
 
 type StoreSkillInstallState = {
@@ -870,8 +867,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   const [installedSort, setInstalledSort] = useState<InstalledSkillSort>(
     readInstalledSortPreference,
   );
-  // 批量选择模式：仅在「已安装」「本地导入」页可用。用于在大量技能中快速圈选
-  // 一段连续区间（点首项、Shift+点末项）而不必逐个勾选。
+
   const [bulkMode, setBulkMode] = useState(false);
   // Temporary multi-select set (not persisted). Independent from enable state.
   const [bulkSelection, setBulkSelection] = useState<ReadonlySet<string>>(() => new Set());
@@ -1006,8 +1002,6 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     );
   }, [filter, skills]);
 
-  // 已安装技能同样按 ClawHub 分区分类，让两个页签体验一致。始终启用（内置）
-  // 技能没有真正的用途归属，统一归到 other 一栏而不参与语义分类。
   const categorizedInstalled = useMemo(
     () =>
       textFilteredInstalled.map((skill) => ({
@@ -1059,7 +1053,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     try {
       const scans = await scanExternalSkills();
       setExternalScans(scans);
-      // 剔除本次扫描已不存在的勾选项，避免按钮计数虚高或静默空导入
+
       const validBaseDirs = new Set(scans.flatMap((scan) => scan.skills.map((s) => s.baseDir)));
       setSelectedExternal((prev) => {
         const next = new Set([...prev].filter((baseDir) => validBaseDirs.has(baseDir)));
@@ -1131,7 +1125,6 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     [isExternalSkillInstalled],
   );
 
-  // 批量区间勾选：已安装技能跳过，且不会进入 selectedExternal。
   const batchToggleExternalSkills = useCallback(
     (baseDirs: string[], on: boolean) => {
       setSelectedExternal((prev) => {
@@ -1753,9 +1746,6 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     [clearBulkUndoTimer],
   );
 
-  // 批量启用/禁用：作用于 bulkSelection，成功后清空选择并弹出 Undo。
-  // 副作用（Undo 快照/定时器/清空选择）都放在 setSettings 之外：
-  // 传给 setSettings 的 updater 必须是纯函数（StrictMode 会双调用）。
   const applyBulkEnableState = useCallback(
     (target: boolean) => {
       const names = [...bulkSelection].filter((name) => !isAlwaysEnabledSkillName(name));
@@ -1892,8 +1882,6 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
 
   useEffect(() => clearBulkUndoTimer, [clearBulkUndoTimer]);
 
-  // 切换视图时退出批量模式并清空选择与锚点。
-  // biome-ignore lint/correctness/useExhaustiveDependencies: 只需在 view 变化时触发；exitBulkMode 是稳定回调
   useEffect(() => {
     exitBulkMode();
   }, [view]);
@@ -1919,7 +1907,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
         ) {
           return;
         }
-        // 「全选当前筛选」只对已安装页有定义；其余视图保留浏览器默认 Ctrl+A。
+
         if (view !== "installed") return;
         event.preventDefault();
         setBulkSelectionRange(filteredSelectableInstalledNames, true);
@@ -2127,7 +2115,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                       value: option.value,
                       label: t(option.labelKey),
                     }))}
-                    width="var(--xagent-hub-sort-control-width)"
+                    width="var(--xgent-hub-sort-control-width)"
                   />
                 ) : null}
                 <TextInput
@@ -2156,7 +2144,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                   }
                   startIcon={Search}
                   hasClear
-                  width="var(--xagent-hub-search-control-width)"
+                  width="var(--xgent-hub-search-control-width)"
                 />
               </HStack>
             </HStack>
@@ -2531,7 +2519,7 @@ function SkillsImportView(props: {
 
   const [activeTool, setActiveTool] = useState<string>(scans[0]?.tool ?? "claude-code");
   const userChoseToolRef = useRef(false);
-  // 扫描结果就绪后自动定位到第一个有技能的工具；用户手动切换后不再干预
+
   useEffect(() => {
     if (userChoseToolRef.current || scans.length === 0) return;
     const preferred =
@@ -2541,7 +2529,7 @@ function SkillsImportView(props: {
     }
   }, [scans, activeTool]);
   const activeScan = filteredScans.find((scan) => scan.tool === activeTool);
-  // 「已选 X / Y」与全选按钮都只统计可导入项：已安装项不可选，不计入分子分母。
+
   const selectableVisibleBaseDirs = useMemo(
     () =>
       activeScan?.skills
@@ -2912,13 +2900,13 @@ function InstalledSkillPreviewDrawer(props: {
       aria-label={t("settings.skillsInstalledPreviewTitle")}
       purpose="info"
       variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "min(var(--xagent-drawer-width), 40dvw)"}
+      width={isCompact ? "100dvw" : "min(var(--xgent-drawer-width), 40dvw)"}
       padding={0}
       style={{
         marginInlineStart: "auto",
         marginInlineEnd: 0,
-        blockSize: "var(--xagent-viewport-height)",
-        maxBlockSize: "var(--xagent-viewport-height)",
+        blockSize: "var(--xgent-viewport-height)",
+        maxBlockSize: "var(--xgent-viewport-height)",
         ...(isCompact
           ? {}
           : { borderRadius: "var(--radius-container) 0 0 var(--radius-container)" }),
@@ -3379,8 +3367,6 @@ function SkillsStoreView(props: {
     [categorizedItems, storeCategory],
   );
 
-  // 分类是本地过滤：选中分类后结果太少且还有下一页时自动补页，
-  // 避免出现"一屏只剩两张卡"的稀疏页面。
   useEffect(() => {
     if (storeCategory === "all" || searching) return;
     if (!cursor || loading || loadingMore) return;
@@ -3741,13 +3727,13 @@ function SkillsStorePreviewDrawer(props: {
       aria-label={t("settings.skillsStorePreviewTitle")}
       purpose="info"
       variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "min(var(--xagent-drawer-width), 40dvw)"}
+      width={isCompact ? "100dvw" : "min(var(--xgent-drawer-width), 40dvw)"}
       padding={0}
       style={{
         marginInlineStart: "auto",
         marginInlineEnd: 0,
-        blockSize: "var(--xagent-viewport-height)",
-        maxBlockSize: "var(--xagent-viewport-height)",
+        blockSize: "var(--xgent-viewport-height)",
+        maxBlockSize: "var(--xgent-viewport-height)",
         ...(isCompact
           ? {}
           : { borderRadius: "var(--radius-container) 0 0 var(--radius-container)" }),

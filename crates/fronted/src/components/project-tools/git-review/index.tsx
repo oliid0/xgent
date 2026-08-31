@@ -2,7 +2,7 @@
 // layout/presentation state shared across views and composes the toolbar,
 // status view and history view around the data layer.
 //
-// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// Shared by every frontend runtime; only relative or @xgent/runtime imports
 // are allowed here.
 
 import { VStack } from "@astryxdesign/core/Layout";

@@ -8,7 +8,7 @@ import { DiffModeEnum, DiffView } from "@git-diff-view/react";
 // context menu, selection autoscroll, horizontal scrollbar) and the
 // DiffReviewCard wrapper used by the changes view.
 //
-// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// Shared by every frontend runtime; only relative or @xgent/runtime imports
 // are allowed here.
 
 import { Button } from "@astryxdesign/core/Button";
@@ -840,7 +840,7 @@ export function DiffContent(props: {
     <ContextMenu
       label={copySelectedTextLabel}
       size="sm"
-      menuWidth="var(--xagent-context-menu-width)"
+      menuWidth="var(--xgent-context-menu-width)"
       items={[
         {
           label: copySelectedTextLabel,

@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type AppUpdateChannel = "stable" | "prerelease";

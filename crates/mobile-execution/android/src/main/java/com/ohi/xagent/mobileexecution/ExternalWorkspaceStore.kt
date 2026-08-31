@@ -1,4 +1,4 @@
-package com.ohi.xagent.mobileexecution
+package com.ohi.xgent.mobileexecution
 
 import android.content.Context
 import android.content.Intent
@@ -29,7 +29,7 @@ internal data class ExternalWorkspaceEntry(
  */
 internal class ExternalWorkspaceStore(private val context: Context) {
     private val preferences =
-        context.getSharedPreferences("xagent-external-workspaces", Context.MODE_PRIVATE)
+        context.getSharedPreferences("xgent-external-workspaces", Context.MODE_PRIVATE)
 
     @Synchronized
     fun list(): List<ExternalWorkspaceEntry> {
@@ -151,7 +151,7 @@ internal class ExternalWorkspaceStore(private val context: Context) {
     }
 
     private fun probeWritable(directory: File): Boolean {
-        val probe = File(directory, ".xagent-write-${UUID.randomUUID()}")
+        val probe = File(directory, ".xgent-write-${UUID.randomUUID()}")
         return runCatching {
             probe.outputStream().use { it.write(0) }
             true

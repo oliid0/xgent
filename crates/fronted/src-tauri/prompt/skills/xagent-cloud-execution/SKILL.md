@@ -1,9 +1,9 @@
 ---
-name: xagent-cloud-execution
+name: xgent-cloud-execution
 description: Run build, packaging, document, media, and other artifact-producing tasks in the user's public GitHub agent-temp repository with GitHub Actions. Use when the current device lacks the required toolchain, the requested target platform differs from the current platform, a mobile shell cannot complete the work, or the user explicitly asks to execute a task in the cloud and return its artifact.
 ---
 
-# XAgent Cloud Execution
+# Xgent Cloud Execution
 
 Choose the execution environment in this order:
 
@@ -13,18 +13,18 @@ Choose the execution environment in this order:
 
 Use cloud execution for cross-platform builds such as creating an IPA from Windows, for large temporary toolchains, and for artifact-producing work such as APK/EXE packaging, PDF generation, presentation generation, and media processing.
 
-Read [references/execution-contract.md](references/execution-contract.md) before starting a cloud task. It defines the generated repository layout, runner contract, environment injection, output rules, and retry semantics implemented by XAgent.
+Read [references/execution-contract.md](references/execution-contract.md) before starting a cloud task. It defines the generated repository layout, runner contract, environment injection, output rules, and retry semantics implemented by Xgent.
 
 ## Security and repository visibility
 
 Treat every task script and input file as public because `agent-temp` is a public repository. Tell the user before uploading private source code, credentials, personal data, or proprietary assets.
 
-Never request, print, place in task files, or pass through a workflow the GitHub personal access token. XAgent reads the token only from its encrypted local vault.
+Never request, print, place in task files, or pass through a workflow the GitHub personal access token. Xgent reads the token only from its encrypted local vault.
 
 Configure runtime credentials and environment values in the `agent-temp` repository under **Settings → Secrets and variables → Actions**:
 
-- Create a variable named `XAGENT_CLOUD_ENV` for non-sensitive values.
-- Create a secret named `XAGENT_CLOUD_ENV` for sensitive values.
+- Create a variable named `XGENT_CLOUD_ENV` for non-sensitive values.
+- Create a secret named `XGENT_CLOUD_ENV` for sensitive values.
 - Store one `NAME=value` entry per line.
 - When the same name exists in both, the secret value takes precedence.
 

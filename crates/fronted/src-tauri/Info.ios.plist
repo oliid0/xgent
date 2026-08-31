@@ -26,6 +26,6 @@
         <true/>
     </dict>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>XAgent connects to your paired computer on the local network for WebUI control and task execution.</string>
+    <string>Xgent connects to your paired computer on the local network for WebUI control and task execution.</string>
 </dict>
 </plist>

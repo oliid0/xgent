@@ -158,7 +158,7 @@ export function HttpRequestListEditor({
                   label={t("settings.cronHttpMethod")}
                   isLabelHidden
                   value={request.method}
-                  width="var(--xagent-http-method-width)"
+                  width="var(--xgent-http-method-width)"
                   size="sm"
                   options={HTTP_METHODS.map((method) => ({
                     value: method,

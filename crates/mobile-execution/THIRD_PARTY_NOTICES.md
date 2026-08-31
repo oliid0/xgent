@@ -1,6 +1,6 @@
 # Third-party notices
 
-The XAgent mobile execution plugin is MIT licensed. It uses these independent
+The Xgent mobile execution plugin is MIT licensed. It uses these independent
 components without changing their upstream license terms.
 
 ## a-Shell-derived iOS execution
@@ -39,7 +39,7 @@ runtimes are not included.
 - Upstream commit: `a89b3732ec6ae1db674510f0843b2f3db54d0a2f`
 - Upstream: `https://github.com/termux/proot/tree/a89b3732ec6ae1db674510f0843b2f3db54d0a2f`
 - License: GPL-2.0-or-later
-- Included as a separate executable, not linked into XAgent.
+- Included as a separate executable, not linked into Xgent.
 - Corresponding source and reproduction details: `PROOT_SOURCE.md`.
 
 ## PRoot native dependencies (Android only)

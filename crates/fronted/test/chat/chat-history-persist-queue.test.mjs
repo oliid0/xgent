@@ -113,7 +113,7 @@ test("overlapping persists serialize and the later one diffs against the committ
   const second = chatHistory.persistConversationState(persistParams(previousRef, stateC));
   await flush();
 
-  // 第二个持久化必须等第一个完成（含基线推进），不得并发发起 IPC。
+  
   assert.equal(recorder.calls.length, 1);
   assert.equal(recorder.calls[0].cmd, "chat_history_append_segment");
   assert.equal(recorder.calls[0].args.input.segment.segmentId, "seg-1");
@@ -121,7 +121,7 @@ test("overlapping persists serialize and the later one diffs against the committ
   recorder.calls[0].deferred.resolve(summaryFor(10));
   await flush();
 
-  // C 对比的是已落盘的 B（同形状 → active upsert），而不是过期的 A（会误判为 append）。
+  
   assert.equal(recorder.calls.length, 2);
   assert.equal(recorder.calls[1].cmd, "chat_history_upsert_active_segment");
   assert.equal(recorder.calls[1].args.input.segment.messageCount, 3);

@@ -1,7 +1,7 @@
 // Pure model helpers for the workspace file tree panel.
 //
 // Shared by every frontend runtime; only relative, npm-package, or
-// @xagent/runtime imports are allowed here. Platform differences are resolved
+// @xgent/runtime imports are allowed here. Platform differences are resolved
 // at runtime (see FILE_TREE_HAS_OS_INTEGRATION).
 
 import type { WorkspaceActivityEventPayload } from "../../../lib/workspace-activity/types";

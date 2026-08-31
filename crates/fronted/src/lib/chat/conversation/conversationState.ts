@@ -36,8 +36,7 @@ export type StoredSummaryMessage = {
     coversThroughMessageId: string;
     coveredMessageCount: number;
     basedOnSummaryMessageId?: string;
-    // 确定性机器维护的文件账本，跨 checkpoint 继承。可选字段；旧数据缺失即视为无账本。
-    // 存储在 summaryMeta（对 Rust 的 summary_json 不透明），不占摘要正文的字符预算。
+
     fileLedger?: FileLedger;
     generatedBy: {
       providerId: string;
@@ -57,9 +56,6 @@ export type StoredSummaryMessage = {
   };
 };
 
-// 压缩引擎在 checkpoint assistant 消息上附带的统计扩展：
-// conversationTokens 是被压缩会话的规模；summarizer 是压缩请求自身的用量。
-// 两者必须分开——checkpoint 消息本身的 usage 恒为零，避免污染 token 观测。
 export type CompactionCheckpointStats = {
   conversationTokens?: number;
   summarizer?: {
@@ -105,8 +101,7 @@ export type RenderSummaryCard = {
     model: string;
     promptVersion?: string;
   };
-  // 压缩落定时的权威上下文占用快照（stats.contextTokensAfter）；用量环
-  // 扫描优先读它，避免退回摘要正文估算（与 WebUI checkpoint 行同口径）。
+
   contextUsageTokens?: number;
   timestamp: number;
   collapsed: boolean;
@@ -181,8 +176,8 @@ function createEmptySegment(index: number, timestamp = Date.now()): StoredContex
 export function isCompactionAssistantMessage(message: Message): message is AssistantMessage {
   return (
     message.role === "assistant" &&
-    (message.api === "xagent-compaction" ||
-      (message.provider === "xagent" && message.model === "summary"))
+    (message.api === "xgent-compaction" ||
+      (message.provider === "xgent" && message.model === "summary"))
   );
 }
 
@@ -306,7 +301,7 @@ function hashFnv1a32(input: string) {
 }
 
 export function getHistoryMessageContentHash(message: Message): string {
-  const parts = ["xagent-history-ref-v1"];
+  const parts = ["xgent-history-ref-v1"];
   appendHashPart(parts, message.role);
   if (message.role === "user") {
     appendHashPart(parts, getUserMessageDisplayText(message as Message & Record<string, unknown>));
@@ -442,9 +437,7 @@ function appendCompactionCheckpointToSegments(
     nextSegmentIndex,
     checkpointMessage.timestamp ?? Date.now(),
   );
-  // 累积账本：上一 checkpoint 的账本（seed）+ 本段被折叠消息的新增操作。在消息级合并，
-  // 以保住本段内“先改后读”等真实时序。previousSegment.summary 恰是上一次压缩产生的
-  // checkpoint（basedOn 亦指向它），其 fileLedger 覆盖 previousSegment.messages 之前的历史。
+
   const fileLedger = mergeMessagesIntoLedger(
     previousSegment.summary?.summaryMeta.fileLedger,
     previousSegment.messages,
@@ -520,7 +513,7 @@ function createSummaryFromAssistant(
         providerId:
           typeof assistant.provider === "string" && assistant.provider.trim()
             ? assistant.provider.trim()
-            : "xagent",
+            : "xgent",
         model:
           typeof assistant.model === "string" && assistant.model.trim()
             ? assistant.model.trim()

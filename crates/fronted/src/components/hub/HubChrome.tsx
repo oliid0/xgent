@@ -73,12 +73,12 @@ export function HubHeader(props: {
         padding={4}
         style={{
           position: "relative",
-          zIndex: "var(--xagent-z-hub-header)",
+          zIndex: "var(--xgent-z-hub-header)",
           paddingBlockStart: "max(var(--spacing-4), env(safe-area-inset-top, 0px))",
           paddingInlineStart: "max(var(--spacing-4), env(safe-area-inset-left, 0px))",
           paddingInlineEnd: "max(var(--spacing-4), env(safe-area-inset-right, 0px))",
-          backgroundColor: "var(--xagent-hub-header-background)",
-          backdropFilter: "blur(var(--xagent-hub-header-blur))",
+          backgroundColor: "var(--xgent-hub-header-background)",
+          backdropFilter: "blur(var(--xgent-hub-header-blur))",
         }}
       >
         {showSidebarButton ? (
@@ -98,26 +98,26 @@ export function HubHeader(props: {
         ) : null}
         <HStack
           width="100%"
-          maxWidth="var(--xagent-hub-content-max-width)"
+          maxWidth="var(--xgent-hub-content-max-width)"
           gap={4}
           vAlign="center"
           style={{
             marginInline: "auto",
-            paddingInlineStart: showSidebarButton ? "var(--xagent-hub-sidebar-reserve)" : 0,
+            paddingInlineStart: showSidebarButton ? "var(--xgent-hub-sidebar-reserve)" : 0,
           }}
         >
           {onClose ? (
             <HStack
               aria-hidden="true"
-              width="var(--xagent-hub-header-control-size)"
-              height="var(--xagent-hub-header-control-size)"
+              width="var(--xgent-hub-header-control-size)"
+              height="var(--xgent-hub-header-control-size)"
             />
           ) : (
             <Center
               data-hub-tone={tone}
               style={{
-                width: "var(--xagent-hub-header-icon-size)",
-                height: "var(--xagent-hub-header-icon-size)",
+                width: "var(--xgent-hub-header-icon-size)",
+                height: "var(--xgent-hub-header-icon-size)",
                 flexShrink: 0,
                 color: "var(--color-icon-primary)",
                 backgroundColor: iconBackground,

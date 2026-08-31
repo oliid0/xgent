@@ -84,7 +84,7 @@ export type UiMessage = {
   attachments?: PendingUploadedFile[];
   rounds?: UiRound[];
   messageIndex?: number;
-  /** 助手分组：本组最后一条 assistant 消息的时间戳（回复时间） */
+
   timestamp?: number;
 };
 

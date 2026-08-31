@@ -1,6 +1,6 @@
-# XAgent 文档
+# Xgent 文档
 
-XAgent 使用一份 React/Tauri 源码覆盖 Web、桌面和移动端。Rust/Tauri 负责本地持久化与系统能力；桌面端可在 `28367` 端口托管同一份 WebUI，移动端还可以选择本机执行或 GitHub Actions 云端执行。
+Xgent 使用一份 React/Tauri 源码覆盖 Web、桌面和移动端。Rust/Tauri 负责本地持久化与系统能力；桌面端可在 `28367` 端口托管同一份 WebUI，移动端还可以选择本机执行或 GitHub Actions 云端执行。
 
 ## 架构
 

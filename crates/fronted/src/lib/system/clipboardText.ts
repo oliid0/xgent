@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 
 /**
  * Read the desktop clipboard outside the webview first. WKWebView may show a

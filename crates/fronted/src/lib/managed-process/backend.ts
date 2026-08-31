@@ -1,7 +1,7 @@
 // Shared transport for the ManagedProcess store: Tauri uses direct invoke;
 // paired browsers use the same calls and events through local-access RPC/SSE.
 
-import { invoke, listen } from "@xagent/runtime";
+import { invoke, listen } from "@xgent/runtime";
 
 import type { ManagedProcessBackend, ManagedProcessRecord, ManagedProcessState } from "./types";
 

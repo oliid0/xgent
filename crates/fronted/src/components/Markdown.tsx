@@ -9,7 +9,7 @@ import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
-import { openUrl } from "@xagent/runtime";
+import { openUrl } from "@xgent/runtime";
 import {
   type ComponentProps,
   cloneElement,
@@ -113,7 +113,7 @@ function MarkdownImageFallback(props: MarkdownImageFallbackProps) {
       as="span"
       type="inherit"
       className="text-xs italic text-muted-foreground"
-      data-xagent-markdown-image="text-fallback"
+      data-xgent-markdown-image="text-fallback"
       aria-label={label}
     >
       {label}

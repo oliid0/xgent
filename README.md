@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/images/banner.webp" alt="XAgent" />
+  <img src="docs/images/banner.webp" alt="Xgent" />
 </p>
 
-<h1 align="center">XAgent</h1>
+<h1 align="center">Xgent</h1>
 
 <p align="center">
   <strong>Your Local-First AI Agent Desktop</strong><br/>
@@ -64,20 +64,20 @@
 ## 🤝 Come Build With Us!
 
 <p align="center">
-  <img src="docs/images/QQ.png" alt="XAgent QQ Group" width="300" />
+  <img src="docs/images/QQ.png" alt="Xgent QQ Group" width="300" />
 </p>
 
 <p align="center">
-  Scan the QR code to join our QQ group and help drive XAgent development!<br/>
+  Scan the QR code to join our QQ group and help drive Xgent development!<br/>
   (Why a QQ group? It just packs a few more features than a WeChat group~)
 </p>
 
 
 ---
 
-## Why XAgent?
+## Why Xgent?
 
-XAgent is a **local-first** AI agent for Web, desktop, and mobile. It deeply integrates large language model reasoning with local system tools, so the AI can genuinely operate files, run commands, use MCP servers and Skills, and manage scheduled tasks.
+Xgent is a **local-first** AI agent for Web, desktop, and mobile. It deeply integrates large language model reasoning with local system tools, so the AI can genuinely operate files, run commands, use MCP servers and Skills, and manage scheduled tasks.
 
 - **An agent that actually gets things done** — beyond chat: read and write files, make precise edits, run Bash, and supervise long-running processes
 - **A fully open ecosystem** — bridge any external tool via the MCP protocol, and load Skills packages on demand
@@ -138,12 +138,12 @@ Installers are automatically built and published by GitHub Actions — grab the 
 
 ### macOS
 
-Download the DMG matching your chip from [Releases](https://github.com/oliid0/xgent/releases/latest), open it, and drag XAgent into Applications:
+Download the DMG matching your chip from [Releases](https://github.com/oliid0/xgent/releases/latest), open it, and drag Xgent into Applications:
 
-- Apple Silicon (M-series): `XAgent-<version>-macOS-aarch64.dmg`
-- Intel: `XAgent-<version>-macOS-x64.dmg`
+- Apple Silicon (M-series): `Xgent-<version>-macOS-aarch64.dmg`
+- Intel: `Xgent-<version>-macOS-x64.dmg`
 
-> For a release without Developer ID signing, macOS blocks the first direct launch. Control-click XAgent in Finder and choose Open, or allow it under System Settings → Privacy & Security. Once approved, the app runs normally. Signed and notarized releases do not need this override.
+> For a release without Developer ID signing, macOS blocks the first direct launch. Control-click Xgent in Finder and choose Open, or allow it under System Settings → Privacy & Security. Once approved, the app runs normally. Signed and notarized releases do not need this override.
 
 ### Windows
 
@@ -151,9 +151,9 @@ Pick an installation method from [Releases](https://github.com/oliid0/xgent/rele
 
 | Method | File | Best for |
 |---|---|---|
-| Setup wizard | `XAgent-<version>-Windows-x64-Setup.exe` | Most users |
-| MSI package | `XAgent-<version>-Windows-x64.msi` | Enterprise distribution / silent install |
-| Portable | `XAgent-<version>-Windows-x64-portable.zip` | No install — unzip and run |
+| Setup wizard | `Xgent-<version>-Windows-x64-Setup.exe` | Most users |
+| MSI package | `Xgent-<version>-Windows-x64.msi` | Enterprise distribution / silent install |
+| Portable | `Xgent-<version>-Windows-x64-portable.zip` | No install — unzip and run |
 
 ### Linux
 
@@ -162,8 +162,8 @@ Choose by distribution from [Releases](https://github.com/oliid0/xgent/releases/
 | Format | Distributions | Install |
 |---|---|---|
 | AppImage | Any distribution | `chmod +x`, then run directly |
-| DEB | Debian / Ubuntu family | `sudo dpkg -i XAgent-<version>-Linux-x86_64.deb` |
-| RPM | Fedora / openSUSE family | `sudo rpm -i XAgent-<version>-Linux-x86_64.rpm` |
+| DEB | Debian / Ubuntu family | `sudo dpkg -i Xgent-<version>-Linux-x86_64.deb` |
+| RPM | Fedora / openSUSE family | `sudo rpm -i Xgent-<version>-Linux-x86_64.rpm` |
 
 ### Use the WebUI on a Local Network
 
@@ -189,7 +189,7 @@ Expand the Development Guide below for the full set of Make commands.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                  Shared XAgent React Source                  │
+│                  Shared Xgent React Source                  │
 │              Web · Desktop · Android · iOS                   │
 └────────────────────────────┬─────────────────────────────────┘
                              │ Tauri IPC or paired HTTP/SSE
@@ -240,7 +240,7 @@ Expand the Development Guide below for the full set of Make commands.
 <summary><b>Project Structure</b> — directory tree</summary>
 
 ```
-XAgent/
+Xgent/
 ├── crates/
 │   ├── fronted/                  # Unified Web/PC/mobile application
 │   │   ├── src/                  # React frontend
@@ -323,7 +323,7 @@ Before submitting a PR, make sure all of the following checks pass (they match t
 
 ## 👥 Contributors
 
-Thanks to everyone who has contributed to XAgent!
+Thanks to everyone who has contributed to Xgent!
 
 <a href="https://github.com/oliid0/xgent/graphs/contributors">
   <img src="docs/images/contributors.svg" alt="Contributors" />

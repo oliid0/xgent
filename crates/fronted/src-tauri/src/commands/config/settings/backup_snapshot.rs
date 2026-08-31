@@ -1,20 +1,15 @@
-// 配置备份快照：采集 / 校验 / 应用。
-//
-// 载体刻意选用「按域聚合的 JSON」而非整库 SQL dump —— 后者会把不可信的 SQL
-// 交给 SQLite 执行（ATTACH DATABASE 可在任意可写路径落文件），且大库导入时
-// 逐行 INSERT 会冻结 UI。本模块只搬运 providers / mcp / system 三张表的
-// payload，skills 启用态由前端提供（它存在 webview localStorage，后端不可见）。
 
-/// 载体格式版本。manifest 结构本身变更时递增。
+//
+
+
+
+
+
 pub(crate) const BACKUP_PROTOCOL_VERSION: u32 = 1;
-/// 配置域 schema 版本。各域 payload 结构不兼容演进时递增。
 pub(crate) const BACKUP_SCHEMA_VERSION: u32 = 1;
 
-/// 导出文件中内联 manifest 的字段名。
 const BACKUP_MANIFEST_FIELD: &str = "_manifest";
-/// 导入文件大小上限，防止畸形/超大输入耗尽内存。
 const BACKUP_MAX_FILE_BYTES: u64 = 16 * 1024 * 1024;
-/// 本地备份保留份数。
 const BACKUP_RETENTION: usize = 10;
 const BACKUP_DIRNAME: &str = "backups";
 
@@ -24,15 +19,12 @@ pub struct BackupManifest {
     pub protocol_version: u32,
     pub schema_version: u32,
     pub snapshot_id: String,
-    /// RFC3339 UTC 时间戳。
-    pub created_at: String,
+        pub created_at: String,
     pub device_name: String,
     pub app_version: String,
-    /// 预留：首版恒为 "none"，后续引入端到端加密时改此字段而不破坏格式。
-    #[serde(default = "default_backup_encryption")]
+        #[serde(default = "default_backup_encryption")]
     pub encryption: String,
-    /// 各域条目数，仅供 UI 展示摘要，不参与校验。
-    #[serde(default)]
+        #[serde(default)]
     pub domains: BackupDomainCounts,
 }
 
@@ -53,7 +45,6 @@ pub struct BackupDomainCounts {
     pub skills: usize,
 }
 
-/// 一份完整的配置快照。字段全部可选：某域为空表示导出侧没有该配置。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupSnapshot {
@@ -63,12 +54,10 @@ pub struct BackupSnapshot {
     pub mcp: Option<Value>,
     #[serde(default)]
     pub system: Option<Value>,
-    /// { enabled: bool, selected: string[] }，由前端从 localStorage 提供。
-    #[serde(default)]
+        #[serde(default)]
     pub skills: Option<Value>,
 }
 
-/// 导入预览：解析并校验成功但尚未写库，供确认对话框展示。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupImportPreview {
@@ -76,14 +65,12 @@ pub struct BackupImportPreview {
     pub manifest: BackupManifest,
 }
 
-/// 导入/下载完成后的结果。skills 需回传前端写入 localStorage。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupApplyOutcome {
     pub applied: BackupDomainCounts,
     pub skills: Option<Value>,
-    /// 应用前生成的本地备份文件路径。
-    pub backup_path: Option<String>,
+        pub backup_path: Option<String>,
 }
 
 fn backup_dir() -> Result<PathBuf, String> {
@@ -108,10 +95,7 @@ fn hostname_label() -> Option<String> {
     None
 }
 
-/// manifest 的 `createdAt`：RFC3339 UTC，固定 `Z` 后缀。
-///
-/// 用 chrono（已是直接依赖）而不是自己算日历，与 `services/memory/schema.rs`
-/// 的既有做法一致。`to_rfc3339()` 会输出 `+00:00`，这里显式指定格式保持 `Z`。
+
 fn rfc3339_now() -> String {
     chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
@@ -162,11 +146,7 @@ pub(crate) fn build_backup_manifest(snapshot: &BackupSnapshot) -> BackupManifest
     }
 }
 
-/// 采集当前配置。skills 由调用方（前端）传入，后端不自行读取。
-///
-/// 注意：同步配置（WebDAV 地址/凭据）刻意存放在独立表 `backup_sync_settings`
-/// 而不在这三张表里 —— 它是设备级的，若随快照流转会让 A 机器的凭据覆盖
-/// B 机器，形成循环。
+
 pub(crate) fn collect_backup_snapshot(
     conn: &Connection,
     skills: Option<Value>,
@@ -179,8 +159,6 @@ pub(crate) fn collect_backup_snapshot(
     })
 }
 
-/// 校验 manifest 的版本兼容性。高于当前支持的版本一律拒绝，
-/// 避免把读不懂的数据当成「空配置」写入而静默清库。
 pub(crate) fn validate_backup_manifest(manifest: &BackupManifest) -> Result<(), String> {
     if manifest.protocol_version > BACKUP_PROTOCOL_VERSION {
         return Err(format!(
@@ -203,7 +181,6 @@ pub(crate) fn validate_backup_manifest(manifest: &BackupManifest) -> Result<(), 
     Ok(())
 }
 
-/// 结构校验：各域必须是预期的 JSON 形状，拒绝畸形输入。
 pub(crate) fn validate_backup_snapshot(snapshot: &BackupSnapshot) -> Result<(), String> {
     if let Some(providers) = &snapshot.providers {
         if !providers.is_array() {
@@ -238,7 +215,6 @@ pub(crate) fn validate_backup_snapshot(snapshot: &BackupSnapshot) -> Result<(), 
     Ok(())
 }
 
-/// 序列化为导出文件内容：快照 + 内联 manifest，单文件自包含。
 pub(crate) fn serialize_backup_document(
     snapshot: &BackupSnapshot,
     manifest: &BackupManifest,
@@ -257,7 +233,6 @@ pub(crate) fn serialize_backup_document(
         .map_err(|e| format!("序列化备份文件失败：{e}"))
 }
 
-/// 解析导出文件内容，返回 (快照, manifest)。已完成版本与结构校验。
 pub(crate) fn parse_backup_document(raw: &str) -> Result<(BackupSnapshot, BackupManifest), String> {
     let mut document = expect_object(
         parse_json(raw, "备份文件")?,
@@ -265,7 +240,7 @@ pub(crate) fn parse_backup_document(raw: &str) -> Result<(BackupSnapshot, Backup
     )?;
     let manifest_value = document
         .remove(BACKUP_MANIFEST_FIELD)
-        .ok_or_else(|| "备份文件缺少元信息，可能不是 XAgent 导出的配置".to_string())?;
+        .ok_or_else(|| "备份文件缺少元信息，可能不是 Xgent 导出的配置".to_string())?;
     let manifest = serde_json::from_value::<BackupManifest>(manifest_value)
         .map_err(|e| format!("解析备份元信息失败：{e}"))?;
     validate_backup_manifest(&manifest)?;
@@ -276,7 +251,6 @@ pub(crate) fn parse_backup_document(raw: &str) -> Result<(BackupSnapshot, Backup
     Ok((snapshot, manifest))
 }
 
-/// 读取备份文件，带大小上限（不可信输入）。
 pub(crate) fn read_backup_file(path: &Path) -> Result<String, String> {
     let metadata = fs::metadata(path).map_err(|e| format!("读取备份文件失败：{e}"))?;
     if metadata.len() > BACKUP_MAX_FILE_BYTES {
@@ -288,9 +262,8 @@ pub(crate) fn read_backup_file(path: &Path) -> Result<String, String> {
     fs::read_to_string(path).map_err(|e| format!("读取备份文件失败：{e}"))
 }
 
-/// 应用前把当前配置备份到 ~/.xagent/backups/，保留最近 BACKUP_RETENTION 份。
 pub(crate) fn backup_current_config(conn: &Connection) -> Result<Option<String>, String> {
-    // skills 存在前端，自动备份取不到；此处只备份后端可见的三域。
+    
     let snapshot = collect_backup_snapshot(conn, None)?;
     let manifest = build_backup_manifest(&snapshot);
     let document = serialize_backup_document(&snapshot, &manifest)?;
@@ -319,21 +292,16 @@ fn prune_backups(dir: &Path) -> Result<(), String> {
     if files.len() <= BACKUP_RETENTION {
         return Ok(());
     }
-    // 文件名内嵌毫秒时间戳，字典序即时间序。
+    
     files.sort();
     for path in files.iter().take(files.len() - BACKUP_RETENTION) {
-        // 清理失败不应阻断主流程。
+        
         let _ = fs::remove_file(path);
     }
     Ok(())
 }
 
-/// 整域覆盖写入（纯写库，不做备份、不刷代理）。
-///
-/// 各域复用既有的 `save_*`，它们各自开事务 —— 无法合并成一个跨域事务
-/// （`save_*` 都要求 `&mut Connection`，rusqlite 的 Transaction 无法嵌套）。
-/// 因此中途失败理论上会留下半套配置。防线是调用方：写库前已完成完整校验
-/// （畸形输入一行都不会写），且写库前已生成本地备份可回退。
+
 pub(crate) fn apply_backup_snapshot_to_db(
     conn: &mut Connection,
     snapshot: &BackupSnapshot,
@@ -350,9 +318,7 @@ pub(crate) fn apply_backup_snapshot_to_db(
     Ok(())
 }
 
-/// 应用一份快照：校验 → 备份当前配置 → 写库 → 刷新代理状态。
-///
-/// 返回的 skills 交由前端写回 localStorage —— 后端无法直接操作 webview 存储。
+
 pub(crate) fn apply_backup_snapshot(
     conn: &mut Connection,
     snapshot: BackupSnapshot,
@@ -363,7 +329,7 @@ pub(crate) fn apply_backup_snapshot(
 
     apply_backup_snapshot_to_db(conn, &snapshot)?;
     if snapshot.system.is_some() {
-        // 代理配置可能变化，立即刷新全局状态，避免需要重启才生效。
+        
         refresh_system_proxy_state(conn)?;
     }
 

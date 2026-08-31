@@ -118,18 +118,11 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
     return () => scrollViewport.removeEventListener("scroll", loadAtTop);
   }, [hasMoreHistory, historyItems, isHistorySwitching, onLoadEarlierHistory, scrollViewport]);
 
-  // 楼层导航：从时间线派生用户消息楼层；当前楼层由 TranscriptList 上报。
-  // 不在此处按 conversationId 重置——TranscriptList 按会话重挂载后其挂载
-  // effect 会先于本组件的 effect 执行并上报新会话锚点，这里再置 null 会把
-  // 刚上报的值清掉且被子组件的去重永久抑制。行 key 含 segmentId，跨会话
-  // 不会误匹配，等待子组件上报即可。
   const floors = useMemo(() => buildFloorEntries(historyItems), [historyItems]);
   const [activeFloorKey, setActiveFloorKey] = useState<string | null>(null);
   const transcriptNavRef = useRef<TranscriptNavHandle | null>(null);
   const handleFloorJump = useCallback(
     (rowKey: string) => {
-      // 粘底跟随激活时程序化滚动会被立即拽回底部——先按「跳入历史」语义解除
-      // 跟随，再执行跳转。
       scrollFollowHandle.breakFollow();
       transcriptNavRef.current?.scrollToRowKey(rowKey);
     },
@@ -207,7 +200,7 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
           <VStack
             width="100%"
             minHeight="100%"
-            maxWidth="var(--xagent-content-width-md)"
+            maxWidth="var(--xgent-content-width-md)"
             paddingInline={5}
             paddingBlock={4}
             className="chat-transcript-content"
@@ -303,7 +296,7 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
           style={{
             position: "absolute",
             insetInlineStart: "50%",
-            zIndex: "var(--xagent-z-chat-floating-action)",
+            zIndex: "var(--xgent-z-chat-floating-action)",
             bottom: `calc(${Math.ceil(bottomReservePx)}px + var(--spacing-4))`,
           }}
         />

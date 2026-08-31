@@ -1,4 +1,4 @@
-//! 后台安装任务：任务注册表、进度快照与 install_start 工作线程。
+
 
 use serde_json::Value;
 use std::collections::HashMap;

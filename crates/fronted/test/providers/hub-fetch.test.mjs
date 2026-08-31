@@ -3,8 +3,8 @@ import test from "node:test";
 
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
-// Hub（Skills/MCP 商店）出网适配层契约：桌面端把完整上游 URL 改写为
-// 本地反代请求，并恒带 use-system-proxy 头交由 Rust 按应用代理配置出网。
+
+
 const loader = createTsModuleLoader({
   mocks: {
     "@tauri-apps/api/core": {
@@ -27,9 +27,9 @@ test("prepareUpstreamProxyRequest 保留路径与查询串并携带三个反代�
   );
 
   assert.equal(prepared.url, "http://127.0.0.1:43110/proxy/hub/api/v1/skills?limit=24&sort=downloads");
-  assert.equal(prepared.headers["x-xagent-upstream-origin"], "https://clawhub.ai");
-  assert.equal(prepared.headers["x-xagent-proxy-token"], "test-proxy-token");
-  assert.equal(prepared.headers["x-xagent-use-system-proxy"], "1");
+  assert.equal(prepared.headers["x-xgent-upstream-origin"], "https://clawhub.ai");
+  assert.equal(prepared.headers["x-xgent-proxy-token"], "test-proxy-token");
+  assert.equal(prepared.headers["x-xgent-use-system-proxy"], "1");
 });
 
 test("prepareUpstreamProxyRequest 拒绝相对地址、非 http(s) 与内嵌凭据", async () => {
@@ -44,7 +44,7 @@ test("prepareUpstreamProxyRequest 拒绝相对地址、非 http(s) 与内嵌凭�
   );
 });
 
-test("prepareUpstreamProxyRequest 拒绝 // 开头路径（防 Url::join 改写上游主机）", async () => {
+test("prepareUpstreamProxyRequest 拒绝 
   await assert.rejects(
     () => proxy.prepareUpstreamProxyRequest("https://api.smithery.ai//servers/foo"),
     /must not begin with \/\//,
@@ -82,11 +82,11 @@ test("hubFetch 桌面端改写请求地址并合并调用方 headers", async () 
   const headers = new Headers(calls[0].init.headers);
   assert.equal(headers.get("accept"), "application/json");
   assert.equal(
-    headers.get("x-xagent-upstream-origin"),
+    headers.get("x-xgent-upstream-origin"),
     "https://registry.modelcontextprotocol.io",
   );
-  assert.equal(headers.get("x-xagent-proxy-token"), "test-proxy-token");
-  assert.equal(headers.get("x-xagent-use-system-proxy"), "1");
+  assert.equal(headers.get("x-xgent-proxy-token"), "test-proxy-token");
+  assert.equal(headers.get("x-xgent-use-system-proxy"), "1");
 });
 
 test("hubFetch 桌面端透传 init 的 method/body/signal", async () => {
@@ -141,6 +141,6 @@ test("hubFetch keeps the native proxy boundary when a browser window exists", as
   assert.equal(calls[0].url, "http://127.0.0.1:43110/proxy/hub/api/v1/skills?limit=24");
   const headers = new Headers(calls[0].init.headers);
   assert.equal(headers.get("accept"), "application/json");
-  assert.equal(headers.get("x-xagent-upstream-origin"), "https://clawhub.ai");
-  assert.equal(headers.get("x-xagent-use-system-proxy"), "1");
+  assert.equal(headers.get("x-xgent-upstream-origin"), "https://clawhub.ai");
+  assert.equal(headers.get("x-xgent-use-system-proxy"), "1");
 });

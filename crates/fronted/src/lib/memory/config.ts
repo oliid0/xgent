@@ -30,7 +30,7 @@ export const EXTRACTION_CONVERSATION_STATE_LIMIT = 128;
 /** Messages shorter than this (in graphemes) are skipped unless they answer a
  *  pending memory confirmation. */
 export const GATING_MIN_USER_TEXT_GRAPHEMES = 6;
-/** Greetings/acks longer than this still reach the LLM (e.g. "谢谢，以后默认用中文"). */
+
 export const GATING_SHORT_ACK_GRAPHEME_LIMIT = 24;
 
 /** Locale-keyed prefix lists; gating builds anchored patterns from these so

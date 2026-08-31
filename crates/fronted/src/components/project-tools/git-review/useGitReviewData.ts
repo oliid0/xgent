@@ -9,7 +9,7 @@
 // when no activity client exists (no-push environment) does a low-frequency
 // fallback poll run while the panel is active.
 //
-// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// Shared by every frontend runtime; only relative or @xgent/runtime imports
 // are allowed here.
 
 import { useCallback, useEffect, useRef, useState } from "react";

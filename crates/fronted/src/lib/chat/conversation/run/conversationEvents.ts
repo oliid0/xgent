@@ -161,9 +161,9 @@ export function createConversationEventController(
       queueEvent({
         type: "token",
         text: summary.content,
-        provider: "xagent",
+        provider: "xgent",
         model: "summary",
-        api: "xagent-compaction",
+        api: "xgent-compaction",
         conversation_id: params.conversationId,
         checkpoint: {
           summaryId: summary.id,

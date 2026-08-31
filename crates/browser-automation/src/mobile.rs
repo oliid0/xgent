@@ -16,7 +16,7 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 ) -> crate::Result<BrowserAutomation<R>> {
     #[cfg(target_os = "android")]
     let handle = api.register_android_plugin(
-        "com.ohi.xagent.browserautomation",
+        "com.ohi.xgent.browserautomation",
         "BrowserAutomationPlugin",
     )?;
     #[cfg(target_os = "ios")]

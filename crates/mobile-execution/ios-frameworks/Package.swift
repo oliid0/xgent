@@ -6,13 +6,13 @@ import PackageDescription
 // that static archive do not become dependencies of the generated Xcode app.
 // The iOS project therefore consumes this binary-only product directly.
 let package = Package(
-    name: "XAgentMobileShellFrameworks",
+    name: "XgentMobileShellFrameworks",
     platforms: [
         .iOS(.v14),
     ],
     products: [
         .library(
-            name: "XAgentMobileShellFrameworks",
+            name: "XgentMobileShellFrameworks",
             targets: [
                 "ios_system",
                 "awk",

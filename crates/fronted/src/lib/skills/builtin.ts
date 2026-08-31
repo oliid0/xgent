@@ -1,7 +1,7 @@
 const ALWAYS_ENABLED_SKILL_NAMES = [
   "skills-creator",
   "skills-installer",
-  "xagent-cloud-execution",
+  "xgent-cloud-execution",
 ] as const;
 
 const alwaysEnabledSkillNameSet = new Set<string>(ALWAYS_ENABLED_SKILL_NAMES);

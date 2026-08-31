@@ -53,7 +53,7 @@ export const EditableUserMessageBubble = memo(function EditableUserMessageBubble
   return (
     <Card
       width="100%"
-      maxWidth="min(85%, calc(var(--xagent-chat-measure) + var(--spacing-10)))"
+      maxWidth="min(85%, calc(var(--xgent-chat-measure) + var(--spacing-10)))"
       padding={3}
       variant="muted"
       className={compactedClass}

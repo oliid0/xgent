@@ -44,7 +44,7 @@ test("长上下文 beta：adaptive 模型 ctx>200K 时仅追加 context-1m，保
   assert.equal(next.headers["anthropic-beta"], CONTEXT_1M_BETA);
   assert.equal(next.headers.Authorization, "Bearer sk-relay-key");
   assert.equal(next.headers["x-api-key"], "sk-relay-key");
-  // 原 options 不被原地修改。
+  
   assert.equal(options.headers["anthropic-beta"], undefined);
 });
 
@@ -131,8 +131,8 @@ test("长上下文 beta：标准窗口/OAuth/非 anthropic api 一律不改写",
     standardWindow,
   );
 
-  // OAuth：pi-ai 注入 claude-code/oauth beta 组合，覆盖会破坏鉴权；官方 GA 后
-  // OAuth 也无需该头。
+  
+  
   const oauth = { apiKey: "sk-ant-oat01-xxx", headers: {} };
   assert.equal(
     longContext.attachAnthropicLongContextBeta(oauth, {
@@ -185,7 +185,7 @@ test("id 规范化：剥离 [1m] 后缀并与日期/@版本/大小写规则组�
   );
   assert.ok(candidates.includes("claude-sonnet-4-6"));
   assert.ok(candidates.includes("claude-sonnet-4-6-20260101"));
-  // 原始 id 始终是首选候选，命中目录后请求体仍用原始 id。
+  
   assert.equal(candidates[0], "Claude-Sonnet-4-6-20260101[1m]");
 });
 
@@ -222,7 +222,7 @@ test("有效限额：adaptive 世代保留 1M，旧世代默认钳回 200K，显
     contextWindow: 1_000_000,
     maxOutputToken: 128_000,
   });
-  // 官方 2026-04-30 起 sonnet-4/4.5 的 context-1m beta 退役，目录 1M 是历史数值。
+  
   assert.deepEqual(anthropicModels.resolveAnthropicKnownModelLimits("claude-sonnet-4-5"), {
     contextWindow: 200_000,
     maxOutputToken: 64_000,

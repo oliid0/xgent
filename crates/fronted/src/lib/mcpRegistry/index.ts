@@ -126,7 +126,6 @@ async function fetchJson(
   url: string,
   params: { fetchImpl?: typeof fetch; headers?: Record<string, string> } = {},
 ): Promise<unknown> {
-  // 默认经 hubFetch 出网（原生端走本地反代，WebUI 走已配对的同源入口）；测试注入 fetchImpl。
   const fetchImpl = params.fetchImpl ?? hubFetch;
   const response = await fetchImpl(url, {
     headers: {
@@ -135,8 +134,6 @@ async function fetchJson(
     },
   });
   if (!response.ok) {
-    // 反代/代理类失败的可行动信息在响应体里（如 502 “App proxy unavailable”），
-    // 截断回显，与 clawHub 的错误回显策略一致。typeof 兜底兼容只实现 json 的测试桩。
     const detail =
       typeof response.text === "function" ? (await response.text().catch(() => "")).trim() : "";
     throw new Error(

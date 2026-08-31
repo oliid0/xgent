@@ -1,4 +1,4 @@
-//! SkillsManager 入口：payload 动作解析与 `system_manage_skill_sync` 分发。
+
 
 use serde_json::Value;
 

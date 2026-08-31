@@ -1839,7 +1839,7 @@ mod tests {
             .unwrap_or_default()
             .as_nanos();
         let workdir = std::env::temp_dir().join(format!(
-            "xagent-upload-root-test-{}-{unique}",
+            "xgent-upload-root-test-{}-{unique}",
             std::process::id()
         ));
         fs::create_dir_all(&workdir).expect("create test workdir");
@@ -1852,8 +1852,8 @@ mod tests {
             root.display()
         );
         assert!(
-            !root.starts_with(workdir.join(".xagent")),
-            "upload root must not use workdir/.xagent: {}",
+            !root.starts_with(workdir.join(".xgent")),
+            "upload root must not use workdir/.xgent: {}",
             root.display()
         );
         assert!(root.exists(), "upload root should be created");
@@ -1937,7 +1937,7 @@ mod tests {
             .unwrap_or_default()
             .as_nanos();
         let workdir = std::env::temp_dir().join(format!(
-            "xagent-upload-multiple-test-{}-{unique}",
+            "xgent-upload-multiple-test-{}-{unique}",
             std::process::id()
         ));
         fs::create_dir_all(&workdir).expect("create test workdir");
@@ -1993,7 +1993,7 @@ mod tests {
             .unwrap_or_default()
             .as_nanos();
         let workdir = std::env::temp_dir().join(format!(
-            "xagent-upload-base64-test-{}-{unique}",
+            "xgent-upload-base64-test-{}-{unique}",
             std::process::id()
         ));
         fs::create_dir_all(&workdir).expect("create test workdir");
@@ -2078,7 +2078,7 @@ mod tests {
             .unwrap_or_default()
             .as_nanos();
         let temp_root = std::env::temp_dir().join(format!(
-            "xagent-upload-paths-test-{}-{unique}",
+            "xgent-upload-paths-test-{}-{unique}",
             std::process::id()
         ));
         let workdir = temp_root.join("workspace");

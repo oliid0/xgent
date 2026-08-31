@@ -71,7 +71,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
         paddingInlineEnd: mobileExperience ? "env(safe-area-inset-right, 0px)" : "var(--spacing-4)",
         paddingInlineStart:
           !sidebarOpen && macOsTauri
-            ? "var(--xagent-macos-titlebar-inset)"
+            ? "var(--xgent-macos-titlebar-inset)"
             : mobileExperience
               ? "env(safe-area-inset-left, 0px)"
               : "var(--spacing-4)",

@@ -19,12 +19,12 @@ function writeAssetPair(dir, name, signature) {
 }
 
 test("release updater manifest embeds generated notes and platform signatures", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "xagent-release-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "xgent-release-"));
   try {
-    writeAssetPair(dir, "XAgent-v9.9.9-macOS-aarch64.app.tar.gz", "sig-mac-arm");
-    writeAssetPair(dir, "XAgent-v9.9.9-macOS-x64.app.tar.gz", "sig-mac-x64");
-    writeAssetPair(dir, "XAgent-v9.9.9-Windows-x64-Setup.exe", "sig-win");
-    writeAssetPair(dir, "XAgent-v9.9.9-Linux-x86_64.AppImage", "sig-linux");
+    writeAssetPair(dir, "Xgent-v9.9.9-macOS-aarch64.app.tar.gz", "sig-mac-arm");
+    writeAssetPair(dir, "Xgent-v9.9.9-macOS-x64.app.tar.gz", "sig-mac-x64");
+    writeAssetPair(dir, "Xgent-v9.9.9-Windows-x64-Setup.exe", "sig-win");
+    writeAssetPair(dir, "Xgent-v9.9.9-Linux-x86_64.AppImage", "sig-linux");
 
     const notesPath = path.join(dir, "release-notes.md");
     const outputPath = path.join(dir, "latest.json");
@@ -55,7 +55,7 @@ test("release updater manifest embeds generated notes and platform signatures", 
     assert.equal(manifest.notes, "## What's Changed\n\n- Fix updater checks.");
     assert.equal(
       manifest.platforms["darwin-aarch64-app"].url,
-      "https://github.com/oliid0/xgent/releases/download/v9.9.9/XAgent-v9.9.9-macOS-aarch64.app.tar.gz",
+      "https://github.com/oliid0/xgent/releases/download/v9.9.9/Xgent-v9.9.9-macOS-aarch64.app.tar.gz",
     );
     assert.equal(manifest.platforms["darwin-aarch64-app"].signature, "sig-mac-arm");
     assert.deepEqual(
@@ -79,9 +79,9 @@ test("release updater manifest embeds generated notes and platform signatures", 
 });
 
 test("release updater manifest omits generic Linux fallback without an AppImage", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "xagent-release-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "xgent-release-"));
   try {
-    writeAssetPair(dir, "XAgent-v9.9.9-Linux-x86_64.deb", "sig-linux-deb");
+    writeAssetPair(dir, "Xgent-v9.9.9-Linux-x86_64.deb", "sig-linux-deb");
 
     const outputPath = path.join(dir, "latest.json");
     const result = spawnSync(
@@ -115,9 +115,9 @@ test("release updater manifest omits generic Linux fallback without an AppImage"
 });
 
 test("release updater manifest uses MSI for generic Windows fallback when NSIS is missing", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "xagent-release-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "xgent-release-"));
   try {
-    writeAssetPair(dir, "XAgent-v9.9.9-Windows-x64.msi", "sig-win-msi");
+    writeAssetPair(dir, "Xgent-v9.9.9-Windows-x64.msi", "sig-win-msi");
 
     const outputPath = path.join(dir, "latest.json");
     const result = spawnSync(

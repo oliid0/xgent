@@ -8,7 +8,7 @@ import { HStack, Section, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,

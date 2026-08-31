@@ -6,7 +6,7 @@ export const PROTECTION_THRESHOLD_FACTOR = 1.2;
 export const MIN_COMPACTION_INTERVAL_MS = 60_000;
 export const MIN_COMPACTION_USER_MESSAGES = 3;
 export const RECENT_COMPACTION_WINDOW_MS = 5 * 60_000;
-// 压缩后仍高于阈值的 90% 视为"低效压缩"，推动压力升级。
+
 export const INEFFECTIVE_COMPACTION_RATIO = 0.9;
 export const MAX_PRESSURE_LEVEL = 2;
 
@@ -16,11 +16,6 @@ const PRUNE_PROTECT_USER_TURNS_BY_LEVEL = [2, 2, 1] as const;
 
 export type PressureLevel = 0 | 1 | 2;
 
-/**
- * 压力升级阶梯：替代旧的 MAX_SESSION_COMPACTIONS 硬顶。连续低效压缩推高
- * level（加大 prune 力度、收紧保护阈值、给出建议性提示），但永不硬性拒绝。
- * 纯数据 + 纯转移函数，由 controller 持有并推进。
- */
 export type CompactionPressure = {
   level: PressureLevel;
   consecutiveIneffective: number;
@@ -123,13 +118,12 @@ export function decideCompaction(params: {
   modelConfig?: ProviderModelConfig;
   activeMessageCount: number;
   userMessageCount: number;
-  // 上一次 checkpoint 的时间（无则 0）；controller 传 max(段 summary 时间, 压力 lastCompactionAt)。
+
   lastCompactionAt: number;
   pressure: CompactionPressure;
   inFlight: boolean;
   now: number;
-  // 手动触发：用户明确要压，跳过阈值与冷却两个短路；disabled /
-  // no-active-messages / in-flight 硬守卫仍然生效。
+
   bypassThresholdAndCooldown?: boolean;
 }): CompactionDecision {
   const contextWindow = Math.max(0, Math.floor(params.modelConfig?.contextWindow ?? 0));
@@ -178,7 +172,6 @@ export function decideCompaction(params: {
     return { ...base, shouldCompact: false, reason: "below-threshold", threshold, thresholdMode };
   }
 
-  // 冷却窗只拦"刚压缩完又立即越阈值"的超大单轮；正常自触发已被账本重置阻断。
   if (
     !params.bypassThresholdAndCooldown &&
     params.lastCompactionAt > 0 &&

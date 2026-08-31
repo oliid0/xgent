@@ -97,7 +97,7 @@ export function MobileQuickActions(props: MobileQuickActionsProps) {
         elevation: "low",
       }}
       items={items}
-      menuWidth="var(--xagent-mobile-actions-width)"
+      menuWidth="var(--xgent-mobile-actions-width)"
       placement="below"
       alignment="end"
       hasChevron={false}

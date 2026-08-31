@@ -1,11 +1,3 @@
-// MCP 工具懒加载(ToolSearch):MCP 工具 schema 总量超过阈值时,工具仍全量注册
-// 在执行层(pi-agent-core 的 prepareToolCall 从 loop 快照查找,必须始终找得到),
-// 但**发给模型的请求**只包含已激活的 MCP 工具——未激活的经 runner 的
-// requestToolFilter 滤掉(与 provider 原生搜索"执行层可见、请求层隐藏"同机制)。
-// 模型通过 ToolSearch 检索并激活工具;直接调用未激活工具也会执行成功并自动
-// 激活(turn 层 executor wrapper),避免"调用成功但下轮看不见"的困惑。
-// 激活集按会话保存在内存(跨 turn 持久,重启后模型重新检索一次即可)。
-
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { estimateToolsTokens } from "../chat/compaction/tokenLedger";
@@ -17,18 +9,11 @@ import {
 
 export const TOOL_SEARCH_TOOL_NAME = "ToolSearch";
 
-/**
- * 懒加载阈值(估算 tokens):MCP 工具 schema 总量低于它时全量注入请求,
- * 不启用 ToolSearch——多一次检索回合的代价只在真的省下可观 context 时才值。
- */
 export const MCP_TOOL_DEFERRAL_THRESHOLD_TOKENS = 12_000;
 
-/** 单次检索返回的工具数上限;夹在 [1, MAX] 内。 */
 export const TOOL_SEARCH_MAX_RESULTS = 10;
 const TOOL_SEARCH_DEFAULT_RESULTS = 5;
 
-// 会话级激活集:跨 turn 保持(同一桌面会话进程内),会话销毁时清理。
-// 不落盘——重启后的新会话由模型按需重新 ToolSearch,成本是一次工具回合。
 const activationByConversation = new Map<string, Set<string>>();
 
 export function getMcpToolActivation(conversationId: string): Set<string> {
@@ -58,10 +43,6 @@ function normalizeQueryTerms(query: string): string[] {
     .filter(Boolean);
 }
 
-/**
- * 无依赖的轻量评分:词项对 name(×3)/serverLabel(×2)/description(×1) 的
- * 子串命中加权求和。目录只有几十到几百个工具,线性扫描足够;不引入 FTS。
- */
 function scoreEntry(entry: DeferredMcpToolEntry, terms: string[]): number {
   const name = entry.tool.name.toLowerCase();
   const description = (entry.tool.description ?? "").toLowerCase();
@@ -78,7 +59,7 @@ function scoreEntry(entry: DeferredMcpToolEntry, terms: string[]): number {
 export type ToolSearchResultDetails = {
   kind: "tool_search";
   query: string;
-  /** 本次新激活的工具名(规范调用名)。 */
+
   activated: string[];
   totalDeferred: number;
 };
@@ -95,10 +76,6 @@ function buildErrorResult(toolCall: ToolCall, text: string): ToolResultMessage {
   };
 }
 
-/**
- * 判定是否启用懒加载:估算全部 MCP 工具 schema 的 token 量与阈值比较。
- * 判定输入是"会进请求的 JSON"(与 tokenLedger 同一估算口径)。
- */
 export function shouldDeferMcpTools(
   mcpTools: readonly Tool[],
   thresholdTokens = MCP_TOOL_DEFERRAL_THRESHOLD_TOKENS,
@@ -109,7 +86,7 @@ export function shouldDeferMcpTools(
 
 export function createToolSearchTools(params: {
   conversationId: string;
-  /** 被延迟注入的 MCP 工具目录(name 为规范调用名 mcp_<server>_<tool>)。 */
+
   entries: readonly DeferredMcpToolEntry[];
 }): BuiltinToolBundle {
   const activation = getMcpToolActivation(params.conversationId);
@@ -230,7 +207,7 @@ export function createToolSearchTools(params: {
         {
           groupId: "system",
           kind: "tool_search",
-          // 只读:仅查目录并改写会话内激活集,不触碰任何外部状态。
+
           isReadOnly: true,
           displayCategory: "system",
         },
@@ -239,12 +216,6 @@ export function createToolSearchTools(params: {
   };
 }
 
-/**
- * 请求层可见性谓词:非 MCP 业务工具恒可见;MCP 业务工具需已激活。判定必须用
- * kind === "mcp"(业务工具专属),不能用裸 groupId——McpManager 也在 groupId
- * "mcp" 下,但它不进延迟目录,按 groupId 隐藏会让它从模型请求中永久消失。
- * ToolSearch 自身恒可见。runner 每轮请求都会重新评估,激活后下一轮立即生效。
- */
 export function buildMcpRequestToolFilter(params: {
   conversationId: string;
   metadataByName: Map<string, BuiltinToolMetadata>;

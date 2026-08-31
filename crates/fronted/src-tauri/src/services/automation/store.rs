@@ -144,10 +144,7 @@ impl AutomationStore {
         scheduler.run_now(task_id)
     }
 
-    /// 翻转单个 cron 任务的启用状态（托盘菜单开关用）。走唯一的
-    /// `cron_apply` 写路径（revision CAS）；读-改窗口内被并发修改时
-    /// 用新快照重试一次，仍冲突则报错。返回翻转后的启用状态。
-    pub fn toggle_cron_task_enabled(&self, task_id: &str) -> Result<bool, String> {
+                pub fn toggle_cron_task_enabled(&self, task_id: &str) -> Result<bool, String> {
         for _ in 0..2 {
             let cron = self.snapshot()?.cron;
             let task = cron

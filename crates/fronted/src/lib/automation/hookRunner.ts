@@ -3,7 +3,7 @@
 // a cancellable native scope. Desktop and mobile provide platform-specific
 // executors behind the same invoke contract.
 
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 
 import { createUuid } from "../shared/id";
 import type { HookDef, HookEvent, HookType } from "./types";
@@ -61,10 +61,10 @@ async function runHook(
       timeout_ms: hook.timeoutMs ?? null,
       scope_id: scopeId,
       context: {
-        XAGENT_HOOK_EVENT: event,
-        XAGENT_HOOK_NAME: hook.name,
-        XAGENT_CONVERSATION_ID: conversationId,
-        XAGENT_WORKDIR: workdir?.trim() ?? "",
+        XGENT_HOOK_EVENT: event,
+        XGENT_HOOK_NAME: hook.name,
+        XGENT_CONVERSATION_ID: conversationId,
+        XGENT_WORKDIR: workdir?.trim() ?? "",
       },
     });
     return;

@@ -3,11 +3,11 @@ import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextM
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Text as AstryxText } from "@astryxdesign/core/Text";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { openUrl } from "@xagent/runtime";
+import { openUrl } from "@xgent/runtime";
 // GitReview history view: commit graph list (virtualized), commit detail pane
 // and the history context menus.
 //
-// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// Shared by every frontend runtime; only relative or @xgent/runtime imports
 // are allowed here.
 
 import {
@@ -1089,7 +1089,7 @@ export function GitReviewHistoryView(props: {
                         <ContextMenu
                           items={historyFileMenuItems(row.commit, row.file)}
                           label={row.file.path}
-                          menuWidth="var(--xagent-git-context-menu-width)"
+                          menuWidth="var(--xgent-git-context-menu-width)"
                           size="sm"
                         >
                           <AstryxButton
@@ -1153,7 +1153,7 @@ export function GitReviewHistoryView(props: {
                       <ContextMenu
                         items={historyCommitMenuItems(commit)}
                         label={commit.subject || commit.shortSha}
-                        menuWidth="var(--xagent-git-context-menu-width)"
+                        menuWidth="var(--xgent-git-context-menu-width)"
                         size="sm"
                       >
                         <AstryxButton

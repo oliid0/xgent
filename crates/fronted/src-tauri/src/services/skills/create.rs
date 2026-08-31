@@ -1,4 +1,4 @@
-//! 创建 Skill：SKILL.md 模板渲染与 create payload 编排。
+
 
 use serde_json::Value;
 use std::fs;
@@ -53,7 +53,7 @@ pub(crate) fn create_skill_from_payload(
     let body = object_string(payload, "body");
     let conflict = normalize_conflict(object_string(payload, "conflict"), "fail")?;
 
-    let tmp = TempDir::new("xagent-skill-create")?;
+    let tmp = TempDir::new("xgent-skill-create")?;
     let source_dir = tmp.path().join(&name);
     fs::create_dir_all(&source_dir)
         .map_err(|e| format!("Failed to create staged Skill directory: {e}"))?;

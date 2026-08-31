@@ -43,7 +43,7 @@ class ErrorBoundaryInner extends Component<ErrorBoundaryInnerProps, ErrorBoundar
     }
     return (
       <Center width="100%" height="100%" padding={8}>
-        <VStack gap={4} width="100%" maxWidth="var(--xagent-content-width-md)">
+        <VStack gap={4} width="100%" maxWidth="var(--xgent-content-width-md)">
           <Banner
             status="error"
             title={this.props.labels.title}

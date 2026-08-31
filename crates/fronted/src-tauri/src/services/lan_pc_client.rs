@@ -13,11 +13,11 @@ use tauri::Emitter;
 use crate::services::cloud_secret_vault::CloudSecretVault;
 
 const SESSION_STORE_KEY: &[u8] = b"lan-pc.session.v1";
-const SESSION_COOKIE_NAME: &str = "xagent_session";
-const CSRF_HEADER: &str = "x-xagent-csrf";
+const SESSION_COOKIE_NAME: &str = "xgent_session";
+const CSRF_HEADER: &str = "x-xgent-csrf";
 const DEFAULT_LAN_PORT: u16 = 28_367;
-pub const LAN_PC_RELAY_EVENT: &str = "xagent:lan-pc-event";
-pub const LAN_PC_SESSION_CHANGED_EVENT: &str = "xagent:lan-pc-session-changed";
+pub const LAN_PC_RELAY_EVENT: &str = "xgent:lan-pc-event";
+pub const LAN_PC_SESSION_CHANGED_EVENT: &str = "xgent:lan-pc-session-changed";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

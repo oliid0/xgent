@@ -68,14 +68,9 @@ function resolveKnownModel(
 }
 
 // ---------------------------------------------------------------------------
-// Anthropic 目录回查与自定义模型思考能力推断
+
 // ---------------------------------------------------------------------------
 
-// 规范化候选回查目录（见 anthropicModels.ts）；漏检后模型丢失
-// compat.forceAdaptiveThinking，思考配置退化成 4.7+/Fable 世代已删除的
-// budget_tokens（官方端点 400、中转剥字段后档位彻底失效）。命中则继承完整
-// 目录元数据；默认保留用户配置的原始 id，官方/Vertex 等端点的 [1m] 后缀则在
-// wire 层剥离，避免把目录装饰符发送给只接受 canonical id 的服务。
 function resolveKnownAnthropicModel(
   modelId: string,
   baseUrl: string,
@@ -92,16 +87,12 @@ function resolveKnownAnthropicModel(
   } as Model<any>;
 }
 
-// 目录彻底未命中的三方改名 id（如 claude-4.6-sonnet）退回 ee8dba1 之前的 id 启发式：
-// 能识别为 adaptive 家族的补上 compat.forceAdaptiveThinking 与 xhigh/max 档位声明，
-// pi-ai stream() 与本地 thinkingLevels.ts 都以模型对象上的这两个字段为准。
 export function deriveAnthropicThinkingOverridesForCustomModel(modelId: string): {
   compat?: Model<"anthropic-messages">["compat"];
   thinkingLevelMap?: Model<"anthropic-messages">["thinkingLevelMap"];
 } {
   if (!isAnthropicAdaptiveModelId(modelId)) return {};
 
-  // xhigh：Opus 4.7+ 与 Claude 5 家族；Mythos Preview / Opus 4.6 / Sonnet 4.6 只到 max。
   const supportsXHigh = anthropicModelSupportsXHigh(modelId);
   return {
     compat: { forceAdaptiveThinking: true },
@@ -337,7 +328,7 @@ export function createModelFromConfig(
         )
       : configuredContextWindow;
   const maxTokens = modelConfig?.maxOutputToken ?? defaults.maxOutputToken;
-  // 用户自填单价优先于目录定价：中转/自定义模型的实际计费经常与官方目录不同。
+
   const configuredCost = modelConfig?.cost;
   const zeroCost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   const customModelCost = configuredCost ?? zeroCost;
@@ -427,9 +418,7 @@ export function createModelFromConfig(
       api,
       provider: "openai",
       baseUrl: normalizedBaseUrl,
-      // 目录之外的自定义模型无法从 id 可靠判断推理能力，与 anthropic/gemini
-      // 自定义分支一致按可推理处理（标准档位，xhigh/max 仍需目录 opt-in），
-      // 是否真的下发思考由用户的开关决定。
+
       ...resolveModelThinkingFields(thinking, isXaiTarget ? XAI_THINKING_LEVEL_MAP : undefined),
       input: resolveCodexModelInput(api, modelId),
       cost: customModelCost,

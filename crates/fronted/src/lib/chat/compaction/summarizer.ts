@@ -73,8 +73,6 @@ function isTransientError(error: unknown) {
 }
 
 function buildSummarizerRuntime(providerId: ProviderId, runtime: ProviderRuntimeConfig) {
-  // Codex 用 medium 档做摘要，避免长思考挤占摘要预算；不能用 minimal——
-  // GPT-5.6 世代已砍掉该档且 pi-ai 目录未标 null，clamp 不会兜底，API 会直接 400。
   return providerId === "codex" ? { ...runtime, reasoning: "medium" as const } : runtime;
 }
 
@@ -122,7 +120,7 @@ async function requestSummary(params: SummarizerRequest): Promise<AssistantMessa
         role: "assistant",
         content: [{ type: "text", text: params.repair.invalidOutput }],
         timestamp: Date.now() + 1,
-        api: "xagent-compaction",
+        api: "xgent-compaction",
         provider: params.providerId,
         model: params.model,
         stopReason: "stop",
@@ -150,10 +148,6 @@ async function requestSummary(params: SummarizerRequest): Promise<AssistantMessa
   });
 }
 
-/**
- * 摘要请求 + 恢复流水线：溢出 → 收缩 payload 重试（一次）；瞬态错误 → 退避重试
- * （一次）；校验失败 → 把无效输出回喂做一次 self-repair。所有 attempt 间检查 abort。
- */
 export async function summarizeConversation(params: {
   providerId: ProviderId;
   model: string;

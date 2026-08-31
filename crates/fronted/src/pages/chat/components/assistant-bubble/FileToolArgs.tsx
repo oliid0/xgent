@@ -50,7 +50,7 @@ function StreamingTextPreviewSurface({
               language="text"
               size="sm"
               width="100%"
-              maxHeight="var(--xagent-tool-preview-max-height)"
+              maxHeight="var(--xgent-tool-preview-max-height)"
               container="section"
               isWrapped
             />

@@ -1,4 +1,4 @@
-package com.ohi.xagent.mobileexecution
+package com.ohi.xgent.mobileexecution
 
 import android.Manifest
 import android.app.Activity

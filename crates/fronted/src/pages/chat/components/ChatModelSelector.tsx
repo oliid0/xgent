@@ -98,7 +98,7 @@ function ModelSelectorContent(props: {
   );
 
   return (
-    <VStack gap={3} width="var(--xagent-model-selector-width)">
+    <VStack gap={3} width="var(--xgent-model-selector-width)">
       <TextInput
         label={t("chat.searchModel")}
         isLabelHidden
@@ -142,7 +142,7 @@ function ModelSelectorContent(props: {
         <VStack
           gap={1}
           isScrollable
-          style={{ maxHeight: "var(--xagent-model-selector-list-height)" }}
+          style={{ maxHeight: "var(--xgent-model-selector-list-height)" }}
         >
           <CollapsibleGroup type="multiple" hasDividers>
             {filteredGroups.map((group) => {

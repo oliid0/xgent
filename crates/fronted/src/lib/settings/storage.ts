@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { type Locale, normalizeLocale } from "../../i18n/config";
 
 import {
@@ -27,7 +27,7 @@ import {
 } from "./index";
 import { buildSshSettingsPatch } from "./sshPatch";
 
-const LOCAL_UI_SETTINGS_STORAGE_KEY = "xagent.ui-settings.v1";
+const LOCAL_UI_SETTINGS_STORAGE_KEY = "xgent.ui-settings.v1";
 
 type PersistedSettingsResponse = {
   providers?: unknown | null;

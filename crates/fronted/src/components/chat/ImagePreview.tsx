@@ -201,7 +201,7 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
               <Center
                 onWheel={handleWheel}
                 style={{
-                  minHeight: "var(--xagent-image-preview-stage-min-height)",
+                  minHeight: "var(--xgent-image-preview-stage-min-height)",
                   flex: 1,
                   overflow: "auto",
                   backgroundColor: "var(--color-background-inverted)",
@@ -216,7 +216,7 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
                   draggable={false}
                   style={{
                     maxWidth: "100%",
-                    maxHeight: "var(--xagent-image-preview-max-height)",
+                    maxHeight: "var(--xgent-image-preview-max-height)",
                     objectFit: "contain",
                     transform: `scale(${zoom})`,
                     transformOrigin: "center",
@@ -249,7 +249,7 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
                 max={3}
                 step={0.1}
                 valueDisplay="text"
-                width="min(40vw, var(--xagent-image-preview-slider-max-width))"
+                width="min(40vw, var(--xgent-image-preview-slider-max-width))"
                 formatValue={(value) => `${Math.round(value * 100)}%`}
                 onChange={(value: number) => setZoom(value)}
               />

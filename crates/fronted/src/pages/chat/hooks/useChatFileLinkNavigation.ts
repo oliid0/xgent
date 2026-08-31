@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { useCallback } from "react";
 import type { WorkspaceCodeEditorOpenRequest } from "../../../components/workspace-editor/WorkspaceCodeEditorOverlay";
 import type { WorkspaceFilePreviewOpenRequest } from "../../../components/workspace-editor/WorkspaceFilePreviewOverlay";

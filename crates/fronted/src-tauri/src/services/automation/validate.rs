@@ -15,11 +15,11 @@ pub const MIN_HOOK_TIMEOUT_MS: u64 = 1_000;
 pub const MAX_HOOK_TIMEOUT_MS: u64 = 10 * 60_000;
 
 /// Cron timeout bounds, per task kind.
-///
+
 /// bash/http: the upper bound mirrors the shell runner's hard cap
 /// (MAX_SHELL_TIMEOUT_MS): a larger stored value would silently be cut to ten
 /// minutes for bash tasks, so validation refuses to store one.
-///
+
 /// prompt: runs execute in the frontend webview, never through the shell
 /// runner, so the shell cap does not apply. The value only bounds the
 /// execution lease, which is stamped at claim time (see store.rs).

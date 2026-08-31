@@ -1,4 +1,4 @@
-import { invoke, isTauriRuntime } from "@xagent/runtime";
+import { invoke, isTauriRuntime } from "@xgent/runtime";
 
 import { isNativeMobileRuntime } from "../runtimePlatform";
 

@@ -37,11 +37,9 @@ type ContextBuildOptions = {
   includeUploadedFilesMetadata?: boolean;
 };
 
-// 所有副作用经由注入的 sinks：ChatPage 提供完整实现，子代理提供轻量子集。
-// 全部可选——缺省即 no-op，controller 自身保持纯净可测。
 export type CompactionSinks = {
   applyState?: (state: ConversationViewState) => void;
-  // 运行中换底：apply + 清空 live transcript（压缩/prune 结果落地后旧流式内容已过期）。
+
   applyStateMidRun?: (state: ConversationViewState) => void;
   publishStatus?: (status: CompactionStatus) => void;
   setLiveToolStatus?: (status: string | null, isCompaction?: boolean) => void;
@@ -58,12 +56,11 @@ export type CompactionSinks = {
 };
 
 export type CompactionPreSendBinding = {
-  // 待 checkpoint 的基线状态（不含本轮待发送的用户消息）。
   baseState: ConversationViewState;
   pendingUserText: string;
   composerText?: string;
   uploadedFiles?: PendingUploadedFile[];
-  // 压缩/prune 后如何得到要 apply 的最终状态（如重新附加待发送的用户消息）。
+
   composeAppliedState: (state: ConversationViewState) => ConversationViewState;
 };
 
@@ -92,10 +89,9 @@ export type CompactionTurnBinding = {
 export type CompactionDuringRunResult = {
   context: Context | null;
   shouldDisableProtection: boolean;
-  // 本次调用的显式结果通道。statusPhase 是控制器生命周期字段（跨操作残留、
-  // 决策拒绝时不 publish），任何调用方都不得用它反推单次调用的结果。
+
   outcome: "compacted" | "skipped" | "failed";
-  // skipped 时携带决策拒绝原因；无 binding 的空跑没有决策、不带 reason。
+
   reason?: CompactionDecisionReason;
 };
 
@@ -109,15 +105,6 @@ export type ManualContextUsageSnapshot = {
   fixedTokens?: number;
 };
 
-/**
- * 压缩生命周期的旁观者，供轨迹埋点订阅。
- *
- * 挂在控制器上而不是各调用点：压缩有 pre-send / mid-stream / post-tool / manual
- * 四个触发路径，逐个调用点埋会漏，也会随新增触发方式失配。控制器内部只有
- * `publishRunning` 一个开始点和 `settleCompleted`/`settleFailed`/`settleAborted` 三个终点。
- *
- * 刻意不引用轨迹类型：控制器不该知道消费者是谁。
- */
 export type CompactionObserver = {
   onStart: (info: { trigger: CompactionTrigger; tokensBefore?: number }) => void;
   onEnd: (info: {
@@ -164,11 +151,6 @@ type RollbackSnapshot = {
   persistOnRollback?: boolean;
 };
 
-/**
- * 每会话压缩状态机。跨轮持有压力阶梯与 token 账本；每轮 bindTurn 注入
- * 运行时/sinks/取消链。单飞由 inFlight 保证；回滚快照是实例字段，所有
- * 终态都经 settle*() 收敛（状态发布与 bridge 状态清理成对，不再散落）。
- */
 export class CompactionController {
   private pressure = createCompactionPressure();
   private readonly ledger = new TokenLedger();
@@ -178,21 +160,16 @@ export class CompactionController {
   private statusPhase: CompactionStatus["phase"] = "idle";
   private turnMeta = { activeMessageCount: 0, userMessageCount: 0, lastSummaryAt: 0 };
   private observer: CompactionObserver | null = null;
-  /** 本次压缩开始时的上下文 token，供结束事件补齐前后对比。 */
+
   private observedTokensBefore: number | undefined;
-  /** checkpoint 落地后的上下文 token；只有成功路径才有值。 */
+
   private observedTokensAfter: number | undefined;
-  /** 已发出 onStart、尚未闭合的压缩触发类型。 */
+
   private observedTrigger: CompactionTrigger | undefined;
-  /** 区分同 trigger 的前后两次异步压缩，拒绝旧 summarizer 的晚到结果。 */
+
   private observedOperationId: number | undefined;
   private nextObservedOperationId = 0;
 
-  /**
-   * 订阅压缩生命周期。
-   *
-   * @param observer - 旁观者；传 null 取消订阅。
-   */
   setObserver(observer: CompactionObserver | null) {
     this.observer = observer;
   }
@@ -226,15 +203,10 @@ export class CompactionController {
     if (persisted === false || persisted === null) {
       throw new Error("compaction checkpoint persistence failed");
     }
-    // 持久化钩子返回的盖章状态（带重建的 revision）优先；布尔/undefined 回落入参。
+
     return typeof persisted === "object" ? persisted : state;
   }
 
-  // 压缩成功后的统一收尾（pre-send 与 during-run 共用同一顺序不变量）：
-  // checkpoint 上下文估值 → 写回 summary stats → 持久化屏障 → 回滚快照失效 →
-  // apply 落地 → completed 终态 → checkpoint 入队。tools 必须与真实请求同参，
-  // 否则 contextTokensAfter 系统性少算工具重量；fixedTokens 用持久化的动态
-  // 开销校准估值（undefined 时 deriveContextTokens 内部回退 system+tools 估算）。
   private async finalizeCheckpoint(params: {
     binding: CompactionTurnBinding;
     trigger: CompactionTrigger;
@@ -244,7 +216,7 @@ export class CompactionController {
     buildOptions: ContextBuildOptions;
     fixedTokens?: number;
     operationId: number;
-    // 在 persist 屏障之后、completed 终态之前同步执行的状态落地钩子。
+
     apply: (checkpointState: ConversationViewState) => void;
   }): Promise<{ checkpointState: ConversationViewState; checkpointTokens: number }> {
     this.assertObservedOperation(params.operationId);
@@ -264,12 +236,11 @@ export class CompactionController {
     this.assertObservedOperation(params.operationId);
     this.rollbackSnapshot = null;
     params.apply(checkpointState);
-    // settleCompleted 读它，所以必须在其之前落定。
+
     this.observedTokensAfter = checkpointTokens;
     this.settleCompleted(params.trigger, params.newSegmentIndex, params.operationId);
     params.binding.sinks.queueCheckpoint?.(checkpointState, checkpointTokens);
-    // 放在最后:checkpoint 上下文估值仍需按压缩前的注入状态计算,通知只影响
-    // 下一轮 planTurn 的走向。
+
     params.binding.sinks.onCompacted?.();
     return { checkpointState, checkpointTokens };
   }
@@ -297,8 +268,6 @@ export class CompactionController {
       : undefined;
   }
 
-  // O(1)：账本读数 + 流式增量估算 + 纯决策，无状态构建、无序列化。
-  // pendingTokenUnits 由调用方按流式 delta 用 estimateTextTokenUnits 累加。
   shouldProtectMidStream(pendingTokenUnits: number): boolean {
     if (!this.binding || this.inFlight) return false;
     return this.decide("protection", this.ledger.totalWithPendingTokens(pendingTokenUnits))
@@ -375,7 +344,6 @@ export class CompactionController {
         complete: binding.complete,
       });
 
-      // apply 在 finalizeCheckpoint 内同步执行，appliedState 在其返回前必已赋值。
       let appliedState!: ConversationViewState;
       await this.finalizeCheckpoint({
         binding,
@@ -387,9 +355,7 @@ export class CompactionController {
         operationId,
         apply: (checkpointState) => {
           appliedState = presend.composeAppliedState(checkpointState);
-          // compose 走 appendMessagesToConversation 会把刚盖上的 revision 清掉。
-          // 追加只发生在内存，DB 仍停在 checkpoint 持久化那一刻，CAS 令牌依旧
-          // 指向当前库版本，补回；下一次成功 persist 会重新盖章。
+
           const revision = checkpointState.transcript.revision;
           if (revision && !appliedState.transcript.revision) {
             appliedState = {
@@ -440,7 +406,7 @@ export class CompactionController {
     tools?: Context["tools"];
     includeAbortedMessages?: boolean;
     includeUploadedFilesMetadata?: boolean;
-    // manual 触发透传给决策：跳过阈值/冷却，硬守卫不受影响。
+
     bypassThresholdAndCooldown?: boolean;
     manualContextUsage?: ManualContextUsageSnapshot;
   }): Promise<CompactionDuringRunResult> {
@@ -448,7 +414,7 @@ export class CompactionController {
     if (!binding) {
       return { context: null, shouldDisableProtection: false, outcome: "skipped" };
     }
-    // 覆盖"mid-stream abort 后、summarizer 启动前"用户恰好点停止的间隙。
+
     if (binding.cancellation.userStop.signal.aborted) {
       throw createCompactionAbortError();
     }
@@ -473,9 +439,7 @@ export class CompactionController {
 
     let workingState = params.state;
     let pruned: PruneConversationResult | null = null;
-    // manual（空闲触发）不做前置 prune：prune 是运行中泄压手段，空闲路径没有
-    // 后续 persist 兜底，落地未持久化的剪枝状态会造成内存/磁盘分叉；同时保证
-    // 执行路径与探针（同样不 prune）对同一状态做决策，消除两者分歧。
+
     if (params.trigger !== "manual" && shouldPruneBeforeCompaction(this.pressure, now)) {
       const attempt = pruneConversationState(workingState, resolvePruneOptions(this.pressure));
       if (attempt.applied) {
@@ -489,10 +453,10 @@ export class CompactionController {
         ? params.budgetContext
         : binding.buildPreparedContext(workingState, params.tools, buildOptions);
     const manualFixedTokens = params.manualContextUsage?.fixedTokens;
-    // rebase 内部校验 fixedTokens（非法/undefined 回退估算），无需在调用点分叉。
+
     this.ledger.rebase(budgetContext, { fixedTokens: manualFixedTokens });
     this.updateTurnMeta(workingState);
-    // manual 是空闲时的从容压缩，走 optimization 口径；运行中触发保持 protection。
+
     const intent: CompactionIntent = params.trigger === "manual" ? "optimization" : "protection";
     const totalTokens =
       positiveTokenCount(params.manualContextUsage?.totalTokens) ?? this.ledger.total();
@@ -685,7 +649,6 @@ export class CompactionController {
     return { ...decision, shouldCompact: false, reason: "below-manual-threshold" };
   }
 
-  // 用户中止后的统一善后：有快照则回滚（恢复状态/输入框/可选持久化）并返回 true。
   async handleTurnAbort(): Promise<boolean> {
     const binding = this.binding;
     const snapshot = this.rollbackSnapshot;
@@ -875,7 +838,6 @@ export class CompactionController {
     this.observedTokensAfter = undefined;
   }
 
-  /** 旁观者是诊断通道，它抛错绝不能把压缩这条主路径带崩。 */
   private notifyObserver(run: () => void) {
     try {
       run();

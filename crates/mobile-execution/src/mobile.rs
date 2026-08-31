@@ -15,7 +15,7 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 ) -> crate::Result<MobileExecution<R>> {
     #[cfg(target_os = "android")]
     let handle = api.register_android_plugin(
-        "com.ohi.xagent.mobileexecution",
+        "com.ohi.xgent.mobileexecution",
         "MobileExecutionPlugin",
     )?;
     #[cfg(target_os = "ios")]

@@ -5,7 +5,7 @@
 | 层 | 路径 | 职责 |
 |---|---|---|
 | builtin source | `crates/fronted/src-tauri/prompt/skills/<skill-name>` | 内置 skills 源文件。 |
-| runtime root | `~/.xagent/skills` | 用户运行时 skills 根目录。 |
+| runtime root | `~/.xgent/skills` | 用户运行时 skills 根目录。 |
 | Rust service | `src-tauri/src/services/skills/*` | seed builtin、list/read/manage/install/create/validate/package/ClawHub。写侧由进程级 `skills_write_guard()` 串行化；安装走 stage-then-swap，读者永远看不到半成品。 |
 | Frontend lib | `src/lib/skills/*` | discover skills、build prompt、ClawHub client、install status。 |
 | Tool | `src/lib/tools/skillTools.ts` | `SkillsManager`。 |

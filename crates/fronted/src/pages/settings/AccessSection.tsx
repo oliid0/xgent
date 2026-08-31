@@ -13,7 +13,7 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { invoke, isBrowserRuntime, listen } from "@xagent/runtime";
+import { invoke, isBrowserRuntime, listen } from "@xgent/runtime";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
@@ -143,7 +143,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
         : /Android/i.test(navigator.userAgent)
           ? "Android"
           : "Mobile";
-    return `XAgent ${platform}`;
+    return `Xgent ${platform}`;
   });
   const [githubToken, setGithubToken] = useState("");
   const [cloudDetailsOpen, setCloudDetailsOpen] = useState(

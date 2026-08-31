@@ -22,8 +22,8 @@ const UPLOADED_READABLE_FILE_KINDS = new Set<string>([
   "archive",
 ]);
 
-const DISPLAY_CONTENT_FIELD = "xagentDisplayContent";
-const ATTACHMENTS_FIELD = "xagentAttachments";
+const DISPLAY_CONTENT_FIELD = "xgentDisplayContent";
+const ATTACHMENTS_FIELD = "xgentAttachments";
 
 function createUserMessageId() {
   return `user-${createUuid()}`;

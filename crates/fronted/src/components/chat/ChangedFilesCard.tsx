@@ -148,7 +148,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard({
           style={
             summary.files.length > MAX_VISIBLE_FILES
               ? {
-                  maxHeight: "var(--xagent-changed-files-list-max-height)",
+                  maxHeight: "var(--xgent-changed-files-list-max-height)",
                   overflowY: "auto",
                   overscrollBehavior: "contain",
                 }

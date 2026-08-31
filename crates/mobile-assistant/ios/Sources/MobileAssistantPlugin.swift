@@ -393,7 +393,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             let format = input.outputFormat(forBus: 0)
             guard format.sampleRate > 0 else {
                 throw NSError(
-                    domain: "XAgentMobileAssistant",
+                    domain: "XgentMobileAssistant",
                     code: 1,
                     userInfo: [NSLocalizedDescriptionKey: "The microphone returned an invalid audio format"]
                 )

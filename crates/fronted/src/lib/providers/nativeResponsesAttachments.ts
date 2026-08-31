@@ -1,5 +1,5 @@
 import type { Api, Context, Model } from "@earendil-works/pi-ai";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 
 import {
   getUserMessageAttachments,
@@ -205,8 +205,6 @@ async function readNativeAttachment(params: {
   workdir: string;
   file: PendingUploadedFile;
 }): Promise<NativeAttachmentCommandResponse> {
-  // 附件读取只走导入时返回的绝对路径；旧版本仅持久化 workdir 相对路径的
-  // 附件不再兼容，直接走各 adapter 的 Read-fallback 分支。
   const absolutePath =
     typeof params.file.absolutePath === "string" ? params.file.absolutePath.trim() : "";
   if (!absolutePath) {

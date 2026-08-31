@@ -541,8 +541,8 @@ mod tests {
 
     #[test]
     fn v1_database_gains_selected_model_column_via_v2_migration() {
-        // 复现存量库场景：完整的 v1 schema（无 selected_model_json）且
-        // user_version 已到 1——版本门禁必须由 v2 迁移补齐新列。
+        
+        
         let v1 = Connection::open_in_memory().expect("open v1 in-memory chat history database");
         v1.execute_batch(
             "
@@ -2223,8 +2223,8 @@ mod tests {
         )
         .expect_err("window construction failure should roll back replace");
 
-        // 轨迹截断点统计在构造窗口前逐段解析消息，坏分段此刻最先暴露
-        // （旧流程要到 locate 才报英文格式；两条路径都在写库前失败，回滚等价）。
+        
+        
         assert!(error.contains("解析历史分段 seg-0 失败"));
         let after_record = get_record_by_id(&conn, "conv-replace").expect("reload source");
         let after_segments = load_segments(&conn, "conv-replace").expect("reload source segments");
@@ -2334,8 +2334,8 @@ mod tests {
 
     #[test]
     fn branch_fails_when_anchor_reply_not_persisted() {
-        // persist-lag 竞态：done 事件先于落盘，锚点用户消息已写入但助手回复
-        // 还没有——此时分支必须报可重试错误，而不是静默复制出缺回复的前缀。
+        
+        
         let mut conn = open_test_db().expect("open test db");
         let u1 = branch_user_message("u1", "第一问", 1_000);
         let a1 = branch_assistant_message("a1", "第一答", 1_001);
@@ -2530,7 +2530,7 @@ mod tests {
 
     #[test]
     fn branch_segments_cut_in_later_segment_midway() {
-        // 锚点轮次的助手回复跨过分段边界：更早分段整段复制，切点段裁剪。
+        
         let u1 = branch_user_message("u1", "第一问", 1_000);
         let a1 = branch_assistant_message("a1", "第一答", 1_001);
         let u2 = branch_user_message("u2", "第二问", 1_002);

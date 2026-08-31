@@ -9,7 +9,7 @@
     /* Bundler mode */
     "moduleResolution": "bundler",
     "paths": {
-      "@xagent/runtime": ["./src/runtime/index.ts"],
+      "@xgent/runtime": ["./src/runtime/index.ts"],
       "@/*": ["./src/*"]
     },
     "allowImportingTsExtensions": true,

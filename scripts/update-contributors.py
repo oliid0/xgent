@@ -49,7 +49,7 @@ def fetch_avatar(avatar_url):
         return None
     separator = "&" if "?" in avatar_url else "?"
     url = f"{avatar_url}{separator}s={AVATAR_FETCH_SIZE}"
-    request = urllib.request.Request(url, headers={"User-Agent": "xagent-contributors-chart"})
+    request = urllib.request.Request(url, headers={"User-Agent": "xgent-contributors-chart"})
     for attempt in range(FETCH_ATTEMPTS):
         try:
             with urllib.request.urlopen(request, timeout=FETCH_TIMEOUT) as response:

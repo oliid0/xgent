@@ -1,11 +1,11 @@
 # PRoot corresponding source
 
 The Android APK bundles PRoot as a separate executable invoked through
-`ProcessBuilder`. XAgent itself remains MIT licensed; PRoot remains licensed
+`ProcessBuilder`. Xgent itself remains MIT licensed; PRoot remains licensed
 under GPL-2.0-or-later.
 
 - Packaged source identity: recorded at build time in
-  `xagent-proot-manifest.json`
+  `xgent-proot-manifest.json`
 - Primary binary source: the current `proot`, `libtalloc`, and
   `libandroid-shmem` packages from the official Termux stable package index
 - Source fallback: the current version declared by the official Termux PRoot
@@ -15,7 +15,7 @@ under GPL-2.0-or-later.
 
 The script resolves the newest version and SHA-256 digest from Termux's signed
 repository metadata for every APK ABI. It packages the official executable,
-unbundled loader, and both required shared libraries together. XAgent points
+unbundled loader, and both required shared libraries together. Xgent points
 `PROOT_LOADER` and `LD_LIBRARY_PATH` at its extracted native-library directory,
 so no `/data/data/com.termux` runtime path is required. If the official package
 index is unavailable, the script resolves the current upstream recipe version,

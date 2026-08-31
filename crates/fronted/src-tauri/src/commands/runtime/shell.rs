@@ -108,12 +108,12 @@ fn build_mobile_ssh_command(
         .filter(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
         .take(96)
         .collect();
-    let temp_root = format!("$PWD/.xagent-tmp/ssh-{}", safe_run_id);
+    let temp_root = format!("$PWD/.xgent-tmp/ssh-{}", safe_run_id);
     let temp_dir = format!("\"{temp_root}\"");
     let key_path = format!("\"{temp_root}/key\"");
     let askpass_path = format!("\"{temp_root}/askpass\"");
-    let known_hosts_dir = "\"$PWD/.xagent-ssh\"";
-    let known_hosts = "\"$PWD/.xagent-ssh/known_hosts\"";
+    let known_hosts_dir = "\"$PWD/.xgent-ssh\"";
+    let known_hosts = "\"$PWD/.xgent-ssh/known_hosts\"";
     let mut setup = vec![
         "umask 077".to_string(),
         format!("mkdir -p {temp_dir} {known_hosts_dir}"),
@@ -337,7 +337,7 @@ pub(crate) async fn run_mobile_shell(
         .map_err(|error| error.to_string())?;
     if let Some(error) = lan_fallback_error {
         let notice = format!(
-            "LAN computer was unavailable, so XAgent used the mobile shell instead: {error}"
+            "LAN computer was unavailable, so Xgent used the mobile shell instead: {error}"
         );
         response.stderr = if response.stderr.trim().is_empty() {
             notice

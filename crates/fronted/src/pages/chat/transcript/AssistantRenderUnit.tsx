@@ -51,7 +51,7 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
       sender="assistant"
       density="compact"
       className="group/assistant"
-      style={compacted ? { opacity: "var(--xagent-opacity-compacted)" } : undefined}
+      style={compacted ? { opacity: "var(--xgent-opacity-compacted)" } : undefined}
     >
       {hasCards ? (
         <VStack gap={2} width="100%">
@@ -105,7 +105,7 @@ export const AssistantRenderUnit = memo(function AssistantRenderUnit(
     <VStack
       width="100%"
       className="group/assistant"
-      style={row.compacted ? { opacity: "var(--xagent-opacity-compacted)" } : undefined}
+      style={row.compacted ? { opacity: "var(--xgent-opacity-compacted)" } : undefined}
     >
       <AssistantBubbleUnit
         row={row}

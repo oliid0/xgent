@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- XAgent's paired WebUI is deliberately served over HTTP on private LAN
+    <!-- Xgent's paired WebUI is deliberately served over HTTP on private LAN
          address literals (for example 192.168.x.x:28367). Android network
          security config cannot express RFC1918 CIDR ranges, so transport
          authorization is enforced by the pairing token and Rust host policy. -->

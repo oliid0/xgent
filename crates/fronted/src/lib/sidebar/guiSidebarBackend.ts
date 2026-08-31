@@ -2,7 +2,7 @@
 // IPC surface and the single CHAT_HISTORY_SYNC_EVENT subscription. This file
 // is NOT mirrored — it is the desktop end's platform boundary.
 
-import { listen } from "@xagent/runtime";
+import { listen } from "@xgent/runtime";
 import type { ChatHistorySummary } from "../chat/history/chatHistory";
 import {
   deleteChatHistory,

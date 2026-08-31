@@ -1,18 +1,17 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 
 import type { ProviderId } from "../settings";
 import { readHeaderValue } from "./customHeaders";
 
-export const XAGENT_PROXY_TOKEN_HEADER = "x-xagent-proxy-token";
-export const XAGENT_UPSTREAM_ORIGIN_HEADER = "x-xagent-upstream-origin";
-export const XAGENT_UPSTREAM_URL_HEADER = "x-xagent-upstream-url";
-export const XAGENT_UPSTREAM_USER_AGENT_HEADER = "x-xagent-upstream-user-agent";
-export const XAGENT_UPSTREAM_CONTENT_TYPE_HEADER = "x-xagent-upstream-content-type";
-export const XAGENT_OAUTH_ACCOUNT_ID_HEADER = "x-xagent-oauth-account-id";
-export const XAGENT_PROVIDER_CONFIG_ID_HEADER = "x-xagent-provider-config-id";
-// 布尔标记头：声明该请求经系统代理出网。代理地址/凭据只存于桌面 Rust 侧，
-// 由本地反代按此头选择带代理的 client（x-xagent-* 头不会转发给上游）。
-export const XAGENT_USE_SYSTEM_PROXY_HEADER = "x-xagent-use-system-proxy";
+export const XGENT_PROXY_TOKEN_HEADER = "x-xgent-proxy-token";
+export const XGENT_UPSTREAM_ORIGIN_HEADER = "x-xgent-upstream-origin";
+export const XGENT_UPSTREAM_URL_HEADER = "x-xgent-upstream-url";
+export const XGENT_UPSTREAM_USER_AGENT_HEADER = "x-xgent-upstream-user-agent";
+export const XGENT_UPSTREAM_CONTENT_TYPE_HEADER = "x-xgent-upstream-content-type";
+export const XGENT_OAUTH_ACCOUNT_ID_HEADER = "x-xgent-oauth-account-id";
+export const XGENT_PROVIDER_CONFIG_ID_HEADER = "x-xgent-provider-config-id";
+
+export const XGENT_USE_SYSTEM_PROXY_HEADER = "x-xgent-use-system-proxy";
 
 type ProxyServerInfo = {
   baseUrl: string;
@@ -30,8 +29,8 @@ export function buildUpstreamHeaderOverrideHeaders(
   const userAgent = readHeaderValue(headers, "user-agent");
   const contentType = readHeaderValue(headers, "content-type");
   return {
-    ...(userAgent !== undefined ? { [XAGENT_UPSTREAM_USER_AGENT_HEADER]: userAgent } : {}),
-    ...(contentType !== undefined ? { [XAGENT_UPSTREAM_CONTENT_TYPE_HEADER]: contentType } : {}),
+    ...(userAgent !== undefined ? { [XGENT_UPSTREAM_USER_AGENT_HEADER]: userAgent } : {}),
+    ...(contentType !== undefined ? { [XGENT_UPSTREAM_CONTENT_TYPE_HEADER]: contentType } : {}),
   };
 }
 
@@ -87,7 +86,6 @@ async function getProxyServerInfo(): Promise<ProxyServerInfo> {
   return proxyServerInfoPromise;
 }
 
-/** 各代理入口共用的 URL 安全校验：绝对地址 + http(s) + 禁内嵌凭据。 */
 function parseAbsoluteHttpUrl(rawUrl: string, label: string): URL {
   let parsed: URL;
   try {
@@ -178,34 +176,26 @@ export type PreparedUpstreamProxyRequest = {
   headers: Record<string, string>;
 };
 
-/** 本地反代的路径段仅用于区分链路（Rust 侧不校验取值），hub = 商店类出网。 */
 const HUB_PROXY_ROUTE = "hub";
 
-/**
- * 把任意完整上游 URL 改写为经本地反代的请求：路径与查询原样保留，
- * origin 移入 upstream-origin 头。恒带 use-system-proxy —— 反代按应用代理
- * 配置出网（未启用=直连，配置异常 502 fail fast，绝不静默降级为直连）。
- */
 export async function prepareUpstreamProxyRequest(
   targetUrl: string,
 ): Promise<PreparedUpstreamProxyRequest> {
   const parsed = parseAbsoluteHttpUrl(targetUrl, "Upstream URL");
-  // “//” 开头的 pathname 会被 Rust 侧 Url::join 当作 scheme-relative 引用
-  // 改写上游主机，必须拒绝（Rust build_target_url 另有同款后盾）。
+
   if (parsed.pathname.startsWith("//")) {
     throw new Error("Upstream URL path must not begin with //");
   }
 
   const proxyServerInfo = await getProxyServerInfo();
-  // 根路径映射为空串：/proxy/hub/ 不匹配任何反代路由（{*rest} 要求非空），
-  // /proxy/hub 才会被 build_target_url 还原成上游的 “/”。
+
   const pathname = parsed.pathname === "/" ? "" : parsed.pathname;
   return {
     url: `${proxyServerInfo.baseUrl}/proxy/${HUB_PROXY_ROUTE}${pathname}${parsed.search}`,
     headers: {
-      [XAGENT_UPSTREAM_ORIGIN_HEADER]: parsed.origin,
-      [XAGENT_PROXY_TOKEN_HEADER]: proxyServerInfo.token,
-      [XAGENT_USE_SYSTEM_PROXY_HEADER]: "1",
+      [XGENT_UPSTREAM_ORIGIN_HEADER]: parsed.origin,
+      [XGENT_PROXY_TOKEN_HEADER]: proxyServerInfo.token,
+      [XGENT_USE_SYSTEM_PROXY_HEADER]: "1",
     },
   };
 }
@@ -234,15 +224,15 @@ export async function prepareProxyRequest(
     headers: {
       ...headers,
       ...buildUpstreamHeaderOverrideHeaders(headers),
-      [XAGENT_UPSTREAM_ORIGIN_HEADER]: upstreamOrigin,
-      ...(upstreamUrl ? { [XAGENT_UPSTREAM_URL_HEADER]: upstreamUrl } : {}),
-      [XAGENT_PROXY_TOKEN_HEADER]: proxyServerInfo.token,
-      ...(options?.useSystemProxy ? { [XAGENT_USE_SYSTEM_PROXY_HEADER]: "1" } : {}),
+      [XGENT_UPSTREAM_ORIGIN_HEADER]: upstreamOrigin,
+      ...(upstreamUrl ? { [XGENT_UPSTREAM_URL_HEADER]: upstreamUrl } : {}),
+      [XGENT_PROXY_TOKEN_HEADER]: proxyServerInfo.token,
+      ...(options?.useSystemProxy ? { [XGENT_USE_SYSTEM_PROXY_HEADER]: "1" } : {}),
       ...(options?.oauthAccountId?.trim()
-        ? { [XAGENT_OAUTH_ACCOUNT_ID_HEADER]: options.oauthAccountId.trim() }
+        ? { [XGENT_OAUTH_ACCOUNT_ID_HEADER]: options.oauthAccountId.trim() }
         : {}),
       ...(options?.providerConfigId?.trim()
-        ? { [XAGENT_PROVIDER_CONFIG_ID_HEADER]: options.providerConfigId.trim() }
+        ? { [XGENT_PROVIDER_CONFIG_ID_HEADER]: options.providerConfigId.trim() }
         : {}),
     },
   };

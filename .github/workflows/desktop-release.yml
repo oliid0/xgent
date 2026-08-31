@@ -1,4 +1,4 @@
-name: XAgent Release
+name: Xgent Release
 
 on:
   push:
@@ -120,9 +120,9 @@ jobs:
       - release-metadata
       - release-preflight
     env:
-      XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
-      XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
-      XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+      XGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
+      XGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
+      XGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
       SIGNED_RELEASE: ${{ needs.release-metadata.outputs.signed_release }}
     strategy:
       fail-fast: false
@@ -147,7 +147,7 @@ jobs:
 
       - name: Prepare release version config
         working-directory: crates/fronted
-        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
 
       - name: Install pnpm
         run: npm install -g pnpm@10.32.1
@@ -173,7 +173,7 @@ jobs:
           set -euo pipefail
           test -n "$APPLE_CERTIFICATE_P12_BASE64"
           test -n "$APPLE_CERTIFICATE_PASSWORD"
-          KEYCHAIN_PATH="$RUNNER_TEMP/xagent-release.keychain-db"
+          KEYCHAIN_PATH="$RUNNER_TEMP/xgent-release.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
           CERT_PATH="$RUNNER_TEMP/developer-id-application.p12"
           printf '%s' "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > "$CERT_PATH"
@@ -204,7 +204,7 @@ jobs:
           test -n "$APPLE_ID"
           test -n "$APPLE_TEAM_ID"
           test -n "$APPLE_APP_SPECIFIC_PASSWORD"
-          xcrun notarytool store-credentials xagent-notary \
+          xcrun notarytool store-credentials xgent-notary \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
@@ -216,8 +216,8 @@ jobs:
           DESKTOP_MACOS_TARGET: ${{ matrix.target }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          XAGENT_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
-          XAGENT_UPDATE_REPOSITORY: ${{ github.repository }}
+          XGENT_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+          XGENT_UPDATE_REPOSITORY: ${{ github.repository }}
         run: make desktop-build-macos-release
 
       - name: Build unsigned macOS packages
@@ -226,26 +226,26 @@ jobs:
         env:
           APPLE_SIGNING_IDENTITY: "-"
           DESKTOP_MACOS_TARGET: ${{ matrix.target }}
-        run: pnpm tauri build --config src-tauri/tauri.macos.conf.json --config "$XAGENT_TAURI_VERSION_CONFIG" --target "$DESKTOP_MACOS_TARGET"
+        run: pnpm tauri build --config src-tauri/tauri.macos.conf.json --config "$XGENT_TAURI_VERSION_CONFIG" --target "$DESKTOP_MACOS_TARGET"
 
       - name: Stage macOS artifact
         run: |
           set -euo pipefail
           mkdir -p dist
-          dmg_path="$(find "target/${{ matrix.target }}/release/bundle/dmg" -maxdepth 1 -name 'XAgent_*.dmg' -print -quit)"
+          dmg_path="$(find "target/${{ matrix.target }}/release/bundle/dmg" -maxdepth 1 -name 'Xgent_*.dmg' -print -quit)"
           updater_path="$(find "target/${{ matrix.target }}/release/bundle/macos" -maxdepth 1 -name '*.app.tar.gz' -print -quit)"
           test -n "$dmg_path"
-          cp "$dmg_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-macOS-${{ matrix.suffix }}.dmg"
+          cp "$dmg_path" "dist/Xgent-${XGENT_RELEASE_TAG}-macOS-${{ matrix.suffix }}.dmg"
           if [ "$SIGNED_RELEASE" = true ]; then
             test -n "$updater_path"
             test -f "$updater_path.sig"
-            cp "$updater_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-macOS-${{ matrix.suffix }}.app.tar.gz"
-            cp "$updater_path.sig" "dist/XAgent-${XAGENT_RELEASE_TAG}-macOS-${{ matrix.suffix }}.app.tar.gz.sig"
+            cp "$updater_path" "dist/Xgent-${XGENT_RELEASE_TAG}-macOS-${{ matrix.suffix }}.app.tar.gz"
+            cp "$updater_path.sig" "dist/Xgent-${XGENT_RELEASE_TAG}-macOS-${{ matrix.suffix }}.app.tar.gz.sig"
           fi
 
       - uses: actions/upload-artifact@v7
         with:
-          name: xagent-macos-${{ matrix.suffix }}
+          name: xgent-macos-${{ matrix.suffix }}
           path: dist/*
           if-no-files-found: error
 
@@ -256,9 +256,9 @@ jobs:
       - release-metadata
       - release-preflight
     env:
-      XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
-      XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
-      XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+      XGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
+      XGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
+      XGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
       SIGNED_RELEASE: ${{ needs.release-metadata.outputs.signed_release }}
     steps:
       - uses: actions/checkout@v6
@@ -272,7 +272,7 @@ jobs:
       - name: Prepare release version config
         shell: bash
         working-directory: crates/fronted
-        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json --tauri-platform windows
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json --tauri-platform windows
 
       - name: Install pnpm
         run: npm install -g pnpm@10.32.1
@@ -294,15 +294,15 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          XAGENT_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
-          XAGENT_UPDATE_REPOSITORY: ${{ github.repository }}
-        run: pnpm tauri build --config src-tauri/tauri.windows.release.conf.json --config "$XAGENT_TAURI_VERSION_CONFIG" --target x86_64-pc-windows-msvc
+          XGENT_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+          XGENT_UPDATE_REPOSITORY: ${{ github.repository }}
+        run: pnpm tauri build --config src-tauri/tauri.windows.release.conf.json --config "$XGENT_TAURI_VERSION_CONFIG" --target x86_64-pc-windows-msvc
 
       - name: Build unsigned Windows packages
         if: env.SIGNED_RELEASE != 'true'
         working-directory: crates/fronted
         shell: bash
-        run: pnpm tauri build --config src-tauri/tauri.windows.conf.json --config "$XAGENT_TAURI_VERSION_CONFIG" --target x86_64-pc-windows-msvc
+        run: pnpm tauri build --config src-tauri/tauri.windows.conf.json --config "$XGENT_TAURI_VERSION_CONFIG" --target x86_64-pc-windows-msvc
 
       - name: Stage Windows artifacts
         shell: bash
@@ -311,28 +311,28 @@ jobs:
           mkdir -p dist
           msi_path="$(find target crates/fronted/src-tauri/target -type f -name '*.msi' -path '*bundle*' -print -quit 2>/dev/null || true)"
           exe_path="$(find target crates/fronted/src-tauri/target -type f -name '*.exe' -path '*bundle*' -print -quit 2>/dev/null || true)"
-          portable_exe_path="$(find target crates/fronted/src-tauri/target -type f -name 'xagent.exe' -path '*/release/*' ! -path '*bundle*' -print -quit 2>/dev/null || true)"
+          portable_exe_path="$(find target crates/fronted/src-tauri/target -type f -name 'xgent.exe' -path '*/release/*' ! -path '*bundle*' -print -quit 2>/dev/null || true)"
           test -n "$msi_path"
           test -n "$exe_path"
           test -n "$portable_exe_path"
-          cp "$msi_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-Windows-x64.msi"
-          cp "$exe_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-Windows-x64-Setup.exe"
+          cp "$msi_path" "dist/Xgent-${XGENT_RELEASE_TAG}-Windows-x64.msi"
+          cp "$exe_path" "dist/Xgent-${XGENT_RELEASE_TAG}-Windows-x64-Setup.exe"
           if [ "$SIGNED_RELEASE" = true ]; then
             test -f "$msi_path.sig"
             test -f "$exe_path.sig"
-            cp "$msi_path.sig" "dist/XAgent-${XAGENT_RELEASE_TAG}-Windows-x64.msi.sig"
-            cp "$exe_path.sig" "dist/XAgent-${XAGENT_RELEASE_TAG}-Windows-x64-Setup.exe.sig"
+            cp "$msi_path.sig" "dist/Xgent-${XGENT_RELEASE_TAG}-Windows-x64.msi.sig"
+            cp "$exe_path.sig" "dist/Xgent-${XGENT_RELEASE_TAG}-Windows-x64-Setup.exe.sig"
           fi
-          mkdir -p dist/portable/XAgent
-          cp "$portable_exe_path" dist/portable/XAgent/XAgent.exe
-          portable_zip="dist/XAgent-${XAGENT_RELEASE_TAG}-Windows-x64-portable.zip"
-          powershell -NoProfile -Command "Compress-Archive -Path 'dist/portable/XAgent/*' -DestinationPath '$portable_zip' -Force"
+          mkdir -p dist/portable/Xgent
+          cp "$portable_exe_path" dist/portable/Xgent/Xgent.exe
+          portable_zip="dist/Xgent-${XGENT_RELEASE_TAG}-Windows-x64-portable.zip"
+          powershell -NoProfile -Command "Compress-Archive -Path 'dist/portable/Xgent/*' -DestinationPath '$portable_zip' -Force"
           rm -rf dist/portable
           test "$(find dist -type f | wc -l)" -gt 0
 
       - uses: actions/upload-artifact@v7
         with:
-          name: xagent-windows-x64
+          name: xgent-windows-x64
           path: dist/*
           if-no-files-found: error
 
@@ -343,9 +343,9 @@ jobs:
       - release-metadata
       - release-preflight
     env:
-      XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
-      XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
-      XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+      XGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
+      XGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
+      XGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
       SIGNED_RELEASE: ${{ needs.release-metadata.outputs.signed_release }}
     steps:
       - uses: actions/checkout@v6
@@ -358,7 +358,7 @@ jobs:
 
       - name: Prepare release version config
         working-directory: crates/fronted
-        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
 
       - name: Install pnpm
         run: npm install -g pnpm@10.32.1
@@ -395,14 +395,14 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          XAGENT_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
-          XAGENT_UPDATE_REPOSITORY: ${{ github.repository }}
-        run: pnpm tauri build --config src-tauri/tauri.linux.release.conf.json --config "$XAGENT_TAURI_VERSION_CONFIG" --target x86_64-unknown-linux-gnu --bundles appimage deb rpm
+          XGENT_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+          XGENT_UPDATE_REPOSITORY: ${{ github.repository }}
+        run: pnpm tauri build --config src-tauri/tauri.linux.release.conf.json --config "$XGENT_TAURI_VERSION_CONFIG" --target x86_64-unknown-linux-gnu --bundles appimage deb rpm
 
       - name: Build unsigned Linux packages
         if: env.SIGNED_RELEASE != 'true'
         working-directory: crates/fronted
-        run: pnpm tauri build --config "$XAGENT_TAURI_VERSION_CONFIG" --target x86_64-unknown-linux-gnu --bundles appimage deb rpm
+        run: pnpm tauri build --config "$XGENT_TAURI_VERSION_CONFIG" --target x86_64-unknown-linux-gnu --bundles appimage deb rpm
 
       - name: Strip bundled Wayland libraries
         run: |
@@ -435,21 +435,21 @@ jobs:
           test -n "$appimage_path"
           test -n "$deb_path"
           test -n "$rpm_path"
-          cp "$appimage_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-Linux-x86_64.AppImage"
-          cp "$deb_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-Linux-x86_64.deb"
-          cp "$rpm_path" "dist/XAgent-${XAGENT_RELEASE_TAG}-Linux-x86_64.rpm"
+          cp "$appimage_path" "dist/Xgent-${XGENT_RELEASE_TAG}-Linux-x86_64.AppImage"
+          cp "$deb_path" "dist/Xgent-${XGENT_RELEASE_TAG}-Linux-x86_64.deb"
+          cp "$rpm_path" "dist/Xgent-${XGENT_RELEASE_TAG}-Linux-x86_64.rpm"
           if [ "$SIGNED_RELEASE" = true ]; then
             test -f "$appimage_path.sig"
             test -f "$deb_path.sig"
             test -f "$rpm_path.sig"
-            cp "$appimage_path.sig" "dist/XAgent-${XAGENT_RELEASE_TAG}-Linux-x86_64.AppImage.sig"
-            cp "$deb_path.sig" "dist/XAgent-${XAGENT_RELEASE_TAG}-Linux-x86_64.deb.sig"
-            cp "$rpm_path.sig" "dist/XAgent-${XAGENT_RELEASE_TAG}-Linux-x86_64.rpm.sig"
+            cp "$appimage_path.sig" "dist/Xgent-${XGENT_RELEASE_TAG}-Linux-x86_64.AppImage.sig"
+            cp "$deb_path.sig" "dist/Xgent-${XGENT_RELEASE_TAG}-Linux-x86_64.deb.sig"
+            cp "$rpm_path.sig" "dist/Xgent-${XGENT_RELEASE_TAG}-Linux-x86_64.rpm.sig"
           fi
 
       - uses: actions/upload-artifact@v7
         with:
-          name: xagent-linux-x64
+          name: xgent-linux-x64
           path: dist/*
           if-no-files-found: error
 
@@ -460,8 +460,8 @@ jobs:
       - release-metadata
       - release-preflight
     env:
-      XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
-      XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+      XGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
+      XGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -517,7 +517,7 @@ jobs:
 
       - name: Prepare release version config
         working-directory: crates/fronted
-        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
 
       - name: Prepare verified Android execution environment
         run: |
@@ -529,7 +529,7 @@ jobs:
           import json
           import re
 
-          with open("crates/mobile-execution/android/src/main/assets/xagent-proot-manifest.json", encoding="utf-8") as stream:
+          with open("crates/mobile-execution/android/src/main/assets/xgent-proot-manifest.json", encoding="utf-8") as stream:
               manifest = json.load(stream)
           version = str(manifest["version"])
           upstream_version = version.split(":", 1)[-1].split("-", 1)[0]
@@ -543,13 +543,13 @@ jobs:
         working-directory: crates/fronted
         run: pnpm tauri android init --ci
 
-      - name: Apply and verify XAgent Android project resources
+      - name: Apply and verify Xgent Android project resources
         working-directory: crates/fronted
         run: node ../../scripts/mobile/apply-android-project-overrides.mjs src-tauri
 
       - name: Build unsigned release APK
         working-directory: crates/fronted
-        run: pnpm tauri android build --ci --apk --target aarch64 --target x86_64 --config "$XAGENT_TAURI_VERSION_CONFIG"
+        run: pnpm tauri android build --ci --apk --target aarch64 --target x86_64 --config "$XGENT_TAURI_VERSION_CONFIG"
 
       - name: Sign and verify installable APK
         run: |
@@ -573,7 +573,7 @@ jobs:
             if [ -n "$value" ]; then credential_count=$((credential_count + 1)); fi
           done
 
-          keystore_path="$RUNNER_TEMP/xagent-android-release.jks"
+          keystore_path="$RUNNER_TEMP/xgent-android-release.jks"
           if [ "$credential_count" -eq 4 ]; then
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
             signing_mode="repository release key"
@@ -582,9 +582,9 @@ jobs:
             effective_key_password="$ANDROID_KEY_PASSWORD"
           elif [ "$credential_count" -eq 0 ]; then
             signing_mode="ephemeral CI key (installable, but not update-stable)"
-            effective_alias="xagent-ci"
-            effective_store_password="xagent-ci-release"
-            effective_key_password="xagent-ci-release"
+            effective_alias="xgent-ci"
+            effective_store_password="xgent-ci-release"
+            effective_key_password="xgent-ci-release"
             keytool -genkeypair -noprompt \
               -keystore "$keystore_path" \
               -storetype PKCS12 \
@@ -594,7 +594,7 @@ jobs:
               -keyalg RSA \
               -keysize 3072 \
               -validity 3650 \
-              -dname "CN=XAgent CI, OU=Release, O=XAgent, C=US"
+              -dname "CN=Xgent CI, OU=Release, O=Xgent, C=US"
           else
             echo "Android signing secrets are partially configured; set all four or none." >&2
             exit 1
@@ -602,8 +602,8 @@ jobs:
 
           build_tools="$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS_VERSION"
           mkdir -p dist
-          aligned_apk="$RUNNER_TEMP/xagent-aligned.apk"
-          release_apk="dist/XAgent-${XAGENT_RELEASE_TAG}-Android-universal.apk"
+          aligned_apk="$RUNNER_TEMP/xgent-aligned.apk"
+          release_apk="dist/Xgent-${XGENT_RELEASE_TAG}-Android-universal.apk"
           # Android 15+ devices can use a 16 KiB memory page size. Build-tools
           # 35+ require -P 16 in addition to the normal 4-byte APK alignment
           # for uncompressed native libraries.
@@ -621,11 +621,11 @@ jobs:
             | tee dist/Android-signing.txt
           "$build_tools/zipalign" -c -P 16 4 "$release_apk"
           printf '\nSigning mode: %s\n' "$signing_mode" >> dist/Android-signing.txt
-          unzip -l "$release_apk" | grep -F 'lib/arm64-v8a/libxagent_proot.so'
-          unzip -l "$release_apk" | grep -F 'lib/x86_64/libxagent_proot.so'
+          unzip -l "$release_apk" | grep -F 'lib/arm64-v8a/libxgent_proot.so'
+          unzip -l "$release_apk" | grep -F 'lib/x86_64/libxgent_proot.so'
           unzip -l "$release_apk" | grep -F 'assets/mobile-execution/rootfs/manifest.json'
 
-          native_check_dir="$RUNNER_TEMP/xagent-native-libraries"
+          native_check_dir="$RUNNER_TEMP/xgent-native-libraries"
           mkdir -p "$native_check_dir"
           unzip -q "$release_apk" 'lib/*/*.so' -d "$native_check_dir"
           readelf="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
@@ -644,7 +644,7 @@ jobs:
       - name: Package PRoot corresponding source
         run: |
           set -euo pipefail
-          source_archive="dist/XAgent-${XAGENT_RELEASE_TAG}-PRoot-${PROOT_VERSION_LABEL}-source.tar.gz"
+          source_archive="dist/Xgent-${XGENT_RELEASE_TAG}-PRoot-${PROOT_VERSION_LABEL}-source.tar.gz"
           curl --fail --location --proto '=https' --tlsv1.2 \
             "https://codeload.github.com/termux/proot/tar.gz/$PROOT_SOURCE_REF" \
             --output "$source_archive"
@@ -654,7 +654,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: xagent-android
+          name: xgent-android
           path: dist/*
           if-no-files-found: error
 
@@ -665,8 +665,8 @@ jobs:
       - release-metadata
       - release-preflight
     env:
-      XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
-      XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+      XGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
+      XGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -694,7 +694,7 @@ jobs:
 
       - name: Prepare release version config
         working-directory: crates/fronted
-        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XAGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
 
       - name: Prepare verified iOS shell resources
         run: |
@@ -746,7 +746,7 @@ jobs:
         run: |
           set -o pipefail
           log="$RUNNER_TEMP/ios-build.log"
-          if ! pnpm tauri ios build --ci --no-sign --target aarch64 --build-number "${{ github.run_number }}" --config "$XAGENT_TAURI_VERSION_CONFIG" 2>&1 | tee "$log"; then
+          if ! pnpm tauri ios build --ci --no-sign --target aarch64 --build-number "${{ github.run_number }}" --config "$XGENT_TAURI_VERSION_CONFIG" 2>&1 | tee "$log"; then
             message="$(tail -n 240 "$log")"
             message="${message//'%'/'%25'}"
             message="${message//$'\r'/'%0D'}"
@@ -768,7 +768,7 @@ jobs:
             exit 1
           fi
           mkdir -p dist
-          release_ipa="dist/XAgent-${XAGENT_RELEASE_TAG}-iOS-arm64-unsigned.ipa"
+          release_ipa="dist/Xgent-${XGENT_RELEASE_TAG}-iOS-arm64-unsigned.ipa"
           cp "${ipa_candidates[0]}" "$release_ipa"
           unzip -t "$release_ipa"
           unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/'
@@ -778,7 +778,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: xagent-ios
+          name: xgent-ios
           path: dist/*
           if-no-files-found: error
 
@@ -796,9 +796,9 @@ jobs:
       - android
       - ios
     env:
-      XAGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
-      XAGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
-      XAGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+      XGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
+      XGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
+      XGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
       SIGNED_RELEASE: ${{ needs.release-metadata.outputs.signed_release }}
     steps:
       - uses: actions/checkout@v6
@@ -823,28 +823,28 @@ jobs:
           AI_RELEASE_NOTES_MODEL: ${{ vars.AI_RELEASE_NOTES_MODEL }}
         run: |
           set -euo pipefail
-          is_prerelease="$XAGENT_IS_PRERELEASE"
+          is_prerelease="$XGENT_IS_PRERELEASE"
 
-          github_notes_path="$RUNNER_TEMP/xagent-github-release-notes.md"
-          notes_path="$RUNNER_TEMP/xagent-release-notes.md"
+          github_notes_path="$RUNNER_TEMP/xgent-github-release-notes.md"
+          notes_path="$RUNNER_TEMP/xgent-release-notes.md"
           if ! gh api "repos/$GH_REPO/releases/generate-notes" \
             -f tag_name="$RELEASE_TAG" \
             -f target_commitish="$RELEASE_SHA" \
             --jq ".body" > "$github_notes_path"; then
-            printf 'XAgent %s\n' "$RELEASE_TAG" > "$github_notes_path"
+            printf 'Xgent %s\n' "$RELEASE_TAG" > "$github_notes_path"
           fi
           if [ ! -s "$github_notes_path" ]; then
-            printf 'XAgent %s\n' "$RELEASE_TAG" > "$github_notes_path"
+            printf 'Xgent %s\n' "$RELEASE_TAG" > "$github_notes_path"
           fi
 
           node scripts/release/create-ai-release-notes.mjs "$RELEASE_TAG" "$notes_path" "$github_notes_path"
           if [ ! -s "$notes_path" ]; then
-            printf 'XAgent %s\n' "$RELEASE_TAG" > "$notes_path"
+            printf 'Xgent %s\n' "$RELEASE_TAG" > "$notes_path"
           fi
 
           created_draft=false
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            edit_args=(--title "XAgent $RELEASE_TAG" --notes-file "$notes_path")
+            edit_args=(--title "Xgent $RELEASE_TAG" --notes-file "$notes_path")
             if [ "$is_prerelease" = true ]; then
               edit_args+=(--prerelease)
             else
@@ -852,7 +852,7 @@ jobs:
             fi
             gh release edit "$RELEASE_TAG" "${edit_args[@]}"
           else
-            create_args=(--draft --target "$RELEASE_SHA" --title "XAgent $RELEASE_TAG" --notes-file "$notes_path")
+            create_args=(--draft --target "$RELEASE_SHA" --title "Xgent $RELEASE_TAG" --notes-file "$notes_path")
             if [ "$is_prerelease" = true ]; then
               create_args+=(--prerelease)
             fi
@@ -885,7 +885,7 @@ jobs:
           fi
 
           if [ "$created_draft" = true ]; then
-            publish_args=(--draft=false --title "XAgent $RELEASE_TAG" --notes-file "$notes_path")
+            publish_args=(--draft=false --title "Xgent $RELEASE_TAG" --notes-file "$notes_path")
             if [ "$is_prerelease" = true ]; then
               publish_args+=(--prerelease)
             else

@@ -10,7 +10,7 @@ import { isExtensionRetryableError } from "./streamRetry";
 /**
  * Provider auto-failover runtime (cc-switch inspired).
  *
- * Mirrors cc-switch's proxy-side design adapted to XAgent's client-side
+ * Mirrors cc-switch's proxy-side design adapted to Xgent's client-side
  * streaming architecture:
  * - a per-target circuit breaker ("consecutive failures → open → cooldown →
  *   half-open probe") keyed by `customProviderId::model`;
@@ -21,10 +21,10 @@ import { isExtensionRetryableError } from "./streamRetry";
  *   withStreamRetry's buffering semantics so the consumer never sees events
  *   from a discarded attempt.
  *
- * Unlike cc-switch (which always routes by queue priority, P1 first), XAgent
+ * Unlike cc-switch (which always routes by queue priority, P1 first), Xgent
  * keeps the user's per-conversation model selection first and uses the queue as
  * fallback order. The breaker intentionally skips cc-switch's half-open permit
- * accounting: XAgent's request concurrency is bounded (one chat turn plus a
+ * accounting: Xgent's request concurrency is bounded (one chat turn plus a
  * handful of subagents), so unlimited half-open probes are acceptable and much
  * simpler.
  */

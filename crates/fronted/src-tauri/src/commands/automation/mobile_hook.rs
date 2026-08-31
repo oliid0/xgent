@@ -94,7 +94,7 @@ fn script_with_context(script: String, context: Option<HashMap<String, String>>)
     let mut exports = context
         .into_iter()
         .filter(|(key, _)| {
-            key.starts_with("XAGENT_")
+            key.starts_with("XGENT_")
                 && key
                     .chars()
                     .all(|character| character == '_' || character.is_ascii_alphanumeric())

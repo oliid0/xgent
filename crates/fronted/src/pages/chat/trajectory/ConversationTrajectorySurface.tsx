@@ -23,7 +23,7 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { Token, type TokenColor } from "@astryxdesign/core/Token";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { Activity, Circle, RefreshCw } from "../../../components/icons";
@@ -310,11 +310,11 @@ function inputText(item: TrajectoryTimelineItem) {
 function TimelineTrack({ item, label }: { item: TrajectoryTimelineItem; label: string }) {
   return (
     <HStack
-      className="xagent-trajectory-track"
+      className="xgent-trajectory-track"
       aria-label={`${label}, ${durationLabel(item.durationMs)}`}
     >
       <HStack
-        className="xagent-trajectory-bar"
+        className="xgent-trajectory-bar"
         data-lane={item.lane}
         aria-hidden="true"
         style={{
@@ -491,7 +491,7 @@ function TrajectoryDetails({
             title={availableTabs.find((candidate) => candidate.id === tab)?.label}
             size="sm"
             width="100%"
-            maxHeight="var(--xagent-trajectory-code-height)"
+            maxHeight="var(--xgent-trajectory-code-height)"
             container="section"
           />
         )}
@@ -897,7 +897,7 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
                                 <Text
                                   type="supporting"
                                   color="secondary"
-                                  className="xagent-trajectory-duration"
+                                  className="xgent-trajectory-duration"
                                 >
                                   {durationLabel(item.durationMs)}
                                 </Text>
@@ -956,7 +956,7 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
     <Layout
       height="fill"
       padding={0}
-      className="xagent-trajectory-surface"
+      className="xgent-trajectory-surface"
       header={
         <LayoutHeader hasDivider>
           <VStack gap={3} width="100%">
@@ -1022,7 +1022,7 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
       end={
         !compact && selected ? (
           <LayoutPanel
-            width="var(--xagent-trajectory-details-width)"
+            width="var(--xgent-trajectory-details-width)"
             hasDivider
             padding={4}
             isScrollable={false}

@@ -26,7 +26,7 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { invoke, isBrowserRuntime } from "@xagent/runtime";
+import { invoke, isBrowserRuntime } from "@xgent/runtime";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,

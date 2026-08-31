@@ -5,7 +5,7 @@ import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Text as AstryxText, Text as Label } from "@astryxdesign/core/Text";
 import { TextInput as Input } from "@astryxdesign/core/TextInput";
-import { listen } from "@xagent/runtime";
+import { listen } from "@xgent/runtime";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirmDialog } from "../../components/astryx/useConfirmDialog";
 import { AlertTriangle, Archive, ArchiveRestore, Cloud, Shield } from "../../components/icons";
@@ -45,19 +45,16 @@ type Status = { kind: "ok" | "error"; text: string } | null;
 
 type SyncBusy = "load" | "test" | "save" | "upload" | "download" | null;
 
-/** 后端返回的错误已是可直接展示的中文文案。 */
 function errorText(error: unknown): string {
   if (error instanceof Error) return error.message.trim();
   return String(error ?? "").trim();
 }
 
-/** manifest.createdAt 是 RFC3339 UTC，按本地时区展示。 */
 function formatCreatedAt(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-/** lastSyncAt 是毫秒时间戳。 */
 function formatTimestamp(value: number): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
@@ -113,16 +110,6 @@ export function BackupSyncSection(props: SettingsSectionProps) {
   const dirty = isDirty(form, syncView);
   const syncLocked = syncBusy !== null;
 
-  /**
-   * 还原（导入 / 下载）落库后同步前端状态。
-   *
-   * 顺序不能反：`reloadSettings` 从 SQLite 重载 providers/mcp/system，
-   * 但 skills 只存在于 localStorage，库里没有 —— 必须重载完再把快照里的
-   * skills 盖上去，否则会被重载出来的旧值顶掉。
-   *
-   * 不重载的后果不是「显示旧值」这么轻：`persistSettings` 按域 diff，
-   * 用户之后动任一域就会拿还原前的内存值写回库，把还原静默回滚掉。
-   */
   const syncStateAfterRestore = useCallback(
     async (skillsPayload: unknown) => {
       await reloadSettings?.();
@@ -154,8 +141,6 @@ export function BackupSyncSection(props: SettingsSectionProps) {
     };
   }, []);
 
-  // 后台自动同步的结果。手动同步的成败由命令返回值就地反馈，不经过这个事件，
-  // 所以这里收到的一定是「用户没主动点按钮时发生的同步」。
   useEffect(() => {
     let unlisten: (() => void) | null = null;
     let cancelled = false;
@@ -165,7 +150,6 @@ export function BackupSyncSection(props: SettingsSectionProps) {
         setSyncStatus({ kind: "ok", text: t("settings.backupSyncAutoDone") });
       }
     }).then((fn) => {
-      // 组件在 listen resolve 前就卸载时，拿到句柄立刻注销，避免泄漏。
       if (cancelled) fn();
       else unlisten = fn;
     });
@@ -185,7 +169,7 @@ export function BackupSyncSection(props: SettingsSectionProps) {
       const next = value as PresetId;
       setPreset(next);
       const matched = SYNC_PRESETS.find((item) => item.id === next);
-      // 选「自定义」时保留当前 URL，只有选到具体预设才覆写。
+
       if (matched) patchForm({ url: matched.url });
     },
     [patchForm],
@@ -216,7 +200,6 @@ export function BackupSyncSection(props: SettingsSectionProps) {
     [confirm, patchForm, t],
   );
 
-  /** 保存后立即测一次连接：配置填错的话，此刻纠正的成本最低。 */
   const handleSaveSync = useCallback(async () => {
     setSyncBusy("save");
     setSyncStatus(null);
@@ -234,7 +217,6 @@ export function BackupSyncSection(props: SettingsSectionProps) {
       setForm(formFromView(view));
       setPreset(detectPreset(view.url));
 
-      // 凭据不全时没什么可测的，直接报保存成功即可。
       if (!canTestSyncConnection(view)) {
         setSyncStatus({ kind: "ok", text: t("settings.backupSyncSaveDone") });
         return;
@@ -243,7 +225,6 @@ export function BackupSyncSection(props: SettingsSectionProps) {
         await testSyncConnection();
         setSyncStatus({ kind: "ok", text: t("settings.backupSyncSaveAndTestDone") });
       } catch (error) {
-        // 保存本身是成功的，连接失败只是提醒 —— 不能让用户以为配置没存上。
         setSyncStatus({
           kind: "error",
           text: `${t("settings.backupSyncSaveAndTestFailed")}${errorText(error)}`,
@@ -259,7 +240,6 @@ export function BackupSyncSection(props: SettingsSectionProps) {
     }
   }, [form, t]);
 
-  /** 测试连接读的是库里的配置，故未保存时不可用。 */
   const handleTestSync = useCallback(async () => {
     setSyncBusy("test");
     setSyncStatus(null);
@@ -280,7 +260,6 @@ export function BackupSyncSection(props: SettingsSectionProps) {
     setSyncBusy("upload");
     setSyncStatus(null);
     try {
-      // 远端已有备份时先让用户看清会覆盖谁 —— 可能是另一台机器刚传的。
       const remote = await fetchRemoteInfo();
       if (remote) {
         const confirmed = await confirm({
@@ -294,7 +273,7 @@ export function BackupSyncSection(props: SettingsSectionProps) {
         if (!confirmed) return;
       }
       const syncedAt = await uploadBackup(settings.skills);
-      // 后端在成功时清了 last_error，视图同步跟上，横幅立即消失。
+
       setSyncView((prev) => (prev ? { ...prev, lastSyncAt: syncedAt, lastError: null } : prev));
       setSyncStatus({ kind: "ok", text: t("settings.backupSyncUploadDone") });
     } catch (error) {
@@ -328,7 +307,7 @@ export function BackupSyncSection(props: SettingsSectionProps) {
 
       const outcome = await downloadBackup();
       await syncStateAfterRestore(outcome.skills);
-      // 下载成功证明这条链路是通的，后端已清 last_error，视图同步跟上。
+
       setSyncView((prev) => (prev ? { ...prev, lastError: null } : prev));
       setSyncStatus({
         kind: "ok",
@@ -348,9 +327,8 @@ export function BackupSyncSection(props: SettingsSectionProps) {
     setBusy("export");
     setStatus(null);
     try {
-      // skills 启用态只存在于前端，必须由这里拼进 payload。
       const path = await exportBackup(settings.skills);
-      // 用户在系统对话框里取消时返回 null，不算失败。
+
       if (path) {
         setStatus({ kind: "ok", text: `${t("settings.backupExportDone")}${path}` });
       }
@@ -365,7 +343,6 @@ export function BackupSyncSection(props: SettingsSectionProps) {
     setBusy("import");
     setStatus(null);
     try {
-      // 先只解析校验、不写库，让用户看到来源摘要再决定是否覆盖。
       const preview = await peekBackupImport();
       if (!preview) return;
 
@@ -543,12 +520,7 @@ export function BackupSyncSection(props: SettingsSectionProps) {
                 }
                 onChange={(nextValue) => {
                   const password = nextValue;
-                  // 清空密码框视为「没动过」，而不是「把密码改成空」。
-                  // 后端只在 passwordTouched 时采用新值，若这里对空串也置 true，
-                  // 用户输入几个字符再全删掉就会静默抹掉已存的密码 —— 与本框
-                  // 自己的「留空则不修改」占位提示直接矛盾，且此后自动同步因
-                  // 凭据不全而永久静默跳过（auto_upload 的 credentials 分支）。
-                  // 真要清空密码就关掉同步或改用户名，不该由删字符触发。
+
                   patchForm({ password, passwordTouched: password.length > 0 });
                 }}
               />
@@ -561,11 +533,11 @@ export function BackupSyncSection(props: SettingsSectionProps) {
                 {t("settings.backupSyncRemoteDir")}
               </Label>
               <Input
-                label="xagent"
+                label="xgent"
                 isLabelHidden
                 value={form.remoteDir}
                 isDisabled={syncLocked}
-                placeholder="xagent"
+                placeholder="xgent"
                 onChange={(nextValue) => patchForm({ remoteDir: nextValue })}
               />
             </AstryxStack>

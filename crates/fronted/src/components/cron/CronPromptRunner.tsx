@@ -1,5 +1,5 @@
 import type { Context } from "@earendil-works/pi-ai";
-import { isBrowserRuntime, listen } from "@xagent/runtime";
+import { isBrowserRuntime, listen } from "@xgent/runtime";
 import { useEffect, useRef } from "react";
 import type { CompletePromptRunInput, PromptRunRequest } from "../../lib/automation";
 import { backend } from "../../lib/automation/backend";
@@ -43,7 +43,7 @@ type CronPromptRunnerProps = {
 };
 
 function buildCronSystemPrompt(taskName: string) {
-  const lines = ["You are running a scheduled Auto Prompt task in XAgent."];
+  const lines = ["You are running a scheduled Auto Prompt task in Xgent."];
   const normalizedTaskName = taskName.trim();
   if (normalizedTaskName) {
     lines.push(`Task: ${normalizedTaskName}`);

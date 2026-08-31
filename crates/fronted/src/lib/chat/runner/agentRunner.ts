@@ -328,8 +328,8 @@ export function buildToolsSuffix(
         ? [
             `- Current platform: ${platformLabel}. Bash runs through Git Bash with POSIX semantics; pwsh, Windows PowerShell, and cmd are fallbacks used only when Git Bash is not installed.`,
             "- Write POSIX/bash-compatible commands by default: `export`, `&&`, `/dev/null`, forward-slash paths.",
-            "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xagent-task.log 2>&1 < /dev/null &`.",
-            "- If a Bash result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing: switch to PowerShell syntax and suggest installing Git for Windows or setting `XAGENT_GIT_BASH_PATH`.",
+            "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xgent-task.log 2>&1 < /dev/null &`.",
+            "- If a Bash result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing: switch to PowerShell syntax and suggest installing Git for Windows or setting `XGENT_GIT_BASH_PATH`.",
           ]
         : [
             `- Current platform: ${platformLabel}. Bash runs through POSIX shells.`,
@@ -342,7 +342,7 @@ export function buildToolsSuffix(
                   : "- Linux prefers Bash, then zsh, then sh. Use POSIX/bash-compatible commands.",
             runtimePlatform === "android" || runtimePlatform === "ios"
               ? "- Mobile operating systems may suspend the app. Keep commands foreground and bounded; do not detach background services."
-              : "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xagent-task.log 2>&1 < /dev/null &`.",
+              : "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xgent-task.log 2>&1 < /dev/null &`.",
           ];
     sections.push(
       [
@@ -353,9 +353,9 @@ export function buildToolsSuffix(
         "- Passing an absolute Skill script path inside the command is also accepted as long as the referenced Skill is enabled in this conversation.",
         "- For endpoint tests with curl, include an explicit timeout such as `--max-time 30` so a stalled local server or upstream request cannot hold the whole turn indefinitely.",
         "- Use ManagedProcess instead of Bash for dev servers, watchers, preview servers, or anything that should keep running.",
-        "- For reading, listing, or searching Skill content, always use Read/List/Glob/Grep with skill:// paths — Bash cat/ls/find/grep/rg/sed/awk against ~/.xagent/skills is still routed back to the file tools.",
+        "- For reading, listing, or searching Skill content, always use Read/List/Glob/Grep with skill:// paths — Bash cat/ls/find/grep/rg/sed/awk against ~/.xgent/skills is still routed back to the file tools.",
         "- Do not guess `skills/` paths inside the workspace; if a Skill is needed, enable it in the chat Skills selector first.",
-        "- Do not cd into ~/.xagent/skills or workspace skills/ guesses.",
+        "- Do not cd into ~/.xgent/skills or workspace skills/ guesses.",
       ].join("\n"),
     );
   }
@@ -649,11 +649,6 @@ function toMessageToolResult(message: Message, toolCall: ToolCall): ToolResultMe
 type TurnContextOverride = {
   context: Context;
   emittedMessages: Message[];
-  /**
-   * 只随出站请求投递的尾部文本（bus 增量、roster 运行状态等易变内容）。
-   * 不写入 agent.state.messages：写进去会经 emittedMessages 泄漏到持久化、
-   * UI 与记忆抽取。runner 逐次累积并在每次出站请求上重挂。
-   */
   wireTailText?: string;
 } | null;
 
@@ -765,39 +760,13 @@ export async function runAssistantWithTools(params: {
   debugLogger?: StreamDebugLogger;
   subagentScheduler?: SubagentScheduler;
   allowEmptyWorkdir?: boolean;
-  /**
-   * 工具审批门:每次工具执行前(截断校验之后)对规范化后的调用调用一次。
-   * 返回 allow:false 时该调用被拦截,reason 作为 toolResult 交给模型(与截断
-   * 拒绝同渲染路径)。回调可 await(交互式审批),被 turn 中止时应 reject/拒绝。
-   * 与策略/元数据实现解耦:runner 只认这个结果,不感知 toolPolicies 细节。
-   */
   resolveToolGate?: (
     toolCall: ToolCall,
     signal?: AbortSignal,
   ) => Promise<{ allow: true } | { allow: false; reason: string }>;
-  /**
-   * 请求层工具可见性谓词(MCP 懒加载):返回 false 的工具不进发给模型的请求,
-   * 但保留在执行层(loop 快照)——已发生的调用照常校验与执行。每轮请求前重新
-   * 评估,ToolSearch 激活后下一轮立即可见。与隐藏的 provider 原生搜索桥同机制。
-   */
   requestToolFilter?: (toolName: string) => boolean;
-  /**
-   * 工具级终止谓词:某批调用里任一调用命中即在该批执行完后结束本轮 run,不再
-   * 跑后续模型轮(pi-agent-core afterToolCall terminate,批内全部标记 terminate
-   * 才生效,故谓词按批铺展——同批的并行调用照常执行,结果保留在历史)。计划
-   * 提交用它跳过无意义的"收尾话"轮——批准事实由卡片展示,执行由续轮承接。
-   */
   resolveToolTermination?: (toolCall: ToolCall) => boolean;
-  /**
-   * 每轮出站请求的 tool_choice 裁决钩子(编排层策略,runner 不感知具体模式)。
-   * 返回 undefined 走缺省(有工具则 "auto")。定向强制({type:"tool"})只应
-   * 由调用方在有界场景使用——无界强制会剥夺模型的文本收尾能力,导致失控循环。
-   */
   resolveToolChoice?: (round: number) => ToolChoice | undefined;
-  /**
-   * 模型轮数上限(含):达到后当前工具批执行完即优雅终止本轮 run(不抛错,
-   * 结果保留在历史),由编排层决定后续(如 plan mode 的补提交/兜底)。缺省无上限。
-   */
   maxRounds?: number;
 }) {
   const modelId = params.model.trim();
@@ -1175,12 +1144,7 @@ export async function runAssistantWithTools(params: {
     let currentSystemPrompt = params.context.systemPrompt;
     let emittedBaselineIndex = params.context.messages.length;
     let latestAgentEndMessages: Message[] = [];
-    // 尾部投递内容的累积器：只进出站请求，永不进 agent.state.messages。
-    // 每个块连同它首次挂上的锚点 toolCallId 一起记住——锚点必须钉死，重新搜索
-    // 会让块随工具循环推进从旧消息搬到新消息，旧消息字节变回去、前缀就断了。
-    // 语义：带 wireTailText 的 override 追加（按到达顺序）；不带 wireTailText 的
-    // override 清空——不带的只有压缩/重冻结分支，此时快照已重算进 systemPrompt，
-    // 旧尾部内容已被快照覆盖，继续挂只会重复投递。
+
     let accumulatedWireTailBlocks: PinnedTailBlock[] = [];
     let agentTools: AgentTool[] = [];
     const pendingRecoveredSeedTurnRef: {
@@ -1377,10 +1341,6 @@ export async function runAssistantWithTools(params: {
     ): AgentContext | undefined {
       if (!agent) return undefined;
       if (override.wireTailText) {
-        // 锚点在这里解析一次就钉死：override.context.messages 是本轮出站请求
-        // 的消息列表，此刻的“最后一条安全工具结果”就是这个块该长期附着的位置。
-        // 解析不出锚点时丢弃本块——调用方在探锚阶段已确认过可挂，走到这里为空
-        // 只可能是压缩改写了消息列表，此时游标也不会推进，下一轮重投。
         const anchorToolCallId = resolveTailBlockAnchorId(override.context.messages);
         if (anchorToolCallId) {
           accumulatedWireTailBlocks = [
@@ -1389,8 +1349,6 @@ export async function runAssistantWithTools(params: {
           ];
         }
       } else {
-        // 见 accumulatedWireTailBlocks 声明处的语义说明：压缩/重冻结分支不带
-        // wireTailText，旧尾部内容已并入重算后的快照，累积必须清空。
         accumulatedWireTailBlocks = [];
       }
       currentSystemPrompt = override.context.systemPrompt;
@@ -1508,10 +1466,7 @@ export async function runAssistantWithTools(params: {
       params.onRetryAttempts?.(round, retryAttemptsForRound);
       const streamTools =
         streamContext.tools ?? (agent?.state.tools as Context["tools"] | undefined) ?? llmTools;
-      // 尾部投递内容只存在于出站请求：每次请求在此重挂到各自钉死的锚点（与记忆
-      // 增量的逐请求重建同口径），agent.state.messages 始终不含它。挂在 sanitize
-      // 之前、capturePrefixShape 之后读取 effectiveContext，归因看到的就是真实
-      // 出站字节。
+
       const outboundMessages =
         accumulatedWireTailBlocks.length > 0
           ? attachPinnedTailBlocks(streamContext.messages.slice(), accumulatedWireTailBlocks)
@@ -1536,13 +1491,8 @@ export async function runAssistantWithTools(params: {
       const primaryRoundTarget: PreparedFailoverTarget =
         streamModel === model ? primaryTarget : { ...primaryTarget, model: streamModel };
 
-      // 哈希只在请求边界算一次:同一轮内的 failover / 重试复用同一份归因,
-      // 更不能进流式回调 —— 那会让开销随 token 数放大。
       //
-      // 缓存参数按主目标口径入账:TTL 或断点策略变化会真实作废缓存,而 system 与
-      // tools 的字节可以一模一样,不单独记这一维就会在真出事时报 unchanged。
-      // 协议族分发在 providers 层的 describeProviderCacheShape 里收敛,这里只
-      // 负责把与注入侧同源的输入(含请求头,x-session-id 已有则以头值为准)递进去。
+
       const roundCacheRetention =
         options?.cacheRetention ??
         resolveProviderCacheRetention(
@@ -1564,7 +1514,7 @@ export async function runAssistantWithTools(params: {
           modelApi: primaryRoundTarget.model.api,
           sessionId: roundSessionId,
           cacheRetention: roundCacheRetention,
-          // 与下方 streamOptions 的 headers 合并口径一致:注入侧看到的就是这份。
+
           headers: {
             ...(options?.headers ?? {}),
             ...primaryRoundTarget.proxyRequest.headers,
@@ -1913,18 +1863,10 @@ export async function runAssistantWithTools(params: {
         }
         return undefined;
       },
-      // 0.84 起 pi-agent-core 用 prepareNextTurnWithContext 取代了原先靠
-      // transformContext 顺带做的 turn 间改写。二者的关键差异:transformContext
-      // 拿不到 loop 的 context,只能读回 agent.state.messages;而 loop 的
-      // currentContext.messages 是 createContextSnapshot() 切出的**另一个数组**,
-      // agent.state 上的改写不会自动回流。所以这里必须显式把改写后的消息作为
-      // context 返回,否则 message_end 里对 assistant 的规范化(工具名归一、
-      // hostedSearch 块回填、seed 工具调用去重)和截断结果重写全部只活在
-      // agent.state,下一轮请求仍按旧快照发出。
+
       prepareNextTurnWithContext: async ({ message, toolResults, context }, signal) => {
         const reconciled = reconcileTruncatedToolResults();
-        // agent.state 是 message_end 规范化后的权威副本;只要它与 loop 快照长度
-        // 一致,就以它为准(内容可能已被就地替换,长度相同不代表内容相同)。
+
         const stateMessages = getAgentMessages(agent);
         const currentContext: AgentContext =
           agent && stateMessages.length === context.messages.length

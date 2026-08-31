@@ -103,7 +103,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "tray.settings": "设置…",
     "tray.checkUpdates": "检查更新…",
     "tray.openDataDir": "打开数据目录",
-    "tray.quit": "退出 XAgent",
+    "tray.quit": "退出 Xgent",
     "tray.untitledConversation": "未命名对话",
     "tray.untitledCronTask": "未命名任务",
     "tray.cronEnabled": "已启用定时任务「{name}」",
@@ -122,7 +122,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "app.errorBoundaryReload": "重新加载",
     "app.errorBoundaryTitle": "页面出现异常",
     "app.loading": "正在加载设置...",
-    "app.name": "XAgent",
+    "app.name": "Xgent",
     "window.controls": "窗口控制",
     "window.minimize": "最小化",
     "window.maximize": "最大化",
@@ -189,7 +189,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "chat.workspaceRemoveRunning": "后台任务运行中，暂时不能移除。",
     "chat.workspaceRemoveDescription": "会删除此工作空间下的历史对话，不会删除文件夹。",
     "chat.workspaceOpenSystemFileManagerFailed": "打开资源管理器失败",
-    "chat.exitConfirmTitle": "退出 XAgent？",
+    "chat.exitConfirmTitle": "退出 Xgent？",
     "chat.exitConfirmSubtitle": "当前仍有终端任务在运行。",
     "chat.exitConfirmRunningLabel": "正在运行的 Terminal",
     "chat.exitConfirmDescription": "继续退出会关闭这些终端进程。取消后可返回项目工具栏处理。",
@@ -254,7 +254,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "chat.resizeSidebarWidth": "调整聊天侧栏宽度",
     "chat.emptyChatHistory": "暂无历史对话",
     "chat.clickNewConversation": "点击上方「新对话」开始聊天",
-    "chat.welcome": "欢迎使用 XAgent",
+    "chat.welcome": "欢迎使用 Xgent",
     "chat.greetingMorning": "早上好",
     "chat.greetingNoon": "中午好",
     "chat.greetingAfternoon": "下午好",
@@ -1162,7 +1162,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.toolPolicyAskDesc": "询问：每次确认",
     "settings.toolPolicyDenyDesc": "拒绝：阻止执行",
     "settings.globalShortcuts": "全局快捷键",
-    "settings.globalShortcutsDesc": "从系统任意位置唤起、切换或置顶 XAgent",
+    "settings.globalShortcutsDesc": "从系统任意位置唤起、切换或置顶 Xgent",
     "settings.shortcutSummon": "唤起窗口",
     "settings.shortcutSummonDesc": "显示并聚焦主窗口",
     "settings.shortcutToggle": "切换窗口",
@@ -1640,7 +1640,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.savedDesc": "设置已写入本地存储",
 
     /* ── Settings About ── */
-    "settings.aboutTitle": "关于 XAgent",
+    "settings.aboutTitle": "关于 Xgent",
     "settings.aboutDescription": "查看当前版本、发布说明和桌面端更新状态。",
     "settings.aboutCurrentVersion": "当前版本",
     "settings.aboutOpenRelease": "发布页",
@@ -1654,7 +1654,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.aboutInstalled": "更新已安装",
     "settings.aboutInstalledDesc": "更新包已安装，点击重启应用后生效。",
     "settings.aboutRestarting": "正在重启应用",
-    "settings.aboutRestartingDesc": "XAgent 正在退出并重新打开。",
+    "settings.aboutRestartingDesc": "Xgent 正在退出并重新打开。",
     "settings.aboutUpdateAvailable": "发现新版本",
     "settings.aboutUpdateAvailableDesc": "该版本已通过 updater 签名清单校验，可以安装。",
     "settings.aboutUpToDate": "已是最新版本",
@@ -1750,7 +1750,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.agentModeDesc": "允许调用工具，执行文件与命令行操作",
     "settings.agentDevMode": "Agent dev 模式",
     "settings.agentDevModeDesc":
-      "与 Agent 模式一致，但会把当前对话的流式请求与返回逐行写入 ~/.xagent/debug/<对话ID>.jsonl",
+      "与 Agent 模式一致，但会把当前对话的流式请求与返回逐行写入 ~/.xgent/debug/<对话ID>.jsonl",
     "settings.workdir": "项目文件夹",
     "settings.workdirRequired": "必填",
     "settings.workdirDesc": "Agent 模式下文件工具使用当前项目文件夹作为根目录。",
@@ -1764,7 +1764,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.noSystemTools": "暂无可用的系统工具",
     "settings.systemToolsTabBuiltin": "内置工具",
     "settings.systemToolsTabCustom": "自定义工具",
-    "settings.systemToolsBuiltinDesc": "XAgent 在 Agent 模式下自动注册的内置工具，此处仅供查阅。",
+    "settings.systemToolsBuiltinDesc": "Xgent 在 Agent 模式下自动注册的内置工具，此处仅供查阅。",
     "settings.systemToolsCustomDesc":
       "可按需启用的自定义系统工具；启用后会在 Agent 模式下注册，供模型在对话中调用。",
     "settings.systemToolsViewDetail": "查看详情",
@@ -2272,7 +2272,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.accessStarting": "Web UI 启动中",
     "settings.accessFailed": "Web UI 启动失败",
     "settings.accessStopped": "Web UI 已关闭",
-    "settings.accessNativeOnly": "安全凭据和服务开关只能在原生 XAgent 客户端中管理。",
+    "settings.accessNativeOnly": "安全凭据和服务开关只能在原生 Xgent 客户端中管理。",
     "settings.accessWebUi": "开启 Web UI",
     "settings.accessWebUiHint":
       "在本机 28367 端口提供同一套前端，局域网设备的任务由本机 Agent 执行",
@@ -2298,7 +2298,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.accessCloudExecutionHint":
       "局域网和移动端本地执行不可用时，允许使用 GitHub Actions 后端",
     "settings.accessCloudEnvironmentHint":
-      "任务环境变量：在仓库 Settings → Secrets and variables → Actions 中创建名为 XAGENT_CLOUD_ENV 的 Variable 或 Secret，每行填写 NAME=value；同名 Secret 会覆盖 Variable。",
+      "任务环境变量：在仓库 Settings → Secrets and variables → Actions 中创建名为 XGENT_CLOUD_ENV 的 Variable 或 Secret，每行填写 NAME=value；同名 Secret 会覆盖 Variable。",
     "settings.accessGithubOwner": "GitHub 用户或组织",
     "settings.accessGithubRepository": "任务仓库",
     "settings.accessSecureVault": "安全凭据库",
@@ -2468,7 +2468,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.skillsHubStoreTab": "技能商店",
     "settings.skillsHubImportTab": "本地导入",
     "settings.skillsImportDesc":
-      "扫描本机 Claude Code、Codex、CodeBuddy 的技能目录，勾选后导入到 XAgent。",
+      "扫描本机 Claude Code、Codex、CodeBuddy 的技能目录，勾选后导入到 Xgent。",
     "settings.skillsImportOverwriteHint": "同名技能将自动备份后覆盖。",
     "settings.skillsImportScanning": "正在扫描本地技能...",
     "settings.skillsImportRescan": "重新扫描",
@@ -2773,7 +2773,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "tray.settings": "Settings…",
     "tray.checkUpdates": "Check for Updates…",
     "tray.openDataDir": "Open Data Folder",
-    "tray.quit": "Quit XAgent",
+    "tray.quit": "Quit Xgent",
     "tray.untitledConversation": "Untitled chat",
     "tray.untitledCronTask": "Untitled task",
     "tray.cronEnabled": "Enabled cron task {name}",
@@ -2794,7 +2794,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "app.errorBoundaryReload": "Reload",
     "app.errorBoundaryTitle": "Something went wrong",
     "app.loading": "Loading settings...",
-    "app.name": "XAgent",
+    "app.name": "Xgent",
     "window.controls": "Window controls",
     "window.minimize": "Minimize",
     "window.maximize": "Maximize",
@@ -2866,7 +2866,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "chat.workspaceRemoveDescription":
       "This deletes conversations under the workspace, but it does not delete the folder.",
     "chat.workspaceOpenSystemFileManagerFailed": "Failed to open the file manager",
-    "chat.exitConfirmTitle": "Exit XAgent?",
+    "chat.exitConfirmTitle": "Exit Xgent?",
     "chat.exitConfirmSubtitle": "Terminal tasks are still running.",
     "chat.exitConfirmRunningLabel": "Running Terminal sessions",
     "chat.exitConfirmDescription":
@@ -2937,7 +2937,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "chat.resizeSidebarWidth": "Resize chat sidebar",
     "chat.emptyChatHistory": "No conversation history",
     "chat.clickNewConversation": "Click 'New Conversation' above to start chatting",
-    "chat.welcome": "Welcome to XAgent",
+    "chat.welcome": "Welcome to Xgent",
     "chat.greetingMorning": "Good morning",
     "chat.greetingNoon": "Good afternoon",
     "chat.greetingAfternoon": "Good afternoon",
@@ -3880,7 +3880,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.toolPolicyAskDesc": "Ask: confirm each time",
     "settings.toolPolicyDenyDesc": "Deny: block execution",
     "settings.globalShortcuts": "Global shortcuts",
-    "settings.globalShortcutsDesc": "Summon, toggle, or pin XAgent from anywhere",
+    "settings.globalShortcutsDesc": "Summon, toggle, or pin Xgent from anywhere",
     "settings.shortcutSummon": "Summon window",
     "settings.shortcutSummonDesc": "Show and focus the main window",
     "settings.shortcutToggle": "Toggle window",
@@ -4379,7 +4379,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.savedDesc": "Settings written to local storage",
 
     /* ── Settings About ── */
-    "settings.aboutTitle": "About XAgent",
+    "settings.aboutTitle": "About Xgent",
     "settings.aboutDescription":
       "View the current version, release notes, and desktop update status.",
     "settings.aboutCurrentVersion": "Current Version",
@@ -4394,9 +4394,9 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.aboutInstallingDesc": "Downloading and verifying the update package.",
     "settings.aboutInstalled": "Update installed",
     "settings.aboutInstalledDesc":
-      "The update package has been installed. Restart XAgent to use it.",
+      "The update package has been installed. Restart Xgent to use it.",
     "settings.aboutRestarting": "Restarting app",
-    "settings.aboutRestartingDesc": "XAgent is quitting and opening again.",
+    "settings.aboutRestartingDesc": "Xgent is quitting and opening again.",
     "settings.aboutUpdateAvailable": "New version available",
     "settings.aboutUpdateAvailableDesc":
       "This version passed updater manifest validation and can be installed.",
@@ -4499,7 +4499,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.agentModeDesc": "Allows tool calls, file and command-line operations",
     "settings.agentDevMode": "Agent Dev Mode",
     "settings.agentDevModeDesc":
-      "Same as Agent mode, but also writes each streaming request and response line-by-line to ~/.xagent/debug/<conversationId>.jsonl",
+      "Same as Agent mode, but also writes each streaming request and response line-by-line to ~/.xgent/debug/<conversationId>.jsonl",
     "settings.workdir": "Project Folder",
     "settings.workdirRequired": "Required",
     "settings.workdirDesc":
@@ -4515,7 +4515,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.systemToolsTabBuiltin": "Built-in",
     "settings.systemToolsTabCustom": "Custom",
     "settings.systemToolsBuiltinDesc":
-      "Built-in tools that XAgent registers automatically in Agent mode. Read-only list; click the eye icon for details.",
+      "Built-in tools that Xgent registers automatically in Agent mode. Read-only list; click the eye icon for details.",
     "settings.systemToolsCustomDesc":
       "Optional custom system tools. Enabled tools are registered in Agent mode for the model to call during conversations.",
     "settings.systemToolsViewDetail": "View details",
@@ -5056,7 +5056,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.accessFailed": "Web UI failed to start",
     "settings.accessStopped": "Web UI stopped",
     "settings.accessNativeOnly":
-      "Security credentials and service switches can only be managed in the native XAgent app.",
+      "Security credentials and service switches can only be managed in the native Xgent app.",
     "settings.accessWebUi": "Enable Web UI",
     "settings.accessWebUiHint":
       "Serve the same frontend on port 28367; LAN tasks are executed by this computer's Agent",
@@ -5085,7 +5085,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.accessCloudExecutionHint":
       "Allow GitHub Actions when LAN and mobile-local execution are unavailable",
     "settings.accessCloudEnvironmentHint":
-      "Task environment: create an Actions Variable or Secret named XAGENT_CLOUD_ENV under repository Settings → Secrets and variables → Actions, with one NAME=value per line. Secret values override Variables.",
+      "Task environment: create an Actions Variable or Secret named XGENT_CLOUD_ENV under repository Settings → Secrets and variables → Actions, with one NAME=value per line. Secret values override Variables.",
     "settings.accessGithubOwner": "GitHub user or organization",
     "settings.accessGithubRepository": "Task repository",
     "settings.accessSecureVault": "Secure credential vault",
@@ -5259,7 +5259,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.skillsHubStoreTab": "Skills Store",
     "settings.skillsHubImportTab": "Local Import",
     "settings.skillsImportDesc":
-      "Scan local Claude Code, Codex, and CodeBuddy skill directories, then pick skills to import into XAgent.",
+      "Scan local Claude Code, Codex, and CodeBuddy skill directories, then pick skills to import into Xgent.",
     "settings.skillsImportOverwriteHint":
       "Skills with the same name are backed up, then overwritten.",
     "settings.skillsImportScanning": "Scanning local skills...",

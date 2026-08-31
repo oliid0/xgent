@@ -1,6 +1,6 @@
 # macOS 可选签名与公证配置
 
-XAgent 的 macOS 包不要求 Developer ID 才能构建或发布。默认 workflow 使用 ad-hoc identity `-` 生成 DMG；用户首次打开时可在“系统设置 → 隐私与安全性”中授权。只有希望 Gatekeeper 显示已验证开发者、完成 Apple 公证并启用签名 updater 时，才需要本页配置并设置 `sign=true`。
+Xgent 的 macOS 包不要求 Developer ID 才能构建或发布。默认 workflow 使用 ad-hoc identity `-` 生成 DMG；用户首次打开时可在“系统设置 → 隐私与安全性”中授权。只有希望 Gatekeeper 显示已验证开发者、完成 Apple 公证并启用签名 updater 时，才需要本页配置并设置 `sign=true`。
 
 ## Apple 证书在哪里
 
@@ -23,7 +23,7 @@ Apple 官方入口：
 6. 将 `.p12` 转为单行 base64：
 
    ```bash
-   openssl base64 -A -in XAgent-Developer-ID.p12 -out XAgent-Developer-ID.p12.base64
+   openssl base64 -A -in Xgent-Developer-ID.p12 -out Xgent-Developer-ID.p12.base64
    ```
 
 Workflow 会从 `.p12` 自动识别唯一的 `Developer ID Application` identity，无需手填 `APPLE_SIGNING_IDENTITY`。不要把 `.p12`、base64 文件或密码提交到 Git。
@@ -32,7 +32,7 @@ Workflow 会从 `.p12` 自动识别唯一的 `Developer ID Application` identity
 
 1. 在 Apple Developer 的 Membership details 获取 10 位 Team ID。
 2. 确认 Apple Account 已启用双重认证。
-3. 登录 [account.apple.com](https://account.apple.com/)，在“登录与安全 → App 专用密码”生成 `XAgent GitHub Release` 密码。不要使用 Apple Account 主密码。
+3. 登录 [account.apple.com](https://account.apple.com/)，在“登录与安全 → App 专用密码”生成 `Xgent GitHub Release` 密码。不要使用 Apple Account 主密码。
 
 ## GitHub 配置
 

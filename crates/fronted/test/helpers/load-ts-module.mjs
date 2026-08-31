@@ -251,7 +251,7 @@ export function createTsModuleLoader(options = {}) {
 
   function resolveMock(specifier, parentDir) {
     if (specifier.startsWith("~icons/")) return createIconModuleMock(specifier);
-    if (specifier === "@xagent/runtime") {
+    if (specifier === "@xgent/runtime") {
       const core = mocks.get("@tauri-apps/api/core") ?? {};
       const events = mocks.get("@tauri-apps/api/event") ?? {};
       const paths = mocks.get("@tauri-apps/api/path") ?? {};

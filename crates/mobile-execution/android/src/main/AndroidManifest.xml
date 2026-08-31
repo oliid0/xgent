@@ -22,9 +22,9 @@
          are linked statically by scripts/mobile/prepare-proot-android.sh. -->
     <application
         android:extractNativeLibs="true"
-        android:networkSecurityConfig="@xml/xagent_network_security_config">
+        android:networkSecurityConfig="@xml/xgent_network_security_config">
         <activity
-            android:name="com.ohi.xagent.mobileexecution.WorkspacePickerActivity"
+            android:name="com.ohi.xgent.mobileexecution.WorkspacePickerActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>

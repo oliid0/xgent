@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "XAgent",
+  "productName": "Xgent",
   "version": "../package.json",
-  "identifier": "com.ohi.xagent",
+  "identifier": "com.ohi.xgent",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",

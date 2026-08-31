@@ -49,7 +49,7 @@
 
 | 能力 | 说明 |
 |---|---|
-| 固定 root | Skills runtime root 是 `~/.xagent/skills`。 |
+| 固定 root | Skills runtime root 是 `~/.xgent/skills`。 |
 | always-on | `skills-creator`、`skills-installer` 是 builtin always enabled skills。 |
 | 文件访问 | 已启用 skill 内部文件可通过 FS tools 的 `root="skills"` 相对路径访问。 |
 | 管理操作 | 创建、安装、ClawHub 安装、validate、package 应通过 `SkillsManager`。 |
@@ -62,7 +62,7 @@
 | read/list/search | 可用于模型按需召回完整记忆。 |
 | write/update/delete/accept | 修改 Markdown 事实源和 SQLite index，受 scope/type 校验。 |
 | daily append | daily 类型通过 append 模式维护日记型记忆，不计入 ordinary quota。 |
-| silent extraction | 隐式记忆提取阶段不直接让模型调用 mutation，而是解析 plan 后由 XAgent 应用。 |
+| silent extraction | 隐式记忆提取阶段不直接让模型调用 mutation，而是解析 plan 后由 Xgent 应用。 |
 
 ## Subagent（Agent / SendMessage）
 

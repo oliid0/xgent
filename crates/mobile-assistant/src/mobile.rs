@@ -20,7 +20,7 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 ) -> crate::Result<MobileAssistant<R>> {
     #[cfg(target_os = "android")]
     let handle =
-        api.register_android_plugin("com.ohi.xagent.mobileassistant", "MobileAssistantPlugin")?;
+        api.register_android_plugin("com.ohi.xgent.mobileassistant", "MobileAssistantPlugin")?;
     #[cfg(target_os = "ios")]
     let handle = api.register_ios_plugin(init_plugin_mobile_assistant)?;
     Ok(MobileAssistant(handle))

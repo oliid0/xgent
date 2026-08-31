@@ -867,7 +867,7 @@ mod tests {
         );
     }
 
-    /// 归一后的 systemProxy 默认值（save/load 全量断言共用）。
+    
     fn default_system_proxy_json() -> Value {
         json!({
             "enabled": false,
@@ -963,7 +963,7 @@ mod tests {
             &mut conn,
             json!({
                 "executionMode": "tools",
-                "workdir": "/tmp/xagent-default-project",
+                "workdir": "/tmp/xgent-default-project",
                 "selectedSystemTools": [],
                 "archivedWorkspaceProjectPaths": [
                     " /tmp/project-a ",
@@ -972,7 +972,7 @@ mod tests {
                     42
                 ]
             }),
-            "/tmp/xagent-default-project",
+            "/tmp/xgent-default-project",
         )
         .expect("save system");
 
@@ -995,7 +995,7 @@ mod tests {
                 "workdir": "",
                 "selectedSystemTools": []
             }),
-            "/tmp/xagent-default-project",
+            "/tmp/xgent-default-project",
         )
         .expect("save system");
 
@@ -1011,13 +1011,13 @@ mod tests {
                 "terminalShell": "auto",
                 "toolPolicies": {},
                 "systemProxy": default_system_proxy_json(),
-                "workdir": "/tmp/xagent-default-project",
+                "workdir": "/tmp/xgent-default-project",
                 "selectedSystemTools": [],
                 "workspaceProjects": [
                     {
                         "id": DEFAULT_WORKSPACE_PROJECT_ID,
                         "name": DEFAULT_WORKSPACE_PROJECT_NAME,
-                        "path": "/tmp/xagent-default-project",
+                        "path": "/tmp/xgent-default-project",
                         "kind": "managed",
                         "createdAt": 1,
                         "updatedAt": 1
@@ -1034,13 +1034,13 @@ mod tests {
             &mut conn,
             json!({
                 "executionMode": "tools",
-                "workdir": "/tmp/xagent-default-project",
+                "workdir": "/tmp/xgent-default-project",
                 "selectedSystemTools": [],
                 "workspaceProjects": [
                     {
                         "id": DEFAULT_WORKSPACE_PROJECT_ID,
                         "name": DEFAULT_WORKSPACE_PROJECT_NAME,
-                        "path": "/tmp/xagent-default-project",
+                        "path": "/tmp/xgent-default-project",
                         "kind": "managed",
                         "createdAt": 10,
                         "updatedAt": 20,
@@ -1049,7 +1049,7 @@ mod tests {
                     }
                 ]
             }),
-            "/tmp/xagent-default-project",
+            "/tmp/xgent-default-project",
         )
         .expect("save system");
 
@@ -1065,13 +1065,13 @@ mod tests {
                 "terminalShell": "auto",
                 "toolPolicies": {},
                 "systemProxy": default_system_proxy_json(),
-                "workdir": "/tmp/xagent-default-project",
+                "workdir": "/tmp/xgent-default-project",
                 "selectedSystemTools": [],
                 "workspaceProjects": [
                     {
                         "id": DEFAULT_WORKSPACE_PROJECT_ID,
                         "name": DEFAULT_WORKSPACE_PROJECT_NAME,
-                        "path": "/tmp/xagent-default-project",
+                        "path": "/tmp/xgent-default-project",
                         "kind": "managed",
                         "createdAt": 1,
                         "updatedAt": 1,
@@ -1086,7 +1086,7 @@ mod tests {
     #[test]
     fn load_system_with_defaults_returns_agent_mode_and_default_project() {
         let conn = open_memory_db();
-        let loaded = load_system_with_defaults(&conn, "/tmp/xagent-default-project")
+        let loaded = load_system_with_defaults(&conn, "/tmp/xgent-default-project")
             .expect("load system");
 
         assert_eq!(
@@ -1100,13 +1100,13 @@ mod tests {
                 "terminalShell": "auto",
                 "toolPolicies": {},
                 "systemProxy": default_system_proxy_json(),
-                "workdir": "/tmp/xagent-default-project",
+                "workdir": "/tmp/xgent-default-project",
                 "selectedSystemTools": [],
                 "workspaceProjects": [
                     {
                         "id": DEFAULT_WORKSPACE_PROJECT_ID,
                         "name": DEFAULT_WORKSPACE_PROJECT_NAME,
-                        "path": "/tmp/xagent-default-project",
+                        "path": "/tmp/xgent-default-project",
                         "kind": "managed",
                         "createdAt": 1,
                         "updatedAt": 1
@@ -1155,7 +1155,7 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn ccswitch_db_candidates_include_home_env_fallback_on_windows() {
-        // 候选列表必须覆盖 ccswitch v3.10.3 在 `%HOME%\.cc-switch\` 的遗留库位置。
+        
         let previous = std::env::var("HOME").ok();
         std::env::set_var("HOME", "C:\\legacy-home");
         let candidates = ccswitch_db_candidates();

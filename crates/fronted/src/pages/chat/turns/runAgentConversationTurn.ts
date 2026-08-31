@@ -5,7 +5,7 @@ import type {
   ToolCall,
   ToolResultMessage,
 } from "@earendil-works/pi-ai";
-import { getLanPcCommandHostConfig } from "@xagent/runtime";
+import { getLanPcCommandHostConfig } from "@xgent/runtime";
 import { ASK_USER_QUESTION_TOOL_NAME } from "../../../lib/chat/askUserQuestion";
 import type { CompactionController } from "../../../lib/chat/compaction/controller";
 import { estimateTextTokenUnits } from "../../../lib/chat/compaction/tokenLedger";
@@ -299,7 +299,7 @@ export type RunAgentConversationTurnParams = {
   sshManagerRemoteAllowed?: boolean;
   onSshSessionsChanged?: (change: SshManagerSessionChange) => void;
   sessionId: string;
-  /** Run 级任务状态存储：由 send 管线构建，提交走非终态持久化。 */
+
   taskStateStore: TaskStateStore;
   conversationId: string;
   checkpointTurnId?: string;
@@ -344,15 +344,15 @@ export type RunAgentConversationTurnParams = {
   memoryExtractionModel?: MemoryExtractionModelConfig;
   onMemoryExtractionModelFailure?: (model: MemoryExtractionModelConfig) => void;
   memoryExtractionStatusText?: MemoryExtractionStatusText;
-  /** 轨迹埋点；缺省时不记录，对话行为完全不变。 */
+
   trajectory?: TrajectoryRecorder;
-  /** 本轮在会话中的 turn 序号（1-based），供轨迹归位。 */
+
   trajectoryTurn?: number;
-  /** 用户消息在完整会话中的 0-based messageIndex，供分支/重发精确裁剪。 */
+
   trajectoryMessageIndex?: number;
-  /** 用户消息稳定 id；正文窗口优先按它与轨迹 turn 对齐。 */
+
   trajectoryMessageId?: string;
-  /** 读取最近一次上下文构建的 system prompt 分段，供轨迹分段去重。 */
+
   readTrajectorySlots?: () => {
     base?: string;
     agent?: string;
@@ -450,25 +450,17 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     }
   };
   const subagentStoreReadyStartedAt = perfNowMs();
-  // roster 拆两段：身份字段（id / name / role / mode）稳定，留在 systemPrompt；
-  // 运行状态（status / last_task / last_summary）随子代理 run 推进而变，后置到消息尾部，
-  // 否则每推进一次状态就改写 systemPrompt，system 块连同其后的全部历史一并作废。
+
   let rosterIdentitySection = "";
-  // 消息总线快照同样按“压缩纪元”冻结：只在 run 起始与各压缩边界重算。
-  // run 内新到的子 agent 消息不回头改写 systemPrompt（那会作废 system 块及其后
-  // 的全部历史），改由 renderMessageBusDelta 渲染成增量块挂到消息尾部投递——
-  // 尾部本就在缓存断点之后、每轮重读，追加不额外损失命中率。
+
   let parentMessageBusSnapshot = "";
-  // 已渲染进上下文的 bus 游标（seq）：run 内只投递其后的增量。
+
   let renderedBusSeq = 0;
-  // 当前冻结快照实际覆盖到的 seq。必须与 renderedBusSeq 分开记：后者会被尾部增量
-  // 推进，快照却只在压缩边界重算，两者在 run 内本就不成对。
+
   let frozenBusSeq = 0;
   const refreezeParentMessageBus = async () => {
     const messages = await loadParentBusMessages();
-    // 读失败时保持上一份快照，并把游标退回该快照覆盖的位置：调用点都在压缩之后，
-    // 挂着增量的尾部块可能已被截断，游标停在原处会让那段消息既不在快照里也不在
-    // 历史里，永久丢失。退回后下一轮重投——重投只多花 token，丢消息不可逆。
+
     if (!messages) {
       renderedBusSeq = frozenBusSeq;
       return;
@@ -479,9 +471,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       currentAgentName: PARENT_MESSAGE_BUS_AGENT_NAME,
     });
     parentMessageBusSnapshot = snapshot.text;
-    // 游标必须用快照实际覆盖到的 seq（连续已渲染前缀），不能用全体可见消息的
-    // 最大 seq：快照有条数上限，被配额挤掉的消息若被游标跳过，就既不在快照里
-    // 也不会再被 delta 投递，静默丢失。
+
     frozenBusSeq = snapshot.renderedSeq;
     renderedBusSeq = frozenBusSeq;
   };
@@ -517,10 +507,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
   };
   let currentTrajectoryRuntimeContext = buildTrajectoryRuntimeContext([]);
   const lastRecordedRuntimeContextBySource = new Map<string, string>();
-  // 已投递进上下文的 roster 易变段：与 bus 的 seq 游标同理，只有真正挂上才推进。
-  // run 起始不投递——此时消息尾部还没有安全锚点（末条是 user 消息），首次投递发生在
-  // 第一轮工具结果之后；在那之前 Agent 工具描述里的 roster 已带有 status / summary，
-  // 模型真要委派时看得到。
+
   let renderedRosterRunStatus = "";
   const buildRosterRunStatusDelta = () => {
     if (!subagentStore) return "";
@@ -534,20 +521,12 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       console.warn("Failed to render the subagent run status", error);
       return "";
     }
-    // 内容没变就不投递：每轮无条件追加等于亲手打穿缓存。
+
     return section === renderedRosterRunStatus ? "" : section;
   };
-  // 任务状态快照按“压缩纪元”冻结：只在 run 起始与各压缩边界重算，run 内不再重读。
-  // 缓存前缀按字节匹配，systemPrompt 排在全部消息之前——每轮重读 meta.taskList
-  // 等于每次 TaskUpdate 都改写前缀，system 块连同其后的全部历史一并作废。
-  // 模型感知任务状态的主通道是 TaskCreate / TaskUpdate / TaskList 的工具结果，
-  // 这份 JSON 只在历史被压缩截断、工具结果被摘要掉之后才不可替代（见
-  // formatTaskListRuntimeContext 的文案），而那一刻前缀本来就要重建，重新冻结是
-  // 免费的。代价是 run 内新建的任务不出现在 system 段，由工具结果覆盖。
+
   let frozenTaskListContext = "";
   const refreezeTaskListContext = () => {
-    // 只注入本 Run 的权威任务状态：edit-resend 等路径可能把上一 Run 持久化的
-    // taskList 带回 meta，工具层按 runId 视其为不存在，注入必须同口径。
     const taskList = getNextConversationState().meta.taskList;
     frozenTaskListContext =
       taskList && taskList.runId === taskStateStore.runId
@@ -556,11 +535,9 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     return frozenTaskListContext;
   };
   refreezeTaskListContext();
-  // Plan mode 段:turn 级快照、run 内恒定文本,与 frozenTaskListContext 同列
-  // 冻结注入——system 段任何变动都会作废整条前缀缓存,绝不能随状态中途改写。
+
   const planModeSection = planModeEnabled ? buildPlanModeSystemPromptSection() : "";
-  // Plan mode 运行策略(turn 级实例):有界升级状态机——终止谓词、轮数熔断、
-  // 重复调用守卫、run 后的补提交/兜底裁决全部收敛于此,runner 保持模式无关。
+
   const planRunPolicy = planModeEnabled ? createPlanModeRunPolicy({ conversationId }) : null;
   const withAgentRuntimeContext = (context: Context): Context => {
     let systemPrompt = context.systemPrompt;
@@ -576,8 +553,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     if (frozenTaskListContext) {
       systemPrompt = appendSystemPrompt(systemPrompt, frozenTaskListContext);
     }
-    // 轨迹 runtime 段与真实注入同口径：只记录此刻真的拼进 systemPrompt 的部分，
-    // builder 会跳过空段，与上方 appendSystemPrompt 的条件一一对应。
+
     currentTrajectoryRuntimeContext = buildTrajectoryRuntimeContext([
       { source: "plan-mode", text: planModeSection },
       { source: "subagent-roster", text: rosterIdentitySection },
@@ -927,9 +903,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
 
   function queueToolCallDelta(toolCall: ToolCall, round: number) {
     if (!shouldShowToolEvent(toolCall)) return;
-    // 提问卡必须等问题与选项全部生成完毕且工具真正开始执行后再显示：
-    // 流式增量与 onToolCall 都只做内部记账，双端统一由
-    // onToolExecutionStart 发布可交互卡片。
+
     if (toolCall.name === ASK_USER_QUESTION_TOOL_NAME) return;
     pendingToolCallDeltas.set(toolCallDeltaKey(round, toolCall.id), { round, toolCall });
     schedulePendingToolCallDeltaFlush();
@@ -943,8 +917,6 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     }
   }
 
-  // Plan mode 文本兜底产出的合成消息对(assistant toolCall + toolResult),
-  // 随最终状态一次性落盘;卡片在 turn 落定后由持久化消息渲染。
   let planFallbackMessages: Message[] = [];
   const lastVisibleAssistantText = (messages: readonly Message[]): string => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -971,8 +943,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
         }),
     );
     pendingAgentContext = null;
-    // 主请求跑在派生 scope 上：mid-stream 压缩只 abort 该 scope，用户停止
-    // （userStop）随时链式传导，不存在换代窗口。
+
     const scope = cancellation.deriveScope();
     compaction.beginRequest(agentContext, getNextConversationState());
 
@@ -1082,7 +1053,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           }
 
           protectionCheckChars = 0;
-          // O(1) 账本判定，触发时才 abort 本地 scope 并在 catch 中构建压缩输入。
+
           if (!compaction.shouldProtectMidStream(streamedAgentTokenUnits)) return;
           midStreamCompactionRequested = true;
           scope.controller.abort();
@@ -1212,8 +1183,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           if (assistant.role !== "assistant") return;
           // Some transports only surface a final message (no incremental text/tool callback).
           trajectory.firstToken(round);
-          // stepEnd 记在这里而不是工具执行之后：这样 step 的耗时是纯模型时间，
-          // 工具各有自己的区间，甘特图上不会把工具时间重复计进模型泳道。
+
           const trajectoryUsage = toTrajectoryUsage(assistant.usage);
           const terminalInfo = trajectoryTerminalInfo(assistant);
           trajectory.stepEnd(round, {
@@ -1286,15 +1256,11 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
               includeUploadedFilesMetadata: true,
             }),
           );
-          // 尾部投递：systemPrompt 里的 bus 快照与 roster 身份段都已冻结，run 内新到的
-          // bus 消息与推进后的 roster 运行状态合并成**同一个**块作为 wireTailText 交给
-          // runner——runner 累积后只挂到每次出站请求上，agent 运行时状态与
-          // emittedMessages 始终不含它，不会泄漏进持久化、UI 与记忆抽取。
+
           const busDelta = await buildParentMessageBusDelta();
           const rosterRunStatusDelta = buildRosterRunStatusDelta();
           const tailBlockText = [busDelta.text, rosterRunStatusDelta].filter(Boolean).join("\n\n");
-          // 探锚：只判断尾部块此刻能否安全挂上（解析得到锚点 = 可挂），不改写
-          // tempContext.messages 本身。真正的挂载与锚点钉死发生在 runner 侧。
+
           const tailBlockAttachable =
             Boolean(tailBlockText) && resolveTailBlockAnchorId(tempContext.messages) !== null;
           const { context: compactedContext } = await compaction.compactDuringRun({
@@ -1305,11 +1271,10 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
             includeUploadedFilesMetadata: true,
           });
           if (!compactedContext) {
-            // 没有增量时返回 null：不产生任何额外内容，运行时状态原样续跑。
             if (!tailBlockAttachable) {
               return null;
             }
-            // 只有确认能挂上才推进游标与基线；没有安全锚点时下一轮重试，避免丢内容。
+
             renderedBusSeq = busDelta.lastSeq;
             if (rosterRunStatusDelta) {
               renderedRosterRunStatus = rosterRunStatusDelta;
@@ -1322,13 +1287,11 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           }
           latestAgentEmittedMessages = [];
           clearPersistableAgentProgress();
-          // 压缩边界②：run 内压缩后重新冻结，必须赶在下面组装续跑上下文之前。
+
           refreezeTaskListContext();
-          // 压缩会截断历史，runner 里累积的尾部投递内容也随本 override 不带
-          // wireTailText 而被清空，必须连同游标一起重新冻结，否则那些消息既
-          // 不在快照里也不会再被投递。
+
           await refreezeParentMessageBus();
-          // 同理：roster 易变段的投递基线也随之作废，重置后下一轮重新投递。
+
           renderedRosterRunStatus = "";
           return {
             context: withAgentRuntimeContext(compactedContext),
@@ -1348,18 +1311,11 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
         },
       );
 
-      // Plan mode 有界升级:run 正常结束但未经 ExitPlanMode 提交时,先补提交一
-      // 轮(nudge),仍未提交则把最后的助手文本兜底注册为待决计划。两步各至多
-      // 一次,turn 必然有限步收敛。
       if (planRunPolicy) {
         const decision = planRunPolicy.decideAfterRun({
           emittedMessages: result.emittedMessages,
         });
         if (decision.kind === "nudge") {
-          // 对齐 mid-stream 压缩的循环重入范式:先把本 run 的消息提交进会话
-          // 状态并重置 live 轮(避免重入后 round key 冲突、消息双渲染),再带
-          // 一条 wire-only 提醒续跑。提醒只进出站请求——不追加进会话状态,
-          // 不持久化、不进 UI 与记忆抽取。
           const interimState = appendMessagesToConversation(
             getNextConversationState(),
             result.emittedMessages,
@@ -1388,9 +1344,6 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
             planText: lastVisibleAssistantText(result.messages),
           });
           if (fallback) {
-            // 合成 ExitPlanMode 调用对追加进最终历史:协议一致(assistant
-            // toolCall + toolResult),计划卡与审批链路零改动复用;usage 置零,
-            // 不污染用量统计。
             planFallbackMessages = [
               {
                 role: "assistant",
@@ -1448,8 +1401,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       if (!compactionResult.context) {
         throw new Error("Mid-stream compaction did not provide a continuation context.");
       }
-      // 压缩边界③：中途流式压缩后重新冻结，续跑上下文在下一轮循环由
-      // withAgentRuntimeContext 包装 pendingAgentContext 时才读取冻结值。
+
       refreezeTaskListContext();
       await refreezeParentMessageBus();
       renderedRosterRunStatus = "";
@@ -1545,7 +1497,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       ? { status: "complete" }
       : trajectoryTerminalInfo(pendingTerminalAssistantMeta.assistant),
   );
-  // 落盘与历史写入对齐：turn 边界是账本的一致点，之后的记忆提取不属于本轮轨迹。
+
   await trajectory.flush();
 
   // Memory extraction reads the in-memory final state. Only run it after the

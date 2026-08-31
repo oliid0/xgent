@@ -59,7 +59,7 @@ test("collectChangedFiles aggregates Write/Edit stats per file across rounds", (
   assert.ok(summary);
   assert.equal(summary.files.length, 2);
   const [app, readme] = summary.files;
-  // Write(3 行) + Edit(真 diff：+1/-0)，同文件跨 round 合并。
+  
   assert.equal(app.path, "src/app.ts");
   assert.equal(app.added, 4);
   assert.equal(app.removed, 0);

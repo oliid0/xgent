@@ -11,7 +11,7 @@ import {
   isBrowserRuntime,
   LAN_PC_SESSION_CHANGED_EVENT,
   listen,
-} from "@xagent/runtime";
+} from "@xgent/runtime";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { useConfirmDialog } from "./components/astryx/useConfirmDialog";
@@ -76,7 +76,7 @@ function AppChrome(props: { children: ReactNode; nativeMobile?: boolean }) {
     <ContextMenu {...contextMenuProps}>
       <VStack
         data-native-mobile={props.nativeMobile ? "true" : undefined}
-        height="var(--xagent-viewport-height)"
+        height="var(--xgent-viewport-height)"
         width="100%"
         gap={0}
         className="app-safe-area app-chrome"
@@ -344,7 +344,6 @@ export default function App() {
     });
   }, [settings.locale]);
 
-  // 同步主题 class 到 <html> 根节点
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", effectiveTheme === "dark");
@@ -519,7 +518,6 @@ export default function App() {
     setSettingsOpen(false);
   }, []);
 
-  // 构建 locale context value，避免每次渲染重新创建
   const localeContextValue = useMemo(
     () => ({
       locale: effectiveLocale,
@@ -645,10 +643,8 @@ export default function App() {
                 }}
                 purpose="form"
                 variant={compactSettingsDialog ? "fullscreen" : "standard"}
-                width="var(--xagent-settings-dialog-width)"
-                maxHeight={
-                  compactSettingsDialog ? "100dvh" : "var(--xagent-settings-dialog-height)"
-                }
+                width="var(--xgent-settings-dialog-width)"
+                maxHeight={compactSettingsDialog ? "100dvh" : "var(--xgent-settings-dialog-height)"}
                 padding={0}
                 aria-label={translate("settings.title", settings.locale)}
               >

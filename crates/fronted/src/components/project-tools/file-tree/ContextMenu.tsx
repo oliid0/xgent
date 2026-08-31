@@ -1,7 +1,7 @@
 // Native Astryx context menu for the workspace file tree.
 //
 // Shared by every frontend runtime; only relative, npm-package, or
-// @xagent/runtime imports are allowed here.
+// @xgent/runtime imports are allowed here.
 
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
 import { useToast } from "@astryxdesign/core/Toast";
@@ -184,7 +184,7 @@ export function FileTreeContextMenu(props: FileTreeContextMenuProps) {
     <ContextMenu
       items={items}
       label={t("projectTools.fileTree.copyPath")}
-      menuWidth="var(--xagent-file-tree-context-menu-width)"
+      menuWidth="var(--xgent-file-tree-context-menu-width)"
       size="sm"
       onOpenChange={(isOpen) => {
         if (!isOpen) onClose();

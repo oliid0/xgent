@@ -147,7 +147,7 @@ export function WorkspaceNavigationRail(props: WorkspaceNavigationRailProps) {
         items={soulMenuItems}
         isMenuOpen={soulMenuOpen}
         onOpenChange={setSoulMenuOpen}
-        menuWidth="var(--xagent-soul-menu-width)"
+        menuWidth="var(--xgent-soul-menu-width)"
         placement="end"
         alignment="end"
         hasChevron={false}
@@ -180,7 +180,7 @@ export function WorkspaceNavigationRail(props: WorkspaceNavigationRailProps) {
       style={{
         height: "100%",
         flexShrink: 0,
-        zIndex: "var(--xagent-z-workspace-navigation)",
+        zIndex: "var(--xgent-z-workspace-navigation)",
       }}
     >
       <SideNavSection title={t("sidebar.navigation")} isHeaderHidden>

@@ -8,7 +8,7 @@ configs:
   debug: debug
   release: release
 packages:
-  XAgentMobileShellFrameworks:
+  XgentMobileShellFrameworks:
     path: ../../../../mobile-execution/ios-frameworks
 settingGroups:
   app:
@@ -89,8 +89,8 @@ targets:
     dependencies:
       - framework: {{ lib-output-file-name }}
         embed: false
-      - package: XAgentMobileShellFrameworks
-        product: XAgentMobileShellFrameworks
+      - package: XgentMobileShellFrameworks
+        product: XgentMobileShellFrameworks
       {{~#each ios-libraries}}
       - framework: {{this}}
         embed: false{{/each}}{{#if ios-vendor-frameworks}}{{~#each ios-vendor-frameworks}}

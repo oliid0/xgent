@@ -40,7 +40,7 @@ fn validate_websocket_url(provider: &Map<String, Value>) -> Result<(), String> {
     let endpoint = require_provider_text(provider, "websocketUrl", "WebSocket 地址")?;
     let request = endpoint
         .into_client_request()
-        .map_err(|_| "WebSocket 地址必须是完整的 wss:// 地址".to_string())?;
+        .map_err(|_| "WebSocket 地址必须是完整的 wss:
     let has_user_info = request
         .uri()
         .authority()
@@ -49,7 +49,7 @@ fn validate_websocket_url(provider: &Map<String, Value>) -> Result<(), String> {
         || request.uri().host().is_none()
         || has_user_info
     {
-        return Err("WebSocket 地址必须是完整的 wss:// 地址".to_string());
+        return Err("WebSocket 地址必须是完整的 wss:
     }
     Ok(())
 }

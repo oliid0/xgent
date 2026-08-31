@@ -19,10 +19,10 @@ import type {
   RuntimeFileDropEvent,
   RuntimeInvokeArgs,
   RuntimeUnlisten,
-  XAgentRuntime,
+  XgentRuntime,
 } from "./types";
 
-export const tauriRuntime: XAgentRuntime = {
+export const tauriRuntime: XgentRuntime = {
   invoke<T>(command: string, args?: RuntimeInvokeArgs) {
     if (shouldDelegateCommandToLanPc(command, args)) {
       const host = getLanPcCommandHostConfig();

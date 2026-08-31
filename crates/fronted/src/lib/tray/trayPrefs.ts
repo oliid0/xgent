@@ -5,7 +5,7 @@ export type TrayPrefs = {
   showRunningBadge: boolean;
 };
 
-const STORAGE_KEY = "xagent.trayPrefs.v1";
+const STORAGE_KEY = "xgent.trayPrefs.v1";
 
 export const DEFAULT_TRAY_PREFS: TrayPrefs = {
   showConversationTitles: true,

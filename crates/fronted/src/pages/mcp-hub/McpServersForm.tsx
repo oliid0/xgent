@@ -13,7 +13,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
-import { isBrowserRuntime } from "@xagent/runtime";
+import { isBrowserRuntime } from "@xgent/runtime";
 import { type FormEvent, memo, useEffect, useMemo, useState } from "react";
 import { ConfirmDeletePopover } from "../../components/astryx/ConfirmActionPopover";
 import { ToolPolicyToggle } from "../../components/hub/ToolPolicyToggle";

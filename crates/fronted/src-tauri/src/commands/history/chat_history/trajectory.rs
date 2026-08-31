@@ -1,22 +1,17 @@
-// 轨迹事件与 prompt 分段的持久化。
+
 //
-// 事件挂在 `chatHistorySegment.trajectory_json` 上；整段删除由外键生命周期处理，
-// 但分支和段内 edit-resend 仍需显式裁剪，相关逻辑位于 trajectory_lifecycle.rs。
+
+
 //
-// 追加不做事件去重：读取侧的 `buildTrajectoryLedger` 按事件身份幂等收敛。
-// 单次追加在 SQLite 事务内执行，避免并发读改写静默覆盖。
+
+
 
 use sha2::{Digest as TrajectoryDigest, Sha256 as TrajectorySha256};
 use std::collections::HashSet as TrajectorySectionIdSet;
 
-/// 单个分段的事件上限，超出后拒绝继续追加。
-///
-/// 正常长回合约 150 条 / 18 KB，这个上限留了两个数量级的余量，只用于挡住
-/// 埋点失控（例如某个循环反复发同一条）导致数据库无界增长。
+
 const TRAJECTORY_MAX_EVENTS_BYTES: usize = 8 * 1024 * 1024;
 
-/// 单份 prompt 分段的上限。memory overview 自身有 16 KB 帽，工具目录序列化后
-/// 通常几十 KB；1 MB 足够容纳异常大的 system prompt 又不至于失控。
 const TRAJECTORY_MAX_SECTION_BYTES: usize = 1024 * 1024;
 /// SYSTEM details need current+previous request slots; 64 leaves ample room while
 /// preventing an authenticated client from constructing an unbounded SQLite IN query.
@@ -43,19 +38,16 @@ pub struct TrajectorySectionRecord {
 #[serde(rename_all = "camelCase")]
 pub struct TrajectoryEventsResponse {
     pub conversation_id: String,
-    /// 全会话事件的扁平 JSON 数组文本；无记录时为 `[]`。
-    pub events_json: String,
+        pub events_json: String,
     pub segment_count: i64,
-    /// 是否有分段因触顶而停止记录，UI 据此提示轨迹不完整。
-    pub truncated: bool,
+        pub truncated: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrajectoryAppendResult {
     pub stored_bytes: i64,
-    /// true 表示本次事件被上限拒绝，没有写入。
-    pub truncated: bool,
+        pub truncated: bool,
 }
 
 fn parse_event_array(raw: &str, label: &str) -> Result<Vec<Value>, String> {
@@ -71,10 +63,7 @@ fn parse_event_array(raw: &str, label: &str) -> Result<Vec<Value>, String> {
     }
 }
 
-/// 追加事件到指定分段。
-///
-/// 分段不存在时返回错误而不是静默建段：轨迹永远跟随已存在的消息分段，凭空建段
-/// 会产生没有消息的孤儿轨迹。
+
 fn append_trajectory_events_sync(
     conn: &Connection,
     conversation_id: &str,
@@ -131,7 +120,7 @@ fn append_trajectory_events_sync(
         serde_json::to_string(&merged).map_err(|e| format!("序列化轨迹事件失败：{e}"))?;
 
     if serialized.len() > TRAJECTORY_MAX_EVENTS_BYTES {
-        // 触顶标记必须持久化；否则重启后读取侧会把不完整轨迹误报为完整。
+        
         tx.execute(
             "UPDATE chatHistorySegment SET trajectory_truncated = 1
              WHERE conversation_id = ?1 AND segment_index = ?2",
@@ -189,7 +178,7 @@ fn load_trajectory_events_sync(
         match parse_event_array(&raw, "轨迹事件") {
             Ok(items) => events.extend(items),
             Err(_) => {
-                // 单个分段损坏只让该段降级，其余分段照常返回。
+                
                 truncated = true;
             }
         }
@@ -324,7 +313,7 @@ fn put_trajectory_sections_sync(
     for section in sections {
         validate_trajectory_section(section)?;
         if section.content.len() > TRAJECTORY_MAX_SECTION_BYTES {
-            // 详情缺失是允许的诊断降级；事件骨架仍可继续写入和查看。
+            
             continue;
         }
         let section_id = section.section_id.trim();

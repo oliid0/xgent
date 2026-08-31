@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 
 export type MobileAssistantBackend = "desktop-unavailable" | "android-native" | "ios-native";
 export type MobilePermissionState = "granted" | "denied" | "prompt";

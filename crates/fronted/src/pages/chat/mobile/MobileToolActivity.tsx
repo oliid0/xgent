@@ -143,7 +143,7 @@ export function MobileToolActivity({
             language="json"
             size="sm"
             width="100%"
-            maxHeight="var(--xagent-tool-input-max-height)"
+            maxHeight="var(--xgent-tool-input-max-height)"
             isWrapped
             container="section"
           />
@@ -157,7 +157,7 @@ export function MobileToolActivity({
                 language="plaintext"
                 size="sm"
                 width="100%"
-                maxHeight="var(--xagent-tool-output-max-height)"
+                maxHeight="var(--xgent-tool-output-max-height)"
                 isWrapped
                 container="section"
               />
@@ -184,7 +184,7 @@ export function MobileToolActivity({
             variant="secondary"
             size="sm"
             elevation="high"
-            width="var(--xagent-mobile-activity-width)"
+            width="var(--xgent-mobile-activity-width)"
             onClick={() => {
               const kind = capsuleItem ? activityKind(capsuleItem.toolCall.name) : "tool";
               if (kind === "browser" && onOpenBrowser) {

@@ -2,7 +2,7 @@
 // directly; the paired WebUI uses the same command/event API through the
 // authenticated local-access bridge.
 
-import { invoke, listen } from "@xagent/runtime";
+import { invoke, listen } from "@xgent/runtime";
 
 import type {
   AutomationApplyInput,

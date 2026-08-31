@@ -354,7 +354,7 @@ final class IOSExternalWorkspaceStore {
     }
 
     private static func probeWritable(at url: URL) -> Bool {
-        let probe = url.appendingPathComponent(".xagent-write-\(UUID().uuidString)")
+        let probe = url.appendingPathComponent(".xgent-write-\(UUID().uuidString)")
         do {
             try Data([0]).write(to: probe, options: .atomic)
             try? FileManager.default.removeItem(at: probe)

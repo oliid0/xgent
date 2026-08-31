@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { type AppSettings, normalizeSttSettings } from "../../lib/settings";
 import type { SttConnectionTestResponse, SttSecretField, SttSettingsService } from "./types";
 

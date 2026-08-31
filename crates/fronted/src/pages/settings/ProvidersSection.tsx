@@ -28,7 +28,7 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput as Input, TextInput } from "@astryxdesign/core/TextInput";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmActionPopover } from "../../components/astryx/ConfirmActionPopover";
 import {
@@ -182,7 +182,7 @@ function ProviderBrandIcon({ type }: { type: ProviderId }) {
 }
 
 const REDACTED_API_KEY_DISPLAY = "API Key";
-const CHERRY_DATA_PATH_STORAGE_KEY = "xagent.cherryStudioDataPath";
+const CHERRY_DATA_PATH_STORAGE_KEY = "xgent.cherryStudioDataPath";
 
 // A local rescan usually returns within a frame, which makes the refresh
 // feedback flash for a single frame. Hold the loading state for one full
@@ -229,7 +229,6 @@ function parsePositiveInteger(input: string): number | null {
   return normalized > 0 ? normalized : null;
 }
 
-// 单价输入：留空视为未配置（0），负数与非数字视为非法。
 function parseCostRate(input: string): number | null {
   const trimmed = input.trim();
   if (!trimmed) return 0;
@@ -1934,7 +1933,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                     }}
                     placement="below"
                     alignment="start"
-                    width="var(--xagent-provider-header-menu-width)"
+                    width="var(--xgent-provider-header-menu-width)"
                     label={t("settings.customHeaderKeyPlaceholder")}
                     role="none"
                     hasAutoFocus={false}
@@ -2258,7 +2257,7 @@ function ProviderAdvancedSettingsPanel(
       <StackItem size="fill" isScrollable>
         <VStack
           width="100%"
-          maxWidth="var(--xagent-settings-content-max-width)"
+          maxWidth="var(--xgent-settings-content-max-width)"
           gap={5}
           padding={5}
           style={{ marginInline: "auto" }}
@@ -2407,7 +2406,7 @@ function cherryProviderName(item: CherryProviderImportItem, allItems: CherryProv
 }
 
 // Re-syncing an existing provider must not silently revert an API key the
-// user already configured in XAgent; like `name`, the existing key wins.
+// user already configured in Xgent; like `name`, the existing key wins.
 function cherryEffectiveApiKey(item: CherryProviderImportItem, existing?: CustomProvider) {
   return existing?.apiKey?.trim() ? existing.apiKey : item.apiKey;
 }
@@ -3011,7 +3010,7 @@ function ProviderList(props: {
               isMenuOpen={syncMenuOpen}
               onOpenChange={handleSyncMenuOpenChange}
               alignment="end"
-              menuWidth="var(--xagent-provider-import-menu-width)"
+              menuWidth="var(--xgent-provider-import-menu-width)"
               items={[
                 {
                   id: "refresh",
@@ -3317,8 +3316,6 @@ export function ProvidersSection(
     return imported;
   }
 
-  // 后台补拉模型列表：失败只体现在 ccsMessage 里，导入的配置不受影响。
-  // 恒带 useSystemProxy —— 反代按应用代理配置出网（未启用=直连）。
   async function syncCcsModelsInBackground(
     transferable: CcsProviderImportItem[],
     importedSummary: string,

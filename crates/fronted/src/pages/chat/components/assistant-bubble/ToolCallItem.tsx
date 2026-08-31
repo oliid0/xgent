@@ -137,7 +137,7 @@ function ToolArguments({ item }: { item: ToolTraceItem }) {
       hasLanguageLabel={false}
       size="sm"
       width="100%"
-      maxHeight="var(--xagent-tool-input-max-height)"
+      maxHeight="var(--xgent-tool-input-max-height)"
       container="section"
     />
   );
@@ -281,7 +281,7 @@ export function ToolCallDetail({ item, isRunning }: { item: ToolTraceItem; isRun
                       hasLanguageLabel={false}
                       size="sm"
                       width="100%"
-                      maxHeight="var(--xagent-tool-output-max-height)"
+                      maxHeight="var(--xgent-tool-output-max-height)"
                       container="section"
                     />
                   </Banner>
@@ -295,7 +295,7 @@ export function ToolCallDetail({ item, isRunning }: { item: ToolTraceItem; isRun
                     hasLanguageLabel={false}
                     size="sm"
                     width="100%"
-                    maxHeight="var(--xagent-tool-output-max-height)"
+                    maxHeight="var(--xgent-tool-output-max-height)"
                   />
                 );
               }
@@ -307,7 +307,7 @@ export function ToolCallDetail({ item, isRunning }: { item: ToolTraceItem; isRun
                     hasLanguageLabel={false}
                     size="sm"
                     width="100%"
-                    maxHeight="var(--xagent-tool-output-max-height)"
+                    maxHeight="var(--xgent-tool-output-max-height)"
                     container="section"
                   />
                 </Collapsible>

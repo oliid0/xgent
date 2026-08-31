@@ -6,7 +6,7 @@ import { Popover } from "@astryxdesign/core/Popover";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Text as AstryxText } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
-import { openUrl } from "@xagent/runtime";
+import { openUrl } from "@xgent/runtime";
 import {
   type ClipboardEvent,
   type FocusEvent,
@@ -1737,7 +1737,7 @@ function Popup({
       }}
       placement="above"
       alignment="start"
-      width="var(--xagent-composer-popup-width)"
+      width="var(--xgent-composer-popup-width)"
       label={trigger === "skill" ? "Skills" : "文件"}
       role="none"
       hasAutoFocus={false}
@@ -1922,9 +1922,9 @@ function CommitMentionCard({
       direction="vertical"
       className="overflow-y-auto"
       style={{
-        minWidth: "var(--xagent-hover-card-min-width)",
-        maxWidth: "var(--xagent-hover-card-width)",
-        maxHeight: "var(--xagent-hover-card-height)",
+        minWidth: "var(--xgent-hover-card-min-width)",
+        maxWidth: "var(--xgent-hover-card-width)",
+        maxHeight: "var(--xgent-hover-card-height)",
       }}
       onMouseDown={(event) => event.preventDefault()}
       onMouseEnter={onMouseEnter}
@@ -3471,7 +3471,7 @@ export const MentionComposer = memo(
             }}
             placement="above"
             alignment="start"
-            width="var(--xagent-hover-card-width)"
+            width="var(--xgent-hover-card-width)"
             label={commitTooltip.subject || commitTooltip.shortSha}
             role="dialog"
             hasAutoFocus={false}
@@ -3488,7 +3488,7 @@ export const MentionComposer = memo(
         <ContextMenu
           items={composerContextMenuItems}
           label={contextMenuLabels.copy}
-          menuWidth="var(--xagent-context-menu-width)"
+          menuWidth="var(--xgent-context-menu-width)"
           size="sm"
           data-testid="mention-composer-context-trigger"
           isDisabled={preferNativeContextMenu}

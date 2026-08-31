@@ -85,7 +85,7 @@ pub(crate) fn canonicalize_workdir(workdir: &str) -> Result<PathBuf, String> {
 }
 
 /// Canonicalize `workdir` and assert it stays inside `project_root`.
-///
+
 /// Both sides are canonicalized before comparison so symlinks, `..` segments and
 /// platform path shapes (Windows casing/separators, macOS `/var` -> `/private/var`)
 /// cannot be used to escape the project. Pane layout JSON is not an authorization
@@ -149,7 +149,7 @@ pub(crate) fn create_zsh_prompt_overlay(prompt: &str) -> Option<PathBuf> {
     let base = dirs::cache_dir()
         .or_else(dirs::home_dir)
         .unwrap_or_else(std::env::temp_dir);
-    let zdotdir = base.join("xagent-zsh");
+    let zdotdir = base.join("xgent-zsh");
     if fs::create_dir_all(&zdotdir).is_err() {
         return None;
     }
@@ -159,7 +159,7 @@ pub(crate) fn create_zsh_prompt_overlay(prompt: &str) -> Option<PathBuf> {
     let user_zshenv = home.join(".zshenv");
 
     let zshenv_content = format!(
-        "export _XAGENT_REAL_ZDOTDIR=\"$HOME\"\n\
+        "export _XGENT_REAL_ZDOTDIR=\"$HOME\"\n\
          [[ -f \"{}\" ]] && source \"{}\"\n",
         user_zshenv.display(),
         user_zshenv.display(),

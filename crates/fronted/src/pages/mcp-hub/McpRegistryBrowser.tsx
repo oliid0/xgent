@@ -433,7 +433,7 @@ function McpConfigureModal(props: {
       variant="standard"
       purpose="form"
       aria-label={t("mcpHub.storeConfigureTitle")}
-      width="min(var(--xagent-settings-dialog-width), calc(100dvw - (var(--spacing-4) * 2)))"
+      width="min(var(--xgent-settings-dialog-width), calc(100dvw - (var(--spacing-4) * 2)))"
       padding={0}
     >
       <form onSubmit={handleSubmit}>
@@ -686,7 +686,7 @@ function RegistryCard(props: {
               options={versionOptions}
               variant="ghost"
               size="sm"
-              width="var(--xagent-mcp-version-selector-width)"
+              width="var(--xgent-mcp-version-selector-width)"
               onChange={setSelectedCardId}
             />
           ) : null}
@@ -755,13 +755,13 @@ function McpRegistryPreviewDrawer(props: {
       aria-label={t("mcpHub.storePreviewTitle")}
       purpose="info"
       variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "min(var(--xagent-drawer-width), 40dvw)"}
+      width={isCompact ? "100dvw" : "min(var(--xgent-drawer-width), 40dvw)"}
       padding={0}
       style={{
         marginInlineStart: "auto",
         marginInlineEnd: 0,
-        blockSize: "var(--xagent-viewport-height)",
-        maxBlockSize: "var(--xagent-viewport-height)",
+        blockSize: "var(--xgent-viewport-height)",
+        maxBlockSize: "var(--xgent-viewport-height)",
         ...(isCompact
           ? {}
           : { borderRadius: "var(--radius-container) 0 0 var(--radius-container)" }),
@@ -1245,7 +1245,7 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
           isLabelHidden
           value={source}
           options={MCP_REGISTRY_SOURCE_OPTIONS}
-          width="var(--xagent-hub-category-control-width)"
+          width="var(--xgent-hub-category-control-width)"
           onChange={(value) => setSource(value as McpRegistrySource)}
         />
         <AstryxCoreButton

@@ -1,4 +1,4 @@
-//! Skill 校验：目录结构与元数据约束。
+
 
 use std::fs;
 use std::io::{BufRead, BufReader};

@@ -65,8 +65,6 @@ export function buildToolsSuffix(
 
   const sections: string[] = [];
 
-  // Plan mode 的行为规则由 system prompt 的 <plan-mode> 段唯一承载;这里只声明
-  // 工具面差异并指回该段,避免规则复述漂移。
   sections.push(
     planModeActive
       ? [
@@ -163,7 +161,7 @@ export function buildToolsSuffix(
     if (has("Delete")) {
       lines.push(
         "- Every intentional deletion of a file or directory inside the workspace, a writable root:// project root, or an enabled writable Skill MUST use Delete with the exact path, preferably workspace-relative, root://, or skill://. Use one Delete call per target; deleting a directory is recursive.",
-        "- NEVER perform such a deletion through Bash, ManagedProcess, a shell script, or a deletion-oriented CLI, including `rm`, `rmdir`, `unlink`, `find -delete`, `git rm`, `git clean`, PowerShell `Remove-Item`, or cmd `del` / `erase` / `rd`. Structured Delete calls are required so XAgent can record the path in Edited Files and the file ledger.",
+        "- NEVER perform such a deletion through Bash, ManagedProcess, a shell script, or a deletion-oriented CLI, including `rm`, `rmdir`, `unlink`, `find -delete`, `git rm`, `git clean`, PowerShell `Remove-Item`, or cmd `del` / `erase` / `rd`. Structured Delete calls are required so Xgent can record the path in Edited Files and the file ledger.",
         "- If a deleted workspace path is tracked by Git and staging is required, call Delete first, then stage only that path with `git add -u -- <exact-workspace-relative-path>`.",
       );
     }
@@ -226,15 +224,15 @@ export function buildToolsSuffix(
         ? [
             `- Current platform: ${platformLabel}. Bash runs through Git Bash with POSIX semantics; pwsh, Windows PowerShell, and cmd are fallbacks used only when Git Bash is not installed.`,
             "- Write POSIX/bash-compatible commands by default: `export`, `&&`, `/dev/null`, forward-slash paths.",
-            "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xagent-task.log 2>&1 < /dev/null &`.",
-            "- If a Bash result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing: switch to PowerShell syntax and suggest installing Git for Windows or setting `XAGENT_GIT_BASH_PATH`.",
+            "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xgent-task.log 2>&1 < /dev/null &`.",
+            "- If a Bash result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing: switch to PowerShell syntax and suggest installing Git for Windows or setting `XGENT_GIT_BASH_PATH`.",
           ]
         : [
             `- Current platform: ${platformLabel}. Bash runs through POSIX shells.`,
             runtimePlatform === "macos"
               ? "- macOS prefers zsh, then Bash, then sh. Use POSIX/zsh-compatible commands."
               : "- Linux prefers Bash, then zsh, then sh. Use POSIX/bash-compatible commands.",
-            "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xagent-task.log 2>&1 < /dev/null &`.",
+            "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xgent-task.log 2>&1 < /dev/null &`.",
           ];
     sections.push(
       [
@@ -260,9 +258,9 @@ export function buildToolsSuffix(
             ]
           : []),
         "- Use ManagedProcess instead of Bash for dev servers, watchers, preview servers, or anything that should keep running.",
-        "- For reading, listing, or searching Skill content, always use Read/List/Glob/Grep with skill:// paths — Bash cat/ls/find/grep/rg/sed/awk against ~/.xagent/skills is still routed back to the file tools.",
+        "- For reading, listing, or searching Skill content, always use Read/List/Glob/Grep with skill:// paths — Bash cat/ls/find/grep/rg/sed/awk against ~/.xgent/skills is still routed back to the file tools.",
         "- Do not guess `skills/` paths inside the workspace; if a Skill is needed, enable it in the chat Skills selector first.",
-        "- Do not cd into ~/.xagent/skills or workspace skills/ guesses.",
+        "- Do not cd into ~/.xgent/skills or workspace skills/ guesses.",
       ].join("\n"),
     );
   }

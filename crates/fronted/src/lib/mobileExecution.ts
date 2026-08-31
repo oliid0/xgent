@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 
 export type MobileExecutionBackend = "android-proot" | "ios-a-shell" | "unavailable";
 

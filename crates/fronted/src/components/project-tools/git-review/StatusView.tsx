@@ -7,7 +7,7 @@ import { Text as AstryxText } from "@astryxdesign/core/Text";
 // GitReview status view: staged/unstaged change lists, the commit bar, the
 // working-tree/branch diff pane and the change context menus.
 //
-// Shared by every frontend runtime; only relative or @xagent/runtime imports
+// Shared by every frontend runtime; only relative or @xgent/runtime imports
 // are allowed here.
 
 import { Button as AstryxButton, Button } from "@astryxdesign/core/Button";
@@ -320,7 +320,7 @@ export function GitReviewStatusView(props: {
         key={`${section}:${entry.kind}:${entry.oldPath ?? ""}:${entry.path}`}
         items={entryMenuItems}
         label={entry.path}
-        menuWidth="var(--xagent-git-context-menu-width)"
+        menuWidth="var(--xgent-git-context-menu-width)"
         size="sm"
       >
         <AstryxStack
@@ -460,7 +460,7 @@ export function GitReviewStatusView(props: {
               },
             },
           ]}
-          menuWidth="var(--xagent-git-context-menu-width)"
+          menuWidth="var(--xgent-git-context-menu-width)"
           placement="below"
           alignment="end"
           hasChevron={false}

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const skillSource = readFileSync(
-  new URL("../../src-tauri/prompt/skills/xagent-code-review/SKILL.md", import.meta.url),
+  new URL("../../src-tauri/prompt/skills/xgent-code-review/SKILL.md", import.meta.url),
   "utf8",
 );
 const builtinRegistrySource = readFileSync(
@@ -12,11 +12,11 @@ const builtinRegistrySource = readFileSync(
 );
 
 test("built-in code review skill is registered under a collision-resistant name", () => {
-  assert.match(skillSource, /^---\r?\nname: xagent-code-review\r?\n/m);
-  assert.match(builtinRegistrySource, /name: "xagent-code-review"/);
+  assert.match(skillSource, /^---\r?\nname: xgent-code-review\r?\n/m);
+  assert.match(builtinRegistrySource, /name: "xgent-code-review"/);
   assert.match(
     builtinRegistrySource,
-    /prompt\/skills\/xagent-code-review\/SKILL\.md/,
+    /prompt\/skills\/xgent-code-review\/SKILL\.md/,
   );
 });
 
@@ -33,7 +33,7 @@ test("built-in code review skill covers PR and local review without remote write
 });
 
 test("built-in code review seeding requires an ownership marker", () => {
-  assert.match(builtinRegistrySource, /_xagent_builtin\.json/);
+  assert.match(builtinRegistrySource, /_xgent_builtin\.json/);
   assert.match(builtinRegistrySource, /conflict_preserved/);
   assert.match(builtinRegistrySource, /builtin_skill_owns_target/);
 });

@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.ohi.xagent.browserautomation"
+    namespace = "com.ohi.xgent.browserautomation"
     compileSdk = 36
 
     defaultConfig {

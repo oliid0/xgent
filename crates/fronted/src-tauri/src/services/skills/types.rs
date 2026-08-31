@@ -1,4 +1,4 @@
-//! Skills 模块对外响应 DTO 与内部数据类型。
+
 
 use serde::Serialize;
 use std::path::PathBuf;
@@ -120,8 +120,7 @@ pub struct SystemBuiltinSkillSeedResponse {
 pub struct SystemExternalSkillEntry {
     pub name: String,
     pub description: String,
-    /// 技能目录的绝对路径，可直接作为 install 动作的 `source`。
-    pub base_dir: String,
+        pub base_dir: String,
     pub skill_file: String,
 }
 
@@ -135,8 +134,6 @@ pub struct SystemExternalToolScan {
     pub errors: Vec<String>,
 }
 
-/// 从外部工具配置文件解析出的单个 MCP Server（字段与前端 McpServerConfig 对齐，
-/// 缺省项由前端导入时补默认值）。
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemExternalMcpServerEntry {
@@ -149,8 +146,7 @@ pub struct SystemExternalMcpServerEntry {
     pub headers: std::collections::BTreeMap<String, String>,
     pub cwd: Option<String>,
     pub timeout_ms: Option<u64>,
-    /// 来源作用域："user" 或项目路径（Claude Code 的项目级配置）。
-    pub origin: String,
+        pub origin: String,
 }
 
 #[derive(Debug, Serialize, Clone)]

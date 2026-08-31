@@ -73,8 +73,7 @@ pub struct ShellSessionResponse {
     pub platform: String,
     pub profile: String,
     pub shell_family: String,
-    /// 生效的沙箱机制;None 表示未启用沙箱。
-    #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "Option::is_none")]
     pub sandbox: Option<String>,
     pub timeout_ms: Option<u64>,
 }
@@ -350,9 +349,9 @@ impl ShellSession {
                 take -= 1;
             }
             if take == 0 {
-                // 剩余配额容不下下一个完整字符：必须就地停止分页。继续扫描
-                // 后续 chunk 会把 cursor 推过本 chunk 未读的尾部，造成乱序输
-                // 出且这些字节永远无法被再次读取。
+                
+                
+                
                 break;
             }
             let fragment = &chunk.text[relative_start..relative_start + take];
@@ -433,9 +432,9 @@ impl ShellSessionManager {
         }
         let actual_cwd = resolve_shell_cwd(&workdir, cwd.as_deref())?;
         let effective_timeout_ms = normalize_explicit_timeout(timeout_ms, max_timeout_ms);
-        // 沙箱写围栏始终锚定 workdir(工作区根),即使 cwd 指向工作区子目录。
-        // 与一次性 shell_run 使用同一 canonicalize/构造逻辑,避免两个执行入口
-        // 的围栏语义漂移。
+        
+        
+        
         let sandbox_spec = match sandbox_options {
             Some(options) => Some(SandboxSpec::from_options(
                 canonical_workdir(&workdir)?,
@@ -494,9 +493,9 @@ impl ShellSessionManager {
                 .unwrap_or(DEFAULT_START_YIELD_MS)
                 .clamp(MIN_START_YIELD_MS, MAX_START_YIELD_MS),
         );
-        // 初始读取显式从 0 开始：初始等待窗口内若环形缓冲已淘汰头部输出，
-        // 响应必须置 output_truncated（cursor=None 只会“从现存缓冲起点读”，
-        // 掩盖丢失）。
+        
+        
+        
         Ok(session.wait(Some(0), yield_time))
     }
 
@@ -676,7 +675,7 @@ fn spawn_stream_reader<R: Read + Send + 'static>(
                     if let Some(session) = session.upgrade() {
                         session.append_output(
                             ShellOutputStream::Stderr,
-                            format!("XAgent failed to read shell output: {error}\n"),
+                            format!("Xgent failed to read shell output: {error}\n"),
                         );
                     }
                     break;
@@ -754,7 +753,7 @@ fn spawn_process_monitor(
                     let _ = terminate_child_process_tree(&mut child, config.termination_grace);
                     session.append_output(
                         ShellOutputStream::Stderr,
-                        format!("XAgent failed to inspect shell process: {error}\n"),
+                        format!("Xgent failed to inspect shell process: {error}\n"),
                     );
                     break (ShellSessionStatus::Failed, Some(-1));
                 }
@@ -977,9 +976,9 @@ mod tests {
 
     #[test]
     fn pagination_never_skips_a_chunk_tail_that_cannot_fit() {
-        // 回归：response 配额在多字节字符前耗尽时必须就地停止分页；曾经的
-        // continue 会跳到后续 chunk 继续取数，导致乱序输出且 cursor 越过
-        // 未读字节（该数据从此不可再读）。
+        
+        
+        
         let config = ShellSessionConfig {
             response_capacity_bytes: 3,
             ..ShellSessionConfig::default()
@@ -1097,7 +1096,7 @@ mod tests {
 
         let home = dirs::home_dir().expect("home directory");
         let outer = tempfile::Builder::new()
-            .prefix(".xagent-sandbox-session-")
+            .prefix(".xgent-sandbox-session-")
             .tempdir_in(home)
             .expect("temporary sandbox parent");
         let workspace = outer.path().join("workspace");

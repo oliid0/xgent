@@ -1,7 +1,7 @@
 // Thin, fully typed bindings over the Rust MemoryStore commands. Browser
 // runtimes use the same API through the authenticated local-access RPC bridge.
 
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import type {
   ApplyDecision,
   MemoryConfidence,

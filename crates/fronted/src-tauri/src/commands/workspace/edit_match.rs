@@ -7,7 +7,7 @@
 //! failing the edit (Claude Code runs a cascade of increasingly lenient
 //! "replacers"; Codex CLI's `apply_patch` locates context with
 //! exact → rstrip → trim passes). This module implements the same idea for
-//! XAgent's exact-string Edit tool.
+//! Xgent's exact-string Edit tool.
 //!
 //! Passes run strictest first, and the first pass that yields at least one
 //! match wins, so a stricter interpretation always takes precedence:
@@ -152,7 +152,7 @@ pub fn find_edit_matches(
 }
 
 /// Splice sorted, non-overlapping replacements into `text`.
-///
+
 /// The ranges must be ascending and non-overlapping, exactly as produced by
 /// [`find_edit_matches`]. This contract is only verified by `debug_assert!`;
 /// in release builds a violating range panics on the inverted slice below

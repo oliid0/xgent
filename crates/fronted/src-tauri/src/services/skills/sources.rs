@@ -1,4 +1,4 @@
-//! 安装源准备：GitHub / HTTP / 本地目录 / 压缩包，含下载与安全解压。
+
 
 use std::fs;
 use std::io::{self, Read, Write};
@@ -102,7 +102,7 @@ where
     let client = crate::services::system_proxy::blocking_client_builder()
         .map_err(|e| format!("Failed to create HTTP client: {e}"))?
         .timeout(Duration::from_secs(30))
-        .user_agent("xagent-skill-installer")
+        .user_agent("xgent-skill-installer")
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
     let mut response = client
@@ -111,7 +111,7 @@ where
         .map_err(|e| format!("Failed to download Skill source: {e}"))?;
     let status = response.status();
     if !status.is_success() {
-        // 注册表错误响应体通常带修复指引（如 ClawHub 409 要求 ownerHandle），截断后回显。
+        
         let mut raw = Vec::new();
         let _ = response.take(2048).read_to_end(&mut raw);
         let body = String::from_utf8_lossy(&raw);

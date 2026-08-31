@@ -2,7 +2,7 @@ import { Button as AstryxButton } from "@astryxdesign/core/Button";
 import { HoverCard } from "@astryxdesign/core/HoverCard";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Text as AstryxText } from "@astryxdesign/core/Text";
-import { openUrl } from "@xagent/runtime";
+import { openUrl } from "@xgent/runtime";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { getFileTypeIcon } from "../../../components/chat/fileTypeIcons";
 import { mentionChipClassName } from "../../../components/chat/mentionChipStyles";
@@ -557,9 +557,9 @@ function CommitReferenceCard({ commit }: { commit: CommitDisplayReference }) {
       direction="vertical"
       className="overflow-y-auto"
       style={{
-        minWidth: "var(--xagent-hover-card-min-width)",
-        maxWidth: "var(--xagent-hover-card-width)",
-        maxHeight: "var(--xagent-hover-card-height)",
+        minWidth: "var(--xgent-hover-card-min-width)",
+        maxWidth: "var(--xgent-hover-card-width)",
+        maxHeight: "var(--xgent-hover-card-height)",
       }}
     >
       <AstryxStack direction="horizontal" className="flex items-start gap-2">

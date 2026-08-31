@@ -273,8 +273,8 @@ test("local proxy preserves explicit user-agent and content-type values for the 
       "CONTENT-TYPE": "application/custom+json",
     }),
     {
-      "x-xagent-upstream-user-agent": "custom-agent/1.0",
-      "x-xagent-upstream-content-type": "application/custom+json",
+      "x-xgent-upstream-user-agent": "custom-agent/1.0",
+      "x-xgent-upstream-content-type": "application/custom+json",
     },
   );
 });
@@ -464,8 +464,8 @@ test("Codex Chat Completions streams forward reasoning effort", async () => {
   const result = localProviders.streamSimpleByApi(
     model,
     {
-      // toolChoice 只在请求真正携带 tools 时下发（无工具下发会被严格
-      // OpenAI 兼容端点 400），透传断言需要一个非空 tools。
+      
+      
       tools: [{ name: "echo", description: "Echo tool", parameters: { type: "object" } }],
       messages: [],
     },
@@ -1371,12 +1371,12 @@ test("resolveProviderCacheRetention maps provider settings and per-request overr
   assert.equal(resolve("claude_code", undefined), "short");
   assert.equal(resolve("claude_code", true, undefined, "long"), "long");
   assert.equal(resolve("claude_code", false, undefined, "long"), "none");
-  // 请求级 override（压缩/标题等辅助请求）永远优先于供应商偏好。
+  
   assert.equal(resolve("claude_code", true, "none", "long"), "none");
   assert.equal(resolve("codex", undefined), "short");
   assert.equal(resolve("codex", false), "none");
   assert.equal(resolve("codex", true, "none"), "none");
-  // long 档位仅对 Anthropic 生效。
+  
   assert.equal(resolve("codex", true, undefined, "long"), "short");
   assert.equal(resolve("gemini", true), undefined);
 });
@@ -1470,7 +1470,7 @@ test("custom model pricing from settings reaches the runtime model", () => {
   );
   assert.deepEqual(geminiModel.cost, cost);
 
-  // 目录内模型同样允许用户覆盖单价：中转计费经常与官方定价不同。
+  
   const catalogOverride = providers.createModelFromConfig(
     "codex",
     "gpt-5",

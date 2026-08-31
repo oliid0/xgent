@@ -190,7 +190,7 @@ function ChatSidebarSurface(props: {
           if (!isOpen) props.onClose();
         }}
         header={<StackItem size="fill">{props.mobileHeader}</StackItem>}
-        label="XAgent"
+        label="Xgent"
         width={360}
         side="start"
       >
@@ -208,13 +208,13 @@ function ChatSidebarSurface(props: {
       className={cn(
         "chat-history-sidebar zone-font-scale relative flex h-full shrink-0 flex-col overflow-hidden border-r border-border bg-body transition-[width,opacity] duration-200 ease-out",
         props.isOpen
-          ? "w-[var(--xagent-chat-sidebar-width)] opacity-100"
+          ? "w-[var(--xgent-chat-sidebar-width)] opacity-100"
           : "pointer-events-none w-0 opacity-0",
       )}
       style={
         {
           "--zone-font-scale": props.fontScale,
-          "--xagent-chat-sidebar-width": `${props.desktopWidth}px`,
+          "--xgent-chat-sidebar-width": `${props.desktopWidth}px`,
         } as CSSProperties
       }
     >
@@ -1964,7 +1964,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
           className={cn(
             "chat-history-sidebar-inner min-h-0 min-w-0 flex-1",
             desktopPanelMode
-              ? "md:w-[var(--xagent-chat-sidebar-width)] md:min-w-[var(--xagent-chat-sidebar-width)]"
+              ? "md:w-[var(--xgent-chat-sidebar-width)] md:min-w-[var(--xgent-chat-sidebar-width)]"
               : "md:w-[272px] md:min-w-[272px]",
           )}
         >

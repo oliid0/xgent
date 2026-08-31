@@ -35,7 +35,7 @@ pub(crate) enum TerminalSessionBackend {
 pub(crate) struct SshSessionRuntime {
     // Clone the shared handle before an async channel operation so the mutex
     // never stays held across network I/O.
-    pub(crate) handle: tokio::sync::Mutex<Option<Arc<client::Handle<XAgentSshClient>>>>,
+    pub(crate) handle: tokio::sync::Mutex<Option<Arc<client::Handle<XgentSshClient>>>>,
     pub(crate) input_tx: Mutex<Option<tokio::sync::mpsc::Sender<SshSessionInput>>>,
     pub(crate) shutdown_tx: Mutex<Option<tokio::sync::mpsc::Sender<()>>>,
     pub(crate) connection_id: AtomicUsize,
@@ -57,7 +57,7 @@ impl SshSessionRuntime {
 
     pub(crate) async fn install_connection(
         &self,
-        handle: client::Handle<XAgentSshClient>,
+        handle: client::Handle<XgentSshClient>,
         input_tx: tokio::sync::mpsc::Sender<SshSessionInput>,
         shutdown_tx: tokio::sync::mpsc::Sender<()>,
     ) -> usize {
@@ -85,7 +85,7 @@ impl SshSessionRuntime {
         }
     }
 
-    pub(crate) async fn current_handle(&self) -> Option<Arc<client::Handle<XAgentSshClient>>> {
+    pub(crate) async fn current_handle(&self) -> Option<Arc<client::Handle<XgentSshClient>>> {
         self.handle.lock().await.as_ref().map(Arc::clone)
     }
 
@@ -155,7 +155,7 @@ pub(crate) enum PendingSshPrompt {
         host_config: Box<RuntimeSshHostConfig>,
         title: String,
         size: TerminalSize,
-        handle: client::Handle<XAgentSshClient>,
+        handle: client::Handle<XgentSshClient>,
         answer_mode: SshPromptAnswerMode,
     },
 }

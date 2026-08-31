@@ -8,7 +8,7 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text as AstryxText, Text } from "@astryxdesign/core/Text";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import type { Context, Message, UserMessage } from "@earendil-works/pi-ai";
-import { invoke, isBrowserRuntime, listen, listenFileDrop, revealItemInDir } from "@xagent/runtime";
+import { invoke, isBrowserRuntime, listen, listenFileDrop, revealItemInDir } from "@xgent/runtime";
 import {
   type CSSProperties,
   lazy,
@@ -682,25 +682,25 @@ export function ChatPage(props: ChatPageProps) {
     defaultSize: 360,
     minSizePx: 280,
     maxSizePx: 560,
-    autoSaveId: "xagent-chat-sidebar-width",
+    autoSaveId: "xgent-chat-sidebar-width",
   });
   const workspacePanelResize = useResizable({
     defaultSize: 420,
     minSizePx: 320,
     maxSizePx: 720,
-    autoSaveId: "xagent-workspace-panel-width",
+    autoSaveId: "xgent-workspace-panel-width",
   });
   const workspaceHubPanelResize = useResizable({
     defaultSize: 420,
     minSizePx: 400,
     maxSizePx: 720,
-    autoSaveId: "xagent-workspace-hub-panel-width",
+    autoSaveId: "xgent-workspace-hub-panel-width",
   });
   const splitConversationResize = useResizable({
     defaultSize: 520,
     minSizePx: 360,
     maxSizePx: 820,
-    autoSaveId: "xagent-split-conversation-width",
+    autoSaveId: "xgent-split-conversation-width",
   });
   const initialConversationRef = useRef(createConversationIdentity());
   const initialConversationStateRef = useRef(createConversationStateFromContext(context));
@@ -968,7 +968,7 @@ export function ChatPage(props: ChatPageProps) {
           (item) =>
             workspaceProjectPathKey(item.path) === normalizedPathKey || item.id === project.id,
         ) ?? project;
-      // 目标工作区已完全激活时提前返回，避免流式进行中触发无谓的 settings 写入与重渲染
+
       if (
         !options?.startConversation &&
         targetProject.id === activeWorkspaceProjectId &&
@@ -1292,9 +1292,7 @@ export function ChatPage(props: ChatPageProps) {
   }, [availableSkills, selectedSkillNames, skillsEnabled]);
   const codeReviewSkill = useMemo(
     () =>
-      availableSkills.find(
-        (skill) => skill.name === "xagent-code-review" && skill.builtIn === true,
-      ),
+      availableSkills.find((skill) => skill.name === "xgent-code-review" && skill.builtIn === true),
     [availableSkills],
   );
 
@@ -1842,7 +1840,7 @@ export function ChatPage(props: ChatPageProps) {
       openWorkspaceFilePreview,
     ],
   );
-  // ── 回复末尾「已编辑文件」卡的三个动作 ────────────────────────────────
+
   const gitReviewFocusNonceRef = useRef(0);
   const [gitReviewFocusRequest, setGitReviewFocusRequest] = useState<GitReviewFocusRequest | null>(
     null,
@@ -2061,7 +2059,7 @@ export function ChatPage(props: ChatPageProps) {
         await invoke("app_confirmed_exit");
       } catch (error) {
         if (!cancelled) {
-          setErrorMessage(asErrorMessage(error, "退出 XAgent 失败"));
+          setErrorMessage(asErrorMessage(error, "退出 Xgent 失败"));
         }
       }
     })
@@ -2199,7 +2197,7 @@ export function ChatPage(props: ChatPageProps) {
     }
     const snapshot = buildChatQueueSnapshot(targetConversationId, queue);
     void invoke("local_access_broadcast_event", {
-      event: "xagent:chat-queue",
+      event: "xgent:chat-queue",
       payload: snapshot,
     } as any).catch((error) => {
       console.warn("local chat queue broadcast failed", error);
@@ -3260,7 +3258,7 @@ export function ChatPage(props: ChatPageProps) {
 
     try {
       await invoke("local_access_broadcast_event", {
-        event: "xagent:chat-runtime",
+        event: "xgent:chat-runtime",
         payload: {
           conversationId: run.conversationId,
           runId: run.runId,
@@ -3426,9 +3424,7 @@ export function ChatPage(props: ChatPageProps) {
       createdAt: currentConversationCreatedAt,
       updatedAt: Date.now(),
     });
-    // 会话不属于当前工作区作用域时（例如流式进行中切换了工作区），不往
-    // 侧栏强插 pending 行：它本就不该出现在新工作区的列表里，反复重插
-    // 会与作用域过滤互相打架，形成无限更新循环导致页面崩溃。
+
     if (!conversationMatchesScope(pendingItem, sidebarScope)) {
       return;
     }
@@ -3805,8 +3801,7 @@ export function ChatPage(props: ChatPageProps) {
     const transcriptStore = getConversationLiveTranscriptStore(conversationId);
     const compaction = getCompactionController(conversationId);
     const isConversationVisible = () => currentConversationIdRef.current === conversationId;
-    // 轮次级取消：会话 abort controller 只注册 userStop 一次；每个 LLM 请求
-    // （主请求/压缩摘要/标题任务）各自派生子 scope，杜绝 abort 换代丢停止的窗口。
+
     const cancellation = createTurnCancellation();
     const conversationDebugLogger = createStreamDebugLogger({
       enabled: effectiveIsAgentDevExecutionMode,
@@ -5123,8 +5118,6 @@ export function ChatPage(props: ChatPageProps) {
     [currentConversationIdRef, setSettings, sidebarStore, updateConversationRuntimeEntry],
   );
 
-  // 跨端收敛：history-sync 带回的会话模型选择（如 WebUI 发消息后落库）
-  // 写回当前会话的 runtime entry；值相等或发送中不动，无回环。
   const displayedConversationPersistedModelJson =
     sidebarConversationsById.get(currentConversationId)?.selectedModelJson;
   useEffect(() => {
@@ -5369,19 +5362,18 @@ export function ChatPage(props: ChatPageProps) {
   });
 
   // Copies the conversation prefix up to (and including) the picked assistant
-  // reply into a fresh "新分支" conversation, then switches to it. Defined
+
   // after the hydration flags above so the guard reads the same sources as
   // useEditResend.
   const branchInFlightRef = useRef(false);
-  // 驱动被点行的转圈与全行禁用；ref 仍是同步防重入的真源。
+
   const [branchPendingMessageId, setBranchPendingMessageId] = useState<string | null>(null);
   const handleBranchConversation = useCallback(
     async (messageRef: HistoryMessageRef) => {
       const conversationId = currentConversationIdRef.current.trim();
       if (!conversationId) return;
       if (isSending || isConversationHydrating || isConversationHydrationFailed) return;
-      // 分支 invoke 会排在同会话 persist 写锁后面，期间按钮仍可点：
-      // 用 ref 挡掉重复确认，避免一次点击风暴造出多份"新分支"。
+
       if (branchInFlightRef.current) return;
       branchInFlightRef.current = true;
       setBranchPendingMessageId(messageRef.messageId);
@@ -5905,8 +5897,6 @@ export function ChatPage(props: ChatPageProps) {
                         }
                         onResendFromEdit={handleResendFromEdit}
                         onBranchConversation={
-                          // 水合中/水合失败时 handler 只会静默 return——直接不传，
-                          // 让 AssistantRow 的 disabled 分支给出可见的禁用态。
                           isConversationHydrating || isConversationHydrationFailed
                             ? undefined
                             : handleBranchConversation

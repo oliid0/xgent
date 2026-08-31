@@ -102,13 +102,13 @@ fn normalize_timeout(timeout_ms: Option<u64>) -> u64 {
 }
 
 /// Context forwarded to hook scripts as environment variables. Keys are
-/// namespaced by the caller (e.g. XAGENT_HOOK_EVENT); values are passed
+/// namespaced by the caller (e.g. XGENT_HOOK_EVENT); values are passed
 /// through verbatim.
 fn normalize_context(context: Option<HashMap<String, String>>) -> Vec<(String, String)> {
     context
         .unwrap_or_default()
         .into_iter()
-        .filter(|(key, _)| key.starts_with("XAGENT_"))
+        .filter(|(key, _)| key.starts_with("XGENT_"))
         .collect()
 }
 
@@ -166,7 +166,7 @@ pub(crate) fn run_hook_script_sync(
         None,
         token.clone(),
         &context,
-        // Hook 脚本是用户显式配置的自动化,不属于模型驱动面,不套沙箱。
+        
         None,
     );
 
@@ -322,9 +322,9 @@ mod tests {
         let registry = HookScopeRegistry::default();
         let dir = temp_workdir();
         let script = if cfg!(windows) {
-            "Write-Output \"event=$env:XAGENT_HOOK_EVENT\""
+            "Write-Output \"event=$env:XGENT_HOOK_EVENT\""
         } else {
-            "printf \"event=$XAGENT_HOOK_EVENT\""
+            "printf \"event=$XGENT_HOOK_EVENT\""
         };
         let result = run_hook_script_sync(
             &registry,
@@ -332,7 +332,7 @@ mod tests {
             script.to_string(),
             None,
             Some(format!("scope-{}", Uuid::new_v4())),
-            vec![("XAGENT_HOOK_EVENT".to_string(), "agent_end".to_string())],
+            vec![("XGENT_HOOK_EVENT".to_string(), "agent_end".to_string())],
         )
         .expect("run hook script");
         assert_eq!(result.exit_code, 0);

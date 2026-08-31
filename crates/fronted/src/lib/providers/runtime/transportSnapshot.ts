@@ -1,4 +1,4 @@
-import { XAGENT_UPSTREAM_ORIGIN_HEADER, XAGENT_USE_SYSTEM_PROXY_HEADER } from "../proxy";
+import { XGENT_UPSTREAM_ORIGIN_HEADER, XGENT_USE_SYSTEM_PROXY_HEADER } from "../proxy";
 
 /**
  * Sanitized transport metadata for one concrete outbound attempt.
@@ -20,10 +20,10 @@ export function captureTransportSnapshot(
     if (value === null) continue;
     byLowerName.set(name.toLowerCase(), value);
   }
-  const upstreamOrigin = byLowerName.get(XAGENT_UPSTREAM_ORIGIN_HEADER)?.trim();
+  const upstreamOrigin = byLowerName.get(XGENT_UPSTREAM_ORIGIN_HEADER)?.trim();
   return {
     ...(upstreamOrigin ? { upstreamOrigin } : {}),
-    useSystemProxy: byLowerName.get(XAGENT_USE_SYSTEM_PROXY_HEADER) === "1",
+    useSystemProxy: byLowerName.get(XGENT_USE_SYSTEM_PROXY_HEADER) === "1",
     fullUrl,
     headerNames: [...byLowerName.keys()].sort(),
   };

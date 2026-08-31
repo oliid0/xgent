@@ -21,7 +21,7 @@ pub fn managed_process_start(
     sandbox: bool,
     sandbox_allow_network: bool,
 ) -> Result<ManagedProcessStartResponse, String> {
-    // 请求侧声明只能加严;下限由后端回查持久化的 commandSafetyMode 得出(P1#3)。
+    
     let sandbox_options = resolve_effective_options(sandbox.then_some(SandboxOptions {
         allow_network: sandbox_allow_network,
     }))?;

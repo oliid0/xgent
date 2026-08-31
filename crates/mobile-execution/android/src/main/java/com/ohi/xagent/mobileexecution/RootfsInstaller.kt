@@ -1,4 +1,4 @@
-package com.ohi.xagent.mobileexecution
+package com.ohi.xgent.mobileexecution
 
 import android.content.res.AssetManager
 import android.system.Os
@@ -37,7 +37,7 @@ internal class RootfsInstaller(
                 "archive does not contain a usable rootfs (bin/sh is missing)"
             }
             RootfsEnvironment.prepare(staging, bundled.repositoryBranch)
-            File(staging, XAGENT_VERSION_FILE).apply {
+            File(staging, XGENT_VERSION_FILE).apply {
                 parentFile?.mkdirs()
                 writeText("${bundled.distribution} ${bundled.version}\n")
             }
@@ -211,7 +211,7 @@ internal class RootfsInstaller(
     companion object {
         private const val ASSET_ROOT = "mobile-execution/rootfs"
         private const val MANIFEST_SCHEMA_VERSION = 1
-        private const val XAGENT_VERSION_FILE = "etc/xagent-environment"
+        private const val XGENT_VERSION_FILE = "etc/xgent-environment"
         private const val BUFFER_SIZE = 64 * 1024
         private const val MAX_ARCHIVE_BYTES = 64L * 1024 * 1024
         private const val MAX_UNPACKED_BYTES = 2L * 1024 * 1024 * 1024

@@ -67,9 +67,9 @@ pub fn local_access_broadcast_event(
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     const ALLOWED_EVENTS: &[&str] = &[
-        "xagent:chat-queue",
-        "xagent:chat-runtime",
-        "xagent:conversation-event",
+        "xgent:chat-queue",
+        "xgent:chat-runtime",
+        "xgent:conversation-event",
     ];
     let event = event.trim();
     if !ALLOWED_EVENTS.contains(&event) {

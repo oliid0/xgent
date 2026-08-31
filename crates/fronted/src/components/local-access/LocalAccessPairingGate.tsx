@@ -9,7 +9,7 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Theme } from "@astryxdesign/core/theme";
-import { isBrowserRuntime } from "@xagent/runtime";
+import { isBrowserRuntime } from "@xgent/runtime";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { LOCAL_ACCESS_CSRF_KEY, LOCAL_ACCESS_SESSION_CHANGED_EVENT } from "../../runtime/browser";
 import { xgentCompactTheme, xgentTheme } from "../../theme/xgentTheme";
@@ -129,10 +129,10 @@ export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
           paddingInlineEnd: "max(var(--spacing-6), env(safe-area-inset-right, 0px))",
         }}
       >
-        <Card width="100%" maxWidth="var(--xagent-content-width-sm)" padding={6} elevation="high">
+        <Card width="100%" maxWidth="var(--xgent-content-width-sm)" padding={6} elevation="high">
           <VStack as="form" gap={4} onSubmit={pair}>
             <VStack gap={1}>
-              <Heading level={1}>连接到 XAgent</Heading>
+              <Heading level={1}>连接到 Xgent</Heading>
               <Text type="body" color="secondary">
                 输入电脑端“本地与局域网访问”设置中显示的六位配对码。
               </Text>

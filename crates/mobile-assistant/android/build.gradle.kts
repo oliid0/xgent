@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.ohi.xagent.mobileassistant"
+    namespace = "com.ohi.xgent.mobileassistant"
     compileSdk = 36
 
     defaultConfig {

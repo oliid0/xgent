@@ -54,7 +54,7 @@ const SummaryCard = memo(function SummaryCard(props: { item: RenderSummaryCard }
 
   return (
     <HStack width="100%" hAlign="center" paddingInline={2}>
-      <Card width="100%" maxWidth="var(--xagent-content-width-md)" padding={3} elevation="low">
+      <Card width="100%" maxWidth="var(--xgent-content-width-md)" padding={3} elevation="low">
         <Collapsible
           defaultIsOpen={false}
           trigger={
@@ -84,7 +84,6 @@ const SummaryCard = memo(function SummaryCard(props: { item: RenderSummaryCard }
 });
 
 export type TranscriptNavHandle = {
-  /** 按行 key 跳转到对应消息（动态行高下会连帧重对准确保落位）。 */
   scrollToRowKey: (rowKey: string) => void;
 };
 
@@ -104,8 +103,7 @@ export type TranscriptListProps = {
   workspaceRoot?: string;
   gitClient?: GitClient | null;
   onOpenFileLink?: (link: ChatFileLink) => void;
-  // 楼层导航：跳转句柄挂载点（与 followRef 同一模式），以及「视口顶部
-  // 当前处于哪条用户消息行」变化时的上报回调。
+
   navRef?: MutableRefObject<TranscriptNavHandle | null>;
   onAnchorUserRowChange?: (rowKey: string | null) => void;
   onResendFromEdit: (
@@ -285,10 +283,6 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
     isFollowing: () => isViewportFollowing?.() ?? false,
   });
 
-  // 楼层导航跳转句柄：按行 key 定位 index 后 scrollToIndex。沿途行首次真实
-  // 测量会不断修正总高度，连续若干帧重新对准，让滚动收敛在目标行顶部
-  // （对准同一 index 是收敛操作，不会震荡）。收敛期间用户的滚轮/触摸/按键
-  // 立即取消收敛；新跳转替换旧收敛；卸载时一并清理。
   const cancelJumpSettleRef = useRef<() => void>(() => {});
   useLayoutEffect(() => {
     if (!navRef) return;
@@ -345,11 +339,6 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
     };
   }, [navRef, virtualizer, scrollViewport]);
 
-  // 楼层导航当前楼层：以「视口顶缘（+8px 容差）」所落在的用户消息为准——与
-  // 跳转的 align:"start" 落位一致，跳转后高亮的必然是刚点的楼层；视口贴近
-  // 内容底部时直接取最后一层（否则短对话拼满一屏时底部楼层永远无法成为当前
-  // 层）。贴底判定用 scrollHeight（与 scrollTop/clientHeight 同一坐标系，
-  // 含底部输入框保留区），避免与 getTotalSize 的列表局部坐标错位。
   const lastAnchorRef = useRef<string | null>(null);
   const onAnchorUserRowChangeRef = useRef(onAnchorUserRowChange);
   onAnchorUserRowChangeRef.current = onAnchorUserRowChange;
@@ -397,8 +386,6 @@ export const TranscriptList = memo(function TranscriptList(props: TranscriptList
     return () => scrollViewport.removeEventListener("scroll", handler);
   }, [scrollViewport]);
 
-  // 行集合变化（消息追加、流式落定）后兜底重算一次；依赖 rows 而不是每次
-  // 渲染都跑，避免「上报 → 父级重渲染 → 再上报」的空转循环。
   useEffect(() => {
     rowsRef.current = rows;
     reportAnchorRef.current();

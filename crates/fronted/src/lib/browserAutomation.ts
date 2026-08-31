@@ -1,4 +1,4 @@
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 
 export type BrowserBackend = "desktop-webview" | "android-webview" | "ios-wk-webview";
 

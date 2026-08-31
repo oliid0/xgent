@@ -1,5 +1,5 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import { invoke } from "@xagent/runtime";
+import { invoke } from "@xgent/runtime";
 import { type TProperties, Type } from "typebox";
 import {
   inferRuntimePlatform,
@@ -277,8 +277,8 @@ function validateBashBackgroundStdio(command: string) {
   throw new Error(
     [
       "Background Bash commands must detach stdout and stderr before using `&`.",
-      "Long-running processes that inherit XAgent's tool pipes can keep the Bash task running forever.",
-      "Redirect output to a log file, for example: `nohup command > /tmp/xagent-task.log 2>&1 < /dev/null &`.",
+      "Long-running processes that inherit Xgent's tool pipes can keep the Bash task running forever.",
+      "Redirect output to a log file, for example: `nohup command > /tmp/xgent-task.log 2>&1 < /dev/null &`.",
       "For dev servers or watchers, prefer a dedicated terminal or managed process workflow.",
     ].join(" "),
   );
@@ -521,7 +521,7 @@ export function createShellTools(params: {
   managedProcessEnabled?: boolean;
   resumableShellEnabled?: boolean;
   resolveHomeDir?: () => Promise<string>;
-  /** OS 级沙箱;undefined 或 enabled=false 时直跑。Windows 联网后端不掩蔽凭据目录。 */
+
   sandbox?: ShellSandboxSettings;
 }): BuiltinToolBundle {
   const timeoutPolicy = resolveBashTimeoutPolicy(params.providerId);
@@ -530,8 +530,7 @@ export function createShellTools(params: {
   const platformLabel = runtimePlatformLabel(runtimePlatform);
   const sandboxEnabled = params.sandbox?.enabled === true;
   const sandboxAllowNetwork = params.sandbox?.allowNetwork !== false;
-  // Windows 联网沙箱是 Low IL token:只围写、不掩读。模型描述不得承诺 ~/.ssh
-  // 被掩蔽;断网(AppContainer)以及 macOS/Linux 才有读掩蔽。
+
   const sandboxMasksCredentials =
     sandboxEnabled && !(runtimePlatform === "windows" && sandboxAllowNetwork);
   const sandboxPolicy = sandboxEnabled
@@ -541,18 +540,18 @@ export function createShellTools(params: {
     : "";
   const shellPolicy =
     runtimePlatform === "windows"
-      ? "Windows runs Bash commands with Git Bash (POSIX semantics) when available, falling back to pwsh, then Windows PowerShell, then cmd only if Git Bash is not installed. Write POSIX/bash syntax by default: `export NAME=value`, `&&`, `/dev/null`, forward-slash paths. If the result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing on this machine — switch to PowerShell syntax and suggest installing Git for Windows or setting XAGENT_GIT_BASH_PATH."
+      ? "Windows runs Bash commands with Git Bash (POSIX semantics) when available, falling back to pwsh, then Windows PowerShell, then cmd only if Git Bash is not installed. Write POSIX/bash syntax by default: `export NAME=value`, `&&`, `/dev/null`, forward-slash paths. If the result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing on this machine — switch to PowerShell syntax and suggest installing Git for Windows or setting XGENT_GIT_BASH_PATH."
       : runtimePlatform === "macos"
         ? "macOS runs Bash commands with POSIX shell syntax: zsh first, then Bash, then sh."
         : runtimePlatform === "android"
-          ? "Android runs commands inside XAgent's Alpine PRoot environment. Use POSIX shell syntax and install only the named capability packs exposed by the mobile environment manager."
+          ? "Android runs commands inside Xgent's Alpine PRoot environment. Use POSIX shell syntax and install only the named capability packs exposed by the mobile environment manager."
           : runtimePlatform === "ios"
             ? "iOS/iPadOS runs a restricted a-Shell-compatible native command set. Use POSIX syntax, do not assume Linux process APIs, Node.js, npm, arbitrary native packages, or arbitrary WASI execution, and inspect the reported mobile capabilities before choosing tools."
             : "Linux runs Bash commands with POSIX shell syntax: Bash first, then zsh, then sh.";
   const backgroundPolicy =
     runtimePlatform === "android" || runtimePlatform === "ios"
-      ? "Mobile operating systems can suspend XAgent; keep commands foreground and bounded, and do not start detached services or background jobs."
-      : "Background commands using `&` must detach stdout and stderr first, for example `nohup command > /tmp/xagent-task.log 2>&1 < /dev/null &`; otherwise the tool rejects them because inherited pipes can keep Bash running forever. Prefer ManagedProcess for dev servers, watchers, or anything long-running.";
+      ? "Mobile operating systems can suspend Xgent; keep commands foreground and bounded, and do not start detached services or background jobs."
+      : "Background commands using `&` must detach stdout and stderr first, for example `nohup command > /tmp/xgent-task.log 2>&1 < /dev/null &`; otherwise the tool rejects them because inherited pipes can keep Bash running forever. Prefer ManagedProcess for dev servers, watchers, or anything long-running.";
   const workdir = params.workdir;
   const allowSkillsRoot = params.skillsRootEnabled === true;
   const allowManagedProcess = params.managedProcessEnabled !== false;
@@ -596,7 +595,7 @@ export function createShellTools(params: {
 
   function commandReferencesFixedSkillsRoot(command: string) {
     const value = normalizeCommandForPolicy(command);
-    if (/(\.xagent\/skills|~\/\.xagent\/skills)/i.test(value)) return true;
+    if (/(\.xgent\/skills|~\/\.xgent\/skills)/i.test(value)) return true;
     const root = cachedSkillsRootDir.trim().replace(/\\/g, "/");
     return Boolean(root && value.includes(root));
   }
@@ -610,8 +609,8 @@ export function createShellTools(params: {
     const root = cachedSkillsRootDir.trim().replace(/\\/g, "/");
     const escapedRoot = root ? root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : null;
     const skillPathPrefix = escapedRoot
-      ? `(?:~/\\.xagent/skills|/\\.xagent/skills|${escapedRoot})`
-      : "(?:~/\\.xagent/skills|/\\.xagent/skills)";
+      ? `(?:~/\\.xgent/skills|/\\.xgent/skills|${escapedRoot})`
+      : "(?:~/\\.xgent/skills|/\\.xgent/skills)";
     const fileReadPattern = new RegExp(
       `(?:^|[\\s;&|()])(?:cat|head|tail|less|more|ls|find|grep|fgrep|egrep|rg|sed|awk)\\b(?:\\s+-[A-Za-z0-9_-]+)*\\s+['"]?${skillPathPrefix}`,
       "i",
@@ -625,8 +624,8 @@ export function createShellTools(params: {
     const root = cachedSkillsRootDir.trim().replace(/\\/g, "/");
     const escapedRoot = root ? root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : null;
     const skillPathPrefix = escapedRoot
-      ? `(?:~/\\.xagent/skills|/\\.xagent/skills|${escapedRoot})`
-      : "(?:~/\\.xagent/skills|/\\.xagent/skills)";
+      ? `(?:~/\\.xgent/skills|/\\.xgent/skills|${escapedRoot})`
+      : "(?:~/\\.xgent/skills|/\\.xgent/skills)";
     const cdPattern = new RegExp(
       `(?:^|[\\s;&|()])(?:cd|pushd)\\b\\s+(?:--\\s+)?['"]?${skillPathPrefix}(?:[/\\s'";&|)]|$)`,
       "i",
@@ -641,8 +640,8 @@ export function createShellTools(params: {
     const names = new Set<string>();
     const segmentChars = "[A-Za-z0-9._-]+";
     const patterns: RegExp[] = [
-      new RegExp(`~/\\.xagent/skills/(${segmentChars})`, "gi"),
-      new RegExp(`(?:^|[\\s;&|(])/\\.xagent/skills/(${segmentChars})`, "gi"),
+      new RegExp(`~/\\.xgent/skills/(${segmentChars})`, "gi"),
+      new RegExp(`(?:^|[\\s;&|(])/\\.xgent/skills/(${segmentChars})`, "gi"),
     ];
     for (const re of patterns) {
       for (const match of value.matchAll(re)) names.add(match[1]);
@@ -663,7 +662,7 @@ export function createShellTools(params: {
   }
 
   function commandSearchesFilesystemForSkills(command: string) {
-    return /\bfind\s+\/(?:\s|$)[\s\S]*(skills|\.xagent|SKILL\.md|skill\.json|README\.md)/i.test(
+    return /\bfind\s+\/(?:\s|$)[\s\S]*(skills|\.xgent|SKILL\.md|skill\.json|README\.md)/i.test(
       normalizeCommandForPolicy(command),
     );
   }
@@ -678,7 +677,7 @@ export function createShellTools(params: {
     if (params.cwd.scope === "skill") {
       if (commandReferencesFixedSkillsRoot(params.command)) {
         throw new Error(
-          "Bash with a Skill cwd must use paths relative to that cwd. Do not cd into or execute absolute ~/.xagent/skills paths.",
+          "Bash with a Skill cwd must use paths relative to that cwd. Do not cd into or execute absolute ~/.xgent/skills paths.",
         );
       }
       if (commandSearchesFilesystemForSkills(params.command)) {
@@ -700,7 +699,7 @@ export function createShellTools(params: {
       // and Skill-aware access policy that raw Bash cannot match.
       if (commandFileReadVerbAgainstSkillsAbsolute(params.command)) {
         throw new Error(
-          "Bash cannot read or search ~/.xagent/skills or absolute Skill paths. Use Read/List/Glob/Grep with a skill://<enabled-skill>/... path instead of cat, head, tail, ls, find, grep, rg, sed, or awk.",
+          "Bash cannot read or search ~/.xgent/skills or absolute Skill paths. Use Read/List/Glob/Grep with a skill://<enabled-skill>/... path instead of cat, head, tail, ls, find, grep, rg, sed, or awk.",
         );
       }
       if (commandChangesDirectoryToSkillsAbsolute(params.command)) {
@@ -714,7 +713,7 @@ export function createShellTools(params: {
       const referencedSkills = extractSkillBaseDirsFromAbsolutePath(params.command);
       if (referencedSkills.length === 0) {
         throw new Error(
-          "Bash references the ~/.xagent/skills root without naming a specific installed Skill. Include a Skill name such as ~/.xagent/skills/<skill-name>/... or set cwd to skill://<enabled-skill>/scripts.",
+          "Bash references the ~/.xgent/skills root without naming a specific installed Skill. Include a Skill name such as ~/.xgent/skills/<skill-name>/... or set cwd to skill://<enabled-skill>/scripts.",
         );
       }
       for (const baseDir of referencedSkills) {
@@ -751,13 +750,13 @@ export function createShellTools(params: {
       hints.push(
         `Hint: Git Bash was not found, so this command ran under ${
           params.shellFamily === "cmd" ? "cmd" : "PowerShell"
-        } where POSIX syntax like \`export\`, \`nohup\`, and \`/dev/null\` fails. Rewrite the command in PowerShell syntax for now, and suggest installing Git for Windows or setting XAGENT_GIT_BASH_PATH to restore Bash semantics.`,
+        } where POSIX syntax like \`export\`, \`nohup\`, and \`/dev/null\` fails. Rewrite the command in PowerShell syntax for now, and suggest installing Git for Windows or setting XGENT_GIT_BASH_PATH to restore Bash semantics.`,
       );
     }
 
     if (
       params.cwd.scope !== "skill" &&
-      /(\.xagent\/skills|~\/\.xagent\/skills|\bskills\/[^ \n;&|]+\/scripts\b)/.test(combined)
+      /(\.xgent\/skills|~\/\.xgent\/skills|\bskills\/[^ \n;&|]+\/scripts\b)/.test(combined)
     ) {
       hints.push(
         "Hint: To run a Skill script, set cwd to skill://<enabled-skill>/scripts and use a relative command, or execute the absolute script path directly when the Skill is enabled.",
@@ -766,7 +765,7 @@ export function createShellTools(params: {
 
     if (
       /(cat|ls|find|grep|rg|sed)\b/.test(params.command) &&
-      /(\.xagent\/skills|~\/\.xagent\/skills|skills\/)/.test(params.command)
+      /(\.xgent\/skills|~\/\.xgent\/skills|skills\/)/.test(params.command)
     ) {
       hints.push(
         "Hint: If you are reading, listing, or searching Skill files, use Read/List/Glob/Grep with skill://<enabled-skill>/... paths instead of Bash.",
@@ -867,7 +866,7 @@ export function createShellTools(params: {
 
   const toolManagedProcess: Tool = {
     name: "ManagedProcess",
-    description: `Start, inspect, wait for, read logs for, or stop a long-running local process such as a dev server, watcher, or preview server. Runtime platform: ${platformLabel}; commands use the same platform shell policy as Bash. Use this instead of detached shell/background syntax, but never use it to intentionally delete workspace or enabled Skill paths; use Delete so XAgent can track the deletion. action="start" runs a foreground command under XAgent process management, redirects stdout/stderr to a log file (line-buffered), and returns immediately with process_id, pid, and log_path. Do not use ProcessWait with that process_id — ProcessWait only accepts Bash session_id values. Use action="wait" to block until new log output arrives, the process exits, or yield_time_ms elapses. By default managed processes are terminated automatically when XAgent exits; pass isolated=true only when the user explicitly wants the service to outlive XAgent. Use action="status" to list or inspect processes, action="read_log" to read recent log output, and action="stop" to terminate the process tree.`,
+    description: `Start, inspect, wait for, read logs for, or stop a long-running local process such as a dev server, watcher, or preview server. Runtime platform: ${platformLabel}; commands use the same platform shell policy as Bash. Use this instead of detached shell/background syntax, but never use it to intentionally delete workspace or enabled Skill paths; use Delete so Xgent can track the deletion. action="start" runs a foreground command under Xgent process management, redirects stdout/stderr to a log file (line-buffered), and returns immediately with process_id, pid, and log_path. Do not use ProcessWait with that process_id — ProcessWait only accepts Bash session_id values. Use action="wait" to block until new log output arrives, the process exits, or yield_time_ms elapses. By default managed processes are terminated automatically when Xgent exits; pass isolated=true only when the user explicitly wants the service to outlive Xgent. Use action="status" to list or inspect processes, action="read_log" to read recent log output, and action="stop" to terminate the process tree.`,
     parameters: strictToolParameters({
       action: Type.Union(
         [
@@ -902,7 +901,7 @@ export function createShellTools(params: {
       isolated: Type.Optional(
         Type.Boolean({
           description:
-            'Only for action="start". Default false: the process is terminated automatically when XAgent exits. Set true ONLY when the user explicitly asks for the service to keep running after XAgent quits; it then detaches from the XAgent lifecycle and must be stopped manually from the background tasks panel.',
+            'Only for action="start". Default false: the process is terminated automatically when Xgent exits. Set true ONLY when the user explicitly asks for the service to keep running after Xgent quits; it then detaches from the Xgent lifecycle and must be stopped manually from the background tasks panel.',
         }),
       ),
       process_id: Type.Optional(
@@ -1144,8 +1143,7 @@ export function createShellTools(params: {
             cwd: cwd || undefined,
             label: label || undefined,
             isolated: isolated || undefined,
-            // 跟随所选模式:sandboxOffline 下常驻进程同样断网(无法对外提供服务,
-            // 需要 dev server 时应切回"沙箱"模式)。
+
             sandbox: sandboxEnabled,
             sandbox_allow_network: sandboxAllowNetwork,
           },
@@ -1435,9 +1433,6 @@ export function createShellTools(params: {
 
     const timeoutRaw = toolCall.arguments?.timeout_ms;
     if (allowResumableShell) {
-      // Resumable 模式下 provider cap（codex 系 30s）不再适用：单轮时延由
-      // yield_time_ms 界定，timeout_ms 只是命令总时长的可选硬上限，按全局
-      // 上限（600s）收敛，避免把显式长限截短后误杀构建。
       const timeout_ms =
         typeof timeoutRaw === "number" && Number.isFinite(timeoutRaw)
           ? normalizeIntegerInRange(

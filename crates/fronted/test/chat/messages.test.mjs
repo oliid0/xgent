@@ -397,7 +397,7 @@ test("UI message builder preserves provider hosted search blocks", () => {
           id: "search-1",
           provider: "codex",
           status: "completed",
-          queries: ["XAgent web search"],
+          queries: ["Xgent web search"],
           sources: [
             {
               url: "https://example.com/result",
@@ -429,7 +429,7 @@ test("UI message builder preserves provider hosted search blocks", () => {
       id: "search-1",
       provider: "codex",
       status: "completed",
-      queries: ["XAgent web search"],
+      queries: ["Xgent web search"],
       sources: [
         {
           url: "https://example.com/result",
@@ -447,7 +447,7 @@ test("UI message builder hides provider-native web_search tool traces when hoste
     type: "toolCall",
     id: "dsml-tool-call-search-1",
     name: "web_search",
-    arguments: { query: "XAgent DeepSeek search" },
+    arguments: { query: "Xgent DeepSeek search" },
   };
   const messages = [
     { role: "user", content: "search", timestamp: 1 },
@@ -460,7 +460,7 @@ test("UI message builder hides provider-native web_search tool traces when hoste
           id: "search-1",
           provider: "claude_code",
           status: "completed",
-          queries: ["XAgent DeepSeek search"],
+          queries: ["Xgent DeepSeek search"],
           sources: [{ url: "https://example.com/result", title: "Result" }],
         },
         webSearchCall,
