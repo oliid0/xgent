@@ -641,7 +641,7 @@ fn clawhub_candidate_does_not_normalize_name_that_does_not_match_slug() {
 
 #[test]
 fn clawhub_candidate_falls_back_to_normalized_name_without_usable_slug() {
-    let tmp = TempDir::new("liveagent-clawhub-name-fallback-test").expect("temp dir");
+    let tmp = TempDir::new("xgent-clawhub-name-fallback-test").expect("temp dir");
     let candidate = tmp.path().join("candidate");
     fs::create_dir_all(&candidate).expect("create candidate");
     fs::write(
@@ -661,7 +661,7 @@ fn clawhub_candidate_falls_back_to_normalized_name_without_usable_slug() {
 
 #[test]
 fn clawhub_candidate_keeps_portable_name_untouched_even_when_it_differs_from_slug() {
-    let tmp = TempDir::new("liveagent-clawhub-name-portable-test").expect("temp dir");
+    let tmp = TempDir::new("xgent-clawhub-name-portable-test").expect("temp dir");
     let candidate = tmp.path().join("candidate");
     fs::create_dir_all(&candidate).expect("create candidate");
     fs::write(
@@ -680,7 +680,7 @@ fn clawhub_candidate_keeps_portable_name_untouched_even_when_it_differs_from_slu
 
 #[test]
 fn clawhub_candidate_rejects_when_neither_slug_nor_name_is_usable() {
-    let tmp = TempDir::new("liveagent-clawhub-name-unusable-test").expect("temp dir");
+    let tmp = TempDir::new("xgent-clawhub-name-unusable-test").expect("temp dir");
     let candidate = tmp.path().join("candidate");
     fs::create_dir_all(&candidate).expect("create candidate");
     fs::write(

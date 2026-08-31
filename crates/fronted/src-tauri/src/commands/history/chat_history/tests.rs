@@ -1619,7 +1619,7 @@ mod tests {
         for (message, (segment_index, message_index, message_id, role)) in
             messages.iter().zip(expected_refs)
         {
-            let history_ref = &message["liveAgentHistoryRef"];
+            let history_ref = &message["xgentHistoryRef"];
             assert_eq!(history_ref["segmentIndex"], json!(segment_index));
             assert_eq!(history_ref["messageIndex"], json!(message_index));
             assert_eq!(history_ref["messageId"], json!(message_id));
@@ -1667,7 +1667,7 @@ mod tests {
             .iter()
             .flat_map(parse_window_messages)
             .map(|message| {
-                message["liveAgentHistoryRef"]["messageId"]
+                message["xgentHistoryRef"]["messageId"]
                     .as_str()
                     .expect("window message id")
                     .to_string()
@@ -1707,7 +1707,7 @@ mod tests {
         let message_ids = parse_window_messages(&window.segments[0])
             .into_iter()
             .map(|message| {
-                message["liveAgentHistoryRef"]["messageId"]
+                message["xgentHistoryRef"]["messageId"]
                     .as_str()
                     .expect("window message id")
                     .to_string()
@@ -1782,7 +1782,7 @@ mod tests {
         let u2 = branch_user_message("u2", "第二问", 1_002);
         let a2 = branch_assistant_message("a2", "第二答", 1_003);
         let mut replacement = branch_user_message("u2-edited", "编辑后的第二问", 1_004);
-        replacement["liveAgentHistoryRef"] = json!({
+        replacement["xgentHistoryRef"] = json!({
             "segmentIndex": 99,
             "messageIndex": 99,
             "segmentId": "stale-segment",
@@ -1837,7 +1837,7 @@ mod tests {
             .as_array()
             .and_then(|messages| messages.last())
             .and_then(Value::as_object)
-            .is_some_and(|message| !message.contains_key("liveAgentHistoryRef")));
+            .is_some_and(|message| !message.contains_key("xgentHistoryRef")));
         assert_eq!(result.segments.len(), 1);
         let window_messages = parse_window_messages(&result.segments[0]);
         assert_eq!(
@@ -1848,7 +1848,7 @@ mod tests {
             vec!["u1", "a1", "u2-edited"]
         );
         assert_eq!(
-            window_messages.last().expect("replacement window message")["liveAgentHistoryRef"]
+            window_messages.last().expect("replacement window message")["xgentHistoryRef"]
                 ["messageId"],
             json!("u2-edited")
         );

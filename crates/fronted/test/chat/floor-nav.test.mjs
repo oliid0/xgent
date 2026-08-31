@@ -152,7 +152,7 @@ test("floor bookmarks toggle and persist through localStorage", () => {
     unsubscribe();
 
     // 损坏数据不抛错
-    store.set("liveagent.floor-bookmarks.v1", "{not json");
+    store.set("xgent.floor-bookmarks.v1", "{not json");
     floorBookmarks.resetFloorBookmarksCacheForTest();
     assert.equal(floorBookmarks.getFloorBookmarks("conv-1").size, 0);
   } finally {
@@ -179,7 +179,7 @@ test("bookmark eviction trims memory and disk together", () => {
     floorBookmarks.resetFloorBookmarksCacheForTest();
     assert.equal(floorBookmarks.getFloorBookmarks("conv-0").size, 0);
     assert.equal(floorBookmarks.getFloorBookmarks("conv-204").size, 1);
-    const payload = JSON.parse(store.get("liveagent.floor-bookmarks.v1"));
+    const payload = JSON.parse(store.get("xgent.floor-bookmarks.v1"));
     assert.ok(Object.keys(payload.conversations).length <= 200);
   } finally {
     delete globalThis.localStorage;

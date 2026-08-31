@@ -162,7 +162,7 @@ pub(crate) fn validate_user_history_message_ref(
 
 fn history_message_timestamp_for_ref(message: &Value) -> i64 {
     // stable-id 兜底必须确定性（前端 buildHistoryMessageRef 不会为缺 id 的
-    // 消息发 ref，server 端合成后经 liveAgentHistoryRef 回显），因此缺失
+    // 消息发 ref，server 端合成后经 xgentHistoryRef 回显），因此缺失
     // 时间戳固定取 0，不取当前时间。
     read_message_timestamp_with_fallback(message, 0)
 }
@@ -374,7 +374,7 @@ pub(crate) fn build_history_message_window(
                 if let Some(history_ref) =
                     build_history_message_ref_value(segment, message_index, message)
                 {
-                    object.insert("liveAgentHistoryRef".to_string(), history_ref);
+                    object.insert("xgentHistoryRef".to_string(), history_ref);
                 }
             }
             messages.push(cloned);

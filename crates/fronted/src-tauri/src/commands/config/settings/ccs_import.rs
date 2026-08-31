@@ -217,7 +217,7 @@ fn ccs_provider_from_value(
         request_format: if provider_type == "deepseek" {
             "openai-completions".to_string()
         } else if provider_type == "xai" {
-            // Grok / xAI 在 LiveAgent 固定 Responses。
+            // Grok / xAI 在 xgent 固定 Responses。
             "openai-responses".to_string()
         } else if provider_type == "codex" && ccs_is_chat_protocol(config) {
             "openai-completions".to_string()

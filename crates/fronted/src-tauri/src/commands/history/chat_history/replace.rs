@@ -48,7 +48,7 @@ pub(crate) fn chat_history_replace_from_message_sync(
     let replacement_message_id = validate_replacement_user_message(replacement_message)?;
     let mut replacement_message = replacement_message.clone();
     if let Some(object) = replacement_message.as_object_mut() {
-        object.remove("liveAgentHistoryRef");
+        object.remove("xgentHistoryRef");
     }
 
     let tx = conn
