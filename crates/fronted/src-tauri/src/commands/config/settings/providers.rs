@@ -117,7 +117,7 @@ fn save_providers(conn: &mut Connection, payload: Value) -> Result<(), String> {
 
     tx.commit()
         .map_err(|e| format!("提交 {PROVIDER_SETTINGS_TABLE} 事务失败：{e}"))?;
-    
+
     #[cfg(desktop)]
     crate::services::webdav_auto_sync::mark_dirty();
     Ok(())

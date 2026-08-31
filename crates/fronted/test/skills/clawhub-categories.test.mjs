@@ -65,7 +65,7 @@ test("topic matches outweigh summary matches", () => {
   const result = classify({
     slug: "mixed",
     displayName: "Mixed",
-    
+
     summary: "Search helper.",
     topics: ["stocks"],
   });

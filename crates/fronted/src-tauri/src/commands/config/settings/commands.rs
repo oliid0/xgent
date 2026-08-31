@@ -72,7 +72,7 @@ pub async fn settings_save_system(
     tauri::async_runtime::spawn_blocking(move || {
         let mut conn = open_db()?;
         save_system(&mut conn, payload)?;
-        
+
         refresh_system_proxy_state(&conn)
     })
     .await

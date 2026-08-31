@@ -93,7 +93,7 @@ test("decideCompaction covers every reason", () => {
   assert.equal(cooldown.reason, "cooldown");
   assert.equal(cooldown.shouldCompact, false);
 
-  
+
   assert.equal(
     decide({ totalTokens: 199_000, lastCompactionAt: NOW - 30_000, userMessageCount: 3 }).reason,
     "threshold-exceeded",
@@ -109,7 +109,7 @@ test("pressure escalates on consecutive ineffective compactions and resets on an
   let pressure = policy.createCompactionPressure();
   assert.equal(pressure.level, 0);
 
-  
+
   pressure = policy.notePressureAfterCompaction(pressure, {
     totalTokensAfter: 150_000,
     threshold: 160_000,
@@ -126,7 +126,7 @@ test("pressure escalates on consecutive ineffective compactions and resets on an
   });
   assert.equal(pressure.level, 2);
 
-  
+
   pressure = policy.notePressureAfterCompaction(pressure, {
     totalTokensAfter: 150_000,
     threshold: 160_000,

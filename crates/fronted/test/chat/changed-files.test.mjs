@@ -59,7 +59,7 @@ test("collectChangedFiles aggregates Write/Edit stats per file across rounds", (
   assert.ok(summary);
   assert.equal(summary.files.length, 2);
   const [app, readme] = summary.files;
-  
+
   assert.equal(app.path, "src/app.ts");
   assert.equal(app.added, 4);
   assert.equal(app.removed, 0);

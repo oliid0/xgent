@@ -137,7 +137,7 @@ impl ProviderUsageService {
 
         match execute_prepared_query(&prepared).await {
             Ok(data) if data.is_empty() => {
-                
+
                 self.cache().invalidate(provider_id);
                 failed_result("Usage query returned no entries".to_string())
             }
@@ -152,8 +152,8 @@ impl ProviderUsageService {
                     .record_success(provider_id, identity, result.clone());
                 result
             }
-            
-            
+
+
             Err(failure) if failure.deterministic => {
                 self.cache().invalidate(provider_id);
                 failed_result(failure.message)
@@ -188,7 +188,7 @@ async fn execute_draft_test(
     draft: UsageQueryConfig,
 ) -> ProviderUsageResult {
     provider.usage_query = merge_draft_config(draft, &provider.usage_query);
-    
+
     provider.usage_query.enabled = true;
     let prepared = match prepare_query(&provider) {
         Ok(prepared) => prepared,
@@ -309,32 +309,32 @@ struct UsageQueryConfig {
     mode: String,
     script: String,
     base_url: String,
-    
+
     #[serde(default)]
     api_key: String,
     access_token: String,
     user_id: String,
     access_key_id: String,
     secret_access_key: String,
-    
-    
+
+
     #[serde(default)]
     coding_plan_provider: String,
-    
-    
+
+
     #[serde(default)]
     team_organization_id: String,
     #[serde(default)]
     team_project_id: String,
-    
-    
+
+
     #[serde(default)]
     api_key_configured: bool,
     #[serde(default)]
     access_token_configured: bool,
     #[serde(default)]
     secret_access_key_configured: bool,
-    
+
     #[serde(default)]
     timeout_secs: Option<f64>,
 }
@@ -400,8 +400,8 @@ fn resolve_timeout(config: &UsageQueryConfig) -> Duration {
 }
 
 fn provider_query_identity(provider: &StoredProvider) -> ProviderQueryIdentity {
-    
-    
+
+
     let script_identity = parse_usage_mode(provider.usage_query.mode.as_str())
         .ok()
         .and_then(|mode| effective_script(mode, &provider.usage_query).ok().flatten())
@@ -489,8 +489,8 @@ enum QueryFailureKind {
 #[derive(Debug)]
 struct QueryFailure {
     kind: QueryFailureKind,
-    
-    
+
+
     deterministic: bool,
     message: String,
 }
@@ -561,7 +561,7 @@ fn prepare_query(provider: &StoredProvider) -> Result<PreparedQuery, String> {
         UsageQueryMode::General | UsageQueryMode::Newapi | UsageQueryMode::Custom => {
             let script = effective_script(mode, &provider.usage_query)?
                 .ok_or_else(|| "Usage script is unavailable".to_string())?;
-            
+
             prepare_script_query(provider, script, mode != UsageQueryMode::Custom)
         }
     }
@@ -620,7 +620,7 @@ fn prepare_balance_query(provider: &StoredProvider) -> Result<PreparedQuery, Str
             ProviderAdapter::DeepSeek,
             "https://api.deepseek.com/user/balance",
         ),
-        
+
         "api.stepfun.com" => (
             ProviderAdapter::StepFun,
             "https://api.stepfun.com/v1/accounts",
@@ -663,9 +663,9 @@ fn prepare_coding_plan_query(provider: &StoredProvider) -> Result<PreparedQuery,
         .trim()
         .to_ascii_lowercase();
 
-    
-    
-    
+
+
+
     if plan == "zhipu_team" {
         let organization = provider.usage_query.team_organization_id.trim();
         let project = provider.usage_query.team_project_id.trim();
@@ -698,8 +698,8 @@ fn prepare_coding_plan_query(provider: &StoredProvider) -> Result<PreparedQuery,
         ));
     }
 
-    
-    
+
+
     let zenmux = plan == "zenmux";
     let base_source = if zenmux && !provider.usage_query.base_url.trim().is_empty() {
         provider.usage_query.base_url.trim()
@@ -893,9 +893,9 @@ async fn execute_prepared_request(
                 QueryFailureKind::Transient => "Volcengine usage request failed",
             };
             let mut failure = QueryFailure::new(kind, message);
-            
-            
-            
+
+
+
             if kind != QueryFailureKind::Auth && !response.status.is_success() {
                 failure.deterministic = deterministic_http_status(response.status);
             }
@@ -965,11 +965,11 @@ async fn send_bounded_request(
     request: &HttpRequest,
     timeout: Duration,
 ) -> Result<HttpResponse, QueryFailure> {
-    
-    
-    
-    
-    
+
+
+
+
+
     let builder = if is_loopback_destination(&request.url) {
         reqwest::Client::builder().no_proxy()
     } else {
@@ -1106,7 +1106,7 @@ fn parse_adapter_response(
 }
 
 fn parse_deepseek(body: &Value) -> Result<Vec<UsageData>, String> {
-    
+
     let unavailable = body.get("is_available").and_then(Value::as_bool) == Some(false);
     let infos = body
         .get("balance_infos")
@@ -1658,7 +1658,7 @@ fn parse_script_usage(item: &Value) -> Result<UsageData, String> {
         .as_object()
         .ok_or_else(|| "Usage script result entries must be objects".to_string())?;
     let data = UsageData {
-        
+
         plan_name: script_string(object, "planName", 128)?.or(script_string(object, "label", 128)?),
         extra: script_string(object, "extra", 256)?,
         is_valid: script_bool(object, "isValid")?,
@@ -1763,7 +1763,7 @@ mod tests {
         assert!(validate_destination("file:///etc/passwd").is_err());
         assert!(validate_destination("not a url").is_err());
         assert!(validate_destination("https://api.example.test").is_ok());
-        
+
         assert!(validate_destination("http://127.0.0.1:8080").is_ok());
         assert!(validate_destination("https://[::1]").is_ok());
         assert!(validate_destination("http://192.168.1.10:3000").is_ok());
@@ -1824,7 +1824,7 @@ mod tests {
             "https://api.example.test/v1",
         )
         .is_ok());
-        
+
         assert!(validate_standard_destination(
             "http://127.0.0.1:3000/user/balance",
             "http://127.0.0.1:3000/v1",
@@ -1923,8 +1923,8 @@ mod tests {
         timeout.usage_query.timeout_secs = Some(20.0);
         assert_ne!(base_identity, provider_query_identity(&timeout));
 
-        
-        
+
+
         let mut explicit = base.clone();
         explicit.usage_query.script = GENERAL_SCRIPT.to_string();
         assert_eq!(base_identity, provider_query_identity(&explicit));
@@ -1959,7 +1959,7 @@ mod tests {
                 ProviderAdapter::StepFun,
                 "https://api.stepfun.com/v1/accounts",
             ),
-            
+
             (
                 "https://api.stepfun.ai/v1",
                 ProviderAdapter::StepFunIntl,
@@ -2070,8 +2070,8 @@ mod tests {
 
     #[test]
     fn balance_adapters_flag_unavailable_and_exhausted_accounts() {
-        
-        
+
+
         let deepseek = parse_adapter_response(
             ProviderAdapter::DeepSeek,
             &json!({
@@ -2301,7 +2301,7 @@ mod tests {
         assert_eq!(valid[0].remaining, Some(4.2));
         assert_eq!(valid[0].unit.as_deref(), Some("USD"));
 
-        
+
         let rich = extract_script_entries(
             script,
             &ScriptVariables::default(),
@@ -2499,7 +2499,7 @@ mod tests {
         persisted.access_token = "saved-token".to_string();
         persisted.secret_access_key = "saved-secret".to_string();
 
-        
+
         let mut redacted = test_provider("newapi", "https://api.example.test/v1").usage_query;
         redacted.api_key_configured = true;
         redacted.access_token_configured = true;
@@ -2509,7 +2509,7 @@ mod tests {
         assert_eq!(merged.access_token, "saved-token");
         assert_eq!(merged.secret_access_key, "saved-secret");
 
-        
+
         let mut cleared = test_provider("newapi", "https://api.example.test/v1").usage_query;
         cleared.access_token = "fresh-token".to_string();
         let merged = merge_draft_config(cleared, &persisted);
@@ -2520,8 +2520,8 @@ mod tests {
 
     #[tokio::test]
     async fn draft_test_runs_editor_config_even_when_usage_query_is_disabled() {
-        
-        
+
+
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
             .expect("bind test server");
@@ -2599,8 +2599,8 @@ mod tests {
 
     #[test]
     fn zhipu_team_plan_routes_by_explicit_selection_with_org_headers() {
-        
-        
+
+
         let mut provider = test_provider("coding-plan", "https://open.bigmodel.cn/api/paas/v4");
         provider.usage_query.coding_plan_provider = "zhipu_team".to_string();
         provider.usage_query.team_organization_id = "org-1".to_string();
@@ -2626,12 +2626,12 @@ mod tests {
             Some("proj-1"),
         );
 
-        
+
         let mut missing = provider.clone();
         missing.usage_query.team_project_id = String::new();
         assert!(prepare_query(&missing).is_err());
 
-        
+
         let personal = test_provider("coding-plan", "https://open.bigmodel.cn/api/paas/v4");
         let prepared = prepare_query(&personal).expect("prepare personal zhipu query");
         assert_eq!(
@@ -2666,7 +2666,7 @@ mod tests {
 
     #[test]
     fn script_modes_fall_back_to_builtin_presets_when_script_is_empty() {
-        
+
         let general = test_provider("general", "https://api.example.test/v1");
         let prepared = prepare_query(&general).expect("general preset fallback");
         assert_eq!(
@@ -2700,7 +2700,7 @@ mod tests {
             prepared.primary.request.url.as_str(),
             "https://api.example.test/v1/api/user/self"
         );
-        
+
         assert_eq!(
             prepared
                 .primary
@@ -2729,8 +2729,8 @@ mod tests {
 
     #[tokio::test]
     async fn general_preset_substitutes_variables_end_to_end() {
-        
-        
+
+
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
             .expect("bind test server");
@@ -2778,9 +2778,9 @@ mod tests {
 
     #[tokio::test]
     async fn user_style_custom_script_reaches_local_server() {
-        
-        
-        
+
+
+
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
             .expect("bind test server");
@@ -2815,11 +2815,11 @@ mod tests {
 
   extractor: function (response) {
     const plans = [];
-    const IND = "　　"; 
+    const IND = "　　";
     const BRANCH = "├─ ";
     const LAST = "└─ ";
 
-    
+
     plans.push({
       planName: "余额",
       remaining: response.balance,
@@ -2827,7 +2827,7 @@ mod tests {
       isValid: true,
     });
 
-    
+
     if (response.subscription) {
       plans.push({
         planName: "订阅 ▶",
@@ -2840,7 +2840,7 @@ mod tests {
       });
     }
 
-    
+
     const subs = Array.isArray(response.subscriptions)
       ? response.subscriptions
       : [];
@@ -2976,12 +2976,12 @@ mod tests {
 
     #[test]
     fn failure_determinism_matches_keep_last_good_policy() {
-        
+
         assert!(QueryFailure::new(QueryFailureKind::Auth, "auth").deterministic);
         assert!(QueryFailure::new(QueryFailureKind::Soft, "script").deterministic);
         assert!(QueryFailure::http(reqwest::StatusCode::NOT_FOUND, "404").deterministic);
         assert!(QueryFailure::http(reqwest::StatusCode::BAD_REQUEST, "400").deterministic);
-        
+
         assert!(!QueryFailure::new(QueryFailureKind::Transient, "net").deterministic);
         assert!(!QueryFailure::http(reqwest::StatusCode::REQUEST_TIMEOUT, "408").deterministic);
         assert!(!QueryFailure::http(reqwest::StatusCode::TOO_EARLY, "425").deterministic);
@@ -2994,8 +2994,8 @@ mod tests {
 
     #[tokio::test]
     async fn volcengine_throttling_body_stays_transient_for_keep_last_good() {
-        
-        
+
+
         let (url, server) = serve_once(|_| {
             let body = r#"{"ResponseMetadata":{"Error":{"Code":"FlowLimitExceeded","Message":"throttled"}}}"#;
             format!(
@@ -3036,7 +3036,7 @@ mod tests {
         assert!(!provider.usage_query.enabled);
         assert!(provider.usage_query.mode.is_empty());
 
-        
+
         let provider: StoredProvider = serde_json::from_value(serde_json::json!({
             "type": "codex",
             "baseUrl": "https://api.example.test/v1",

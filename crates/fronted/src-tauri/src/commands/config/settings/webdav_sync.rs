@@ -214,10 +214,10 @@ pub(crate) fn resolve_backup_sync_config(
         remote_dir: request.remote_dir,
         profile: request.profile,
         auto_sync: request.auto_sync,
-        
+
         last_sync_at: persisted.last_sync_at,
-        
-        
+
+
         last_error: None,
     })
 }
@@ -301,7 +301,7 @@ fn touch_backup_last_sync_at() -> Result<i64, String> {
     let conn = open_db()?;
     let mut config = load_backup_sync_config(&conn)?;
     config.last_sync_at = Some(timestamp);
-    
+
     config.last_error = None;
     persist_backup_sync_config(&conn, &config)?;
     Ok(timestamp)
@@ -462,7 +462,7 @@ pub(crate) async fn auto_upload_backup_snapshot(
         Ok(timestamp) => Ok(Some(timestamp)),
         Err(error) => {
             let message = error.clone();
-            
+
             let _ = tauri::async_runtime::spawn_blocking(move || {
                 record_backup_auto_sync_error(&message);
             })
@@ -492,7 +492,7 @@ pub async fn settings_backup_download() -> Result<BackupApplyOutcome, String> {
     else {
         return Err("远端还没有备份，请先在任一设备上传一次".to_string());
     };
-    
+
     let remote = parse_backup_remote_manifest(&manifest_body)?;
 
     let Some(body) = crate::services::webdav::get_bytes(
@@ -510,18 +510,18 @@ pub async fn settings_backup_download() -> Result<BackupApplyOutcome, String> {
         String::from_utf8(body).map_err(|_| "远端配置不是合法的 UTF-8 文本".to_string())?;
 
     tauri::async_runtime::spawn_blocking(move || {
-        
-        
+
+
         let _suppression = crate::services::webdav_auto_sync::suppress();
         let (snapshot, _) = parse_backup_document(&document)?;
         let mut conn = open_db()?;
         let outcome = apply_backup_snapshot(&mut conn, snapshot)?;
-        
-        
-        
-        
-        
-        
+
+
+
+
+
+
         let _ = touch_backup_last_sync_at();
         Ok(outcome)
     })

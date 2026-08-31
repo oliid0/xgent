@@ -117,7 +117,7 @@ pub(crate) fn synthetic_workspace_sid(write_root: &Path) -> String {
     }
     let canonical = write_root.to_string_lossy().to_lowercase();
     let h1 = fnv1a64(canonical.as_bytes());
-    
+
     let mut salted = canonical.into_bytes();
     salted.push(0);
     salted.extend_from_slice(b"xgent-sandbox");
@@ -147,7 +147,7 @@ pub(crate) fn build_command_line(program: &str, args: &[String]) -> Vec<u16> {
                 backslashes += 1;
             } else {
                 if w == quote {
-                    
+
                     for _ in 0..=backslashes {
                         cmd.push(backslash);
                     }
@@ -187,7 +187,7 @@ pub(crate) fn resolve_program_in_path(
         return Some(program.to_path_buf());
     }
     let name = program.as_os_str();
-    
+
     let mut exts: Vec<String> = vec![String::new()];
     exts.extend(
         pathext
@@ -198,7 +198,7 @@ pub(crate) fn resolve_program_in_path(
     );
     for dir in path_env.split(';').map(str::trim) {
         let dir_path = Path::new(dir);
-        
+
         if !dir_path.is_absolute() {
             continue;
         }
@@ -290,8 +290,8 @@ impl SandboxSpec {
         Self {
             write_root,
             allow_network: options.allow_network,
-            
-            
+
+
             isolated: false,
         }
     }
@@ -409,7 +409,7 @@ contain credential or app-config directories.",
             ));
         }
         if path_encloses(&dir, &root) {
-            
+
             let dir_key = normalize_for_compare(&dir);
             if app_config
                 .as_deref()
@@ -522,8 +522,8 @@ fn writable_temp_dirs() -> Vec<PathBuf> {
     if let Ok(tmpdir) = std::env::var("TMPDIR") {
         let tmpdir = PathBuf::from(tmpdir.trim_end_matches('/'));
         if tmpdir.is_absolute() && tmpdir.is_dir() {
-            
-            
+
+
             #[cfg(target_os = "macos")]
             if let Some(parent) = darwin_user_temp_parent(&tmpdir) {
                 push_canonical(parent);
@@ -678,8 +678,8 @@ mod platform {
                     .to_string(),
             );
         };
-        
-        
+
+
         match Command::new(&bwrap)
             .args([
                 "--die-with-parent",
@@ -716,8 +716,8 @@ mod platform {
     }
 
     pub(super) fn bwrap_args(spec: &SandboxSpec) -> Vec<String> {
-        
-        
+
+
         let mut args: Vec<String> = Vec::new();
         if !spec.isolated {
             args.push("--die-with-parent".to_string());
@@ -741,8 +741,8 @@ mod platform {
             let tmp = tmp.to_string_lossy().into_owned();
             args.extend(["--bind".to_string(), tmp.clone(), tmp]);
         }
-        
-        
+
+
         for dir in sensitive_dirs() {
             if dir.is_dir() {
                 args.extend(["--tmpfs".to_string(), dir.to_string_lossy().into_owned()]);
@@ -795,7 +795,7 @@ mod platform {
             network_control: false,
             reason: Some(reason),
         };
-        
+
         if let Err(err) = std::env::current_exe() {
             return unsupported(format!("cannot resolve current executable: {err}"));
         }
@@ -807,8 +807,8 @@ mod platform {
             supported: true,
             mechanism: "low-integrity-token",
             platform: "windows",
-            
-            
+
+
             network_control: appcontainer.is_ok(),
             reason: appcontainer
                 .err()
@@ -825,9 +825,9 @@ mod platform {
         program: &Path,
         args: &[String],
     ) -> Result<(PathBuf, Vec<String>, &'static str), String> {
-        
-        
-        
+
+
+
         if !spec.allow_network && !capability().network_control {
             return Err(format!(
                 "Offline sandbox is enabled but the AppContainer backend is unavailable on this \
@@ -872,7 +872,7 @@ mod tests {
         assert!(profile.starts_with("(version 1)\n(allow default)\n(deny file-write*)\n"));
         assert!(profile.contains("xgent \\\"quoted\\\" ws"));
         assert!(profile.ends_with("(deny network*)\n"));
-        
+
         let deny_read = profile
             .find("(deny file-read*")
             .expect("deny file-read rule");
@@ -914,7 +914,7 @@ mod tests {
         }
     }
 
-    
+
     #[cfg(all(not(windows), not(target_os = "macos")))]
     #[test]
     fn bwrap_args_isolated_omits_die_with_parent() {
@@ -932,22 +932,22 @@ mod tests {
             isolated: true,
         });
         assert!(!isolated.contains(&"--die-with-parent".to_string()));
-        
+
         assert_eq!(isolated.first().map(String::as_str), Some("--unshare-pid"));
         assert_eq!(isolated.last().map(String::as_str), Some("--"));
     }
 
-    
+
     #[test]
     fn validate_workspace_rejects_ancestor_of_sensitive_dir() {
         let Some(home) = dirs::home_dir() else {
             return;
         };
-        
+
         assert!(validate_workspace(&home).is_err());
     }
 
-    
+
     #[test]
     fn validate_workspace_rejects_inside_credential_dir() {
         let Some(home) = dirs::home_dir() else {
@@ -957,7 +957,7 @@ mod tests {
         assert!(validate_workspace(&inside_ssh).is_err());
     }
 
-    
+
     #[test]
     fn validate_workspace_allows_default_project_under_app_config() {
         let Some(config) = app_config_dir() else {
@@ -967,16 +967,16 @@ mod tests {
         assert!(validate_workspace(&default_project).is_ok());
     }
 
-    
+
     #[test]
     fn validate_workspace_allows_ordinary_workspace() {
         assert!(validate_workspace(Path::new("/tmp/xgent-ordinary-ws")).is_ok());
     }
 
-    
 
-    
-    
+
+
+
     #[test]
     fn normalize_for_compare_strips_verbatim_prefixes() {
         assert_eq!(
@@ -1007,7 +1007,7 @@ mod tests {
             Path::new("/home/user/.ssh"),
             Path::new("/home/user")
         ));
-        
+
         #[cfg(windows)]
         {
             assert!(path_encloses(
@@ -1021,7 +1021,7 @@ mod tests {
         }
     }
 
-    
+
     #[test]
     fn strictest_takes_the_tighter_side() {
         let online = Some(SandboxOptions {
@@ -1033,7 +1033,7 @@ mod tests {
         assert!(strictest(None, None).is_none());
         assert_eq!(strictest(None, online).map(|o| o.allow_network), Some(true));
         assert_eq!(strictest(online, None).map(|o| o.allow_network), Some(true));
-        
+
         assert_eq!(
             strictest(online, offline).map(|o| o.allow_network),
             Some(false)
@@ -1074,7 +1074,7 @@ mod tests {
                 &args,
             );
             assert_eq!(built[0], SANDBOX_EXEC_SUBCOMMAND);
-            
+
             let parsed = parse_launcher_args(&built[1..]).expect("parse");
             assert_eq!(parsed.write_root, PathBuf::from(r"C:\ws\proj"));
             assert_eq!(parsed.allow_network, allow_network);
@@ -1089,7 +1089,7 @@ mod tests {
         assert!(parse_launcher_args(&["--write-root".to_string()]).is_err());
         assert!(parse_launcher_args(&["--".to_string()]).is_err());
         assert!(parse_launcher_args(&[]).is_err());
-        
+
         assert!(parse_launcher_args(&[
             "--net".to_string(),
             "on".to_string(),
@@ -1097,7 +1097,7 @@ mod tests {
             "cmd.exe".to_string(),
         ])
         .is_err());
-        
+
         assert!(parse_launcher_args(&[
             "--write-root".to_string(),
             r"C:\ws".to_string(),
@@ -1105,7 +1105,7 @@ mod tests {
             "cmd.exe".to_string(),
         ])
         .is_err());
-        
+
         assert!(parse_launcher_args(&[
             "--write-root".to_string(),
             r"C:\ws".to_string(),
@@ -1140,7 +1140,7 @@ mod tests {
         let b = synthetic_workspace_sid(Path::new(r"c:\users\me\project"));
         assert_eq!(a, b, "Windows 路径大小写不敏感,应得同一 SID");
         assert!(a.starts_with("S-1-5-21-"));
-        
+
         assert_eq!(a.split('-').count(), 8);
         let other = synthetic_workspace_sid(Path::new(r"C:\Users\Me\Other"));
         assert_ne!(a, other, "不同路径应得不同 SID");
@@ -1158,27 +1158,27 @@ mod tests {
         );
         assert_eq!(line.last(), Some(&0u16), "须以 NUL 结尾");
         let decoded = String::from_utf16(&line[..line.len() - 1]).unwrap();
-        
+
         assert!(decoded.starts_with(r#""C:\Program Files\App\app.exe""#));
-        
+
         assert!(decoded.contains(" --flag "));
-        
+
         assert!(decoded.contains(r#" "a b" "#));
-        
+
         assert!(decoded.ends_with(r#""say \"hi\"""#));
     }
 
     #[test]
     fn command_line_doubles_trailing_backslashes_before_closing_quote() {
-        
-        
+
+
         let line = build_command_line("prog", &[r"a\b c\".to_string()]);
         let decoded = String::from_utf16(&line[..line.len() - 1]).unwrap();
         assert!(decoded.ends_with(r#""a\b c\\""#));
     }
 
-    
-    
+
+
     #[test]
     fn resolve_program_searches_absolute_dirs_first_match_wins() {
         let present: std::collections::HashSet<PathBuf> =
@@ -1200,7 +1200,7 @@ mod tests {
 
     #[test]
     fn resolve_program_never_probes_relative_or_dot_dirs() {
-        
+
         let is_file = |p: &Path| {
             assert!(
                 p.is_absolute(),
@@ -1301,7 +1301,7 @@ mod tests {
             darwin_user_temp_parent(Path::new("/private/var/folders/zz/abc123/T")),
             Some(PathBuf::from("/private/var/folders/zz/abc123"))
         );
-        
+
         assert_eq!(darwin_user_temp_parent(Path::new("/tmp")), None);
         assert_eq!(darwin_user_temp_parent(Path::new("/private/tmp")), None);
         assert_eq!(darwin_user_temp_parent(Path::new("/var/tmp")), None);

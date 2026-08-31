@@ -113,7 +113,7 @@ test("overlapping persists serialize and the later one diffs against the committ
   const second = chatHistory.persistConversationState(persistParams(previousRef, stateC));
   await flush();
 
-  
+
   assert.equal(recorder.calls.length, 1);
   assert.equal(recorder.calls[0].cmd, "chat_history_append_segment");
   assert.equal(recorder.calls[0].args.input.segment.segmentId, "seg-1");
@@ -121,7 +121,7 @@ test("overlapping persists serialize and the later one diffs against the committ
   recorder.calls[0].deferred.resolve(summaryFor(10));
   await flush();
 
-  
+
   assert.equal(recorder.calls.length, 2);
   assert.equal(recorder.calls[1].cmd, "chat_history_upsert_active_segment");
   assert.equal(recorder.calls[1].args.input.segment.messageCount, 3);

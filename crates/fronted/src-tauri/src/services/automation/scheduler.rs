@@ -786,10 +786,10 @@ fn execute_bash(task: &CronTask, workdir: String) -> CompletedRun {
         Ok(cwd) => cwd,
         Err(error) => return failed_run(&task.id, error, true),
     };
-    
-    
-    
-    
+
+
+
+
     let sandbox_options = match sandbox::resolve_effective_options(None) {
         Ok(options) => options,
         Err(error) => return failed_run(&task.id, error, true),

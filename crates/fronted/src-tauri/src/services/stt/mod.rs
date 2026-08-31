@@ -561,7 +561,7 @@ fn websocket_endpoint(
         .is_some_and(|authority| authority.as_str().contains('@'));
     if request.uri().scheme_str() != Some("wss") || request.uri().host().is_none() || has_user_info
     {
-        return Err("STT WebSocket 地址必须是完整的 wss:
+        return Err("STT WebSocket 地址必须是完整的 wss:// 地址".to_string());
     }
     Ok(endpoint)
 }

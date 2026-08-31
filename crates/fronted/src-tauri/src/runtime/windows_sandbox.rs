@@ -55,7 +55,7 @@ pub fn run_sandbox_launcher_if_requested() {
     use crate::runtime::sandbox::{parse_launcher_args, SANDBOX_EXEC_SUBCOMMAND};
 
     let raw: Vec<String> = std::env::args().collect();
-    
+
     if raw.get(1).map(String::as_str) != Some(SANDBOX_EXEC_SUBCOMMAND) {
         return;
     }
@@ -71,8 +71,8 @@ pub fn run_sandbox_launcher_if_requested() {
             ) {
                 Ok(code) => code,
                 Err(err) => {
-                    
-                    
+
+
                     eprintln!("xgent sandbox launcher failed: {err}");
                     127
                 }
@@ -135,9 +135,9 @@ mod win {
         }
     }
 
-    
-    
-    
+
+
+
     const TOKEN_QUERY: u32 = 0x0008;
     const TOKEN_DUPLICATE: u32 = 0x0002;
     const TOKEN_ASSIGN_PRIMARY: u32 = 0x0001;
@@ -190,7 +190,7 @@ mod win {
     const GENERIC_ALL: u32 = 0x1000_0000;
     const SE_GROUP_ENABLED: u32 = 0x0000_0004;
 
-    
+
     const FILE_GENERIC_READ: u32 = 0x0012_0089;
     const FILE_GENERIC_WRITE: u32 = 0x0012_0116;
     const FILE_GENERIC_EXECUTE: u32 = 0x0012_00A0;
@@ -206,12 +206,12 @@ mod win {
     const STD_OUTPUT_HANDLE: u32 = 0xFFFF_FFF5; // -11
     const STD_ERROR_HANDLE: u32 = 0xFFFF_FFF4; // -12
 
-    
-    
+
+
     const PROC_THREAD_ATTRIBUTE_HANDLE_LIST: usize = 0x0002_0002;
     const PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES: usize = 0x0002_0009;
-    
-    
+
+
     const PROC_THREAD_ATTRIBUTE_BNO_ISOLATION: usize = 0x0002_0013;
 
     #[repr(C)]
@@ -228,25 +228,25 @@ mod win {
     const LOW_INTEGRITY_SID: &str = "S-1-16-4096";
     const LOW_INTEGRITY_SDDL: &str = "S:(ML;OICI;NW;;;LW)";
 
-    
-    
+
+
     const STATUS_DLL_INIT_FAILED: u32 = 0xC000_0142;
     const STATUS_DLL_NOT_FOUND: u32 = 0xC000_0135;
     const STATUS_ACCESS_DENIED: u32 = 0xC000_0022;
-    
-    
+
+
     const CLR_UNHANDLED_EXCEPTION: u32 = 0xE043_4352;
     const NTE_PROVIDER_DLL_FAIL: u32 = 0x8009_001D;
     // HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED):Windows PowerShell / .NET Framework
-    
+
     const E_ACCESSDENIED: u32 = 0x8007_0005;
-    
+
     const POWERSHELL_CLR_INIT_FAILED: u32 = 0xFFFF_0000;
 
         type PSID = *mut c_void;
 
-    
-    
+
+
     #[inline]
     fn ok(b: i32) -> bool {
         b != 0
@@ -521,12 +521,12 @@ mod win {
 
         fn logon_sid_bytes(token: HANDLE) -> Result<Vec<u8>, String> {
         let mut len: u32 = 0;
-        
+
         unsafe { GetTokenInformation(token, TOKEN_GROUPS_CLASS, null_mut(), 0, &mut len) };
         if len == 0 {
             return Err(last_error("GetTokenInformation(TokenGroups) size probe"));
         }
-        
+
         let mut buf: Vec<u64> = vec![0u64; ((len as usize) + 7) / 8];
         let r = unsafe {
             GetTokenInformation(
@@ -660,7 +660,7 @@ mod win {
 
         ///
                 fn append_sid_to_default_dacl(token: HANDLE, sid: PSID) -> Result<(), String> {
-        const ACL_APPEND_AT_END: u32 = 0xFFFF_FFFF; 
+        const ACL_APPEND_AT_END: u32 = 0xFFFF_FFFF;
         unsafe {
             let mut len: u32 = 0;
             GetTokenInformation(token, TOKEN_DEFAULT_DACL_CLASS, null_mut(), 0, &mut len);
@@ -680,7 +680,7 @@ mod win {
                 return Err(last_error("GetTokenInformation(TokenDefaultDacl)"));
             }
             let old_dacl = (*(buf.as_ptr() as *const TOKEN_DEFAULT_DACL)).DefaultDacl;
-            
+
             if old_dacl.is_null() {
                 return Ok(());
             }
@@ -702,8 +702,8 @@ mod win {
             if sid_len == 0 {
                 return Err(last_error("GetLengthSid(default DACL trustee)"));
             }
-            
-            
+
+
             let ace_len = std::mem::size_of::<ACCESS_ALLOWED_ACE>() as u32 - 4 + sid_len;
             let new_len = ((info.AclBytesInUse + ace_len) + 3) & !3;
 
@@ -712,7 +712,7 @@ mod win {
             if !ok(InitializeAcl(new_acl, new_len, ACL_REVISION)) {
                 return Err(last_error("InitializeAcl(default DACL)"));
             }
-            
+
             for i in 0..info.AceCount {
                 let mut ace: *mut c_void = null_mut();
                 if !ok(GetAce(old_dacl, i, &mut ace)) || ace.is_null() {
@@ -729,7 +729,7 @@ mod win {
             let tdd = TOKEN_DEFAULT_DACL {
                 DefaultDacl: new_acl,
             };
-            
+
             if !ok(SetTokenInformation(
                 token,
                 TOKEN_DEFAULT_DACL_CLASS,
@@ -840,7 +840,7 @@ mod win {
                 name_w.as_ptr(),
                 display_w.as_ptr(),
                 desc_w.as_ptr(),
-                null(), 
+                null(),
                 0,
                 &mut sid,
             )
@@ -978,7 +978,7 @@ mod win {
 
         ///
                 struct AttrList {
-        buf: Vec<u64>, 
+        buf: Vec<u64>,
     }
 
     impl AttrList {
@@ -1074,7 +1074,7 @@ mod win {
             ("HTTP_PROXY", BLACKHOLE),
             ("HTTPS_PROXY", BLACKHOLE),
             ("ALL_PROXY", BLACKHOLE),
-            ("NO_PROXY", ""), 
+            ("NO_PROXY", ""),
             ("CARGO_NET_OFFLINE", "true"),
             ("PIP_NO_INDEX", "1"),
             ("NPM_CONFIG_OFFLINE", "true"),
@@ -1175,9 +1175,9 @@ mod win {
                 return Err(format!("GetNamedSecurityInfoW({name}) failed (error={rc})"));
             }
 
-            
-            
-            
+
+
+
             if old_dacl.is_null() {
                 if !psd.is_null() {
                     LocalFree(psd as _);
@@ -1960,8 +1960,8 @@ mod win {
     }
 
     fn stamp_directory_object(nt_path: &str, sids: &[PSID]) {
-        
-        
+
+
         let access = DIRECTORY_QUERY | DIRECTORY_TRAVERSE | READ_CONTROL | WRITE_DAC;
         match open_directory_object(nt_path, access) {
             Ok(dir) => stamp_kernel_handle(
@@ -2001,8 +2001,8 @@ mod win {
             }
         };
         if let Some(dir) = handle.as_ref() {
-            
-            
+
+
             nt_set_dacl(dir.0, sd, nt_path);
             set_handle_low_integrity(dir.0, nt_path);
             stamp_kernel_handle(
@@ -2095,7 +2095,7 @@ mod win {
                     dir.0,
                     buf.as_mut_ptr() as *mut c_void,
                     buf.len() as u32,
-                    1, 
+                    1,
                     restart,
                     &mut context,
                     &mut ret_len,
@@ -2144,7 +2144,7 @@ mod win {
                 }
             }
             if ty == "Directory" {
-                
+
                 stamp_directory_children(&child, sids, false);
             }
         }
@@ -2203,8 +2203,8 @@ mod win {
                 }
             }
         }
-        
-        
+
+
         stamp_nt_path_dacl(r"\Device\NamedPipe", sids);
         held
     }
@@ -2217,9 +2217,9 @@ mod win {
         extra_sids: &[PSID],
     ) -> Result<PathBuf, String> {
         let base = std::env::temp_dir().join(format!("xgent-sandbox-{dir_key}"));
-        
-        
-        
+
+
+
         ensure_plain_directory(&base)?;
         remove_write_ace(&base, legacy_appcontainer_sid)?;
         ensure_write_ace(&base, sid)?;
@@ -2230,7 +2230,7 @@ mod win {
                 ));
             }
         }
-        let _ = write_root; 
+        let _ = write_root;
         let base_wide = to_wide(&base.to_string_lossy());
         for name in ["TEMP", "TMP", "TMPDIR"] {
             let name_wide = to_wide(name);
@@ -2247,7 +2247,7 @@ mod win {
     }
 
             fn inheritable_std_handles() -> Result<(HANDLE, HANDLE, HANDLE), String> {
-        
+
         let invalid: HANDLE = usize::MAX as HANDLE;
         unsafe {
             let stdin = GetStdHandle(STD_INPUT_HANDLE);
@@ -2255,7 +2255,7 @@ mod win {
             let stderr = GetStdHandle(STD_ERROR_HANDLE);
             for h in [stdin, stdout, stderr] {
                 if !h.is_null() && h != invalid {
-                    
+
                     SetHandleInformation(h, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
                 }
             }
@@ -2299,18 +2299,18 @@ mod win {
             synthetic_workspace_sid, validate_workspace,
         };
 
-        
-        
-        
+
+
+
         validate_workspace(write_root)?;
 
         let synthetic_str = synthetic_workspace_sid(write_root);
-        
+
         let dir_key = synthetic_str
             .trim_start_matches("S-1-5-21-")
             .replace('-', "_");
 
-        
+
         let path_env = std::env::var("PATH").unwrap_or_default();
         let pathext =
             std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_string());
@@ -2329,10 +2329,10 @@ mod win {
                  powershell.exe / cmd.exe"
             ));
         }
-        
-        
-        
-        
+
+
+
+
         let appcontainer_sid = if allow_network {
             derive_appcontainer_profile_sid(&dir_key)?
         } else {
@@ -2354,19 +2354,19 @@ mod win {
             let user = token_user_sid_bytes(token.0)?;
             let user_ptr = user.as_ptr() as PSID;
             let rt = OwnedHandle(duplicate_primary_token(token.0)?);
-            
+
             append_sid_to_default_dacl(rt.0, logon_ptr)?;
-            
-            
-            
+
+
+
             set_token_low_integrity(rt.0)?;
             network_token = Some(rt);
             fence_sid = user_ptr;
             logon_sid = Some(logon);
             user_sid = Some(user);
         } else {
-            
-            
+
+
             set_offline_env()?;
             network_token = None;
             fence_sid = workspace_capability
@@ -2377,9 +2377,9 @@ mod win {
             user_sid = None;
         }
 
-        
-        
-        
+
+
+
         remove_write_ace(write_root, appcontainer_sid.0)?;
         ensure_write_ace(write_root, fence_sid)?;
         let extra_temp: Vec<PSID> = logon_sid
@@ -2399,7 +2399,7 @@ mod win {
                 .as_ref()
                 .map(|sid| sid.as_ptr() as PSID)
                 .ok_or_else(|| "sandbox launcher user SID is unavailable".to_string())?;
-            
+
             ensure_low_integrity_label(
                 SE_FILE_OBJECT,
                 &write_root.to_string_lossy(),
@@ -2412,7 +2412,7 @@ mod win {
                 launcher_user_sid,
             );
         }
-        
+
         remove_legacy_appcontainer_runtime_surface(appcontainer_sid.0);
         let mut runtime_sids: Vec<PSID> = vec![fence_sid];
         if let Some(ref logon) = logon_sid {
@@ -2423,18 +2423,18 @@ mod win {
             ensure_clr_user_write_surface(sid);
         }
 
-        
+
         let (h_in, h_out, h_err) = inheritable_std_handles()?;
         if allow_network {
-            
-            
-            
+
+
+
             set_handle_low_integrity(h_in, "stdin");
             set_handle_low_integrity(h_out, "stdout");
             set_handle_low_integrity(h_err, "stderr");
         }
 
-        
+
         let mut namespace_sids: Vec<PSID> = Vec::with_capacity(4);
         if let Some(ref logon) = logon_sid {
             namespace_sids.push(logon.as_ptr() as PSID);
@@ -2447,18 +2447,18 @@ mod win {
         let _held_namespace =
             ensure_object_namespace_write_surface(&namespace_sids, &resolved, &isolation_prefix);
 
-        let program_str = program.to_string_lossy(); 
-        let app_wide = to_wide(&resolved.to_string_lossy()); 
-        let mut cmdline = build_command_line(&program_str, args); 
+        let program_str = program.to_string_lossy();
+        let app_wide = to_wide(&resolved.to_string_lossy());
+        let mut cmdline = build_command_line(&program_str, args);
 
-        
-        
-        
+
+
+
         let mut desktop = to_wide("winsta0\\default");
 
-        
-        
-        
+
+
+
         let invalid: HANDLE = usize::MAX as HANDLE;
         let mut handle_list: Vec<HANDLE> = Vec::with_capacity(3);
         for h in [h_in, h_out, h_err] {
@@ -2468,8 +2468,8 @@ mod win {
         }
         let inherit = !handle_list.is_empty();
 
-        
-        
+
+
         let mut capability_attrs: Vec<SID_AND_ATTRIBUTES> = workspace_capability
             .as_ref()
             .map(|sid| SID_AND_ATTRIBUTES {
@@ -2485,8 +2485,8 @@ mod win {
             Reserved: 0,
         };
 
-        
-        
+
+
         let attr_count = 2;
         let mut bno_attr = ProcessBnoIsolationAttribute {
             isolation_enabled: 1,
@@ -2523,7 +2523,7 @@ mod win {
             )?;
         }
 
-        
+
         let result = unsafe {
             let mut si: STARTUPINFOEXW = std::mem::zeroed();
             si.StartupInfo.cb = std::mem::size_of::<STARTUPINFOEXW>() as u32;
@@ -2545,14 +2545,14 @@ mod win {
                     null(),
                     i32::from(inherit),
                     flags,
-                    null(), 
-                    null(), 
+                    null(),
+                    null(),
                     &si as *const _ as *const STARTUPINFOW,
                     &mut pi,
                 )
             } else {
-                
-                
+
+
                 CreateProcessW(
                     app_wide.as_ptr(),
                     cmdline.as_mut_ptr(),
@@ -2574,10 +2574,10 @@ mod win {
                 }));
             }
 
-            
-            
-            
-            
+
+
+
+
             let job = if isolated {
                 null_mut()
             } else {
@@ -2609,15 +2609,15 @@ mod win {
             let mut exit_code: u32 = 0;
             let got = GetExitCodeProcess(pi.hProcess, &mut exit_code);
             CloseHandle(pi.hProcess);
-            
+
             if !job.is_null() {
                 CloseHandle(job);
             }
             if !ok(got) {
                 return Err(last_error("GetExitCodeProcess"));
             }
-            
-            
+
+
             if let Some(hint) = loader_failure_hint(exit_code) {
                 eprintln!("xgent sandbox: process exited with {exit_code:#010X}: {hint}");
             }
@@ -2641,7 +2641,7 @@ mod tests {
 
     #[test]
     fn appcontainer_profile_name_is_deterministic_and_within_limits() {
-        
+
         let worst = profile_name_for("S-1-5-21-4294967295-4294967295-4294967295-4294967295");
         assert_eq!(
             worst,
@@ -2655,7 +2655,7 @@ mod tests {
         assert!(worst
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_'));
-        
+
         assert_eq!(
             profile_name_for("S-1-5-21-1-2-3-4"),
             profile_name_for("S-1-5-21-1-2-3-4")
@@ -2718,8 +2718,8 @@ mod tests {
             }
         }
 
-        
-        
+
+
         #[test]
         fn derive_appcontainer_sid_is_deterministic() {
             let a = win::appcontainer_profile_sid_for_test("Xgent.Sandbox.test_1_2_3_4");
@@ -2729,7 +2729,7 @@ mod tests {
                 "DeriveAppContainerSidFromAppContainerName failed"
             );
             assert_eq!(a, b);
-            
+
             assert!(a.unwrap().starts_with("S-1-15-2-"));
         }
 
@@ -2746,9 +2746,9 @@ mod tests {
             );
         }
 
-        
-        
-        
+
+
+
         #[test]
         fn default_dacl_append_adds_logon_sid() {
             let (before, after) =

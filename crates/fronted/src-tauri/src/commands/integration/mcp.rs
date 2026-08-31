@@ -394,8 +394,8 @@ impl StdioTransport {
             .stderr(Stdio::piped());
         maybe_augment_macos_path(&mut command);
         configure_child_process_group(&mut command);
-        
-        
+
+
         for (key, value) in crate::services::system_proxy::shell_proxy_envs()? {
             command.env(key, value);
         }
@@ -592,7 +592,7 @@ impl HttpTransport {
 
         let headers = build_header_map(&config.headers)?;
 
-        
+
         let client = crate::services::system_proxy::blocking_client_builder()
             .map_err(|e| format!("创建 HTTP client 失败：{e}"))?
             .connect_timeout(Duration::from_secs(10))
@@ -797,7 +797,7 @@ impl SseTransport {
             }
         };
 
-        
+
         let client_get = crate::services::system_proxy::blocking_client_builder()
             .map_err(|e| format!("创建 SSE http client 失败：{e}"))?
             .connect_timeout(Duration::from_secs(10))
@@ -1135,8 +1135,8 @@ struct McpClient {
 
 impl McpClient {
     fn spawn(config: McpServerConfig) -> Result<Self, String> {
-        
-        
+
+
         let proxy_revision = crate::services::system_proxy::revision();
         let transport = match config.transport().trim() {
             "http" => McpTransport::Http(HttpTransport::spawn(&config)?),
@@ -1530,7 +1530,7 @@ impl McpRuntimeManager {
         if let Some(existing) = existing.as_ref() {
             // Restart if config changed. Same-id calls serialize on the client
             // lock (protocol streams cannot be shared), other servers do not.
-            
+
             let proxy_revision = crate::services::system_proxy::revision();
             let same_config = existing
                 .lock()
@@ -1544,10 +1544,10 @@ impl McpRuntimeManager {
         let client = match McpClient::spawn(cfg) {
             Ok(client) => client,
             Err(error) => {
-                
-                
-                
-                
+
+
+
+
                 if let Some(stale) = existing {
                     if let Ok(mut map) = self.clients.lock() {
                         if map
@@ -1738,8 +1738,8 @@ pub async fn mcp_list_tools(
             }
         }
 
-        
-        
+
+
         if succeeded == 0 && !failures.is_empty() {
             return Err(format!(
                 "所有已启用的 MCP server 都不可用：\n{}",
@@ -2017,8 +2017,8 @@ mod tests {
             .ensure_client(offline_http_config("srv"))
             .expect("initial ensure");
 
-        
-        
+
+
         manager
             .ensure_client(url_config("srv", "http", Some("::not-a-url::")))
             .expect_err("respawn must fail");
@@ -2099,7 +2099,7 @@ mod tests {
 
     #[test]
     fn windows_cmd_quote_arg_doubles_embedded_quotes() {
-        
+
         assert_eq!(windows_cmd_quote_arg("-y"), r#""-y""#);
         assert_eq!(windows_cmd_quote_arg(r#"a"b"#), r#""a""b""#);
         assert_eq!(windows_cmd_quote_arg("with space"), r#""with space""#);
@@ -2107,18 +2107,18 @@ mod tests {
 
     #[test]
     fn windows_cmd_quote_arg_doubles_backslashes_before_quotes() {
-        
+
         assert_eq!(windows_cmd_quote_arg(r#"a\"b"#), r#""a\\""b""#);
-        
+
         assert_eq!(windows_cmd_quote_arg(r"C:\data\"), r#""C:\data\\""#);
-        
+
         assert_eq!(windows_cmd_quote_arg(r"C:\a\b"), r#""C:\a\b""#);
         assert_eq!(windows_cmd_quote_arg(""), r#""""#);
     }
 
     #[test]
     fn windows_cmd_quote_arg_neutralizes_percent_expansion() {
-        
+
         assert_eq!(windows_cmd_quote_arg("%PATH%"), r#""%%cd:~,%PATH%%cd:~,%""#);
         assert_eq!(windows_cmd_quote_arg("100%"), r#""100%%cd:~,%""#);
         assert_eq!(windows_cmd_quote_arg("a\rb"), "\"a%%cd:~,\rb\"");
@@ -2126,7 +2126,7 @@ mod tests {
 
     #[test]
     fn windows_cmd_c_argument_wraps_whole_line_for_slash_s() {
-        
+
         let program = Path::new(r"C:\Program Files\nodejs\npx.cmd");
         let args = vec!["-y".to_string(), "@playwright/mcp".to_string()];
         assert_eq!(
@@ -2146,7 +2146,7 @@ mod tests {
 
     #[test]
     fn windows_cmd_c_argument_survives_trailing_backslash_arg() {
-        
+
         let program = Path::new(r"C:\Program Files\nodejs\npx.cmd");
         let args = vec![
             "-y".to_string(),

@@ -274,14 +274,14 @@ test("hosted search aggregation accumulates an Anthropic query streamed as parti
   anthropic.accept({
     type: "content_block_delta",
     index: 0,
-    delta: { type: "input_json_delta", partial_json: 'ry": "XAg' },
+    delta: { type: "input_json_delta", partial_json: 'ry": "Xge' },
   });
   assert.deepEqual(anthropic.getBlocks(), []);
 
   anthropic.accept({
     type: "content_block_delta",
     index: 0,
-    delta: { type: "input_json_delta", partial_json: 'ent incremental search"}' },
+    delta: { type: "input_json_delta", partial_json: 'nt incremental search"}' },
   });
 
   assert.deepEqual(anthropic.getBlocks()[0].queries, ["Xgent incremental search"]);

@@ -44,7 +44,7 @@ test("prepareUpstreamProxyRequest 拒绝相对地址、非 http(s) 与内嵌凭�
   );
 });
 
-test("prepareUpstreamProxyRequest 拒绝 
+test("prepareUpstreamProxyRequest rejects an upstream path beginning with //", async () => {
   await assert.rejects(
     () => proxy.prepareUpstreamProxyRequest("https://api.smithery.ai//servers/foo"),
     /must not begin with \/\//,

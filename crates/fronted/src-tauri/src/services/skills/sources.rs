@@ -111,7 +111,7 @@ where
         .map_err(|e| format!("Failed to download Skill source: {e}"))?;
     let status = response.status();
     if !status.is_success() {
-        
+
         let mut raw = Vec::new();
         let _ = response.take(2048).read_to_end(&mut raw);
         let body = String::from_utf8_lossy(&raw);

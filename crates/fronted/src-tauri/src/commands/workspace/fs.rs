@@ -1663,7 +1663,7 @@ fn build_pdf_window(
 }
 
 fn decode_xml_entities(input: &str) -> String {
-    
+
     match quick_xml::escape::unescape(input) {
         Ok(decoded) => decoded.into_owned(),
         Err(_) => input.to_string(),
@@ -2473,8 +2473,8 @@ fn read_url_image_source(source: &str) -> Result<ReadResponse, FsError> {
         }
     }
 
-    
-    
+
+
     let client = crate::services::system_proxy::blocking_client_builder()
         .map_err(|e| FsError::Other(format!("Failed to create the HTTP client: {e}")))?
         .timeout(Duration::from_secs(IMAGE_SOURCE_HTTP_TIMEOUT_SECS))
@@ -3083,9 +3083,9 @@ fn fs_write_text_impl(
             )
         }
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
-            
-            
-            
+
+
+
             let parent = ensure_parent_dir(&path.root, &raw_target)?;
             let file_name = raw_target
                 .file_name()
@@ -3102,8 +3102,8 @@ fn fs_write_text_impl(
         ensure_expected_version_matches(&target, &logical_path, &expected)?;
     }
 
-    
-    
+
+
     capture_pre_image(
         checkpoint.as_ref(),
         &path.root,
@@ -3263,7 +3263,7 @@ fn fs_edit_text_impl(
     };
     let next = apply_edit_replacements(&text, applied);
 
-    
+
     capture_pre_image(
         checkpoint.as_ref(),
         wd,
@@ -3358,16 +3358,16 @@ fn fs_delete_impl(
     let meta = fs::symlink_metadata(&target)?;
     let ckpt_rel = checkpoint_rel(wd, &target, &rel);
     let kind = if meta.file_type().is_symlink() {
-        
+
         remove_symlink_path(&target)?;
         "symlink"
     } else if meta.is_file() {
-        
+
         capture_pre_image(checkpoint.as_ref(), wd, &ckpt_rel, PreImage::File(None));
         fs::remove_file(&target)?;
         "file"
     } else if meta.is_dir() {
-        
+
         capture_pre_image(checkpoint.as_ref(), wd, &ckpt_rel, PreImage::Dir);
         fs::remove_dir_all(&target)?;
         "dir"
@@ -5182,7 +5182,7 @@ mod tests {
             "a & b <c> \"d\" 'e'"
         );
         assert_eq!(decode_xml_entities("&#65;&#x4E2D;"), "A中");
-        
+
         assert_eq!(
             decode_xml_entities("keep &bogus; text"),
             "keep &bogus; text"
@@ -6153,8 +6153,8 @@ mod tests {
         std::os::unix::fs::symlink(workdir.join("real"), workdir.join("link"))
             .expect("create dir symlink");
 
-        
-        
+
+
         let write = fs_write_text_sync(
             workdir.display().to_string(),
             "link/new.txt".to_string(),
@@ -6167,7 +6167,7 @@ mod tests {
         .expect("write through symlinked parent should succeed");
         assert!(write.file_id.is_some());
         assert!(workdir.join("real/new.txt").is_file());
-        
+
         let resolved = resolve_existing_file_target(&workdir, Path::new("link/new.txt"))
             .expect("resolve through symlink");
         assert_eq!(

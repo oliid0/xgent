@@ -158,8 +158,8 @@ pub fn set_config(raw: Option<&Value>) {
         .snapshot
         .write()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    
-    
+
+
     if snapshot.mode == mode {
         return;
     }
@@ -218,8 +218,8 @@ pub fn shell_proxy_envs() -> Result<Vec<(String, String)>, String> {
 
 fn build_proxy(config: &SystemProxyConfig) -> Result<reqwest::Proxy, String> {
     reqwest::Proxy::all(config.proxy_url())
-        
-        
+
+
         .map(|proxy| proxy.no_proxy(reqwest::NoProxy::from_string(NO_PROXY_DEFAULT)))
         .map_err(|_| format!("应用代理地址无效：{}", config.display_target()))
 }
@@ -276,8 +276,8 @@ pub fn cached_client() -> Result<reqwest::Client, String> {
 
 fn os_proxy_fallback_builder_for_mode(mode: &ProxyMode) -> Result<reqwest::ClientBuilder, String> {
     match mode {
-        
-        
+
+
         ProxyMode::Disabled => Ok(reqwest::Client::builder()),
         mode => async_client_builder_for_mode(mode),
     }
@@ -387,7 +387,7 @@ mod tests {
             assert!(matches!(mode, ProxyMode::Invalid(_)));
             assert!(async_client_builder_for_mode(&mode).is_err());
             assert!(blocking_client_builder_for_mode(&mode).is_err());
-            
+
             assert!(os_proxy_fallback_builder_for_mode(&mode).is_err());
             assert!(shell_proxy_envs_for_mode(&mode).is_err());
         }
@@ -408,8 +408,8 @@ mod tests {
         let config = json!({
             "enabled": true, "type": "http", "host": "proxy.local", "port": 8080
         });
-        
-        
+
+
         assert_eq!(
             parse_proxy_mode(Some(&config)),
             parse_proxy_mode(Some(&config))

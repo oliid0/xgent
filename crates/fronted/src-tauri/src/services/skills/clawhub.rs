@@ -67,7 +67,7 @@ pub(crate) fn clawhub_download_url_for_slug(
     url.query_pairs_mut()
         .append_pair("slug", slug)
         .append_pair("tag", tag);
-    
+
     if let Some(owner) = owner_handle
         .map(str::trim)
         .filter(|value| !value.is_empty())

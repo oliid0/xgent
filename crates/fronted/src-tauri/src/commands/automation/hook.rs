@@ -166,7 +166,7 @@ pub(crate) fn run_hook_script_sync(
         None,
         token.clone(),
         &context,
-        
+
         None,
     );
 

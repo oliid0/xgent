@@ -102,7 +102,7 @@ test("runCompaction produces a zero-usage checkpoint and appends a new segment",
   assert.equal(checkpoint.api, "xgent-compaction");
   assert.equal(checkpoint.model, "claude-x");
   assert.equal(checkpoint.promptVersion, "summary-v3");
-  
+
   assert.equal(checkpoint.usage.totalTokens, 0);
   assert.equal(checkpoint.usage.input, 0);
   assert.deepEqual(checkpoint.compactionStats, {
@@ -113,7 +113,7 @@ test("runCompaction produces a zero-usage checkpoint and appends a new segment",
   assert.equal(outcome.newSegmentIndex, 1);
   assert.equal(outcome.state.activeSegmentIndex, 1);
   assert.equal(outcome.state.segments.length, 2);
-  
+
   assert.equal(outcome.state.segments[0].messages.length, 2);
   assert.equal(outcome.state.segments[1].messages.length, 0);
 

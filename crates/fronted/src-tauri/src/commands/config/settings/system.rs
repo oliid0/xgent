@@ -501,7 +501,7 @@ fn normalize_command_safety_mode_value(raw: Option<&Value>) -> Value {
         return Value::String(COMMAND_SAFETY_MODE_DEFAULT.to_string());
     };
     let Some(text) = value.as_str().map(str::trim) else {
-        
+
         eprintln!(
             "[settings] non-string commandSafetyMode {value}; failing closed to \
 \"{COMMAND_SAFETY_MODE_FAIL_CLOSED}\""

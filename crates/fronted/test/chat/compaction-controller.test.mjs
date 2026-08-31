@@ -170,7 +170,7 @@ test("pre-send compaction: checkpoint, persist, re-appended user message, paired
   const statuses = recorder.byKind("publishStatus").map(([, status]) => status.phase);
   assert.deepEqual(statuses, ["running", "completed"]);
 
-  
+
   const [, persistedState] = recorder.byKind("persist")[0];
   assert.equal(persistedState.segments.length, 2);
   assert.equal(persistedState.segments[1].messages.length, 0);
@@ -272,20 +272,20 @@ test("user stop chains into the summarizer; handleTurnAbort rolls back and persi
 
   const [, restoredState] = recorder.byKind("applyStateMidRun")[0];
   assert.equal(restoredState, state);
-  
+
   assert.equal(recorder.byKind("persistRollback").length, 1);
   const statuses = recorder.byKind("publishStatus").map(([, status]) => status.phase);
   assert.deepEqual(statuses, ["running", "idle"]);
   // Rollback clears the live tool status and does not leave compaction active.
   assert.equal(recorder.byKind("liveToolStatus").at(-1)[1], null);
 
-  
+
   assert.equal(await controller.handleTurnAbort(), false);
 });
 
 test("summarizer failure degrades to prune and still returns a usable context", async () => {
   const controller = new CompactionController();
-  
+
   const state = conversationState.createConversationStateFromContext({
     systemPrompt: "sys",
     messages: [
@@ -415,7 +415,7 @@ test("escalation ladder: consecutive ineffective compactions advise but never ha
       completeCalls += 1;
       return summaryResponse();
     },
-    
+
     buildResumeContext: () => ({
       systemPrompt: "sys",
       messages: [assistantWithUsage("still huge", 190_000, 99)],
@@ -439,7 +439,7 @@ test("escalation ladder: consecutive ineffective compactions advise but never ha
     .map(([, text]) => text);
   assert.equal(runningTexts.length, 3);
   assert.doesNotMatch(runningTexts[0], /建议适时开启新会话/);
-  
+
   assert.match(runningTexts[2], /建议适时开启新会话/);
 });
 

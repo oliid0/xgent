@@ -263,7 +263,7 @@ pub(crate) fn read_backup_file(path: &Path) -> Result<String, String> {
 }
 
 pub(crate) fn backup_current_config(conn: &Connection) -> Result<Option<String>, String> {
-    
+
     let snapshot = collect_backup_snapshot(conn, None)?;
     let manifest = build_backup_manifest(&snapshot);
     let document = serialize_backup_document(&snapshot, &manifest)?;
@@ -292,10 +292,10 @@ fn prune_backups(dir: &Path) -> Result<(), String> {
     if files.len() <= BACKUP_RETENTION {
         return Ok(());
     }
-    
+
     files.sort();
     for path in files.iter().take(files.len() - BACKUP_RETENTION) {
-        
+
         let _ = fs::remove_file(path);
     }
     Ok(())
@@ -329,7 +329,7 @@ pub(crate) fn apply_backup_snapshot(
 
     apply_backup_snapshot_to_db(conn, &snapshot)?;
     if snapshot.system.is_some() {
-        
+
         refresh_system_proxy_state(conn)?;
     }
 

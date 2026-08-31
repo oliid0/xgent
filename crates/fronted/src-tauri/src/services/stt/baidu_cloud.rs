@@ -59,7 +59,7 @@ pub async fn run<R: Runtime>(
         .map_err(|e| stage_failure("Baidu", "connect", format!("网络错误: {e}")))?;
     let (mut write, mut read) = socket.split();
     send_provider_message(&mut write, Message::Text( serde_json::json!({ "type":"START", "data": { "appid":app_id, "appkey":app_key, "dev_pid":dev_pid, "cuid":format!("Xgent-{}", uuid::Uuid::new_v4()), "format":"pcm", "sample":16000 } }) .to_string() .into(), ), "Baidu", "start").await?;
-    
+
     emit(
         &app,
         SttEvent::Ready {

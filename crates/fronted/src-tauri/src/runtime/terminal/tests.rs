@@ -1295,9 +1295,9 @@ fn registry_create_rejects_cwd_outside_the_project() {
 
 #[test]
 fn mark_finished_broadcasts_exit_only_for_the_first_finisher() {
-    
-    
-    
+
+
+
     let registry = Arc::new(TerminalSessionRegistry::default());
     insert_test_ssh_session(
         &registry,
@@ -1338,7 +1338,7 @@ fn close_emits_exit_then_closed_without_a_trailing_exit() {
     registry
         .close("ssh-close-order".to_string())
         .expect("close test session");
-    
+
     registry.mark_finished("ssh-close-order");
 
     let kinds: Vec<String> = std::iter::from_fn(|| rx.try_recv().ok())

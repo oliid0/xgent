@@ -349,9 +349,9 @@ impl ShellSession {
                 take -= 1;
             }
             if take == 0 {
-                
-                
-                
+
+
+
                 break;
             }
             let fragment = &chunk.text[relative_start..relative_start + take];
@@ -432,9 +432,9 @@ impl ShellSessionManager {
         }
         let actual_cwd = resolve_shell_cwd(&workdir, cwd.as_deref())?;
         let effective_timeout_ms = normalize_explicit_timeout(timeout_ms, max_timeout_ms);
-        
-        
-        
+
+
+
         let sandbox_spec = match sandbox_options {
             Some(options) => Some(SandboxSpec::from_options(
                 canonical_workdir(&workdir)?,
@@ -493,9 +493,9 @@ impl ShellSessionManager {
                 .unwrap_or(DEFAULT_START_YIELD_MS)
                 .clamp(MIN_START_YIELD_MS, MAX_START_YIELD_MS),
         );
-        
-        
-        
+
+
+
         Ok(session.wait(Some(0), yield_time))
     }
 
@@ -976,9 +976,9 @@ mod tests {
 
     #[test]
     fn pagination_never_skips_a_chunk_tail_that_cannot_fit() {
-        
-        
-        
+
+
+
         let config = ShellSessionConfig {
             response_capacity_bytes: 3,
             ..ShellSessionConfig::default()

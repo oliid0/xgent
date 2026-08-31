@@ -30,8 +30,8 @@ pub async fn fetch_provider_models(
     models_url: Option<&str>,
     is_full_url: bool,
 ) -> Result<String, String> {
-    
-    
+
+
     let client = if use_system_proxy {
         crate::services::system_proxy::cached_client()
             .map_err(|error| format!("App proxy unavailable: {error}"))?
@@ -303,7 +303,7 @@ fn build_provider_models_attempts_with_override(
             .unwrap_or_else(|| build_provider_models_url(provider_type, &base_url, official)),
         headers: build_provider_models_headers(provider_type, api_key, official),
     });
-    
+
     let mut attempts = vec![default_attempt];
     if official_attempt.url != attempts[0].url || official_attempt.headers != attempts[0].headers {
         attempts.push(official_attempt);
@@ -434,14 +434,14 @@ mod tests {
             "https://relay.example.com/v1beta/models"
         );
 
-        
+
         let claude =
             build_provider_models_attempts("claude_code", "https://relay.example.com", "key")
                 .expect("claude attempts");
         assert_eq!(claude.len(), 2);
         assert_eq!(claude[0].url, claude[1].url);
 
-        
+
         let codex = build_provider_models_attempts(
             "codex",
             "https://relay.example.com/v1/responses",

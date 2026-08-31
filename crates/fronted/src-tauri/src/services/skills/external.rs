@@ -9,9 +9,9 @@ use crate::runtime::platform::expand_tilde_path;
 const EXTERNAL_TOOL_ROOTS: &[(&str, &str)] = &[
     ("claude-code", "~/.claude/skills"),
     ("codex", "~/.codex/skills"),
-    
+
     ("codebuddy", "~/.codebuddy/skills-marketplace/skills"),
-    
+
     ("agents", "~/.agents/skills"),
 ];
 
@@ -25,8 +25,8 @@ pub(crate) fn scan_external_skills() -> Vec<SystemExternalToolScan> {
             let mut errors = Vec::new();
             if exists {
                 for dir in discover_skill_dirs(&root) {
-                    
-                    
+
+
                     if standard_metadata_file_for(&dir).is_none() {
                         errors.push(format!(
                             "No SKILL.md, skill.md, or skill.json found in {}",

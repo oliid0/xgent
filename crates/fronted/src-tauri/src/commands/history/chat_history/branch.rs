@@ -108,9 +108,9 @@ pub(crate) fn build_branch_segments(
     let anchor_messages = location.messages;
     let anchor_position = location.message_index;
 
-    
-    
-    
+
+
+
     let mut cut: Option<(usize, usize)> = None;
     let mut saw_reply_after_anchor = false;
     'scan: for (segment_pos, segment) in segments.iter().enumerate().skip(anchor_segment_pos) {
@@ -141,7 +141,7 @@ pub(crate) fn build_branch_segments(
     let mut kept: Vec<ChatHistorySegmentInput> = Vec::new();
     match cut {
         Some((cut_segment_pos, cut_message_index)) if cut_segment_pos == anchor_segment_pos => {
-            
+
             for segment in &segments[..anchor_segment_pos] {
                 kept.push(record_to_segment_input(segment));
             }
@@ -153,8 +153,8 @@ pub(crate) fn build_branch_segments(
             )?);
         }
         Some((cut_segment_pos, cut_message_index)) => {
-            
-            
+
+
             for segment in &segments[..cut_segment_pos] {
                 kept.push(record_to_segment_input(segment));
             }

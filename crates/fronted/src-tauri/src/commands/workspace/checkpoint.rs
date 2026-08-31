@@ -325,16 +325,16 @@ fn capture_at_with_limits(
     let existing = read_index(dir);
     let turn_seq = resolve_turn_seq(&existing, turn_id);
 
-    
-    
-    
+
+
+
     if existing.len() + RECORD_CAP_ERROR_RESERVE >= MAX_RECORDS_PER_CONVERSATION {
         return Err(format!(
             "checkpoint record cap reached ({MAX_RECORDS_PER_CONVERSATION})"
         ));
     }
 
-    
+
     if existing
         .iter()
         .any(|r| r.turn_seq == turn_seq && r.root == root_str && r.rel_path == rel_str)
@@ -378,8 +378,8 @@ fn capture_at_with_limits(
             let bytes = match bytes {
                 Some(b) => b,
                 None => {
-                    
-                    
+
+
                     let len = fs::metadata(&abs_path).map_err(|e| e.to_string())?.len();
                     if len > max_blob_bytes {
                         append_error_record(
@@ -423,9 +423,9 @@ fn capture_at_with_limits(
                 );
                 return Ok(turn_seq);
             }
-            
-            
-            
+
+
+
             let mtime_ms = fs::symlink_metadata(&abs_path)
                 .ok()
                 .and_then(|md| md.modified().ok())
@@ -553,7 +553,7 @@ pub fn capture_pre_image(
             "checkpoint capture failed for {}: {error}",
             root.join(rel_path).display()
         );
-        
+
         record_capture_skip(ctx, root, rel_path, &error);
     }
 }
@@ -609,8 +609,8 @@ fn checkpoint_turn_summaries(records: Vec<CheckpointRecord>) -> Vec<CheckpointTu
             "dir" => summary.dir_count += 1,
             "error" => summary.incomplete = true,
             "file" => summary.file_count += 1,
-            
-            
+
+
             _ => {}
         }
         if record.captured_at < summary.first_captured_at {
@@ -704,16 +704,16 @@ fn canonical_authorized_roots(roots: &[String]) -> Vec<PathBuf> {
         let Ok(canonical) = fs::canonicalize(path) else {
             continue;
         };
-        
-        
-        
+
+
+
         if let Some(repo_root) = enclosing_repo_root(&canonical) {
             push(repo_root);
         }
         push(canonical);
     }
-    
-    
+
+
     if let Ok(skills_root) = crate::services::skills::skills_root_dir() {
         push(skills_root);
     }
@@ -725,7 +725,7 @@ fn enclosing_repo_root(start: &Path) -> Option<PathBuf> {
     let home = dirs::home_dir().and_then(|h| fs::canonicalize(h).ok());
     let mut cursor = Some(start);
     while let Some(dir) = cursor {
-        
+
         let parent = dir.parent()?;
         if home.as_deref() == Some(dir) {
             return None;
@@ -842,8 +842,8 @@ fn classify_entry(
             current_hash: None,
         };
     }
-    
-    
+
+
     let target = match resolve_rewind_target(&record.root, &record.rel_path, authorized_roots) {
         Ok(target) => target,
         Err(_) => {
@@ -868,9 +868,9 @@ fn classify_entry(
             Some(blob) => match fs::read(blobs_dir(dir).join(blob)) {
                 Err(_) => "missing-blob",
                 Ok(expected) => {
-                    
-                    
-                    
+
+
+
                     let current_content = hash.split_once('@').map_or(hash.as_str(), |(c, _)| c);
                     if sha256_hex(&expected) == current_content
                         && !mode_differs(record.mode, &target)
@@ -883,8 +883,8 @@ fn classify_entry(
             },
         }
     };
-    
-    
+
+
     CheckpointDiffEntry {
         path: display,
         key,
@@ -977,11 +977,11 @@ fn atomic_write(target: &Path, bytes: &[u8]) -> Result<(), String> {
     fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
     match fs::rename(&tmp, target) {
         Ok(()) => Ok(()),
-        
-        
-        
-        
-        
+
+
+
+
+
         Err(_) if target.exists() => {
             let backup = parent.join(format!(".ckpt-bak-{}-{}", std::process::id(), now_ms()));
             if let Err(e) = fs::rename(target, &backup) {
@@ -1015,10 +1015,10 @@ fn checkpoint_rewind_code_sync(
 ) -> Result<CheckpointRewindResult, String> {
     let dir = conversation_dir(&conversation_id)?;
     let authorized = canonical_authorized_roots(&authorized_roots);
-    
-    
-    
-    
+
+
+
+
     let _guard = INDEX_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     Ok(rewind_and_mark_at(
         &dir,
@@ -1035,11 +1035,11 @@ fn rewind_and_mark_at(
     expected: Option<&[CheckpointExpectedEntry]>,
 ) -> CheckpointRewindResult {
     let result = rewind_at(dir, turn_seq, authorized, expected);
-    
-    
-    
+
+
+
     let complete = rewind_is_complete(&result);
-    
+
     let marker = CheckpointRecord {
         schema: 2,
         turn_seq: if complete { turn_seq } else { 0 },
@@ -1064,7 +1064,7 @@ fn rewind_and_mark_at(
         )),
         mode: None,
     };
-    
+
     let _ = append_record(dir, &marker);
     result
 }
@@ -1098,8 +1098,8 @@ fn rewind_at(
             result.skipped_dirs += 1;
             continue;
         }
-        
-        
+
+
         let target = match resolve_rewind_target(&record.root, &record.rel_path, authorized_roots) {
             Ok(t) => t,
             Err(e) => {
@@ -1107,10 +1107,10 @@ fn rewind_at(
                 continue;
             }
         };
-        
-        
-        
-        
+
+
+
+
         let key = record_key(&record.root, &record.rel_path);
         if let Some(map) = &expected_by_key {
             let current = current_state_hash(&target);
@@ -1137,7 +1137,7 @@ fn rewind_at(
                         result.failed.push(format!("{display}: {e}"));
                         continue;
                     }
-                    
+
                     if let Err(e) = reverify_target(&record, &target, authorized_roots) {
                         result.failed.push(format!("{display}: {e}"));
                         continue;
@@ -1165,10 +1165,10 @@ fn rewind_at(
                     reject_multi_hardlink(&md)?;
                     if let Ok(current) = fs::read(&target) {
                         if current == pre_image {
-                            
-                            
-                            
-                            
+
+
+
+
                             let mode_changed = mode_differs(record.mode, &target);
                             restore_file_mode(&target, record.mode);
                             return Ok(mode_changed);
@@ -1180,11 +1180,11 @@ fn rewind_at(
                 }
                 Err(_) => {}
             }
-            
+
             reverify_target(&record, &target, authorized_roots)?;
             atomic_write(&target, &pre_image)?;
-            
-            
+
+
             restore_file_mode(&target, record.mode);
             Ok(true)
         })();
@@ -1245,7 +1245,7 @@ fn classify_worktree_pre_image(abs: &Path) -> Result<PreImage<'static>, String> 
     match fs::symlink_metadata(abs) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(PreImage::Missing),
         Err(e) => Err(format!("pre-image stat failed: {e}")),
-        
+
         Ok(md) if md.file_type().is_symlink() => Err("symlink pre-image not captured".to_string()),
         Ok(md) if md.is_file() => Ok(PreImage::File(None)),
         Ok(md) if md.is_dir() => Ok(PreImage::Dir),
@@ -1327,7 +1327,7 @@ mod tests {
         let file = root.join("a.txt");
         fs::write(&file, "v1").unwrap();
 
-        
+
         let seq = capture_at(
             &ckpt,
             "turn-1",
@@ -1338,7 +1338,7 @@ mod tests {
         .unwrap();
         fs::write(&file, "v2").unwrap();
 
-        
+
         let result = rewind_at(&ckpt, seq, &roots(&root), None);
         assert_eq!(result.restored_files, 1);
         assert_eq!(fs::read_to_string(&file).unwrap(), "v1");
@@ -1381,7 +1381,7 @@ mod tests {
         assert!(seq2 > seq1);
         fs::write(&file, "v3").unwrap();
 
-        
+
         let result = rewind_at(&ckpt, seq1, &roots(&root), None);
         assert_eq!(result.restored_files, 1);
         assert_eq!(fs::read_to_string(&file).unwrap(), "v1");
@@ -1401,7 +1401,7 @@ mod tests {
         let seq2 = capture_at(&ckpt, "turn-2", &root, &r, PreImage::File(None)).unwrap();
         fs::write(&file, "v3").unwrap();
 
-        
+
         let result = rewind_at(&ckpt, seq2, &roots(&root), None);
         assert_eq!(result.restored_files, 1);
         assert_eq!(fs::read_to_string(&file).unwrap(), "v2");
@@ -1418,7 +1418,7 @@ mod tests {
 
         capture_at(&ckpt, "turn-1", &root, &r, PreImage::File(None)).unwrap();
         fs::write(&file, "v1a").unwrap();
-        
+
         capture_at(&ckpt, "turn-1", &root, &r, PreImage::File(None)).unwrap();
 
         let records = read_index(&ckpt);
@@ -1437,7 +1437,7 @@ mod tests {
         fs::write(&a, "a").unwrap();
         fs::write(&b, "b").unwrap();
 
-        
+
         let s1 = capture_at(&ckpt, "t-x", &root, &rel(&a, &root), PreImage::File(None)).unwrap();
         let s1b = capture_at(&ckpt, "t-x", &root, &rel(&b, &root), PreImage::File(None)).unwrap();
         let s2 = capture_at(&ckpt, "t-y", &root, &rel(&a, &root), PreImage::File(None)).unwrap();
@@ -1458,7 +1458,7 @@ mod tests {
         assert_eq!(records[0].kind, "turn");
         assert_eq!(records[0].turn_seq, 1);
 
-        
+
         fs::write(&file, "created").unwrap();
         let seq = capture_at(
             &ckpt,
@@ -1531,10 +1531,10 @@ mod tests {
         let a = root.join("a.txt");
         fs::write(&a, "a").unwrap();
         let s1 = capture_at(&ckpt, "t-x", &root, &rel(&a, &root), PreImage::File(None)).unwrap();
-        
+
         append_rewind_marker(&ckpt, 0);
 
-        
+
         let records = read_index(&ckpt);
         assert_eq!(resolve_turn_seq(&records, ""), s1 + 1);
     }
@@ -1598,7 +1598,7 @@ mod tests {
         let seq = capture_at(&ckpt, "turn-1", &root, &r, PreImage::File(None)).unwrap();
         fs::write(&file, "v2").unwrap();
 
-        
+
         let preview_hash = current_state_hash(&file);
         fs::write(&file, "v3").unwrap();
         let expected = vec![CheckpointExpectedEntry {
@@ -1610,7 +1610,7 @@ mod tests {
         assert_eq!(result.conflicts.len(), 1);
         assert_eq!(fs::read_to_string(&file).unwrap(), "v3");
 
-        
+
         let expected = vec![CheckpointExpectedEntry {
             key: record_key(&normalize_root(&root), &normalize_rel(&r)),
             current_hash: current_state_hash(&file),
@@ -1633,7 +1633,7 @@ mod tests {
         fs::write(&outside, "secret").unwrap();
 
         let seq = capture_at(&ckpt, "turn-1", &root, &r, PreImage::File(None)).unwrap();
-        
+
         fs::remove_file(&file).unwrap();
         std::os::unix::fs::symlink(&outside, &file).unwrap();
 
@@ -1662,7 +1662,7 @@ mod tests {
             PreImage::File(None),
         )
         .unwrap();
-        
+
         let elsewhere = root.join("elsewhere");
         fs::create_dir_all(&elsewhere).unwrap();
         fs::remove_dir_all(&sub).unwrap();
@@ -1686,7 +1686,7 @@ mod tests {
 
         let seq = capture_at(&ckpt, "turn-1", &root, &r, PreImage::File(None)).unwrap();
         fs::write(&file, "v2").unwrap();
-        
+
         fs::hard_link(&file, root.join("alias.txt")).unwrap();
 
         let result = rewind_at(&ckpt, seq, &roots(&root), None);
@@ -1706,7 +1706,7 @@ mod tests {
 
         let seq = capture_at(&ckpt, "turn-1", &root, &r, PreImage::File(None)).unwrap();
         fs::write(&file, "v2").unwrap();
-        
+
         for entry in fs::read_dir(blobs_dir(&ckpt)).unwrap() {
             fs::remove_file(entry.unwrap().path()).unwrap();
         }
@@ -1724,7 +1724,7 @@ mod tests {
         let ckpt = root.join("ckpt");
         let missing = root.join("does-not-exist.txt");
 
-        
+
         let ctx = CheckpointCtx {
             conversation_id: "unused".to_string(),
             turn_id: "turn-1".to_string(),
@@ -1737,7 +1737,7 @@ mod tests {
             PreImage::File(None),
         );
         assert!(err.is_err());
-        
+
         append_error_record(
             &ckpt,
             1,
@@ -1763,7 +1763,7 @@ mod tests {
         fs::write(&big, "0123456789").unwrap();
         fs::write(&small, "ok").unwrap();
 
-        
+
         capture_at_with_limits(
             &ckpt,
             "turn-1",
@@ -1774,7 +1774,7 @@ mod tests {
             MAX_TOTAL_BLOB_BYTES,
         )
         .unwrap();
-        
+
         capture_at_with_limits(
             &ckpt,
             "turn-1",
@@ -1794,7 +1794,7 @@ mod tests {
         let blobs: Vec<_> = fs::read_dir(blobs_dir(&ckpt)).unwrap().collect();
         assert!(blobs.is_empty());
 
-        
+
         capture_at_with_limits(
             &ckpt,
             "turn-2",
@@ -1856,7 +1856,7 @@ mod tests {
         let root = fs::canonicalize(tmp.path()).unwrap();
         let ckpt = root.join("ckpt");
         fs::create_dir_all(&ckpt).unwrap();
-        
+
         fs::write(
             index_path(&ckpt),
             "{\"turnSeq\":1,\"path\":\"/tmp/a\",\"kind\":\"file\",\"existedBefore\":true,\"blob\":null,\"size\":0,\"mtimeMs\":0,\"capturedAt\":0}\n",
@@ -1874,9 +1874,9 @@ mod tests {
         let existing = parent.join("mod.txt");
         fs::write(&existing, "parent-v1").unwrap();
 
-        
-        
-        
+
+
+
         let ckpt = root.join("ckpt");
         let paths = ["mod.txt".to_string(), "new.txt".to_string()];
         for rel_str in &paths {
@@ -1889,7 +1889,7 @@ mod tests {
             };
             capture_at(&ckpt, "turn-1", &parent, &rel_path, pre_image).unwrap();
         }
-        
+
         fs::write(&existing, "worktree-v2").unwrap();
         fs::write(parent.join("new.txt"), "worktree-new").unwrap();
 
@@ -1909,7 +1909,7 @@ mod tests {
         fs::create_dir_all(&parent).unwrap();
         let ckpt = root.join("ckpt");
 
-        
+
         let already = parent.join("same.txt");
         fs::write(&already, "identical").unwrap();
         capture_at(
@@ -1921,8 +1921,8 @@ mod tests {
         )
         .unwrap();
 
-        
-        
+
+
         capture_at(
             &ckpt,
             "turn-1",
@@ -1932,7 +1932,7 @@ mod tests {
         )
         .unwrap();
 
-        
+
         let result = rewind_at(&ckpt, 1, &roots(&parent), None);
         assert_eq!(result.restored_files, 0, "内容未变不该被当成 restore 写回");
         assert_eq!(
@@ -1942,7 +1942,7 @@ mod tests {
         assert_eq!(result.clean_files, 2);
         assert!(result.failed.is_empty());
         assert!(result.conflicts.is_empty());
-        
+
         assert_eq!(fs::read_to_string(&already).unwrap(), "identical");
         assert!(!parent.join("never-created.txt").exists());
     }
@@ -1990,7 +1990,7 @@ mod tests {
             .unwrap();
         assert_eq!(dirty_entry.action, "restore");
         assert_eq!(clean_entry.action, "clean");
-        
+
         assert_eq!(
             dirty_entry.current_hash.as_deref(),
             Some(current_state_hash(&dirty).as_str())
@@ -2008,9 +2008,9 @@ mod tests {
 
         let authorized = canonical_authorized_roots(&[workspace.to_string_lossy().to_string()]);
         assert!(authorized.contains(&workspace));
-        
+
         assert!(authorized.contains(&fs::canonicalize(&repo).unwrap()));
-        
+
         let skills_root = crate::services::skills::skills_root_dir().unwrap();
         assert!(authorized.contains(&skills_root));
     }
@@ -2025,7 +2025,7 @@ mod tests {
         fs::create_dir_all(repo.join(".git")).unwrap();
         let ckpt = base.join("ckpt");
 
-        
+
         let file = repo.join("shared.txt");
         fs::write(&file, "v1").unwrap();
         let seq = capture_at(
@@ -2038,7 +2038,7 @@ mod tests {
         .unwrap();
         fs::write(&file, "v2").unwrap();
 
-        
+
         let authorized = canonical_authorized_roots(&[workspace.to_string_lossy().to_string()]);
         let result = rewind_at(&ckpt, seq, &authorized, None);
         assert!(result.failed.is_empty(), "failed: {:?}", result.failed);
@@ -2060,15 +2060,15 @@ mod tests {
         let result = rewind_at(&ckpt, seq, &roots(&root), None);
         assert_eq!(result.restored_files, 1);
 
-        
-        
+
+
         append_rewind_marker(&ckpt, seq);
         assert!(live_records(read_index(&ckpt)).is_empty());
         let (records, errors) = earliest_records_since(&ckpt, 1);
         assert!(records.is_empty());
         assert_eq!(errors, 0);
 
-        
+
         fs::write(&file, "v3").unwrap();
         let next = capture_at(&ckpt, "turn-2", &root, &r, PreImage::File(None)).unwrap();
         assert!(next > seq);
@@ -2087,8 +2087,8 @@ mod tests {
 
         let seq = capture_at(&ckpt, "turn-1", &root, &r, PreImage::File(None)).unwrap();
         fs::write(&file, "v2").unwrap();
-        
-        
+
+
         append_rewind_marker(&ckpt, 0);
         let (records, _) = earliest_records_since(&ckpt, seq);
         assert_eq!(records.len(), 1);
@@ -2146,8 +2146,8 @@ mod tests {
         .unwrap();
         fs::write(&dirty, "v2").unwrap();
 
-        
-        
+
+
         let only_restore: Vec<CheckpointExpectedEntry> = expected_from_diff(&ckpt, seq, &root)
             .into_iter()
             .filter(|e| e.key.ends_with("dirty.txt"))
@@ -2161,7 +2161,7 @@ mod tests {
         assert!(result.conflicts[0].ends_with("clean.txt"));
         assert_eq!(fs::read_to_string(&untouched).unwrap(), "hand-edited");
 
-        
+
         let full = expected_from_diff(&ckpt, seq, &root);
         let result = rewind_at(&ckpt, seq, &roots(&root), Some(&full));
         assert!(result.conflicts.is_empty());
@@ -2180,14 +2180,14 @@ mod tests {
         let seq = capture_at(&ckpt, "turn-1", &root, &r, PreImage::File(None)).unwrap();
         fs::write(&file, "v2").unwrap();
 
-        
+
         let result = rewind_at(&ckpt, seq, &[], None);
         assert_eq!(result.restored_files, 0);
         assert_eq!(result.failed.len(), 1);
         assert!(result.failed[0].contains("authorized workspace root"));
         assert_eq!(fs::read_to_string(&file).unwrap(), "v2");
 
-        
+
         let (records, _) = earliest_records_since(&ckpt, seq);
         let entry = classify_entry(&ckpt, &records[0], &[]);
         assert_eq!(entry.action, "unresolvable");
@@ -2209,15 +2209,15 @@ mod tests {
         let seq = capture_at(&ckpt, "turn-1", &root, &r, PreImage::File(None)).unwrap();
         fs::write(&file, "v2").unwrap();
 
-        
-        
+
+
         let outside = base.join("outside");
         fs::create_dir_all(&outside).unwrap();
         fs::write(outside.join("a.txt"), "outside-secret").unwrap();
         fs::rename(&root, base.join("workspace-moved")).unwrap();
         std::os::unix::fs::symlink(&outside, &root).unwrap();
 
-        
+
         let result = rewind_at(&ckpt, seq, &roots(&root), None);
         assert_eq!(result.restored_files, 0);
         assert_eq!(result.failed.len(), 1);
@@ -2227,7 +2227,7 @@ mod tests {
             "outside-secret"
         );
 
-        
+
         let authorized = canonical_authorized_roots(&[root.to_string_lossy().to_string()]);
         assert!(!authorized.contains(&root));
     }
@@ -2256,9 +2256,9 @@ mod tests {
             classify_worktree_pre_image(&root.join("nope.txt")),
             Ok(PreImage::Missing)
         ));
-        
-        
-        
+
+
+
         let Err(err) = classify_worktree_pre_image(&link) else {
             panic!("符号链接不能被当成可捕获的前像");
         };
@@ -2275,7 +2275,7 @@ mod tests {
         fs::write(&file, "v1").unwrap();
 
         let seq = capture_at(&ckpt, "turn-1", &root, &r, PreImage::File(None)).unwrap();
-        
+
         append_error_record(
             &ckpt,
             seq,
@@ -2290,12 +2290,12 @@ mod tests {
             let _guard = INDEX_LOCK.lock().unwrap_or_else(|e| e.into_inner());
             rewind_and_mark_at(&ckpt, seq, &roots(&root), None)
         };
-        
+
         assert_eq!(result.restored_files, 1);
         assert_eq!(result.capture_errors, 1);
         assert!(!rewind_is_complete(&result));
-        
-        
+
+
         let live = live_records(read_index(&ckpt));
         assert!(live.iter().any(|rec| rec.kind == "error"));
         assert!(live.iter().any(|rec| rec.kind == "file"));
@@ -2319,7 +2319,7 @@ mod tests {
         };
         assert!(rewind_is_complete(&result));
         assert_eq!(fs::read_to_string(&file).unwrap(), "v1");
-        
+
         assert!(live_records(read_index(&ckpt)).is_empty());
     }
 
@@ -2338,8 +2338,8 @@ mod tests {
         let seq = capture_at(&ckpt, "turn-1", &root, &r, PreImage::File(None)).unwrap();
         fs::write(&file, "v2").unwrap();
 
-        
-        
+
+
         let expected = expected_from_diff(&ckpt, seq, &root);
         fs::set_permissions(&file, fs::Permissions::from_mode(0o755)).unwrap();
 
@@ -2363,8 +2363,8 @@ mod tests {
         fs::set_permissions(&file, fs::Permissions::from_mode(0o755)).unwrap();
 
         let seq = capture_at(&ckpt, "turn-1", &root, &r, PreImage::File(None)).unwrap();
-        
-        
+
+
         fs::set_permissions(&file, fs::Permissions::from_mode(0o600)).unwrap();
 
         let (records, _) = earliest_records_since(&ckpt, seq);

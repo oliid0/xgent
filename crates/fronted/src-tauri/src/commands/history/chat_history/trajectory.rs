@@ -120,7 +120,7 @@ fn append_trajectory_events_sync(
         serde_json::to_string(&merged).map_err(|e| format!("序列化轨迹事件失败：{e}"))?;
 
     if serialized.len() > TRAJECTORY_MAX_EVENTS_BYTES {
-        
+
         tx.execute(
             "UPDATE chatHistorySegment SET trajectory_truncated = 1
              WHERE conversation_id = ?1 AND segment_index = ?2",
@@ -178,7 +178,7 @@ fn load_trajectory_events_sync(
         match parse_event_array(&raw, "轨迹事件") {
             Ok(items) => events.extend(items),
             Err(_) => {
-                
+
                 truncated = true;
             }
         }
@@ -313,7 +313,7 @@ fn put_trajectory_sections_sync(
     for section in sections {
         validate_trajectory_section(section)?;
         if section.content.len() > TRAJECTORY_MAX_SECTION_BYTES {
-            
+
             continue;
         }
         let section_id = section.section_id.trim();

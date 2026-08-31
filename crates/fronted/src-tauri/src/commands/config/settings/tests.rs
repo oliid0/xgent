@@ -867,7 +867,7 @@ mod tests {
         );
     }
 
-    
+
     fn default_system_proxy_json() -> Value {
         json!({
             "enabled": false,
@@ -1155,7 +1155,7 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn ccswitch_db_candidates_include_home_env_fallback_on_windows() {
-        
+
         let previous = std::env::var("HOME").ok();
         std::env::set_var("HOME", "C:\\legacy-home");
         let candidates = ccswitch_db_candidates();

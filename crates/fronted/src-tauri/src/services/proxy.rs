@@ -146,8 +146,8 @@ async fn handle_image_proxy(Query(query): Query<ImageProxyQuery>, headers: Heade
         Err(message) => return error_response(StatusCode::BAD_REQUEST, &message, &headers),
     };
 
-    
-    
+
+
     let client = match crate::services::system_proxy::cached_client() {
         Ok(client) => client,
         Err(error) => {
@@ -404,8 +404,8 @@ async fn handle_proxy(
         .get(USE_SYSTEM_PROXY_HEADER)
         .and_then(|value| value.to_str().ok())
         .is_some_and(|value| value == "1");
-    
-    
+
+
     let client = if use_system_proxy {
         match crate::services::system_proxy::cached_client() {
             Ok(client) => client,
@@ -525,8 +525,8 @@ fn build_target_url(
         .strip_prefix(&prefix)
         .ok_or_else(|| "Invalid proxy path prefix".to_string())?;
     let resolved = if suffix.is_empty() { "/" } else { suffix };
-    
-    
+
+
     if resolved.starts_with("//") {
         return Err("Proxy request path must not begin with //".to_string());
     }

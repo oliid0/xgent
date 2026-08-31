@@ -60,17 +60,17 @@ test("estimateTextTokens is ceil(chars/4) of trimmed text for non-CJK content", 
 });
 
 test("estimateTextTokens weighs CJK characters at 0.7 tokens each", () => {
-  
+
   assert.equal(estimateTextTokens("你".repeat(100)), Math.ceil(100 * 0.7));
-  
+
   assert.equal(estimateTextTokens("あ".repeat(50)), Math.ceil(50 * 0.7));
   assert.equal(estimateTextTokens("한".repeat(50)), Math.ceil(50 * 0.7));
-  
+
   assert.equal(
     estimateTextTokens(`${"你".repeat(40)}${"a".repeat(40)}`),
     Math.ceil(40 * 0.7 + 40 / 4),
   );
-  
+
   assert.equal(estimateTextTokens("。".repeat(10)), Math.ceil(10 * 0.7));
 });
 
@@ -111,13 +111,13 @@ test("estimateMessageTokens memoizes by object identity", () => {
   const message = user("a".repeat(4000));
   const first = estimateMessageTokens(message);
   message.content = "";
-  
+
   assert.equal(estimateMessageTokens(message), first);
 });
 
 test("getUsageTotalTokens derives from parts without double-counting reasoning", () => {
   assert.equal(getUsageTotalTokens(usage(5000)), 5000);
-  
+
   assert.equal(
     getUsageTotalTokens(usage(0, { input: 100, output: 50, reasoning: 30 })),
     150,
@@ -153,7 +153,7 @@ test("rebase anchors on the latest real usage and estimates the trailing message
   assert.equal(snapshot.hasObservedUsage, true);
   assert.equal(snapshot.observedTokens, 5000);
   assert.equal(snapshot.trailingTokens, expectedTrailing);
-  
+
   assert.equal(snapshot.totalTokens, snapshot.observedTokens + snapshot.trailingTokens);
 });
 
@@ -198,7 +198,7 @@ test("totalWithPendingTokens adds the streamed token-unit estimate in O(1)", () 
   ledger.rebase({ systemPrompt: "", messages: [assistant("w", usage(4000))] });
   assert.equal(ledger.totalWithPendingTokens(0), 4000);
   assert.equal(ledger.totalWithPendingTokens(estimateTextTokenUnits("a".repeat(401))), 4000 + 101);
-  
+
   assert.equal(
     ledger.totalWithPendingTokens(estimateTextTokenUnits("好".repeat(400))),
     4000 + Math.ceil(400 * 0.7),

@@ -52,7 +52,7 @@ pub fn mark_dirty() {
         return;
     }
     if let Some(tx) = DIRTY_TX.get() {
-        
+
         let _ = tx.try_send(());
     }
 }
@@ -82,7 +82,7 @@ pub fn start(app: AppHandle) {
 
 async fn run(app: AppHandle, mut rx: mpsc::Receiver<()>) {
     loop {
-        
+
         if rx.recv().await.is_none() {
             return;
         }
@@ -91,9 +91,9 @@ async fn run(app: AppHandle, mut rx: mpsc::Receiver<()>) {
         tokio::pin!(cap);
         loop {
             tokio::select! {
-                
+
                 _ = tokio::time::sleep(DEBOUNCE) => break,
-                
+
                 _ = &mut cap => break,
                 signal = rx.recv() => {
                     if signal.is_none() {
@@ -108,15 +108,15 @@ async fn run(app: AppHandle, mut rx: mpsc::Receiver<()>) {
 }
 
 async fn sync_once(app: &AppHandle) {
-    
+
     //
-    
-    
-    
-    
+
+
+
+
     //
-    
-    
+
+
     if suppressed() {
         if let Some(tx) = DIRTY_TX.get() {
             let _ = tx.try_send(());
@@ -125,7 +125,7 @@ async fn sync_once(app: &AppHandle) {
     }
 
     match crate::commands::settings::auto_upload_backup_snapshot(cached_skills()).await {
-        
+
         Ok(None) => {}
         Ok(Some(last_sync_at)) => emit_status(
             app,
@@ -134,7 +134,7 @@ async fn sync_once(app: &AppHandle) {
                 last_error: None,
             },
         ),
-        
+
         Err(error) => emit_status(
             app,
             AutoSyncStatus {
@@ -161,14 +161,14 @@ mod tests {
 
         let outer = suppress();
         assert!(suppressed());
-        
+
         mark_dirty();
 
         {
             let _inner = suppress();
             assert!(suppressed());
         }
-        
+
         assert!(suppressed(), "仍有外层 guard 存活时必须保持抑制");
 
         drop(outer);

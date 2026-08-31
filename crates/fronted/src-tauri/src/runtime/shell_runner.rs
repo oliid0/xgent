@@ -361,8 +361,8 @@ fn windows_powershell_command(cmd: &str) -> String {
         "[Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)",
         "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)",
         "$OutputEncoding = [Console]::OutputEncoding",
-        
-        
+
+
         "try { [Console]::Out.AutoFlush = $true; [Console]::Error.AutoFlush = $true } catch {}",
         cmd,
     ]
@@ -471,7 +471,7 @@ fn find_git_bash() -> Option<PathBuf> {
             PathBuf::from(r"C:\Program Files (x86)"),
         ]);
     for root in roots {
-        
+
         for rel in [r"Git\bin\bash.exe", r"Git\usr\bin\bash.exe"] {
             let candidate = root.join(rel);
             if is_git_bash_candidate(&candidate) {
@@ -516,7 +516,7 @@ fn platform_shell_candidates(cmd: &str) -> Vec<ShellCandidate> {
                     display_shell: "bash",
                 },
                 program: bash,
-                
+
                 args: vec!["-c".to_string(), cmd.to_string()],
                 augment_macos_path: false,
             });
@@ -897,9 +897,9 @@ where
         } else {
             (candidate.args.clone(), Vec::new())
         };
-        
-        
-        
+
+
+
         let (spawn_program, spawn_args, sandbox_mechanism) = match sandbox_spec {
             Some(spec) => {
                 let (program, args, mechanism) =
@@ -908,11 +908,11 @@ where
             }
             None => (candidate.program.clone(), candidate_args, None),
         };
-        
-        
-        
-        
-        
+
+
+
+
+
         #[cfg(windows)]
         if let (Some(spec), Some(mechanism)) = (sandbox_spec, sandbox_mechanism) {
             if !sandbox_candidate_usable(spec, &candidate, mechanism) {
@@ -929,7 +929,7 @@ where
             stdio_factory().map_err(|err| format!("Failed to prepare shell stdio: {err}"))?;
         let mut c = Command::new(&spawn_program);
         c.args(&spawn_args);
-        
+
         for (key, value) in &system_proxy_envs {
             c.env(key, value);
         }
@@ -1018,8 +1018,8 @@ pub(crate) fn run_shell_script_with_envs(
     let timeout = Duration::from_millis(effective_timeout_ms);
     let start = Instant::now();
 
-    
-    
+
+
     let sandbox_spec = match sandbox_options {
         Some(options) => {
             let wd = canonicalize_workdir(&workdir).map_err(|e| e.to_string())?;
@@ -1146,34 +1146,34 @@ mod tests {
     use std::sync::Arc;
     use std::time::{Duration, Instant};
 
-    
-    
+
+
     #[test]
     fn sandbox_probe_verdict_only_rejects_loader_ntstatus() {
-        
+
         assert!(is_loader_failure_exit(0xC000_0142_u32 as i32)); // STATUS_DLL_INIT_FAILED
         assert!(is_loader_failure_exit(0xC000_0135_u32 as i32)); // STATUS_DLL_NOT_FOUND
         assert!(is_loader_failure_exit(0xC000_0022_u32 as i32)); // STATUS_ACCESS_DENIED
         assert!(!sandbox_probe_verdict(Some(0xC000_0142_u32 as i32)));
-        
+
         assert_eq!((-532_462_766i32) as u32, 0xE043_4352);
         assert!(is_loader_failure_exit(-532_462_766));
         assert!(!sandbox_probe_verdict(Some(-532_462_766)));
         assert!(is_loader_failure_exit(0x8009_001D_u32 as i32)); // NTE_PROVIDER_DLL_FAIL
         assert!(!sandbox_probe_verdict(Some(0x8009_001D_u32 as i32)));
-        
+
         assert_eq!((-2_147_024_891i32) as u32, 0x8007_0005);
         assert!(is_loader_failure_exit(-2_147_024_891));
         assert!(!sandbox_probe_verdict(Some(-2_147_024_891)));
-        
+
         assert_eq!((-65536i32) as u32, 0xFFFF_0000);
         assert!(is_loader_failure_exit(-65536));
         assert!(!sandbox_probe_verdict(Some(-65536)));
-        
+
         assert!(sandbox_probe_verdict(Some(0)));
         assert!(sandbox_probe_verdict(Some(1)));
         assert!(sandbox_probe_verdict(Some(127)));
-        assert!(sandbox_probe_verdict(Some(0xC000_0005_u32 as i32))); 
+        assert!(sandbox_probe_verdict(Some(0xC000_0005_u32 as i32)));
         assert!(sandbox_probe_verdict(None));
     }
 
@@ -1214,7 +1214,7 @@ mod tests {
         let profile = default_platform_shell_profile();
         if cfg!(windows) {
             assert_eq!(profile.platform, "windows");
-            
+
             match profile.profile {
                 "windows-git-bash" => assert_eq!(profile.shell_family, "posix"),
                 "windows-pwsh" => assert_eq!(profile.shell_family, "powershell"),
@@ -1252,14 +1252,14 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn windows_path_scan_skips_zero_byte_app_execution_alias() {
-        
-        
+
+
         let alias_dir = tempfile::tempdir().expect("alias dir");
         let real_dir = tempfile::tempdir().expect("real dir");
         fs::write(alias_dir.path().join("bash.exe"), b"").unwrap();
         fs::write(real_dir.path().join("bash.exe"), b"MZfake-git-bash").unwrap();
 
-        
+
         let path_var =
             std::env::join_paths([alias_dir.path(), real_dir.path()]).expect("join paths");
         assert_eq!(
@@ -1267,7 +1267,7 @@ mod tests {
             Some(real_dir.path().join("bash.exe"))
         );
 
-        
+
         let alias_only = std::env::join_paths([alias_dir.path()]).expect("join paths");
         assert_eq!(super::find_git_bash_on_path(&alias_only), None);
     }
@@ -1275,13 +1275,13 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn windows_known_wsl_alias_dirs_are_rejected() {
-        
+
         let local_appdata = std::env::var_os("LOCALAPPDATA").expect("LOCALAPPDATA");
         let windows_apps = std::path::Path::new(&local_appdata)
             .join("Microsoft")
             .join("WindowsApps");
         assert!(super::is_windows_apps_alias_dir(&windows_apps));
-        
+
         let with_slash = format!("{}\\", windows_apps.display().to_string().to_uppercase());
         assert!(super::is_windows_apps_alias_dir(std::path::Path::new(
             &with_slash
@@ -1297,7 +1297,7 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn find_git_bash_env_override_prefers_xgent_var() {
-        
+
         let dir = tempfile::tempdir().expect("tempdir");
         let xgent_bash = dir.path().join("xgent-bash.exe");
         let claude_bash = dir.path().join("claude-bash.exe");
@@ -1310,11 +1310,11 @@ mod tests {
         std::env::set_var("CLAUDE_CODE_GIT_BASH_PATH", &claude_bash);
         assert_eq!(super::find_git_bash(), Some(xgent_bash.clone()));
 
-        
+
         std::env::set_var("XGENT_GIT_BASH_PATH", &app_execution_alias);
         assert_eq!(super::find_git_bash(), Some(claude_bash.clone()));
 
-        
+
         std::env::set_var(
             "XGENT_GIT_BASH_PATH",
             dir.path().join("missing-bash.exe"),

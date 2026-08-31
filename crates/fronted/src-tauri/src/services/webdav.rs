@@ -78,7 +78,7 @@ pub fn redact_url_for_log(url: &str) -> String {
         Some((scheme, rest)) => (Some(scheme), rest),
         None => (None, url),
     };
-    
+
     let authority_end = rest.find('/').unwrap_or(rest.len());
     let (authority, path) = rest.split_at(authority_end);
     let host = match authority.rsplit_once('@') {
@@ -102,7 +102,7 @@ fn is_jianguoyun(url: &str) -> bool {
         .next()
         .unwrap_or("")
         .to_ascii_lowercase();
-    
+
     ["jianguoyun.com", "nutstore.net", "nutstore.com"]
         .iter()
         .any(|domain| host == *domain || host.ends_with(&format!(".{domain}")))
@@ -312,7 +312,7 @@ mod tests {
             join_url("https://example.com/dav/", &["xgent", "v1"]),
             "https://example.com/dav/xgent/v1"
         );
-        
+
         assert_eq!(
             join_url("https://example.com/dav", &["//xgent//", "/v1/"]),
             "https://example.com/dav/xgent/v1"
@@ -325,13 +325,13 @@ mod tests {
 
     #[test]
     fn dir_ladder_flattens_multi_level_segments() {
-        
-        
+
+
         assert_eq!(
             dir_ladder(&["a/b", "v1", "default"]),
             ["a", "b", "v1", "default"]
         );
-        
+
         assert_eq!(dir_ladder(&["//a//", "/b/"]), ["a", "b"]);
     }
 
@@ -345,12 +345,12 @@ mod tests {
             join_url("https://example.com/dav", &["配置"]),
             "https://example.com/dav/%E9%85%8D%E7%BD%AE"
         );
-        
+
         assert_eq!(
             join_url("https://example.com/dav", &["config-v1.2_final~x.json"]),
             "https://example.com/dav/config-v1.2_final~x.json"
         );
-        
+
         assert_eq!(
             join_url("https://example.com/dav", &["a?b"]),
             "https://example.com/dav/a%3Fb"
@@ -379,7 +379,7 @@ mod tests {
             redact_url_for_log("https://example.com/dav/x"),
             "https://example.com/dav/x"
         );
-        
+
         assert_eq!(
             redact_url_for_log("https://example.com/dav/a@b"),
             "https://example.com/dav/a@b"
@@ -391,16 +391,16 @@ mod tests {
     fn detects_jianguoyun_hosts() {
         assert!(is_jianguoyun("https://dav.jianguoyun.com/dav/"));
         assert!(is_jianguoyun("https://DAV.JianGuoYun.com/dav/"));
-        
+
         assert!(is_jianguoyun(
             "https://dav.jianguoyun.com.nutstore.net/dav/"
         ));
         assert!(is_jianguoyun("https://app.nutstore.net/dav/"));
         assert!(!is_jianguoyun("https://example.com/dav/"));
-        
+
         assert!(!is_jianguoyun("https://jianguoyun.com.evil.test/dav/"));
         assert!(!is_jianguoyun("https://nutstore.net.evil.test/dav/"));
-        
+
         assert!(!is_jianguoyun("https://mynutstore.example/dav/"));
     }
 
@@ -430,7 +430,7 @@ mod tests {
         let storage = describe_status_error(url, StatusCode::INSUFFICIENT_STORAGE, "上传");
         assert!(storage.contains("空间不足"), "{storage}");
 
-        
+
         let teapot = describe_status_error(url, StatusCode::IM_A_TEAPOT, "上传");
         assert!(teapot.contains("上传失败"), "{teapot}");
     }
@@ -476,13 +476,13 @@ mod tests {
             password,
         };
 
-        
+
         test_connection(&creds)
             .await
             .expect("test_connection 应成功");
         eprintln!("① test_connection: ok");
 
-        
+
         let bad = WebdavCredentials {
             password: "definitely-not-the-password".to_string(),
             ..creds.clone()
@@ -495,18 +495,18 @@ mod tests {
         );
         eprintln!("② 错误密码: {err}");
 
-        
+
         let dir = format!("xgent-livetest-{}", std::process::id());
         ensure_remote_dirs(&creds, &[&dir])
             .await
             .expect("ensure_remote_dirs 应成功");
-        
+
         ensure_remote_dirs(&creds, &[&dir])
             .await
             .expect("ensure_remote_dirs 应幂等");
         eprintln!("③ ensure_remote_dirs（含幂等重试）: ok");
 
-        
+
         let body = r#"{"hello":"webdav","zh":"中文"}"#.as_bytes().to_vec();
         put_bytes(
             &creds,
@@ -523,7 +523,7 @@ mod tests {
         assert_eq!(fetched, body, "下行字节必须与上行完全一致");
         eprintln!("④ put/get 往返 {} 字节: 一致", body.len());
 
-        
+
         let missing = get_bytes(&creds, &[&dir, "no-such-file.json"], 1024, "探针")
             .await
             .expect("404 不应报错");

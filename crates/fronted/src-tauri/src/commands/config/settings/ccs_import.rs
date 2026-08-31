@@ -57,9 +57,9 @@ fn ccswitch_db_candidates() -> Vec<PathBuf> {
         candidates.push(override_dir.join(&filename));
     }
     candidates.push(ccswitch_legacy_config_dir().join(&filename));
-    
-    
-    
+
+
+
     #[cfg(windows)]
     if let Ok(home_env) = std::env::var("HOME") {
         let trimmed = home_env.trim();
@@ -211,7 +211,7 @@ fn ccs_provider_from_value(
         request_format: if provider_type == "deepseek" {
             "openai-completions".to_string()
         } else if provider_type == "xai" {
-            
+
             "openai-responses".to_string()
         } else if provider_type == "codex" && ccs_is_chat_protocol(config) {
             "openai-completions".to_string()
@@ -228,7 +228,7 @@ fn ccs_provider_type_from_app_type(app_type: &str) -> Option<&'static str> {
         "claude" | "claude-code" | "claude_code" => Some("claude_code"),
         "gemini" => Some("gemini"),
         "deepseek" => Some("deepseek"),
-        
+
         "grokbuild" | "grok-build" | "grok_build" | "grok" | "xai" => Some("xai"),
         _ => None,
     }
@@ -278,8 +278,8 @@ fn ccs_extract_models(provider_type: &str, config: &Value) -> Vec<String> {
             }
         }
         "xai" => {
-            
-            
+
+
             if let Some(config_text) = config.get("config").and_then(Value::as_str) {
                 if let Some(model) = ccs_extract_toml_string_value(config_text, "default") {
                     push_model(model);
@@ -339,7 +339,7 @@ fn ccs_extract_base_url(provider_type: &str, config: &Value) -> Option<String> {
                     .and_then(|value| ccs_string_at(value, &["base_url", "baseURL"]))
             })
             .or_else(|| {
-                
+
                 config
                     .get("config")
                     .and_then(Value::as_str)

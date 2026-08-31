@@ -87,7 +87,7 @@ pub(crate) fn scan_mcp_config_content(
     }
     if servers.is_empty() {
         let mut message = format!("No MCP server definitions found in {display}");
-        
+
         if !errors.is_empty() {
             const MAX_SHOWN_ERRORS: usize = 3;
             let shown = errors
@@ -135,7 +135,7 @@ fn parse_mcp_config_json(
             }
         }
     } else {
-        
+
         collect_json_server_map(Some(&root), "user", servers, errors);
     }
     Ok(())
@@ -147,8 +147,8 @@ fn parse_mcp_config_toml(
     servers: &mut Vec<SystemExternalMcpServerEntry>,
     errors: &mut Vec<String>,
 ) -> Result<(), String> {
-    
-    
+
+
     let root: toml::Value = toml::from_str(strip_utf8_bom(text))
         .map_err(|err| format!("Failed to parse {display}: {}", err.message()))?;
     let Some(map) = root.get("mcp_servers").and_then(toml::Value::as_table) else {
@@ -164,9 +164,9 @@ fn parse_mcp_config_toml(
 }
 
 fn scan_claude_code() -> SystemExternalMcpToolScan {
-    
-    
-    
+
+
+
     let mut servers = Vec::new();
     let mut errors = Vec::new();
     let mut scanned_paths = Vec::new();
@@ -237,7 +237,7 @@ fn scan_codex() -> SystemExternalMcpToolScan {
 
 fn scan_claude_desktop() -> SystemExternalMcpToolScan {
     // Windows: %APPDATA%/Claude；macOS: ~/Library/Application Support/Claude；
-    
+
     let mut servers = Vec::new();
     let mut errors = Vec::new();
     let mut scanned_paths = Vec::new();
@@ -278,7 +278,7 @@ fn claude_desktop_config_path() -> Option<PathBuf> {
 }
 
 fn scan_codebuddy() -> SystemExternalMcpToolScan {
-    
+
     let mut servers = Vec::new();
     let mut errors = Vec::new();
     let mut scanned_paths = Vec::new();
@@ -311,7 +311,7 @@ fn finish_scan(
     errors: Vec<String>,
 ) -> SystemExternalMcpToolScan {
     let exists = !scanned_paths.is_empty();
-    
+
     let mut seen = std::collections::HashSet::new();
     servers.retain(|server| seen.insert(server.id.to_lowercase()));
     servers.sort_by(|a, b| a.id.to_lowercase().cmp(&b.id.to_lowercase()));
@@ -370,7 +370,7 @@ fn json_entry_to_server(
         TRANSPORT_HTTP | "streamable-http" | "streamable_http" => TRANSPORT_HTTP,
         TRANSPORT_SSE => TRANSPORT_SSE,
         TRANSPORT_STDIO => TRANSPORT_STDIO,
-        
+
         "" if !command.is_empty() => TRANSPORT_STDIO,
         "" if !url.is_empty() => TRANSPORT_HTTP,
         other => {
@@ -667,7 +667,7 @@ url = "https://mcp.example.com"
             .unwrap_err()
             .contains("must be a JSON object"));
 
-        
+
         let unrelated = write_config(&tmp, "package.json", r#"{ "name": "x", "version": "1" }"#);
         let err = scan_mcp_config_file(&unrelated).unwrap_err();
         assert!(err.contains("No MCP server definitions found"));

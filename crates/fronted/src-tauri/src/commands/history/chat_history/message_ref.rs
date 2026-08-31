@@ -161,9 +161,9 @@ pub(crate) fn validate_user_history_message_ref(
 }
 
 fn history_message_timestamp_for_ref(message: &Value) -> i64 {
-    
-    
-    
+
+
+
     read_message_timestamp_with_fallback(message, 0)
 }
 

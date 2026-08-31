@@ -292,8 +292,8 @@ fn selected_release_candidates_from_entries(
 }
 
 fn github_client() -> Result<reqwest::Client, String> {
-    
-    
+
+
     crate::services::system_proxy::client_builder_with_os_proxy_fallback()?
         .timeout(Duration::from_secs(20))
         .build()
@@ -453,9 +453,9 @@ fn build_updater(
         builder = builder.pubkey(public_key);
     }
 
-    
-    
-    
+
+
+
     if let Some(proxy_url) = crate::services::system_proxy::current_proxy_url()? {
         builder = builder.proxy(proxy_url);
     }

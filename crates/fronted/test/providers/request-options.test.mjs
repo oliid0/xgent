@@ -464,8 +464,8 @@ test("Codex Chat Completions streams forward reasoning effort", async () => {
   const result = localProviders.streamSimpleByApi(
     model,
     {
-      
-      
+
+
       tools: [{ name: "echo", description: "Echo tool", parameters: { type: "object" } }],
       messages: [],
     },
@@ -1371,12 +1371,12 @@ test("resolveProviderCacheRetention maps provider settings and per-request overr
   assert.equal(resolve("claude_code", undefined), "short");
   assert.equal(resolve("claude_code", true, undefined, "long"), "long");
   assert.equal(resolve("claude_code", false, undefined, "long"), "none");
-  
+
   assert.equal(resolve("claude_code", true, "none", "long"), "none");
   assert.equal(resolve("codex", undefined), "short");
   assert.equal(resolve("codex", false), "none");
   assert.equal(resolve("codex", true, "none"), "none");
-  
+
   assert.equal(resolve("codex", true, undefined, "long"), "short");
   assert.equal(resolve("gemini", true), undefined);
 });
@@ -1470,7 +1470,7 @@ test("custom model pricing from settings reaches the runtime model", () => {
   );
   assert.deepEqual(geminiModel.cost, cost);
 
-  
+
   const catalogOverride = providers.createModelFromConfig(
     "codex",
     "gpt-5",

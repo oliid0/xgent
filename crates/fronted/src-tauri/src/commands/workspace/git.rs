@@ -1765,7 +1765,7 @@ fn validate_start_point(repo_root: &str, value: &str) -> Result<String, String> 
         repo_root,
         &["rev-parse", "--verify", "--end-of-options", &rev],
     )?;
-    
+
     Ok(start_point.to_string())
 }
 

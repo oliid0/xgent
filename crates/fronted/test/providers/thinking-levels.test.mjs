@@ -73,7 +73,7 @@ test("anthropic: supportsAdaptiveAnthropicThinking reads catalog compat.forceAda
     ),
     false,
   );
-  
+
   assert.equal(supportsAdaptiveAnthropicThinking(createAnthropicModel("claude-custom-x")), false);
 });
 
@@ -85,7 +85,7 @@ test("anthropic: mapReasoningToAnthropicEffort honors catalog thinkingLevelMap o
   assert.equal(mapReasoningToAnthropicEffort("xhigh", opus46), "max");
   assert.equal(mapReasoningToAnthropicEffort("medium", opus46), "medium");
 
-  
+
   const fable = createAnthropicModel("claude-fable-5", {
     compat: { forceAdaptiveThinking: true },
   });
@@ -130,15 +130,15 @@ test("anthropic: resolveAnthropicThinkingRuntime shrinks the budget for small ma
   const runtime = resolveAnthropicThinkingRuntime(small, { reasoning: "max" });
   assert.equal(runtime.mode, "budget");
   assert.equal(runtime.maxTokens, 4_000);
-  
+
   assert.equal(runtime.thinkingBudgetTokens, 2_976);
 });
 
 test("openai: clampOpenAIReasoningEffort clamps to nearest catalog-supported level", () => {
   const codexLike = createOpenAIModel("gpt-5.1-codex", { thinkingLevelMap: { minimal: null } });
-  
+
   assert.equal(clampOpenAIReasoningEffort(codexLike, "minimal"), "low");
-  
+
   assert.equal(clampOpenAIReasoningEffort(codexLike, "xhigh"), "high");
   assert.equal(clampOpenAIReasoningEffort(codexLike, "high"), "high");
 });
@@ -166,7 +166,7 @@ test("gemini: 3 pro stays two-tier LOW/HIGH regardless of minor version", () => 
   const pro31 = createGoogleModel("gemini-3.1-pro-preview");
   assert.deepEqual(resolveGeminiThinkingRuntime(pro31, "low"), { enabled: true, level: "LOW" });
   assert.deepEqual(resolveGeminiThinkingRuntime(pro31, "high"), { enabled: true, level: "HIGH" });
-  
+
   assert.deepEqual(resolveGeminiThinkingRuntime(pro31, "xhigh"), { enabled: true, level: "HIGH" });
 });
 

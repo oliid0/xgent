@@ -40,7 +40,7 @@ test("buildFloorEntries keeps only user items and builds previews", () => {
   assert.ok(floors[1].preview.endsWith("…"));
   assert.equal(floors[1].preview.length, 49);
   assert.equal(floors[2].preview, "…");
-  
+
   assert.equal(floors[2].messageId, "u3");
 });
 
@@ -90,7 +90,7 @@ test("sampleFloorEntries keeps bookmarked floors and stays continuous at the cap
   assert.equal(sampled[0].rowKey, "u0");
   assert.equal(sampled[sampled.length - 1].rowKey, "u99");
 
-  
+
   const floors25 = floors.slice(0, 25);
   const sampled25 = floorModel.sampleFloorEntries(floors25, 24, new Set());
   assert.ok(sampled25.length >= 23, `expected >=23 markers, got ${sampled25.length}`);
@@ -139,11 +139,11 @@ test("floor bookmarks toggle and persist through localStorage", () => {
     assert.ok(floorBookmarks.getFloorBookmarks("conv-1").has("user-aaa"));
     assert.equal(notified, 1);
 
-    
+
     const snapshot = floorBookmarks.getFloorBookmarks("conv-1");
     assert.equal(floorBookmarks.getFloorBookmarks("conv-1"), snapshot);
 
-    
+
     floorBookmarks.resetFloorBookmarksCacheForTest();
     assert.ok(floorBookmarks.getFloorBookmarks("conv-1").has("user-aaa"));
 
@@ -151,7 +151,7 @@ test("floor bookmarks toggle and persist through localStorage", () => {
     assert.equal(floorBookmarks.getFloorBookmarks("conv-1").size, 0);
     unsubscribe();
 
-    
+
     store.set("xgent.floor-bookmarks.v1", "{not json");
     floorBookmarks.resetFloorBookmarksCacheForTest();
     assert.equal(floorBookmarks.getFloorBookmarks("conv-1").size, 0);
@@ -172,10 +172,10 @@ test("bookmark eviction trims memory and disk together", () => {
     for (let i = 0; i < 205; i++) {
       floorBookmarks.toggleFloorBookmark(`conv-${i}`, `user-${i}`);
     }
-    
+
     assert.equal(floorBookmarks.getFloorBookmarks("conv-0").size, 0);
     assert.equal(floorBookmarks.getFloorBookmarks("conv-204").size, 1);
-    
+
     floorBookmarks.resetFloorBookmarksCacheForTest();
     assert.equal(floorBookmarks.getFloorBookmarks("conv-0").size, 0);
     assert.equal(floorBookmarks.getFloorBookmarks("conv-204").size, 1);

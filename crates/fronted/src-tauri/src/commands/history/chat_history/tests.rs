@@ -541,8 +541,8 @@ mod tests {
 
     #[test]
     fn v1_database_gains_selected_model_column_via_v2_migration() {
-        
-        
+
+
         let v1 = Connection::open_in_memory().expect("open v1 in-memory chat history database");
         v1.execute_batch(
             "
@@ -2223,8 +2223,8 @@ mod tests {
         )
         .expect_err("window construction failure should roll back replace");
 
-        
-        
+
+
         assert!(error.contains("解析历史分段 seg-0 失败"));
         let after_record = get_record_by_id(&conn, "conv-replace").expect("reload source");
         let after_segments = load_segments(&conn, "conv-replace").expect("reload source segments");
@@ -2334,8 +2334,8 @@ mod tests {
 
     #[test]
     fn branch_fails_when_anchor_reply_not_persisted() {
-        
-        
+
+
         let mut conn = open_test_db().expect("open test db");
         let u1 = branch_user_message("u1", "第一问", 1_000);
         let a1 = branch_assistant_message("a1", "第一答", 1_001);
@@ -2530,7 +2530,7 @@ mod tests {
 
     #[test]
     fn branch_segments_cut_in_later_segment_midway() {
-        
+
         let u1 = branch_user_message("u1", "第一问", 1_000);
         let a1 = branch_assistant_message("a1", "第一答", 1_001);
         let u2 = branch_user_message("u2", "第二问", 1_002);
