@@ -1946,13 +1946,42 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     </AstryxStack>
   );
 
+  const mobileSidebarHeader = (
+    <AstryxStack direction="horizontal" width="100%" gap={2} vAlign="center">
+      <StackItem size="fill">
+        <AstryxText as="span" type="heading" className="tracking-[-0.02em]">
+          XGent
+        </AstryxText>
+      </StackItem>
+      <IconButton
+        label={t("chat.history.search")}
+        tooltip={t("chat.history.search")}
+        icon={
+          searchStatus === "loading" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Search className="h-4 w-4" />
+          )
+        }
+        variant="secondary"
+        size="lg"
+        onClick={() => {
+          setHistorySearchOpen((open) => {
+            if (open) onSearchQueryChange("");
+            return !open;
+          });
+        }}
+      />
+    </AstryxStack>
+  );
+
   return (
     <>
       <ChatSidebarSurface
         mobileExperience={mobileExperience}
         isOpen={isOpen}
         onClose={onCloseSidebar}
-        mobileHeader={sidebarModeControls}
+        mobileHeader={mobileSidebarHeader}
         desktopWidth={desktopWidth}
         fontScale={fontScale}
       >
@@ -1977,14 +2006,16 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
 
             <AstryxStack direction="vertical" className="chat-sidebar-primary-nav mt-3">
               <SideNavSection title={t("sidebar.navigation")} isHeaderHidden>
-                <SideNavItem
-                  label={t("chat.newConversation")}
-                  icon={SquarePen}
-                  isSelected={activeView === "chat"}
-                  onClick={onNewConversation}
-                  className="chat-history-new-conversation-button"
-                  size="sm"
-                />
+                {!mobileExperience ? (
+                  <SideNavItem
+                    label={t("chat.newConversation")}
+                    icon={SquarePen}
+                    isSelected={activeView === "chat"}
+                    onClick={onNewConversation}
+                    className="chat-history-new-conversation-button"
+                    size="sm"
+                  />
+                ) : null}
                 <SideNavItem
                   label="Skills"
                   icon={Blend}
@@ -2009,6 +2040,38 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   className={cn("sidebar-hub-menu-item", desktopPanelMode && "md:hidden")}
                   size="sm"
                 />
+                {mobileExperience ? (
+                  <>
+                    <SideNavItem
+                      label={t("sidebar.terminal")}
+                      icon={Terminal}
+                      isDisabled={!workspaceToolsAvailable || !onOpenWorkspaceTool}
+                      onClick={() => onOpenWorkspaceTool?.("terminal")}
+                      size="sm"
+                    />
+                    <SideNavItem
+                      label={t("sidebar.gitReview")}
+                      icon={GitBranch}
+                      isDisabled={!workspaceToolsAvailable || !onOpenWorkspaceTool}
+                      onClick={() => onOpenWorkspaceTool?.("gitReview")}
+                      size="sm"
+                    />
+                    <SideNavItem
+                      label={t("sidebar.sshConnection")}
+                      icon={Key}
+                      isDisabled={!workspaceToolsAvailable || !onOpenWorkspaceTool}
+                      onClick={() => onOpenWorkspaceTool?.("sshConnection")}
+                      size="sm"
+                    />
+                    <SideNavItem
+                      label={t("sidebar.backgroundTasks")}
+                      icon={Cpu}
+                      isDisabled={!onOpenWorkspaceTool}
+                      onClick={() => onOpenWorkspaceTool?.("backgroundTasks")}
+                      size="sm"
+                    />
+                  </>
+                ) : null}
               </SideNavSection>
             </AstryxStack>
           </AstryxStack>
@@ -2824,60 +2887,25 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               </AstryxStack>
             ) : null}
             <AstryxGrid className="mobile-chat-sidebar-footer grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-              <Button
+              {mobileExperience ? (
+                <Button
+                  label={t("chat.newConversation")}
+                  type="button"
+                  variant="primary"
+                  onClick={onNewConversation}
+                  className="h-11 w-full min-w-0 justify-center gap-2 rounded-xl px-4 text-sm font-semibold shadow-none"
+                >
+                  <SquarePen className="h-4 w-4" />
+                  <AstryxText as="span" type="inherit">
+                    {t("chat.mode.chat")}
+                  </AstryxText>
+                </Button>
+              ) : (
+                <Button
                 label={t("sidebar.soulMenu")}
                 type="button"
                 variant="ghost"
-                onPointerDown={(event) => {
-                  if (!mobileExperience) return;
-                  suppressSoulClickRef.current = false;
-                  soulLongPressStartRef.current = {
-                    pointerId: event.pointerId,
-                    x: event.clientX,
-                    y: event.clientY,
-                  };
-                  soulLongPressTimerRef.current = window.setTimeout(() => {
-                    soulLongPressTimerRef.current = null;
-                    suppressSoulClickRef.current = true;
-                    setSoulLauncherOpen(true);
-                    navigator.vibrate?.(8);
-                  }, 520);
-                }}
-                onPointerUp={() => {
-                  if (soulLongPressTimerRef.current !== null) {
-                    window.clearTimeout(soulLongPressTimerRef.current);
-                    soulLongPressTimerRef.current = null;
-                  }
-                  soulLongPressStartRef.current = null;
-                }}
-                onPointerMove={(event) => {
-                  const start = soulLongPressStartRef.current;
-                  if (
-                    start &&
-                    start.pointerId === event.pointerId &&
-                    Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10 &&
-                    soulLongPressTimerRef.current !== null
-                  ) {
-                    window.clearTimeout(soulLongPressTimerRef.current);
-                    soulLongPressTimerRef.current = null;
-                  }
-                }}
-                onPointerCancel={() => {
-                  if (soulLongPressTimerRef.current !== null) {
-                    window.clearTimeout(soulLongPressTimerRef.current);
-                    soulLongPressTimerRef.current = null;
-                  }
-                  soulLongPressStartRef.current = null;
-                }}
                 onClick={() => {
-                  if (suppressSoulClickRef.current) {
-                    suppressSoulClickRef.current = false;
-                    return;
-                  }
-                  if (mobileExperience) {
-                    onOpenSettings();
-                    return;
-                  }
                   setSoulLauncherOpen((open) => !open);
                 }}
                 aria-expanded={soulLauncherOpen}
@@ -2909,10 +2937,72 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     soulLauncherOpen && "-rotate-90",
                   )}
                 />
-              </Button>
-              {appUpdate?.showUpdateButton ? (
-                <AppUpdateButton appUpdate={appUpdate} iconOnly />
-              ) : null}
+                </Button>
+              )}
+              <AstryxStack direction="horizontal" gap={1} vAlign="center">
+                {mobileExperience ? (
+                  <Button
+                    label={t("tooltip.settings")}
+                    tooltip={t("tooltip.settings")}
+                    type="button"
+                    variant="ghost"
+                    onPointerDown={(event) => {
+                      suppressSoulClickRef.current = false;
+                      soulLongPressStartRef.current = {
+                        pointerId: event.pointerId,
+                        x: event.clientX,
+                        y: event.clientY,
+                      };
+                      soulLongPressTimerRef.current = window.setTimeout(() => {
+                        soulLongPressTimerRef.current = null;
+                        suppressSoulClickRef.current = true;
+                        setSoulLauncherOpen(true);
+                        navigator.vibrate?.(8);
+                      }, 520);
+                    }}
+                    onPointerUp={() => {
+                      if (soulLongPressTimerRef.current !== null) {
+                        window.clearTimeout(soulLongPressTimerRef.current);
+                        soulLongPressTimerRef.current = null;
+                      }
+                      soulLongPressStartRef.current = null;
+                    }}
+                    onPointerMove={(event) => {
+                      const start = soulLongPressStartRef.current;
+                      if (
+                        start &&
+                        start.pointerId === event.pointerId &&
+                        Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10 &&
+                        soulLongPressTimerRef.current !== null
+                      ) {
+                        window.clearTimeout(soulLongPressTimerRef.current);
+                        soulLongPressTimerRef.current = null;
+                      }
+                    }}
+                    onPointerCancel={() => {
+                      if (soulLongPressTimerRef.current !== null) {
+                        window.clearTimeout(soulLongPressTimerRef.current);
+                        soulLongPressTimerRef.current = null;
+                      }
+                      soulLongPressStartRef.current = null;
+                    }}
+                    onClick={() => {
+                      if (suppressSoulClickRef.current) {
+                        suppressSoulClickRef.current = false;
+                        return;
+                      }
+                      onOpenSettings();
+                    }}
+                    aria-expanded={soulLauncherOpen}
+                    className="h-11 w-11 shrink-0 justify-center rounded-full border border-border bg-background p-0 shadow-none"
+                  >
+                    <Settings className="h-[18px] w-[18px]" />
+                  </Button>
+                ) : null}
+                {appUpdate?.showUpdateButton ? (
+                  <AppUpdateButton appUpdate={appUpdate} iconOnly />
+                ) : null}
+              </AstryxStack>
             </AstryxGrid>
           </AstryxStack>
         </AstryxStack>

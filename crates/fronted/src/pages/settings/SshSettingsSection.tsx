@@ -97,12 +97,13 @@ function SshPasswordInput(props: {
 
 function SshHostModal(props: {
   initialData?: SshHostConfig;
-  onImport?: () => void;
+  existingHosts: SshHostConfig[];
+  onImport?: (hosts: SshImportCandidate[]) => void;
   onSave: (data: SshHostDraft) => void;
   onClose: () => void;
 }) {
   const browser = isBrowserRuntime();
-  const { initialData, onImport, onSave, onClose } = props;
+  const { initialData, existingHosts, onImport, onSave, onClose } = props;
   const { t } = useLocale();
   const [name, setName] = useState(initialData?.name ?? "");
   const [host, setHost] = useState(initialData?.host ?? "");
@@ -117,6 +118,10 @@ function SshHostModal(props: {
   );
   const [selectedKeyFile, setSelectedKeyFile] = useState<File | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importResult, setImportResult] = useState<SshScanResult | null>(null);
+  const [importError, setImportError] = useState("");
+  const [selectedImportIds, setSelectedImportIds] = useState<Set<string>>(() => new Set());
   const advancedSectionRef = useRef<HTMLDivElement | null>(null);
   const [proxyType, setProxyType] = useState<SshProxyType>(initialData?.proxy.type ?? "socks5");
   const [proxyUrl, setProxyUrl] = useState(initialData?.proxy.url ?? "");
@@ -127,6 +132,41 @@ function SshHostModal(props: {
   const isPasswordAuth = authType === "password";
   const isPrivateKeyAuth = authType === "privateKey";
   const isKeyboardInteractiveAuth = authType === "keyboardInteractive";
+  const importCandidates = importResult?.candidates ?? [];
+  const selectedImportCandidates = importCandidates.filter((candidate) =>
+    selectedImportIds.has(candidate.id),
+  );
+
+  useEffect(() => {
+    if (!importOpen || !onImport) return;
+    let cancelled = false;
+    setImportResult(null);
+    setImportError("");
+    scanSshImportCandidates(existingHosts)
+      .then((scanResult) => {
+        if (cancelled) return;
+        setImportResult(scanResult);
+        setSelectedImportIds(
+          new Set(scanResult.candidates.filter((item) => !item.duplicate).map((item) => item.id)),
+        );
+      })
+      .catch((scanError) => {
+        if (cancelled) return;
+        setImportError(scanError instanceof Error ? scanError.message : String(scanError));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [existingHosts, importOpen, onImport]);
+
+  function toggleImportCandidate(id: string) {
+    setSelectedImportIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function handleFileSelected(file: File | null) {
     setSelectedKeyFile(file);
@@ -217,24 +257,81 @@ function SshHostModal(props: {
           <LayoutContent isScrollable>
             <VStack gap={5}>
               {!isEditing && onImport ? (
-                <Section variant="muted" padding={3}>
-                  <HStack width="100%" gap={3} hAlign="between" vAlign="center" wrap="wrap">
-                    <VStack gap={0.5}>
-                      <Text type="body" weight="semibold">
-                        {t("settings.sshImport")}
-                      </Text>
-                      <Text type="supporting" color="secondary">
-                        {t("settings.sshImportDesc")}
-                      </Text>
-                    </VStack>
-                    <AstryxCoreButton
-                      label={t("settings.sshImport")}
-                      variant="secondary"
-                      size="sm"
-                      onClick={onImport}
-                    />
-                  </HStack>
-                </Section>
+                <Collapsible
+                  trigger={t("settings.sshImport")}
+                  isOpen={importOpen}
+                  onOpenChange={setImportOpen}
+                >
+                  <VStack width="100%" gap={3} paddingBlock={1}>
+                    <Text type="supporting" color="secondary">
+                      {t("settings.sshImportDesc")}
+                    </Text>
+                    {!importResult && !importError ? (
+                      <HStack gap={2} vAlign="center">
+                        <Spinner size="sm" aria-label={t("settings.sshImportScanning")} />
+                        <Text type="supporting" color="secondary">
+                          {t("settings.sshImportScanning")}
+                        </Text>
+                      </HStack>
+                    ) : null}
+                    {importError ? (
+                      <Banner
+                        status="error"
+                        title={t("settings.sshImportFailed")}
+                        description={importError}
+                        collapsible={false}
+                      />
+                    ) : null}
+                    {importResult ? (
+                      <VStack gap={3} width="100%">
+                        <ListItem
+                          label={importResult.sshDirPath}
+                          description={t("settings.sshImportFound")
+                            .replace("{count}", String(importCandidates.length))
+                            .replace("{keys}", String(importResult.keyFiles.length))}
+                          startContent={<AstryxIcon icon={Key} size="sm" color="secondary" />}
+                        />
+                        {importCandidates.length === 0 ? (
+                          <EmptyState
+                            title={t("settings.sshImportEmpty")}
+                            description={t("settings.sshImportEmptyHint")}
+                            icon={<AstryxIcon icon={Key} size="lg" color="secondary" />}
+                            isCompact
+                          />
+                        ) : (
+                          <AstryxList density="balanced" hasDividers>
+                            {importCandidates.map((candidate) => (
+                              <SshImportCandidateRow
+                                key={candidate.id}
+                                candidate={candidate}
+                                selected={selectedImportIds.has(candidate.id)}
+                                onChange={() => toggleImportCandidate(candidate.id)}
+                              />
+                            ))}
+                          </AstryxList>
+                        )}
+                        <HStack gap={2} hAlign="between" vAlign="center" wrap="wrap">
+                          <Text type="supporting" color="secondary" hasTabularNumbers>
+                            {t("settings.sshImportSelected").replace(
+                              "{count}",
+                              String(selectedImportCandidates.length),
+                            )}
+                          </Text>
+                          <AstryxCoreButton
+                            label={t("settings.sshImport")}
+                            variant="secondary"
+                            size="sm"
+                            isDisabled={selectedImportCandidates.length === 0}
+                            onClick={() => {
+                              onImport(selectedImportCandidates);
+                              onClose();
+                            }}
+                          />
+                        </HStack>
+                      </VStack>
+                    ) : null}
+                  </VStack>
+                </Collapsible>
               ) : null}
               <FormLayout>
                 <FormLayout direction="horizontal">
@@ -519,160 +616,10 @@ function SshImportCandidateRow(props: {
   );
 }
 
-function SshImportModal(props: {
-  existingHosts: SshHostConfig[];
-  onImport: (hosts: SshImportCandidate[]) => void;
-  onClose: () => void;
-}) {
-  const { existingHosts, onImport, onClose } = props;
-  const { t } = useLocale();
-  const [result, setResult] = useState<SshScanResult | null>(null);
-  const [error, setError] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
-
-  useEffect(() => {
-    let cancelled = false;
-    setResult(null);
-    setError("");
-    scanSshImportCandidates(existingHosts)
-      .then((scanResult) => {
-        if (cancelled) return;
-        setResult(scanResult);
-        setSelectedIds(
-          new Set(scanResult.candidates.filter((item) => !item.duplicate).map((item) => item.id)),
-        );
-      })
-      .catch((scanError) => {
-        if (cancelled) return;
-        setError(scanError instanceof Error ? scanError.message : String(scanError));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [existingHosts]);
-
-  const candidates = result?.candidates ?? [];
-  const selected = candidates.filter((candidate) => selectedIds.has(candidate.id));
-
-  function toggle(id: string) {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  return (
-    <SettingsModalShell onClose={onClose} ariaLabel={t("settings.sshImport")}>
-      <Layout
-        height="fill"
-        header={
-          <DialogHeader
-            title={t("settings.sshImport")}
-            subtitle={t("settings.sshImportDesc")}
-            startContent={
-              <IconButton
-                label={t("settings.cancel")}
-                tooltip={t("settings.cancel")}
-                variant="ghost"
-                size="sm"
-                icon={<AstryxIcon icon={ArrowLeft} size="sm" color="inherit" />}
-                onClick={onClose}
-              />
-            }
-          />
-        }
-        content={
-          <LayoutContent padding={5} isScrollable>
-            <VStack gap={4}>
-              {!result && !error ? (
-                <VStack minHeight="var(--spacing-32)" hAlign="center" vAlign="center" gap={2}>
-                  <Spinner size="sm" aria-label={t("settings.sshImportScanning")} />
-                  <Text color="secondary">{t("settings.sshImportScanning")}</Text>
-                </VStack>
-              ) : null}
-
-              {error ? (
-                <Banner
-                  status="error"
-                  title={t("settings.sshImportFailed")}
-                  description={error}
-                  collapsible={false}
-                />
-              ) : null}
-
-              {result ? (
-                <VStack gap={4}>
-                  <AstryxList density="balanced">
-                    <ListItem
-                      label={result.sshDirPath}
-                      description={t("settings.sshImportFound")
-                        .replace("{count}", String(candidates.length))
-                        .replace("{keys}", String(result.keyFiles.length))}
-                      startContent={<AstryxIcon icon={Key} size="sm" color="secondary" />}
-                    />
-                  </AstryxList>
-
-                  {candidates.length === 0 ? (
-                    <EmptyState
-                      title={t("settings.sshImportEmpty")}
-                      description={t("settings.sshImportEmptyHint")}
-                      icon={<AstryxIcon icon={Key} size="lg" color="secondary" />}
-                      isCompact
-                    />
-                  ) : (
-                    <AstryxList density="balanced" hasDividers>
-                      {candidates.map((candidate) => (
-                        <SshImportCandidateRow
-                          key={candidate.id}
-                          candidate={candidate}
-                          selected={selectedIds.has(candidate.id)}
-                          onChange={() => toggle(candidate.id)}
-                        />
-                      ))}
-                    </AstryxList>
-                  )}
-                </VStack>
-              ) : null}
-            </VStack>
-          </LayoutContent>
-        }
-        footer={
-          <LayoutFooter hasDivider>
-            <HStack gap={3} hAlign="between" vAlign="center" wrap="wrap">
-              <Text type="supporting" color="secondary" hasTabularNumbers>
-                {t("settings.sshImportSelected").replace("{count}", String(selected.length))}
-              </Text>
-              <HStack gap={2} vAlign="center">
-                <AstryxCoreButton
-                  label={t("settings.cancel")}
-                  variant="secondary"
-                  onClick={onClose}
-                />
-                <AstryxCoreButton
-                  label={t("settings.sshImport")}
-                  variant="primary"
-                  isDisabled={selected.length === 0}
-                  onClick={() => {
-                    onImport(selected);
-                    onClose();
-                  }}
-                />
-              </HStack>
-            </HStack>
-          </LayoutFooter>
-        }
-      />
-    </SettingsModalShell>
-  );
-}
-
 export function SshSettingsSection(props: SettingsSectionProps) {
   const { settings, setSettings } = props;
   const { t } = useLocale();
   const [modalOpen, setModalOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const [editingHost, setEditingHost] = useState<SshHostConfig | null>(null);
   const [knownHostResettingId, setKnownHostResettingId] = useState<string | null>(null);
   const [knownHostResetStatus, setKnownHostResetStatus] = useState<SshKnownHostResetStatus | null>(
@@ -850,26 +797,10 @@ export function SshSettingsSection(props: SettingsSectionProps) {
     return (
       <SshHostModal
         initialData={editingHost ?? undefined}
-        onImport={
-          editingHost
-            ? undefined
-            : () => {
-                closeModal();
-                setImportOpen(true);
-              }
-        }
+        existingHosts={hosts}
+        onImport={editingHost ? undefined : handleImport}
         onSave={handleSave}
         onClose={closeModal}
-      />
-    );
-  }
-
-  if (importOpen) {
-    return (
-      <SshImportModal
-        existingHosts={hosts}
-        onImport={handleImport}
-        onClose={() => setImportOpen(false)}
       />
     );
   }
@@ -882,7 +813,7 @@ export function SshSettingsSection(props: SettingsSectionProps) {
             <Badge label={hosts.length} variant="neutral" />
             <AstryxCoreButton
               label={t("settings.sshAdd")}
-              variant="primary"
+              variant="secondary"
               size="sm"
               onClick={openAdd}
             />
@@ -899,7 +830,7 @@ export function SshSettingsSection(props: SettingsSectionProps) {
           actions={
             <AstryxCoreButton
               label={t("settings.sshAdd")}
-              variant="primary"
+              variant="secondary"
               size="sm"
               onClick={openAdd}
             />

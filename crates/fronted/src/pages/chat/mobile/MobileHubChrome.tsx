@@ -5,7 +5,7 @@ import { Switch } from "@astryxdesign/core/Switch";
 import { Heading } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import type { ReactNode } from "react";
-import { PanelLeft, Search } from "../../../components/icons";
+import { Menu, Search } from "../../../components/icons";
 
 type MobileHubHeaderProps = {
   title: string;
@@ -37,7 +37,7 @@ export function MobileHubHeader(props: MobileHubHeaderProps) {
         <IconButton
           label={props.title}
           tooltip={props.title}
-          icon={<PanelLeft />}
+          icon={<Menu />}
           size="lg"
           variant="secondary"
           onClick={props.onOpenSidebar}

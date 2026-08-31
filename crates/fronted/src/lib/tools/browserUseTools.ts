@@ -31,6 +31,7 @@ const BROWSER_ACTIONS = [
   "screenshot",
   "click",
   "type",
+  "press_key",
   "get_text",
   "get_readable",
   "scroll",
@@ -38,6 +39,8 @@ const BROWSER_ACTIONS = [
   "find_elements",
   "get_page_info",
   "get_backbone",
+  "snapshot",
+  "wait_for_selector",
   "wait_for_dom_stable",
   "execute_js",
 ] as const;
@@ -49,9 +52,12 @@ type BrowserUseArguments = {
   session_id?: string;
   url?: string;
   selector?: string;
+  ref?: string;
   text?: string;
+  key?: string;
+  submit?: boolean;
   script?: string;
-  direction?: "up" | "down";
+  direction?: "up" | "down" | "left" | "right";
   amount?: number;
   coordinate_x?: number;
   coordinate_y?: number;
@@ -89,13 +95,30 @@ const BROWSER_PARAMETERS = Type.Object({
         "CSS selector for click, type, get_text, scroll, hover, or find_elements. Use selectors returned by find_elements/get_backbone.",
     }),
   ),
+  ref: Type.Optional(
+    Type.String({
+      description:
+        "Stable element reference (for example e12) returned by snapshot, get_backbone, or find_elements. Prefer ref over a CSS selector.",
+    }),
+  ),
   text: Type.Optional(Type.String({ description: "Text to enter for action=type." })),
+  key: Type.Optional(Type.String({ description: "Keyboard key for action=press_key." })),
+  submit: Type.Optional(
+    Type.Boolean({ description: "Submit the containing form after action=type." }),
+  ),
   script: Type.Optional(
     Type.String({
       description: "Synchronous JavaScript body for execute_js. Return a JSON-serializable value.",
     }),
   ),
-  direction: Type.Optional(Type.Union([Type.Literal("up"), Type.Literal("down")])),
+  direction: Type.Optional(
+    Type.Union([
+      Type.Literal("up"),
+      Type.Literal("down"),
+      Type.Literal("left"),
+      Type.Literal("right"),
+    ]),
+  ),
   amount: Type.Optional(
     Type.Number({ minimum: 1, maximum: 10_000, description: "Scroll distance in CSS pixels." }),
   ),
@@ -143,7 +166,10 @@ function actionInput(args: BrowserUseArguments): BrowserActionInput {
   return {
     url: args.url,
     selector: args.selector,
+    ref: args.ref,
     text: args.text,
+    key: args.key,
+    submit: args.submit,
     script: args.script,
     direction: args.direction,
     amount: args.amount,
@@ -164,6 +190,8 @@ function runtimeAction(action: BrowserUseAction): BrowserAction {
       return "page_info";
     case "get_backbone":
       return "backbone";
+    case "snapshot":
+      return "snapshot";
     default:
       return action as BrowserAction;
   }
@@ -239,6 +267,32 @@ async function waitForDomStable(
   };
 }
 
+async function waitForSelector(
+  controller: BrowserSessionController,
+  sessionId: string,
+  selector: string,
+  timeoutMs: number,
+  signal?: AbortSignal,
+) {
+  const normalizedTimeout = Math.min(30_000, Math.max(500, timeoutMs));
+  const startedAt = Date.now();
+  const deadline = startedAt + normalizedTimeout;
+  while (Date.now() < deadline) {
+    if (signal?.aborted) throw new Error("Cancelled");
+    const response = await controller.action(
+      "find_elements",
+      { selector, limit: 1 },
+      { sessionId, timeoutMs: Math.min(5_000, normalizedTimeout) },
+    );
+    const data = (response.data ?? {}) as { count?: number; elements?: unknown[] };
+    if ((data.count ?? 0) > 0) {
+      return { found: true, elapsedMs: Date.now() - startedAt, ...data };
+    }
+    await abortableDelay(200, signal);
+  }
+  return { found: false, elapsedMs: Date.now() - startedAt, selector };
+}
+
 function formatResult(action: BrowserUseAction, sessionId: string, result: unknown) {
   const encoded = JSON.stringify(result, null, 2);
   const body =
@@ -273,7 +327,7 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
   const tool: Tool = {
     name: "browser_use",
     description:
-      "Operate Xgent's embedded browser. It shares the same live WebView tab with the user on PC, Android, and iOS; it is not a separate browser extension. Use navigate/open, then inspect with get_page_info, get_readable, find_elements, or get_backbone before clicking/typing. Reuse session_id for follow-up actions. Prefer selectors returned by the browser over guessed coordinates. Use screenshot when visual inspection is necessary. Use wait_for_dom_stable after navigation or actions that cause a page transition.",
+      "Operate Xgent's embedded browser. It shares the same live WebView tab with the user on PC, Android, and iOS; it is not a separate browser extension. Use open/navigate, then snapshot to receive stable element refs. Click, type, press keys, hover, or scroll with ref whenever possible. Reuse session_id for follow-up actions. Use wait_for_selector or wait_for_dom_stable after page changes and screenshot when visual layout matters.",
     parameters: BROWSER_PARAMETERS,
   };
 
@@ -339,14 +393,27 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
       } else if (action === "wait_for_dom_stable") {
         await controller.ensureSession({ sessionId });
         result = await waitForDomStable(controller, sessionId, args.timeout ?? 8_000, signal);
+      } else if (action === "wait_for_selector") {
+        await controller.ensureSession({ sessionId });
+        result = await waitForSelector(
+          controller,
+          sessionId,
+          requiredString(args.selector, "selector"),
+          args.timeout ?? 8_000,
+          signal,
+        );
       } else {
         if (action === "navigate") {
           args.url = normalizeBrowserAddress(requiredString(args.url, "url"));
         }
-        if (action === "type") requiredString(args.selector, "selector");
+        if (action === "type" && !args.selector && !args.ref) {
+          throw new Error("browser_use type requires ref or selector.");
+        }
+        if (action === "press_key") requiredString(args.key, "key");
         if (
           action === "click" &&
           !args.selector &&
+          !args.ref &&
           (args.coordinate_x == null || args.coordinate_y == null)
         ) {
           throw new Error("browser_use click requires selector or coordinate_x + coordinate_y.");

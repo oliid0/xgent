@@ -43,6 +43,7 @@ export type BrowserAction =
   | "screenshot"
   | "click"
   | "type"
+  | "press_key"
   | "get_text"
   | "readable"
   | "scroll"
@@ -50,14 +51,18 @@ export type BrowserAction =
   | "find_elements"
   | "page_info"
   | "backbone"
+  | "snapshot"
   | "execute_js";
 
 export type BrowserActionInput = {
   url?: string;
   selector?: string;
+  ref?: string;
   text?: string;
+  key?: string;
+  submit?: boolean;
   script?: string;
-  direction?: "up" | "down";
+  direction?: "up" | "down" | "left" | "right";
   amount?: number;
   x?: number;
   y?: number;

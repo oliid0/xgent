@@ -13,10 +13,9 @@ pub(crate) fn is_local_access_settings_write(command: &str) -> bool {
     LOCAL_ACCESS_SETTINGS_WRITE_COMMANDS.contains(&command)
 }
 
-/// Sanitizes settings writes received from a paired browser before they are
-/// forwarded to Tauri. Metadata remains editable, while credentials never
-/// cross the unencrypted LAN boundary and redaction markers can never replace
-/// the real values stored by the desktop application.
+/// Sanitizes settings writes received from an authenticated, paired browser
+/// before they are forwarded to Tauri. Reads stay redacted; explicit new
+/// values replace secrets, while redaction markers preserve stored values.
 pub(crate) fn sanitize_local_access_settings_write(
     conn: &Connection,
     command: &str,
@@ -68,13 +67,6 @@ fn merge_provider_api_key(
         .and_then(Value::as_bool)
         .unwrap_or(false);
     let value = optional_string(incoming.get("apiKey"), "provider apiKey")?;
-    if value.is_some_and(|value| {
-        !value.is_empty() && value != LOCAL_ACCESS_SETTINGS_SECRET_SENTINEL
-    }) {
-        return Err(
-            "provider credentials can only be changed in the native application".to_string(),
-        );
-    }
     let preserve = configured
         && value.is_none_or(|value| {
             value.is_empty() || value == LOCAL_ACCESS_SETTINGS_SECRET_SENTINEL
@@ -127,11 +119,6 @@ fn merge_provider_headers(
                 format!("provider custom header marker has no stored value for {key}")
             })?;
             header.insert("value".to_string(), Value::String(secret.clone()));
-        } else if !value.is_empty() {
-            return Err(
-                "provider header credentials can only be changed in the native application"
-                    .to_string(),
-            );
         }
     }
     Ok(())
@@ -230,10 +217,6 @@ fn merge_secret_map(
                 .and_then(|stored| stored.get(key))
                 .cloned()
                 .ok_or_else(|| format!("{label} marker has no stored value for {key}"))?;
-        } else if !text.is_empty() {
-            return Err(format!(
-                "{label} can only be changed in the native application"
-            ));
         }
     }
     Ok(())

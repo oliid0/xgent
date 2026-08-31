@@ -3,6 +3,19 @@
 
   const MAX_TEXT = 20_000;
   const MAX_ELEMENTS = 100;
+  const elementRefs = new WeakMap();
+  const elementsByRef = new Map();
+  let nextElementRef = 1;
+
+  const elementRef = (element) => {
+    if (!(element instanceof Element)) return null;
+    const existing = elementRefs.get(element);
+    if (existing) return existing;
+    const ref = `e${nextElementRef++}`;
+    elementRefs.set(element, ref);
+    elementsByRef.set(ref, element);
+    return ref;
+  };
 
   const text = (element, limit = 240) =>
     String(element?.innerText || element?.textContent || "")
@@ -63,6 +76,7 @@
     const rect = element.getBoundingClientRect();
     return {
       index,
+      ref: elementRef(element),
       tag: element.tagName.toLowerCase(),
       selector: elementSelector(element),
       id: element.id || null,
@@ -95,10 +109,18 @@
     };
   };
 
-  const requireElement = (selector) => {
-    if (!selector || typeof selector !== "string") {
-      throw new Error("A CSS selector is required");
+  const requireElement = (input) => {
+    const ref = typeof input?.ref === "string" ? input.ref.trim() : "";
+    if (ref) {
+      const referenced = elementsByRef.get(ref);
+      if (!referenced || !referenced.isConnected) {
+        elementsByRef.delete(ref);
+        throw new Error(`Element reference is stale or missing: ${ref}. Take a new snapshot.`);
+      }
+      return referenced;
     }
+    const selector = typeof input?.selector === "string" ? input.selector.trim() : "";
+    if (!selector) throw new Error("An element ref or CSS selector is required");
     const element = document.querySelector(selector);
     if (!element) throw new Error(`Element not found: ${selector}`);
     return element;
@@ -129,7 +151,7 @@
         : null;
     const element = point
       ? document.elementFromPoint(point.x, point.y)
-      : requireElement(input?.selector);
+      : requireElement(input);
     if (!element) throw new Error(`No element at (${point.x}, ${point.y})`);
     if ("disabled" in element && element.disabled) throw new Error("Element is disabled");
     element.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
@@ -154,7 +176,7 @@
   };
 
   const typeInto = (input) => {
-    const element = requireElement(input?.selector);
+    const element = requireElement(input);
     const value = String(input?.text ?? "");
     element.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
     element.focus?.({ preventScroll: true });
@@ -174,11 +196,45 @@
       }),
     );
     element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+    if (input?.submit) {
+      const form = element instanceof HTMLElement ? element.closest("form") : null;
+      if (form instanceof HTMLFormElement) form.requestSubmit();
+      else dispatchKey(element, "Enter");
+    }
     return { typed: true, length: value.length, element: describeElement(element) };
   };
 
+  const dispatchKey = (element, key) => {
+    const normalizedKey = String(key || "").trim();
+    if (!normalizedKey) throw new Error("key is required");
+    element.focus?.({ preventScroll: true });
+    const options = {
+      key: normalizedKey,
+      code: normalizedKey.length === 1 ? `Key${normalizedKey.toUpperCase()}` : normalizedKey,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    };
+    const accepted = element.dispatchEvent(new KeyboardEvent("keydown", options));
+    if (accepted && normalizedKey === "Enter") {
+      const form = element instanceof HTMLElement ? element.closest("form") : null;
+      if (form instanceof HTMLFormElement) form.requestSubmit();
+    }
+    element.dispatchEvent(new KeyboardEvent("keyup", options));
+    return { pressed: true, key: normalizedKey, element: describeElement(element) };
+  };
+
+  const pressKey = (input) => {
+    const target = input?.ref || input?.selector
+      ? requireElement(input)
+      : document.activeElement instanceof Element
+        ? document.activeElement
+        : document.body;
+    return dispatchKey(target, input?.key);
+  };
+
   const getText = (input) => {
-    const element = input?.selector ? requireElement(input.selector) : document.body;
+    const element = input?.selector || input?.ref ? requireElement(input) : document.body;
     const value = String(element.innerText || element.textContent || "").slice(0, MAX_TEXT);
     return {
       text: value,
@@ -234,19 +290,35 @@
   };
 
   const scroll = (input) => {
-    const direction = input?.direction === "up" ? -1 : 1;
+    const direction = ["up", "down", "left", "right"].includes(input?.direction)
+      ? input.direction
+      : "down";
     const amount = Math.max(1, Math.min(10_000, Number(input?.amount) || 600));
-    const target = input?.selector ? requireElement(input.selector) : findScrollable();
-    const before = target === document.scrollingElement ? window.scrollY : target.scrollTop;
+    const target = input?.selector || input?.ref ? requireElement(input) : findScrollable();
+    const horizontal = direction === "left" || direction === "right";
+    const delta = direction === "up" || direction === "left" ? -amount : amount;
+    const before = horizontal
+      ? target === document.scrollingElement ? window.scrollX : target.scrollLeft
+      : target === document.scrollingElement ? window.scrollY : target.scrollTop;
     if (target === document.scrollingElement || target === document.documentElement) {
-      window.scrollBy({ top: direction * amount, behavior: input?.smooth ? "smooth" : "instant" });
+      window.scrollBy({
+        left: horizontal ? delta : 0,
+        top: horizontal ? 0 : delta,
+        behavior: input?.smooth ? "smooth" : "instant",
+      });
     } else {
-      target.scrollBy({ top: direction * amount, behavior: input?.smooth ? "smooth" : "instant" });
+      target.scrollBy({
+        left: horizontal ? delta : 0,
+        top: horizontal ? 0 : delta,
+        behavior: input?.smooth ? "smooth" : "instant",
+      });
     }
-    const after = target === document.scrollingElement ? window.scrollY : target.scrollTop;
+    const after = horizontal
+      ? target === document.scrollingElement ? window.scrollX : target.scrollLeft
+      : target === document.scrollingElement ? window.scrollY : target.scrollTop;
     return {
       scrolled: before !== after,
-      direction: direction < 0 ? "up" : "down",
+      direction,
       amount,
       before,
       after,
@@ -255,7 +327,7 @@
   };
 
   const hover = (input) => {
-    const element = requireElement(input?.selector);
+    const element = requireElement(input);
     const rect = element.getBoundingClientRect();
     const options = {
       bubbles: true,
@@ -317,6 +389,7 @@
       }
       const description = describeElement(element);
       return {
+        ref: description.ref,
         tag: description.tag,
         selector: description.selector,
         role: description.role,
@@ -359,6 +432,9 @@
         case "type":
           data = typeInto(input);
           break;
+        case "press_key":
+          data = pressKey(input);
+          break;
         case "get_text":
           data = getText(input);
           break;
@@ -378,6 +454,7 @@
           data = pageInfo();
           break;
         case "backbone":
+        case "snapshot":
           data = backbone(input);
           break;
         case "execute_js":

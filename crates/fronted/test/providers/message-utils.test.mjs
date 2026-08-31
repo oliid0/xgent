@@ -18,6 +18,17 @@ test("provider citation markers are removed from final assistant messages", () =
   assert.equal(sanitized.content[0].text, "Before  after");
 });
 
+test("orphan provider citation controls do not render as black glyph blocks", () => {
+  const message = {
+    role: "assistant",
+    content: [{ type: "text", text: "Before\uE202middle\uE201after" }],
+  };
+
+  const sanitized = messageUtils.sanitizeAssistantMessage(message);
+
+  assert.equal(sanitized.content[0].text, "Beforemiddleafter");
+});
+
 test("stream reconciliation holds citation fragments and preserves visible deltas", () => {
   const reconciler = messageUtils.createStreamingTextReconciler();
 
@@ -28,4 +39,11 @@ test("stream reconciliation holds citation fragments and preserves visible delta
     reconciler.reconcileFinalText("0", "Answer \uE200cite\uE202source-1\uE201 done!"),
     "!",
   );
+});
+
+test("stream reconciliation drops orphan citation controls", () => {
+  const reconciler = messageUtils.createStreamingTextReconciler();
+
+  assert.equal(reconciler.appendDelta("0", "A\uE202B\uE201C"), "ABC");
+  assert.equal(reconciler.reconcileFinalText("0", "A\uE202B\uE201CD"), "D");
 });

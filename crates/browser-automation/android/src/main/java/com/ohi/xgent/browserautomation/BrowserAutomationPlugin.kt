@@ -62,8 +62,10 @@ class SetViewportArgs {
 @InvokeArg
 class BrowserActionInputArgs {
     var url: String? = null
+    var ref: String? = null
     var selector: String? = null
     var text: String? = null
+    var key: String? = null
     var script: String? = null
     var direction: String? = null
     var amount: Double? = null
@@ -73,11 +75,14 @@ class BrowserActionInputArgs {
     var maxDepth: Double? = null
     var maxNodes: Double? = null
     var smooth: Boolean? = null
+    var submit: Boolean? = null
 
     fun toJson(): JSONObject = JSONObject().apply {
         url?.let { put("url", it) }
+        ref?.let { put("ref", it) }
         selector?.let { put("selector", it) }
         text?.let { put("text", it) }
+        key?.let { put("key", it) }
         script?.let { put("script", it) }
         direction?.let { put("direction", it) }
         amount?.let { put("amount", it) }
@@ -87,6 +92,7 @@ class BrowserActionInputArgs {
         maxDepth?.let { put("maxDepth", it) }
         maxNodes?.let { put("maxNodes", it) }
         smooth?.let { put("smooth", it) }
+        submit?.let { put("submit", it) }
     }
 }
 

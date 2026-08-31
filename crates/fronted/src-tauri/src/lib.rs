@@ -1268,7 +1268,7 @@ fn initialize_mobile_services(app: tauri::AppHandle) -> Vec<String> {
 #[cfg(mobile)]
 #[tauri::mobile_entry_point]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_browser_automation::init())
         .plugin(tauri_plugin_mobile_assistant::init())
@@ -1288,6 +1288,16 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(app_invoke_handler!())
-        .run(tauri::generate_context!())
-        .expect("error while running Xgent mobile application");
+        .build(tauri::generate_context!())
+        .expect("error while building Xgent mobile application");
+
+    app.run(|app, event| {
+        if matches!(event, tauri::RunEvent::Resumed) {
+            if let Some(window) = app.get_webview_window("main") {
+                if let Err(error) = window.show() {
+                    eprintln!("failed to restore Xgent window after resume: {error}");
+                }
+            }
+        }
+    });
 }

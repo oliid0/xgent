@@ -57,11 +57,19 @@ async function fileToUploadInput(file: File): Promise<SystemUploadedReadableFile
   };
 }
 
-function pickFilesFromWebView(): Promise<File[]> {
+type WebViewFilePickerOptions = {
+  accept?: string;
+  capture?: "environment" | "user";
+  multiple?: boolean;
+};
+
+function pickFilesFromWebView(options: WebViewFilePickerOptions = {}): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.multiple = true;
+    input.multiple = options.multiple ?? true;
+    if (options.accept) input.accept = options.accept;
+    if (options.capture) input.setAttribute("capture", options.capture);
     input.tabIndex = -1;
     input.style.position = "fixed";
     input.style.inset = "0 auto auto -10000px";
@@ -359,6 +367,20 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
     });
   }, [importReadableFiles, nativeMobileRuntime, runUploadTask]);
 
+  const pickReadablePhotos = useCallback(async () => {
+    const files = await pickFilesFromWebView({ accept: "image/*", multiple: true });
+    await importReadableFiles(files);
+  }, [importReadableFiles]);
+
+  const captureReadablePhoto = useCallback(async () => {
+    const files = await pickFilesFromWebView({
+      accept: "image/*",
+      capture: "environment",
+      multiple: false,
+    });
+    await importReadableFiles(files);
+  }, [importReadableFiles]);
+
   const removePendingUpload = useCallback(
     (relativePath: string) => {
       const targetConversationId = currentConversationIdRef.current.trim();
@@ -376,6 +398,8 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
     getPendingUploadsForConversation,
     setPendingUploadsForConversation,
     pickReadableFiles,
+    pickReadablePhotos,
+    captureReadablePhoto,
     importReadableFilePaths,
     importReadableFiles,
     removePendingUpload,

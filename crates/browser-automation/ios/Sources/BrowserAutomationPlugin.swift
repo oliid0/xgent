@@ -31,8 +31,10 @@ private struct SetViewportArgs: Decodable {
 
 private struct BrowserActionInputArgs: Decodable {
     let url: String?
+    let ref: String?
     let selector: String?
     let text: String?
+    let key: String?
     let script: String?
     let direction: String?
     let amount: Double?
@@ -42,12 +44,15 @@ private struct BrowserActionInputArgs: Decodable {
     let maxDepth: Double?
     let maxNodes: Double?
     let smooth: Bool?
+    let submit: Bool?
 
     var dictionary: [String: Any] {
         var value: [String: Any] = [:]
         if let url { value["url"] = url }
+        if let ref { value["ref"] = ref }
         if let selector { value["selector"] = selector }
         if let text { value["text"] = text }
+        if let key { value["key"] = key }
         if let script { value["script"] = script }
         if let direction { value["direction"] = direction }
         if let amount { value["amount"] = amount }
@@ -57,6 +62,7 @@ private struct BrowserActionInputArgs: Decodable {
         if let maxDepth { value["maxDepth"] = maxDepth }
         if let maxNodes { value["maxNodes"] = maxNodes }
         if let smooth { value["smooth"] = smooth }
+        if let submit { value["submit"] = submit }
         return value
     }
 }
@@ -319,8 +325,10 @@ final class BrowserAutomationPlugin: Plugin {
                 timeoutMs: request.timeoutMs ?? 30_000,
                 input: request.input ?? BrowserActionInputArgs(
                     url: nil,
+                    ref: nil,
                     selector: nil,
                     text: nil,
+                    key: nil,
                     script: nil,
                     direction: nil,
                     amount: nil,
@@ -329,7 +337,8 @@ final class BrowserAutomationPlugin: Plugin {
                     limit: nil,
                     maxDepth: nil,
                     maxNodes: nil,
-                    smooth: nil
+                    smooth: nil,
+                    submit: nil
                 )
             )
         }

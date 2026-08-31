@@ -193,7 +193,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
                     "allDay": event.isAllDay,
                     "location": event.location.map { $0 as Any } ?? NSNull(),
                     "notes": event.notes.map { $0 as Any } ?? NSNull(),
-                    "calendar": event.calendar?.title.map { $0 as Any } ?? NSNull(),
+                    "calendar": event.calendar.map { $0.title as Any } ?? NSNull(),
                 ] as [String: Any]
             }
         invoke.resolve(Array(events))
@@ -228,7 +228,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
                             .map { self.milliseconds($0) as Any } ?? NSNull(),
                         "completed": reminder.isCompleted,
                         "notes": reminder.notes.map { $0 as Any } ?? NSNull(),
-                        "list": reminder.calendar?.title.map { $0 as Any } ?? NSNull(),
+                        "list": reminder.calendar.map { $0.title as Any } ?? NSNull(),
                     ] as [String: Any]
                 }
             invoke.resolve(Array(payload))

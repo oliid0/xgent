@@ -53,7 +53,6 @@ import type { WorkspaceCodeEditorOpenRequest } from "../components/workspace-edi
 import type { WorkspaceFilePreviewOpenRequest } from "../components/workspace-editor/WorkspaceFilePreviewOverlay";
 import type { WorkspaceSshTerminalOpenRequest } from "../components/workspace-editor/WorkspaceSshTerminalOverlay";
 import {
-  isWorkspaceEditablePreviewPath,
   isWorkspacePreviewPath,
 } from "../components/workspace-editor/workspaceImagePreview";
 import { WorkspaceNavigationRail } from "../components/workspace-tools/WorkspaceNavigationRail";
@@ -1804,7 +1803,7 @@ export function ChatPage(props: ChatPageProps) {
         path,
         imagePaths,
       };
-      if (isWorkspacePreviewPath(path) && !isWorkspaceEditablePreviewPath(path)) {
+      if (isWorkspacePreviewPath(path)) {
         openWorkspaceFilePreview(request);
         return;
       }
@@ -1827,7 +1826,7 @@ export function ChatPage(props: ChatPageProps) {
         imagePaths,
       };
       setMobileWorkspaceDestination(null);
-      if (isWorkspacePreviewPath(path) && !isWorkspaceEditablePreviewPath(path)) {
+      if (isWorkspacePreviewPath(path)) {
         openWorkspaceFilePreview(request);
         return;
       }
@@ -2131,6 +2130,8 @@ export function ChatPage(props: ChatPageProps) {
     getPendingUploadsForConversation,
     setPendingUploadsForConversation,
     pickReadableFiles,
+    pickReadablePhotos,
+    captureReadablePhoto,
     importReadableFilePaths,
     importReadableFiles,
     removePendingUpload,
@@ -5400,7 +5401,11 @@ export function ChatPage(props: ChatPageProps) {
   );
 
   const shouldEmbedComposerInLanding =
-    chatSurface === "conversation" && hasModels && historyRenderItems.length === 0 && !isSending;
+    !mobileExperience &&
+    chatSurface === "conversation" &&
+    hasModels &&
+    historyRenderItems.length === 0 &&
+    !isSending;
   const renderChatComposer = () => (
     <ChatComposerBar
       conversationId={currentConversationId}
@@ -5436,6 +5441,8 @@ export function ChatPage(props: ChatPageProps) {
         setSettings((previous) => updateSystem(previous, { commandSafetyMode }))
       }
       onPickReadableFiles={pickReadableFiles}
+      onPickReadablePhotos={pickReadablePhotos}
+      onCaptureReadablePhoto={captureReadablePhoto}
       onPasteFiles={importReadableFiles}
       loadHistoryPrompts={loadComposerHistoryPrompts}
       pendingUploadedFiles={pendingUploadedFiles}
@@ -5659,6 +5666,7 @@ export function ChatPage(props: ChatPageProps) {
           initialSkills={availableSkills}
           initialSkillsRootDir={skillsRootDir}
           isAgentMode={isAgentMode}
+          onClose={() => setWorkspaceToolsOpen(false)}
         />
       ) : null}
 
@@ -5905,6 +5913,7 @@ export function ChatPage(props: ChatPageProps) {
                         onOpenSettings={onOpenSettings}
                         onSuggestionSelect={handleEmptyStateSuggestion}
                         suggestionsDisabled={isSuggestionTyping}
+                        mobileExperience={mobileExperience}
                         emptyStateComposer={
                           shouldEmbedComposerInLanding ? renderChatComposer() : undefined
                         }

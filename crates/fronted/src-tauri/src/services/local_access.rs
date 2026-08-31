@@ -34,6 +34,7 @@ const MAX_RPC_BODY_BYTES: usize = 16 * 1024 * 1024;
 const RPC_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const SESSION_COOKIE: &str = "xgent_session";
 const CSRF_HEADER: &str = "x-xgent-csrf";
+const PROXY_TOKEN_HEADER: &str = "x-xgent-proxy-token";
 const PROVIDER_CONFIG_ID_HEADER: &str = "x-xgent-provider-config-id";
 const LOCAL_ACCESS_STATUS_EVENT: &str = "local-access:status";
 const LOCAL_ACCESS_RPC_REQUEST_EVENT: &str = "local-access:rpc-request";
@@ -388,6 +389,10 @@ impl LocalAccessController {
             .route(
                 "/api/local-access/proxy/{provider}/{*rest}",
                 axum::routing::any(local_provider_proxy),
+            )
+            .route(
+                "/api/local-access/image-proxy",
+                axum::routing::any(local_image_proxy),
             )
             .route("/api/local-access/events", get(event_stream))
             .route("/api/local-access/subscriptions", post(subscribe_event))
@@ -766,6 +771,7 @@ async fn local_provider_proxy(
                 | "content-length"
                 | "connection"
                 | CSRF_HEADER
+                | PROXY_TOKEN_HEADER
                 | PROVIDER_CONFIG_ID_HEADER
         ) {
             continue;
@@ -773,7 +779,10 @@ async fn local_provider_proxy(
         let value = replace_secret_sentinel(name.as_str(), value, provider_secrets.as_ref());
         request = request.header(name, value);
     }
-    request = request.header("x-xgent-proxy-token", &controller.proxy_info.token);
+    // The browser-side route intentionally uses a non-secret placeholder.
+    // Never append it alongside the real loopback token: reqwest preserves
+    // duplicate header values and the loopback proxy validates the first one.
+    request = request.header(PROXY_TOKEN_HEADER, &controller.proxy_info.token);
     if !body.is_empty() {
         request = request.body(body);
     }
@@ -783,6 +792,65 @@ async fn local_provider_proxy(
             return error_response(
                 StatusCode::BAD_GATEWAY,
                 format!("local provider proxy failed: {error}"),
+            )
+        }
+    };
+    let status = upstream.status();
+    let response_headers = upstream.headers().clone();
+    let mut response = Response::new(Body::from_stream(upstream.bytes_stream()));
+    *response.status_mut() = status;
+    for (name, value) in &response_headers {
+        if !matches!(
+            name.as_str(),
+            "content-length" | "connection" | "transfer-encoding"
+        ) {
+            response.headers_mut().append(name, value.clone());
+        }
+    }
+    response
+}
+
+async fn local_image_proxy(
+    State(controller): State<Arc<LocalAccessController>>,
+    method: Method,
+    headers: HeaderMap,
+    OriginalUri(original_uri): OriginalUri,
+) -> Response {
+    if let Err(error) = controller.validate_request_origin(&headers) {
+        return error_response(StatusCode::FORBIDDEN, error);
+    }
+    if let Err(error) = controller.authenticate(&headers, false) {
+        return error_response(StatusCode::UNAUTHORIZED, error);
+    }
+    if method != Method::GET && method != Method::HEAD {
+        return error_response(
+            StatusCode::METHOD_NOT_ALLOWED,
+            "image proxy only supports GET".to_string(),
+        );
+    }
+    let suffix = original_uri
+        .path_and_query()
+        .map(|value| value.as_str())
+        .unwrap_or("/")
+        .strip_prefix("/api/local-access")
+        .unwrap_or("/");
+    let target = format!(
+        "{}{}",
+        controller.proxy_info.base_url.trim_end_matches('/'),
+        suffix
+    );
+    let upstream = match controller
+        .proxy_client
+        .request(method, target)
+        .header(PROXY_TOKEN_HEADER, &controller.proxy_info.token)
+        .send()
+        .await
+    {
+        Ok(response) => response,
+        Err(error) => {
+            return error_response(
+                StatusCode::BAD_GATEWAY,
+                format!("local image proxy failed: {error}"),
             )
         }
     };

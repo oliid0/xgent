@@ -30,10 +30,15 @@ import {
   type MentionComposerSkill,
 } from "../../../components/chat/MentionComposer";
 import {
+  AtSign,
+  Blend,
+  Camera,
+  Check,
   ChevronUp,
   Clock3,
   Globe,
   GlobeOff,
+  ImageIcon,
   Lightbulb,
   LightbulbOff,
   Loader2,
@@ -323,6 +328,8 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   onChatRuntimeControlsChange: (patch: Partial<ChatRuntimeControls>) => void;
   onCommandSafetyModeChange: (mode: CommandSafetyMode) => void;
   onPickReadableFiles: () => void;
+  onPickReadablePhotos: () => void;
+  onCaptureReadablePhoto: () => void;
   onPasteFiles: (files: File[]) => void;
   /** Prompts previously sent in this conversation for ↑/↓ recall. */
   loadHistoryPrompts?: () => readonly string[];
@@ -370,6 +377,8 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     onChatRuntimeControlsChange,
     onCommandSafetyModeChange,
     onPickReadableFiles,
+    onPickReadablePhotos,
+    onCaptureReadablePhoto,
     onPasteFiles,
     loadHistoryPrompts,
     pendingUploadedFiles,
@@ -548,6 +557,199 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   }, [isComposerExpanded]);
 
   useEffect(() => () => expandAnimationRef.current?.cancel(), []);
+
+  const addMenuContent = (
+    <VStack gap={3} padding={2} width="100%">
+      <List density="compact" hasDividers>
+        <ListItem
+          label={t("chat.upload.filesAndPhotos")}
+          description={uploadDisabled ? uploadTooltip : t("chat.upload.selectFiles")}
+          startContent={<Paperclip />}
+          isDisabled={uploadDisabled}
+          onClick={() => {
+            setIsAddMenuOpen(false);
+            onPickReadableFiles();
+          }}
+        />
+      </List>
+      <VStack gap={2} width="100%">
+        <Switch
+          label={
+            chatRuntimeControls.planModeEnabled ? t("chat.planMode.on") : t("chat.planMode.off")
+          }
+          value={chatRuntimeControls.planModeEnabled}
+          onChange={(value) => onChatRuntimeControlsChange({ planModeEnabled: value })}
+          labelIcon={Sparkle}
+          labelPosition="start"
+          labelSpacing="spread"
+          size="sm"
+          width="100%"
+          isDisabled={controlsDisabled || !isAgentMode}
+        />
+        <Switch
+          label={webSearchTooltip}
+          value={chatRuntimeControls.nativeWebSearchEnabled}
+          onChange={(value) =>
+            onChatRuntimeControlsChange({ nativeWebSearchEnabled: value })
+          }
+          labelIcon={chatRuntimeControls.nativeWebSearchEnabled ? Globe : GlobeOff}
+          labelPosition="start"
+          labelSpacing="spread"
+          size="sm"
+          width="100%"
+          isDisabled={controlsDisabled}
+        />
+        <Switch
+          label={
+            !thinkingSupported
+              ? t("chat.runtime.thinkingUnavailable")
+              : chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn
+                ? t("chat.runtime.thinkingOn")
+                : t("chat.runtime.thinkingOff")
+          }
+          value={
+            thinkingSupported && (chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn)
+          }
+          onChange={(value) => onChatRuntimeControlsChange({ thinkingEnabled: value })}
+          labelIcon={
+            chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn ? Lightbulb : LightbulbOff
+          }
+          labelPosition="start"
+          labelSpacing="spread"
+          size="sm"
+          width="100%"
+          isDisabled={controlsDisabled || !thinkingSupported || thinkingAlwaysOn}
+          disabledMessage={!thinkingSupported ? t("chat.runtime.thinkingUnavailable") : undefined}
+        />
+        {voiceInputAvailable ? (
+          <List density="compact">
+            <ListItem
+              label={
+                voiceInputActive
+                  ? t("chat.composer.voiceListening")
+                  : t("chat.composer.voiceInput")
+              }
+              description={voiceInputError ?? voiceInputPartial ?? undefined}
+              startContent={voiceInputActive ? <Loader2 /> : <Mic />}
+              isDisabled={isInputDisabled || (isNativeMobileRuntime() && voiceInputActive)}
+              onClick={() => void startVoiceInput()}
+            />
+          </List>
+        ) : null}
+      </VStack>
+      {isAgentMode ? (
+        <ComposerGitRepositoryControl
+          workdir={workdir}
+          gitClient={gitClient}
+          workspaceActivityClient={workspaceActivityClient}
+          isOpen={isAddMenuOpen}
+          isDisabled={controlsDisabled}
+          canWrite={gitWriteEnabled}
+          disabledMessage={gitDisabledMessage}
+        />
+      ) : null}
+    </VStack>
+  );
+
+  const mobileAddMenuContent = (
+    <VStack
+      gap={1}
+      padding={1}
+      width="100%"
+      isScrollable
+      style={{ maxHeight: "min(31rem, calc(100dvh - 10rem))" }}
+    >
+      <List
+        density="compact"
+        style={{
+          border: "none",
+          borderRadius: 0,
+          background: "transparent",
+          boxShadow: "none",
+        }}
+      >
+        <ListItem
+          label={t("chat.upload.camera")}
+          startContent={<Camera />}
+          isDisabled={uploadDisabled}
+          onClick={() => {
+            setIsAddMenuOpen(false);
+            onCaptureReadablePhoto();
+          }}
+        />
+        <ListItem
+          label={t("chat.upload.photos")}
+          startContent={<ImageIcon />}
+          isDisabled={uploadDisabled}
+          onClick={() => {
+            setIsAddMenuOpen(false);
+            onPickReadablePhotos();
+          }}
+        />
+        <ListItem
+          label={t("chat.upload.files")}
+          startContent={<Paperclip />}
+          isDisabled={uploadDisabled}
+          onClick={() => {
+            setIsAddMenuOpen(false);
+            onPickReadableFiles();
+          }}
+        />
+        <ListItem
+          label={t("chat.composer.plugins")}
+          startContent={<Blend />}
+          isDisabled={controlsDisabled || enabledSkills.length === 0}
+          onClick={() => {
+            setIsAddMenuOpen(false);
+            composerRef.current?.insertText("/");
+            composerRef.current?.focus();
+          }}
+        />
+        <ListItem
+          label={t("chat.runtime.thinkHarder")}
+          startContent={<Lightbulb />}
+          endContent={
+            chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn ? <Check /> : undefined
+          }
+          isSelected={chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn}
+          isDisabled={controlsDisabled || !thinkingSupported || thinkingAlwaysOn}
+          onClick={() =>
+            onChatRuntimeControlsChange({
+              thinkingEnabled: !chatRuntimeControls.thinkingEnabled,
+            })
+          }
+        />
+        <ListItem
+          label={webSearchTooltip}
+          startContent={
+            chatRuntimeControls.nativeWebSearchEnabled ? <Globe /> : <GlobeOff />
+          }
+          endContent={chatRuntimeControls.nativeWebSearchEnabled ? <Check /> : undefined}
+          isSelected={chatRuntimeControls.nativeWebSearchEnabled}
+          isDisabled={controlsDisabled}
+          onClick={() =>
+            onChatRuntimeControlsChange({
+              nativeWebSearchEnabled: !chatRuntimeControls.nativeWebSearchEnabled,
+            })
+          }
+        />
+        <ListItem
+          label={
+            chatRuntimeControls.planModeEnabled ? t("chat.planMode.on") : t("chat.planMode.off")
+          }
+          startContent={<Sparkle />}
+          endContent={chatRuntimeControls.planModeEnabled ? <Check /> : undefined}
+          isSelected={chatRuntimeControls.planModeEnabled}
+          isDisabled={controlsDisabled || !isAgentMode}
+          onClick={() =>
+            onChatRuntimeControlsChange({
+              planModeEnabled: !chatRuntimeControls.planModeEnabled,
+            })
+          }
+        />
+      </List>
+    </VStack>
+  );
 
   const toggleComposerExpanded = useCallback(() => {
     setComposerExpanded(!isComposerExpandedRef.current);
@@ -847,6 +1049,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 workdir={workdir}
                 enabledSkills={enabledSkills}
                 preferNativeContextMenu={mobileExperience}
+                compact={mobileExperience}
                 className={
                   isComposerExpanded
                     ? "xgent-chat-mention-composer xgent-chat-mention-composer-expanded"
@@ -857,130 +1060,78 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           }
           footerActions={
             <HStack gap={1} vAlign="center" wrap="wrap">
-              <Popover
-                placement="above"
-                alignment="start"
-                width="var(--xgent-composer-add-menu-width)"
-                label={addMenuTooltip}
-                isOpen={isAddMenuOpen}
-                onOpenChange={setIsAddMenuOpen}
-                isEnabled={!controlsDisabled}
-                content={
-                  <VStack gap={3} padding={2} width="100%">
-                    <List density="compact" hasDividers>
-                      <ListItem
-                        label={t("chat.upload.filesAndPhotos")}
-                        description={uploadDisabled ? uploadTooltip : t("chat.upload.selectFiles")}
-                        startContent={<Paperclip />}
-                        isDisabled={uploadDisabled}
-                        onClick={() => {
-                          setIsAddMenuOpen(false);
-                          onPickReadableFiles();
-                        }}
-                      />
-                    </List>
-                    <VStack gap={2} width="100%">
-                      <Switch
-                        label={
-                          chatRuntimeControls.planModeEnabled
-                            ? t("chat.planMode.on")
-                            : t("chat.planMode.off")
-                        }
-                        value={chatRuntimeControls.planModeEnabled}
-                        onChange={(value) =>
-                          onChatRuntimeControlsChange({ planModeEnabled: value })
-                        }
-                        labelIcon={Sparkle}
-                        labelPosition="start"
-                        labelSpacing="spread"
-                        size="sm"
-                        width="100%"
-                        isDisabled={controlsDisabled || !isAgentMode}
-                      />
-                      <Switch
-                        label={webSearchTooltip}
-                        value={chatRuntimeControls.nativeWebSearchEnabled}
-                        onChange={(value) =>
-                          onChatRuntimeControlsChange({ nativeWebSearchEnabled: value })
-                        }
-                        labelIcon={chatRuntimeControls.nativeWebSearchEnabled ? Globe : GlobeOff}
-                        labelPosition="start"
-                        labelSpacing="spread"
-                        size="sm"
-                        width="100%"
-                        isDisabled={controlsDisabled}
-                      />
-                      <Switch
-                        label={
-                          !thinkingSupported
-                            ? t("chat.runtime.thinkingUnavailable")
-                            : chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn
-                              ? t("chat.runtime.thinkingOn")
-                              : t("chat.runtime.thinkingOff")
-                        }
-                        value={
-                          thinkingSupported &&
-                          (chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn)
-                        }
-                        onChange={(value) =>
-                          onChatRuntimeControlsChange({ thinkingEnabled: value })
-                        }
-                        labelIcon={
-                          chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn
-                            ? Lightbulb
-                            : LightbulbOff
-                        }
-                        labelPosition="start"
-                        labelSpacing="spread"
-                        size="sm"
-                        width="100%"
-                        isDisabled={controlsDisabled || !thinkingSupported || thinkingAlwaysOn}
-                        disabledMessage={
-                          !thinkingSupported ? t("chat.runtime.thinkingUnavailable") : undefined
-                        }
-                      />
-                      {voiceInputAvailable ? (
-                        <List density="compact">
-                          <ListItem
-                            label={
-                              voiceInputActive
-                                ? t("chat.composer.voiceListening")
-                                : t("chat.composer.voiceInput")
-                            }
-                            description={voiceInputError ?? voiceInputPartial ?? undefined}
-                            startContent={voiceInputActive ? <Loader2 /> : <Mic />}
-                            isDisabled={
-                              isInputDisabled || (isNativeMobileRuntime() && voiceInputActive)
-                            }
-                            onClick={() => void startVoiceInput()}
-                          />
-                        </List>
-                      ) : null}
-                    </VStack>
-                    {isAgentMode ? (
-                      <ComposerGitRepositoryControl
-                        workdir={workdir}
-                        gitClient={gitClient}
-                        workspaceActivityClient={workspaceActivityClient}
-                        isOpen={isAddMenuOpen}
-                        isDisabled={controlsDisabled}
-                        canWrite={gitWriteEnabled}
-                        disabledMessage={gitDisabledMessage}
-                      />
-                    ) : null}
-                  </VStack>
-                }
-              >
-                <IconButton
+              {mobileExperience ? (
+                <>
+                  <Popover
+                    placement="above"
+                    alignment="start"
+                    width="min(21rem, calc(100dvw - var(--spacing-6)))"
+                    label={addMenuTooltip}
+                    isOpen={isAddMenuOpen}
+                    onOpenChange={setIsAddMenuOpen}
+                    isEnabled={!controlsDisabled}
+                    content={mobileAddMenuContent}
+                  >
+                    <IconButton
+                      label={addMenuTooltip}
+                      tooltip={addMenuTooltip}
+                      variant="ghost"
+                      size="sm"
+                      icon={<Plus />}
+                      isLoading={isUploadingFiles}
+                      isDisabled={controlsDisabled}
+                    />
+                  </Popover>
+                  <IconButton
+                    label={t("chat.composer.addMention")}
+                    tooltip={t("chat.composer.addMentionDesc")}
+                    variant="ghost"
+                    size="sm"
+                    icon={<AtSign />}
+                    isDisabled={controlsDisabled}
+                    onClick={() => {
+                      composerRef.current?.insertText("@");
+                      composerRef.current?.focus();
+                    }}
+                  />
+                  {voiceInputAvailable ? (
+                    <IconButton
+                      label={
+                        voiceInputActive
+                          ? t("chat.composer.voiceListening")
+                          : t("chat.composer.voiceInput")
+                      }
+                      tooltip={voiceInputError ?? voiceInputPartial ?? undefined}
+                      variant="ghost"
+                      size="sm"
+                      icon={voiceInputActive ? <Loader2 /> : <Mic />}
+                      isDisabled={isInputDisabled || (isNativeMobileRuntime() && voiceInputActive)}
+                      onClick={() => void startVoiceInput()}
+                    />
+                  ) : null}
+                </>
+              ) : (
+                <Popover
+                  placement="above"
+                  alignment="start"
+                  width="var(--xgent-composer-add-menu-width)"
                   label={addMenuTooltip}
-                  tooltip={addMenuTooltip}
-                  variant="ghost"
-                  size="sm"
-                  icon={<Plus />}
-                  isLoading={isUploadingFiles}
-                  isDisabled={controlsDisabled}
-                />
-              </Popover>
+                  isOpen={isAddMenuOpen}
+                  onOpenChange={setIsAddMenuOpen}
+                  isEnabled={!controlsDisabled}
+                  content={addMenuContent}
+                >
+                  <IconButton
+                    label={addMenuTooltip}
+                    tooltip={addMenuTooltip}
+                    variant="ghost"
+                    size="sm"
+                    icon={<Plus />}
+                    isLoading={isUploadingFiles}
+                    isDisabled={controlsDisabled}
+                  />
+                </Popover>
+              )}
 
               <Selector
                 label={t("settings.commandSafety.title")}

@@ -59,7 +59,8 @@ export function MobilePanelHeader(props: {
             label={props.backLabel}
             tooltip={props.backLabel}
             icon={<ArrowLeft size={20} />}
-            variant="ghost"
+            variant="secondary"
+            size="lg"
             onClick={props.onBack}
           />
           {props.leading}

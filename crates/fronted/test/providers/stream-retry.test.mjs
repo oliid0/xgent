@@ -22,6 +22,30 @@ test("retry extension recognizes configured status codes and keywords only", () 
     true,
   );
   assert.equal(
+    isExtensionRetryableError(
+      createAssistant(undefined, "error", { errorMessage: "TypeError: Load failed" }),
+    ),
+    true,
+  );
+  assert.equal(
+    isExtensionRetryableError(
+      createAssistant(undefined, "error", { errorMessage: "Bad response from upstream" }),
+    ),
+    true,
+  );
+  assert.equal(
+    isExtensionRetryableError(
+      createAssistant(undefined, "error", { errorMessage: "connection reset by peer" }),
+    ),
+    true,
+  );
+  assert.equal(
+    isExtensionRetryableError(
+      createAssistant(undefined, "error", { errorMessage: "invalid_request_error" }),
+    ),
+    false,
+  );
+  assert.equal(
     isExtensionRetryableError(createAssistant(undefined, "error", { errorMessage: "HTTP 529" })),
     true,
   );
@@ -230,19 +254,44 @@ test("withStreamRetry never calls onRetryRecovered when no retry occurred", asyn
   assert.equal(recoveredCalls, 0);
 });
 
-test("withStreamRetry does not retry once content has been committed", async () => {
+test("withStreamRetry reconnects text-only streams and suppresses the replayed prefix", async () => {
   let calls = 0;
   const wrapped = withStreamRetry(() => {
     calls += 1;
-    return createErrorAfterContentStream("partial", "503 service unavailable");
+    if (calls === 1) return createErrorAfterContentStream("partial", "503 service unavailable");
+    return createSuccessStream("partial answer");
   });
 
   const events = await collectEvents(wrapped);
-  assert.equal(calls, 1);
+  assert.equal(calls, 2);
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ["start", "text_delta", "text_delta", "done"],
+  );
+  assert.deepEqual(
+    events.filter((event) => event.type === "text_delta").map((event) => event.delta),
+    ["partial", " answer"],
+  );
+  const final = await wrapped.result();
+  assert.equal(final.stopReason, "stop");
+  assert.equal(final.content[0].text, "partial answer");
+});
+
+test("withStreamRetry preserves the original failure when a resumed answer diverges", async () => {
+  let calls = 0;
+  const wrapped = withStreamRetry(() => {
+    calls += 1;
+    if (calls === 1) return createErrorAfterContentStream("partial", "503 service unavailable");
+    return createSuccessStream("different answer");
+  });
+
+  const events = await collectEvents(wrapped);
+  assert.equal(calls, 2);
   assert.deepEqual(
     events.map((event) => event.type),
     ["start", "text_delta", "error"],
   );
+  assert.equal(events[2].error.errorMessage, "503 service unavailable");
   const final = await wrapped.result();
   assert.equal(final.stopReason, "error");
 });

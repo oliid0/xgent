@@ -19,13 +19,24 @@ export type RetryErrorExtension = {
 
 const DEFAULT_RETRY_ERROR_EXTENSION: RetryErrorExtension = {
   statusCodes: [...RETRYABLE_PRESET_HTTP_STATUS_CODES],
-  // Tauri/WebKit can collapse a transient non-2xx fetch into this opaque
-  // transport code, leaving no numeric status for the normal classifier.
-  patterns: ["bad_response_status_code"],
+  patterns: [],
 };
 
 const REQUIRED_RETRY_STATUS_CODES = [529];
-const REQUIRED_RETRY_PATTERNS = ["bad_response_status_code"];
+// Native WebViews and provider adapters use different wording for the same
+// transient transport failures. Keep this list narrow: authentication,
+// billing, invalid-request, and model errors must still fail immediately.
+const REQUIRED_RETRY_PATTERNS = [
+  "bad_response_status_code",
+  "bad response status code",
+  "bad response",
+  "load failed",
+  "failed to fetch",
+  "network connection was lost",
+  "networkerror",
+  "connection reset",
+  "socket hang up",
+];
 
 let currentRetryErrorExtension: RetryErrorExtension = DEFAULT_RETRY_ERROR_EXTENSION;
 
@@ -97,6 +108,17 @@ function isTerminalEvent(event: AssistantMessageEvent): event is TerminalEvent {
 
 function terminalMessage(event: TerminalEvent) {
   return event.type === "done" ? event.message : event.error;
+}
+
+function isRetryableTerminal(
+  terminal: TerminalEvent | undefined,
+  extension: RetryErrorExtension | undefined,
+): terminal is Extract<TerminalEvent, { type: "error" }> {
+  if (terminal?.type !== "error") return false;
+  return (
+    isRetryableAssistantError(terminalMessage(terminal)) ||
+    isExtensionRetryableError(terminalMessage(terminal), extension)
+  );
 }
 
 /** Codex-style backoff: base * factor^(attempt-1) * uniform(0.9, 1.1), uncapped. */
@@ -173,13 +195,70 @@ export function withStreamRetry(
     let attempt = 1;
     let source = firstSource;
     let hasRetried = false;
+    let replayTarget: { contentIndex: number; text: string } | undefined;
+    let visibleFailure: Extract<TerminalEvent, { type: "error" }> | undefined;
 
     while (true) {
       let committed = false;
+      let retrySafe = true;
+      let committedText = replayTarget?.text ?? "";
+      let committedTextIndex = replayTarget?.contentIndex;
+      let replayCursor = 0;
+      let replaying = replayTarget !== undefined;
+      let replayDiverged = false;
       const buffered: AssistantMessageEvent[] = [];
       let terminal: TerminalEvent | undefined;
 
       for await (const event of source) {
+        if (replaying && replayTarget) {
+          if (event.type === "text_delta") {
+            if (event.contentIndex !== replayTarget.contentIndex) {
+              replayDiverged = true;
+              break;
+            }
+            const remaining = replayTarget.text.slice(replayCursor);
+            const replayLength = Math.min(remaining.length, event.delta.length);
+            if (event.delta.slice(0, replayLength) !== remaining.slice(0, replayLength)) {
+              replayDiverged = true;
+              break;
+            }
+            replayCursor += replayLength;
+            if (replayCursor < replayTarget.text.length) continue;
+
+            replaying = false;
+            committed = true;
+            hasRetried = false;
+            options?.onRetryRecovered?.();
+            const suffix = event.delta.slice(replayLength);
+            if (suffix) {
+              committedText += suffix;
+              output.push({ ...event, delta: suffix });
+            }
+            continue;
+          }
+
+          if (isTerminalEvent(event)) {
+            terminal = event;
+            if (event.type === "done") replayDiverged = true;
+            break;
+          }
+          if (
+            event.type === "thinking_start" ||
+            event.type === "thinking_delta" ||
+            event.type === "thinking_end" ||
+            event.type === "toolcall_start" ||
+            event.type === "toolcall_delta" ||
+            event.type === "toolcall_end" ||
+            event.type === "text_end"
+          ) {
+            replayDiverged = true;
+            break;
+          }
+          // The replacement stream's start/text_start describes content that
+          // is already visible, so it is intentionally suppressed.
+          continue;
+        }
+
         if (!committed && COMMITTING_EVENT_TYPES.has(event.type)) {
           committed = true;
           for (const bufferedEvent of buffered.splice(0)) output.push(bufferedEvent);
@@ -188,19 +267,52 @@ export function withStreamRetry(
             options?.onRetryRecovered?.();
           }
         }
-        if (committed) {
+        if (event.type === "text_delta") {
+          if (committedTextIndex === undefined) {
+            committedTextIndex = event.contentIndex;
+          } else if (committedTextIndex !== event.contentIndex) {
+            retrySafe = false;
+          }
+          committedText += event.delta;
+        } else if (
+          event.type === "thinking_start" ||
+          event.type === "thinking_delta" ||
+          event.type === "thinking_end" ||
+          event.type === "toolcall_start" ||
+          event.type === "toolcall_delta" ||
+          event.type === "toolcall_end"
+        ) {
+          retrySafe = false;
+        }
+        if (isTerminalEvent(event)) terminal = event;
+        if (committed && !isTerminalEvent(event)) {
           output.push(event);
         } else {
           buffered.push(event);
         }
-        if (isTerminalEvent(event)) terminal = event;
       }
 
-      if (terminal?.type === "error" && !committed && !disabled && attempt < maxAttempts) {
-        if (
-          isRetryableAssistantError(terminalMessage(terminal)) ||
-          isExtensionRetryableError(terminalMessage(terminal), options?.retryExtension)
-        ) {
+      if (replayDiverged && visibleFailure) {
+        output.push(visibleFailure);
+        output.end(terminalMessage(visibleFailure));
+        return;
+      }
+
+      const mayReplayVisibleText =
+        (committed || replaying) &&
+        retrySafe &&
+        committedText.length > 0 &&
+        committedTextIndex !== undefined;
+      if (
+        isRetryableTerminal(terminal, options?.retryExtension) &&
+        (!committed || mayReplayVisibleText) &&
+        !disabled &&
+        attempt < maxAttempts
+      ) {
+          if (mayReplayVisibleText) {
+            replayTarget = { contentIndex: committedTextIndex, text: committedText };
+            visibleFailure = terminal;
+          }
           const errorMessage = terminalMessage(terminal)?.errorMessage || "Unknown error";
           attempt += 1;
           const plannedDelayMs = Math.round(computeStreamRetryBackoffMs(attempt - 1));
@@ -228,11 +340,17 @@ export function withStreamRetry(
             // real failure below instead of hanging the consumer on a retry
             // that will never happen.
           }
-        }
       }
 
+      if (replaying && visibleFailure) {
+        output.push(visibleFailure);
+        output.end(terminalMessage(visibleFailure));
+        return;
+      }
       if (!committed) {
         for (const bufferedEvent of buffered) output.push(bufferedEvent);
+      } else if (terminal) {
+        output.push(terminal);
       }
       // Some streams (notably minimal test doubles) never yield a terminal
       // done/error event through iteration and only expose the final message

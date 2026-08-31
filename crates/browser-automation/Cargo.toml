@@ -8,6 +8,7 @@ license = "MIT"
 links = "tauri-plugin-browser-automation"
 
 [dependencies]
+base64 = "0.22"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tauri = "2.11.5"
@@ -16,6 +17,16 @@ url = "2.5"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri = { version = "2.11.5", features = ["unstable"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+webview2-com = "0.38"
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Com_StructuredStorage"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.5"
+objc2-app-kit = { version = "0.2", features = ["NSImage", "NSImageRep", "NSBitmapImageRep"] }
+objc2-foundation = { version = "0.2", features = ["NSData", "NSError", "NSString", "NSDictionary"] }
+objc2-web-kit = { version = "0.2", features = ["WKWebView", "WKSnapshotConfiguration", "block2", "objc2-app-kit"] }
 
 [build-dependencies]
 tauri-plugin = "2.5.4"

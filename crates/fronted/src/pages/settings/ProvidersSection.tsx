@@ -1030,7 +1030,6 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                         authMode === "oauth-token" ? t("settings.providerOAuthToken") : "API Key"
                       }
                       value={apiKey}
-                      isDisabled={isBrowser}
                       onChange={setApiKey}
                       onFocus={(event) => {
                         if (apiKeyIsRedactedDisplay && event.target instanceof HTMLInputElement) {
@@ -1078,7 +1077,6 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                       isLabelHidden
                       id="modal-oauth-account-id"
                       value={manualOAuthAccountId}
-                      isDisabled={isBrowser}
                       onChange={(nextValue) => setManualOAuthAccountId(nextValue)}
                       placeholder={t("settings.providerOAuthAccountIdPlaceholder")}
                     />

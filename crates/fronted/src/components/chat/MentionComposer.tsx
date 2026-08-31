@@ -198,6 +198,7 @@ export interface MentionComposerProps {
   enabledSkills?: MentionComposerSkill[];
   className?: string;
   preferNativeContextMenu?: boolean;
+  compact?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1782,7 +1783,15 @@ function Popup({
                 {error}
               </AstryxText>
             )}
-            <List density="compact">
+            <List
+              density="compact"
+              style={{
+                border: "none",
+                borderRadius: 0,
+                background: "transparent",
+                boxShadow: "none",
+              }}
+            >
               {suggestions.map((suggestion, i) => {
                 const isSkill = suggestion.type === "skill";
                 const entry = suggestion.type === "file" ? suggestion.entry : null;
@@ -2034,6 +2043,7 @@ export const MentionComposer = memo(
       enabledSkills = [],
       className,
       preferNativeContextMenu = false,
+      compact = false,
     }: MentionComposerProps,
     ref,
   ) {
@@ -3523,7 +3533,8 @@ export const MentionComposer = memo(
             onCompositionEnd={handleCompositionEnd}
             onBlur={handleBlur}
             className={cn(
-              "mention-composer min-h-[70px] max-h-[160px] w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] outline-hidden",
+              "mention-composer max-h-[160px] w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] outline-hidden",
+              compact ? "min-h-11" : "min-h-[70px]",
               "text-sm",
               isDomEmpty && "is-empty",
               disabled && "cursor-not-allowed opacity-60",

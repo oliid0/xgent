@@ -1,9 +1,10 @@
 use std::{
     collections::HashMap,
-    sync::{mpsc, Mutex},
+    sync::{mpsc, Arc, Mutex},
     time::Duration,
 };
 
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use tauri::{
@@ -53,7 +54,7 @@ impl<R: Runtime> BrowserAutomation<R> {
                 visible_sessions: true,
                 dom_automation: true,
                 javascript: true,
-                screenshots: false,
+                screenshots: cfg!(any(target_os = "windows", target_os = "macos")),
                 downloads: false,
                 multiple_sessions: true,
             },
@@ -179,6 +180,7 @@ impl<R: Runtime> BrowserAutomation<R> {
             .ok_or_else(|| Error::Message("browser session WebView is missing".to_string()))?;
         let action = request.action.trim().to_lowercase();
 
+        let mut screenshot_base64 = None;
         let data = match action.as_str() {
             "navigate" => {
                 let target = request
@@ -210,9 +212,15 @@ impl<R: Runtime> BrowserAutomation<R> {
                 json!({ "requested": "forward" })
             }
             "screenshot" => {
-                return Err(Error::Message(
-                    "desktop browser screenshots are not available in this build".to_string(),
-                ));
+                let bytes = capture_desktop_webview(
+                    &webview,
+                    Duration::from_millis(request.timeout_ms.clamp(1_000, 30_000)),
+                )?;
+                screenshot_base64 = Some(BASE64_STANDARD.encode(&bytes));
+                json!({
+                    "mimeType": "image/png",
+                    "encodedBytes": bytes.len(),
+                })
             }
             _ => evaluate_dom_action(
                 &webview,
@@ -235,7 +243,7 @@ impl<R: Runtime> BrowserAutomation<R> {
             url,
             title,
             data,
-            screenshot_base64: None,
+            screenshot_base64,
         })
     }
 
@@ -292,6 +300,177 @@ impl<R: Runtime> BrowserAutomation<R> {
                 .map_err(|error| Error::Message(format!("failed to hide browser: {error}")))
         }
     }
+}
+
+#[cfg(target_os = "windows")]
+fn capture_desktop_webview<R: Runtime>(
+    webview: &tauri::Webview<R>,
+    timeout: Duration,
+) -> crate::Result<Vec<u8>> {
+    use webview2_com::{
+        CapturePreviewCompletedHandler,
+        Microsoft::Web::WebView2::Win32::COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG,
+    };
+    use windows::Win32::{
+        Foundation::HGLOBAL,
+        System::Com::{StructuredStorage::CreateStreamOnHGlobal, IStream},
+    };
+
+    let (sender, receiver) = mpsc::sync_channel(1);
+    let pending_sender = Arc::new(Mutex::new(Some(sender)));
+    let closure_sender = Arc::clone(&pending_sender);
+    webview
+        .with_webview(move |platform_webview| unsafe {
+            let result = (|| -> Result<(), String> {
+                let core_webview = platform_webview
+                    .controller()
+                    .CoreWebView2()
+                    .map_err(|error| format!("failed to access CoreWebView2: {error}"))?;
+                let stream: IStream = CreateStreamOnHGlobal(HGLOBAL::default(), true)
+                    .map_err(|error| format!("failed to allocate screenshot stream: {error}"))?;
+                let callback_stream = stream.clone();
+                let callback_sender = Arc::clone(&closure_sender);
+                let handler = CapturePreviewCompletedHandler::create(Box::new(move |result| {
+                    let result = result
+                        .map_err(|error| format!("CapturePreview failed: {error}"))
+                        .and_then(|_| read_windows_stream(&callback_stream));
+                    if let Ok(mut slot) = callback_sender.lock() {
+                        if let Some(sender) = slot.take() {
+                            let _ = sender.send(result);
+                        }
+                    }
+                    Ok(())
+                }));
+                core_webview
+                    .CapturePreview(
+                        COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG,
+                        &stream,
+                        &handler,
+                    )
+                    .map_err(|error| format!("failed to start CapturePreview: {error}"))?;
+                Ok(())
+            })();
+            if let Err(error) = result {
+                if let Ok(mut slot) = closure_sender.lock() {
+                    if let Some(sender) = slot.take() {
+                        let _ = sender.send(Err(error));
+                    }
+                }
+            }
+        })
+        .map_err(|error| Error::Message(format!("failed to access browser WebView: {error}")))?;
+
+    receiver
+        .recv_timeout(timeout)
+        .map_err(|_| Error::Message("browser screenshot timed out".to_string()))?
+        .map_err(|error| Error::Message(format!("browser screenshot failed: {error}")))
+}
+
+#[cfg(target_os = "windows")]
+unsafe fn read_windows_stream(
+    stream: &windows::Win32::System::Com::IStream,
+) -> Result<Vec<u8>, String> {
+    use windows::Win32::System::Com::{STREAM_SEEK_END, STREAM_SEEK_SET};
+
+    stream
+        .Seek(0, STREAM_SEEK_SET, None)
+        .map_err(|error| format!("failed to seek screenshot stream: {error}"))?;
+    let mut end_position = 0_u64;
+    stream
+        .Seek(0, STREAM_SEEK_END, Some(&mut end_position))
+        .map_err(|error| format!("failed to measure screenshot stream: {error}"))?;
+    stream
+        .Seek(0, STREAM_SEEK_SET, None)
+        .map_err(|error| format!("failed to rewind screenshot stream: {error}"))?;
+    let mut bytes = vec![0_u8; end_position as usize];
+    let mut bytes_read = 0_u32;
+    stream
+        .Read(
+            bytes.as_mut_ptr().cast(),
+            bytes.len() as u32,
+            Some(&mut bytes_read),
+        )
+        .ok()
+        .map_err(|error| format!("failed to read screenshot stream: {error}"))?;
+    bytes.truncate(bytes_read as usize);
+    if bytes.is_empty() {
+        Err("CapturePreview returned an empty image".to_string())
+    } else {
+        Ok(bytes)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn capture_desktop_webview<R: Runtime>(
+    webview: &tauri::Webview<R>,
+    timeout: Duration,
+) -> crate::Result<Vec<u8>> {
+    use block2::RcBlock;
+    use objc2_app_kit::NSImage;
+    use objc2_foundation::NSError;
+    use objc2_web_kit::{WKSnapshotConfiguration, WKWebView};
+
+    let (sender, receiver) = mpsc::sync_channel(1);
+    let pending_sender = Arc::new(Mutex::new(Some(sender)));
+    webview
+        .with_webview({
+            let pending_sender = Arc::clone(&pending_sender);
+            move |platform_webview| unsafe {
+                let wk_webview: &WKWebView = &*platform_webview.inner().cast();
+                let configuration = WKSnapshotConfiguration::new();
+                let callback_sender = Arc::clone(&pending_sender);
+                let handler = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {
+                    let result = if !error.is_null() {
+                        Err((&*error).localizedDescription().to_string())
+                    } else if !image.is_null() {
+                        ns_image_to_png(&*image)
+                    } else {
+                        Err("WKWebView returned no screenshot image".to_string())
+                    };
+                    if let Ok(mut slot) = callback_sender.lock() {
+                        if let Some(sender) = slot.take() {
+                            let _ = sender.send(result);
+                        }
+                    }
+                });
+                wk_webview.takeSnapshotWithConfiguration_completionHandler(
+                    Some(&configuration),
+                    &handler,
+                );
+            }
+        })
+        .map_err(|error| Error::Message(format!("failed to access browser WebView: {error}")))?;
+
+    receiver
+        .recv_timeout(timeout)
+        .map_err(|_| Error::Message("browser screenshot timed out".to_string()))?
+        .map_err(|error| Error::Message(format!("browser screenshot failed: {error}")))
+}
+
+#[cfg(target_os = "macos")]
+unsafe fn ns_image_to_png(image: &objc2_app_kit::NSImage) -> Result<Vec<u8>, String> {
+    use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep};
+    use objc2_foundation::NSDictionary;
+
+    let tiff = image
+        .TIFFRepresentation()
+        .ok_or_else(|| "failed to create TIFF screenshot representation".to_string())?;
+    let bitmap = NSBitmapImageRep::imageRepWithData(&tiff)
+        .ok_or_else(|| "failed to create bitmap screenshot representation".to_string())?;
+    let png = bitmap
+        .representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new())
+        .ok_or_else(|| "failed to encode browser screenshot as PNG".to_string())?;
+    Ok(std::slice::from_raw_parts(png.bytes().as_ptr(), png.len()).to_vec())
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+fn capture_desktop_webview<R: Runtime>(
+    _webview: &tauri::Webview<R>,
+    _timeout: Duration,
+) -> crate::Result<Vec<u8>> {
+    Err(Error::Message(
+        "browser screenshots are not available on this desktop platform".to_string(),
+    ))
 }
 
 fn normalized_viewport(viewport: &BrowserViewport) -> BrowserViewport {

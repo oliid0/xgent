@@ -49,6 +49,7 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
     onOpenSettings,
     onSuggestionSelect,
     suggestionsDisabled = false,
+    mobileExperience = false,
     emptyStateComposer,
   } = props;
   const { locale } = useLocale();
@@ -210,7 +211,14 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
               <Center
                 width="100%"
                 className="chat-empty-state-stage"
-                style={{ flex: 1, minHeight: 0 }}
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  justifyContent:
+                    mobileExperience && showStartChatState ? "flex-end" : undefined,
+                  paddingBlockEnd:
+                    mobileExperience && showStartChatState ? "var(--spacing-4)" : undefined,
+                }}
               >
                 {/* Keyed per conversation so the hero entrance replays when
                   switching between empty conversations, not just on mount. */}

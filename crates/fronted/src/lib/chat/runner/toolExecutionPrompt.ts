@@ -322,7 +322,8 @@ export function buildToolsSuffix(
       [
         "## Embedded Browser",
         "- browser_use operates Xgent's user-visible embedded browser on desktop, Android, and iOS. It is the same live tab the user can inspect, not a mock or a separate extension session.",
-        "- Start with open/navigate, then inspect with get_page_info, get_readable, find_elements, or get_backbone before clicking or typing. Prefer selectors returned by inspection instead of guessed coordinates.",
+        "- Start with open/navigate, then call snapshot. Prefer the returned stable element refs for click, type, press_key, hover, and scroll instead of guessing selectors or coordinates.",
+        "- type can submit the containing form; press_key handles keyboard actions. wait_for_selector is preferred for content that appears asynchronously.",
         "- Reuse session_id for follow-up actions so navigation, cookies, and page state stay in the same tab. Use list_tabs/new_tab only when the task genuinely needs another tab.",
         "- After navigation or an action that changes the page, use wait_for_dom_stable and inspect again before the next interaction. Use screenshot only when visual layout matters.",
         "- Treat authenticated pages as acting on the user's behalf. Do not submit, purchase, publish, or delete unless that external side effect is clearly within the request.",

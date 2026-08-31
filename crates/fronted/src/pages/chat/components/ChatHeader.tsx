@@ -5,7 +5,7 @@ import { HStack } from "@astryxdesign/core/Stack";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { memo, type ReactNode } from "react";
 
-import { MonitorSmartphone, Moon, PanelLeft, Sun } from "../../../components/icons";
+import { Menu, MonitorSmartphone, Moon, Sun } from "../../../components/icons";
 import { isMacOsTauri } from "../../../components/MacOsTitleBarSpacer";
 import { useLocale } from "../../../i18n";
 import {
@@ -89,8 +89,9 @@ export const ChatHeader = memo(function ChatHeader(props: {
                 <IconButton
                   label={t("tooltip.openSidebar")}
                   tooltip={t("tooltip.openSidebar")}
-                  icon={<PanelLeft size={20} />}
-                  variant="ghost"
+                  icon={<Menu size={20} />}
+                  variant="secondary"
+                  size="lg"
                   onClick={onOpenSidebar}
                 />
               ) : null}

@@ -7,11 +7,186 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>XAgent</title>
+    <title>XGent</title>
+    <style>
+      html,
+      body,
+      #root {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        overflow: hidden;
+        background: #f7f7f5;
+        color: #171716;
+        font-family: ui-sans-serif, system-ui, -apple-system, "PingFang SC", sans-serif;
+      }
+      .launch-shell {
+        box-sizing: border-box;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        width: 100%;
+        height: 100dvh;
+        padding: max(12px, env(safe-area-inset-top, 0px)) 14px
+          max(12px, env(safe-area-inset-bottom, 0px));
+        background: #f7f7f5;
+      }
+      .launch-header,
+      .launch-mode,
+      .launch-composer-controls {
+        display: flex;
+        align-items: center;
+      }
+      .launch-header {
+        justify-content: space-between;
+        min-height: 44px;
+      }
+      .launch-circle {
+        box-sizing: border-box;
+        display: grid;
+        width: 36px;
+        height: 36px;
+        place-items: center;
+        border: 1px solid #deded9;
+        border-radius: 999px;
+        background: #fff;
+      }
+      .launch-menu::before,
+      .launch-menu::after {
+        display: block;
+        width: 15px;
+        height: 1.5px;
+        border-radius: 2px;
+        background: currentColor;
+        content: "";
+      }
+      .launch-menu::after {
+        width: 11px;
+        margin-top: 4px;
+      }
+      .launch-avatar {
+        border: 0;
+        background: #252523;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 650;
+      }
+      .launch-mode {
+        gap: 3px;
+        padding: 3px;
+        border-radius: 12px;
+        background: #ecece8;
+        font-size: 13px;
+      }
+      .launch-mode span {
+        padding: 6px 13px;
+        border-radius: 9px;
+      }
+      .launch-mode span:first-child {
+        background: #fff;
+        box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+        font-weight: 600;
+      }
+      .launch-content {
+        display: grid;
+        place-content: center;
+        gap: 18px;
+        padding: 24px;
+        text-align: center;
+      }
+      .launch-wordmark {
+        font-size: clamp(28px, 8vw, 40px);
+        font-weight: 650;
+        letter-spacing: -0.04em;
+      }
+      .launch-lines {
+        display: grid;
+        gap: 9px;
+        width: min(74vw, 320px);
+      }
+      .launch-lines span {
+        height: 10px;
+        border-radius: 999px;
+        background: #e8e8e3;
+      }
+      .launch-lines span:last-child {
+        width: 68%;
+        justify-self: center;
+      }
+      .launch-composer {
+        box-sizing: border-box;
+        min-height: 92px;
+        padding: 14px;
+        border: 1px solid #deded9;
+        border-radius: 22px;
+        background: #fff;
+        box-shadow: 0 8px 24px rgb(0 0 0 / 6%);
+      }
+      .launch-placeholder {
+        color: #8a8a84;
+        font-size: 15px;
+      }
+      .launch-composer-controls {
+        justify-content: space-between;
+        margin-top: 19px;
+      }
+      .launch-control-dot {
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        background: #efefeb;
+      }
+      .launch-send {
+        background: #242422;
+      }
+      @media (prefers-color-scheme: dark) {
+        body,
+        .launch-shell {
+          background: #191918;
+          color: #f2f2ef;
+        }
+        .launch-circle,
+        .launch-mode span:first-child,
+        .launch-composer {
+          border-color: #3a3a37;
+          background: #252523;
+        }
+        .launch-mode,
+        .launch-lines span,
+        .launch-control-dot {
+          background: #30302d;
+        }
+        .launch-avatar,
+        .launch-send {
+          background: #f2f2ef;
+          color: #191918;
+        }
+      }
+    </style>
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="launch-shell" aria-hidden="true">
+        <div class="launch-header">
+          <span class="launch-circle launch-menu"></span>
+          <div class="launch-mode"><span>Chat</span><span>Work</span></div>
+          <span class="launch-circle launch-avatar">X</span>
+        </div>
+        <main class="launch-content">
+          <div class="launch-wordmark">XGent</div>
+          <div class="launch-lines"><span></span><span></span></div>
+        </main>
+        <div class="launch-composer">
+          <div class="launch-placeholder">Ask anything</div>
+          <div class="launch-composer-controls">
+            <span class="launch-control-dot"></span>
+            <span class="launch-control-dot launch-send"></span>
+          </div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

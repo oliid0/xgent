@@ -21,6 +21,10 @@ const CITATION_START = "\uE200cite";
 const CITATION_DELIMITER = "\uE202";
 const CITATION_END = "\uE201";
 
+function stripOrphanCitationControls(text: string) {
+  return text.replaceAll(CITATION_DELIMITER, "").replaceAll(CITATION_END, "");
+}
+
 type CitationMatch = { kind: "complete"; end: number } | { kind: "incomplete" } | { kind: "none" };
 
 function matchCitationAt(text: string, from: number): CitationMatch {
@@ -90,7 +94,7 @@ function sanitizeCitationText(text: string, holdIncomplete: boolean) {
 }
 
 export function stripProviderCitationMarkers(text: string) {
-  return sanitizeCitationText(text, false).visible;
+  return stripOrphanCitationControls(sanitizeCitationText(text, false).visible);
 }
 
 function createProviderCitationStreamSanitizer() {
@@ -100,7 +104,7 @@ function createProviderCitationStreamSanitizer() {
     append(text: string) {
       const result = sanitizeCitationText(pending + text, true);
       pending = result.pending;
-      return result.visible;
+      return stripOrphanCitationControls(result.visible);
     },
     finish(text: string) {
       pending = "";

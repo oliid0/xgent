@@ -44,6 +44,7 @@ export type ChatTranscriptProps = {
   onOpenSettings: (section?: SectionId) => void;
   onSuggestionSelect?: (text: string) => void;
   suggestionsDisabled?: boolean;
+  mobileExperience?: boolean;
   /** The live composer moves into the empty-state hero without duplicating its state or handlers. */
   emptyStateComposer?: ReactNode;
 };

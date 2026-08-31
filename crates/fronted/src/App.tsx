@@ -1,4 +1,5 @@
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
+import { BottomSheet } from "@astryxdesign/core/BottomSheet";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { StackItem, VStack } from "@astryxdesign/core/Stack";
@@ -636,32 +637,58 @@ export default function App() {
                   onRunningConversationCountChange={handleRunningConversationCountChange}
                 />
               </AppErrorBoundary>
-              <Dialog
-                isOpen={settingsOpen}
-                onOpenChange={(isOpen) => {
-                  if (!isOpen) closeSettings();
-                }}
-                purpose="form"
-                variant={compactSettingsDialog ? "fullscreen" : "standard"}
-                width="var(--xgent-settings-dialog-width)"
-                maxHeight={compactSettingsDialog ? "100dvh" : "var(--xgent-settings-dialog-height)"}
-                padding={0}
-                aria-label={translate("settings.title", settings.locale)}
-              >
-                <AppErrorBoundary>
-                  <SettingsPage
-                    settings={settings}
-                    setSettings={setSettings}
-                    reloadSettings={reloadPersistedSettings}
-                    saveState={settingsSaveState}
-                    onBack={closeSettings}
-                    initialSection={settingsSection}
-                    soulCreateRequestId={soulCreateRequestId}
-                    nativeMobile={nativeMobile}
-                    appUpdate={appUpdate}
-                  />
-                </AppErrorBoundary>
-              </Dialog>
+              {compactSettingsDialog ? (
+                <BottomSheet
+                  isOpen={settingsOpen}
+                  onOpenChange={(isOpen) => {
+                    if (!isOpen) closeSettings();
+                  }}
+                  label={translate("settings.title", settings.locale)}
+                  purpose="info"
+                  height="tall"
+                >
+                  <AppErrorBoundary>
+                    <SettingsPage
+                      settings={settings}
+                      setSettings={setSettings}
+                      reloadSettings={reloadPersistedSettings}
+                      saveState={settingsSaveState}
+                      onBack={closeSettings}
+                      initialSection={settingsSection}
+                      soulCreateRequestId={soulCreateRequestId}
+                      nativeMobile={nativeMobile}
+                      appUpdate={appUpdate}
+                    />
+                  </AppErrorBoundary>
+                </BottomSheet>
+              ) : (
+                <Dialog
+                  isOpen={settingsOpen}
+                  onOpenChange={(isOpen) => {
+                    if (!isOpen) closeSettings();
+                  }}
+                  purpose="info"
+                  variant="standard"
+                  width="var(--xgent-settings-dialog-width)"
+                  maxHeight="var(--xgent-settings-dialog-height)"
+                  padding={0}
+                  aria-label={translate("settings.title", settings.locale)}
+                >
+                  <AppErrorBoundary>
+                    <SettingsPage
+                      settings={settings}
+                      setSettings={setSettings}
+                      reloadSettings={reloadPersistedSettings}
+                      saveState={settingsSaveState}
+                      onBack={closeSettings}
+                      initialSection={settingsSection}
+                      soulCreateRequestId={soulCreateRequestId}
+                      nativeMobile={nativeMobile}
+                      appUpdate={appUpdate}
+                    />
+                  </AppErrorBoundary>
+                </Dialog>
+              )}
               {restartConfirmDialog}
             </SoulProvider>
           </AppChrome>

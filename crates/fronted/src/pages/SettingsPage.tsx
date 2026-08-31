@@ -285,6 +285,38 @@ export function SettingsPage(props: SettingsPageProps) {
       `${item.label} ${item.description}`.toLocaleLowerCase().includes(query),
     );
   }, [navItems, searchQuery]);
+  const mobileNavGroups = useMemo(
+    () =>
+      [
+        {
+          label: t("settings.mobile.appearanceGroup"),
+          ids: new Set<SectionId>(["system", "providers"]),
+        },
+        {
+          label: t("settings.mobile.personalGroup"),
+          ids: new Set<SectionId>(["soul", "memory", "mobileAssistant"]),
+        },
+        {
+          label: t("settings.mobile.capabilitiesGroup"),
+          ids: new Set<SectionId>([
+            "mobileExecution",
+            "toolPermissions",
+            "shortcuts",
+            "voice",
+            "other",
+            "access",
+            "backup",
+            "about",
+          ]),
+        },
+      ]
+        .map((group) => ({
+          ...group,
+          items: navItems.filter((item) => group.ids.has(item.id)),
+        }))
+        .filter((group) => group.items.length > 0),
+    [navItems, t],
+  );
 
   useEffect(() => {
     setSection(normalizeSettingsSection(initialSection));
@@ -401,23 +433,31 @@ export function SettingsPage(props: SettingsPageProps) {
                   title={mobileDetailOpen ? sectionLabels[section] : t("settings.title")}
                   hasDivider
                   startContent={
-                    <IconButton
-                      label={
-                        mobileDetailOpen
-                          ? t("settings.mobile.backToSettings")
-                          : t("settings.backToChat")
-                      }
-                      tooltip={
-                        mobileDetailOpen
-                          ? t("settings.mobile.backToSettings")
-                          : t("settings.backToChat")
-                      }
-                      icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
-                      variant="ghost"
-                      onClick={mobileDetailOpen ? () => setMobileDetailOpen(false) : onBack}
-                    />
+                    mobileDetailOpen ? (
+                      <IconButton
+                        label={t("settings.mobile.backToSettings")}
+                        tooltip={t("settings.mobile.backToSettings")}
+                        icon={<Icon icon={ArrowLeft} size="md" color="inherit" />}
+                        variant="secondary"
+                        size="lg"
+                        onClick={() => setMobileDetailOpen(false)}
+                      />
+                    ) : undefined
                   }
-                  endContent={<SaveStatus indicator={saveIndicator} />}
+                  endContent={
+                    mobileDetailOpen ? (
+                      <SaveStatus indicator={saveIndicator} />
+                    ) : (
+                      <IconButton
+                        label={t("settings.backToChat")}
+                        tooltip={t("settings.backToChat")}
+                        icon={<Icon icon={X} size="md" color="inherit" />}
+                        variant="secondary"
+                        size="lg"
+                        onClick={onBack}
+                      />
+                    )
+                  }
                 />
               )
             }
@@ -446,24 +486,34 @@ export function SettingsPage(props: SettingsPageProps) {
                   <VStack
                     width="100%"
                     maxWidth="var(--xgent-content-width-md)"
-                    gap={4}
+                    gap={5}
                     style={{ marginInline: "auto" }}
                   >
-                    <List density="spacious" hasDividers>
-                      {navItems.map((item) => (
-                        <ListItem
-                          key={item.id}
-                          label={item.label}
-                          description={item.description}
-                          startContent={<Icon icon={item.icon} size="md" color="secondary" />}
-                          endContent={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
-                          onClick={() => {
-                            setSection(item.id);
-                            setMobileDetailOpen(true);
-                          }}
-                        />
-                      ))}
-                    </List>
+                    {mobileNavGroups.map((group) => (
+                      <VStack key={group.label} width="100%" gap={2}>
+                        <Heading level={3} className="text-muted-foreground">
+                          {group.label}
+                        </Heading>
+                        <List density="balanced" hasDividers>
+                          {group.items.map((item) => (
+                            <ListItem
+                              key={item.id}
+                              label={item.label}
+                              startContent={
+                                <Icon icon={item.icon} size="md" color="inherit" />
+                              }
+                              endContent={
+                                <Icon icon={ChevronRight} size="sm" color="tertiary" />
+                              }
+                              onClick={() => {
+                                setSection(item.id);
+                                setMobileDetailOpen(true);
+                              }}
+                            />
+                          ))}
+                        </List>
+                      </VStack>
+                    ))}
                   </VStack>
                 </LayoutContent>
               )

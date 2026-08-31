@@ -1,6 +1,7 @@
 import { Button } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Heading } from "@astryxdesign/core/Heading";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import {
   HStack,
   Layout,
@@ -30,7 +31,7 @@ import type {
 import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types";
 import { McpHubPage } from "../../pages/mcp-hub/McpHubPage";
 import { SkillsHubPage } from "../../pages/skills-hub/SkillsHubPage";
-import { Cable, FolderTree, GitBranch, Key, SkillIcon, Terminal } from "../icons";
+import { Cable, FolderTree, GitBranch, Key, SkillIcon, Terminal, X } from "../icons";
 import { FileTreePanel } from "../project-tools/file-tree";
 import type { GitCommitContextPayload, GitFileContextPayload } from "../project-tools/git-review";
 import { GitReviewPanel } from "../project-tools/git-review";
@@ -87,6 +88,7 @@ type WorkspaceSidePanelProps = {
   initialSkills?: SkillSummary[];
   initialSkillsRootDir?: string;
   isAgentMode: boolean;
+  onClose: () => void;
 };
 
 function normalizeTreePath(path: string) {
@@ -305,6 +307,15 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
                     {title}
                   </Heading>
                 </StackItem>
+                <IconButton
+                  type="button"
+                  label={t("settings.close")}
+                  tooltip={t("settings.close")}
+                  icon={<X />}
+                  variant="ghost"
+                  size="sm"
+                  onClick={props.onClose}
+                />
               </HStack>
             </LayoutHeader>
           }
