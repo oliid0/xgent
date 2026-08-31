@@ -180,9 +180,9 @@ export function FloorNavRail(props: {
 
   const railLabel = isEn ? "Message navigation" : "楼层导航";
 
-  const pinnedTitle = isEn ? "Pinned" : "已置顶";
-  const pinLabel = isEn ? "Pin" : "置顶";
-  const unpinLabel = isEn ? "Unpin" : "取消置顶";
+  const pinnedTitle = isEn ? "Pinned" : "收藏";
+  const pinLabel = isEn ? "Pin" : "收藏";
+  const unpinLabel = isEn ? "Unpin" : "取消收藏";
 
   const bookmarkedFloors = useMemo(
     () => floors.filter((floor) => bookmarks.has(floor.messageId)),

@@ -4,15 +4,15 @@ export type FloorEntry = {
   rowKey: string;
   /** 稳定消息 id（持久化于 SQLite，重启不变），用于收藏。 */
   messageId: string;
-  /** 消息开头若干字符，空白折叠后截断。 */
+  /** 用户消息开头若干字符，空白折叠后截断。 */
   preview: string;
-  /** 紧随该用户消息的助手文本预览。 */
-  responsePreview?: string;
+  /** 紧随该用户消息的助手纯文本摘要；工具调用与思考内容不进入悬浮预览。 */
+  responsePreview: string | null;
 };
 
 /**
  * 楼层来源行的最小结构：桌面端渲染时间线（RenderTimelineItem）与 WebUI 转写
- * 行（TranscriptRow）都满足此形状，本模块因此可在两端字节级镜像。
+ * 行（TranscriptRow）都满足此形状，因此两端可直接复用本模块。
  */
 export type FloorSourceItem = {
   kind: string;
@@ -20,20 +20,34 @@ export type FloorSourceItem = {
   text?: string;
   messageRef?: { messageId: string };
   rounds?: readonly {
-    blocks: readonly { kind: string; text?: string }[];
+    blocks: readonly {
+      kind: string;
+      text?: string;
+    }[];
   }[];
 };
 
-const PREVIEW_MAX_CHARS = 24;
+const PREVIEW_MAX_CHARS = 48;
+const RESPONSE_PREVIEW_MAX_CHARS = 180;
+
+function buildTruncatedPreview(text: string, maxChars: number): string | null {
+  const collapsed = text.replace(/\s+/g, " ").trim();
+  if (!collapsed) return null;
+  const chars = Array.from(collapsed);
+  return chars.length > maxChars ? `${chars.slice(0, maxChars).join("")}…` : collapsed;
+}
 
 export function buildFloorPreview(text: string): string {
-  const collapsed = text.replace(/\s+/g, " ").trim();
-  if (!collapsed) return "…";
-  // 按码点截断（Array.from 迭代码点），避免把 emoji 等代理对从中间劈开。
-  const chars = Array.from(collapsed);
-  return chars.length > PREVIEW_MAX_CHARS
-    ? `${chars.slice(0, PREVIEW_MAX_CHARS).join("")}…`
-    : collapsed;
+  return buildTruncatedPreview(text, PREVIEW_MAX_CHARS) ?? "…";
+}
+
+function buildFloorResponsePreview(item: FloorSourceItem): string | null {
+  const text = (item.rounds ?? [])
+    .flatMap((round) => round.blocks)
+    .filter((block) => block.kind === "text")
+    .map((block) => block.text ?? "")
+    .join(" ");
+  return buildTruncatedPreview(text, RESPONSE_PREVIEW_MAX_CHARS);
 }
 
 /**
@@ -42,25 +56,27 @@ export function buildFloorPreview(text: string): string {
  */
 export function buildFloorEntries(items: readonly FloorSourceItem[]): FloorEntry[] {
   const entries: FloorEntry[] = [];
-  for (let index = 0; index < items.length; index += 1) {
-    const item = items[index];
-    if (!item) continue;
-    if (item.kind !== "user") continue;
-    const assistant = items.slice(index + 1).find((candidate) => candidate.kind !== "summary");
-    const responseText =
-      assistant?.kind === "assistant"
-        ? (assistant.rounds ?? [])
-            .flatMap((round) => round.blocks)
-            .filter((block) => block.kind === "text")
-            .map((block) => block.text ?? "")
-            .join("")
-        : "";
-    entries.push({
-      rowKey: item.key,
-      messageId: item.messageRef?.messageId ?? item.key,
-      preview: buildFloorPreview(item.text ?? ""),
-      ...(responseText.trim() ? { responsePreview: buildFloorPreview(responseText) } : {}),
-    });
+  let pendingEntryIndex = -1;
+  for (const item of items) {
+    if (item.kind === "user") {
+      entries.push({
+        rowKey: item.key,
+        messageId: item.messageRef?.messageId ?? item.key,
+        preview: buildFloorPreview(item.text ?? ""),
+        responsePreview: null,
+      });
+      pendingEntryIndex = entries.length - 1;
+      continue;
+    }
+    if (item.kind !== "assistant" || pendingEntryIndex < 0) continue;
+    const responsePreview = buildFloorResponsePreview(item);
+    if (responsePreview) {
+      entries[pendingEntryIndex] = {
+        ...entries[pendingEntryIndex],
+        responsePreview,
+      };
+    }
+    pendingEntryIndex = -1;
   }
   return entries;
 }

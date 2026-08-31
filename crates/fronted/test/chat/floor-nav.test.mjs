@@ -38,7 +38,7 @@ test("buildFloorEntries keeps only user items and builds previews", () => {
   assert.equal(floors[0].preview, "帮我看看 这个 bug 在哪");
   assert.equal(floors[0].messageId, "user-aaa");
   assert.ok(floors[1].preview.endsWith("…"));
-  assert.equal(floors[1].preview.length, 25);
+  assert.equal(floors[1].preview.length, 49);
   assert.equal(floors[2].preview, "…");
   // 无 messageRef 时回退到行 key，收藏仍可用
   assert.equal(floors[2].messageId, "u3");
@@ -50,10 +50,32 @@ test("buildFloorEntries attaches the following assistant text preview", () => {
     {
       kind: "assistant",
       key: "a1",
-      rounds: [{ blocks: [{ kind: "text", text: "answer with useful context" }] }],
+      rounds: [
+        {
+          blocks: [
+            { kind: "text", text: "answer" },
+            { kind: "tool", text: "ignored tool output" },
+            { kind: "text", text: "with useful context" },
+          ],
+        },
+      ],
     },
   ]);
-  assert.equal(floors[0].responsePreview, floorModel.buildFloorPreview("answer with useful context"));
+  assert.equal(floors[0].responsePreview, "answer with useful context");
+});
+
+test("buildFloorEntries keeps xx response preview length and pending assistant pairing", () => {
+  const floors = floorModel.buildFloorEntries([
+    userItem("u1", "first", "user-1"),
+    { kind: "summary", key: "s1" },
+    {
+      kind: "assistant",
+      key: "a1",
+      rounds: [{ blocks: [{ kind: "text", text: "x".repeat(220) }] }],
+    },
+  ]);
+  assert.equal(floors[0].responsePreview.length, 181);
+  assert.ok(floors[0].responsePreview.endsWith("…"));
 });
 
 test("sampleFloorEntries keeps bookmarked floors and stays continuous at the cap", () => {
@@ -87,11 +109,11 @@ test("resolveNearestSampledRowKey maps active floor to nearest marker", () => {
 });
 
 test("buildFloorPreview truncates on code points without splitting surrogates", () => {
-  const emoji = "😀".repeat(30);
+  const emoji = "😀".repeat(60);
   const preview = floorModel.buildFloorPreview(emoji);
   assert.ok(preview.endsWith("…"));
   const chars = Array.from(preview);
-  assert.equal(chars.length, 25);
+  assert.equal(chars.length, 49);
   for (const ch of chars.slice(0, -1)) {
     assert.equal(ch, "😀", `expected intact emoji, got ${JSON.stringify(ch)}`);
   }
@@ -130,7 +152,7 @@ test("floor bookmarks toggle and persist through localStorage", () => {
     unsubscribe();
 
     // 损坏数据不抛错
-    store.set("xagent.floor-bookmarks.v1", "{not json");
+    store.set("liveagent.floor-bookmarks.v1", "{not json");
     floorBookmarks.resetFloorBookmarksCacheForTest();
     assert.equal(floorBookmarks.getFloorBookmarks("conv-1").size, 0);
   } finally {
@@ -157,7 +179,7 @@ test("bookmark eviction trims memory and disk together", () => {
     floorBookmarks.resetFloorBookmarksCacheForTest();
     assert.equal(floorBookmarks.getFloorBookmarks("conv-0").size, 0);
     assert.equal(floorBookmarks.getFloorBookmarks("conv-204").size, 1);
-    const payload = JSON.parse(store.get("xagent.floor-bookmarks.v1"));
+    const payload = JSON.parse(store.get("liveagent.floor-bookmarks.v1"));
     assert.ok(Object.keys(payload.conversations).length <= 200);
   } finally {
     delete globalThis.localStorage;
