@@ -57,7 +57,8 @@ export function attachPayloadDebugLogging(
   },
 ): StreamOptionsEx {
   const previousOnPayload = options.onPayload;
-  if (!debugLogger && !previousOnPayload) return options;
+  const previousOnResponse = options.onResponse;
+  if (!debugLogger && !previousOnPayload && !previousOnResponse) return options;
 
   return {
     ...options,
@@ -76,10 +77,22 @@ export function attachPayloadDebugLogging(
         sessionId: extra?.sessionId,
         api: model.api,
         provider: model.provider,
+        headers: options.headers,
         payload: nextPayload,
       });
 
       return nextPayload;
+    },
+    onResponse: async (response, model) => {
+      await previousOnResponse?.(response, model);
+      debugLogger?.logResponse({
+        phase: extra?.phase ?? "provider_response",
+        round: extra?.round,
+        sessionId: extra?.sessionId,
+        api: model.api,
+        provider: model.provider,
+        response,
+      });
     },
   };
 }

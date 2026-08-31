@@ -1,7 +1,13 @@
 import { BottomSheet } from "@astryxdesign/core/BottomSheet";
 import { Dialog, DialogHeader, type DialogPurpose } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { Layout, LayoutContent, LayoutFooter, VStack } from "@astryxdesign/core/Layout";
+import {
+  Layout,
+  LayoutContent,
+  LayoutFooter,
+  LayoutHeader,
+  VStack,
+} from "@astryxdesign/core/Layout";
 import type { ReactNode } from "react";
 
 const TOUCH_ORIENTED_LG_QUERY = "(max-width: 1024px) and (pointer: coarse) and (hover: none)";
@@ -71,7 +77,11 @@ export function AdaptiveDialog({
       padding={0}
     >
       <Layout
-        header={<DialogHeader title={title} subtitle={subtitle} onOpenChange={onOpenChange} />}
+        header={
+          <LayoutHeader hasDivider padding={4}>
+            <DialogHeader title={title} subtitle={subtitle} onOpenChange={onOpenChange} />
+          </LayoutHeader>
+        }
         content={<LayoutContent padding={4}>{children}</LayoutContent>}
         footer={footer ? <LayoutFooter padding={4}>{footer}</LayoutFooter> : undefined}
       />

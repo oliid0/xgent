@@ -77,7 +77,6 @@ test("anthropic: 装饰过的目录模型 id（日期后缀/大小写/@版本）
 
 test("anthropic: 装饰 id 的可选档位与目录基础模型一致（xhigh/max 不丢失）", () => {
   assert.deepEqual(levelsFor("claude-opus-4-8-20260213"), [
-    "minimal",
     "low",
     "medium",
     "high",
@@ -85,7 +84,6 @@ test("anthropic: 装饰 id 的可选档位与目录基础模型一致（xhigh/ma
     "max",
   ]);
   assert.deepEqual(levelsFor("claude-sonnet-4-6-20251114"), [
-    "minimal",
     "low",
     "medium",
     "high",
@@ -99,14 +97,14 @@ test("anthropic: 目录未命中的三方改名 id 走启发式识别 adaptive �
     const model = createModelFromConfig("claude_code", modelId, RELAY_BASE_URL);
     assert.equal(model.compat?.forceAdaptiveThinking, true, `${modelId} should be adaptive`);
     assert.equal(model.contextWindow, 1_000_000, `${modelId} should expose the 1M window`);
-    assert.deepEqual(model.thinkingLevelMap, { xhigh: "xhigh", max: "max" });
+    assert.deepEqual(model.thinkingLevelMap, { minimal: null, xhigh: "xhigh", max: "max" });
   }
   // Opus 4.6/Sonnet 4.6/Mythos Preview：只到 max。
   for (const modelId of ["claude-4.6-sonnet", "claude-mythos-preview"]) {
     const model = createModelFromConfig("claude_code", modelId, RELAY_BASE_URL);
     assert.equal(model.compat?.forceAdaptiveThinking, true, `${modelId} should be adaptive`);
     assert.equal(model.contextWindow, 1_000_000, `${modelId} should expose the 1M window`);
-    assert.deepEqual(model.thinkingLevelMap, { max: "max" });
+    assert.deepEqual(model.thinkingLevelMap, { minimal: null, max: "max" });
   }
 });
 

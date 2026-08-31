@@ -147,13 +147,13 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
       title={mode === "clone" ? t("chat.clone.title") : t("chat.mobileWorkspace.new")}
       subtitle={t("chat.mobileWorkspace.hint")}
       purpose="form"
-      width="var(--xagent-dialog-width-md)"
-      maxHeight="var(--xagent-dialog-height-lg)"
+      width="min(32rem, calc(100dvw - (var(--spacing-4) * 2)))"
+      maxHeight="var(--xagent-dialog-height-md)"
       touchPresentation="bottom-sheet"
       bottomSheetHeight="tall"
     >
-      <form onSubmit={(event) => void submit(event)}>
-        <VStack gap={4}>
+      <form onSubmit={(event) => void submit(event)} style={{ minWidth: 0 }}>
+        <VStack gap={4} width="100%" minWidth={0}>
           {cloneAvailable ? (
             <SegmentedControl
               value={mode}
@@ -190,7 +190,7 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
                 size="lg"
                 width="100%"
               />
-              <HStack gap={2} vAlign="end">
+              <HStack gap={2} vAlign="end" wrap="wrap">
                 <Typeahead
                   label={t("chat.clone.branch")}
                   searchSource={branchSearchSource}

@@ -111,6 +111,7 @@ export function buildProviderModelsUrl(
 type ProviderModelsAuthOptions = {
   authMode?: ProviderAuthMode;
   oauthAccountId?: string;
+  providerConfigId?: string;
   customHeaders?: CustomProvider["customHeaders"];
   isFullUrl?: boolean;
   modelsUrl?: string;
@@ -441,7 +442,6 @@ export async function fetchModelsFromApi(
   const attempts = buildProviderModelsAttempts(type, normalizedUrl, normalizedApiKey, options);
   const failures: ProviderModelsFailure[] = [];
   let emptyResult: ProviderModelConfig[] | null = null;
-  let discoveredModels: ProviderModelConfig[] = [];
 
   for (const attempt of attempts) {
     const proxyRequest = await prepareProxyRequest(
@@ -451,6 +451,7 @@ export async function fetchModelsFromApi(
       {
         useSystemProxy: options?.useSystemProxy === true,
         oauthAccountId: options?.authMode === "oauth-managed" ? options.oauthAccountId : undefined,
+        providerConfigId: options?.providerConfigId,
         isFullUrl: Boolean(exactModelsUrl),
       },
     );
@@ -516,21 +517,10 @@ export async function fetchModelsFromApi(
 
     if (attemptFailed) continue;
     const models = normalizeFetchedModels(allItems, type);
-    if (models.length > 0) {
-      if (type !== "gemini") return models;
-      // Gemini exposes different catalog versions at /v1 and /v1beta. A relay
-      // can return a valid subset from each, so merge both successful results.
-      const discoveredIds = new Set(discoveredModels.map((model) => model.id));
-      discoveredModels = [
-        ...discoveredModels,
-        ...models.filter((model) => !discoveredIds.has(model.id)),
-      ];
-      continue;
-    }
+    if (models.length > 0) return models;
     emptyResult = models;
   }
 
-  if (discoveredModels.length > 0) return discoveredModels;
   if (emptyResult !== null) return emptyResult;
 
   const failure = pickProviderModelsFailure(failures);

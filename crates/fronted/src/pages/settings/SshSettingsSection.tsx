@@ -4,7 +4,6 @@ import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { DialogHeader } from "@astryxdesign/core/Dialog";
-import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { FileInput } from "@astryxdesign/core/FileInput";
 import { FormLayout } from "@astryxdesign/core/FormLayout";
@@ -98,11 +97,12 @@ function SshPasswordInput(props: {
 
 function SshHostModal(props: {
   initialData?: SshHostConfig;
+  onImport?: () => void;
   onSave: (data: SshHostDraft) => void;
   onClose: () => void;
 }) {
   const browser = isBrowserRuntime();
-  const { initialData, onSave, onClose } = props;
+  const { initialData, onImport, onSave, onClose } = props;
   const { t } = useLocale();
   const [name, setName] = useState(initialData?.name ?? "");
   const [host, setHost] = useState(initialData?.host ?? "");
@@ -117,6 +117,7 @@ function SshHostModal(props: {
   );
   const [selectedKeyFile, setSelectedKeyFile] = useState<File | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const advancedSectionRef = useRef<HTMLDivElement | null>(null);
   const [proxyType, setProxyType] = useState<SshProxyType>(initialData?.proxy.type ?? "socks5");
   const [proxyUrl, setProxyUrl] = useState(initialData?.proxy.url ?? "");
   const [proxyPort, setProxyPort] = useState<number | null>(initialData?.proxy.port || null);
@@ -215,6 +216,26 @@ function SshHostModal(props: {
         content={
           <LayoutContent isScrollable>
             <VStack gap={5}>
+              {!isEditing && onImport ? (
+                <Section variant="muted" padding={3}>
+                  <HStack width="100%" gap={3} hAlign="between" vAlign="center" wrap="wrap">
+                    <VStack gap={0.5}>
+                      <Text type="body" weight="semibold">
+                        {t("settings.sshImport")}
+                      </Text>
+                      <Text type="supporting" color="secondary">
+                        {t("settings.sshImportDesc")}
+                      </Text>
+                    </VStack>
+                    <AstryxCoreButton
+                      label={t("settings.sshImport")}
+                      variant="secondary"
+                      size="sm"
+                      onClick={onImport}
+                    />
+                  </HStack>
+                </Section>
+              ) : null}
               <FormLayout>
                 <FormLayout direction="horizontal">
                   <TextInput
@@ -349,70 +370,79 @@ function SshHostModal(props: {
               <Collapsible
                 trigger={t("settings.sshAdvancedSettings")}
                 isOpen={advancedOpen}
-                onOpenChange={setAdvancedOpen}
+                onOpenChange={(isOpen) => {
+                  setAdvancedOpen(isOpen);
+                  if (isOpen) {
+                    window.requestAnimationFrame(() => {
+                      advancedSectionRef.current?.scrollIntoView({ block: "nearest" });
+                    });
+                  }
+                }}
               >
-                <FormLayout>
-                  <VStack gap={2}>
-                    <Text type="body" weight="semibold">
-                      {t("settings.sshProxyType")}
-                    </Text>
-                    <SegmentedControl
-                      label={t("settings.sshProxyType")}
-                      value={proxyType}
-                      layout="fill"
-                      onChange={(value) => {
-                        if (value === "socks5" || value === "http") setProxyType(value);
-                      }}
-                    >
-                      <SegmentedControlItem
-                        value="socks5"
-                        label={t("settings.sshProxyTypeSocks5")}
+                <VStack ref={advancedSectionRef} width="100%" paddingBlock={1}>
+                  <FormLayout>
+                    <VStack gap={2}>
+                      <Text type="body" weight="semibold">
+                        {t("settings.sshProxyType")}
+                      </Text>
+                      <SegmentedControl
+                        label={t("settings.sshProxyType")}
+                        value={proxyType}
+                        layout="fill"
+                        onChange={(value) => {
+                          if (value === "socks5" || value === "http") setProxyType(value);
+                        }}
+                      >
+                        <SegmentedControlItem
+                          value="socks5"
+                          label={t("settings.sshProxyTypeSocks5")}
+                        />
+                        <SegmentedControlItem value="http" label={t("settings.sshProxyTypeHttp")} />
+                      </SegmentedControl>
+                    </VStack>
+                    <FormLayout direction="horizontal">
+                      <TextInput
+                        label={t("settings.sshProxyUrl")}
+                        value={proxyUrl}
+                        placeholder={t(
+                          proxyType === "socks5"
+                            ? "settings.sshProxyUrlSocks5Placeholder"
+                            : "settings.sshProxyUrlHttpPlaceholder",
+                        )}
+                        onChange={setProxyUrl}
                       />
-                      <SegmentedControlItem value="http" label={t("settings.sshProxyTypeHttp")} />
-                    </SegmentedControl>
-                  </VStack>
-                  <FormLayout direction="horizontal">
-                    <TextInput
-                      label={t("settings.sshProxyUrl")}
-                      value={proxyUrl}
-                      placeholder={t(
-                        proxyType === "socks5"
-                          ? "settings.sshProxyUrlSocks5Placeholder"
-                          : "settings.sshProxyUrlHttpPlaceholder",
-                      )}
-                      onChange={setProxyUrl}
-                    />
-                    <NumberInput
-                      label={t("settings.sshProxyPort")}
-                      value={proxyPort}
-                      min={1}
-                      max={65535}
-                      step={1}
-                      hasClear
-                      isIntegerOnly
-                      isWheelEnabled={false}
-                      onChange={(value) => setProxyPort(value ?? null)}
-                    />
+                      <NumberInput
+                        label={t("settings.sshProxyPort")}
+                        value={proxyPort}
+                        min={1}
+                        max={65535}
+                        step={1}
+                        hasClear
+                        isIntegerOnly
+                        isWheelEnabled={false}
+                        onChange={(value) => setProxyPort(value ?? null)}
+                      />
+                    </FormLayout>
+                    <FormLayout direction="horizontal">
+                      <TextInput
+                        label={t("settings.sshProxyUsername")}
+                        value={proxyUsername}
+                        onChange={setProxyUsername}
+                      />
+                      <SshPasswordInput
+                        label={t("settings.sshProxyPassword")}
+                        value={proxyPassword}
+                        disabled={browser}
+                        configuredMessage={
+                          initialData?.proxy.passwordConfigured
+                            ? t("settings.sshProxyPasswordConfigured")
+                            : undefined
+                        }
+                        onChange={setProxyPassword}
+                      />
+                    </FormLayout>
                   </FormLayout>
-                  <FormLayout direction="horizontal">
-                    <TextInput
-                      label={t("settings.sshProxyUsername")}
-                      value={proxyUsername}
-                      onChange={setProxyUsername}
-                    />
-                    <SshPasswordInput
-                      label={t("settings.sshProxyPassword")}
-                      value={proxyPassword}
-                      disabled={browser}
-                      configuredMessage={
-                        initialData?.proxy.passwordConfigured
-                          ? t("settings.sshProxyPasswordConfigured")
-                          : undefined
-                      }
-                      onChange={setProxyPassword}
-                    />
-                  </FormLayout>
-                </FormLayout>
+                </VStack>
               </Collapsible>
             </VStack>
           </LayoutContent>
@@ -820,6 +850,14 @@ export function SshSettingsSection(props: SettingsSectionProps) {
     return (
       <SshHostModal
         initialData={editingHost ?? undefined}
+        onImport={
+          editingHost
+            ? undefined
+            : () => {
+                closeModal();
+                setImportOpen(true);
+              }
+        }
         onSave={handleSave}
         onClose={closeModal}
       />
@@ -842,17 +880,11 @@ export function SshSettingsSection(props: SettingsSectionProps) {
         <Section variant="transparent" padding={0}>
           <HStack width="100%" gap={2} vAlign="center" hAlign="end" wrap="wrap">
             <Badge label={hosts.length} variant="neutral" />
-            <DropdownMenu
-              button={{ label: t("settings.sshAdd"), variant: "primary", size: "sm" }}
-              alignment="end"
-              items={[
-                { id: "add", label: t("settings.sshAdd"), onClick: openAdd },
-                {
-                  id: "import",
-                  label: t("settings.sshImport"),
-                  onClick: () => setImportOpen(true),
-                },
-              ]}
+            <AstryxCoreButton
+              label={t("settings.sshAdd")}
+              variant="primary"
+              size="sm"
+              onClick={openAdd}
             />
           </HStack>
         </Section>
@@ -865,17 +897,11 @@ export function SshSettingsSection(props: SettingsSectionProps) {
           title={t("settings.sshNoHosts")}
           description={t("settings.sshNoHostsHint")}
           actions={
-            <DropdownMenu
-              button={{ label: t("settings.sshAdd"), variant: "primary", size: "sm" }}
-              alignment="center"
-              items={[
-                { id: "add", label: t("settings.sshAdd"), onClick: openAdd },
-                {
-                  id: "import",
-                  label: t("settings.sshImport"),
-                  onClick: () => setImportOpen(true),
-                },
-              ]}
+            <AstryxCoreButton
+              label={t("settings.sshAdd")}
+              variant="primary"
+              size="sm"
+              onClick={openAdd}
             />
           }
         />

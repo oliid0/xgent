@@ -66,6 +66,7 @@ function buildOpenAIBaseOptions(model: Model<Api>, options: StreamOptionsEx) {
     sessionId: options.sessionId,
     headers: options.headers,
     onPayload: options.onPayload,
+    onResponse: options.onResponse,
     maxRetryDelayMs: options.maxRetryDelayMs,
     metadata: options.metadata,
   };
@@ -110,6 +111,7 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
             sessionId: effectiveOptions.sessionId,
             headers: effectiveOptions.headers,
             onPayload: effectiveOptions.onPayload,
+            onResponse: effectiveOptions.onResponse,
             maxRetryDelayMs: effectiveOptions.maxRetryDelayMs,
             metadata: effectiveOptions.metadata,
             thinkingEnabled: anthropicThinking.thinkingEnabled,
@@ -184,6 +186,7 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
         apiKey: options.apiKey,
         headers: options.headers,
         onPayload: options.onPayload,
+        onResponse: options.onResponse,
         maxRetryDelayMs: options.maxRetryDelayMs,
         metadata: options.metadata,
         thinking: resolveGeminiThinkingRuntime(model, options.reasoning),

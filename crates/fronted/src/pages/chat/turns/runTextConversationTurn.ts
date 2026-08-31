@@ -36,7 +36,7 @@ import {
   createDeferredProviderNativeWebSearchStatus,
   resolveProviderNativeWebSearchStatus,
 } from "../../../lib/chat/search/providerNativeSearchStatus";
-import type { StreamDebugLogger } from "../../../lib/debug/agentDebug";
+import { observeStreamDebugLogger, type StreamDebugLogger } from "../../../lib/debug/agentDebug";
 import { assistantMessageToText, streamAssistantMessage } from "../../../lib/providers/llm";
 import type { ProviderId } from "../../../lib/settings";
 import { trajectoryTerminalInfo } from "../../../lib/trajectory/assistantOutcome";
@@ -211,6 +211,14 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
   let pendingTextContext: Context | null = null;
   let textRound = 1;
   let protectionCompactionDisabled = false;
+  const trajectoryConversationDebugLogger = observeStreamDebugLogger(
+    conversationDebugLogger,
+    (type, payload) => trajectory.noteModelDiagnostic(textRound, type, payload),
+  );
+  const trajectoryRecoveryDebugLogger = observeStreamDebugLogger(
+    recoveryDebugLogger,
+    (type, payload) => trajectory.noteModelDiagnostic(textRound, type, payload),
+  );
 
   function commitAssistantRoundMeta(assistant: AssistantMessage, round: number) {
     const contextUsageTokens = compaction.observeContextMessages([assistant]);
@@ -446,7 +454,8 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
             updateHostedSearch(hostedSearch, textRound, streamedAssistantText);
           },
           signal: scope.controller.signal,
-          debugLogger: streamAttempt === 0 ? conversationDebugLogger : recoveryDebugLogger,
+          debugLogger:
+            streamAttempt === 0 ? trajectoryConversationDebugLogger : trajectoryRecoveryDebugLogger,
           onRetryStatus: (attempt, maxAttempts, errorMessage, plannedDelayMs, providerLabel) => {
             trajectory.noteRetry(textRound, {
               attempt,

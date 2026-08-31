@@ -52,7 +52,7 @@ import {
   type AgentRunnerFailoverParams,
   runAssistantWithTools,
 } from "../../../lib/chat/runner/agentRunner";
-import type { StreamDebugLogger } from "../../../lib/debug/agentDebug";
+import { observeStreamDebugLogger, type StreamDebugLogger } from "../../../lib/debug/agentDebug";
 import { assistantMessageToText } from "../../../lib/providers/llm";
 import { resolveRuntimePlatform } from "../../../lib/runtimePlatform";
 import {
@@ -760,6 +760,9 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
   let latestAgentEmittedMessages: Message[] = [];
   let suppressedToolTrace: SuppressedToolTraceSnapshot[] = [];
   let activeAgentRound = 0;
+  const trajectoryDebugLogger = observeStreamDebugLogger(conversationDebugLogger, (type, payload) =>
+    trajectory.noteModelDiagnostic(activeAgentRound, type, payload),
+  );
   let pendingAgentContext: Context | null = null;
   const pendingTerminalAssistantMetaRef: {
     current: {
@@ -1333,7 +1336,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           };
         },
         signal: scope.controller.signal,
-        debugLogger: conversationDebugLogger,
+        debugLogger: trajectoryDebugLogger,
       });
       finishAgentPerfSpan(
         conversationDebugLogger,

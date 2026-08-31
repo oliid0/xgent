@@ -1,7 +1,6 @@
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
-import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Icon } from "@astryxdesign/core/Icon";
@@ -28,14 +27,7 @@ import CssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
 import HtmlWorker from "monaco-editor/esm/vs/language/html/html.worker?worker";
 import JsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
 import TsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
-import {
-  type MouseEvent as ReactMouseEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import {
   type CodeMentionReference,
@@ -44,18 +36,13 @@ import {
 import { invokeFs, isFsBackendError } from "../../lib/tools/fsBackend";
 import { AdaptiveDialog } from "../astryx/AdaptiveDialog";
 import {
-  ClipboardPaste,
   Copy,
   FilePenLine,
   MessageSquareText,
-  Redo2,
   RefreshCw,
   Replace,
   Save,
-  Scissors,
   Search,
-  TextSelect,
-  Undo2,
   X,
 } from "../icons";
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
@@ -312,26 +299,6 @@ function editorModelUri(tabKey: string) {
   });
 }
 
-function isMacLikePlatform() {
-  if (typeof navigator === "undefined") return false;
-  const platform = `${navigator.userAgent} ${navigator.platform}`;
-  return /Mac|iPhone|iPad|iPod/i.test(platform);
-}
-
-function getEditorContextMenuShortcuts() {
-  const isMac = isMacLikePlatform();
-  return {
-    undo: isMac ? "⌘Z" : "Ctrl+Z",
-    redo: isMac ? "⌘⇧Z" : "Ctrl+Y",
-    cut: isMac ? "⌘X" : "Ctrl+X",
-    copy: isMac ? "⌘C" : "Ctrl+C",
-    paste: isMac ? "⌘V" : "Ctrl+V",
-    selectAll: isMac ? "⌘A" : "Ctrl+A",
-    find: isMac ? "⌘F" : "Ctrl+F",
-    replace: isMac ? "⌥⌘F" : "Ctrl+H",
-  } as const;
-}
-
 export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProps) {
   const {
     openRequest,
@@ -345,7 +312,6 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
     onClose,
   } = props;
   const { t } = useLocale();
-  const contextMenuShortcuts = useMemo(() => getEditorContextMenuShortcuts(), []);
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -775,15 +741,6 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
     onInsertCodeMention(reference);
   }, [activeTab, onInsertCodeMention]);
 
-  const openEditorContextMenu = useCallback(
-    (event: ReactMouseEvent<HTMLDivElement>) => {
-      if (!activeTab || pendingDialog) return;
-      event.preventDefault();
-      editorRef.current?.focus();
-    },
-    [activeTab, pendingDialog],
-  );
-
   useEffect(() => {
     if (!openRequest || openRequestIdRef.current === openRequest.id) return;
     openRequestIdRef.current = openRequest.id;
@@ -830,7 +787,7 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
       fontLigatures: true,
       minimap: { enabled: true },
       model: null,
-      contextmenu: false,
+      contextmenu: true,
       scrollBeyondLastLine: false,
       smoothScrolling: true,
       tabSize: 2,
@@ -953,62 +910,6 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
         ? t("workspaceEditor.reloadDirtyDescription")
         : t("workspaceEditor.closeTabDirtyDescription");
 
-  const editorContextMenuItems: ContextMenuOption[] = [
-    {
-      label: `${t("workspaceEditor.context.undo")} · ${contextMenuShortcuts.undo}`,
-      icon: <Undo2 />,
-      onClick: () => runEditorCommand("undo"),
-    },
-    {
-      label: `${t("workspaceEditor.context.redo")} · ${contextMenuShortcuts.redo}`,
-      icon: <Redo2 />,
-      onClick: () => runEditorCommand("redo"),
-    },
-    { type: "divider" },
-    {
-      label: `${t("workspaceEditor.context.cut")} · ${contextMenuShortcuts.cut}`,
-      icon: <Scissors />,
-      onClick: () => runEditorCommand("editor.action.clipboardCutAction"),
-    },
-    {
-      label: `${t("workspaceEditor.context.copy")} · ${contextMenuShortcuts.copy}`,
-      icon: <Copy />,
-      onClick: () => runEditorCommand("editor.action.clipboardCopyAction"),
-    },
-    {
-      label: `${t("workspaceEditor.context.paste")} · ${contextMenuShortcuts.paste}`,
-      icon: <ClipboardPaste />,
-      onClick: () => runEditorCommand("editor.action.clipboardPasteAction"),
-    },
-    { type: "divider" },
-    {
-      label: `${t("workspaceEditor.context.selectAll")} · ${contextMenuShortcuts.selectAll}`,
-      icon: <TextSelect />,
-      onClick: () => runEditorCommand("editor.action.selectAll"),
-    },
-    ...(onInsertCodeMention
-      ? [
-          { type: "divider" } as const,
-          {
-            label: t("workspaceEditor.context.insertCodeMention"),
-            icon: <MessageSquareText />,
-            onClick: insertSelectionAsCodeMention,
-          },
-        ]
-      : []),
-    { type: "divider" },
-    {
-      label: `${t("workspaceEditor.find")} · ${contextMenuShortcuts.find}`,
-      icon: <Search />,
-      onClick: showFind,
-    },
-    {
-      label: `${t("workspaceEditor.replace")} · ${contextMenuShortcuts.replace}`,
-      icon: <Replace />,
-      onClick: showReplace,
-    },
-  ];
-
   return (
     <VStack
       ref={overlayRef}
@@ -1075,6 +976,17 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
                       isDisabled={!activeTab}
                       onClick={() => runEditorCommand("editor.action.clipboardCopyAction")}
                     />
+                    {onInsertCodeMention ? (
+                      <IconButton
+                        label={t("workspaceEditor.context.insertCodeMention")}
+                        tooltip={t("workspaceEditor.context.insertCodeMention")}
+                        icon={<Icon icon={MessageSquareText} size="sm" color="inherit" />}
+                        variant="ghost"
+                        size="sm"
+                        isDisabled={!activeTab}
+                        onClick={insertSelectionAsCodeMention}
+                      />
+                    ) : null}
                     {isNarrow ? (
                       <MoreMenu
                         label={t("workspaceEditor.moreActions")}
@@ -1252,33 +1164,24 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
               />
             ) : null}
             <StackItem className="xagent-workspace-editor-context-menu" size="fill">
-              <ContextMenu
-                items={editorContextMenuItems}
-                label={t("workspaceEditor.context.copy")}
-                menuWidth="var(--xagent-editor-context-menu-width)"
-                size="sm"
-                isDisabled={!activeTab || Boolean(pendingDialog)}
+              <LayoutContent
+                ref={containerRef}
+                className="xagent-workspace-editor-stage"
+                padding={0}
+                isScrollable={false}
               >
-                <LayoutContent
-                  ref={containerRef}
-                  className="xagent-workspace-editor-stage"
-                  padding={0}
-                  isScrollable={false}
-                  onContextMenu={openEditorContextMenu}
-                >
-                  {!activeTab ? (
-                    isOpening ? (
-                      <Spinner size="lg" label={t("workspaceEditor.opening")} />
-                    ) : (
-                      <EmptyState
-                        title={t("workspaceEditor.emptyHint")}
-                        icon={<Icon icon={FilePenLine} size="lg" color="secondary" />}
-                        isCompact
-                      />
-                    )
-                  ) : null}
-                </LayoutContent>
-              </ContextMenu>
+                {!activeTab ? (
+                  isOpening ? (
+                    <Spinner size="lg" label={t("workspaceEditor.opening")} />
+                  ) : (
+                    <EmptyState
+                      title={t("workspaceEditor.emptyHint")}
+                      icon={<Icon icon={FilePenLine} size="lg" color="secondary" />}
+                      isCompact
+                    />
+                  )
+                ) : null}
+              </LayoutContent>
             </StackItem>
           </VStack>
         }

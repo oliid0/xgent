@@ -8,6 +8,7 @@
  * 落到当前 segment。两条路同源，所以实时状态和最终落盘保持一致。
  */
 
+import { type DebugLineType, sanitizeDebugValue } from "@/lib/debug/agentDebug";
 import { buildTrajectoryHeader, type TrajectorySectionInput } from "@/lib/trajectory/sections";
 import type {
   TrajectoryEvent,
@@ -21,6 +22,7 @@ import { createTrajectoryPersistenceQueue } from "./persistenceQueue";
 /** 工具参数在事件里的截断长度：实时通道要小，详情由正文索引另行提供。 */
 const TOOL_ARGS_PREVIEW_CHARS = 200;
 const CONTEXT_PREVIEW_CHARS = 512;
+const MODEL_DIAGNOSTIC_CHARS = 48_000;
 const DEFAULT_FLUSH_INTERVAL_MS = 2_000;
 const DISPOSE_FLUSH_ATTEMPTS = 3;
 
@@ -97,6 +99,8 @@ export type TrajectoryRecorder = {
       headerNames?: readonly string[];
     },
   ) => void;
+  /** Sanitized provider request/stream/result/error payload for the raw trajectory inspector. */
+  noteModelDiagnostic: (step: number, type: DebugLineType, payload: unknown) => void;
   toolStart: (step: number, toolCall: { id: string; name: string; arguments?: unknown }) => void;
   toolEnd: (
     callId: string,
@@ -138,6 +142,18 @@ function previewContext(value: string | undefined): string | undefined {
   return value.length > CONTEXT_PREVIEW_CHARS ? `${value.slice(0, CONTEXT_PREVIEW_CHARS)}…` : value;
 }
 
+function serializeModelDiagnostic(payload: unknown): string {
+  try {
+    const serialized = JSON.stringify(sanitizeDebugValue(payload), null, 2);
+    if (typeof serialized !== "string") return String(serialized);
+    return serialized.length > MODEL_DIAGNOSTIC_CHARS
+      ? `${serialized.slice(0, MODEL_DIAGNOSTIC_CHARS)}\n[trajectory payload truncated]`
+      : serialized;
+  } catch (error) {
+    return `[trajectory payload could not be serialized: ${error instanceof Error ? error.message : String(error)}]`;
+  }
+}
+
 /** 一个不做任何事的 recorder，供 text 模式与测试替身使用。 */
 export const NOOP_TRAJECTORY_RECORDER: TrajectoryRecorder = {
   beginTurn: () => {},
@@ -149,6 +165,7 @@ export const NOOP_TRAJECTORY_RECORDER: TrajectoryRecorder = {
   noteRetry: () => {},
   noteFailover: () => {},
   noteTransport: () => {},
+  noteModelDiagnostic: () => {},
   toolStart: () => {},
   toolEnd: () => {},
   compactionStart: () => {},
@@ -352,6 +369,15 @@ export function createTrajectoryRecorder(params: {
         ...(info.headerNames === undefined || info.headerNames.length === 0
           ? {}
           : { hn: [...info.headerNames] }),
+      });
+    },
+    noteModelDiagnostic: (step, type, payload) => {
+      emit({
+        k: `model_${type}`,
+        t: currentTurn,
+        s: step,
+        at: Date.now(),
+        body: serializeModelDiagnostic(payload),
       });
     },
     toolStart: (step, toolCall) => {

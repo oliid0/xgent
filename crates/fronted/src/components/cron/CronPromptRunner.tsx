@@ -208,6 +208,7 @@ async function executeCronPromptRun(
     providerId: provider.type,
     model: request.model,
     runtime: {
+      providerConfigId: provider.id,
       baseUrl: provider.baseUrl,
       isFullUrl: provider.isFullUrl,
       apiKey: provider.apiKey,

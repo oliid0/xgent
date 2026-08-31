@@ -34,6 +34,7 @@ const MAX_RPC_BODY_BYTES: usize = 16 * 1024 * 1024;
 const RPC_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const SESSION_COOKIE: &str = "xagent_session";
 const CSRF_HEADER: &str = "x-xagent-csrf";
+const PROVIDER_CONFIG_ID_HEADER: &str = "x-xagent-provider-config-id";
 const LOCAL_ACCESS_STATUS_EVENT: &str = "local-access:status";
 const LOCAL_ACCESS_RPC_REQUEST_EVENT: &str = "local-access:rpc-request";
 const LOCAL_ACCESS_SUBSCRIBE_EVENT: &str = "local-access:event-subscribe";
@@ -738,7 +739,13 @@ async fn local_provider_proxy(
             )
         }
     };
-    let provider_secrets = match load_provider_secrets(&path.provider) {
+    let provider_config_id = headers
+        .get(PROVIDER_CONFIG_ID_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(path.provider.as_str());
+    let provider_secrets = match load_provider_secrets(provider_config_id) {
         Ok(secrets) => secrets,
         Err(error) => return error_response(StatusCode::BAD_REQUEST, error),
     };
@@ -746,7 +753,13 @@ async fn local_provider_proxy(
     for (name, value) in &headers {
         if matches!(
             name.as_str(),
-            "host" | "cookie" | "origin" | "content-length" | "connection" | CSRF_HEADER
+            "host"
+                | "cookie"
+                | "origin"
+                | "content-length"
+                | "connection"
+                | CSRF_HEADER
+                | PROVIDER_CONFIG_ID_HEADER
         ) {
             continue;
         }

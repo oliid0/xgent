@@ -95,7 +95,6 @@ test("debug sanitizer redacts nested credentials without hiding token usage", ()
     "raw-authorization",
     "raw-header-key",
     "raw-cookie",
-    "raw-custom-header",
     "raw-client-secret",
     "raw-refresh-token",
     "raw-password",
@@ -104,7 +103,7 @@ test("debug sanitizer redacts nested credentials without hiding token usage", ()
   }
   assert.equal(sanitized.apiKey, "[redacted credential]");
   assert.equal(sanitized.headers.Authorization, "[redacted credential]");
-  assert.equal(sanitized.headers["X-Request-ID"], "[redacted credential]");
+  assert.equal(sanitized.headers["X-Request-ID"], "raw-custom-header");
   assert.equal(sanitized.provider.client_secret, "[redacted credential]");
   assert.equal(sanitized.hasApiKey, true);
   assert.equal(sanitized.inputTokens, 123);

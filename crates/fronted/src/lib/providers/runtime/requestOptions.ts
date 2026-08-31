@@ -108,6 +108,7 @@ export async function prepareProviderRequest(
     {
       useSystemProxy: runtime.useSystemProxy === true,
       oauthAccountId: runtime.authMode === "oauth-managed" ? runtime.oauthAccountId : undefined,
+      providerConfigId: runtime.providerConfigId,
       isFullUrl: runtime.isFullUrl === true,
     },
   );

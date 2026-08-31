@@ -93,6 +93,10 @@ test("llm facade preserves provider runtime exports", () => {
 });
 
 test("proxy base URL builder validates upstream URLs and carries origin separately", () => {
+  assert.equal(
+    proxy.resolveProxyServerBaseUrl("/api/local-access", "https://web.example.com"),
+    "https://web.example.com/api/local-access",
+  );
   assert.deepEqual(
     proxy.buildProxyBaseUrl("codex", "https://api.openai.com/v1/responses", "http://127.0.0.1:18080/"),
     {
@@ -125,6 +129,10 @@ test("proxy base URL builder validates upstream URLs and carries origin separate
   assert.throws(
     () => proxy.buildProxyBaseUrl("codex", "not-a-url", "http://proxy"),
     /absolute URL/,
+  );
+  assert.throws(
+    () => proxy.resolveProxyServerBaseUrl("/api/local-access", undefined),
+    /must be absolute/,
   );
 });
 
@@ -790,6 +798,59 @@ test("payload middleware composer preserves previous-hook-first order", async ()
   );
 
   assert.deepEqual(payload.trace, ["base", "first", "second"]);
+});
+
+test("payload diagnostics preserve response hooks and expose response metadata", async () => {
+  const trace = [];
+  const debugEntries = [];
+  const model = { api: "openai-responses", provider: "openai", id: "gpt-5" };
+  const options = providers.attachPayloadDebugLogging(
+    {
+      onResponse: async (response) => {
+        trace.push(`base:${response.status}`);
+      },
+    },
+    {
+      logRequest() {},
+      logResponse(payload) {
+        trace.push("debug");
+        debugEntries.push(payload);
+      },
+    },
+    { phase: "conversation", round: 2, sessionId: "session-1" },
+  );
+
+  await options.onResponse(
+    { status: 200, headers: { "content-type": "text/event-stream", "x-request-id": "req-1" } },
+    model,
+  );
+
+  assert.deepEqual(trace, ["base:200", "debug"]);
+  assert.deepEqual(debugEntries, [
+    {
+      phase: "conversation",
+      round: 2,
+      sessionId: "session-1",
+      api: "openai-responses",
+      provider: "openai",
+      response: {
+        status: 200,
+        headers: { "content-type": "text/event-stream", "x-request-id": "req-1" },
+      },
+    },
+  ]);
+});
+
+test("provider API dispatch forwards response diagnostics to pi-ai streams", async () => {
+  const state = loadProvidersWithCapturedAnthropicStream();
+  const onResponse = async () => {};
+  state.localProviders.streamSimpleByApi(
+    createDeepSeekAnthropicModel(),
+    { messages: [] },
+    { onResponse },
+  );
+
+  assert.equal(state.state.captured.options.onResponse, onResponse);
 });
 
 test("codex responses payloads always opt into upstream storage after previous payload hooks", async () => {

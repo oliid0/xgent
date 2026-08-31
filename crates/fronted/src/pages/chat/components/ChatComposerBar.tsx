@@ -401,7 +401,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const [voiceInputError, setVoiceInputError] = useState<string | null>(null);
   const [voiceInputPartial, setVoiceInputPartial] = useState<string | null>(null);
   const desktopSttCaptureRef = useRef<DesktopSttCapture | null>(null);
-  const uploadDisabled = isInputDisabled || isUploadingFiles || !isAgentMode || !workdir;
+  const uploadDisabled = isInputDisabled || isUploadingFiles || !workdir;
   const controlsDisabled = isInputDisabled;
   const hasSendableDraft = !composerIsEmpty || pendingUploadedFiles.length > 0;
   const thinkingSupported = reasoningOptions.length > 0 || thinkingAlwaysOn;
@@ -411,11 +411,9 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const documentUploads = pendingUploadedFiles.filter((file) => file.kind !== "image");
   const uploadTooltip = isUploadingFiles
     ? t("chat.upload.uploading")
-    : !isAgentMode
-      ? t("chat.upload.onlyInTools")
-      : !workdir
-        ? t("chat.upload.requireWorkdir")
-        : t("chat.upload.button");
+    : !workdir
+      ? t("chat.upload.requireWorkdir")
+      : t("chat.upload.button");
   const addMenuTooltip = t("chat.upload.add");
   const webSearchTooltip = t("chat.runtime.webSearchTooltip");
 

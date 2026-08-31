@@ -130,7 +130,12 @@ function eventStep(event: TrajectoryEvent): number | null {
 function trajectoryLane(event: TrajectoryEvent): TrajectoryLane {
   if (event.k === "user") return "user";
   if (event.k === "context" || event.k === "header") return "context";
-  if (event.k === "step_start" || event.k === "first_token" || event.k === "step_end") {
+  if (
+    event.k === "step_start" ||
+    event.k === "first_token" ||
+    event.k === "step_end" ||
+    event.k.startsWith("model_")
+  ) {
     return "model";
   }
   if (event.k === "tool_start" || event.k === "tool_end") return "tool";

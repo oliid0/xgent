@@ -299,6 +299,7 @@ function sectionsForHeader(
 }
 
 function inputText(item: TrajectoryTimelineItem) {
+  if (item.event.k.startsWith("model_")) return textField(item.event, "body");
   if (item.event.k === "user" || item.event.k === "context") {
     return textField(item.event, "tx");
   }

@@ -4,7 +4,7 @@ import { invoke } from "@xagent/runtime";
 import type { CodexRequestFormat, ExecutionMode, ProviderId, ReasoningLevel } from "../settings";
 import type { PrefixCacheDiagnostics } from "./prefixCacheShape";
 
-type DebugLineType = "request" | "result" | "error";
+export type DebugLineType = "request" | "response" | "result" | "error";
 
 type RuntimeDebugInput = {
   baseUrl: string;
@@ -79,7 +79,7 @@ function sanitizeDebugString(value: string) {
   return `[redacted data URL: ${mimeType}, base64 chars=${base64Length}]`;
 }
 
-function sanitizeDebugValue(value: unknown, seen = new WeakSet<object>()): unknown {
+export function sanitizeDebugValue(value: unknown, seen = new WeakSet<object>()): unknown {
   if (value == null) return value;
 
   const valueType = typeof value;
@@ -138,7 +138,12 @@ function sanitizeDebugValue(value: unknown, seen = new WeakSet<object>()): unkno
         !Array.isArray(nested)
       ) {
         out[key] = Object.fromEntries(
-          Object.keys(nested).map((name) => [name, REDACTED_DEBUG_CREDENTIAL]),
+          Object.entries(nested).map(([name, headerValue]) => [
+            name,
+            isSensitiveDebugKey(name)
+              ? REDACTED_DEBUG_CREDENTIAL
+              : sanitizeDebugValue(headerValue, seen),
+          ]),
         );
       } else if (isBase64Source && key === "data") {
         out[key] = `[redacted base64: ${sourceMimeType}, chars=${sourceData.length}]`;
@@ -252,10 +257,44 @@ export function createStreamDebugLogger(params: {
   return {
     enabled: true,
     logRequest: (payload) => push("request", payload),
-    logResponse: () => {},
+    logResponse: (payload) => push("response", payload),
     logResult: (payload) => push("result", payload),
     logError: (payload) => push("error", payload),
     flush: () => flushDebugLog(params.conversationId),
+  };
+}
+
+/** Mirror a debug stream into a read-only observer without changing file logging policy. */
+export function observeStreamDebugLogger(
+  base: StreamDebugLogger,
+  observer: (type: DebugLineType, payload: unknown) => void,
+): StreamDebugLogger {
+  const notify = (type: DebugLineType, payload: unknown) => {
+    try {
+      observer(type, payload);
+    } catch (error) {
+      console.warn("[trajectory] debug observer failed; provider request is unaffected", error);
+    }
+  };
+  return {
+    enabled: base.enabled,
+    logRequest: (payload) => {
+      base.logRequest(payload);
+      notify("request", payload);
+    },
+    logResponse: (payload) => {
+      base.logResponse(payload);
+      notify("response", payload);
+    },
+    logResult: (payload) => {
+      base.logResult(payload);
+      notify("result", payload);
+    },
+    logError: (payload) => {
+      base.logError(payload);
+      notify("error", payload);
+    },
+    flush: () => base.flush(),
   };
 }
 

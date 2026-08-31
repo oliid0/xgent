@@ -1,8 +1,6 @@
-import { Center } from "@astryxdesign/core/Center";
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { Spinner } from "@astryxdesign/core/Spinner";
 import { StackItem, VStack } from "@astryxdesign/core/Stack";
 import { ToastViewport } from "@astryxdesign/core/Toast";
 import { Theme } from "@astryxdesign/core/theme";
@@ -565,8 +563,6 @@ export default function App() {
     messages: appUpdateMessages,
     beforeRestart: beforeAppRestart,
   });
-  const mobileStartupPending = nativeMobile && mobileStartup.phase === "starting";
-
   useEffect(() => {
     if (!desktopBridgeEnabled || nativeMobile || browserRuntime) return;
     let disposed = false;
@@ -620,64 +616,58 @@ export default function App() {
       <ToastViewport position="topEnd" maxVisible={4}>
         <LocaleContext.Provider value={localeContextValue}>
           <AppChrome nativeMobile={nativeMobile}>
-            {mobileStartupPending ? (
-              <Center width="100%" height="100%" padding={8}>
-                <Spinner size="lg" label={translate("chat.loading", effectiveLocale)} />
-              </Center>
-            ) : (
-              <SoulProvider>
-                {settingsReady ? <CronPromptRunner settings={settings} /> : null}
-                {settingsReady ? (
-                  <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
-                ) : null}
+            <SoulProvider>
+              {settingsReady ? <CronPromptRunner settings={settings} /> : null}
+              {settingsReady ? (
+                <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
+              ) : null}
+              <AppErrorBoundary>
+                <ChatPage
+                  settings={settings}
+                  setSettings={setSettings}
+                  getMcpSettings={getMcpSettings}
+                  getToolPolicies={getToolPolicies}
+                  context={context}
+                  setContext={setContext}
+                  onOpenSettings={openSettings}
+                  onToggleTheme={toggleTheme}
+                  appUpdate={appUpdate}
+                  desktopBridgeEnabled={desktopBridgeEnabled}
+                  lanPcCommandHostReady={lanPcCommandHostReady}
+                  nativeMobile={nativeMobile}
+                  onRunningConversationCountChange={handleRunningConversationCountChange}
+                />
+              </AppErrorBoundary>
+              <Dialog
+                isOpen={settingsOpen}
+                onOpenChange={(isOpen) => {
+                  if (!isOpen) closeSettings();
+                }}
+                purpose="form"
+                variant={compactSettingsDialog ? "fullscreen" : "standard"}
+                width="var(--xagent-settings-dialog-width)"
+                maxHeight={
+                  compactSettingsDialog ? "100dvh" : "var(--xagent-settings-dialog-height)"
+                }
+                padding={0}
+                aria-label={translate("settings.title", settings.locale)}
+              >
                 <AppErrorBoundary>
-                  <ChatPage
+                  <SettingsPage
                     settings={settings}
                     setSettings={setSettings}
-                    getMcpSettings={getMcpSettings}
-                    getToolPolicies={getToolPolicies}
-                    context={context}
-                    setContext={setContext}
-                    onOpenSettings={openSettings}
-                    onToggleTheme={toggleTheme}
-                    appUpdate={appUpdate}
-                    desktopBridgeEnabled={desktopBridgeEnabled}
-                    lanPcCommandHostReady={lanPcCommandHostReady}
+                    reloadSettings={reloadPersistedSettings}
+                    saveState={settingsSaveState}
+                    onBack={closeSettings}
+                    initialSection={settingsSection}
+                    soulCreateRequestId={soulCreateRequestId}
                     nativeMobile={nativeMobile}
-                    onRunningConversationCountChange={handleRunningConversationCountChange}
+                    appUpdate={appUpdate}
                   />
                 </AppErrorBoundary>
-                <Dialog
-                  isOpen={settingsOpen}
-                  onOpenChange={(isOpen) => {
-                    if (!isOpen) closeSettings();
-                  }}
-                  purpose="form"
-                  variant={compactSettingsDialog ? "fullscreen" : "standard"}
-                  width="var(--xagent-settings-dialog-width)"
-                  maxHeight={
-                    compactSettingsDialog ? "100dvh" : "var(--xagent-settings-dialog-height)"
-                  }
-                  padding={0}
-                  aria-label={translate("settings.title", settings.locale)}
-                >
-                  <AppErrorBoundary>
-                    <SettingsPage
-                      settings={settings}
-                      setSettings={setSettings}
-                      reloadSettings={reloadPersistedSettings}
-                      saveState={settingsSaveState}
-                      onBack={closeSettings}
-                      initialSection={settingsSection}
-                      soulCreateRequestId={soulCreateRequestId}
-                      nativeMobile={nativeMobile}
-                      appUpdate={appUpdate}
-                    />
-                  </AppErrorBoundary>
-                </Dialog>
-                {restartConfirmDialog}
-              </SoulProvider>
-            )}
+              </Dialog>
+              {restartConfirmDialog}
+            </SoulProvider>
           </AppChrome>
         </LocaleContext.Provider>
       </ToastViewport>

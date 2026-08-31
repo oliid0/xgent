@@ -314,7 +314,9 @@ test("fetchModelsFromApi follows Gemini page tokens and returns every model", as
         "https://relay.example.com",
         "test-key",
       );
-      assert.equal(calls.length, 3);
+      // Complete both pages of the first successful catalog, then stop before
+      // querying the alternate Gemini API version.
+      assert.equal(calls.length, 2);
       assert.match(calls[1].url, /pageToken=page-2/);
       assert.deepEqual(
         models.map((model) => model.id),
@@ -324,7 +326,7 @@ test("fetchModelsFromApi follows Gemini page tokens and returns every model", as
   );
 });
 
-test("fetchModelsFromApi merges successful Gemini v1 and v1beta catalogs", async () => {
+test("fetchModelsFromApi stops after the first successful Gemini catalog", async () => {
   await withFetchStub(
     (url) =>
       url.includes("/v1beta/models")
@@ -336,10 +338,10 @@ test("fetchModelsFromApi merges successful Gemini v1 and v1beta catalogs", async
         "https://relay.example.com",
         "test-key",
       );
-      assert.equal(calls.length, 2);
+      assert.equal(calls.length, 1);
       assert.deepEqual(
         models.map((model) => model.id),
-        ["gemini-2.5-pro", "gemini-2.5-flash"],
+        ["gemini-2.5-pro"],
       );
     },
   );

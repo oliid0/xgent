@@ -27,7 +27,6 @@ type UploadTarget = {
 };
 
 type UsePendingUploadsParams = {
-  isAgentMode: boolean;
   workdir: string;
   conversationId: string;
   currentConversationIdRef: MutableRefObject<string>;
@@ -85,7 +84,6 @@ function pickFilesFromWebView(): Promise<File[]> {
 
 export function usePendingUploads(params: UsePendingUploadsParams) {
   const {
-    isAgentMode,
     workdir,
     conversationId,
     currentConversationIdRef,
@@ -99,15 +97,12 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
   const uploadTaskActiveRef = useRef(false);
   const pendingUploadsByConversationRef = useRef(new Map<string, PendingUploadedFile[]>());
   const pendingUploadedFilesRef = useRef(pendingUploadedFiles);
-  // Render-assigned mirrors: an in-flight import settling between a render
-  // and its effects must still see the latest mode/workdir when it decides
-  // whether its result is stale.
-  const isAgentModeRef = useRef(isAgentMode);
-  isAgentModeRef.current = isAgentMode;
+  // An in-flight import must still see the latest workspace before accepting
+  // files. Execution mode is deliberately absent: attachments belong to the
+  // conversation/workspace and remain valid when Chat and Agent are toggled.
   const workdirRef = useRef(workdir);
   workdirRef.current = workdir;
   const uploadContextRef = useRef<{
-    isAgentMode: boolean;
     workdir: string;
     conversationId: string;
   } | null>(null);
@@ -162,16 +157,8 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
 
   useEffect(() => {
     const previous = uploadContextRef.current;
-    uploadContextRef.current = { isAgentMode, workdir, conversationId };
+    uploadContextRef.current = { workdir, conversationId };
     if (!previous) return;
-    if (previous.isAgentMode !== isAgentMode) {
-      // Attachments are only usable in tools mode; a mode flip invalidates
-      // every conversation's pending uploads.
-      pendingUploadsByConversationRef.current.clear();
-      pendingUploadedFilesRef.current = [];
-      setPendingUploadedFiles([]);
-      return;
-    }
     // Switching conversations must not invalidate any conversation's
     // uploads — each entry is relative to its own workdir. Only a workdir
     // change within the same conversation (a draft switching projects)
@@ -179,7 +166,7 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
     if (previous.conversationId !== conversationId) return;
     if (previous.workdir === workdir) return;
     setPendingUploadsForConversation(conversationId, []);
-  }, [isAgentMode, workdir, conversationId, setPendingUploadsForConversation]);
+  }, [workdir, conversationId, setPendingUploadsForConversation]);
 
   const captureUploadTarget = useCallback((): UploadTarget | null => {
     const targetConversationId = currentConversationIdRef.current.trim();
@@ -219,7 +206,7 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
       // An import that settles after its upload context was invalidated must
       // not resurrect cleared attachments: the files landed under the old
       // workdir, so their relative paths are stale there.
-      if (!isAgentModeRef.current || (isTargetDisplayed && workdirRef.current !== targetWorkdir)) {
+      if (isTargetDisplayed && workdirRef.current !== targetWorkdir) {
         addNotify("warning", "上传目标已失效，已忽略本次导入的文件");
         return;
       }
@@ -262,7 +249,7 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
     ],
   );
 
-  // Shared import skeleton: single-flight guard, mode/workdir preconditions,
+  // Shared import skeleton: single-flight guard, workspace precondition,
   // busy state, result merge, and error routing to the owning conversation.
   const runUploadTask = useCallback(
     async (task: {
@@ -272,10 +259,6 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
     }) => {
       if (uploadTaskActiveRef.current) {
         addNotify("warning", "当前正在上传文件，请稍候");
-        return;
-      }
-      if (!isAgentMode) {
-        setErrorMessage("文件上传仅在 tools 模式可用。");
         return;
       }
       if (!workdir) {
@@ -310,7 +293,6 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
       appendImportedFiles,
       captureUploadTarget,
       currentConversationIdRef,
-      isAgentMode,
       setErrorMessage,
       workdir,
     ],

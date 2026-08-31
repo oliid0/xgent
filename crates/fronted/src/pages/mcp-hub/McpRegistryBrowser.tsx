@@ -1009,7 +1009,7 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
   const [activeQuery, setActiveQuery] = useState("");
   const [items, setItems] = useState<McpRegistryCard[]>([]);
   const [nextCursor, setNextCursor] = useState<string | undefined>();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [prefetchedPage, setPrefetchedPage] = useState<PrefetchedMcpPage | null>(null);
   const loadMoreInFlightRef = useRef(false);

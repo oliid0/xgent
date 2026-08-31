@@ -19,6 +19,7 @@ export type ModelOption = {
 };
 
 export type ProviderRuntimeConfig = {
+  providerConfigId: string;
   baseUrl: string;
   isFullUrl: boolean;
   apiKey: string;

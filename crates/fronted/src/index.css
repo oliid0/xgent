@@ -2453,14 +2453,6 @@
     background: color-mix(in srgb, var(--background) calc(0.58 * 100%), transparent);
   }
 
-  .settings-page-compact [data-settings-section="providers"] {
-    padding-inline: 0;
-  }
-
-  .settings-page-compact [data-settings-section="providers"] .settings-section-shell {
-    max-width: none;
-  }
-
   .provider-list {
     gap: 10px;
   }
@@ -2493,6 +2485,26 @@
 .settings-page {
   color: var(--color-content-primary);
   background: var(--color-background);
+}
+
+.settings-page,
+.settings-page *,
+.settings-page *::before,
+.settings-page *::after {
+  box-sizing: border-box;
+}
+
+.settings-page [data-settings-section],
+.settings-page .settings-section-shell,
+.settings-page .settings-section-shell > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.settings-page input,
+.settings-page textarea,
+.settings-page select {
+  max-width: 100%;
 }
 
 .settings-page-desktop {
@@ -2537,11 +2549,6 @@
     display: block;
     flex-shrink: 0;
     color: inherit;
-  }
-
-  .settings-page-compact [data-settings-section="memory"] {
-    padding-inline: 0;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .settings-memory-panel {

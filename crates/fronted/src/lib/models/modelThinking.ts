@@ -100,10 +100,11 @@ const FALLBACK_LEVELS: readonly ThinkingLevel[] = ["minimal", "low", "medium", "
 
 function fallbackCapability(providerId: CatalogAppProviderId, modelId: string) {
   if (providerId === "claude_code" && isAnthropicAdaptiveModelId(modelId)) {
-    // pi-ai 对未显式禁用的基础档默认支持 minimal；仅 xhigh/max 需要 opt-in。
+    // Keep the adaptive generations aligned with the authoritative catalog:
+    // these models start at low, while xhigh remains family-specific.
     const levels: ThinkingLevel[] = anthropicModelSupportsXHigh(modelId)
-      ? ["minimal", "low", "medium", "high", "xhigh", "max"]
-      : ["minimal", "low", "medium", "high", "max"];
+      ? ["low", "medium", "high", "xhigh", "max"]
+      : ["low", "medium", "high", "max"];
     return { reasoning: true, levels, alwaysOn: false, fromCatalog: false };
   }
   return { reasoning: true, levels: [...FALLBACK_LEVELS], alwaysOn: false, fromCatalog: false };
@@ -129,15 +130,7 @@ export function resolveModelThinking(
     ? entry.thinking
       ? {
           reasoning: true,
-          // Anthropic 的 pi-ai 模型只用 map 显式声明 xhigh/max；基础 minimal
-          // 缺省可用。目录源未列出 minimal 时在消费边界补回，避免 UI 与真实
-          // getSupportedThinkingLevels() 漂移。
-          levels:
-            providerId === "claude_code" &&
-            isAnthropicAdaptiveModelId(trimmedId) &&
-            !entry.thinking.levels.includes("minimal")
-              ? (["minimal", ...entry.thinking.levels] as ThinkingLevel[])
-              : [...entry.thinking.levels],
+          levels: [...entry.thinking.levels],
           alwaysOn: !entry.thinking.off,
           fromCatalog: true,
         }

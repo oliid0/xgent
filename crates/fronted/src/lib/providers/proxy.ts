@@ -9,6 +9,7 @@ export const XAGENT_UPSTREAM_URL_HEADER = "x-xagent-upstream-url";
 export const XAGENT_UPSTREAM_USER_AGENT_HEADER = "x-xagent-upstream-user-agent";
 export const XAGENT_UPSTREAM_CONTENT_TYPE_HEADER = "x-xagent-upstream-content-type";
 export const XAGENT_OAUTH_ACCOUNT_ID_HEADER = "x-xagent-oauth-account-id";
+export const XAGENT_PROVIDER_CONFIG_ID_HEADER = "x-xagent-provider-config-id";
 // 布尔标记头：声明该请求经系统代理出网。代理地址/凭据只存于桌面 Rust 侧，
 // 由本地反代按此头选择带代理的 client（x-xagent-* 头不会转发给上游）。
 export const XAGENT_USE_SYSTEM_PROXY_HEADER = "x-xagent-use-system-proxy";
@@ -36,15 +37,31 @@ export function buildUpstreamHeaderOverrideHeaders(
 
 let proxyServerInfoPromise: Promise<ProxyServerInfo> | null = null;
 
+export function resolveProxyServerBaseUrl(
+  rawBaseUrl: string,
+  browserOrigin = typeof window !== "undefined" ? window.location?.origin : undefined,
+): string {
+  const trimmed = String(rawBaseUrl ?? "").trim();
+  if (!trimmed) throw new Error("Local proxy base URL is empty");
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed, browserOrigin);
+  } catch (error) {
+    throw new Error(
+      `Local proxy base URL must be absolute: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (!matchesHttpProtocol(parsed.protocol) || !parsed.host) {
+    throw new Error("Local proxy base URL must start with http:// or https://");
+  }
+  return parsed.toString().replace(/\/+$/, "");
+}
+
 function normalizeProxyServerInfo(info: ProxyServerInfo): ProxyServerInfo {
-  const baseUrl = String(info.baseUrl ?? "")
-    .trim()
-    .replace(/\/+$/, "");
+  const baseUrl = resolveProxyServerBaseUrl(info.baseUrl);
   const token = String(info.token ?? "").trim();
 
-  if (!baseUrl) {
-    throw new Error("Local proxy base URL is empty");
-  }
   if (!token) {
     throw new Error("Local proxy token is empty");
   }
@@ -89,6 +106,10 @@ function parseAbsoluteHttpUrl(rawUrl: string, label: string): URL {
   return parsed;
 }
 
+function matchesHttpProtocol(protocol: string): boolean {
+  return protocol === "http:" || protocol === "https:";
+}
+
 export function buildProxyBaseUrl(
   providerId: ProviderId,
   upstreamBaseUrl: string,
@@ -119,7 +140,7 @@ export function buildProxyBaseUrl(
     throw new Error("Base URL cannot include query parameters or fragments");
   }
 
-  const normalizedProxyServerBaseUrl = proxyServerBaseUrl.trim().replace(/\/+$/, "");
+  const normalizedProxyServerBaseUrl = resolveProxyServerBaseUrl(proxyServerBaseUrl);
   if (options?.isFullUrl) {
     return {
       baseUrl: `${normalizedProxyServerBaseUrl}/proxy/${providerId}`,
@@ -143,10 +164,7 @@ export function buildImageProxyUrl(imageUrl: string, proxyServerBaseUrl: string)
 
   const parsed = parseAbsoluteHttpUrl(normalizedImageUrl, "Image URL");
 
-  const normalizedProxyServerBaseUrl = proxyServerBaseUrl.trim().replace(/\/+$/, "");
-  if (!normalizedProxyServerBaseUrl) {
-    throw new Error("Local proxy base URL is empty");
-  }
+  const normalizedProxyServerBaseUrl = resolveProxyServerBaseUrl(proxyServerBaseUrl);
   return `${normalizedProxyServerBaseUrl}/image-proxy?url=${encodeURIComponent(parsed.toString())}`;
 }
 
@@ -196,7 +214,12 @@ export async function prepareProxyRequest(
   providerId: ProviderId,
   upstreamBaseUrl: string,
   headers: Record<string, string>,
-  options?: { useSystemProxy?: boolean; oauthAccountId?: string; isFullUrl?: boolean },
+  options?: {
+    useSystemProxy?: boolean;
+    oauthAccountId?: string;
+    providerConfigId?: string;
+    isFullUrl?: boolean;
+  },
 ): Promise<PreparedProxyRequest> {
   const proxyServerInfo = await getProxyServerInfo();
   const { baseUrl, upstreamOrigin, upstreamUrl } = buildProxyBaseUrl(
@@ -217,6 +240,9 @@ export async function prepareProxyRequest(
       ...(options?.useSystemProxy ? { [XAGENT_USE_SYSTEM_PROXY_HEADER]: "1" } : {}),
       ...(options?.oauthAccountId?.trim()
         ? { [XAGENT_OAUTH_ACCOUNT_ID_HEADER]: options.oauthAccountId.trim() }
+        : {}),
+      ...(options?.providerConfigId?.trim()
+        ? { [XAGENT_PROVIDER_CONFIG_ID_HEADER]: options.providerConfigId.trim() }
         : {}),
     },
   };

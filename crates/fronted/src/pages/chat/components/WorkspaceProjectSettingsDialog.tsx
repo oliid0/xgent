@@ -24,10 +24,10 @@ export function WorkspaceProjectSettingsDialog(props: {
         if (!isOpen) onClose();
       }}
       title={t("chat.workspaceSettings")}
-      subtitle={project.path}
-      width="min(52rem, calc(100dvw - var(--spacing-8)))"
-      maxHeight="min(46rem, calc(100dvh - var(--spacing-8)))"
-      touchPresentation="fullscreen"
+      width="var(--xagent-dialog-width-md)"
+      maxHeight="var(--xagent-dialog-height-md)"
+      touchPresentation="bottom-sheet"
+      bottomSheetHeight="tall"
     >
       <VStack gap={4} width="100%">
         <HStack gap={3} vAlign="center" width="100%">
@@ -37,7 +37,7 @@ export function WorkspaceProjectSettingsDialog(props: {
               <Text type="label" weight="semibold" maxLines={1}>
                 {project.name}
               </Text>
-              <Text type="supporting" color="secondary" maxLines={1}>
+              <Text type="supporting" color="secondary" maxLines={2} wordBreak="break-all">
                 {project.path}
               </Text>
             </VStack>

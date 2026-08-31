@@ -4,7 +4,7 @@ import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { FileInput } from "@astryxdesign/core/FileInput";
 import { Icon } from "@astryxdesign/core/Icon";
-import { HStack, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { Grid, HStack, Section, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
@@ -282,30 +282,29 @@ export function McpImportView(props: {
                 );
               })}
             </TabList>
-            <HStack width="100%" gap={2} hAlign="end" vAlign="end" wrap="wrap">
-              <StackItem size="fill">
-                <FileInput
-                  label={t("mcpHub.importFromFile")}
-                  isLabelHidden
-                  mode="input"
-                  width="100%"
-                  value={selectedFile}
-                  accept=".json,.toml,application/json,text/plain"
-                  maxSize={MAX_MCP_CONFIG_FILE_BYTES}
-                  isLoading={filePicking}
-                  isDisabled={filePicking || loading}
-                  placeholder={t("mcpHub.importFromFileHint")}
-                  onChange={(files) => {
-                    const file = Array.isArray(files) ? files[0] : files;
-                    setSelectedFile(file ?? null);
-                    if (file) void scanSelectedFile(file);
-                  }}
-                />
-              </StackItem>
+            <FileInput
+              label={t("mcpHub.importFromFile")}
+              isLabelHidden
+              mode="input"
+              width="100%"
+              value={selectedFile}
+              accept=".json,.toml,application/json,text/plain"
+              maxSize={MAX_MCP_CONFIG_FILE_BYTES}
+              isLoading={filePicking}
+              isDisabled={filePicking || loading}
+              placeholder={t("mcpHub.importFromFileHint")}
+              onChange={(files) => {
+                const file = Array.isArray(files) ? files[0] : files;
+                setSelectedFile(file ?? null);
+                if (file) void scanSelectedFile(file);
+              }}
+            />
+            <Grid columns={{ minWidth: 140, max: 2, repeat: "fit" }} gap={2} width="100%">
               <Button
                 label={t("mcpHub.importRescan")}
                 variant="secondary"
                 size="sm"
+                width="100%"
                 isLoading={loading}
                 isDisabled={loading}
                 onClick={() => void rescan()}
@@ -314,10 +313,11 @@ export function McpImportView(props: {
                 label={`${t("mcpHub.importButton")}${selected.size > 0 ? ` (${selected.size})` : ""}`}
                 variant="primary"
                 size="sm"
+                width="100%"
                 isDisabled={selected.size === 0 || loading}
                 onClick={importSelected}
               />
-            </HStack>
+            </Grid>
           </VStack>
 
           {activeScan ? (

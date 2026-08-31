@@ -542,7 +542,13 @@ export function SettingsPage(props: SettingsPageProps) {
                   paddingBlockStart={2}
                   vAlign="center"
                 >
-                  <Heading level={2}>{sectionLabels[section]}</Heading>
+                  <HStack
+                    width="100%"
+                    maxWidth="var(--xagent-settings-content-max-width)"
+                    style={{ marginInline: "auto" }}
+                  >
+                    <Heading level={2}>{sectionLabels[section]}</Heading>
+                  </HStack>
                 </HStack>
               </LayoutHeader>
             ) : null}
@@ -554,8 +560,9 @@ export function SettingsPage(props: SettingsPageProps) {
                 maxWidth="var(--xagent-settings-content-max-width)"
                 height="100%"
                 minHeight={sectionManagesScroll ? 0 : "100%"}
-                padding={sectionManagesScroll ? 0 : 3}
+                padding={3}
                 className="settings-section-shell settings-section-enter"
+                style={{ marginInline: "auto" }}
               >
                 {sectionContent}
               </VStack>

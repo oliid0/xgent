@@ -819,12 +819,10 @@ export function ChatPage(props: ChatPageProps) {
   const activeWorkspaceProjectPath = activeWorkspaceProject?.path.trim() ?? "";
   const sidebarScope = useMemo<SidebarScope>(
     () =>
-      isAgentMode
-        ? activeWorkspaceProjectPath
-          ? { kind: "workdir", cwd: activeWorkspaceProjectPath }
-          : { kind: "none" }
-        : { kind: "unscoped" },
-    [activeWorkspaceProjectPath, isAgentMode],
+      activeWorkspaceProjectPath
+        ? { kind: "workdir", cwd: activeWorkspaceProjectPath }
+        : { kind: "none" },
+    [activeWorkspaceProjectPath],
   );
   useEffect(() => {
     sidebarStore.setScope(sidebarScope);
@@ -1530,9 +1528,9 @@ export function ChatPage(props: ChatPageProps) {
 
   const isDraftConversation = !historyItems.some((item) => item.id === currentConversationId);
   const canShowTrajectory =
-    isAgentMode &&
-    !isDraftConversation &&
-    (historyRenderItems.length > 0 || isSending || isConversationRunning(currentConversationId));
+    isSending ||
+    isConversationRunning(currentConversationId) ||
+    (!isDraftConversation && historyRenderItems.length > 0);
   useEffect(() => {
     if (!canShowTrajectory && chatSurface === "trajectory") {
       setChatSurface("conversation");
@@ -1547,7 +1545,8 @@ export function ChatPage(props: ChatPageProps) {
   const displayedConversationWorkdir =
     currentConversationPersistedCwd ||
     currentConversationRuntimeWorkdir ||
-    (isAgentMode ? activeWorkspaceProjectPath || workdir : "");
+    activeWorkspaceProjectPath ||
+    workdir;
   // Execution mode controls which tools the model may call, not whether the user
   // can inspect and operate the workspace UI directly.
   const terminalProjectPath = activeWorkspaceProjectPath.trim();
@@ -2138,7 +2137,6 @@ export function ChatPage(props: ChatPageProps) {
     importReadableFiles,
     removePendingUpload,
   } = usePendingUploads({
-    isAgentMode,
     workdir: displayedConversationWorkdir,
     conversationId: currentConversationId,
     currentConversationIdRef,
@@ -3570,20 +3568,19 @@ export function ChatPage(props: ChatPageProps) {
     const effectiveExecutionMode =
       overrides?.executionModeOverride ?? settings.system.executionMode;
     const effectiveIsAgentMode = isAgentExecutionMode(effectiveExecutionMode);
-    const effectiveWorkdir = (
-      overrides?.workdirOverride ??
-      (effectiveIsAgentMode ? (runtimeEntry?.workdir ?? settings.system.workdir) : "")
-    ).trim();
+    const runtimeWorkdir = (overrides?.workdirOverride ?? runtimeEntry?.workdir ?? "").trim();
+    const effectiveWorkdir =
+      runtimeWorkdir || activeWorkspaceProjectPath || settings.system.workdir.trim();
     const effectiveSelectedSystemToolIds =
       overrides?.selectedSystemToolIdsOverride ?? settings.system.selectedSystemTools;
     const effectiveProjectPathKey = workspaceProjectPathKey(effectiveWorkdir);
     const effectiveProject = workspaceProjects.find(
       (project) => workspaceProjectPathKey(project.path) === effectiveProjectPathKey,
     );
-    let additionalRoots: AdditionalProjectRoot[] = [];
-    if (effectiveIsAgentMode && effectiveProject && desktopBridgeEnabled) {
+    const loadAdditionalRoots = async (): Promise<AdditionalProjectRoot[]> => {
+      if (!effectiveIsAgentMode || !effectiveProject || !desktopBridgeEnabled) return [];
       try {
-        additionalRoots = (await listWorkspaceRootGrants(effectiveProject))
+        return (await listWorkspaceRootGrants(effectiveProject))
           .filter((grant) => grant.state === "active")
           .map((grant) => ({
             id: grant.id,
@@ -3593,8 +3590,9 @@ export function ChatPage(props: ChatPageProps) {
           }));
       } catch (error) {
         console.warn("Failed to load workspace root grants", error);
+        return [];
       }
-    }
+    };
     const effectiveAssociatedSshHostIds = getSshProjectHostIds(
       settings.ssh,
       effectiveProjectPathKey,
@@ -4012,6 +4010,7 @@ export function ChatPage(props: ChatPageProps) {
       }
     }
     markConversationRunStarted();
+    const additionalRoots = await loadAdditionalRoots();
     // Clear the composer in the same beat as the optimistic user bubble.
     // Everything below until the runtime turn starts (initial history persist,
     // skills refresh, memory overview read) may

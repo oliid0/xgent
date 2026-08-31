@@ -883,7 +883,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   const [storeSort, setStoreSort] = useState<ClawHubSort>("downloads");
   const [storeItems, setStoreItems] = useState<ClawHubSkillCard[]>([]);
   const [storeCursor, setStoreCursor] = useState<string | null>(null);
-  const [storeLoading, setStoreLoading] = useState(false);
+  const [storeLoading, setStoreLoading] = useState(true);
   const [storeLoadingMore, setStoreLoadingMore] = useState(false);
   const [prefetchedStorePage, setPrefetchedStorePage] = useState<PrefetchedStorePage | null>(null);
   const storeLoadMoreInFlightRef = useRef(false);
@@ -1374,12 +1374,12 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   useEffect(() => {
     if (view !== "store" || lockedByChatMode) return;
     let cancelled = false;
+    setStoreLoading(true);
+    setStoreError(null);
+    setStoreCursor(null);
+    setPrefetchedStorePage(null);
     const timer = window.setTimeout(async () => {
       const query = storeQuery.trim();
-      setStoreLoading(true);
-      setStoreError(null);
-      setStoreCursor(null);
-      setPrefetchedStorePage(null);
       try {
         if (query) {
           const results = await searchClawHubSkills({ query, limit: STORE_PAGE_LIMIT });
@@ -2669,7 +2669,7 @@ function SkillsImportView(props: {
               ))}
             </TabList>
 
-            <HStack width="100%" gap={1} vAlign="center" hAlign="end" wrap="wrap">
+            <Grid columns={{ minWidth: 140, max: 3, repeat: "fit" }} gap={2} width="100%">
               <input
                 ref={folderInputRef}
                 type="file"
@@ -2687,6 +2687,7 @@ function SkillsImportView(props: {
                 label={t("settings.skillsLocalImport")}
                 variant="secondary"
                 size="sm"
+                width="100%"
                 isLoading={localBundleImporting}
                 isDisabled={loading || importing || localBundleImporting}
                 onClick={() => folderInputRef.current?.click()}
@@ -2695,6 +2696,7 @@ function SkillsImportView(props: {
                 label={t("settings.skillsImportRescan")}
                 variant="secondary"
                 size="sm"
+                width="100%"
                 isDisabled={loading || importing}
                 onClick={onRescan}
               />
@@ -2705,12 +2707,13 @@ function SkillsImportView(props: {
                     (importableSelectedCount > 0 ? " (" + importableSelectedCount + ")" : "")
                   }
                   size="sm"
+                  width="100%"
                   isLoading={importing}
                   isDisabled={selected.size === 0 || importing || loading}
                   onClick={onImport}
                 />
               ) : null}
-            </HStack>
+            </Grid>
           </VStack>
 
           {bulkMode ? (
@@ -3502,6 +3505,7 @@ function SkillsStoreView(props: {
           {loading && items.length === 0 ? (
             <Section padding={3} variant="transparent">
               <VStack gap={2}>
+                <Spinner size="sm" label={t("settings.skillsStoreLoadingTitle")} />
                 <Skeleton width="35%" height="var(--spacing-4)" radius="rounded" index={0} />
                 <Skeleton width="100%" height="var(--spacing-10)" radius="rounded" index={1} />
                 <Skeleton width="100%" height="var(--spacing-10)" radius="rounded" index={2} />
@@ -3669,10 +3673,13 @@ function SkillsStoreView(props: {
           {cursor && !searching ? (
             <VStack ref={loadMoreSentinelRef} width="100%" padding={2}>
               {loadingMore ? (
-                <Grid columns={{ minWidth: 280, max: 2, repeat: "fit" }} gap={2} width="100%">
-                  <Skeleton width="100%" height="5rem" radius="rounded" index={0} />
-                  <Skeleton width="100%" height="5rem" radius="rounded" index={1} />
-                </Grid>
+                <VStack gap={2} width="100%">
+                  <Spinner size="sm" label={t("settings.skillsStoreLoadMore")} />
+                  <Grid columns={{ minWidth: 280, max: 2, repeat: "fit" }} gap={2} width="100%">
+                    <Skeleton width="100%" height="5rem" radius="rounded" index={0} />
+                    <Skeleton width="100%" height="5rem" radius="rounded" index={1} />
+                  </Grid>
+                </VStack>
               ) : (
                 <Text type="supporting" color="secondary">
                   {t("settings.skillsStoreLoadMore")}

@@ -369,6 +369,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
         const list = await fetchModelsFromApi(providerType, url, key, {
           authMode: supportsOAuth ? authMode : "api-key",
           oauthAccountId: authMode === "oauth-managed" ? managedOAuthAccountId : undefined,
+          providerConfigId: initialData?.id,
           customHeaders,
           useSystemProxy,
           isFullUrl,
@@ -385,6 +386,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
       authMode,
       customHeaders,
       isFullUrl,
+      initialData?.id,
       managedOAuthAccountId,
       modelsUrl,
       providerType,
