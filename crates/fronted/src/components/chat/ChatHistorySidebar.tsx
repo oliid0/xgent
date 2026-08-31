@@ -1282,8 +1282,10 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false);
   const projectsCollapsed = !workspaceManagerOpen;
   const projectsDisclosure = useCollapsible({
-    isOpen: workspaceManagerOpen,
-    onOpenChange: setWorkspaceManagerOpen,
+    isCollapsible: {
+      isOpen: workspaceManagerOpen,
+      onOpenChange: setWorkspaceManagerOpen,
+    },
   });
   // Recent conversations always belong to the selected workspace. Keeping
   // this lane visible avoids the former unrelated second disclosure state.

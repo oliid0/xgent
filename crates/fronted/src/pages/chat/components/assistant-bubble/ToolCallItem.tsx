@@ -258,7 +258,7 @@ export function ToolCallDetail({ item, isRunning }: { item: ToolTraceItem; isRun
           cancelled={askDetails?.cancelled === true}
           timedOut={askDetails?.timedOut === true}
           interactive={Boolean(isRunning) && !result}
-          deadlineAt={getAskUserQuestionDeadlineAt(item.toolCall.id)}
+          deadlineAt={getAskUserQuestionDeadlineAt(item.toolCall.id) ?? undefined}
           onSubmit={submitAskUserQuestion}
         />
       ) : null}

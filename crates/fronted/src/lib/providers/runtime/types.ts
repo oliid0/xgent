@@ -46,7 +46,7 @@ export type ToolChoice =
       name: string;
     };
 
-export type StreamOptionsEx = SimpleStreamOptions & {
+export type StreamOptionsEx = Omit<SimpleStreamOptions, "toolChoice"> & {
   /** Custom fetch boundary used by native adapters for response capture. */
   fetch?: typeof globalThis.fetch;
   /** Provider-specific sampling fields preserved by the payload pipeline. */
