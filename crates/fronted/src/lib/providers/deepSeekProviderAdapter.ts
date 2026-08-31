@@ -10,7 +10,8 @@ import type { ProviderId } from "../settings";
 
 type PayloadHook = (payload: unknown, model: Model<Api>) => unknown | Promise<unknown>;
 
-type DeepSeekStreamOptionsLike = SimpleStreamOptions & {
+type DeepSeekStreamOptionsLike = {
+  reasoning?: SimpleStreamOptions["reasoning"];
   onPayload?: PayloadHook;
   deepSeekDsmlToolCallRepair?: boolean;
   deepSeekProviderAdapter?: boolean;
