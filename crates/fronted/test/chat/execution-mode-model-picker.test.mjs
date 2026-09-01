@@ -116,7 +116,10 @@ test("composer exposes the requested controls through Astryx slots", () => {
   assert.match(composerSource, /<Selector[\s\S]*?settings\.commandSafety[\s\S]*?placement="above"/);
   assert.match(composerSource, /sendActions=\{/);
   assert.match(composerSource, /const usedTokens = Math\.max\(0, tokens \?\? 0\)/);
-  assert.doesNotMatch(composerSource, /chat\.composer\.addMention/);
+  assert.match(
+    composerSource,
+    /chat\.composer\.addMention[\s\S]*?insertText\("@"\)[\s\S]*?\.focus\(\)/,
+  );
   assert.doesNotMatch(composerSource, /chat\.composer\.addCommand/);
 });
 

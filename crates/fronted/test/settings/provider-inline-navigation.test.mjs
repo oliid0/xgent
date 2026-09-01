@@ -76,7 +76,12 @@ test("nested settings workflows render as content layers instead of nested dialo
   assert.match(hooksSource, /if \(modalOpen\)[\s\S]*?<HookModal/);
   assert.match(cronSource, /if \(detail\.open\)[\s\S]*?<CronTaskModal/);
   assert.match(sshSource, /if \(modalOpen\)[\s\S]*?<SshHostModal/);
-  assert.match(sshSource, /if \(importOpen\)[\s\S]*?<SshImportModal/);
+  assert.doesNotMatch(sshSource, /SshImportModal/);
+  assert.match(sshSource, /<Collapsible[\s\S]*?isOpen=\{importOpen\}/);
+  assert.match(
+    sshSource,
+    /scanSshImportCandidates\(existingHosts\)[\s\S]*?onImport\(selectedImportCandidates\)/,
+  );
 });
 
 test("third-party provider imports stay reachable when automatic discovery finds nothing", () => {
