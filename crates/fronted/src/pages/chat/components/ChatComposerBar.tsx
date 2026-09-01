@@ -589,9 +589,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
         <Switch
           label={webSearchTooltip}
           value={chatRuntimeControls.nativeWebSearchEnabled}
-          onChange={(value) =>
-            onChatRuntimeControlsChange({ nativeWebSearchEnabled: value })
-          }
+          onChange={(value) => onChatRuntimeControlsChange({ nativeWebSearchEnabled: value })}
           labelIcon={chatRuntimeControls.nativeWebSearchEnabled ? Globe : GlobeOff}
           labelPosition="start"
           labelSpacing="spread"
@@ -607,9 +605,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 ? t("chat.runtime.thinkingOn")
                 : t("chat.runtime.thinkingOff")
           }
-          value={
-            thinkingSupported && (chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn)
-          }
+          value={thinkingSupported && (chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn)}
           onChange={(value) => onChatRuntimeControlsChange({ thinkingEnabled: value })}
           labelIcon={
             chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn ? Lightbulb : LightbulbOff
@@ -625,9 +621,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           <List density="compact">
             <ListItem
               label={
-                voiceInputActive
-                  ? t("chat.composer.voiceListening")
-                  : t("chat.composer.voiceInput")
+                voiceInputActive ? t("chat.composer.voiceListening") : t("chat.composer.voiceInput")
               }
               description={voiceInputError ?? voiceInputPartial ?? undefined}
               startContent={voiceInputActive ? <Loader2 /> : <Mic />}
@@ -721,9 +715,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
         />
         <ListItem
           label={webSearchTooltip}
-          startContent={
-            chatRuntimeControls.nativeWebSearchEnabled ? <Globe /> : <GlobeOff />
-          }
+          startContent={chatRuntimeControls.nativeWebSearchEnabled ? <Globe /> : <GlobeOff />}
           endContent={chatRuntimeControls.nativeWebSearchEnabled ? <Check /> : undefined}
           isSelected={chatRuntimeControls.nativeWebSearchEnabled}
           isDisabled={controlsDisabled}

@@ -52,9 +52,7 @@ import {
 import type { WorkspaceCodeEditorOpenRequest } from "../components/workspace-editor/WorkspaceCodeEditorOverlay";
 import type { WorkspaceFilePreviewOpenRequest } from "../components/workspace-editor/WorkspaceFilePreviewOverlay";
 import type { WorkspaceSshTerminalOpenRequest } from "../components/workspace-editor/WorkspaceSshTerminalOverlay";
-import {
-  isWorkspacePreviewPath,
-} from "../components/workspace-editor/workspaceImagePreview";
+import { isWorkspacePreviewPath } from "../components/workspace-editor/workspaceImagePreview";
 import { WorkspaceNavigationRail } from "../components/workspace-tools/WorkspaceNavigationRail";
 import { WorkspaceSidePanel } from "../components/workspace-tools/WorkspaceSidePanel";
 import { useLocale } from "../i18n";
