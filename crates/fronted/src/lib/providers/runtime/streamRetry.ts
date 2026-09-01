@@ -309,37 +309,37 @@ export function withStreamRetry(
         !disabled &&
         attempt < maxAttempts
       ) {
-          if (mayReplayVisibleText && committedTextIndex !== undefined) {
-            replayTarget = { contentIndex: committedTextIndex, text: committedText };
-            visibleFailure = terminal;
+        if (mayReplayVisibleText && committedTextIndex !== undefined) {
+          replayTarget = { contentIndex: committedTextIndex, text: committedText };
+          visibleFailure = terminal;
+        }
+        const errorMessage = terminalMessage(terminal)?.errorMessage || "Unknown error";
+        attempt += 1;
+        const plannedDelayMs = Math.round(computeStreamRetryBackoffMs(attempt - 1));
+        options?.onRetry?.(attempt - 1, maxAttempts - 1, errorMessage, plannedDelayMs);
+        hasRetried = true;
+        try {
+          await sleepWithAbort(plannedDelayMs, signal);
+          source = factory();
+          continue;
+        } catch {
+          // Stopped mid-backoff: the terminal must say "aborted", not replay
+          // the prior attempt's transport error. Handing the consumer that
+          // error instead loses the fact that the user stopped the run — the
+          // abort branches upstream never fire, so nothing records the
+          // cancellation and the status row falls back to a spinner.
+          if (signal?.aborted) {
+            const aborted = buildAbortedAssistantMessage(
+              terminalMessage(terminal) as AssistantMessage | undefined,
+            );
+            output.push({ type: "error", reason: "aborted", error: aborted });
+            output.end(aborted);
+            return;
           }
-          const errorMessage = terminalMessage(terminal)?.errorMessage || "Unknown error";
-          attempt += 1;
-          const plannedDelayMs = Math.round(computeStreamRetryBackoffMs(attempt - 1));
-          options?.onRetry?.(attempt - 1, maxAttempts - 1, errorMessage, plannedDelayMs);
-          hasRetried = true;
-          try {
-            await sleepWithAbort(plannedDelayMs, signal);
-            source = factory();
-            continue;
-          } catch {
-            // Stopped mid-backoff: the terminal must say "aborted", not replay
-            // the prior attempt's transport error. Handing the consumer that
-            // error instead loses the fact that the user stopped the run — the
-            // abort branches upstream never fire, so nothing records the
-            // cancellation and the status row falls back to a spinner.
-            if (signal?.aborted) {
-              const aborted = buildAbortedAssistantMessage(
-                terminalMessage(terminal) as AssistantMessage | undefined,
-              );
-              output.push({ type: "error", reason: "aborted", error: aborted });
-              output.end(aborted);
-              return;
-            }
-            // The next attempt failed to start — surface the prior attempt's
-            // real failure below instead of hanging the consumer on a retry
-            // that will never happen.
-          }
+          // The next attempt failed to start — surface the prior attempt's
+          // real failure below instead of hanging the consumer on a retry
+          // that will never happen.
+        }
       }
 
       if (replaying && visibleFailure) {

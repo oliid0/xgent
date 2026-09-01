@@ -499,12 +499,8 @@ export function SettingsPage(props: SettingsPageProps) {
                             <ListItem
                               key={item.id}
                               label={item.label}
-                              startContent={
-                                <Icon icon={item.icon} size="md" color="inherit" />
-                              }
-                              endContent={
-                                <Icon icon={ChevronRight} size="sm" color="tertiary" />
-                              }
+                              startContent={<Icon icon={item.icon} size="md" color="inherit" />}
+                              endContent={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
                               onClick={() => {
                                 setSection(item.id);
                                 setMobileDetailOpen(true);

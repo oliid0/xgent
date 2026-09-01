@@ -2902,41 +2902,41 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                 </Button>
               ) : (
                 <Button
-                label={t("sidebar.soulMenu")}
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setSoulLauncherOpen((open) => !open);
-                }}
-                aria-expanded={soulLauncherOpen}
-                className="h-10 w-full min-w-0 justify-start gap-2.5 rounded-xl px-2 text-[calc(13px*var(--zone-font-scale,1))] font-normal text-foreground/85 shadow-none hover:bg-foreground/[0.08] hover:text-foreground"
-                tooltip={t("sidebar.soulMenu")}
-              >
-                <AstryxStack
-                  as="span"
-                  direction="horizontal"
-                  className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500/25 via-sky-500/20 to-amber-500/25 ring-1 ring-border/70"
+                  label={t("sidebar.soulMenu")}
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setSoulLauncherOpen((open) => !open);
+                  }}
+                  aria-expanded={soulLauncherOpen}
+                  className="h-10 w-full min-w-0 justify-start gap-2.5 rounded-xl px-2 text-[calc(13px*var(--zone-font-scale,1))] font-normal text-foreground/85 shadow-none hover:bg-foreground/[0.08] hover:text-foreground"
+                  tooltip={t("sidebar.soulMenu")}
                 >
-                  <Sparkles className="h-3.5 w-3.5 text-violet-500" />
-                </AstryxStack>
-                <AstryxText as="span" type="inherit" className="min-w-0 flex-1 text-left">
-                  <AstryxText as="span" type="inherit" className="block truncate font-medium">
-                    {soulDocument?.metadata.name.trim() || "XGent"}
-                  </AstryxText>
-                  <AstryxText
+                  <AstryxStack
                     as="span"
-                    type="inherit"
-                    className="block truncate text-[10px] leading-3 text-muted-foreground"
+                    direction="horizontal"
+                    className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500/25 via-sky-500/20 to-amber-500/25 ring-1 ring-border/70"
                   >
-                    {t("sidebar.soul")}
+                    <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+                  </AstryxStack>
+                  <AstryxText as="span" type="inherit" className="min-w-0 flex-1 text-left">
+                    <AstryxText as="span" type="inherit" className="block truncate font-medium">
+                      {soulDocument?.metadata.name.trim() || "XGent"}
+                    </AstryxText>
+                    <AstryxText
+                      as="span"
+                      type="inherit"
+                      className="block truncate text-[10px] leading-3 text-muted-foreground"
+                    >
+                      {t("sidebar.soul")}
+                    </AstryxText>
                   </AstryxText>
-                </AstryxText>
-                <ChevronRight
-                  className={cn(
-                    "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
-                    soulLauncherOpen && "-rotate-90",
-                  )}
-                />
+                  <ChevronRight
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+                      soulLauncherOpen && "-rotate-90",
+                    )}
+                  />
                 </Button>
               )}
               <AstryxStack direction="horizontal" gap={1} vAlign="center">

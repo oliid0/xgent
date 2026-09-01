@@ -28,14 +28,14 @@ import {
 } from "react";
 import { ArrowLeft, Globe, Lock, Plus, RefreshCw, X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
-import { useCompactViewport } from "../../../lib/responsive/compactViewport";
-import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
 import {
   browserSessionController,
   HIDDEN_BROWSER_VIEWPORT,
   MAX_BROWSER_SESSIONS,
   normalizeBrowserAddress,
 } from "../../../lib/browser/browserSessionController";
+import { useCompactViewport } from "../../../lib/responsive/compactViewport";
+import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
 
 function hostname(url: string) {
   try {
@@ -214,7 +214,9 @@ function BrowserViewportSlot() {
     if (!localNativeSurface) return;
     const previous = previousSessionRef.current;
     if (previous && previous !== activeSessionId) {
-      void browserSessionController.setViewport(previous, HIDDEN_BROWSER_VIEWPORT).catch(() => undefined);
+      void browserSessionController
+        .setViewport(previous, HIDDEN_BROWSER_VIEWPORT)
+        .catch(() => undefined);
     }
     previousSessionRef.current = activeSessionId;
     syncViewport();
@@ -234,7 +236,9 @@ function BrowserViewportSlot() {
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
       const current = previousSessionRef.current;
       if (current) {
-        void browserSessionController.setViewport(current, HIDDEN_BROWSER_VIEWPORT).catch(() => undefined);
+        void browserSessionController
+          .setViewport(current, HIDDEN_BROWSER_VIEWPORT)
+          .catch(() => undefined);
       }
     };
   }, [localNativeSurface, syncViewport]);

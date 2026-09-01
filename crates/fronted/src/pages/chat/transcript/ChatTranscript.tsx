@@ -214,8 +214,7 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
                 style={{
                   flex: 1,
                   minHeight: 0,
-                  justifyContent:
-                    mobileExperience && showStartChatState ? "flex-end" : undefined,
+                  justifyContent: mobileExperience && showStartChatState ? "flex-end" : undefined,
                   paddingBlockEnd:
                     mobileExperience && showStartChatState ? "var(--spacing-4)" : undefined,
                 }}
