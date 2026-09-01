@@ -309,7 +309,7 @@ export function withStreamRetry(
         !disabled &&
         attempt < maxAttempts
       ) {
-          if (mayReplayVisibleText) {
+          if (mayReplayVisibleText && committedTextIndex !== undefined) {
             replayTarget = { contentIndex: committedTextIndex, text: committedText };
             visibleFailure = terminal;
           }

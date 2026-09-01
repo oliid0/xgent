@@ -1949,7 +1949,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   const mobileSidebarHeader = (
     <AstryxStack direction="horizontal" width="100%" gap={2} vAlign="center">
       <StackItem size="fill">
-        <AstryxText as="span" type="heading" className="tracking-[-0.02em]">
+        <AstryxText as="span" type="large" className="tracking-[-0.02em]">
           XGent
         </AstryxText>
       </StackItem>
