@@ -26,11 +26,7 @@ impl Default for AccessSettingsPayload {
             web_ui_port: default_web_ui_port(),
             lan_control_url: String::new(),
             prefer_lan_pc_execution: false,
-            allow_terminal: false,
-            allow_browser_automation: false,
-            allow_ssh: false,
-            allow_git: false,
-            allow_file_write: false,
+            blocked_local_capabilities: Vec::new(),
             cloud_execution_enabled: false,
             github_owner: String::new(),
             github_repository: default_github_repository(),
@@ -49,6 +45,19 @@ pub(crate) fn normalize_access_settings_payload(
         _ => "lan",
     };
     let repository = payload.github_repository.trim();
+    let mut blocked_local_capabilities = payload
+        .blocked_local_capabilities
+        .into_iter()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| {
+            matches!(
+                value.as_str(),
+                "terminal" | "browser_automation" | "ssh" | "git" | "file_write"
+            )
+        })
+        .collect::<Vec<_>>();
+    blocked_local_capabilities.sort();
+    blocked_local_capabilities.dedup();
     AccessSettingsPayload {
         web_ui_enabled: payload.web_ui_enabled,
         web_ui_scope: scope.to_string(),
@@ -59,11 +68,7 @@ pub(crate) fn normalize_access_settings_payload(
         },
         lan_control_url: payload.lan_control_url.trim().to_string(),
         prefer_lan_pc_execution: payload.prefer_lan_pc_execution,
-        allow_terminal: payload.allow_terminal,
-        allow_browser_automation: payload.allow_browser_automation,
-        allow_ssh: payload.allow_ssh,
-        allow_git: payload.allow_git,
-        allow_file_write: payload.allow_file_write,
+        blocked_local_capabilities,
         cloud_execution_enabled: payload.cloud_execution_enabled,
         github_owner: payload.github_owner.trim().to_string(),
         github_repository: if repository.is_empty() {

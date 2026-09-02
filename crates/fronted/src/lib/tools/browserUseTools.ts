@@ -237,14 +237,27 @@ async function waitForDomStable(
   let stableCount = 0;
   let previous = "";
   let latest: BrowserActionResponse | null = null;
+  let latestError: unknown = null;
 
   while (Date.now() < deadline) {
     if (signal?.aborted) throw new Error("Cancelled");
-    latest = await controller.action(
-      "page_info",
-      {},
-      { sessionId, timeoutMs: Math.min(5_000, timeoutMs) },
-    );
+    try {
+      latest = await controller.action(
+        "page_info",
+        {},
+        { sessionId, timeoutMs: Math.min(5_000, normalizedTimeout) },
+      );
+      latestError = null;
+    } catch (error) {
+      // A document swap can cancel an in-flight evaluation. CDP clients wait
+      // for the next lifecycle event; WebView-backed platforms retry after the
+      // new document becomes evaluable instead of failing the tool call.
+      latestError = error;
+      stableCount = 0;
+      previous = "";
+      await abortableDelay(200, signal);
+      continue;
+    }
     const info = (latest.data ?? {}) as PageInfo;
     const fingerprint = pageFingerprint(info);
     const complete = info.readyState === "complete" || info.readyState === "interactive";
@@ -264,6 +277,12 @@ async function waitForDomStable(
     stable: false,
     elapsedMs: Date.now() - startedAt,
     page: (latest?.data ?? {}) as PageInfo,
+    error:
+      latestError instanceof Error
+        ? latestError.message
+        : latestError
+          ? String(latestError)
+          : undefined,
   };
 }
 
@@ -367,6 +386,7 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
           sessionId,
           url: normalizeBrowserAddress(requiredString(args.url, "url")),
         });
+        await abortableDelay(250, signal);
         result = {
           session,
           dom: await waitForDomStable(
@@ -435,7 +455,16 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
               },
             }
           : response;
-        if (action === "navigate") {
+        if (
+          action === "navigate" ||
+          action === "reload" ||
+          action === "go_back" ||
+          action === "go_forward" ||
+          action === "click" ||
+          action === "type" ||
+          action === "press_key"
+        ) {
+          await abortableDelay(250, signal);
           result = {
             ...browserResult,
             dom: await waitForDomStable(

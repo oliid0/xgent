@@ -1,6 +1,6 @@
 use std::{
     net::{Ipv4Addr, TcpListener},
-    sync::Arc,
+    sync::{Arc, RwLock},
     time::Duration,
 };
 
@@ -63,12 +63,24 @@ pub struct ProxyServerInfo {
 pub struct ProxyServerState {
     info: ProxyServerInfo,
     client: reqwest::Client,
-    provider_oauth: Arc<ProviderOAuthService>,
+    provider_oauth: RwLock<Option<Arc<ProviderOAuthService>>>,
 }
 
 impl ProxyServerState {
     pub fn info(&self) -> ProxyServerInfo {
         self.info.clone()
+    }
+
+    pub fn set_provider_oauth(
+        &self,
+        provider_oauth: Arc<ProviderOAuthService>,
+    ) -> Result<(), String> {
+        let mut current = self
+            .provider_oauth
+            .write()
+            .map_err(|_| "provider OAuth proxy state is unavailable".to_string())?;
+        *current = Some(provider_oauth);
+        Ok(())
     }
 }
 
@@ -90,7 +102,7 @@ pub fn proxy_get_server_info(state: tauri::State<'_, Arc<ProxyServerState>>) -> 
 }
 
 pub fn start_proxy_server(
-    provider_oauth: Arc<ProviderOAuthService>,
+    provider_oauth: Option<Arc<ProviderOAuthService>>,
 ) -> Result<Arc<ProxyServerState>, String> {
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
         .map_err(|err| format!("绑定本地代理端口失败：{err}"))?;
@@ -111,7 +123,7 @@ pub fn start_proxy_server(
             base_url: proxy_base_url,
             token: Uuid::new_v4().to_string(),
         },
-        provider_oauth,
+        provider_oauth: RwLock::new(provider_oauth),
         client: reqwest::Client::builder()
             .no_proxy()
             .build()
@@ -428,8 +440,25 @@ async fn handle_proxy(
             .map(str::trim)
             .filter(|value| !value.is_empty())
         {
+            let provider_oauth = match state.provider_oauth.read() {
+                Ok(provider_oauth) => provider_oauth.clone(),
+                Err(_) => {
+                    return error_response(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "OpenAI OAuth proxy state is unavailable",
+                        &headers,
+                    )
+                }
+            };
+            let Some(provider_oauth) = provider_oauth else {
+                return error_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "OpenAI OAuth is unavailable on this device; use an API key or repair secure credential storage",
+                    &headers,
+                );
+            };
             let (access_token, resolved_account_id) =
-                match state.provider_oauth.codex_access_token(Some(account_id)).await {
+                match provider_oauth.codex_access_token(Some(account_id)).await {
                     Ok(result) => result,
                     Err(error) => {
                         return error_response(

@@ -494,11 +494,7 @@ export type AccessSettings = {
   lanControlUrl: string;
   /** Prefer the paired LAN computer for supported tool execution on native mobile. */
   preferLanPcExecution: boolean;
-  allowTerminal: boolean;
-  allowBrowserAutomation: boolean;
-  allowSsh: boolean;
-  allowGit: boolean;
-  allowFileWrite: boolean;
+  blockedLocalCapabilities: Array<"terminal" | "browser_automation" | "ssh" | "git" | "file_write">;
   cloudExecutionEnabled: boolean;
   githubOwner: string;
   githubRepository: string;
@@ -1438,17 +1434,27 @@ function normalizeIntegerInRange(
 
 export function normalizeAccessSettings(input: unknown): AccessSettings {
   const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const blockedLocalCapabilities = Array.isArray(obj.blockedLocalCapabilities)
+    ? Array.from(
+        new Set(
+          obj.blockedLocalCapabilities.filter(
+            (value): value is AccessSettings["blockedLocalCapabilities"][number] =>
+              value === "terminal" ||
+              value === "browser_automation" ||
+              value === "ssh" ||
+              value === "git" ||
+              value === "file_write",
+          ),
+        ),
+      )
+    : [];
   return {
     webUiEnabled: obj.webUiEnabled === true,
     webUiScope: obj.webUiScope === "loopback" ? "loopback" : "lan",
     webUiPort: normalizeIntegerInRange(obj.webUiPort, 1, 65_535, 28_367),
     lanControlUrl: normalizeOptionalText(obj.lanControlUrl),
     preferLanPcExecution: obj.preferLanPcExecution === true,
-    allowTerminal: obj.allowTerminal === true,
-    allowBrowserAutomation: obj.allowBrowserAutomation === true,
-    allowSsh: obj.allowSsh === true,
-    allowGit: obj.allowGit === true,
-    allowFileWrite: obj.allowFileWrite === true,
+    blockedLocalCapabilities,
     cloudExecutionEnabled: obj.cloudExecutionEnabled === true,
     githubOwner: normalizeOptionalText(obj.githubOwner),
     githubRepository: normalizeOptionalText(obj.githubRepository) || "agent-temp",

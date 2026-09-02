@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_mobile_execution::{CancelRequest as MobileCancelRequest, MobileExecutionExt};
 
 use crate::commands::shell::{run_mobile_shell, MobileShellRunInput};
@@ -116,7 +116,6 @@ fn script_with_context(script: String, context: Option<HashMap<String, String>>)
 #[tauri::command(rename_all = "snake_case")]
 pub async fn hook_run_script(
     app: AppHandle,
-    lan_pc_client: tauri::State<'_, Arc<LanPcClient>>,
     registry: tauri::State<'_, Arc<MobileHookScopeRegistry>>,
     workdir: Option<String>,
     script: String,
@@ -124,6 +123,9 @@ pub async fn hook_run_script(
     scope_id: Option<String>,
     context: Option<HashMap<String, String>>,
 ) -> Result<crate::runtime::shell_types::ShellRunResponse, String> {
+    let lan_pc_client = app
+        .try_state::<Arc<LanPcClient>>()
+        .map(|state| Arc::clone(state.inner()));
     let workdir = workdir
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
@@ -136,7 +138,7 @@ pub async fn hook_run_script(
     registry.register(&scope_id, &run_id)?;
     let result = run_mobile_shell(
         app,
-        lan_pc_client.inner(),
+        lan_pc_client.as_deref(),
         MobileShellRunInput {
             workdir,
             command: script_with_context(script, context),
@@ -266,10 +268,12 @@ pub async fn hook_run_http_requests(
 #[tauri::command(rename_all = "snake_case")]
 pub async fn hook_cancel_scope(
     app: AppHandle,
-    lan_pc_client: tauri::State<'_, Arc<LanPcClient>>,
     registry: tauri::State<'_, Arc<MobileHookScopeRegistry>>,
     scope_id: String,
 ) -> Result<(), String> {
+    let lan_pc_client = app
+        .try_state::<Arc<LanPcClient>>()
+        .map(|state| Arc::clone(state.inner()));
     let run_ids = registry.cancel(scope_id.trim())?;
     let settings = crate::commands::settings::open_db()
         .and_then(|connection| crate::commands::settings::load_access_settings(&connection))
@@ -280,9 +284,12 @@ pub async fn hook_cancel_scope(
             .cancel(MobileCancelRequest {
                 run_id: run_id.clone(),
             });
-        if let Some(settings) = settings.as_ref().filter(|settings| {
-            settings.prefer_lan_pc_execution && !settings.lan_control_url.trim().is_empty()
-        }) {
+        if let (Some(settings), Some(lan_pc_client)) = (
+            settings.as_ref().filter(|settings| {
+                settings.prefer_lan_pc_execution && !settings.lan_control_url.trim().is_empty()
+            }),
+            lan_pc_client.as_ref(),
+        ) {
             let _ = lan_pc_client
                 .invoke(
                     Some(&settings.lan_control_url),

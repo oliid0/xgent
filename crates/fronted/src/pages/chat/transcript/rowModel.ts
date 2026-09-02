@@ -67,6 +67,7 @@ export type AssistantFooterRenderUnit = {
 
 export type AssistantStatusRenderUnit = {
   kind: "status";
+  hasRunningToolCall: boolean;
 };
 
 export type AssistantRenderUnit =
@@ -382,7 +383,12 @@ function buildAssistantUnits(input: BuildAssistantUnitsInput): AssistantUnitRow[
       mutable: true,
       renderMode,
       compacted,
-      unit: { kind: "status" },
+      unit: {
+        kind: "status",
+        hasRunningToolCall: rows.some(
+          (row) => row.unit.kind === "block" && row.unit.hasRunningToolCall,
+        ),
+      },
     });
   } else {
     const changedFilesCandidate = hasChangedFilesCandidate(rounds);

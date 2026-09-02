@@ -336,7 +336,7 @@ export function buildToolsSuffix(
             runtimePlatform === "macos"
               ? "- macOS prefers zsh, then Bash, then sh. Use POSIX/zsh-compatible commands."
               : runtimePlatform === "android"
-                ? "- Android executes inside the installed Alpine PRoot environment. Use POSIX shell commands and only capability packs reported by Mobile execution settings."
+                ? "- Android executes inside the installed Alpine PRoot environment. Use POSIX shell commands, prefer capability packs reported by MobileEnvironment, and use apk for task dependencies only when package management is reported available."
                 : runtimePlatform === "ios"
                   ? "- iOS/iPadOS exposes a restricted a-Shell-compatible native command catalog. Arbitrary WASI modules stay disabled until enforceable interruption is available; do not assume Linux process APIs, Node.js/npm, or arbitrary native packages."
                   : "- Linux prefers Bash, then zsh, then sh. Use POSIX/bash-compatible commands.",
@@ -349,16 +349,33 @@ export function buildToolsSuffix(
         "## Bash",
         "- Bash.cwd follows the path rules in **Workspace & Paths**.",
         ...bashPlatformLines,
+        ...(has("MobileEnvironment")
+          ? [
+              "- Before the first mobile Bash call, use MobileEnvironment to inspect the verified backend and installed toolchains. Do not guess that a command or package manager exists.",
+              "- Android packages come from Alpine `apk`; iOS native commands are signed into the app and compatible WebAssembly commands use a-Shell `pkg`. Use `python3 -m pip` only when MobileEnvironment reports Python.",
+            ]
+          : []),
         '- To run installed Skill scripts, use cwd="skill://<enabled-skill>/scripts" plus a relative command.',
         "- Passing an absolute Skill script path inside the command is also accepted as long as the referenced Skill is enabled in this conversation.",
         "- For endpoint tests with curl, include an explicit timeout such as `--max-time 30` so a stalled local server or upstream request cannot hold the whole turn indefinitely.",
-        "- Use ManagedProcess instead of Bash for dev servers, watchers, preview servers, or anything that should keep running.",
+        runtimePlatform === "android" || runtimePlatform === "ios"
+          ? "- ManagedProcess is unavailable on native mobile. Do not start servers, watchers, detached jobs, or other long-lived background processes."
+          : "- Use ManagedProcess instead of Bash for dev servers, watchers, preview servers, or anything that should keep running.",
         "- For reading, listing, or searching Skill content, always use Read/List/Glob/Grep with skill:// paths — Bash cat/ls/find/grep/rg/sed/awk against ~/.xgent/skills is still routed back to the file tools.",
         "- Do not guess `skills/` paths inside the workspace; if a Skill is needed, enable it in the chat Skills selector first.",
         "- Do not cd into ~/.xgent/skills or workspace skills/ guesses.",
       ].join("\n"),
     );
   }
+
+  sections.push(
+    [
+      "## File Preview",
+      "- The Xgent interface automatically renders successfully written HTML and Markdown files beneath the assistant reply, with Preview and Source tabs and source copying.",
+      "- Do not start a local/dev/preview server and do not open the embedded or external browser merely to preview one HTML or Markdown file.",
+      "- Start a managed server only when the user's task explicitly requires a running multi-file application or server behavior that a single-file preview cannot provide.",
+    ].join("\n"),
+  );
 
   if (has("Agent")) {
     sections.push(
@@ -390,7 +407,7 @@ export function buildToolsSuffix(
     sections.push(
       [
         "## ManagedProcess",
-        '- Use ManagedProcess(action="start") for dev servers, preview servers, watchers, or other long-running foreground commands that should continue while you run tests.',
+        '- Use ManagedProcess(action="start") for required application servers, watchers, or other long-running foreground commands that should continue while you run tests; never start one only to preview a single HTML or Markdown file.',
         "- Do not append `&` to ManagedProcess.command. It starts the process in the background, redirects stdout/stderr to a log file, and returns process_id/pid/log_path.",
         '- Use ManagedProcess(action="status") to inspect running processes, action="read_log" to inspect recent output, and action="stop" to terminate the process tree.',
         managedProcessPreference,

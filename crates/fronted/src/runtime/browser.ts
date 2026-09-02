@@ -18,6 +18,7 @@ type RpcResponse<T> = {
 type BrowserEventEnvelope = {
   subscriptionId?: string;
   payload?: unknown;
+  sessionRevoked?: boolean;
 };
 
 const eventHandlers = new Map<string, (payload: unknown) => void>();
@@ -29,6 +30,14 @@ function ensureEventSource() {
   source.onmessage = (message) => {
     try {
       const envelope = JSON.parse(message.data) as BrowserEventEnvelope;
+      if (envelope.sessionRevoked === true) {
+        globalThis.sessionStorage?.removeItem(LOCAL_ACCESS_CSRF_KEY);
+        eventHandlers.clear();
+        source.close();
+        if (eventSource === source) eventSource = undefined;
+        globalThis.dispatchEvent?.(new Event(LOCAL_ACCESS_SESSION_CHANGED_EVENT));
+        return;
+      }
       if (envelope.subscriptionId) {
         eventHandlers.get(envelope.subscriptionId)?.(envelope.payload);
       }

@@ -26,6 +26,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { createPortal } from "react-dom";
 import { ArrowLeft, Globe, Lock, Plus, RefreshCw, X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import {
@@ -280,7 +281,7 @@ export function BrowserPanel() {
   }, [state.panelOpen]);
   if (!state.panelOpen) return null;
 
-  return (
+  return createPortal(
     <VStack
       as="section"
       width="100%"
@@ -289,9 +290,10 @@ export function BrowserPanel() {
       data-edge-swipe-ignore
       aria-label={t("browser.title")}
       style={{
-        position: "absolute",
+        position: "fixed",
         inset: 0,
-        zIndex: 66,
+        zIndex: "var(--xgent-z-browser-overlay)",
+        isolation: "isolate",
         paddingBlockStart: "env(safe-area-inset-top, 0px)",
         paddingBlockEnd: "env(safe-area-inset-bottom, 0px)",
         backgroundColor: "var(--color-background-primary)",
@@ -356,6 +358,7 @@ export function BrowserPanel() {
           </LayoutContent>
         }
       />
-    </VStack>
+    </VStack>,
+    document.body,
   );
 }

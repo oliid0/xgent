@@ -29,16 +29,10 @@ pub struct AccessSettingsPayload {
     /// Route supported mobile tool calls to the paired LAN computer when available.
     #[serde(default)]
     pub prefer_lan_pc_execution: bool,
+    /// Paired WebUI devices are full Xgent clients by default. This denylist
+    /// only records capabilities the desktop owner explicitly disabled.
     #[serde(default)]
-    pub allow_terminal: bool,
-    #[serde(default)]
-    pub allow_browser_automation: bool,
-    #[serde(default)]
-    pub allow_ssh: bool,
-    #[serde(default)]
-    pub allow_git: bool,
-    #[serde(default)]
-    pub allow_file_write: bool,
+    pub blocked_local_capabilities: Vec<String>,
     #[serde(default)]
     pub cloud_execution_enabled: bool,
     #[serde(default)]

@@ -15,6 +15,10 @@ private struct PermissionRequestArgs: Decodable {
     let permissions: [String]?
 }
 
+private struct CurrentLocationArgs: Decodable {
+    let timeoutMs: UInt64
+}
+
 private struct CalendarRangeArgs: Decodable {
     let startMs: Int64
     let endMs: Int64
@@ -48,8 +52,38 @@ private struct ComposeMessageArgs: Decodable {
     let body: String?
 }
 
+private struct CalendarEventPayload: Encodable {
+    let id: String
+    let title: String
+    let startMs: Int64
+    let endMs: Int64
+    let allDay: Bool
+    let location: String?
+    let notes: String?
+    let calendar: String?
+}
+
+private struct ReminderPayload: Encodable {
+    let id: String
+    let title: String
+    let dueMs: Int64?
+    let completed: Bool
+    let notes: String?
+    let list: String?
+}
+
+private struct LocationPayload: Encodable {
+    let latitude: Double
+    let longitude: Double
+    let altitudeMeters: Double?
+    let accuracyMeters: Double
+    let timestampMs: Int64
+    let provider: String?
+}
+
 private enum PermissionAlias {
     static let microphone = "microphone"
+    static let camera = "camera"
     static let calendar = "calendar"
     static let reminders = "reminders"
     static let photos = "photos"
@@ -62,6 +96,8 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
     private let eventStore = EKEventStore()
     private let locationManager = CLLocationManager()
     private var locationPermissionInvokes: [Invoke] = []
+    private var locationReadInvoke: Invoke?
+    private var locationTimeout: DispatchWorkItem?
 
     private var audioEngine: AVAudioEngine?
     private var speechRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -91,6 +127,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             "homeAvailable": false,
             "permissionAliases": [
                 "microphone": PermissionAlias.microphone,
+                "camera": PermissionAlias.camera,
                 "calendar": PermissionAlias.calendar,
                 "reminders": PermissionAlias.reminders,
                 "photos": PermissionAlias.photos,
@@ -114,6 +151,10 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
         switch alias {
         case PermissionAlias.microphone:
             requestVoicePermissions(invoke)
+        case PermissionAlias.camera:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] _ in
+                DispatchQueue.main.async { self?.checkPermissions(invoke) }
+            }
         case PermissionAlias.calendar:
             requestEventPermission(invoke, entity: .event)
         case PermissionAlias.reminders:
@@ -168,6 +209,37 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
         }
     }
 
+    @objc func getCurrentLocation(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(CurrentLocationArgs.self)
+        let timeoutMs = min(30_000, max(1_000, args.timeoutMs))
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                invoke.reject("Location service is unavailable")
+                return
+            }
+            guard self.locationPermissionState() == "granted" else {
+                invoke.reject("Location permission is required")
+                return
+            }
+            guard self.locationReadInvoke == nil else {
+                invoke.reject("Another location request is already active")
+                return
+            }
+
+            self.locationReadInvoke = invoke
+            self.locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+            self.locationManager.requestLocation()
+            let timeout = DispatchWorkItem { [weak self] in
+                self?.finishLocation(error: "Location request timed out")
+            }
+            self.locationTimeout = timeout
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + .milliseconds(Int(timeoutMs)),
+                execute: timeout
+            )
+        }
+    }
+
     @objc func listCalendarEvents(_ invoke: Invoke) throws {
         let args = try invoke.parseArgs(CalendarRangeArgs.self)
         guard canReadEvents(.event) else {
@@ -185,17 +257,19 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             .sorted { $0.startDate < $1.startDate }
             .prefix(clampedLimit(args.limit))
             .map { event in
-                [
-                    "id": event.eventIdentifier ?? "",
-                    "title": event.title ?? "Untitled event",
-                    "startMs": milliseconds(event.startDate),
-                    "endMs": milliseconds(event.endDate),
-                    "allDay": event.isAllDay,
-                    "location": event.location.map { $0 as Any } ?? NSNull(),
-                    "notes": event.notes.map { $0 as Any } ?? NSNull(),
-                    "calendar": event.calendar.map { $0.title as Any } ?? NSNull(),
-                ] as [String: Any]
+                CalendarEventPayload(
+                    id: event.eventIdentifier ?? "",
+                    title: event.title ?? "Untitled event",
+                    startMs: milliseconds(event.startDate),
+                    endMs: milliseconds(event.endDate),
+                    allDay: event.isAllDay,
+                    location: event.location,
+                    notes: event.notes,
+                    calendar: event.calendar?.title
+                )
             }
+        // The Encodable overload supports an array root; dictionaries with
+        // `Any` values do not conform to Encodable and fail Swift compilation.
         invoke.resolve(Array(events))
     }
 
@@ -221,15 +295,14 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
                 }
                 .prefix(self.clampedLimit(args.limit))
                 .map { reminder in
-                    [
-                        "id": reminder.calendarItemIdentifier,
-                        "title": reminder.title ?? "Untitled reminder",
-                        "dueMs": self.reminderDueDate(reminder)
-                            .map { self.milliseconds($0) as Any } ?? NSNull(),
-                        "completed": reminder.isCompleted,
-                        "notes": reminder.notes.map { $0 as Any } ?? NSNull(),
-                        "list": reminder.calendar.map { $0.title as Any } ?? NSNull(),
-                    ] as [String: Any]
+                    ReminderPayload(
+                        id: reminder.calendarItemIdentifier,
+                        title: reminder.title ?? "Untitled reminder",
+                        dueMs: self.reminderDueDate(reminder).map { self.milliseconds($0) },
+                        completed: reminder.isCompleted,
+                        notes: reminder.notes,
+                        list: reminder.calendar?.title
+                    )
                 }
             invoke.resolve(Array(payload))
         }
@@ -514,6 +587,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
     private func permissionPayload() -> [String: String] {
         [
             PermissionAlias.microphone: combinedVoicePermissionState(),
+            PermissionAlias.camera: cameraPermissionState(),
             PermissionAlias.calendar: eventPermissionState(.event),
             PermissionAlias.reminders: eventPermissionState(.reminder),
             PermissionAlias.photos: photoPermissionState(),
@@ -541,6 +615,15 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
         return "prompt"
     }
 
+    private func cameraPermissionState() -> String {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: return "granted"
+        case .denied, .restricted: return "denied"
+        case .notDetermined: return "prompt"
+        @unknown default: return "prompt"
+        }
+    }
+
     private func eventPermissionState(_ entity: EKEntityType) -> String {
         let state = EKEventStore.authorizationStatus(for: entity)
         if #available(iOS 17.0, *) {
@@ -556,7 +639,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
         case .authorized: return "granted"
         case .denied, .restricted: return "denied"
         case .notDetermined: return "prompt"
-        @unknown default: return "prompt"
+        default: return "prompt"
         }
     }
 
@@ -642,6 +725,43 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
         for invoke in invokes {
             checkPermissions(invoke)
         }
+    }
+
+    func locationManager(
+        _ manager: CLLocationManager,
+        didUpdateLocations locations: [CLLocation]
+    ) {
+        guard let location = locations.max(by: { $0.timestamp < $1.timestamp }) else {
+            finishLocation(error: "Core Location returned no location")
+            return
+        }
+        finishLocation(location: location)
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        finishLocation(error: "Unable to read location: \(error.localizedDescription)")
+    }
+
+    private func finishLocation(location: CLLocation? = nil, error: String? = nil) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        guard let invoke = locationReadInvoke else { return }
+        locationReadInvoke = nil
+        locationTimeout?.cancel()
+        locationTimeout = nil
+        guard let location else {
+            invoke.reject(error ?? "Location request failed")
+            return
+        }
+        invoke.resolve(
+            LocationPayload(
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                altitudeMeters: location.verticalAccuracy >= 0 ? location.altitude : nil,
+                accuracyMeters: max(0, location.horizontalAccuracy),
+                timestampMs: milliseconds(location.timestamp),
+                provider: "core-location"
+            )
+        )
     }
 }
 

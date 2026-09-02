@@ -147,12 +147,12 @@ export const xgentCompactTheme = defineTheme({
     "--color-border": ["#0000001a", "#ffffff1f"],
     "--size-element-sm": "40px",
     "--size-element-md": "44px",
-    "--size-element-lg": "48px",
+    "--size-element-lg": "56px",
     "--radius-inner": "12px",
     "--radius-element": "16px",
-    "--radius-container": "24px",
-    "--radius-page": "30px",
-    "--radius-chat": "28px",
+    "--radius-container": "30px",
+    "--radius-page": "36px",
+    "--radius-chat": "34px",
     "--shadow-low":
       "0 1px 2px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 24%)), 0 10px 28px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 34%))",
     "--shadow-med":
@@ -180,10 +180,10 @@ export const xgentCompactTheme = defineTheme({
     list: {
       base: {
         overflow: "hidden",
-        border: "1px solid var(--color-border)",
+        border: "none",
         borderRadius: "var(--radius-container)",
         backgroundColor: "var(--color-background-card)",
-        boxShadow: "var(--shadow-low)",
+        boxShadow: "none",
       },
     },
     "list-item": {
@@ -195,21 +195,21 @@ export const xgentCompactTheme = defineTheme({
     },
     "side-nav-item": {
       base: {
-        minHeight: "44px",
+        minHeight: "52px",
         borderRadius: "var(--radius-element)",
       },
     },
     "segmented-control": {
       base: {
-        minHeight: "44px",
-        padding: "3px",
+        minHeight: "52px",
+        padding: "4px",
         borderRadius: "var(--radius-full)",
         backgroundColor: "var(--color-background-muted)",
       },
     },
     "segmented-control-item": {
       base: {
-        minHeight: "36px",
+        minHeight: "44px",
         borderRadius: "var(--radius-full)",
       },
       selected: {
@@ -219,6 +219,7 @@ export const xgentCompactTheme = defineTheme({
     },
     "chat-composer": {
       base: {
+        minHeight: "112px",
         backgroundColor: "var(--color-background-surface)",
         borderRadius: "var(--radius-chat)",
         boxShadow: "var(--shadow-med)",

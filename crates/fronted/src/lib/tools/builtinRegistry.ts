@@ -31,7 +31,9 @@ import { createFsTools } from "./fsTools";
 import { createMcpManagerTools } from "./mcpManagerTools";
 import { createMcpTools } from "./mcpTools";
 import { createMemoryTools } from "./memoryTools";
+import { createMobileExecutionTools } from "./mobileExecutionTools";
 import { createMobilePersonalAssistantTools } from "./mobilePersonalAssistantTools";
+import { createMobilePreviewTools } from "./mobilePreviewTools";
 import { createExitPlanModeTools, isPlanModeAllowedTool } from "./planModeTools";
 import { resolveRuntimeToolCapabilities, resolveRuntimeToolHost } from "./runtimeToolCapabilities";
 import { createShellTools, type ShellSandboxSettings } from "./shellTools";
@@ -259,7 +261,16 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       workdir: params.workdir,
       mode: params.memoryToolMode ?? "rw",
     }),
+    ...(runtimeToolHost === "native-mobile" ? [createMobileExecutionTools()] : []),
     ...(runtimeToolHost === "native-mobile" ? [createMobilePersonalAssistantTools()] : []),
+    ...(runtimeToolHost === "native-mobile" && params.runtimeScope === "chat"
+      ? [
+          createMobilePreviewTools({
+            workdir: params.workdir,
+            projectPathKey: params.projectPathKey,
+          }),
+        ]
+      : []),
     createBrowserUseTools({
       delegateToLanPc: {
         enabled:

@@ -51,7 +51,7 @@ pub struct AutomationScheduler {
     #[cfg(mobile)]
     app_handle: tauri::AppHandle,
     #[cfg(mobile)]
-    lan_pc_client: Arc<LanPcClient>,
+    lan_pc_client: Option<Arc<LanPcClient>>,
     scheduler: AsyncMutex<Option<JobScheduler>>,
     jobs: AsyncMutex<HashMap<String, ScheduledJob>>,
     active_runs: Mutex<HashSet<String>>,
@@ -76,7 +76,7 @@ impl AutomationScheduler {
     pub fn new(
         store: Arc<AutomationStore>,
         app_handle: tauri::AppHandle,
-        lan_pc_client: Arc<LanPcClient>,
+        lan_pc_client: Option<Arc<LanPcClient>>,
     ) -> Self {
         Self {
             store,
@@ -469,7 +469,7 @@ impl AutomationScheduler {
                     task,
                     workdir,
                     self.app_handle.clone(),
-                    Arc::clone(&self.lan_pc_client),
+                    self.lan_pc_client.clone(),
                 )
                 .await
             }
@@ -547,7 +547,7 @@ async fn execute_mobile_bash(
     task: &CronTask,
     workdir: String,
     app_handle: tauri::AppHandle,
-    lan_pc_client: Arc<LanPcClient>,
+    lan_pc_client: Option<Arc<LanPcClient>>,
 ) -> CompletedRun {
     let started_at = now_ms();
     let overall = Instant::now();
@@ -570,7 +570,7 @@ async fn execute_mobile_bash(
     let timeout_ms = task.timeout_seconds.saturating_mul(1_000);
     let result = run_mobile_shell(
         app_handle,
-        &lan_pc_client,
+        lan_pc_client.as_deref(),
         MobileShellRunInput {
             workdir,
             command: script.clone(),

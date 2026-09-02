@@ -2,6 +2,77 @@
 
 import PackageDescription
 
+private struct PythonFramework {
+    let target: String
+    let file: String
+}
+
+private let pythonFrameworks = [
+    PythonFramework(target: "python3_ios_runtime", file: "python3_ios"),
+    PythonFramework(target: "python3_ios_asyncio", file: "python3_ios-_asyncio"),
+    PythonFramework(target: "python3_ios_bisect", file: "python3_ios-_bisect"),
+    PythonFramework(target: "python3_ios_blake2", file: "python3_ios-_blake2"),
+    PythonFramework(target: "python3_ios_bz2", file: "python3_ios-_bz2"),
+    PythonFramework(target: "python3_ios_codecs_cn", file: "python3_ios-_codecs_cn"),
+    PythonFramework(target: "python3_ios_codecs_hk", file: "python3_ios-_codecs_hk"),
+    PythonFramework(target: "python3_ios_codecs_iso2022", file: "python3_ios-_codecs_iso2022"),
+    PythonFramework(target: "python3_ios_codecs_jp", file: "python3_ios-_codecs_jp"),
+    PythonFramework(target: "python3_ios_codecs_kr", file: "python3_ios-_codecs_kr"),
+    PythonFramework(target: "python3_ios_codecs_tw", file: "python3_ios-_codecs_tw"),
+    PythonFramework(target: "python3_ios_contextvars", file: "python3_ios-_contextvars"),
+    PythonFramework(target: "python3_ios_crypt", file: "python3_ios-_crypt"),
+    PythonFramework(target: "python3_ios_csv", file: "python3_ios-_csv"),
+    PythonFramework(target: "python3_ios_ctypes", file: "python3_ios-_ctypes"),
+    PythonFramework(target: "python3_ios_datetime", file: "python3_ios-_datetime"),
+    PythonFramework(target: "python3_ios_dbm", file: "python3_ios-_dbm"),
+    PythonFramework(target: "python3_ios_decimal", file: "python3_ios-_decimal"),
+    PythonFramework(target: "python3_ios_elementtree", file: "python3_ios-_elementtree"),
+    PythonFramework(target: "python3_ios_hashlib", file: "python3_ios-_hashlib"),
+    PythonFramework(target: "python3_ios_heapq", file: "python3_ios-_heapq"),
+    PythonFramework(target: "python3_ios_json", file: "python3_ios-_json"),
+    PythonFramework(target: "python3_ios_lsprof", file: "python3_ios-_lsprof"),
+    PythonFramework(target: "python3_ios_md5", file: "python3_ios-_md5"),
+    PythonFramework(target: "python3_ios_multibytecodec", file: "python3_ios-_multibytecodec"),
+    PythonFramework(target: "python3_ios_multiprocessing", file: "python3_ios-_multiprocessing"),
+    PythonFramework(target: "python3_ios_opcode", file: "python3_ios-_opcode"),
+    PythonFramework(target: "python3_ios_pickle", file: "python3_ios-_pickle"),
+    PythonFramework(target: "python3_ios_posixshmem", file: "python3_ios-_posixshmem"),
+    PythonFramework(target: "python3_ios_posixsubprocess", file: "python3_ios-_posixsubprocess"),
+    PythonFramework(target: "python3_ios_queue", file: "python3_ios-_queue"),
+    PythonFramework(target: "python3_ios_random", file: "python3_ios-_random"),
+    PythonFramework(target: "python3_ios_sha1", file: "python3_ios-_sha1"),
+    PythonFramework(target: "python3_ios_sha256", file: "python3_ios-_sha256"),
+    PythonFramework(target: "python3_ios_sha3", file: "python3_ios-_sha3"),
+    PythonFramework(target: "python3_ios_sha512", file: "python3_ios-_sha512"),
+    PythonFramework(target: "python3_ios_socket", file: "python3_ios-_socket"),
+    PythonFramework(target: "python3_ios_sqlite3", file: "python3_ios-_sqlite3"),
+    PythonFramework(target: "python3_ios_ssl", file: "python3_ios-_ssl"),
+    PythonFramework(target: "python3_ios_statistics", file: "python3_ios-_statistics"),
+    PythonFramework(target: "python3_ios_struct", file: "python3_ios-_struct"),
+    PythonFramework(target: "python3_ios_zoneinfo", file: "python3_ios-_zoneinfo"),
+    PythonFramework(target: "python3_ios_array", file: "python3_ios-array"),
+    PythonFramework(target: "python3_ios_audioop", file: "python3_ios-audioop"),
+    PythonFramework(target: "python3_ios_binascii", file: "python3_ios-binascii"),
+    PythonFramework(target: "python3_ios_cmath", file: "python3_ios-cmath"),
+    PythonFramework(target: "python3_ios_fcntl", file: "python3_ios-fcntl"),
+    PythonFramework(target: "python3_ios_grp", file: "python3_ios-grp"),
+    PythonFramework(target: "python3_ios_math", file: "python3_ios-math"),
+    PythonFramework(target: "python3_ios_mmap", file: "python3_ios-mmap"),
+    PythonFramework(target: "python3_ios_parser", file: "python3_ios-parser"),
+    PythonFramework(target: "python3_ios_pyexpat", file: "python3_ios-pyexpat"),
+    PythonFramework(target: "python3_ios_resource", file: "python3_ios-resource"),
+    PythonFramework(target: "python3_ios_select", file: "python3_ios-select"),
+    PythonFramework(target: "python3_ios_syslog", file: "python3_ios-syslog"),
+    PythonFramework(target: "python3_ios_termios", file: "python3_ios-termios"),
+    PythonFramework(target: "python3_ios_unicodedata", file: "python3_ios-unicodedata"),
+    PythonFramework(target: "python3_ios_zlib", file: "python3_ios-zlib"),
+]
+
+private let nativeTargetNames = [
+    "ios_system", "awk", "curl_ios", "files", "shell", "tar", "text", "ssh_cmd",
+    "dash", "vim", "lg2", "ffmpeg", "ffprobe",
+]
+
 // Tauri compiles the Swift plugin into libapp.a, but binary dependencies of
 // that static archive do not become dependencies of the generated Xcode app.
 // The iOS project therefore consumes this binary-only product directly.
@@ -13,21 +84,7 @@ let package = Package(
     products: [
         .library(
             name: "XgentMobileShellFrameworks",
-            targets: [
-                "ios_system",
-                "awk",
-                "curl_ios",
-                "files",
-                "shell",
-                "tar",
-                "text",
-                "ssh_cmd",
-                "dash",
-                "vim",
-                "lg2",
-                "ffmpeg",
-                "ffprobe",
-            ]
+            targets: nativeTargetNames + pythonFrameworks.map(\.target)
         ),
     ],
     targets: [
@@ -96,5 +153,10 @@ let package = Package(
             url: "https://github.com/holzschu/ios_system/releases/download/Auxiliary/ffprobe.xcframework.zip",
             checksum: "c66df5198becb1e0432c27c8f0df628fa185224c9f0bcff2039e3bd21246b130"
         ),
-    ]
+    ] + pythonFrameworks.map { framework in
+        .binaryTarget(
+            name: framework.target,
+            path: "Frameworks/\(framework.file).xcframework"
+        )
+    }
 )

@@ -122,6 +122,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "app.errorBoundaryReload": "重新加载",
     "app.errorBoundaryTitle": "页面出现异常",
     "app.loading": "正在加载设置...",
+    "app.mobileStartupDegraded": "部分移动服务未能启动",
     "app.name": "Xgent",
     "window.controls": "窗口控制",
     "window.minimize": "最小化",
@@ -1304,6 +1305,8 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.mobileAssistant.refresh": "刷新权限状态",
     "settings.mobileAssistant.microphone": "麦克风与语音识别",
     "settings.mobileAssistant.microphoneDescription": "将语音转换为输入框文字，不会自动发送。",
+    "settings.mobileAssistant.camera": "相机",
+    "settings.mobileAssistant.cameraDescription": "仅在你选择拍照时访问相机并将照片加入对话。",
     "settings.mobileAssistant.calendar": "日历",
     "settings.mobileAssistant.calendarDescription": "允许个人助手处理日程。",
     "settings.mobileAssistant.reminders": "提醒事项",
@@ -2289,6 +2292,17 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.accessScopeLan": "局域网设备",
     "settings.accessScopeLoopback": "仅本机",
     "settings.accessPort": "端口",
+    "settings.accessBlockTerminal": "禁止终端访问",
+    "settings.accessBlockTerminalHint": "开启后，配对设备不能创建或操作本机终端",
+    "settings.accessBlockBrowserAutomation": "禁止浏览器自动化",
+    "settings.accessBlockBrowserAutomationHint":
+      "开启后，配对设备上的 Agent 不能操作本机内置浏览器",
+    "settings.accessBlockSsh": "禁止 SSH 访问",
+    "settings.accessBlockSshHint": "开启后，配对设备不能使用本机保存的 SSH 主机配置",
+    "settings.accessBlockGit": "禁止 Git 写操作",
+    "settings.accessBlockGitHint": "开启后，配对设备仍可读取 Git，但不能暂存、提交、切换分支或同步",
+    "settings.accessBlockFileWrite": "禁止文件写入",
+    "settings.accessBlockFileWriteHint": "开启后，配对设备只能读取工作区文件",
     "settings.accessAllowTerminal": "允许终端",
     "settings.accessAllowTerminalHint": "配对设备可创建并操作本机项目终端",
     "settings.accessAllowBrowserAutomation": "允许浏览器自动化",
@@ -2302,6 +2316,9 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.accessAllowFileWriteHint": "配对设备可通过 Agent 修改工作区文件，仍遵循审批规则",
     "settings.accessPairing": "设备配对",
     "settings.accessPairedDevices": "已配对 {count} 台设备",
+    "settings.accessDeviceLastSeen": "最近使用：{time}",
+    "settings.accessRevokeDevice": "移除配对设备",
+    "settings.accessNoPairedDevices": "暂无已配对设备",
     "settings.accessNewPairingCode": "生成配对码",
     "settings.accessCloudExecution": "云端执行任务",
     "settings.accessCloudExecutionHint":
@@ -2803,6 +2820,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "app.errorBoundaryReload": "Reload",
     "app.errorBoundaryTitle": "Something went wrong",
     "app.loading": "Loading settings...",
+    "app.mobileStartupDegraded": "Some mobile services did not start",
     "app.name": "Xgent",
     "window.controls": "Window controls",
     "window.minimize": "Minimize",
@@ -4033,6 +4051,9 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.mobileAssistant.microphone": "Microphone and speech",
     "settings.mobileAssistant.microphoneDescription":
       "Transcribe speech into the composer without sending it automatically.",
+    "settings.mobileAssistant.camera": "Camera",
+    "settings.mobileAssistant.cameraDescription":
+      "Access the camera only when you choose to take a photo for a conversation.",
     "settings.mobileAssistant.calendar": "Calendar",
     "settings.mobileAssistant.calendarDescription": "Allow the assistant to work with events.",
     "settings.mobileAssistant.reminders": "Reminders",
@@ -5082,6 +5103,20 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.accessScopeLan": "LAN devices",
     "settings.accessScopeLoopback": "This device only",
     "settings.accessPort": "Port",
+    "settings.accessBlockTerminal": "Disable terminal access",
+    "settings.accessBlockTerminalHint":
+      "Prevent paired devices from creating or controlling local terminals",
+    "settings.accessBlockBrowserAutomation": "Disable browser automation",
+    "settings.accessBlockBrowserAutomationHint":
+      "Prevent agents on paired devices from operating this computer's embedded browser",
+    "settings.accessBlockSsh": "Disable SSH access",
+    "settings.accessBlockSshHint":
+      "Prevent paired devices from using SSH profiles saved on this computer",
+    "settings.accessBlockGit": "Disable Git writes",
+    "settings.accessBlockGitHint":
+      "Keep Git reads available but prevent staging, commits, branch changes, and synchronization",
+    "settings.accessBlockFileWrite": "Disable file writes",
+    "settings.accessBlockFileWriteHint": "Limit paired devices to read-only workspace file access",
     "settings.accessAllowTerminal": "Allow terminals",
     "settings.accessAllowTerminalHint":
       "Paired devices may create and control local project terminals",
@@ -5098,6 +5133,9 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
       "Paired devices may change workspace files through the Agent, subject to approvals",
     "settings.accessPairing": "Device pairing",
     "settings.accessPairedDevices": "{count} paired devices",
+    "settings.accessDeviceLastSeen": "Last used: {time}",
+    "settings.accessRevokeDevice": "Remove paired device",
+    "settings.accessNoPairedDevices": "No paired devices",
     "settings.accessNewPairingCode": "New pairing code",
     "settings.accessCloudExecution": "Cloud task execution",
     "settings.accessCloudExecutionHint":

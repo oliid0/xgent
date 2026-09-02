@@ -544,7 +544,7 @@ export function createShellTools(params: {
       : runtimePlatform === "macos"
         ? "macOS runs Bash commands with POSIX shell syntax: zsh first, then Bash, then sh."
         : runtimePlatform === "android"
-          ? "Android runs commands inside Xgent's Alpine PRoot environment. Use POSIX shell syntax and install only the named capability packs exposed by the mobile environment manager."
+          ? "Android runs commands inside Xgent's Alpine PRoot environment. Use POSIX shell syntax. Prefer the verified capability packs reported by MobileEnvironment, and use Alpine apk for a task dependency only after that tool confirms package management is available."
           : runtimePlatform === "ios"
             ? "iOS/iPadOS runs a restricted a-Shell-compatible native command set. Use POSIX syntax, do not assume Linux process APIs, Node.js, npm, arbitrary native packages, or arbitrary WASI execution, and inspect the reported mobile capabilities before choosing tools."
             : "Linux runs Bash commands with POSIX shell syntax: Bash first, then zsh, then sh.";

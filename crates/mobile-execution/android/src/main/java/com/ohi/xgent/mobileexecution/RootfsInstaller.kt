@@ -21,7 +21,7 @@ internal class RootfsInstaller(
 ) {
     fun bundledRootfsStatus(): Result<BundledRootfs> = runCatching { loadBundledRootfs() }
 
-    fun install(): BundledRootfs {
+    fun install(verifyActivated: () -> Unit): BundledRootfs {
         val bundled = loadBundledRootfs()
 
         backendDir.mkdirs()
@@ -41,7 +41,7 @@ internal class RootfsInstaller(
                 parentFile?.mkdirs()
                 writeText("${bundled.distribution} ${bundled.version}\n")
             }
-            replaceAtomically(staging, backup)
+            replaceAtomically(staging, backup, verifyActivated)
             return bundled
         } finally {
             archive.delete()
@@ -185,16 +185,26 @@ internal class RootfsInstaller(
         return output
     }
 
-    private fun replaceAtomically(staging: File, backup: File) {
+    private fun replaceAtomically(
+        staging: File,
+        backup: File,
+        verifyActivated: () -> Unit,
+    ) {
         if (backup.exists()) backup.deleteRecursively()
         if (rootfsDir.exists()) {
             require(rootfsDir.renameTo(backup)) { "could not preserve the existing rootfs" }
         }
         try {
             require(staging.renameTo(rootfsDir)) { "could not activate the new rootfs" }
+            verifyActivated()
             if (backup.exists()) backup.deleteRecursively()
         } catch (error: Throwable) {
-            if (!rootfsDir.exists() && backup.exists()) backup.renameTo(rootfsDir)
+            if (rootfsDir.exists()) rootfsDir.deleteRecursively()
+            if (backup.exists()) {
+                require(backup.renameTo(rootfsDir)) {
+                    "rootfs activation failed and the previous environment could not be restored"
+                }
+            }
             throw error
         }
     }

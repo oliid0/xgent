@@ -8,6 +8,7 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Camera,
   Check,
   Clock3,
   Cloud,
@@ -41,6 +42,12 @@ const PERMISSIONS: PermissionDescriptor[] = [
     labelKey: "settings.mobileAssistant.microphone",
     descriptionKey: "settings.mobileAssistant.microphoneDescription",
     icon: Mic,
+  },
+  {
+    id: "camera",
+    labelKey: "settings.mobileAssistant.camera",
+    descriptionKey: "settings.mobileAssistant.cameraDescription",
+    icon: Camera,
   },
   {
     id: "calendar",

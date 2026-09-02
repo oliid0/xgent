@@ -1,6 +1,8 @@
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::AppHandle;
+#[cfg(mobile)]
+use tauri::Manager;
 #[cfg(desktop)]
 use tauri::State;
 
@@ -237,7 +239,7 @@ fn build_mobile_ssh_command(
 #[cfg(mobile)]
 pub(crate) async fn run_mobile_shell(
     app: AppHandle,
-    lan_pc_client: &LanPcClient,
+    lan_pc_client: Option<&LanPcClient>,
     input: MobileShellRunInput,
 ) -> Result<ShellRunResponse, String> {
     let MobileShellRunInput {
@@ -250,9 +252,12 @@ pub(crate) async fn run_mobile_shell(
         run_id,
     } = input;
 
-    let settings = crate::commands::settings::load_access_settings(
-        &crate::commands::settings::open_db()?,
-    )?;
+    // Local native execution must survive a degraded settings database. LAN
+    // preferences are an optional routing enhancement, not a prerequisite for
+    // entering the verified a-Shell/PRoot backend.
+    let settings = crate::commands::settings::open_db()
+        .and_then(|connection| crate::commands::settings::load_access_settings(&connection))
+        .ok();
     let run_id = run_id
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
@@ -265,66 +270,79 @@ pub(crate) async fn run_mobile_shell(
         .clamp(MIN_SHELL_TIMEOUT_MS, maximum);
 
     let mut lan_fallback_error = None;
-    if settings.prefer_lan_pc_execution && !settings.lan_control_url.trim().is_empty() {
-        let remote_workdir = lan_pc_client
-            .invoke(
-                Some(&settings.lan_control_url),
-                "settings_load_all",
-                json!({}),
-            )
-            .await
-            .and_then(|value| {
-                value
-                    .get("defaultWorkdir")
-                    .and_then(|value| value.as_str())
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .map(ToOwned::to_owned)
-                    .ok_or_else(|| "paired LAN computer did not report a working directory".to_string())
-            });
-        match remote_workdir {
-            Ok(remote_workdir) => {
-                match lan_pc_client
-                    .invoke(
-                        Some(&settings.lan_control_url),
-                        "shell_run",
-                        json!({
-                            "workdir": remote_workdir,
-                            "command": &command,
-                            "cwd": null,
-                            "timeout_ms": effective_timeout_ms,
-                            "max_timeout_ms": maximum,
-                            "provider_id": provider_id.as_deref(),
-                            "run_id": &run_id,
-                        }),
-                    )
-                    .await
-                    .and_then(|value| {
-                        serde_json::from_value::<ShellRunResponse>(value)
-                            .map_err(|error| format!("decode LAN computer shell result failed: {error}"))
-                    })
-                {
-                    Ok(mut response) => {
-                        response.profile = format!("lan-pc/{}", response.profile);
-                        return Ok(response);
+    if let Some(settings) = settings.as_ref().filter(|settings| {
+        settings.prefer_lan_pc_execution && !settings.lan_control_url.trim().is_empty()
+    }) {
+        if let Some(lan_pc_client) = lan_pc_client {
+            let remote_workdir = lan_pc_client
+                .invoke(
+                    Some(&settings.lan_control_url),
+                    "settings_load_all",
+                    json!({}),
+                )
+                .await
+                .and_then(|value| {
+                    value
+                        .get("defaultWorkdir")
+                        .and_then(|value| value.as_str())
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                        .map(ToOwned::to_owned)
+                        .ok_or_else(|| "paired LAN computer did not report a working directory".to_string())
+                });
+            match remote_workdir {
+                Ok(remote_workdir) => {
+                    match lan_pc_client
+                        .invoke(
+                            Some(&settings.lan_control_url),
+                            "shell_run",
+                            json!({
+                                "workdir": remote_workdir,
+                                "command": &command,
+                                "cwd": null,
+                                "timeout_ms": effective_timeout_ms,
+                                "max_timeout_ms": maximum,
+                                "provider_id": provider_id.as_deref(),
+                                "run_id": &run_id,
+                            }),
+                        )
+                        .await
+                        .and_then(|value| {
+                            serde_json::from_value::<ShellRunResponse>(value)
+                                .map_err(|error| format!("decode LAN computer shell result failed: {error}"))
+                        })
+                    {
+                        Ok(mut response) => {
+                            response.profile = format!("lan-pc/{}", response.profile);
+                            return Ok(response);
+                        }
+                        Err(error) => lan_fallback_error = Some(error),
                     }
-                    Err(error) => lan_fallback_error = Some(error),
                 }
+                Err(error) => lan_fallback_error = Some(error),
             }
-            Err(error) => lan_fallback_error = Some(error),
+        } else {
+            lan_fallback_error = Some(
+                "paired LAN execution is unavailable because secure client state did not initialize"
+                    .to_string(),
+            );
         }
     }
-    #[cfg(target_os = "android")]
-    if !settings.android_proot_enabled {
-        return Err("Android PRoot execution is disabled in Access settings".to_string());
+    let mobile_execution = app.mobile_execution();
+    let status = mobile_execution.status().map_err(|error| error.to_string())?;
+    if !status.available {
+        return Err(status
+            .detail
+            .unwrap_or_else(|| "The mobile shell backend is unavailable in this build".to_string()));
     }
-    #[cfg(target_os = "ios")]
-    if !settings.ios_a_shell_enabled {
-        return Err("iOS a-Shell execution is disabled in Access settings".to_string());
+    if !status.installed {
+        return Err(
+            "Install and verify the mobile Shell environment in Settings before using it"
+                .to_string(),
+        );
     }
 
-    let mut response = app
-        .mobile_execution()
+    let mut response = mobile_execution
         .run(MobileRunRequest {
             run_id,
             workdir,
@@ -368,7 +386,6 @@ pub(crate) async fn run_mobile_shell(
 #[cfg(mobile)]
 pub async fn shell_run(
     app: AppHandle,
-    lan_pc_client: tauri::State<'_, Arc<LanPcClient>>,
     workdir: String,
     command: String,
     cwd: Option<String>,
@@ -379,9 +396,12 @@ pub async fn shell_run(
     sandbox: bool,
     sandbox_allow_network: bool,
 ) -> Result<ShellRunResponse, String> {
+    let lan_pc_client = app
+        .try_state::<Arc<LanPcClient>>()
+        .map(|state| Arc::clone(state.inner()));
     run_mobile_shell(
         app,
-        lan_pc_client.inner(),
+        lan_pc_client.as_deref(),
         MobileShellRunInput {
             workdir,
             command,
@@ -399,7 +419,6 @@ pub async fn shell_run(
 #[cfg(mobile)]
 pub async fn mobile_ssh_exec(
     app: AppHandle,
-    lan_pc_client: tauri::State<'_, Arc<LanPcClient>>,
     host_id: String,
     workdir: String,
     remote_command: String,
@@ -407,6 +426,9 @@ pub async fn mobile_ssh_exec(
     timeout_ms: Option<u64>,
     run_id: Option<String>,
 ) -> Result<ShellRunResponse, String> {
+    let lan_pc_client = app
+        .try_state::<Arc<LanPcClient>>()
+        .map(|state| Arc::clone(state.inner()));
     let host = crate::commands::settings::load_runtime_ssh_host(&host_id)?
         .ok_or_else(|| format!("SSH host not found: {}", host_id.trim()))?;
     let normalized_run_id = run_id
@@ -422,7 +444,7 @@ pub async fn mobile_ssh_exec(
     )?;
     run_mobile_shell(
         app,
-        lan_pc_client.inner(),
+        lan_pc_client.as_deref(),
         MobileShellRunInput {
             workdir,
             command,
@@ -491,20 +513,21 @@ pub async fn shell_run(
 #[cfg(mobile)]
 pub async fn shell_cancel(
     app: AppHandle,
-    lan_pc_client: tauri::State<'_, Arc<LanPcClient>>,
     run_id: String,
 ) -> Result<ShellCancelResponse, String> {
     // Own the managed state before the first await so Tauri's command future never retains an
     // IPC-message borrow. This is required by mobile archive builds where commands are `Send +
     // 'static`.
-    let lan_pc_client = Arc::clone(lan_pc_client.inner());
+    let lan_pc_client = app
+        .try_state::<Arc<LanPcClient>>()
+        .map(|state| Arc::clone(state.inner()));
     let run_id = run_id.trim().to_string();
     let settings = crate::commands::settings::open_db()
         .and_then(|connection| crate::commands::settings::load_access_settings(&connection))
         .ok();
-    let remote_cancelled = if let Some(settings) = settings.filter(|settings| {
+    let remote_cancelled = if let (Some(settings), Some(lan_pc_client)) = (settings.filter(|settings| {
         settings.prefer_lan_pc_execution && !settings.lan_control_url.trim().is_empty()
-    }) {
+    }), lan_pc_client.as_ref()) {
         lan_pc_client
             .invoke(
                 Some(&settings.lan_control_url),

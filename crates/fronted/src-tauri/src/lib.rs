@@ -346,9 +346,11 @@ macro_rules! app_invoke_handler {
             commands::local_access::local_access_status,
             commands::local_access::local_access_rotate_pairing_code,
             commands::local_access::local_access_revoke_all_devices,
+            commands::local_access::local_access_revoke_device,
             commands::local_access::local_access_rpc_respond,
             commands::local_access::local_access_event_publish,
             commands::local_access::local_access_broadcast_event,
+            commands::local_access::local_access_latest_conversation_selection,
             commands::local_access::workspace_watch_set,
             commands::provider_usage::provider_usage_query,
             commands::provider_usage::provider_usage_test,
@@ -977,7 +979,7 @@ pub fn run() {
                 app.manage(Arc::new(
                     services::cloud_execution::CloudExecutionService::new(app_data_dir)?,
                 ));
-                let proxy_server = services::proxy::start_proxy_server(provider_oauth)?;
+                let proxy_server = services::proxy::start_proxy_server(Some(provider_oauth))?;
                 app.manage(Arc::clone(&proxy_server));
                 let local_access_controller = Arc::new(
                     services::local_access::LocalAccessController::new(
@@ -1124,6 +1126,24 @@ fn initialize_mobile_services(app: tauri::AppHandle) -> Vec<String> {
         }
     };
 
+    // API-key provider traffic only needs the loopback proxy. Start it before
+    // optional stores/services so a degraded vault, memory, or scheduler cannot
+    // leave an otherwise rendered mobile chat unable to reach its model.
+    let proxy_server = match services::proxy::start_proxy_server(None) {
+        Ok(proxy_server) => {
+            app.manage(Arc::clone(&proxy_server));
+            Some(proxy_server)
+        }
+        Err(error) => {
+            record_mobile_startup_failure(
+                &mut failures,
+                "start local proxy server failed",
+                error,
+            );
+            None
+        }
+    };
+
     if let Err(error) = commands::history_db::initialize_history_db() {
         record_mobile_startup_failure(
             &mut failures,
@@ -1213,6 +1233,18 @@ fn initialize_mobile_services(app: tauri::AppHandle) -> Vec<String> {
         }
     });
 
+    if let (Some(proxy_server), Some(provider_oauth)) =
+        (proxy_server.as_ref(), provider_oauth.as_ref())
+    {
+        if let Err(error) = proxy_server.set_provider_oauth(Arc::clone(provider_oauth)) {
+            record_mobile_startup_failure(
+                &mut failures,
+                "attach provider OAuth service to local proxy failed",
+                error,
+            );
+        }
+    }
+
     let lan_pc_client = cloud_secret_vault.as_ref().and_then(|vault| {
         match services::lan_pc_client::LanPcClient::new(Arc::clone(vault)) {
             Ok(client) => {
@@ -1231,20 +1263,7 @@ fn initialize_mobile_services(app: tauri::AppHandle) -> Vec<String> {
         }
     });
 
-    if let Some(provider_oauth) = provider_oauth {
-        match services::proxy::start_proxy_server(provider_oauth) {
-            Ok(proxy_server) => {
-                app.manage(proxy_server);
-            }
-            Err(error) => record_mobile_startup_failure(
-                &mut failures,
-                "start local proxy server failed",
-                error,
-            ),
-        }
-    }
-
-    if let (Some(automation_store), Some(lan_pc_client)) = (automation_store, lan_pc_client) {
+    if let Some(automation_store) = automation_store {
         let automation_scheduler = Arc::new(services::automation::AutomationScheduler::new(
             Arc::clone(&automation_store),
             app.clone(),

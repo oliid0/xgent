@@ -68,6 +68,8 @@ private struct ActiveCommand {
 private struct IOSShellResourceStatus {
     let vim: Bool
     let certificateBundle: Bool
+    let packageManager: Bool
+    let python: Bool
 }
 
 private struct IOSToolchain {
@@ -145,11 +147,19 @@ private func iosToolchains(
         ),
         IOSToolchain(
             id: "wasi",
-            label: "WebAssembly/WASI",
-            installed: available && wasiExecutionAvailable,
+            label: "WebAssembly packages",
+            installed: available && resources.packageManager,
             installable: false,
-            version: "WasmKit 0.1.6",
-            detail: "Reserved for verified extensions; arbitrary modules stay disabled until a cancellable runtime is available"
+            version: "a-Shell wasm3",
+            detail: "WASM commands installed with pkg run through a-Shell; direct untrusted WASI invocation stays disabled"
+        ),
+        IOSToolchain(
+            id: "python",
+            label: "Python and pip",
+            installed: available && resources.python,
+            installable: false,
+            version: "CPython 3.9",
+            detail: "Signed a-Shell CPython, standard library, pip, SSL and SQLite"
         ),
         IOSToolchain(
             id: "node",
@@ -161,11 +171,11 @@ private func iosToolchains(
         ),
         IOSToolchain(
             id: "extensions",
-            label: "Verified WASI extensions",
-            installed: false,
+            label: "a-Shell pkg",
+            installed: available && resources.packageManager,
             installable: false,
-            version: nil,
-            detail: "The signed Xgent extension catalog is not installed in this build yet"
+            version: "a-Shell-commands",
+            detail: "Installs compatible WebAssembly commands into the persistent mobile shell home"
         ),
     ]
 }
@@ -180,7 +190,9 @@ private func iosToolchainPayload(
 final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private let installationPreferenceKey = "xgent.mobileExecution.iosShellInstalled"
     private let installationVerificationKey = "xgent.mobileExecution.iosShellVerification"
-    private let installationVerificationVersion = "ios-a-shell-v1"
+    private let installationVerificationVersion = "ios-a-shell-v3"
+    private let installationDirectoryName = "environment-v3"
+    private let installationMarkerName = ".xgent-environment"
     private let installationProbeToken = "xgent-ios-shell-ready"
     private let executionQueue = DispatchQueue(label: "com.ohi.xgent.mobile-execution")
     private let stateLock = NSLock()
@@ -195,37 +207,43 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private var pendingWorkspaceAllowWrite = true
 
     @objc func status(_ invoke: Invoke) {
-        let available = bundledBackendAvailable()
-        var initializationError: Error?
-        if available && environmentInstalled {
-            do {
-                try initializeBackendIfNeeded()
-            } catch {
-                initializationError = error
+        executionQueue.async { [weak self] in
+            guard let self else {
+                invoke.reject("The mobile execution backend is unavailable")
+                return
             }
+            let available = self.bundledBackendAvailable()
+            var initializationError: Error?
+            if available && self.environmentInstalled {
+                do {
+                    try self.initializeBackendIfNeeded()
+                } catch {
+                    initializationError = error
+                }
+            }
+            let installed = available && self.environmentInstalled && initializationError == nil
+            let resources = self.shellResourceStatus()
+            invoke.resolve([
+                "backend": "ios-a-shell",
+                "available": available,
+                "installed": installed,
+                "detail": initializationError?.localizedDescription
+                    ?? (installed
+                        ? "The a-Shell command environment is initialized; arbitrary WASI, Node.js/npm, and Linux process APIs remain disabled"
+                        : "The bundled a-Shell environment is available but must be installed and initialized before use"),
+                "capabilities": [
+                    "shell": installed,
+                    "wasi": installed && wasiExecutionAvailable,
+                    "network": installed && resources.certificateBundle,
+                    "childProcesses": false,
+                    "userSelectedWorkspaces": true,
+                    "packageManagement": installed && resources.packageManager,
+                ],
+                "toolchains": iosToolchainPayload(available: installed, resources: resources),
+                "environmentVersion": installed ? "Xgent iOS a-Shell environment 3" : NSNull(),
+                "diskUsageBytes": self.installedEnvironmentDiskUsage().map { $0 as Any } ?? NSNull(),
+            ])
         }
-        let installed = available && environmentInstalled && initializationError == nil
-        let resources = shellResourceStatus()
-        invoke.resolve([
-            "backend": "ios-a-shell",
-            "available": available,
-            "installed": installed,
-            "detail": initializationError?.localizedDescription
-                ?? (installed
-                    ? "The a-Shell command environment is initialized; arbitrary WASI, Node.js/npm, and Linux process APIs remain disabled"
-                    : "The bundled a-Shell environment is available but must be installed and initialized before use"),
-            "capabilities": [
-                "shell": installed,
-                "wasi": installed && wasiExecutionAvailable,
-                "network": installed && resources.certificateBundle,
-                "childProcesses": false,
-                "userSelectedWorkspaces": true,
-                "packageManagement": false,
-            ],
-            "toolchains": iosToolchainPayload(available: installed, resources: resources),
-            "environmentVersion": "Xgent iOS shell core 1",
-            "diskUsageBytes": NSNull(),
-        ])
     }
 
     @objc func install(_ invoke: Invoke) throws {
@@ -236,35 +254,10 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 return
             }
             do {
-                try self.initializeBackendIfNeeded()
-                let workspace = try self.installationProbeWorkspace()
-                let request = RunArgs(
-                    runId: "install-probe",
-                    workdir: workspace.path,
-                    command: "echo \(self.installationProbeToken)",
-                    cwd: nil,
-                    timeoutMs: 15_000,
-                    stdinBase64: nil,
-                    wasi: nil
-                )
-                let result = try self.executeShell(
-                    request,
-                    workspace: workspace,
-                    cwd: workspace,
-                    stdin: nil
-                )
-                let output = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard result.exitCode == 0,
-                      !result.timedOut,
-                      !result.cancelled,
-                      output == self.installationProbeToken else {
-                    let diagnostics = result.stderr
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    throw MobileExecutionError.io(
-                        "a-Shell started but failed its command verification "
-                            + "(exit=\(result.exitCode))"
-                            + (diagnostics.isEmpty ? "" : ": \(diagnostics.prefix(2_000))")
-                    )
+                try self.installBundledEnvironmentResources {
+                    try self.initializeBackendIfNeeded()
+                    let workspace = try self.installationProbeWorkspace()
+                    try self.runInstallationProbes(workspace: workspace)
                 }
                 UserDefaults.standard.set(true, forKey: self.installationPreferenceKey)
                 UserDefaults.standard.set(
@@ -274,7 +267,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 invoke.resolve([
                     "backend": "ios-a-shell",
                     "installed": true,
-                    "detail": "The bundled iOS shell executed its installation verification command successfully",
+                    "detail": "a-Shell passed filesystem, Python, JavaScript, FFmpeg and package-manager verification",
                 ])
             } catch {
                 UserDefaults.standard.set(false, forKey: self.installationPreferenceKey)
@@ -517,8 +510,8 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         guard ios_setMiniRoot(workspace.path) == 1 else {
             throw MobileExecutionError.invalidRequest("Could not restrict the iOS shell to workdir")
         }
-        guard let resourcePath = Bundle.module.resourcePath else {
-            throw MobileExecutionError.invalidRequest("Bundled iOS shell resources are missing")
+        guard let resourcePath = installedEnvironmentRoot()?.path else {
+            throw MobileExecutionError.invalidRequest("The installed iOS shell resources are missing")
         }
         var allowedPaths = [resourcePath]
         if !isPath(cwd.path, inside: workspace.path) {
@@ -607,6 +600,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 throw MobileExecutionError.io("Could not load \(resource).plist: \(error.localizedDescription)")
             }
         }
+        replaceCommand("rehash", "xgent_rehash", true)
         initialized = true
     }
 
@@ -614,18 +608,183 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         UserDefaults.standard.bool(forKey: installationPreferenceKey)
             && UserDefaults.standard.string(forKey: installationVerificationKey)
                 == installationVerificationVersion
+            && installedEnvironmentResourcesAreValid()
     }
 
-    private func installationProbeWorkspace() throws -> URL {
+    private func mobileExecutionSupportRoot(create: Bool = false) -> URL? {
         guard let applicationSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
-        ).first else {
+        ).first else { return nil }
+        let root = applicationSupport.appendingPathComponent("mobile-execution", isDirectory: true)
+        if create {
+            do {
+                try FileManager.default.createDirectory(
+                    at: root,
+                    withIntermediateDirectories: true
+                )
+            } catch {
+                return nil
+            }
+        }
+        return root
+    }
+
+    private func installedEnvironmentRoot() -> URL? {
+        mobileExecutionSupportRoot()?.appendingPathComponent(
+            installationDirectoryName,
+            isDirectory: true
+        )
+    }
+
+    private func installedEnvironmentResourcesAreValid() -> Bool {
+        guard let root = installedEnvironmentRoot(),
+              let marker = try? String(
+                contentsOf: root.appendingPathComponent(installationMarkerName),
+                encoding: .utf8
+              ),
+              marker.trimmingCharacters(in: .whitespacesAndNewlines)
+                == installationVerificationVersion else { return false }
+        return FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("vim/syntax/syntax.vim").path
+        ) && FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("terminfo", isDirectory: true).path
+        ) && ((try? Data(contentsOf: root.appendingPathComponent("cacert.pem")).isEmpty) == false)
+            && ((try? Data(contentsOf: root.appendingPathComponent("bin/pkg")).isEmpty) == false)
+            && FileManager.default.isExecutableFile(
+                atPath: root.appendingPathComponent("bin/pkg").path
+            )
+            && FileManager.default.fileExists(
+                atPath: root.appendingPathComponent("home/Library/lib/python3.9/os.py").path
+            )
+    }
+
+    private func installBundledEnvironmentResources(
+        verifyActivated: () throws -> Void
+    ) throws {
+        if installedEnvironmentResourcesAreValid() {
+            try verifyActivated()
+            return
+        }
+        guard let supportRoot = mobileExecutionSupportRoot(create: true) else {
+            throw MobileExecutionError.io("Could not create iOS shell application support storage")
+        }
+        guard let bundledResources = Bundle.module.resourceURL else {
+            throw MobileExecutionError.io("The a-Shell resource bundle is unavailable")
+        }
+        let operationId = UUID().uuidString
+        let staging = supportRoot.appendingPathComponent(
+            ".\(installationDirectoryName)-\(operationId).staging",
+            isDirectory: true
+        )
+        let backup = supportRoot.appendingPathComponent(
+            ".\(installationDirectoryName)-\(operationId).backup",
+            isDirectory: true
+        )
+        let destination = supportRoot.appendingPathComponent(
+            installationDirectoryName,
+            isDirectory: true
+        )
+        let fileManager = FileManager.default
+        defer {
+            try? fileManager.removeItem(at: staging)
+        }
+        do {
+            try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
+            for item in ["bin", "vim", "terminfo", "cacert.pem"] {
+                let source = bundledResources.appendingPathComponent(item)
+                guard fileManager.fileExists(atPath: source.path) else {
+                    throw MobileExecutionError.io("The bundled a-Shell resource is missing: \(item)")
+                }
+                try fileManager.copyItem(
+                    at: source,
+                    to: staging.appendingPathComponent(item)
+                )
+            }
+            let stagedPackageCommand = staging.appendingPathComponent("bin/pkg")
+            try fileManager.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: stagedPackageCommand.path
+            )
+            let pythonSource = bundledResources.appendingPathComponent("python", isDirectory: true)
+            guard fileManager.fileExists(
+                atPath: pythonSource.appendingPathComponent("lib/python3.9/os.py").path
+            ) else {
+                throw MobileExecutionError.io("The bundled a-Shell Python standard library is missing")
+            }
+            try fileManager.createDirectory(
+                at: staging.appendingPathComponent("home", isDirectory: true),
+                withIntermediateDirectories: true
+            )
+            try fileManager.copyItem(
+                at: pythonSource,
+                to: staging.appendingPathComponent("home/Library", isDirectory: true)
+            )
+            try installationVerificationVersion.write(
+                to: staging.appendingPathComponent(installationMarkerName),
+                atomically: true,
+                encoding: .utf8
+            )
+            guard fileManager.fileExists(
+                atPath: staging.appendingPathComponent("vim/syntax/syntax.vim").path
+            ), ((try? Data(contentsOf: staging.appendingPathComponent("cacert.pem")).isEmpty)
+                == false), ((try? Data(contentsOf: staging.appendingPathComponent("bin/pkg")).isEmpty)
+                == false), fileManager.isExecutableFile(
+                    atPath: stagedPackageCommand.path
+                ), fileManager.fileExists(
+                    atPath: staging.appendingPathComponent("home/Library/lib/python3.9/os.py").path
+                ) else {
+                throw MobileExecutionError.io("The staged a-Shell environment failed validation")
+            }
+            for relativeDirectory in [
+                "home/Documents/bin",
+                "home/Documents/.pkg",
+                "home/Library/bin",
+                "home/Library/man/man1",
+                "home/tmp",
+            ] {
+                try fileManager.createDirectory(
+                    at: staging.appendingPathComponent(relativeDirectory, isDirectory: true),
+                    withIntermediateDirectories: true
+                )
+            }
+            if fileManager.fileExists(atPath: destination.path) {
+                try fileManager.moveItem(at: destination, to: backup)
+            }
+            do {
+                try fileManager.moveItem(at: staging, to: destination)
+                try verifyActivated()
+                try? fileManager.removeItem(at: backup)
+            } catch {
+                if fileManager.fileExists(atPath: destination.path) {
+                    try? fileManager.removeItem(at: destination)
+                }
+                if !fileManager.fileExists(atPath: destination.path),
+                   fileManager.fileExists(atPath: backup.path) {
+                    do {
+                        try fileManager.moveItem(at: backup, to: destination)
+                    } catch {
+                        throw MobileExecutionError.io(
+                            "Shell verification failed and the previous environment could not be restored: \(error.localizedDescription)"
+                        )
+                    }
+                }
+                throw error
+            }
+        } catch let error as MobileExecutionError {
+            throw error
+        } catch {
+            throw MobileExecutionError.io(
+                "Could not install the a-Shell environment: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func installationProbeWorkspace() throws -> URL {
+        guard let applicationSupport = mobileExecutionSupportRoot(create: true) else {
             throw MobileExecutionError.io("Could not locate iOS application support storage")
         }
-        let workspace = applicationSupport
-            .appendingPathComponent("mobile-execution", isDirectory: true)
-            .appendingPathComponent("install-probe", isDirectory: true)
+        let workspace = applicationSupport.appendingPathComponent("install-probe", isDirectory: true)
         do {
             try FileManager.default.createDirectory(
                 at: workspace,
@@ -639,10 +798,90 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         return try resolveWorkspace(workspace.path)
     }
 
+    private func runInstallationProbes(workspace: URL) throws {
+        let token = installationProbeToken
+        let probes: [(name: String, command: String, expected: String)] = [
+            ("shell", "printf '\(token)'", token),
+            (
+                "filesystem",
+                "printf '\(token)' > .xgent-write-probe && cat .xgent-write-probe",
+                token
+            ),
+            (
+                "python",
+                "python3 -c 'import json, pathlib, sqlite3, ssl; print(\"\(token)\")'",
+                token
+            ),
+            (
+                "javascript",
+                "printf 'print(\"\(token)\");' > .xgent-probe.js && jsc .xgent-probe.js",
+                token
+            ),
+            ("ffmpeg", "ffmpeg -version", "ffmpeg version"),
+            ("package manager", "pkg", "Usage: pkg"),
+        ]
+        defer {
+            try? FileManager.default.removeItem(
+                at: workspace.appendingPathComponent(".xgent-write-probe")
+            )
+            try? FileManager.default.removeItem(
+                at: workspace.appendingPathComponent(".xgent-probe.js")
+            )
+        }
+        for (index, probe) in probes.enumerated() {
+            let request = RunArgs(
+                runId: "install-probe-\(index)",
+                workdir: workspace.path,
+                command: probe.command,
+                cwd: nil,
+                timeoutMs: 30_000,
+                stdinBase64: nil,
+                wasi: nil
+            )
+            let result = try executeShell(
+                request,
+                workspace: workspace,
+                cwd: workspace,
+                stdin: nil
+            )
+            guard result.exitCode == 0,
+                  !result.timedOut,
+                  !result.cancelled,
+                  result.stdout.contains(probe.expected) else {
+                let diagnostics = [result.stdout, result.stderr]
+                    .joined(separator: "\n")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                throw MobileExecutionError.io(
+                    "a-Shell \(probe.name) verification failed (exit=\(result.exitCode))"
+                        + (diagnostics.isEmpty ? "" : ": \(diagnostics.prefix(2_000))")
+                )
+            }
+        }
+    }
+
+    private func bundledPythonFrameworkAvailable() -> Bool {
+        guard let frameworks = Bundle.main.privateFrameworksURL else { return false }
+        return FileManager.default.fileExists(
+            atPath: frameworks
+                .appendingPathComponent("python3_ios.framework/python3_ios")
+                .path
+        )
+    }
+
     private func bundledBackendAvailable() -> Bool {
-        ["commandDictionary", "extraCommandsDictionary"].allSatisfy { resource in
+        let dictionariesAvailable = ["commandDictionary", "extraCommandsDictionary"].allSatisfy { resource in
             Bundle.module.path(forResource: resource, ofType: "plist") != nil
         }
+        guard dictionariesAvailable, let resources = Bundle.module.resourceURL else { return false }
+        return FileManager.default.fileExists(
+            atPath: resources.appendingPathComponent("vim/syntax/syntax.vim").path
+        ) && FileManager.default.fileExists(
+            atPath: resources.appendingPathComponent("terminfo", isDirectory: true).path
+        ) && ((try? Data(contentsOf: resources.appendingPathComponent("cacert.pem")).isEmpty)
+            == false) && ((try? Data(contentsOf: resources.appendingPathComponent("bin/pkg")).isEmpty)
+            == false) && FileManager.default.fileExists(
+                atPath: resources.appendingPathComponent("python/lib/python3.9/os.py").path
+            ) && bundledPythonFrameworkAvailable()
     }
 
     private func scheduleTimeout(runId: String, pid: Int32, timeoutMs: UInt64) {
@@ -726,11 +965,12 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 .resolvingSymlinksInPath()
                 .standardizedFileURL
             var isDirectory: ObjCBool = false
-            guard isPath(target.path, inside: workspace.path),
+            guard (isPath(target.path, inside: sandboxRootPath())
+                    || externalWorkspaces.contains(path: target.path)),
                   FileManager.default.fileExists(atPath: target.path, isDirectory: &isDirectory),
                   isDirectory.boolValue else {
                 throw MobileExecutionError.invalidRequest(
-                    "absolute cwd must be an existing directory inside the Xgent application sandbox"
+                    "absolute cwd must be inside the Xgent application sandbox or an authorized workspace"
                 )
             }
             return target
@@ -791,16 +1031,29 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     }
 
     private func configureCommandEnvironment(workspace: URL) {
-        let resources = Bundle.module.resourceURL
-        let temporary = workspace.appendingPathComponent(".xgent-tmp", isDirectory: true)
+        let resources = installedEnvironmentRoot()
+        let home = resources?.appendingPathComponent("home", isDirectory: true)
+        let temporary = home?.appendingPathComponent("tmp", isDirectory: true)
+            ?? workspace.appendingPathComponent(".xgent-tmp", isDirectory: true)
+        let documentsBin = home?.appendingPathComponent("Documents/bin", isDirectory: true).path
+            ?? ""
+        let applicationBin = resources?.appendingPathComponent("bin", isDirectory: true).path ?? ""
         try? FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
-        setenv("HOME", workspace.path, 1)
+        setenv("HOME", home?.path ?? workspace.path, 1)
         setenv("TMPDIR", temporary.path, 1)
-        setenv("PATH", "\(workspace.path)/bin:/usr/bin:/bin", 1)
+        setenv(
+            "PATH",
+            "\(workspace.path)/bin:\(documentsBin):\(applicationBin):/usr/bin:/bin",
+            1
+        )
         setenv("APPDIR", resources?.path ?? "", 1)
         setenv("VIMRUNTIME", resources?.appendingPathComponent("vim").path ?? "", 1)
         setenv("TERMINFO", resources?.appendingPathComponent("terminfo").path ?? "", 1)
         setenv("SSL_CERT_FILE", resources?.appendingPathComponent("cacert.pem").path ?? "", 1)
+        setenv("CURL_HOME", home?.appendingPathComponent("Documents").path ?? "", 1)
+        setenv("SSH_HOME", home?.appendingPathComponent("Documents").path ?? "", 1)
+        setenv("PYTHONHOME", home?.appendingPathComponent("Library").path ?? "", 1)
+        setenv("PYTHONUSERBASE", home?.appendingPathComponent("Library").path ?? "", 1)
         setenv("TERM", "xterm-256color", 1)
         setenv("LANG", "C.UTF-8", 1)
     }
@@ -840,7 +1093,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     }
 
     private func shellResourceStatus() -> IOSShellResourceStatus {
-        let resources = Bundle.module.resourceURL
+        let resources = installedEnvironmentRoot()
         return IOSShellResourceStatus(
             vim: resources.map {
                 FileManager.default.fileExists(
@@ -849,8 +1102,32 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             } ?? false,
             certificateBundle: resources.map {
                 FileManager.default.fileExists(atPath: $0.appendingPathComponent("cacert.pem").path)
+            } ?? false,
+            packageManager: resources.map {
+                ((try? Data(contentsOf: $0.appendingPathComponent("bin/pkg")).isEmpty) == false)
+            } ?? false,
+            python: resources.map {
+                FileManager.default.fileExists(
+                    atPath: $0.appendingPathComponent("home/Library/lib/python3.9/os.py").path
+                ) && bundledPythonFrameworkAvailable()
             } ?? false
         )
+    }
+
+    private func installedEnvironmentDiskUsage() -> UInt64? {
+        guard environmentInstalled, let root = installedEnvironmentRoot(),
+              let enumerator = FileManager.default.enumerator(
+                at: root,
+                includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey]
+              ) else { return nil }
+        var total: UInt64 = 0
+        for case let url as URL in enumerator {
+            guard let values = try? url.resourceValues(
+                forKeys: [.isRegularFileKey, .fileSizeKey]
+            ), values.isRegularFile == true else { continue }
+            total += UInt64(max(0, values.fileSize ?? 0))
+        }
+        return total
     }
 
     deinit {
@@ -873,4 +1150,16 @@ private struct AShellCommandResult {
 @_cdecl("init_plugin_mobile_execution")
 func initPlugin() -> Plugin {
     MobileExecutionPlugin()
+}
+
+// a-Shell's pkg script calls rehash after changing ~/Documents/bin. Xgent does
+// not expose a terminal autocomplete list, so the next command is resolved
+// directly from PATH and refreshing that list is a successful no-op.
+@_cdecl("xgent_rehash")
+func xgentRehash(
+    argc: Int32,
+    argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>?
+) -> Int32 {
+    _ = (argc, argv)
+    return 0
 }

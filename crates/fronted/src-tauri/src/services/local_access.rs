@@ -51,11 +51,22 @@ pub struct LocalAccessStatus {
     pub port: u16,
     pub urls: Vec<String>,
     pub paired_devices: usize,
+    pub devices: Vec<LocalAccessDevice>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pairing_code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pairing_code_expires_at: Option<i64>,
     pub last_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalAccessDevice {
+    pub device_id: String,
+    pub label: String,
+    pub created_at: i64,
+    pub last_seen_at: i64,
+    pub expires_at: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -80,6 +91,7 @@ pub struct LocalAccessController {
     pair_attempts: Mutex<PairAttemptWindow>,
     pending_rpc: Mutex<HashMap<String, oneshot::Sender<Result<Value, String>>>>,
     subscriptions: Mutex<HashMap<String, LocalEventSubscription>>,
+    latest_conversation_selection: Mutex<Option<Value>>,
     event_tx: broadcast::Sender<LocalBrowserEvent>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
     server_task: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
@@ -161,12 +173,20 @@ struct LocalEventUnsubscribeRequest {
     subscription_id: String,
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct LocalBrowserEvent {
     device_id: String,
-    subscription_id: String,
-    payload: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    subscription_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    payload: Option<Value>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    session_revoked: bool,
 }
 
 impl LocalAccessController {
@@ -191,6 +211,7 @@ impl LocalAccessController {
                 port: DEFAULT_PORT,
                 urls: Vec::new(),
                 paired_devices: 0,
+                devices: Vec::new(),
                 pairing_code: None,
                 pairing_code_expires_at: None,
                 last_error: None,
@@ -199,6 +220,7 @@ impl LocalAccessController {
             pair_attempts: Mutex::new(PairAttemptWindow::default()),
             pending_rpc: Mutex::new(HashMap::new()),
             subscriptions: Mutex::new(HashMap::new()),
+            latest_conversation_selection: Mutex::new(None),
             event_tx,
             shutdown: Mutex::new(None),
             server_task: Mutex::new(None),
@@ -288,7 +310,8 @@ impl LocalAccessController {
             .map_err(|_| "local access status lock poisoned".to_string())?
             .clone();
         status.enabled = enabled;
-        status.paired_devices = count_paired_devices()?;
+        status.devices = list_paired_devices()?;
+        status.paired_devices = status.devices.len();
         let pairing = self.current_pairing_code()?;
         status.pairing_code = pairing.as_ref().map(|value| value.plaintext.clone());
         status.pairing_code_expires_at = pairing.map(|value| value.expires_at_ms);
@@ -311,13 +334,79 @@ impl LocalAccessController {
     }
 
     pub fn revoke_all_devices(&self) -> Result<LocalAccessStatus, String> {
+        let device_ids = list_paired_devices()?
+            .into_iter()
+            .map(|device| device.device_id)
+            .collect::<Vec<_>>();
         let conn = open_db()?;
         conn.execute(
             "UPDATE local_access_devices SET revoked_at = ?1 WHERE revoked_at IS NULL",
             params![now_ms()],
         )
         .map_err(|error| format!("revoke local access devices failed: {error}"))?;
+        for device_id in device_ids {
+            self.notify_device_revoked(&device_id);
+            self.remove_device_subscriptions(&device_id)?;
+        }
         self.rotate_pairing_code()
+    }
+
+    pub fn revoke_device(&self, device_id: &str) -> Result<LocalAccessStatus, String> {
+        let device_id = device_id.trim();
+        if device_id.is_empty() || device_id.len() > 128 {
+            return Err("paired device id is invalid".to_string());
+        }
+        let conn = open_db()?;
+        let changed = conn
+            .execute(
+                "UPDATE local_access_devices
+                 SET revoked_at = ?1
+                 WHERE device_id = ?2 AND revoked_at IS NULL",
+                params![now_ms(), device_id],
+            )
+            .map_err(|error| format!("revoke paired device failed: {error}"))?;
+        if changed == 0 {
+            return Err("paired device was not found".to_string());
+        }
+        self.notify_device_revoked(device_id);
+        self.remove_device_subscriptions(device_id)?;
+        self.publish_status();
+        self.status()
+    }
+
+    fn remove_device_subscriptions(&self, device_id: &str) -> Result<(), String> {
+        let removed = {
+            let mut subscriptions = self
+                .subscriptions
+                .lock()
+                .map_err(|_| "local access subscription lock poisoned".to_string())?;
+            let ids = subscriptions
+                .iter()
+                .filter_map(|(subscription_id, subscription)| {
+                    (subscription.device_id == device_id).then(|| subscription_id.clone())
+                })
+                .collect::<Vec<_>>();
+            for subscription_id in &ids {
+                subscriptions.remove(subscription_id);
+            }
+            ids
+        };
+        for subscription_id in removed {
+            let _ = self.app_handle.emit(
+                LOCAL_ACCESS_UNSUBSCRIBE_EVENT,
+                LocalEventUnsubscribeRequest { subscription_id },
+            );
+        }
+        Ok(())
+    }
+
+    fn notify_device_revoked(&self, device_id: &str) {
+        let _ = self.event_tx.send(LocalBrowserEvent {
+            device_id: device_id.to_string(),
+            subscription_id: None,
+            payload: None,
+            session_revoked: true,
+        });
     }
 
     fn ensure_pairing_code(&self) -> Result<(), String> {
@@ -628,10 +717,31 @@ impl LocalAccessController {
         )?;
         let _ = self.event_tx.send(LocalBrowserEvent {
             device_id: subscription.device_id,
-            subscription_id: subscription_id.to_string(),
-            payload,
+            subscription_id: Some(subscription_id.to_string()),
+            payload: Some(payload),
+            session_revoked: false,
         });
         Ok(())
+    }
+
+    pub fn broadcast_client_event(&self, event: &str, payload: Value) -> Result<(), String> {
+        if event == "xgent:conversation-selection" {
+            *self
+                .latest_conversation_selection
+                .lock()
+                .map_err(|_| "local conversation selection lock poisoned".to_string())? =
+                Some(payload.clone());
+        }
+        self.app_handle
+            .emit(event, payload)
+            .map_err(|error| format!("broadcast local access event failed: {error}"))
+    }
+
+    pub fn latest_conversation_selection(&self) -> Result<Option<Value>, String> {
+        self.latest_conversation_selection
+            .lock()
+            .map_err(|_| "local conversation selection lock poisoned".to_string())
+            .map(|selection| selection.clone())
     }
 
     async fn dispatch_rpc(&self, payload: LocalRpcPayload) -> Result<Value, String> {
@@ -1176,36 +1286,6 @@ fn authorize_local_command(
     command: &str,
     config: &AccessSettingsPayload,
 ) -> Result<(), String> {
-    const ALWAYS_ALLOWED_PREFIXES: &[&str] = &[
-        "chat_history_",
-        "memory_",
-        "subagent_",
-        "mcp_",
-        "system_read_",
-        "system_list_",
-        "system_ensure_",
-        "proxy_get_",
-        "automation_snapshot",
-        "automation_list_",
-        "app_runtime_platform",
-        "local_access_status",
-        "local_access_broadcast_event",
-        "local_chat_",
-    ];
-    const FILE_READ_COMMANDS: &[&str] = &[
-        "fs_read_text",
-        "fs_read_editable_text",
-        "fs_path_status",
-        "fs_read_image_source",
-        "fs_read_workspace_image",
-        "fs_open_workspace_path",
-        "fs_roots",
-        "fs_list_dirs",
-        "fs_list",
-        "fs_glob",
-        "fs_grep",
-        "fs_mention_list",
-    ];
     const FILE_WRITE_COMMANDS: &[&str] = &[
         "fs_write_text",
         "fs_edit_text",
@@ -1223,38 +1303,27 @@ fn authorize_local_command(
         "git_compare_commit_with_remote",
         "git_commit_diff",
     ];
-    // A paired browser with every local permission deliberately enabled is a
-    // full Xgent control surface. Keep cloud execution behind its separate
-    // feature switch, but do not maintain a second incomplete command allowlist
-    // for the rest of the desktop experience.
-    if has_full_local_permissions(config) && !command.starts_with("cloud_task_") {
-        return Ok(());
-    }
-    if command == "settings_load_all"
-        || command == "workspace_watch_set"
-        || command == "system_home_dir"
-        || command == "system_load_soul"
-        || command == "system_list_souls"
-        || command == "system_save_soul"
-        || command == "system_create_soul"
-        || command == "system_select_soul"
-        || command == "system_delete_soul"
-        || command == "system_manage_skill"
-        || command == "cron_validate_expression"
-        || crate::commands::settings::is_local_access_settings_write(command)
-        || ALWAYS_ALLOWED_PREFIXES
+    let blocked = |capability: &str| {
+        config
+            .blocked_local_capabilities
             .iter()
-            .any(|prefix| command.starts_with(prefix))
-        || FILE_READ_COMMANDS.contains(&command)
-        || GIT_READ_COMMANDS.contains(&command)
-    {
+            .any(|value| value == capability)
+    };
+
+    if command.starts_with("cloud_task_") {
+        if !config.cloud_execution_enabled {
+            return Err("cloud execution is disabled for paired devices".to_string());
+        }
+        if command == "cloud_task_download_artifact" && blocked("file_write") {
+            return Err("file writes are disabled for paired devices".to_string());
+        }
         return Ok(());
     }
-    if FILE_WRITE_COMMANDS.contains(&command) && config.allow_file_write {
-        return Ok(());
+    if FILE_WRITE_COMMANDS.contains(&command) && blocked("file_write") {
+        return Err("file writes are disabled for paired devices".to_string());
     }
-    if command.starts_with("git_") && config.allow_git {
-        return Ok(());
+    if command.starts_with("git_") && !GIT_READ_COMMANDS.contains(&command) && blocked("git") {
+        return Err("Git writes are disabled for paired devices".to_string());
     }
     if (command.starts_with("terminal_")
         || command.starts_with("managed_process_")
@@ -1267,63 +1336,45 @@ fn authorize_local_command(
                 | "automation_clear_runs"
                 | "automation_run_cron_now"
         ))
-        && config.allow_terminal
+        && blocked("terminal")
     {
-        return Ok(());
+        return Err("terminal access is disabled for paired devices".to_string());
     }
-    if command.starts_with("cloud_task_")
-        && config.cloud_execution_enabled
-        && (command != "cloud_task_download_artifact" || config.allow_file_write)
-    {
-        return Ok(());
+    if command.starts_with("plugin:browser-automation|") && blocked("browser_automation") {
+        return Err("browser automation is disabled for paired devices".to_string());
     }
-    if command.starts_with("plugin:browser-automation|") && config.allow_browser_automation {
-        return Ok(());
+    if (command.starts_with("ssh_") || command.starts_with("sftp_")) && blocked("ssh") {
+        return Err("SSH access is disabled for paired devices".to_string());
     }
-    if (command.starts_with("ssh_") || command.starts_with("sftp_")) && config.allow_ssh {
-        return Ok(());
-    }
-    Err(format!("local access command is not allowed: {command}"))
+
+    // Pairing creates another presentation of the same Xgent client. Commands
+    // therefore share the desktop surface unless the owner explicitly blocks
+    // their capability above. Command-specific approval/sandbox policies still
+    // run after this transport authorization step.
+    Ok(())
 }
 
 fn authorize_local_event(event: &str, config: &AccessSettingsPayload) -> Result<(), String> {
-    if has_full_local_permissions(config) {
-        return Ok(());
-    }
-    const SAFE_EVENTS: &[&str] = &[
-        "automation:cron-changed",
-        "automation:hooks-changed",
-        "chat-history:changed",
-        "workspace:activity",
-        "xgent:chat-queue",
-        "xgent:chat-runtime",
-        "xgent:conversation-event",
-    ];
-    if SAFE_EVENTS.contains(&event) {
-        return Ok(());
-    }
+    let blocked = |capability: &str| {
+        config
+            .blocked_local_capabilities
+            .iter()
+            .any(|value| value == capability)
+    };
     if matches!(
         event,
         "terminal:event"
             | "terminal:stream"
             | "terminal:exit-requested"
             | "managed-process:changed"
-    ) && config.allow_terminal
+    ) && blocked("terminal")
     {
-        return Ok(());
+        return Err("terminal events are disabled for paired devices".to_string());
     }
-    if event == "sftp:event" && config.allow_ssh {
-        return Ok(());
+    if event == "sftp:event" && blocked("ssh") {
+        return Err("SSH events are disabled for paired devices".to_string());
     }
-    Err(format!("local access event is not allowed: {event}"))
-}
-
-fn has_full_local_permissions(config: &AccessSettingsPayload) -> bool {
-    config.allow_terminal
-        && config.allow_browser_automation
-        && config.allow_ssh
-        && config.allow_git
-        && config.allow_file_write
+    Ok(())
 }
 
 async fn index_asset(
@@ -1584,17 +1635,29 @@ fn split_host_port(host: &str, default_port: u16) -> (String, u16) {
     (host.trim_matches(['[', ']']).to_string(), default_port)
 }
 
-fn count_paired_devices() -> Result<usize, String> {
+fn list_paired_devices() -> Result<Vec<LocalAccessDevice>, String> {
     let conn = open_db()?;
-    let count = conn
-        .query_row(
-            "SELECT COUNT(*) FROM local_access_devices
-             WHERE revoked_at IS NULL AND expires_at > ?1",
-            params![now_ms()],
-            |row| row.get::<_, i64>(0),
+    let mut statement = conn
+        .prepare(
+            "SELECT device_id, label, created_at, last_seen_at, expires_at
+             FROM local_access_devices
+             WHERE revoked_at IS NULL AND expires_at > ?1
+             ORDER BY last_seen_at DESC, created_at DESC",
         )
-        .map_err(|error| format!("count paired devices failed: {error}"))?;
-    Ok(usize::try_from(count).unwrap_or(usize::MAX))
+        .map_err(|error| format!("prepare paired device list failed: {error}"))?;
+    let rows = statement
+        .query_map(params![now_ms()], |row| {
+            Ok(LocalAccessDevice {
+                device_id: row.get(0)?,
+                label: row.get(1)?,
+                created_at: row.get(2)?,
+                last_seen_at: row.get(3)?,
+                expires_at: row.get(4)?,
+            })
+        })
+        .map_err(|error| format!("list paired devices failed: {error}"))?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("read paired device failed: {error}"))
 }
 
 fn pairing_code_from_uuid(id: Uuid) -> String {
@@ -1675,17 +1738,18 @@ mod tests {
     }
 
     #[test]
-    fn all_local_permissions_expose_the_full_non_cloud_command_surface() {
+    fn paired_devices_default_to_full_non_cloud_access_with_explicit_blocks() {
         let mut config = AccessSettingsPayload::default();
-        config.allow_terminal = true;
-        config.allow_browser_automation = true;
-        config.allow_ssh = true;
-        config.allow_git = true;
-        config.allow_file_write = true;
 
         assert!(authorize_local_command("system_clipboard_read_text", &config).is_ok());
         assert!(authorize_local_event("custom:desktop-event", &config).is_ok());
         assert!(authorize_local_command("cloud_task_start", &config).is_err());
+
+        config
+            .blocked_local_capabilities
+            .push("browser_automation".to_string());
+        assert!(authorize_local_command("plugin:browser-automation|action", &config).is_err());
+        assert!(authorize_local_command("terminal_create", &config).is_ok());
 
         config.cloud_execution_enabled = true;
         assert!(authorize_local_command("cloud_task_start", &config).is_ok());

@@ -82,7 +82,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
           label={t("settings.executionMode")}
           size="lg"
           gap={1}
-          className="w-full"
+          className="xgent-mobile-chat-toolbar w-full"
           startContent={
             <HStack gap={1} vAlign="center" hAlign="start">
               {!sidebarOpen && !macOsTauri ? (
@@ -104,6 +104,8 @@ export const ChatHeader = memo(function ChatHeader(props: {
                 onChange={(value) => onSelectExecutionMode(value as "text" | "tools")}
                 label={t("settings.executionMode")}
                 layout="fill"
+                size="lg"
+                className="xgent-mobile-chat-mode"
               >
                 <SegmentedControlItem value="text" label={t("chat.mode.chat")} />
                 <SegmentedControlItem value="tools" label={t("chat.mode.agent")} />

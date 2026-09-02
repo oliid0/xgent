@@ -88,15 +88,22 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
           <VStack gap={2}>
             <Heading level={3}>{t("browser.automation")}</Heading>
             <Switch
-              label={t("settings.accessAllowBrowserAutomation")}
-              description={t("settings.accessAllowBrowserAutomationHint")}
+              label={t("settings.accessBlockBrowserAutomation")}
+              description={t("settings.accessBlockBrowserAutomationHint")}
               labelIcon={Shield}
               labelPosition="start"
               labelSpacing="spread"
               width="100%"
-              value={props.settings.access.allowBrowserAutomation}
-              onChange={(allowBrowserAutomation) =>
-                props.setSettings((prev) => updateAccessSettings(prev, { allowBrowserAutomation }))
+              value={props.settings.access.blockedLocalCapabilities.includes("browser_automation")}
+              onChange={(blocked) =>
+                props.setSettings((prev) => {
+                  const capabilities = new Set(prev.access.blockedLocalCapabilities);
+                  if (blocked) capabilities.add("browser_automation");
+                  else capabilities.delete("browser_automation");
+                  return updateAccessSettings(prev, {
+                    blockedLocalCapabilities: Array.from(capabilities),
+                  });
+                })
               }
             />
           </VStack>

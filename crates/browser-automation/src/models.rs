@@ -83,6 +83,8 @@ pub struct SetViewportRequest {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserActionRequest {
+    #[serde(default)]
+    pub request_id: String,
     pub session_id: String,
     pub action: String,
     #[serde(default)]
@@ -98,10 +100,21 @@ fn default_action_timeout_ms() -> u64 {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserActionResponse {
+    pub request_id: String,
     pub session_id: String,
     pub action: String,
     pub url: String,
     pub title: Option<String>,
     pub data: Value,
     pub screenshot_base64: Option<String>,
+    pub lifecycle: BrowserCommandLifecycle,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserCommandLifecycle {
+    pub command_completed: bool,
+    pub navigation_started: bool,
+    pub navigation_finished: bool,
+    pub recovered: bool,
 }

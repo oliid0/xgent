@@ -14,6 +14,7 @@ export type LiveTranscriptState = {
 export type LiveTranscriptStore = {
   getSnapshot: () => LiveTranscriptState;
   subscribe: (listener: () => void) => () => void;
+  replace: (nextState: LiveTranscriptState) => void;
   reset: () => void;
   settle: () => void;
   appendDraftAssistantText: (delta: string) => void;
@@ -53,6 +54,11 @@ export function createLiveTranscriptStore(
       return () => {
         listeners.delete(listener);
       };
+    },
+    replace: (nextState) => {
+      if (state === nextState) return;
+      state = nextState;
+      emitChange();
     },
     reset: () => {
       if (

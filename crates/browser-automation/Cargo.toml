@@ -28,5 +28,9 @@ objc2-app-kit = { version = "0.2", features = ["NSImage", "NSImageRep", "NSBitma
 objc2-foundation = { version = "0.2", features = ["NSData", "NSError", "NSString", "NSDictionary"] }
 objc2-web-kit = { version = "0.2", features = ["WKWebView", "WKSnapshotConfiguration", "block2", "objc2-app-kit"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
+cairo-rs = { version = "0.18", features = ["png"] }
+
 [build-dependencies]
 tauri-plugin = "2.5.4"

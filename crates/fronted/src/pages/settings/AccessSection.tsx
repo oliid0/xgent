@@ -27,6 +27,7 @@ import {
   Server,
   Shield,
   Terminal,
+  Trash2,
   Wifi,
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
@@ -45,9 +46,18 @@ type LocalAccessStatus = {
   port: number;
   urls: string[];
   pairedDevices: number;
+  devices: LocalAccessDevice[];
   pairingCode?: string | null;
   pairingCodeExpiresAt?: number | null;
   lastError?: string | null;
+};
+
+type LocalAccessDevice = {
+  deviceId: string;
+  label: string;
+  createdAt: number;
+  lastSeenAt: number;
+  expiresAt: number;
 };
 
 type CloudSecretVaultStatus = {
@@ -69,12 +79,14 @@ const EMPTY_LOCAL_STATUS: LocalAccessStatus = {
   port: 28_367,
   urls: [],
   pairedDevices: 0,
+  devices: [],
 };
 
 const EMPTY_VAULT_STATUS: CloudSecretVaultStatus = { githubTokenConfigured: false };
 const EMPTY_LAN_PC_STATUS: LanPcClientStatus = { paired: false };
 
 type AccessSectionProps = SettingsSectionProps & { nativeMobile: boolean };
+type LocalAccessCapability = AppSettings["access"]["blockedLocalCapabilities"][number];
 
 function updateAccess(
   setSettings: SettingsSectionProps["setSettings"],
@@ -84,6 +96,18 @@ function updateAccess(
     ...previous,
     access: { ...previous.access, ...patch },
   }));
+}
+
+function setLocalCapabilityBlocked(
+  settings: AppSettings,
+  setSettings: SettingsSectionProps["setSettings"],
+  capability: LocalAccessCapability,
+  blocked: boolean,
+) {
+  const next = new Set(settings.access.blockedLocalCapabilities);
+  if (blocked) next.add(capability);
+  else next.delete(capability);
+  updateAccess(setSettings, { blockedLocalCapabilities: Array.from(next) });
 }
 
 function CopyButton({ value, label }: { value: string; label: string }) {
@@ -594,74 +618,82 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
             </HStack>
             <List density="compact" hasDividers>
               <ListItem
-                label={t("settings.accessAllowTerminal")}
-                description={t("settings.accessAllowTerminalHint")}
+                label={t("settings.accessBlockTerminal")}
+                description={t("settings.accessBlockTerminalHint")}
                 startContent={<Icon icon={Terminal} size="sm" color="secondary" />}
                 endContent={
                   <Switch
-                    label={t("settings.accessAllowTerminal")}
+                    label={t("settings.accessBlockTerminal")}
                     isLabelHidden
-                    value={settings.access.allowTerminal}
-                    isDisabled={browser}
-                    onChange={(value) => updateAccess(setSettings, { allowTerminal: value })}
-                  />
-                }
-              />
-              <ListItem
-                label={t("settings.accessAllowBrowserAutomation")}
-                description={t("settings.accessAllowBrowserAutomationHint")}
-                startContent={<Icon icon={Globe} size="sm" color="secondary" />}
-                endContent={
-                  <Switch
-                    label={t("settings.accessAllowBrowserAutomation")}
-                    isLabelHidden
-                    value={settings.access.allowBrowserAutomation}
+                    value={settings.access.blockedLocalCapabilities.includes("terminal")}
                     isDisabled={browser}
                     onChange={(value) =>
-                      updateAccess(setSettings, { allowBrowserAutomation: value })
+                      setLocalCapabilityBlocked(settings, setSettings, "terminal", value)
                     }
                   />
                 }
               />
               <ListItem
-                label={t("settings.accessAllowSsh")}
-                description={t("settings.accessAllowSshHint")}
+                label={t("settings.accessBlockBrowserAutomation")}
+                description={t("settings.accessBlockBrowserAutomationHint")}
+                startContent={<Icon icon={Globe} size="sm" color="secondary" />}
+                endContent={
+                  <Switch
+                    label={t("settings.accessBlockBrowserAutomation")}
+                    isLabelHidden
+                    value={settings.access.blockedLocalCapabilities.includes("browser_automation")}
+                    isDisabled={browser}
+                    onChange={(value) =>
+                      setLocalCapabilityBlocked(settings, setSettings, "browser_automation", value)
+                    }
+                  />
+                }
+              />
+              <ListItem
+                label={t("settings.accessBlockSsh")}
+                description={t("settings.accessBlockSshHint")}
                 startContent={<Icon icon={Server} size="sm" color="secondary" />}
                 endContent={
                   <Switch
-                    label={t("settings.accessAllowSsh")}
+                    label={t("settings.accessBlockSsh")}
                     isLabelHidden
-                    value={settings.access.allowSsh}
+                    value={settings.access.blockedLocalCapabilities.includes("ssh")}
                     isDisabled={browser}
-                    onChange={(value) => updateAccess(setSettings, { allowSsh: value })}
+                    onChange={(value) =>
+                      setLocalCapabilityBlocked(settings, setSettings, "ssh", value)
+                    }
                   />
                 }
               />
               <ListItem
-                label={t("settings.accessAllowGit")}
-                description={t("settings.accessAllowGitHint")}
+                label={t("settings.accessBlockGit")}
+                description={t("settings.accessBlockGitHint")}
                 startContent={<Icon icon={GitBranch} size="sm" color="secondary" />}
                 endContent={
                   <Switch
-                    label={t("settings.accessAllowGit")}
+                    label={t("settings.accessBlockGit")}
                     isLabelHidden
-                    value={settings.access.allowGit}
+                    value={settings.access.blockedLocalCapabilities.includes("git")}
                     isDisabled={browser}
-                    onChange={(value) => updateAccess(setSettings, { allowGit: value })}
+                    onChange={(value) =>
+                      setLocalCapabilityBlocked(settings, setSettings, "git", value)
+                    }
                   />
                 }
               />
               <ListItem
-                label={t("settings.accessAllowFileWrite")}
-                description={t("settings.accessAllowFileWriteHint")}
+                label={t("settings.accessBlockFileWrite")}
+                description={t("settings.accessBlockFileWriteHint")}
                 startContent={<Icon icon={Shield} size="sm" color="secondary" />}
                 endContent={
                   <Switch
-                    label={t("settings.accessAllowFileWrite")}
+                    label={t("settings.accessBlockFileWrite")}
                     isLabelHidden
-                    value={settings.access.allowFileWrite}
+                    value={settings.access.blockedLocalCapabilities.includes("file_write")}
                     isDisabled={browser}
-                    onChange={(value) => updateAccess(setSettings, { allowFileWrite: value })}
+                    onChange={(value) =>
+                      setLocalCapabilityBlocked(settings, setSettings, "file_write", value)
+                    }
                   />
                 }
               />
@@ -694,6 +726,47 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                 }
               />
             </HStack>
+            {localStatus.devices.length > 0 ? (
+              <List density="compact" hasDividers>
+                {localStatus.devices.map((device) => {
+                  const revokeAction = `revoke-device:${device.deviceId}`;
+                  return (
+                    <ListItem
+                      key={device.deviceId}
+                      label={device.label}
+                      description={t("settings.accessDeviceLastSeen").replace(
+                        "{time}",
+                        new Date(device.lastSeenAt).toLocaleString(),
+                      )}
+                      startContent={<Icon icon={MonitorSmartphone} size="sm" color="secondary" />}
+                      endContent={
+                        <IconButton
+                          label={t("settings.accessRevokeDevice")}
+                          tooltip={t("settings.accessRevokeDevice")}
+                          icon={<Icon icon={Trash2} size="sm" color="inherit" />}
+                          variant="ghost"
+                          size="sm"
+                          isDisabled={browser || busyAction !== ""}
+                          onClick={() =>
+                            void runAction(revokeAction, async () => {
+                              setLocalStatus(
+                                await invoke<LocalAccessStatus>("local_access_revoke_device", {
+                                  deviceId: device.deviceId,
+                                }),
+                              );
+                            })
+                          }
+                        />
+                      }
+                    />
+                  );
+                })}
+              </List>
+            ) : (
+              <Text type="supporting" color="secondary">
+                {t("settings.accessNoPairedDevices")}
+              </Text>
+            )}
           </VStack>
         </Section>
       )}

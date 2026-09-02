@@ -215,6 +215,7 @@ import type { TerminalSession, TerminalShellOption } from "../lib/terminal/types
 import type { AdditionalProjectRoot } from "../lib/tools/additionalProjectRoots";
 import { cancelPendingAskUserQuestionsForConversation } from "../lib/tools/askUserQuestionTools";
 import { invokeFs } from "../lib/tools/fsBackend";
+import { subscribeMobilePreviewRequests } from "../lib/tools/mobilePreviewTools";
 import {
   answerPlanDecision,
   getPendingPlanForConversation,
@@ -295,7 +296,9 @@ import { useChatFileLinkNavigation } from "./chat/hooks/useChatFileLinkNavigatio
 import { useContextUsageTokensSource } from "./chat/hooks/useContextUsageTokensSource";
 import {
   buildConversationRuntimeSnapshotEntries,
+  type ConversationRuntimeSnapshotPayload,
   type ConversationRuntimeSnapshotState,
+  conversationRuntimeSnapshotToLiveTranscript,
 } from "./chat/local-access/conversationRuntimeSnapshot";
 import { MobileBackgroundTasksPanel } from "./chat/mobile/MobileBackgroundTasksPanel";
 import { MobileBrowserSettingsPanel } from "./chat/mobile/MobileBrowserSettingsPanel";
@@ -402,10 +405,17 @@ type ActiveConversationRuntimeRun = {
   toolStatusIsCompaction: boolean;
 };
 
+type ConversationSelectionPayload = {
+  sourceInstanceId: string;
+  conversationId: string;
+  updatedAt: number;
+};
+
 const PROJECT_HISTORY_DELETE_PAGE_SIZE = 200;
 const CONVERSATION_RUNTIME_SNAPSHOT_DEBOUNCE_MS = 300;
 // Must stay well below the desktop run ledger's 5-minute active TTL.
 const CONVERSATION_RUNTIME_RUN_KEEPALIVE_MS = 60_000;
+const CHAT_RUNTIME_SOURCE_INSTANCE_ID = createUuid();
 
 function appendManagedSkillSelections(current: readonly string[], names: readonly string[]) {
   const out = mergeAlwaysEnabledSkillNames(current);
@@ -1589,13 +1599,7 @@ export function ChatPage(props: ChatPageProps) {
     if (!nativeMobile) return true;
     try {
       const status = await mobileExecutionStatus();
-      const enabled =
-        status.backend === "android-proot"
-          ? settings.access.androidProotEnabled
-          : status.backend === "ios-a-shell"
-            ? settings.access.iosAShellEnabled
-            : false;
-      if (enabled && status.installed && status.capabilities.shell) return true;
+      if (status.installed && status.capabilities.shell) return true;
     } catch (cause) {
       setErrorMessage(asErrorMessage(cause, "Unable to inspect the mobile shell environment."));
     }
@@ -1603,12 +1607,7 @@ export function ChatPage(props: ChatPageProps) {
     setMobileWorkspaceDestination(null);
     onOpenSettings("mobileExecution");
     return false;
-  }, [
-    nativeMobile,
-    onOpenSettings,
-    settings.access.androidProotEnabled,
-    settings.access.iosAShellEnabled,
-  ]);
+  }, [nativeMobile, onOpenSettings]);
   const handleOpenWorkspaceTool = useCallback(
     (target: WorkspaceToolTarget, shell?: string) => {
       if (mobileExperience) {
@@ -1792,6 +1791,17 @@ export function ChatPage(props: ChatPageProps) {
     },
     [hideWorkspaceSshTerminalOverlay],
   );
+  useEffect(() => {
+    if (!nativeMobile) return;
+    return subscribeMobilePreviewRequests((request) => {
+      openWorkspaceFilePreview({
+        projectPathKey:
+          request.projectPathKey || workspaceProjectPathKey(request.workdir) || request.workdir,
+        workdir: request.workdir,
+        path: request.path,
+      });
+    });
+  }, [nativeMobile, openWorkspaceFilePreview]);
   const handleOpenWorkspaceFile = useCallback(
     (path: string, imagePaths?: string[]) => {
       if (!terminalProjectPath || !terminalProjectPathKey) return;
@@ -2140,7 +2150,7 @@ export function ChatPage(props: ChatPageProps) {
     composerRef,
     setErrorMessage,
     addNotify,
-    nativeMobileRuntime: !desktopBridgeEnabled,
+    nativeMobileRuntime: nativeMobile,
   });
   const [isFileDropActive, setIsFileDropActive] = useState(false);
   const [composerOverlayHeight, setComposerOverlayHeight] = useState(0);
@@ -2162,7 +2172,21 @@ export function ChatPage(props: ChatPageProps) {
   const activeConversationRuntimeRunsRef = useRef(new Map<string, ActiveConversationRuntimeRun>());
   const conversationRuntimeSnapshotChainsRef = useRef(new Map<string, Promise<void>>());
   const conversationRuntimeSnapshotTimersRef = useRef(new Map<string, number>());
+  const remoteConversationRuntimeRevisionsRef = useRef(
+    new Map<string, { runId: string; revision: number }>(),
+  );
+  const remoteConversationRuntimePayloadsRef = useRef(
+    new Map<string, ConversationRuntimeSnapshotPayload>(),
+  );
+  const remoteConversationHydrationRef = useRef(new Map<string, Promise<boolean>>());
+  const remoteConversationHydratedRunsRef = useRef(new Map<string, string>());
   const previousRunningConversationIdsRef = useRef<ReadonlySet<string>>(new Set());
+  const conversationSelectionInitializedRef = useRef(false);
+  const conversationSelectionUpdatedAtRef = useRef(0);
+  const suppressedConversationSelectionRef = useRef<{
+    conversationId: string;
+    expiresAt: number;
+  } | null>(null);
 
   function buildChatQueueSnapshot(
     conversationId: string,
@@ -3259,6 +3283,7 @@ export function ChatPage(props: ChatPageProps) {
       await invoke("local_access_broadcast_event", {
         event: "xgent:chat-runtime",
         payload: {
+          sourceInstanceId: CHAT_RUNTIME_SOURCE_INSTANCE_ID,
           conversationId: run.conversationId,
           runId: run.runId,
           state,
@@ -3370,6 +3395,129 @@ export function ChatPage(props: ChatPageProps) {
     return () => window.clearInterval(keepaliveTimerId);
   }, [desktopBridgeEnabled]);
 
+  useEffect(() => {
+    if (!desktopBridgeEnabled) return;
+    let disposed = false;
+
+    const hydratePersistedRemoteConversation = (conversationId: string, force: boolean) => {
+      const targetConversationId = conversationId.trim();
+      if (!targetConversationId || disposed) return Promise.resolve(false);
+      const existing = remoteConversationHydrationRef.current.get(targetConversationId);
+      if (existing && !force) return existing;
+
+      const hydration = getChatHistory(targetConversationId)
+        .then(async (record) => {
+          if (!record || disposed || currentConversationIdRef.current !== targetConversationId) {
+            return false;
+          }
+          persistedConversationStateRef.current.delete(targetConversationId);
+          conversationRuntimeCacheRef.current.delete(targetConversationId);
+          await openInitialActionRef.current(targetConversationId);
+          const latestPayload =
+            remoteConversationRuntimePayloadsRef.current.get(targetConversationId);
+          if (
+            latestPayload &&
+            !disposed &&
+            currentConversationIdRef.current === targetConversationId
+          ) {
+            getConversationLiveTranscriptStore(targetConversationId).replace(
+              conversationRuntimeSnapshotToLiveTranscript(latestPayload),
+            );
+            setConversationSendingState(targetConversationId, latestPayload.state === "running");
+          }
+          return true;
+        })
+        .catch((error) => {
+          console.warn("remote conversation history hydration failed", error);
+          return false;
+        })
+        .finally(() => {
+          if (remoteConversationHydrationRef.current.get(targetConversationId) === hydration) {
+            remoteConversationHydrationRef.current.delete(targetConversationId);
+          }
+        });
+      remoteConversationHydrationRef.current.set(targetConversationId, hydration);
+      return hydration;
+    };
+
+    const unlistenPromise = listen<ConversationRuntimeSnapshotPayload>(
+      "xgent:chat-runtime",
+      (event) => {
+        const payload = event.payload;
+        const conversationId = payload?.conversationId?.trim();
+        const runId = payload?.runId?.trim();
+        if (
+          disposed ||
+          !conversationId ||
+          !runId ||
+          payload.sourceInstanceId === CHAT_RUNTIME_SOURCE_INSTANCE_ID ||
+          activeConversationRuntimeRunsRef.current.has(conversationId) ||
+          !Array.isArray(payload.entries) ||
+          !Number.isFinite(payload.revision)
+        ) {
+          return;
+        }
+
+        const previous = remoteConversationRuntimeRevisionsRef.current.get(conversationId);
+        if (previous?.runId === runId && payload.revision <= previous.revision) {
+          return;
+        }
+        remoteConversationRuntimeRevisionsRef.current.set(conversationId, {
+          runId,
+          revision: payload.revision,
+        });
+        remoteConversationRuntimePayloadsRef.current.set(conversationId, payload);
+
+        const running = payload.state === "running";
+        const transcriptStore = getConversationLiveTranscriptStore(conversationId);
+        transcriptStore.replace(conversationRuntimeSnapshotToLiveTranscript(payload));
+        setConversationSendingState(conversationId, running);
+
+        if (currentConversationIdRef.current === conversationId) {
+          const hydratedRun = remoteConversationHydratedRunsRef.current.get(conversationId);
+          if (!running || hydratedRun !== runId) {
+            void hydratePersistedRemoteConversation(conversationId, !running)
+              .then((hydrated) => {
+                if (hydrated && running) {
+                  remoteConversationHydratedRunsRef.current.set(conversationId, runId);
+                }
+              })
+              .finally(() => {
+                if (!running) {
+                  remoteConversationHydratedRunsRef.current.delete(conversationId);
+                  transcriptStore.settle();
+                  remoteConversationRuntimePayloadsRef.current.delete(conversationId);
+                }
+              });
+          }
+        } else if (!running) {
+          remoteConversationHydratedRunsRef.current.delete(conversationId);
+          transcriptStore.settle();
+          remoteConversationRuntimePayloadsRef.current.delete(conversationId);
+        }
+      },
+    ).catch((error) => {
+      console.warn("local chat runtime subscription failed", error);
+      return () => undefined;
+    });
+
+    return () => {
+      disposed = true;
+      void unlistenPromise.then((unlisten) => unlisten());
+      remoteConversationHydrationRef.current.clear();
+      remoteConversationHydratedRunsRef.current.clear();
+      remoteConversationRuntimeRevisionsRef.current.clear();
+      remoteConversationRuntimePayloadsRef.current.clear();
+    };
+  }, [
+    conversationRuntimeCacheRef,
+    currentConversationIdRef,
+    desktopBridgeEnabled,
+    getConversationLiveTranscriptStore,
+    persistedConversationStateRef,
+    setConversationSendingState,
+  ]);
+
   useEffect(
     () => () => {
       for (const timerId of conversationRuntimeSnapshotTimersRef.current.values()) {
@@ -3385,7 +3533,32 @@ export function ChatPage(props: ChatPageProps) {
     currentConversationIdRef.current = currentConversationId;
     // Per-conversation pending uploads are restored inside usePendingUploads
     // when its conversationId param changes.
-  }, [currentConversationId]);
+    if (!desktopBridgeEnabled) return;
+    if (!conversationSelectionInitializedRef.current) {
+      conversationSelectionInitializedRef.current = true;
+      if (browserRuntime) return;
+    }
+    const conversationId = currentConversationId.trim();
+    if (!conversationId) return;
+    const suppressed = suppressedConversationSelectionRef.current;
+    if (suppressed?.conversationId === conversationId && suppressed.expiresAt > Date.now()) {
+      suppressedConversationSelectionRef.current = null;
+      return;
+    }
+    suppressedConversationSelectionRef.current = null;
+    const updatedAt = Date.now();
+    conversationSelectionUpdatedAtRef.current = updatedAt;
+    void invoke("local_access_broadcast_event", {
+      event: "xgent:conversation-selection",
+      payload: {
+        sourceInstanceId: CHAT_RUNTIME_SOURCE_INSTANCE_ID,
+        conversationId,
+        updatedAt,
+      } satisfies ConversationSelectionPayload,
+    } as any).catch((error) => {
+      console.warn("local conversation selection broadcast failed", error);
+    });
+  }, [browserRuntime, currentConversationId, currentConversationIdRef, desktopBridgeEnabled]);
 
   useEffect(() => {
     const currentItem = historyItems.find((item) => item.id === currentConversationId);
@@ -4496,7 +4669,7 @@ export function ChatPage(props: ChatPageProps) {
             agentTemplates: settings.agents,
             selectedSystemToolIds: effectiveSelectedSystemToolIds,
             cloudExecution: settings.access,
-            nativeMobileRuntime: !desktopBridgeEnabled,
+            nativeMobileRuntime: nativeMobile,
             lanPcCommandHostReady,
             getMcpSettings: getEffectiveMcpSettings,
             getToolPolicies,
@@ -4735,7 +4908,13 @@ export function ChatPage(props: ChatPageProps) {
   const handleDesktopNavigationSelect = useCallback(
     (target: WorkspaceNavigationTarget, shell?: string) => {
       if (desktopNavigationTarget === target && sidebarOpen && !shell) {
-        setSidebarOpen(false);
+        if (target === "conversations") {
+          setSidebarOpen(false);
+        } else {
+          setWorkspaceToolsOpen(false);
+          setDesktopNavigationTarget("conversations");
+          setSidebarOpen(true);
+        }
         return;
       }
       if (target === "conversations") {
@@ -4809,6 +4988,51 @@ export function ChatPage(props: ChatPageProps) {
     },
     [compactViewport, openController],
   );
+
+  useEffect(() => {
+    if (!desktopBridgeEnabled) return;
+    let disposed = false;
+    const applyConversationSelection = (payload: ConversationSelectionPayload | null) => {
+      if (disposed || !payload) return;
+      const conversationId = payload.conversationId?.trim();
+      if (
+        !conversationId ||
+        payload.sourceInstanceId === CHAT_RUNTIME_SOURCE_INSTANCE_ID ||
+        !Number.isFinite(payload.updatedAt) ||
+        payload.updatedAt <= conversationSelectionUpdatedAtRef.current ||
+        conversationId === currentConversationIdRef.current.trim()
+      ) {
+        return;
+      }
+      conversationSelectionUpdatedAtRef.current = payload.updatedAt;
+      suppressedConversationSelectionRef.current = {
+        conversationId,
+        expiresAt: Date.now() + 10_000,
+      };
+      setActiveView("chat");
+      setWorkspaceToolsOpen(false);
+      setDesktopNavigationTarget("conversations");
+      handleSelectConversation(conversationId);
+    };
+    const unlistenPromise = listen<ConversationSelectionPayload>(
+      "xgent:conversation-selection",
+      (event) => applyConversationSelection(event.payload),
+    ).catch((error) => {
+      console.warn("local conversation selection subscription failed", error);
+      return () => undefined;
+    });
+    void unlistenPromise.then(() =>
+      invoke<ConversationSelectionPayload | null>("local_access_latest_conversation_selection")
+        .then(applyConversationSelection)
+        .catch((error) => {
+          console.warn("local conversation selection hydration failed", error);
+        }),
+    );
+    return () => {
+      disposed = true;
+      void unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [currentConversationIdRef, desktopBridgeEnabled, handleSelectConversation]);
 
   useEffect(() => {
     const conversationId = splitConversationId?.trim();
@@ -5664,7 +5888,11 @@ export function ChatPage(props: ChatPageProps) {
           initialSkills={availableSkills}
           initialSkillsRootDir={skillsRootDir}
           isAgentMode={isAgentMode}
-          onClose={() => setWorkspaceToolsOpen(false)}
+          onClose={() => {
+            setWorkspaceToolsOpen(false);
+            setDesktopNavigationTarget("conversations");
+            setSidebarOpen(true);
+          }}
         />
       ) : null}
 
@@ -5695,6 +5923,7 @@ export function ChatPage(props: ChatPageProps) {
             像素字号，整列缩放会造成混排（聊天区设置也只应影响聊天区）。 */}
       <StackItem
         size="fill"
+        data-mobile-chat-workspace={mobileExperience ? "true" : undefined}
         className={cn(
           "chat-workspace-main zone-scroll-region",
           activeView === "chat" && "zone-font-scale",
@@ -5795,29 +6024,16 @@ export function ChatPage(props: ChatPageProps) {
                     trailingActions={
                       mobileExperience ? (
                         <>
-                          {canShowTrajectory ? (
-                            <ToggleButton
-                              label={
-                                chatSurface === "trajectory"
-                                  ? t("chat.trajectory.backToChat")
-                                  : t("chat.trajectory.open")
-                              }
-                              tooltip={
-                                chatSurface === "trajectory"
-                                  ? t("chat.trajectory.backToChat")
-                                  : t("chat.trajectory.open")
-                              }
-                              isIconOnly
-                              size="lg"
-                              isPressed={chatSurface === "trajectory"}
-                              icon={<Activity className="h-4 w-4" />}
-                              pressedIcon={<MessageSquare className="h-4 w-4" />}
-                              onPressedChange={(isPressed) =>
-                                setChatSurface(isPressed ? "trajectory" : "conversation")
-                              }
-                            />
-                          ) : null}
                           <MobileQuickActions
+                            trajectoryOpen={chatSurface === "trajectory"}
+                            onToggleTrajectory={
+                              canShowTrajectory
+                                ? () =>
+                                    setChatSurface((current) =>
+                                      current === "trajectory" ? "conversation" : "trajectory",
+                                    )
+                                : undefined
+                            }
                             onOpenTerminal={() => handleOpenWorkspaceTool("terminal")}
                             onOpenRootfs={() => {
                               setSidebarOpen(false);

@@ -4,9 +4,10 @@ use tauri::{plugin::PluginApi, AppHandle, Runtime};
 
 use crate::models::{
     CalendarRangeRequest, ComposeMessageRequest, CreateCalendarEventRequest,
-    CreateReminderRequest, MobileActionResult, MobileAssistantBackend, MobileAssistantStatus,
-    MobileCalendarEvent, MobilePermissionRequest, MobilePermissionStates, MobileReminder,
-    ReminderListRequest, VoiceInputRequest, VoiceInputResult,
+    CreateReminderRequest, CurrentLocationRequest, MobileActionResult, MobileAssistantBackend,
+    MobileAssistantStatus, MobileCalendarEvent, MobileLocation, MobilePermissionRequest,
+    MobilePermissionStates, MobileReminder, ReminderListRequest, VoiceInputRequest,
+    VoiceInputResult,
 };
 use crate::{Error, Result};
 
@@ -54,6 +55,13 @@ impl<R: Runtime> MobileAssistant<R> {
         Err(Error::Unavailable(
             "native permissions are only available on Android and iOS".into(),
         ))
+    }
+
+    pub fn get_current_location(
+        &self,
+        _request: CurrentLocationRequest,
+    ) -> Result<MobileLocation> {
+        Err(Error::Unavailable("location access is only available on mobile".into()))
     }
 
     pub fn list_calendar_events(

@@ -126,6 +126,35 @@
     return element;
   };
 
+  // Native browser backends use this private action only to resolve stable
+  // references/selectors into viewport geometry before dispatching trusted
+  // platform input. It deliberately returns data, never a DOM object.
+  const prepareNativeTarget = (input) => {
+    const point =
+      Number.isFinite(input?.x) && Number.isFinite(input?.y)
+        ? { x: Number(input.x), y: Number(input.y) }
+        : null;
+    const element = point ? document.elementFromPoint(point.x, point.y) : requireElement(input);
+    if (!element) throw new Error(`No element at (${point?.x}, ${point?.y})`);
+    if ("disabled" in element && element.disabled) throw new Error("Element is disabled");
+    if (!point) {
+      element.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
+    }
+    element.focus?.({ preventScroll: true });
+    if (input?.selectAll) {
+      if (typeof element.select === "function") {
+        element.select();
+      } else if (element.isContentEditable) {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
+    }
+    return describeElement(element);
+  };
+
   const dispatchPointerSequence = (element, point) => {
     const options = {
       bubbles: true,
@@ -426,6 +455,9 @@
     try {
       let data;
       switch (action) {
+        case "__native_target":
+          data = prepareNativeTarget(input);
+          break;
         case "click":
           data = click(input);
           break;

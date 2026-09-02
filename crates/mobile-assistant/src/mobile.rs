@@ -6,9 +6,9 @@ use tauri::{
 
 use crate::models::{
     CalendarRangeRequest, ComposeMessageRequest, CreateCalendarEventRequest,
-    CreateReminderRequest, MobileActionResult, MobileAssistantStatus, MobileCalendarEvent,
-    MobilePermissionRequest, MobilePermissionStates, MobileReminder, ReminderListRequest,
-    VoiceInputRequest, VoiceInputResult,
+    CreateReminderRequest, CurrentLocationRequest, MobileActionResult, MobileAssistantStatus,
+    MobileCalendarEvent, MobileLocation, MobilePermissionRequest, MobilePermissionStates,
+    MobileReminder, ReminderListRequest, VoiceInputRequest, VoiceInputResult,
 };
 
 #[cfg(target_os = "ios")]
@@ -97,6 +97,15 @@ impl<R: Runtime> MobileAssistant<R> {
             native,
             &status.permission_aliases,
         ))
+    }
+
+    pub fn get_current_location(
+        &self,
+        request: CurrentLocationRequest,
+    ) -> crate::Result<MobileLocation> {
+        self.0
+            .run_mobile_plugin("getCurrentLocation", request)
+            .map_err(Into::into)
     }
 
     pub fn list_calendar_events(

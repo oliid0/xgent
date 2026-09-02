@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use serde_json::Value;
-use tauri::Emitter;
 
 use crate::services::local_access::{LocalAccessController, LocalAccessStatus};
 use crate::services::workspace_watch::WorkspaceWatchService;
@@ -24,6 +23,14 @@ pub fn local_access_revoke_all_devices(
     controller: tauri::State<'_, Arc<LocalAccessController>>,
 ) -> Result<LocalAccessStatus, String> {
     controller.revoke_all_devices()
+}
+
+#[tauri::command]
+pub fn local_access_revoke_device(
+    device_id: String,
+    controller: tauri::State<'_, Arc<LocalAccessController>>,
+) -> Result<LocalAccessStatus, String> {
+    controller.revoke_device(&device_id)
 }
 
 #[tauri::command]
@@ -64,17 +71,24 @@ pub fn local_access_event_publish(
 pub fn local_access_broadcast_event(
     event: String,
     payload: Value,
-    app: tauri::AppHandle,
+    controller: tauri::State<'_, Arc<LocalAccessController>>,
 ) -> Result<(), String> {
     const ALLOWED_EVENTS: &[&str] = &[
         "xgent:chat-queue",
         "xgent:chat-runtime",
         "xgent:conversation-event",
+        "xgent:conversation-selection",
     ];
     let event = event.trim();
     if !ALLOWED_EVENTS.contains(&event) {
         return Err("local access broadcast event is not allowed".to_string());
     }
-    app.emit(event, payload)
-        .map_err(|error| format!("broadcast local access event failed: {error}"))
+    controller.broadcast_client_event(event, payload)
+}
+
+#[tauri::command]
+pub fn local_access_latest_conversation_selection(
+    controller: tauri::State<'_, Arc<LocalAccessController>>,
+) -> Result<Option<Value>, String> {
+    controller.latest_conversation_selection()
 }

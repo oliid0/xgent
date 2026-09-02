@@ -52,7 +52,8 @@ export type BrowserAction =
   | "page_info"
   | "backbone"
   | "snapshot"
-  | "execute_js";
+  | "execute_js"
+  | "recover";
 
 export type BrowserActionInput = {
   url?: string;
@@ -73,15 +74,68 @@ export type BrowserActionInput = {
 };
 
 export type BrowserActionResponse = {
+  requestId: string;
   sessionId: string;
   action: BrowserAction;
   url: string;
   title?: string | null;
   data: unknown;
   screenshotBase64?: string | null;
+  lifecycle: {
+    commandCompleted: boolean;
+    navigationStarted: boolean;
+    navigationFinished: boolean;
+    recovered: boolean;
+  };
 };
 
 const PLUGIN_COMMAND = "plugin:browser-automation|";
+const DEFAULT_BROWSER_INVOKE_TIMEOUT_MS = 30_000;
+const BROWSER_INVOKE_GRACE_MS = 2_000;
+let browserRequestSequence = 0;
+
+export function createBrowserRequestId() {
+  browserRequestSequence = (browserRequestSequence + 1) % Number.MAX_SAFE_INTEGER;
+  return `browser-${Date.now().toString(36)}-${browserRequestSequence.toString(36)}`;
+}
+
+function assertBrowserResponse(
+  response: BrowserActionResponse,
+  requestId: string,
+): BrowserActionResponse {
+  if (response.requestId !== requestId) {
+    throw new Error(
+      `Embedded browser response mismatch: expected ${requestId}, received ${response.requestId || "no request id"}.`,
+    );
+  }
+  if (response.lifecycle?.commandCompleted !== true) {
+    throw new Error(`Embedded browser request ${requestId} returned without command completion.`);
+  }
+  return response;
+}
+
+function withBrowserInvokeTimeout<T>(
+  operation: Promise<T>,
+  label: string,
+  timeoutMs = DEFAULT_BROWSER_INVOKE_TIMEOUT_MS,
+) {
+  const normalizedTimeout = Math.max(500, Math.min(90_000, timeoutMs));
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(`${label} did not return within ${normalizedTimeout} ms.`));
+    }, normalizedTimeout);
+    operation.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 export type BrowserAutomationClient = {
   status: () => Promise<BrowserStatus>;
@@ -110,22 +164,55 @@ type OpenBrowserSessionRequest = {
 };
 
 export const localBrowserAutomationClient: BrowserAutomationClient = {
-  status: () => invoke<BrowserStatus>(`${PLUGIN_COMMAND}status`),
+  status: () =>
+    withBrowserInvokeTimeout(
+      invoke<BrowserStatus>(`${PLUGIN_COMMAND}status`),
+      "Embedded browser status",
+      10_000,
+    ),
   openSession: (request) =>
-    invoke<BrowserSessionSummary>(`${PLUGIN_COMMAND}open_session`, { request }),
-  listSessions: () => invoke<BrowserSessionSummary[]>(`${PLUGIN_COMMAND}list_sessions`),
+    withBrowserInvokeTimeout(
+      invoke<BrowserSessionSummary>(`${PLUGIN_COMMAND}open_session`, { request }),
+      "Embedded browser session creation",
+    ),
+  listSessions: () =>
+    withBrowserInvokeTimeout(
+      invoke<BrowserSessionSummary[]>(`${PLUGIN_COMMAND}list_sessions`),
+      "Embedded browser tab listing",
+      10_000,
+    ),
   closeSession: (sessionId) =>
-    invoke<BrowserSessionSummary>(`${PLUGIN_COMMAND}close_session`, {
-      request: { sessionId },
-    }),
+    withBrowserInvokeTimeout(
+      invoke<BrowserSessionSummary>(`${PLUGIN_COMMAND}close_session`, {
+        request: { sessionId },
+      }),
+      "Embedded browser tab close",
+      10_000,
+    ),
   setViewport: (sessionId, viewport) =>
-    invoke<BrowserSessionSummary>(`${PLUGIN_COMMAND}set_viewport`, {
-      request: { sessionId, viewport },
-    }),
-  action: (sessionId, action, input = {}, timeoutMs = 30_000) =>
-    invoke<BrowserActionResponse>(`${PLUGIN_COMMAND}action`, {
-      request: { sessionId, action, input, timeoutMs },
-    }),
+    withBrowserInvokeTimeout(
+      invoke<BrowserSessionSummary>(`${PLUGIN_COMMAND}set_viewport`, {
+        request: { sessionId, viewport },
+      }),
+      "Embedded browser viewport update",
+      10_000,
+    ),
+  action: (sessionId, action, input = {}, timeoutMs = 30_000) => {
+    const requestId = createBrowserRequestId();
+    return withBrowserInvokeTimeout(
+      invoke<BrowserActionResponse>(`${PLUGIN_COMMAND}action`, {
+        request: {
+          requestId,
+          sessionId,
+          action,
+          input,
+          timeoutMs,
+        },
+      }),
+      `Embedded browser ${action}`,
+      timeoutMs + BROWSER_INVOKE_GRACE_MS,
+    ).then((response) => assertBrowserResponse(response, requestId));
+  },
 };
 
 function invokeOnLanComputer<T>(baseUrl: string, command: string, args: unknown) {
@@ -142,22 +229,40 @@ function invokeOnLanComputer<T>(baseUrl: string, command: string, args: unknown)
  * the local WebView controller.
  */
 export function createLanPcBrowserAutomationClient(baseUrl: string): BrowserAutomationClient {
-  const remote = <T>(suffix: string, args: unknown = {}) =>
-    invokeOnLanComputer<T>(baseUrl, `${PLUGIN_COMMAND}${suffix}`, args);
+  const remote = <T>(
+    suffix: string,
+    args: unknown = {},
+    timeoutMs = DEFAULT_BROWSER_INVOKE_TIMEOUT_MS,
+  ) =>
+    withBrowserInvokeTimeout(
+      invokeOnLanComputer<T>(baseUrl, `${PLUGIN_COMMAND}${suffix}`, args),
+      `Paired computer browser ${suffix}`,
+      timeoutMs,
+    );
   return {
-    status: () => remote<BrowserStatus>("status"),
+    status: () => remote<BrowserStatus>("status", {}, 10_000),
     openSession: (request) => remote<BrowserSessionSummary>("open_session", { request }),
-    listSessions: () => remote<BrowserSessionSummary[]>("list_sessions"),
+    listSessions: () => remote<BrowserSessionSummary[]>("list_sessions", {}, 10_000),
     closeSession: (sessionId) =>
-      remote<BrowserSessionSummary>("close_session", { request: { sessionId } }),
+      remote<BrowserSessionSummary>("close_session", { request: { sessionId } }, 10_000),
     setViewport: (sessionId, viewport) =>
-      remote<BrowserSessionSummary>("set_viewport", {
-        request: { sessionId, viewport },
-      }),
-    action: (sessionId, action, input = {}, timeoutMs = 30_000) =>
-      remote<BrowserActionResponse>("action", {
-        request: { sessionId, action, input, timeoutMs },
-      }),
+      remote<BrowserSessionSummary>("set_viewport", { request: { sessionId, viewport } }, 10_000),
+    action: (sessionId, action, input = {}, timeoutMs = 30_000) => {
+      const requestId = createBrowserRequestId();
+      return remote<BrowserActionResponse>(
+        "action",
+        {
+          request: {
+            requestId,
+            sessionId,
+            action,
+            input,
+            timeoutMs,
+          },
+        },
+        timeoutMs + BROWSER_INVOKE_GRACE_MS,
+      ).then((response) => assertBrowserResponse(response, requestId));
+    },
   };
 }
 

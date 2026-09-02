@@ -70,3 +70,5 @@ crates/mobile-execution/ios/Sources/Resources/vim/
 crates/mobile-execution/ios/Sources/Resources/cacert.pem
 crates/mobile-execution/ios/Sources/Resources/terminfo/
 crates/mobile-execution/ios/Sources/Resources/Legal/
+crates/mobile-execution/ios/Sources/Resources/python/
+crates/mobile-execution/ios-frameworks/Frameworks/

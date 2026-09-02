@@ -4,6 +4,7 @@ import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
@@ -11,6 +12,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceError
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -98,6 +101,7 @@ class BrowserActionInputArgs {
 
 @InvokeArg
 class ActionArgs {
+    var requestId: String? = null
     var sessionId: String? = null
     var action: String? = null
     var input: BrowserActionInputArgs? = null
@@ -107,21 +111,36 @@ class ActionArgs {
 
 private data class BrowserSession(
     val sessionId: String,
-    val webView: WebView,
+    var webView: WebView,
     var runtimeScript: String,
+    var userAgent: String? = null,
+    var lastUrl: String = "",
+    var viewport: BrowserViewportArgs = BrowserViewportArgs(),
     var title: String? = null,
     var loading: Boolean = false,
     var visible: Boolean = false,
+    var pendingNavigation: PendingBrowserNavigation? = null,
+)
+
+private data class PendingBrowserNavigation(
+    val action: String,
+    val gate: BrowserInvocationGate,
+    val requestId: String,
+    val requestedUrl: String? = null,
+    val recovered: Boolean = false,
+    var generation: Long = 0,
 )
 
 private class BrowserInvocationGate(
     private val invoke: Invoke,
     timeoutMs: Long,
+    private val onTimeout: (() -> Unit)? = null,
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private var completed = false
     private val normalizedTimeout = timeoutMs.coerceIn(500L, 30_000L)
     private val timeout = Runnable {
+        onTimeout?.invoke()
         reject("Browser action timed out after $normalizedTimeout ms")
     }
 
@@ -147,6 +166,7 @@ private class BrowserInvocationGate(
 @TauriPlugin
 class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity) {
     private val sessions = linkedMapOf<String, BrowserSession>()
+    private var navigationGeneration = 0L
 
     @Command
     fun status(invoke: Invoke) {
@@ -186,6 +206,11 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
                 val existing = sessions[sessionId]
                 if (existing != null) {
                     existing.runtimeScript = runtimeScript
+                    existing.userAgent = args.userAgent
+                    existing.lastUrl = url
+                    args.userAgent
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { existing.webView.settings.userAgentString = it }
                     applyViewport(existing, args.viewport)
                     existing.webView.loadUrl(url)
                     invoke.resolve(summary(existing))
@@ -197,6 +222,8 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
                     sessionId = sessionId,
                     webView = webView,
                     runtimeScript = runtimeScript,
+                    userAgent = args.userAgent,
+                    lastUrl = url,
                 )
                 configureWebView(session, args.userAgent)
                 contentRoot().addView(webView)
@@ -229,6 +256,8 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
                 invoke.reject("Browser session was not found")
                 return@runOnUiThread
             }
+            session.pendingNavigation?.gate?.reject("Browser tab was closed during navigation")
+            session.pendingNavigation = null
             val payload = summary(session)
             (session.webView.parent as? ViewGroup)?.removeView(session.webView)
             session.webView.stopLoading()
@@ -256,6 +285,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
     @Command
     fun action(invoke: Invoke) {
         val args = parse(invoke, ActionArgs::class.java) ?: return
+        val requestId = validateRequestId(invoke, args.requestId) ?: return
         val sessionId = validateSessionId(invoke, args.sessionId) ?: return
         val action = args.action?.trim()?.lowercase(Locale.US).orEmpty()
         if (action.isBlank()) {
@@ -273,6 +303,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
             executeAction(
                 invoke,
                 session,
+                requestId,
                 action,
                 args.input ?: BrowserActionInputArgs(),
                 args.timeoutMs ?: 30_000L,
@@ -311,19 +342,102 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 session.loading = true
+                url?.let { session.lastUrl = it }
+                session.pendingNavigation?.let { pending ->
+                    navigationGeneration = navigationGeneration.inc()
+                    pending.generation = navigationGeneration
+                }
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
-                session.loading = false
-                session.title = view?.title
-                view?.evaluateJavascript(session.runtimeScript, null)
+                url?.let { session.lastUrl = it }
+                val generation = session.pendingNavigation?.generation
+                val loadedView = view ?: return finishRenderedPage(session, null, generation)
+                if (url != null && loadedView.url != null && url != loadedView.url) return
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    loadedView.postVisualStateCallback(
+                        System.nanoTime(),
+                        object : WebView.VisualStateCallback() {
+                            override fun onComplete(requestId: Long) {
+                                if (session.webView === loadedView) {
+                                    finishRenderedPage(session, loadedView, generation)
+                                }
+                            }
+                        },
+                    )
+                } else {
+                    finishRenderedPage(session, loadedView, generation)
+                }
             }
+
+            override fun onReceivedError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                error: WebResourceError?,
+            ) {
+                if (request?.isForMainFrame != true) return
+                session.loading = false
+                failNavigation(
+                    session,
+                    "Browser navigation failed: ${error?.description ?: "unknown WebView error"}",
+                )
+            }
+
+            override fun onRenderProcessGone(
+                view: WebView?,
+                detail: RenderProcessGoneDetail?,
+            ): Boolean {
+                val failedView = view ?: return false
+                if (session.webView !== failedView) return true
+                recoverAndroidRenderer(session, failedView, detail?.didCrash() == true)
+                return true
+            }
+        }
+    }
+
+    private fun finishRenderedPage(
+        session: BrowserSession,
+        view: WebView?,
+        generation: Long?,
+    ) {
+        session.loading = false
+        session.title = view?.title
+        view?.evaluateJavascript(session.runtimeScript, null)
+        completeNavigation(session, generation)
+    }
+
+    private fun recoverAndroidRenderer(
+        session: BrowserSession,
+        failedView: WebView,
+        crashed: Boolean,
+    ) {
+        session.loading = false
+        failNavigation(
+            session,
+            if (crashed) {
+                "Browser renderer crashed and was recreated"
+            } else {
+                "Browser renderer was terminated and was recreated"
+            },
+        )
+        val root = contentRoot()
+        root.removeView(failedView)
+        failedView.destroy()
+
+        val replacement = WebView(activity)
+        session.webView = replacement
+        configureWebView(session, session.userAgent)
+        root.addView(replacement)
+        applyViewport(session, session.viewport)
+        session.lastUrl.takeIf { it.startsWith("http://") || it.startsWith("https://") }?.let {
+            replacement.loadUrl(it)
         }
     }
 
     private fun executeAction(
         invoke: Invoke,
         session: BrowserSession,
+        requestId: String,
         action: String,
         input: BrowserActionInputArgs,
         timeoutMs: Long,
@@ -332,46 +446,144 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
         when (action) {
             "navigate" -> {
                 val url = validateUrl(invoke, input.url) ?: return
-                webView.loadUrl(url)
-                invoke.resolve(actionResponse(session, action, JSONObject().put("navigated", true)))
+                beginNavigation(invoke, session, requestId, action, url, timeoutMs) {
+                    webView.loadUrl(url)
+                }
             }
             "reload" -> {
-                webView.reload()
-                invoke.resolve(actionResponse(session, action, JSONObject().put("reloaded", true)))
+                beginNavigation(invoke, session, requestId, action, webView.url, timeoutMs) {
+                    webView.reload()
+                }
             }
             "go_back" -> {
-                if (webView.canGoBack()) webView.goBack()
-                invoke.resolve(
-                    actionResponse(
-                        session,
-                        action,
-                        JSONObject().put("navigated", webView.canGoBack()),
-                    ),
-                )
+                if (!webView.canGoBack()) {
+                    invoke.resolve(
+                        actionResponse(
+                            session,
+                            requestId,
+                            action,
+                            JSONObject().put("navigated", false),
+                        ),
+                    )
+                } else {
+                    beginNavigation(invoke, session, requestId, action, null, timeoutMs) {
+                        webView.goBack()
+                    }
+                }
             }
             "go_forward" -> {
-                if (webView.canGoForward()) webView.goForward()
-                invoke.resolve(
-                    actionResponse(
-                        session,
-                        action,
-                        JSONObject().put("navigated", webView.canGoForward()),
-                    ),
-                )
+                if (!webView.canGoForward()) {
+                    invoke.resolve(
+                        actionResponse(
+                            session,
+                            requestId,
+                            action,
+                            JSONObject().put("navigated", false),
+                        ),
+                    )
+                } else {
+                    beginNavigation(invoke, session, requestId, action, null, timeoutMs) {
+                        webView.goForward()
+                    }
+                }
             }
-            "screenshot" -> captureScreenshot(invoke, session, action, timeoutMs)
-            else -> evaluateDomAction(invoke, session, action, input.toJson(), timeoutMs)
+            "recover" -> {
+                webView.stopLoading()
+                beginNavigation(
+                    invoke,
+                    session,
+                    requestId,
+                    action,
+                    webView.url ?: session.lastUrl,
+                    timeoutMs.coerceAtMost(10_000L),
+                    recovered = true,
+                ) { webView.reload() }
+            }
+            "screenshot" -> captureScreenshot(invoke, session, requestId, action, timeoutMs)
+            else -> evaluateDomAction(
+                invoke,
+                session,
+                requestId,
+                action,
+                input.toJson(),
+                timeoutMs,
+            )
         }
+    }
+
+    private fun beginNavigation(
+        invoke: Invoke,
+        session: BrowserSession,
+        requestId: String,
+        action: String,
+        requestedUrl: String?,
+        timeoutMs: Long,
+        recovered: Boolean = false,
+        start: () -> Unit,
+    ) {
+        session.pendingNavigation?.gate?.reject("Browser navigation was superseded by a new action")
+        lateinit var pending: PendingBrowserNavigation
+        val gate = BrowserInvocationGate(invoke, timeoutMs) {
+            if (session.pendingNavigation === pending) {
+                session.pendingNavigation = null
+                session.loading = false
+                session.webView.stopLoading()
+            }
+        }
+        pending = PendingBrowserNavigation(action, gate, requestId, requestedUrl, recovered)
+        session.pendingNavigation = pending
+        session.loading = true
+        requestedUrl?.let { session.lastUrl = it }
+        runCatching(start).onFailure { error ->
+            if (session.pendingNavigation === pending) session.pendingNavigation = null
+            session.loading = false
+            gate.reject("Browser navigation failed: ${error.message}")
+        }
+    }
+
+    private fun completeNavigation(session: BrowserSession, generation: Long?) {
+        val pending = session.pendingNavigation ?: return
+        if (generation == null || pending.generation == 0L || pending.generation != generation) return
+        session.pendingNavigation = null
+        val data = JSONObject().apply {
+            put("navigated", true)
+            put("readyState", "complete")
+            put("url", session.webView.url ?: pending.requestedUrl ?: "")
+        }
+        pending.gate.resolve(
+            actionResponse(
+                session,
+                pending.requestId,
+                pending.action,
+                data,
+                navigationStarted = true,
+                navigationFinished = true,
+                recovered = pending.recovered,
+            ),
+        )
+    }
+
+    private fun failNavigation(session: BrowserSession, message: String) {
+        val pending = session.pendingNavigation ?: return
+        session.pendingNavigation = null
+        pending.gate.reject(message)
     }
 
     private fun evaluateDomAction(
         invoke: Invoke,
         session: BrowserSession,
+        requestId: String,
         action: String,
         input: JSONObject,
         timeoutMs: Long,
     ) {
-        val gate = BrowserInvocationGate(invoke, timeoutMs)
+        val actionWebView = session.webView
+        val gate = BrowserInvocationGate(invoke, timeoutMs) {
+            if (session.webView === actionWebView) {
+                actionWebView.stopLoading()
+                actionWebView.reload()
+            }
+        }
         val script = """
             (() => {
               if (!window.__xgentBrowserRuntime) {
@@ -380,7 +592,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
               return window.__xgentBrowserRuntime.execute(${JSONObject.quote(action)}, ${input});
             })()
         """.trimIndent()
-        session.webView.evaluateJavascript(script) { encoded ->
+        actionWebView.evaluateJavascript(script) { encoded ->
             runCatching {
                 val decoded = JSONTokener(encoded).nextValue()
                 val raw = if (decoded is String) decoded else encoded
@@ -393,6 +605,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
                 gate.resolve(
                     actionResponse(
                         session,
+                        requestId,
                         action,
                         envelope.opt("data") ?: JSONObject.NULL,
                     ),
@@ -406,11 +619,18 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
     private fun captureScreenshot(
         invoke: Invoke,
         session: BrowserSession,
+        requestId: String,
         action: String,
         timeoutMs: Long,
     ) {
-        val gate = BrowserInvocationGate(invoke, timeoutMs)
-        val webView = session.webView
+        val screenshotWebView = session.webView
+        val gate = BrowserInvocationGate(invoke, timeoutMs) {
+            if (session.webView === screenshotWebView) {
+                screenshotWebView.stopLoading()
+                screenshotWebView.reload()
+            }
+        }
+        val webView = screenshotWebView
         if (webView.width <= 0 || webView.height <= 0) {
             gate.reject("Browser viewport has no drawable size")
             return
@@ -424,6 +644,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
             val encoded = Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
             actionResponse(
                 session,
+                requestId,
                 action,
                 JSONObject().apply {
                     put("width", webView.width)
@@ -439,6 +660,14 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
 
     private fun applyViewport(session: BrowserSession, raw: BrowserViewportArgs?) {
         val viewport = raw ?: BrowserViewportArgs()
+        session.viewport = BrowserViewportArgs().also { copy ->
+            copy.x = viewport.x
+            copy.y = viewport.y
+            copy.width = viewport.width
+            copy.height = viewport.height
+            copy.visible = viewport.visible
+            copy.scaleFactor = viewport.scaleFactor
+        }
         val scale = max(0.1, viewport.scaleFactor ?: activity.resources.displayMetrics.density.toDouble())
         val width = max(1, ((viewport.width ?: 1.0) * scale).roundToInt())
         val height = max(1, ((viewport.height ?: 1.0) * scale).roundToInt())
@@ -468,7 +697,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
 
     private fun summary(session: BrowserSession): JSObject = JSObject().apply {
         put("sessionId", session.sessionId)
-        put("url", session.webView.url ?: "")
+        put("url", session.webView.url ?: session.lastUrl)
         put("title", session.title ?: JSONObject.NULL)
         put("visible", session.visible)
         put("loading", session.loading)
@@ -476,16 +705,30 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
 
     private fun actionResponse(
         session: BrowserSession,
+        requestId: String,
         action: String,
         data: Any,
         screenshotBase64: String? = null,
+        navigationStarted: Boolean = false,
+        navigationFinished: Boolean = false,
+        recovered: Boolean = false,
     ): JSObject = JSObject().apply {
+        put("requestId", requestId)
         put("sessionId", session.sessionId)
         put("action", action)
-        put("url", session.webView.url ?: "")
+        put("url", session.webView.url ?: session.lastUrl)
         put("title", session.title ?: JSONObject.NULL)
         put("data", data)
         put("screenshotBase64", screenshotBase64 ?: JSONObject.NULL)
+        put(
+            "lifecycle",
+            JSONObject().apply {
+                put("commandCompleted", true)
+                put("navigationStarted", navigationStarted)
+                put("navigationFinished", navigationFinished)
+                put("recovered", recovered)
+            },
+        )
     }
 
     private fun contentRoot(): ViewGroup =
@@ -511,6 +754,21 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
             return null
         }
         return sessionId
+    }
+
+    private fun validateRequestId(invoke: Invoke, raw: String?): String? {
+        val requestId = raw?.trim().orEmpty()
+        val valid =
+            requestId.isNotEmpty() &&
+                requestId.length <= 128 &&
+                requestId.all {
+                    (it.isLetterOrDigit() && it.code <= 0x7f) || it == '-' || it == '_' || it == '.'
+                }
+        if (!valid) {
+            invoke.reject("requestId must contain 1-128 ASCII letters, digits, '-', '_' or '.'")
+            return null
+        }
+        return requestId
     }
 
     private fun validateUrl(invoke: Invoke, raw: String?): String? {

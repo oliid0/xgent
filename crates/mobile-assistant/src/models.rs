@@ -49,6 +49,24 @@ pub struct MobilePermissionRequest {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CurrentLocationRequest {
+    #[serde(default = "default_location_timeout_ms")]
+    pub timeout_ms: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MobileLocation {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub altitude_meters: Option<f64>,
+    pub accuracy_meters: f64,
+    pub timestamp_ms: i64,
+    pub provider: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CalendarRangeRequest {
     pub start_ms: i64,
     pub end_ms: i64,
@@ -135,6 +153,10 @@ pub struct MobileActionResult {
 
 fn default_result_limit() -> u16 {
     50
+}
+
+fn default_location_timeout_ms() -> u64 {
+    10_000
 }
 
 fn default_true() -> bool {

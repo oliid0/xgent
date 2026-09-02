@@ -623,7 +623,39 @@ jobs:
           printf '\nSigning mode: %s\n' "$signing_mode" >> dist/Android-signing.txt
           unzip -l "$release_apk" | grep -F 'lib/arm64-v8a/libxgent_proot.so'
           unzip -l "$release_apk" | grep -F 'lib/x86_64/libxgent_proot.so'
+          unzip -l "$release_apk" | grep -F 'lib/arm64-v8a/libxgent_proot_loader.so'
+          unzip -l "$release_apk" | grep -F 'lib/x86_64/libxgent_proot_loader.so'
+          unzip -l "$release_apk" | grep -F 'assets/xgent-proot-manifest.json'
           unzip -l "$release_apk" | grep -F 'assets/mobile-execution/rootfs/manifest.json'
+          unzip -l "$release_apk" | grep -F 'assets/mobile-execution/rootfs/alpine-3.22.5-arm64-v8a.tar.gz'
+          unzip -l "$release_apk" | grep -F 'assets/mobile-execution/rootfs/alpine-3.22.5-x86_64.tar.gz'
+          python3 - "$release_apk" <<'PY'
+          import hashlib
+          import json
+          import sys
+          import zipfile
+
+          with zipfile.ZipFile(sys.argv[1]) as archive:
+              names = set(archive.namelist())
+              proot = json.loads(archive.read("assets/xgent-proot-manifest.json"))
+              if proot.get("source") == "termux-official-packages":
+                  for abi in ("arm64-v8a", "x86_64"):
+                      for library in ("libtalloc.so", "libandroid-shmem.so"):
+                          path = f"lib/{abi}/{library}"
+                          if path not in names:
+                              raise SystemExit(f"Missing official PRoot dependency: {path}")
+              root = "assets/mobile-execution/rootfs/"
+              manifest = json.loads(archive.read(root + "manifest.json"))
+              if manifest.get("schemaVersion") != 1:
+                  raise SystemExit("Unexpected Android rootfs manifest schema")
+              for abi, record in manifest["archives"].items():
+                  payload = archive.read(root + record["file"])
+                  actual = hashlib.sha256(payload).hexdigest()
+                  if actual != record["sha256"]:
+                      raise SystemExit(
+                          f"Rootfs SHA-256 mismatch inside APK for {abi}: {actual}"
+                      )
+          PY
 
           native_check_dir="$RUNNER_TEMP/xgent-native-libraries"
           mkdir -p "$native_check_dir"
@@ -701,6 +733,8 @@ jobs:
           set -euo pipefail
           bash scripts/mobile/prepare-ios-shell-resources.sh
           bash scripts/mobile/prepare-mobile-legal-notices.sh
+          test -s crates/mobile-execution/ios-frameworks/Frameworks/python3_ios.xcframework/Info.plist
+          test -s crates/mobile-execution/ios/Sources/Resources/python/lib/python3.9/os.py
 
       - name: Install Tauri iOS host dependencies
         shell: bash
@@ -772,6 +806,14 @@ jobs:
           cp "${ipa_candidates[0]}" "$release_ipa"
           unzip -t "$release_ipa"
           unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/'
+          unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/Frameworks/ios_system\.framework/ios_system'
+          unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/Frameworks/ffmpeg\.framework/ffmpeg'
+          unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/Frameworks/python3_ios\.framework/python3_ios'
+          unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/Frameworks/python3_ios-_ssl\.framework/python3_ios-_ssl'
+          unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/Frameworks/python3_ios-_sqlite3\.framework/python3_ios-_sqlite3'
+          unzip -l "$release_ipa" | grep -E 'python/lib/python3\.9/os\.py'
+          unzip -l "$release_ipa" | grep -E 'python/lib/python3\.9/ssl\.py'
+          unzip -l "$release_ipa" | grep -E '/bin/pkg$'
           printf '%s\n' \
             'This IPA is intentionally unsigned. Re-sign it with an Apple Developer identity or a compatible sideloading service before installation.' \
             > dist/iOS-signing.txt

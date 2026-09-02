@@ -109,6 +109,8 @@ let package = Package(
                 // preserving their hierarchy.
                 .process("Resources/commandDictionary.plist"),
                 .process("Resources/extraCommandsDictionary.plist"),
+                .copy("Resources/bin"),
+                .copy("Resources/python"),
                 .copy("Resources/vim"),
                 .copy("Resources/terminfo"),
                 .copy("Resources/cacert.pem"),

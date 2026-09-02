@@ -191,7 +191,7 @@ function ChatSidebarSurface(props: {
         }}
         header={<StackItem size="fill">{props.mobileHeader}</StackItem>}
         label="Xgent"
-        width={360}
+        width={320}
         side="start"
       >
         {props.children}

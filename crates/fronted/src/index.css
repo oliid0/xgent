@@ -20,6 +20,7 @@
     --xgent-image-preview-slider-max-width: 20rem;
     --xgent-workspace-image-stage-min-height: 12rem;
     --xgent-z-workspace-overlay: 50;
+    --xgent-z-browser-overlay: 80;
     --xgent-z-workspace-navigation: 30;
     --xgent-z-chat-queue: 30;
     --xgent-z-chat-composer: 20;
@@ -108,7 +109,7 @@
     --xgent-hover-card-width: min(27.5rem, calc(100dvw - (var(--spacing-4) * 2)));
     --xgent-hover-card-height: min(32.5rem, calc(100dvh - (var(--spacing-4) * 2)));
     --xgent-composer-popup-width: min(45rem, calc(100dvw - (var(--spacing-4) * 2)));
-    --xgent-composer-width: min(64rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xgent-composer-width: min(50rem, calc(100dvw - (var(--spacing-4) * 2)));
     --xgent-composer-add-menu-width: min(19rem, calc(100dvw - (var(--spacing-4) * 2)));
     --xgent-context-progress-width: 6rem;
     --xgent-chat-queue-width: 62rem;
@@ -117,8 +118,10 @@
     --xgent-model-selector-trigger-width: min(20rem, calc(100dvw - 8.5rem));
     --xgent-model-selector-list-height: min(20rem, 50dvh);
     --xgent-mobile-panel-hidden-offset: 8%;
-    --xgent-mobile-header-action-size: 3rem;
-    --xgent-mobile-header-height: 3.5rem;
+    --xgent-mobile-header-action-size: 3.5rem;
+    --xgent-mobile-header-height: 4.25rem;
+    --xgent-mobile-composer-menu-width: min(22rem, calc(100dvw - var(--spacing-6)));
+    --xgent-mobile-composer-menu-icon-size: 3.5rem;
     --xgent-mobile-activity-width: min(26.25rem, 86vw);
     --xgent-z-mobile-panel: 74;
   }
@@ -3369,6 +3372,23 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   overflow: hidden;
 }
 
+.xgent-mobile-composer-menu-row {
+  min-height: 4.75rem;
+  border-radius: var(--radius-container);
+}
+
+.xgent-mobile-composer-menu-icon {
+  flex: 0 0 var(--xgent-mobile-composer-menu-icon-size);
+  border-radius: var(--radius-full);
+  color: var(--color-content-primary);
+  background: var(--color-background-muted);
+}
+
+.xgent-mobile-composer-menu-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
 .xgent-chat-mention-composer {
   padding: 0;
 }
@@ -3404,6 +3424,20 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 @media (max-width: 768px) {
+  [data-mobile-chat-workspace="true"] {
+    background: var(--color-background-surface);
+  }
+
+  .xgent-mobile-chat-toolbar {
+    min-height: var(--xgent-mobile-header-height);
+    padding-inline: var(--spacing-3);
+  }
+
+  .xgent-mobile-chat-mode {
+    width: calc(var(--spacing-12) * 4);
+    max-width: calc(100dvw - (var(--xgent-mobile-header-action-size) * 2) - var(--spacing-8));
+  }
+
   .chat-transcript-content {
     padding-right: max(var(--spacing-4), env(safe-area-inset-right, 0px));
     padding-left: max(var(--spacing-4), env(safe-area-inset-left, 0px));
@@ -3476,6 +3510,19 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   padding-right: max(var(--spacing-4), env(safe-area-inset-right, 0px));
   padding-bottom: calc(var(--spacing-4) + env(safe-area-inset-bottom, 0px));
   padding-left: max(var(--spacing-4), env(safe-area-inset-left, 0px));
+}
+
+[data-mobile-left-drawer="true"] .chat-sidebar-header,
+[data-mobile-left-drawer="true"] > :last-child {
+  border-color: transparent;
+}
+
+[data-mobile-left-drawer="true"] .chat-sidebar-primary-nav {
+  margin-top: var(--spacing-4);
+}
+
+[data-mobile-left-drawer="true"] .mobile-chat-sidebar-footer {
+  padding-block: var(--spacing-2);
 }
 
 [data-native-mobile="true"] .settings-page-compact [data-settings-section] {

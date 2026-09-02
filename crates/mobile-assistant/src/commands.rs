@@ -2,9 +2,9 @@ use tauri::{command, AppHandle, Runtime};
 
 use crate::models::{
     CalendarRangeRequest, ComposeMessageRequest, CreateCalendarEventRequest,
-    CreateReminderRequest, MobileActionResult, MobileAssistantStatus, MobileCalendarEvent,
-    MobilePermissionRequest, MobilePermissionStates, MobileReminder, ReminderListRequest,
-    VoiceInputRequest, VoiceInputResult,
+    CreateReminderRequest, CurrentLocationRequest, MobileActionResult, MobileAssistantStatus,
+    MobileCalendarEvent, MobileLocation, MobilePermissionRequest, MobilePermissionStates,
+    MobileReminder, ReminderListRequest, VoiceInputRequest, VoiceInputResult,
 };
 use crate::{MobileAssistantExt, Result};
 
@@ -34,6 +34,14 @@ pub(crate) async fn request_permissions<R: Runtime>(
     request: MobilePermissionRequest,
 ) -> Result<MobilePermissionStates> {
     app.mobile_assistant().request_permissions(request)
+}
+
+#[command]
+pub(crate) async fn get_current_location<R: Runtime>(
+    app: AppHandle<R>,
+    request: CurrentLocationRequest,
+) -> Result<MobileLocation> {
+    app.mobile_assistant().get_current_location(request)
 }
 
 #[command]

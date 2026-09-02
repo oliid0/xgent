@@ -47,6 +47,16 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function isRecoverableBrowserFailure(error: unknown) {
+  const message = errorMessage(error).toLowerCase();
+  return (
+    message.includes("timed out") ||
+    message.includes("did not return") ||
+    message.includes("process terminated") ||
+    message.includes("renderer crashed")
+  );
+}
+
 function normalizedSessionId(value: string | undefined) {
   const sessionId = value?.trim() || DEFAULT_BROWSER_SESSION_ID;
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(sessionId)) {
@@ -191,17 +201,12 @@ export class BrowserSessionController {
         return existing;
       }
       const target = normalizeBrowserAddress(options.url || existing.url);
-      const response = await this.enqueue(sessionId, () =>
-        this.client.action(sessionId, "navigate", { url: target }),
-      );
+      const response = await this.action("navigate", { url: target }, { sessionId });
       const session: BrowserSessionSummary = {
         ...existing,
-        // Native WebViews update their public URL asynchronously after load().
-        // Keep the requested target in shared state until the next DOM action
-        // reports the committed URL instead of flashing the previous address.
-        url: target,
+        url: response.url || target,
         title: response.title ?? existing.title,
-        loading: true,
+        loading: false,
       };
       this.update({
         sessions: mergeSession(this.state.sessions, session),
@@ -333,7 +338,34 @@ export class BrowserSessionController {
       });
       return response;
     } catch (error) {
-      this.update({ error: errorMessage(error) });
+      let recoveryError: unknown = null;
+      if (action !== "recover" && isRecoverableBrowserFailure(error)) {
+        try {
+          const recovered = await this.client.action(sessionId, "recover", {}, 10_000);
+          const existing = this.state.sessions.find((session) => session.sessionId === sessionId);
+          this.update({
+            sessions: mergeSession(this.state.sessions, {
+              sessionId,
+              url: recovered.url || existing?.url || "",
+              title: recovered.title ?? existing?.title,
+              visible: existing?.visible ?? false,
+              loading: false,
+            }),
+          });
+        } catch (nextError) {
+          recoveryError = nextError;
+          try {
+            await this.refreshSessions();
+          } catch {
+            // Preserve the original correlated command failure for the model.
+          }
+        }
+      }
+      this.update({
+        error: recoveryError
+          ? `${errorMessage(error)} Recovery failed: ${errorMessage(recoveryError)}`
+          : errorMessage(error),
+      });
       throw error;
     } finally {
       this.setSessionBusy(sessionId, false);

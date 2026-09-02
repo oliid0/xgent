@@ -9,7 +9,6 @@ import { List, ListItem } from "@astryxdesign/core/List";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { Section } from "@astryxdesign/core/Section";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
-import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { invoke, isBrowserRuntime } from "@xgent/runtime";
@@ -28,18 +27,7 @@ import {
   removeExternalMobileWorkspace,
 } from "../../lib/mobileExecution";
 import { normalizeRuntimePlatform, type RuntimePlatform } from "../../lib/runtimePlatform";
-import type { AppSettings } from "../../lib/settings";
 import type { SettingsSectionProps } from "./types";
-
-function updateAccess(
-  setSettings: SettingsSectionProps["setSettings"],
-  patch: Partial<AppSettings["access"]>,
-) {
-  setSettings((previous) => ({
-    ...previous,
-    access: { ...previous.access, ...patch },
-  }));
-}
 
 function formatBytes(value?: number | null) {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -58,7 +46,7 @@ function createRunId() {
   return `mobile-install-${suffix}`.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 128);
 }
 
-export function MobileExecutionSection({ settings, setSettings }: SettingsSectionProps) {
+export function MobileExecutionSection(_props: SettingsSectionProps) {
   const { t } = useLocale();
   const browser = isBrowserRuntime();
   const [platform, setPlatform] = useState<RuntimePlatform>();
@@ -70,8 +58,6 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
   const [error, setError] = useState("");
 
   const isNativeMobile = !browser && (platform === "android" || platform === "ios");
-  const enabled =
-    platform === "android" ? settings.access.androidProotEnabled : settings.access.iosAShellEnabled;
 
   const refresh = useCallback(async () => {
     if (!isNativeMobile) return;
@@ -122,28 +108,11 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
     [status],
   );
 
-  function toggleEnabled() {
-    if (!enabled && status && !status.installed) {
-      void installEnvironment();
-      return;
-    }
-    if (platform === "android") {
-      updateAccess(setSettings, { androidProotEnabled: !settings.access.androidProotEnabled });
-    } else if (platform === "ios") {
-      updateAccess(setSettings, { iosAShellEnabled: !settings.access.iosAShellEnabled });
-    }
-  }
-
   async function installEnvironment() {
     setBusy("environment");
     setError("");
     try {
       await installMobileEnvironment();
-      if (platform === "android") {
-        updateAccess(setSettings, { androidProotEnabled: true });
-      } else if (platform === "ios") {
-        updateAccess(setSettings, { iosAShellEnabled: true });
-      }
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -234,13 +203,11 @@ export function MobileExecutionSection({ settings, setSettings }: SettingsSectio
             </VStack>
           </StackItem>
           {isNativeMobile ? (
-            <Switch
-              value={enabled}
-              label={t("settings.mobileEnable")}
-              isLabelHidden
-              isDisabled={!status?.available || busy !== ""}
-              disabledMessage={!status?.available ? t("settings.mobileNativeOnly") : undefined}
-              onChange={toggleEnabled}
+            <StatusDot
+              label={
+                status?.installed ? t("settings.mobileReady") : t("settings.mobileNotInstalled")
+              }
+              variant={status?.installed ? "success" : "neutral"}
             />
           ) : null}
         </HStack>

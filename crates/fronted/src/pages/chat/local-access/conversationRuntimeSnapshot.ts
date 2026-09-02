@@ -1,8 +1,9 @@
-import type { Message, ToolCall, ToolResultMessage, Usage } from "@earendil-works/pi-ai";
+import type { Message, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 
 import type { LiveTranscriptState } from "../../../lib/chat/conversation/liveTranscriptStore";
 import type { HostedSearchBlock } from "../../../lib/chat/messages/hostedSearch";
 import {
+  type LiveRound,
   safeStringify,
   summarizeToolCall,
   toolResultMessageToText,
@@ -17,14 +18,7 @@ import { buildToolCallPreviewArguments } from "../turns/toolCallPreview";
 
 export type ConversationRuntimeSnapshotState = "running" | "completed" | "failed" | "cancelled";
 
-type AssistantRuntimeMeta = {
-  provider?: string;
-  model?: string;
-  api?: string;
-  stopReason?: string;
-  usage?: Usage;
-  usageTotalTokens?: number;
-};
+type AssistantRuntimeMeta = NonNullable<UiRound["meta"]>;
 
 export type ConversationRuntimeSnapshotEntry =
   | {
@@ -62,6 +56,19 @@ export type ConversationRuntimeSnapshotEntry =
 export type ConversationRuntimeSnapshotInput = {
   userMessage?: Message | null;
   liveTranscript: LiveTranscriptState;
+};
+
+export type ConversationRuntimeSnapshotPayload = {
+  sourceInstanceId?: string;
+  conversationId: string;
+  runId: string;
+  state: ConversationRuntimeSnapshotState;
+  cwd?: string;
+  updatedAt: number;
+  revision: number;
+  entries: ConversationRuntimeSnapshotEntry[];
+  toolStatus?: string;
+  toolStatusIsCompaction?: boolean;
 };
 
 function readMessageId(message: Message | undefined, fallback: string) {
@@ -287,4 +294,105 @@ export function buildConversationRuntimeSnapshotEntries(
   }
 
   return entries;
+}
+
+function createRuntimeRound(round: number): LiveRound {
+  return {
+    round,
+    key: `runtime-r${round}`,
+    blocks: [],
+    runningToolCallIds: [],
+    thinkingOpen: false,
+  };
+}
+
+/**
+ * Rebuild the normal live-transcript shape from a remote runtime snapshot.
+ * The paired WebUI and desktop client therefore use the same transcript
+ * renderer instead of maintaining a second, eventually divergent chat UI.
+ */
+export function conversationRuntimeSnapshotToLiveTranscript(
+  payload: Pick<ConversationRuntimeSnapshotPayload, "entries" | "state" | "toolStatus">,
+): LiveTranscriptState {
+  const rounds = new Map<number, LiveRound>();
+  const toolBlocks = new Map<
+    string,
+    { round: LiveRound; item: { toolCall: ToolCall; toolResult?: ToolResultMessage } }
+  >();
+
+  const ensureRound = (value: number | undefined) => {
+    const roundNumber =
+      typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 1;
+    const existing = rounds.get(roundNumber);
+    if (existing) return existing;
+    const created = createRuntimeRound(roundNumber);
+    rounds.set(roundNumber, created);
+    return created;
+  };
+
+  for (const entry of payload.entries) {
+    if (entry.kind === "user") continue;
+    const round = ensureRound("round" in entry ? entry.round : undefined);
+
+    if (entry.kind === "assistant" || entry.kind === "error") {
+      if (entry.text.trim()) {
+        round.blocks.push({ kind: "text", id: entry.id, text: entry.text });
+      }
+      if (entry.kind === "assistant" && entry.meta && !round.meta) {
+        round.meta = entry.meta;
+      }
+      continue;
+    }
+
+    if (entry.kind === "thinking") {
+      if (entry.text) {
+        round.blocks.push({ kind: "thinking", id: entry.id, text: entry.text });
+      }
+      continue;
+    }
+
+    if (entry.kind === "tool_call") {
+      const item = { toolCall: normalizeToolCall(entry.toolCall, entry.id) };
+      round.blocks.push({ kind: "tool", item });
+      round.runningToolCallIds.push(item.toolCall.id);
+      toolBlocks.set(item.toolCall.id, { round, item });
+      continue;
+    }
+
+    if (entry.kind === "tool_result") {
+      const toolCallId = entry.toolResult.toolCallId?.trim();
+      const target = toolCallId ? toolBlocks.get(toolCallId) : undefined;
+      if (target) {
+        target.item.toolResult = normalizeToolResult(entry.toolResult, target.item.toolCall);
+        target.round.runningToolCallIds = target.round.runningToolCallIds.filter(
+          (id) => id !== target.item.toolCall.id,
+        );
+      }
+      continue;
+    }
+
+    if (entry.kind === "hosted_search") {
+      round.blocks.push({ kind: "hostedSearch", item: entry.hostedSearch });
+    }
+  }
+
+  const liveRounds = Array.from(rounds.values()).sort((left, right) => left.round - right.round);
+  if (payload.state === "running") {
+    for (const round of liveRounds) {
+      round.thinkingOpen = round.blocks.at(-1)?.kind === "thinking";
+    }
+  } else {
+    for (const round of liveRounds) {
+      round.runningToolCallIds = [];
+      round.thinkingOpen = false;
+    }
+  }
+
+  return {
+    draftAssistantText: "",
+    toolStatus: payload.toolStatus?.trim() || null,
+    liveRounds,
+    retryAttempts: [],
+    isSettled: payload.state !== "running",
+  };
 }

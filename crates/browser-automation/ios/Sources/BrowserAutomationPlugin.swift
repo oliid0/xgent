@@ -68,6 +68,7 @@ private struct BrowserActionInputArgs: Decodable {
 }
 
 private struct ActionArgs: Decodable {
+    let requestId: String?
     let sessionId: String
     let action: String
     let input: BrowserActionInputArgs?
@@ -96,6 +97,7 @@ private final class BrowserSession {
     var loading = false
     var visible = false
     var navigationDelegate: BrowserNavigationDelegate?
+    var pendingNavigation: PendingBrowserNavigation?
 
     init(sessionId: String, webView: WKWebView, runtimeScript: String) {
         self.sessionId = sessionId
@@ -127,11 +129,11 @@ private final class BrowserNavigationDelegate: NSObject, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation?) {
-        owner?.updateLoading(sessionId: sessionId, loading: true)
+        owner?.pageDidStart(sessionId: sessionId, navigation: navigation)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
-        owner?.pageDidFinish(sessionId: sessionId)
+        owner?.pageDidFinish(sessionId: sessionId, navigation: navigation)
     }
 
     func webView(
@@ -139,7 +141,9 @@ private final class BrowserNavigationDelegate: NSObject, WKNavigationDelegate {
         didFail navigation: WKNavigation?,
         withError error: Error
     ) {
-        owner?.updateLoading(sessionId: sessionId, loading: false)
+        Task { @MainActor in
+            owner?.pageDidFail(sessionId: sessionId, navigation: navigation, error: error)
+        }
     }
 
     func webView(
@@ -147,7 +151,15 @@ private final class BrowserNavigationDelegate: NSObject, WKNavigationDelegate {
         didFailProvisionalNavigation navigation: WKNavigation?,
         withError error: Error
     ) {
-        owner?.updateLoading(sessionId: sessionId, loading: false)
+        Task { @MainActor in
+            owner?.pageDidFail(sessionId: sessionId, navigation: navigation, error: error)
+        }
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        Task { @MainActor in
+            owner?.pageProcessDidTerminate(sessionId: sessionId)
+        }
     }
 }
 
@@ -155,11 +167,14 @@ private final class BrowserInvocationGate {
     private let invoke: Invoke
     private var completed = false
     private var timeoutWorkItem: DispatchWorkItem?
+    private let onTimeout: (() -> Void)?
 
-    init(invoke: Invoke, timeoutMs: UInt64) {
+    init(invoke: Invoke, timeoutMs: UInt64, onTimeout: (() -> Void)? = nil) {
         self.invoke = invoke
+        self.onTimeout = onTimeout
         let normalizedTimeout = min(30_000, max(500, timeoutMs))
         let workItem = DispatchWorkItem { [weak self] in
+            self?.onTimeout?()
             self?.reject("Browser action timed out after \(normalizedTimeout) ms")
         }
         timeoutWorkItem = workItem
@@ -183,6 +198,32 @@ private final class BrowserInvocationGate {
         timeoutWorkItem?.cancel()
         timeoutWorkItem = nil
         invoke.reject(message)
+    }
+}
+
+private final class PendingBrowserNavigation {
+    let id: UUID
+    let action: String
+    let requestedURL: String?
+    let gate: BrowserInvocationGate
+    let requestId: String
+    let recovered: Bool
+    var navigation: WKNavigation?
+
+    init(
+        id: UUID,
+        action: String,
+        requestedURL: String?,
+        gate: BrowserInvocationGate,
+        requestId: String,
+        recovered: Bool
+    ) {
+        self.id = id
+        self.action = action
+        self.requestedURL = requestedURL
+        self.gate = gate
+        self.requestId = requestId
+        self.recovered = recovered
     }
 }
 
@@ -225,6 +266,9 @@ final class BrowserAutomationPlugin: Plugin {
             do {
                 if let existing = sessions[sessionId] {
                     existing.runtimeScript = request.runtimeScript
+                    if let userAgent = request.userAgent, !userAgent.isEmpty {
+                        existing.webView.customUserAgent = userAgent
+                    }
                     applyViewport(request.viewport, to: existing)
                     existing.webView.load(URLRequest(url: url))
                     invoke.resolve(summary(existing))
@@ -283,6 +327,8 @@ final class BrowserAutomationPlugin: Plugin {
                 return
             }
             let response = summary(session)
+            session.pendingNavigation?.gate.reject("Browser tab was closed during navigation")
+            session.pendingNavigation = nil
             session.webView.stopLoading()
             session.webView.navigationDelegate = nil
             session.webView.removeFromSuperview()
@@ -305,6 +351,7 @@ final class BrowserAutomationPlugin: Plugin {
 
     @objc func action(_ invoke: Invoke) throws {
         let request = try invoke.parseArgs(ActionArgs.self)
+        let requestId = try validatedRequestId(request.requestId)
         let sessionId = try validatedSessionId(request.sessionId)
         let action = request.action.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !action.isEmpty else {
@@ -321,6 +368,7 @@ final class BrowserAutomationPlugin: Plugin {
             executeAction(
                 invoke,
                 session: session,
+                requestId: requestId,
                 action: action,
                 timeoutMs: request.timeoutMs ?? 30_000,
                 input: request.input ?? BrowserActionInputArgs(
@@ -345,22 +393,52 @@ final class BrowserAutomationPlugin: Plugin {
     }
 
     @MainActor
-    fileprivate func updateLoading(sessionId: String, loading: Bool) {
-        sessions[sessionId]?.loading = loading
+    fileprivate func pageDidStart(sessionId: String, navigation: WKNavigation?) {
+        guard let session = sessions[sessionId] else { return }
+        session.loading = true
+        guard let pending = session.pendingNavigation,
+              pending.navigation == nil || pending.navigation === navigation
+        else { return }
+        pending.navigation = navigation
     }
 
     @MainActor
-    fileprivate func pageDidFinish(sessionId: String) {
+    fileprivate func pageDidFinish(sessionId: String, navigation: WKNavigation?) {
         guard let session = sessions[sessionId] else { return }
         session.loading = false
         session.title = session.webView.title
         session.webView.evaluateJavaScript(session.runtimeScript)
+        completeNavigation(session, navigation: navigation)
+    }
+
+    @MainActor
+    fileprivate func pageDidFail(
+        sessionId: String,
+        navigation: WKNavigation?,
+        error: Error
+    ) {
+        guard let session = sessions[sessionId] else { return }
+        session.loading = false
+        failNavigation(
+            session,
+            navigation: navigation,
+            message: "Browser navigation failed: \(error.localizedDescription)"
+        )
+    }
+
+    @MainActor
+    fileprivate func pageProcessDidTerminate(sessionId: String) {
+        guard let session = sessions[sessionId] else { return }
+        session.loading = false
+        failNavigation(session, message: "Browser WebContent process terminated")
+        session.webView.reload()
     }
 
     @MainActor
     private func executeAction(
         _ invoke: Invoke,
         session: BrowserSession,
+        requestId: String,
         action: String,
         timeoutMs: UInt64,
         input: BrowserActionInputArgs
@@ -371,30 +449,97 @@ final class BrowserAutomationPlugin: Plugin {
                 guard let target = input.url else {
                     throw BrowserAutomationError.invalidRequest("navigate requires input.url")
                 }
-                session.webView.load(URLRequest(url: try validatedURL(target)))
-                invoke.resolve(actionResponse(
-                    session,
+                let url = try validatedURL(target)
+                beginNavigation(
+                    invoke,
+                    session: session,
+                    requestId: requestId,
                     action: action,
-                    data: ["navigated": true, "url": target]
-                ))
+                    requestedURL: url.absoluteString,
+                    timeoutMs: timeoutMs
+                ) {
+                    session.webView.load(URLRequest(url: url))
+                }
             } catch {
                 invoke.reject(error.localizedDescription)
             }
         case "reload":
-            session.webView.reload()
-            invoke.resolve(actionResponse(session, action: action, data: ["reloaded": true]))
+            beginNavigation(
+                invoke,
+                session: session,
+                requestId: requestId,
+                action: action,
+                requestedURL: session.webView.url?.absoluteString,
+                timeoutMs: timeoutMs
+            ) {
+                session.webView.reload()
+            }
         case "go_back":
-            if session.webView.canGoBack { session.webView.goBack() }
-            invoke.resolve(actionResponse(session, action: action, data: ["navigated": true]))
+            if session.webView.canGoBack {
+                beginNavigation(
+                    invoke,
+                    session: session,
+                    requestId: requestId,
+                    action: action,
+                    requestedURL: nil,
+                    timeoutMs: timeoutMs
+                ) {
+                    session.webView.goBack()
+                }
+            } else {
+                invoke.resolve(actionResponse(
+                    session,
+                    requestId: requestId,
+                    action: action,
+                    data: ["navigated": false]
+                ))
+            }
         case "go_forward":
-            if session.webView.canGoForward { session.webView.goForward() }
-            invoke.resolve(actionResponse(session, action: action, data: ["navigated": true]))
+            if session.webView.canGoForward {
+                beginNavigation(
+                    invoke,
+                    session: session,
+                    requestId: requestId,
+                    action: action,
+                    requestedURL: nil,
+                    timeoutMs: timeoutMs
+                ) {
+                    session.webView.goForward()
+                }
+            } else {
+                invoke.resolve(actionResponse(
+                    session,
+                    requestId: requestId,
+                    action: action,
+                    data: ["navigated": false]
+                ))
+            }
+        case "recover":
+            session.webView.stopLoading()
+            beginNavigation(
+                invoke,
+                session: session,
+                requestId: requestId,
+                action: action,
+                requestedURL: session.webView.url?.absoluteString,
+                timeoutMs: min(timeoutMs, 10_000),
+                recovered: true
+            ) {
+                session.webView.reload()
+            }
         case "screenshot":
-            captureScreenshot(invoke, session: session, action: action, timeoutMs: timeoutMs)
+            captureScreenshot(
+                invoke,
+                session: session,
+                requestId: requestId,
+                action: action,
+                timeoutMs: timeoutMs
+            )
         default:
             evaluateDOMAction(
                 invoke,
                 session: session,
+                requestId: requestId,
                 action: action,
                 input: input.dictionary,
                 timeoutMs: timeoutMs
@@ -403,14 +548,101 @@ final class BrowserAutomationPlugin: Plugin {
     }
 
     @MainActor
+    private func beginNavigation(
+        _ invoke: Invoke,
+        session: BrowserSession,
+        requestId: String,
+        action: String,
+        requestedURL: String?,
+        timeoutMs: UInt64,
+        recovered: Bool = false,
+        start: () -> WKNavigation?
+    ) {
+        session.pendingNavigation?.gate.reject("Browser navigation was superseded by a new action")
+        let navigationId = UUID()
+        let sessionId = session.sessionId
+        let gate = BrowserInvocationGate(invoke: invoke, timeoutMs: timeoutMs) { [weak self] in
+            Task { @MainActor in
+                self?.navigationTimedOut(sessionId: sessionId, navigationId: navigationId)
+            }
+        }
+        session.pendingNavigation = PendingBrowserNavigation(
+            id: navigationId,
+            action: action,
+            requestedURL: requestedURL,
+            gate: gate,
+            requestId: requestId,
+            recovered: recovered
+        )
+        let pending = session.pendingNavigation
+        session.loading = true
+        pending?.navigation = start()
+        if pending?.navigation == nil {
+            session.pendingNavigation = nil
+            session.loading = false
+            gate.reject("Browser navigation did not start")
+        }
+    }
+
+    @MainActor
+    private func navigationTimedOut(sessionId: String, navigationId: UUID) {
+        guard let session = sessions[sessionId],
+              session.pendingNavigation?.id == navigationId
+        else { return }
+        session.pendingNavigation = nil
+        session.loading = false
+        session.webView.stopLoading()
+    }
+
+    @MainActor
+    private func completeNavigation(_ session: BrowserSession, navigation: WKNavigation?) {
+        guard let pending = session.pendingNavigation,
+              pending.navigation === navigation
+        else { return }
+        session.pendingNavigation = nil
+        pending.gate.resolve(actionResponse(
+            session,
+            requestId: pending.requestId,
+            action: pending.action,
+            data: [
+                "navigated": true,
+                "readyState": "complete",
+                "url": session.webView.url?.absoluteString ?? pending.requestedURL ?? "",
+            ],
+            navigationStarted: true,
+            navigationFinished: true,
+            recovered: pending.recovered
+        ))
+    }
+
+    @MainActor
+    private func failNavigation(
+        _ session: BrowserSession,
+        navigation: WKNavigation? = nil,
+        message: String
+    ) {
+        guard let pending = session.pendingNavigation,
+              navigation == nil || pending.navigation === navigation
+        else { return }
+        session.pendingNavigation = nil
+        pending.gate.reject(message)
+    }
+
+    @MainActor
     private func evaluateDOMAction(
         _ invoke: Invoke,
         session: BrowserSession,
+        requestId: String,
         action: String,
         input: [String: Any],
         timeoutMs: UInt64
     ) {
-        let gate = BrowserInvocationGate(invoke: invoke, timeoutMs: timeoutMs)
+        let sessionId = session.sessionId
+        let gate = BrowserInvocationGate(invoke: invoke, timeoutMs: timeoutMs) { [weak self] in
+            Task { @MainActor in
+                self?.recoverTimedOutAction(sessionId: sessionId)
+            }
+        }
         do {
             let actionJSON = try jsonLiteral(action)
             let inputJSON = try jsonLiteral(input)
@@ -442,6 +674,7 @@ final class BrowserAutomationPlugin: Plugin {
                     }
                     gate.resolve(self.actionResponse(
                         session,
+                        requestId: requestId,
                         action: action,
                         data: envelope["data"] ?? NSNull()
                     ))
@@ -458,10 +691,16 @@ final class BrowserAutomationPlugin: Plugin {
     private func captureScreenshot(
         _ invoke: Invoke,
         session: BrowserSession,
+        requestId: String,
         action: String,
         timeoutMs: UInt64
     ) {
-        let gate = BrowserInvocationGate(invoke: invoke, timeoutMs: timeoutMs)
+        let sessionId = session.sessionId
+        let gate = BrowserInvocationGate(invoke: invoke, timeoutMs: timeoutMs) { [weak self] in
+            Task { @MainActor in
+                self?.recoverTimedOutAction(sessionId: sessionId)
+            }
+        }
         let configuration = WKSnapshotConfiguration()
         configuration.rect = session.webView.bounds
         session.webView.takeSnapshot(with: configuration) { [weak self] image, error in
@@ -476,6 +715,7 @@ final class BrowserAutomationPlugin: Plugin {
             }
             gate.resolve(self.actionResponse(
                 session,
+                requestId: requestId,
                 action: action,
                 data: [
                     "width": image.size.width,
@@ -485,6 +725,14 @@ final class BrowserAutomationPlugin: Plugin {
                 screenshotBase64: data.base64EncodedString()
             ))
         }
+    }
+
+    @MainActor
+    private func recoverTimedOutAction(sessionId: String) {
+        guard let session = sessions[sessionId] else { return }
+        session.loading = false
+        session.webView.stopLoading()
+        session.webView.reload()
     }
 
     @MainActor
@@ -531,17 +779,28 @@ final class BrowserAutomationPlugin: Plugin {
     @MainActor
     private func actionResponse(
         _ session: BrowserSession,
+        requestId: String,
         action: String,
         data: Any,
-        screenshotBase64: String? = nil
+        screenshotBase64: String? = nil,
+        navigationStarted: Bool = false,
+        navigationFinished: Bool = false,
+        recovered: Bool = false
     ) -> [String: Any] {
         [
+            "requestId": requestId,
             "sessionId": session.sessionId,
             "action": action,
             "url": session.webView.url?.absoluteString ?? "",
             "title": session.title.map { $0 as Any } ?? NSNull(),
             "data": data,
             "screenshotBase64": screenshotBase64.map { $0 as Any } ?? NSNull(),
+            "lifecycle": [
+                "commandCompleted": true,
+                "navigationStarted": navigationStarted,
+                "navigationFinished": navigationFinished,
+                "recovered": recovered,
+            ],
         ]
     }
 
@@ -570,6 +829,22 @@ final class BrowserAutomationPlugin: Plugin {
             )
         }
         return sessionId
+    }
+
+    private func validatedRequestId(_ raw: String?) throws -> String {
+        let requestId = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let allowed = CharacterSet(
+            charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."
+        )
+        guard !requestId.isEmpty,
+              requestId.count <= 128,
+              requestId.unicodeScalars.allSatisfy({ allowed.contains($0) })
+        else {
+            throw BrowserAutomationError.invalidRequest(
+                "requestId must contain 1-128 ASCII letters, digits, '-', '_' or '.'"
+            )
+        }
+        return requestId
     }
 
     private func validatedURL(_ raw: String) throws -> URL {

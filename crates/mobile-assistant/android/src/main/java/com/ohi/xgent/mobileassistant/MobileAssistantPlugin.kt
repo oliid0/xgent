@@ -3,7 +3,11 @@ package com.ohi.xgent.mobileassistant
 import android.Manifest
 import android.app.Activity
 import android.content.ContentUris
+import android.content.Context
 import android.content.Intent
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -25,6 +29,7 @@ import java.util.Locale
 import org.json.JSONArray
 
 private const val ALIAS_MICROPHONE = "microphone"
+private const val ALIAS_CAMERA = "camera"
 private const val ALIAS_CALENDAR = "calendar"
 private const val ALIAS_LOCATION = "location"
 private const val ALIAS_PHOTOS = "photos"
@@ -33,6 +38,11 @@ private const val ALIAS_PHOTOS_LEGACY = "photosLegacy"
 @InvokeArg
 class VoiceInputArgs {
     var locale: String? = null
+}
+
+@InvokeArg
+class CurrentLocationArgs {
+    var timeoutMs: Long = 10_000
 }
 
 @InvokeArg
@@ -76,6 +86,7 @@ class ComposeMessageArgs {
 @TauriPlugin(
     permissions = [
         Permission(strings = [Manifest.permission.RECORD_AUDIO], alias = ALIAS_MICROPHONE),
+        Permission(strings = [Manifest.permission.CAMERA], alias = ALIAS_CAMERA),
         Permission(
             strings = [
                 Manifest.permission.READ_CALENDAR,
@@ -99,6 +110,10 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
     private var speechRecognizer: SpeechRecognizer? = null
     private var pendingVoiceInvoke: Invoke? = null
     private var voiceTimeout: Runnable? = null
+    private var pendingLocationInvoke: Invoke? = null
+    private var pendingLocationManager: LocationManager? = null
+    private var pendingLocationListener: LocationListener? = null
+    private var locationTimeout: Runnable? = null
 
     @Command
     override fun checkPermissions(invoke: Invoke) {
@@ -129,6 +144,7 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
                     "permissionAliases",
                     JSObject().apply {
                         put("microphone", ALIAS_MICROPHONE)
+                        put("camera", ALIAS_CAMERA)
                         put("calendar", ALIAS_CALENDAR)
                         put("reminders", ALIAS_CALENDAR)
                         put("photos", photoAlias)
@@ -219,6 +235,81 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
             }
             voiceTimeout = timeout
             mainHandler.postDelayed(timeout, VOICE_TIMEOUT_MS)
+        }
+    }
+
+    @Command
+    fun getCurrentLocation(invoke: Invoke) {
+        val args = parseArgs(invoke, CurrentLocationArgs::class.java) ?: return
+        if (getPermissionState(ALIAS_LOCATION) != PermissionState.GRANTED) {
+            invoke.reject("Location permission is required")
+            return
+        }
+        mainHandler.post {
+            if (pendingLocationInvoke != null) {
+                invoke.reject("Another location request is already active")
+                return@post
+            }
+            val manager = activity.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            if (manager == null) {
+                invoke.reject("Location service is unavailable on this device")
+                return@post
+            }
+            val enabledProviders = runCatching {
+                manager.allProviders.filter { provider -> manager.isProviderEnabled(provider) }
+            }.getOrDefault(emptyList())
+            if (enabledProviders.isEmpty()) {
+                invoke.reject("Location services are disabled on this device")
+                return@post
+            }
+
+            val cached = enabledProviders
+                .mapNotNull { provider ->
+                    runCatching {
+                        @Suppress("MissingPermission")
+                        manager.getLastKnownLocation(provider)
+                    }.getOrNull()
+                }
+                .maxByOrNull { location -> location.time }
+            if (cached != null) {
+                resolveLocation(invoke, cached)
+                return@post
+            }
+
+            val provider = listOf(LocationManager.NETWORK_PROVIDER, "fused", LocationManager.GPS_PROVIDER)
+                .firstOrNull(enabledProviders::contains)
+            if (provider == null) {
+                invoke.reject("No supported location provider is enabled")
+                return@post
+            }
+            val listener = object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    finishLocationSuccess(location)
+                }
+
+                override fun onProviderDisabled(disabledProvider: String) {
+                    if (disabledProvider == provider) {
+                        finishLocationError("The active location provider was disabled")
+                    }
+                }
+
+                override fun onProviderEnabled(enabledProvider: String) = Unit
+
+                @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+                override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
+            }
+            pendingLocationInvoke = invoke
+            pendingLocationManager = manager
+            pendingLocationListener = listener
+            val timeout = Runnable { finishLocationError("Location request timed out") }
+            locationTimeout = timeout
+            mainHandler.postDelayed(timeout, args.timeoutMs.coerceIn(1_000, 30_000))
+            runCatching {
+                @Suppress("MissingPermission", "DEPRECATION")
+                manager.requestSingleUpdate(provider, listener, Looper.getMainLooper())
+            }.onFailure { error ->
+                finishLocationError("Unable to read location: ${error.message}")
+            }
         }
     }
 
@@ -454,6 +545,44 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
         voiceTimeout = null
     }
 
+    private fun resolveLocation(invoke: Invoke, location: Location) {
+        invoke.resolve(
+            JSObject().apply {
+                put("latitude", location.latitude)
+                put("longitude", location.longitude)
+                put("altitudeMeters", if (location.hasAltitude()) location.altitude else null)
+                put("accuracyMeters", location.accuracy.coerceAtLeast(0f).toDouble())
+                put("timestampMs", location.time)
+                put("provider", location.provider)
+            },
+        )
+    }
+
+    private fun finishLocationSuccess(location: Location) {
+        val invoke = pendingLocationInvoke ?: return
+        clearLocationRequest()
+        resolveLocation(invoke, location)
+    }
+
+    private fun finishLocationError(message: String) {
+        val invoke = pendingLocationInvoke ?: return
+        clearLocationRequest()
+        invoke.reject(message)
+    }
+
+    private fun clearLocationRequest() {
+        locationTimeout?.let(mainHandler::removeCallbacks)
+        locationTimeout = null
+        val manager = pendingLocationManager
+        val listener = pendingLocationListener
+        pendingLocationInvoke = null
+        pendingLocationManager = null
+        pendingLocationListener = null
+        if (manager != null && listener != null) {
+            runCatching { manager.removeUpdates(listener) }
+        }
+    }
+
     private fun speechErrorMessage(error: Int): String = when (error) {
         SpeechRecognizer.ERROR_AUDIO -> "Audio capture failed"
         SpeechRecognizer.ERROR_CLIENT -> "Voice input was cancelled"
@@ -471,6 +600,9 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
         super.onPause()
         if (pendingVoiceInvoke != null) {
             finishVoiceError("Voice input was interrupted")
+        }
+        if (pendingLocationInvoke != null) {
+            finishLocationError("Location request was interrupted")
         }
     }
 

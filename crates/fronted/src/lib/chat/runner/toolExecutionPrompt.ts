@@ -265,6 +265,15 @@ export function buildToolsSuffix(
     );
   }
 
+  sections.push(
+    [
+      "## File Preview",
+      "- The Xgent interface automatically renders successfully written HTML and Markdown files beneath the assistant reply, with Preview and Source tabs and source copying.",
+      "- Do not start a local/dev/preview server and do not open the embedded or external browser merely to preview one HTML or Markdown file.",
+      "- Start a managed server only when the user's task explicitly requires a running multi-file application or server behavior that a single-file preview cannot provide.",
+    ].join("\n"),
+  );
+
   if (has("Agent")) {
     sections.push(
       [
@@ -297,7 +306,7 @@ export function buildToolsSuffix(
     sections.push(
       [
         "## ManagedProcess",
-        '- Use ManagedProcess(action="start") for dev servers, preview servers, watchers, or other long-running foreground commands that should continue while you run tests.',
+        '- Use ManagedProcess(action="start") for required application servers, watchers, or other long-running foreground commands that should continue while you run tests; never start one only to preview a single HTML or Markdown file.',
         "- Do not append `&` to ManagedProcess.command. It starts the process in the background, redirects stdout/stderr to a log file, and returns process_id/pid/log_path.",
         '- Use ManagedProcess(action="status") to inspect running processes, action="wait" to block until new log output or exit (not ProcessWait), action="read_log" to inspect recent output, and action="stop" to terminate the process tree.',
         "- ProcessWait/ProcessStop only accept Bash session_id values. A ManagedProcess process_id is a UUID and must stay on the ManagedProcess tool.",

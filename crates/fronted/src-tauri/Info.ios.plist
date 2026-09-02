@@ -6,6 +6,8 @@
   <string>XGent uses the microphone only when you start voice input.</string>
   <key>NSSpeechRecognitionUsageDescription</key>
   <string>XGent converts speech to text when you start voice input.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>XGent uses the camera only when you choose to take a photo for a conversation.</string>
   <key>NSCalendarsFullAccessUsageDescription</key>
   <string>XGent can read and manage calendar events after you grant access.</string>
   <key>NSCalendarsUsageDescription</key>

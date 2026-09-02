@@ -16,6 +16,7 @@ import { Thumbnail } from "@astryxdesign/core/Thumbnail";
 import { Token } from "@astryxdesign/core/Token";
 import {
   memo,
+  type ReactNode,
   type RefObject,
   useCallback,
   useEffect,
@@ -97,6 +98,20 @@ type ReadWorkspaceImageResponse = {
   mimeType: string;
   data: string;
 };
+
+function MobileComposerMenuIcon(props: { children: ReactNode }) {
+  return (
+    <HStack
+      width="var(--xgent-mobile-composer-menu-icon-size)"
+      height="var(--xgent-mobile-composer-menu-icon-size)"
+      hAlign="center"
+      vAlign="center"
+      className="xgent-mobile-composer-menu-icon"
+    >
+      {props.children}
+    </HStack>
+  );
+}
 
 function PendingImageThumbnail(props: {
   file: PendingUploadedFile;
@@ -651,6 +666,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
       padding={1}
       width="100%"
       isScrollable
+      className="xgent-mobile-composer-menu"
       style={{ maxHeight: "min(31rem, calc(100dvh - 10rem))" }}
     >
       <List
@@ -663,8 +679,13 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
         }}
       >
         <ListItem
+          className="xgent-mobile-composer-menu-row"
           label={t("chat.upload.camera")}
-          startContent={<Camera />}
+          startContent={
+            <MobileComposerMenuIcon>
+              <Camera />
+            </MobileComposerMenuIcon>
+          }
           isDisabled={uploadDisabled}
           onClick={() => {
             setIsAddMenuOpen(false);
@@ -672,8 +693,13 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           }}
         />
         <ListItem
+          className="xgent-mobile-composer-menu-row"
           label={t("chat.upload.photos")}
-          startContent={<ImageIcon />}
+          startContent={
+            <MobileComposerMenuIcon>
+              <ImageIcon />
+            </MobileComposerMenuIcon>
+          }
           isDisabled={uploadDisabled}
           onClick={() => {
             setIsAddMenuOpen(false);
@@ -681,8 +707,13 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           }}
         />
         <ListItem
+          className="xgent-mobile-composer-menu-row"
           label={t("chat.upload.files")}
-          startContent={<Paperclip />}
+          startContent={
+            <MobileComposerMenuIcon>
+              <Paperclip />
+            </MobileComposerMenuIcon>
+          }
           isDisabled={uploadDisabled}
           onClick={() => {
             setIsAddMenuOpen(false);
@@ -690,8 +721,13 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           }}
         />
         <ListItem
+          className="xgent-mobile-composer-menu-row"
           label={t("chat.composer.plugins")}
-          startContent={<Blend />}
+          startContent={
+            <MobileComposerMenuIcon>
+              <Blend />
+            </MobileComposerMenuIcon>
+          }
           isDisabled={controlsDisabled || enabledSkills.length === 0}
           onClick={() => {
             setIsAddMenuOpen(false);
@@ -700,8 +736,13 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           }}
         />
         <ListItem
+          className="xgent-mobile-composer-menu-row"
           label={t("chat.runtime.thinkHarder")}
-          startContent={<Lightbulb />}
+          startContent={
+            <MobileComposerMenuIcon>
+              <Lightbulb />
+            </MobileComposerMenuIcon>
+          }
           endContent={
             chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn ? <Check /> : undefined
           }
@@ -714,8 +755,13 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           }
         />
         <ListItem
+          className="xgent-mobile-composer-menu-row"
           label={webSearchTooltip}
-          startContent={chatRuntimeControls.nativeWebSearchEnabled ? <Globe /> : <GlobeOff />}
+          startContent={
+            <MobileComposerMenuIcon>
+              {chatRuntimeControls.nativeWebSearchEnabled ? <Globe /> : <GlobeOff />}
+            </MobileComposerMenuIcon>
+          }
           endContent={chatRuntimeControls.nativeWebSearchEnabled ? <Check /> : undefined}
           isSelected={chatRuntimeControls.nativeWebSearchEnabled}
           isDisabled={controlsDisabled}
@@ -726,10 +772,15 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           }
         />
         <ListItem
+          className="xgent-mobile-composer-menu-row"
           label={
             chatRuntimeControls.planModeEnabled ? t("chat.planMode.on") : t("chat.planMode.off")
           }
-          startContent={<Sparkle />}
+          startContent={
+            <MobileComposerMenuIcon>
+              <Sparkle />
+            </MobileComposerMenuIcon>
+          }
           endContent={chatRuntimeControls.planModeEnabled ? <Check /> : undefined}
           isSelected={chatRuntimeControls.planModeEnabled}
           isDisabled={controlsDisabled || !isAgentMode}
@@ -953,7 +1004,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           onStop={onStop}
           isStopShown={isSending && !canQueueDraftWhileSending}
           isDisabled={isInputDisabled}
-          density="compact"
+          density={mobileExperience ? "balanced" : "compact"}
           elevation="low"
           onKeyDown={
             isComposerExpanded
@@ -1057,7 +1108,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                   <Popover
                     placement="above"
                     alignment="start"
-                    width="min(21rem, calc(100dvw - var(--spacing-6)))"
+                    width="var(--xgent-mobile-composer-menu-width)"
                     label={addMenuTooltip}
                     isOpen={isAddMenuOpen}
                     onOpenChange={setIsAddMenuOpen}
@@ -1171,7 +1222,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           }
           sendButton={
             <ChatSendButton
-              size="sm"
+              size={mobileExperience ? "md" : "sm"}
               isStopShown={isSending && !canQueueDraftWhileSending}
               isDisabled={isSending ? false : sendDisabled}
               onSend={handleComposerSend}

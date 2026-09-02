@@ -86,7 +86,13 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun status(invoke: Invoke) {
-        invoke.resolve(statusPayload())
+        worker.execute {
+            runCatching { statusPayload() }
+                .onSuccess(invoke::resolve)
+                .onFailure { error ->
+                    invoke.reject("Could not inspect the Android shell environment: ${error.message}")
+                }
+        }
     }
 
     @Command
@@ -98,9 +104,10 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
         }
         worker.execute {
             runCatching {
-                val rootfs = installer.install()
-                verifyInstalledEnvironment()
-                readinessMarker().writeText("$READINESS_VERSION\n")
+                val rootfs = installer.install {
+                    verifyInstalledEnvironment()
+                    readinessMarker().writeText("$READINESS_VERSION\n")
+                }
                 rootfs
             }
                 .onSuccess { rootfs ->
@@ -428,30 +435,58 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
         readinessMarker().delete()
         val workspace = File(backendDir, "install-probe").apply { mkdirs() }
         require(workspace.isDirectory) { "could not create the PRoot verification workspace" }
-        val result = runner.execute(
-            AndroidRunRequest(
-                runId = "install-probe-${System.currentTimeMillis()}",
-                workdir = workspace.absolutePath,
-                command = "printf '$READINESS_TOKEN'",
-                cwd = "",
-                timeoutMs = INSTALL_PROBE_TIMEOUT_MS,
-                stdin = null,
-            ),
+        val probes = listOf(
+            "shell" to "printf '$READINESS_TOKEN'",
+            "filesystem" to
+                "printf '$READINESS_TOKEN' > .xgent-write-probe && " +
+                "test \"\$(cat .xgent-write-probe)\" = '$READINESS_TOKEN' && " +
+                "printf '$READINESS_TOKEN'",
+            "base commands" to
+                "for command in sh ls cp mv rm find grep sed awk tar gzip; do " +
+                "command -v \"\$command\" >/dev/null || exit 41; done; " +
+                "printf '$READINESS_TOKEN'",
+            "package manager" to
+                "test -x /sbin/apk && apk --version >/dev/null && " +
+                "test -s /etc/apk/repositories && " +
+                "grep -Fq 'https://dl-cdn.alpinelinux.org/alpine/v3.22/main' " +
+                "/etc/apk/repositories && printf '$READINESS_TOKEN'",
+            "network configuration" to
+                "test -s /etc/resolv.conf && " +
+                "test -s /etc/ssl/certs/ca-certificates.crt && " +
+                "printf '$READINESS_TOKEN'",
         )
-        val diagnostics = result.stderr.trim().ifEmpty { result.stdout.trim() }
-        require(
-            result.exitCode == 0 &&
-                !result.timedOut &&
-                !result.cancelled &&
-                result.stdout == READINESS_TOKEN
-        ) {
-            buildString {
-                append("PRoot started but failed its Alpine shell verification")
-                append(" (exit=${result.exitCode}, abi=")
-                append(android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")
-                append(")")
-                if (diagnostics.isNotEmpty()) append(": ${diagnostics.take(2_000)}")
+        try {
+            probes.forEachIndexed { index, (name, command) ->
+                val result = runner.execute(
+                    AndroidRunRequest(
+                        runId = "install-probe-$index-${System.currentTimeMillis()}",
+                        workdir = workspace.absolutePath,
+                        command = command,
+                        cwd = "",
+                        timeoutMs = INSTALL_PROBE_TIMEOUT_MS,
+                        stdin = null,
+                    ),
+                )
+                val diagnostics = listOf(result.stdout, result.stderr)
+                    .joinToString("\n")
+                    .trim()
+                require(
+                    result.exitCode == 0 &&
+                        !result.timedOut &&
+                        !result.cancelled &&
+                        result.stdout == READINESS_TOKEN
+                ) {
+                    buildString {
+                        append("PRoot failed its Alpine $name verification")
+                        append(" (exit=${result.exitCode}, abi=")
+                        append(android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")
+                        append(")")
+                        if (diagnostics.isNotEmpty()) append(": ${diagnostics.take(2_000)}")
+                    }
+                }
             }
+        } finally {
+            File(workspace, ".xgent-write-probe").delete()
         }
     }
 
@@ -497,7 +532,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
         private const val MAX_STDIN_BYTES = 1024 * 1024
         private const val MAX_COMMAND_CHARS = 256 * 1024
         private const val READINESS_MARKER = ".xgent-runtime-ready"
-        private const val READINESS_VERSION = "android-proot-alpine-v1"
+        private const val READINESS_VERSION = "android-proot-alpine-v2"
         private const val READINESS_TOKEN = "xgent-android-shell-ready"
         private const val INSTALL_PROBE_TIMEOUT_MS = 15_000L
         private val RUN_ID_PATTERN = Regex("[A-Za-z0-9._-]{1,128}")

@@ -4,6 +4,7 @@ export type MobileAssistantBackend = "desktop-unavailable" | "android-native" | 
 export type MobilePermissionState = "granted" | "denied" | "prompt";
 export type MobileAssistantPermission =
   | "microphone"
+  | "camera"
   | "calendar"
   | "reminders"
   | "photos"
@@ -51,6 +52,15 @@ export type MobileReminder = {
   list?: string | null;
 };
 
+export type MobileLocation = {
+  latitude: number;
+  longitude: number;
+  altitudeMeters?: number | null;
+  accuracyMeters: number;
+  timestampMs: number;
+  provider?: string | null;
+};
+
 export type MobileActionResult = {
   id?: string | null;
   presented: boolean;
@@ -74,6 +84,7 @@ export function normalizeMobileAssistantPermissions(
   const normalized: MobilePermissionStates = {};
   for (const permission of [
     "microphone",
+    "camera",
     "calendar",
     "reminders",
     "photos",
@@ -104,6 +115,12 @@ export function listMobileCalendarEvents(request: {
 }) {
   return invoke<MobileCalendarEvent[]>(`${PLUGIN_COMMAND}list_calendar_events`, {
     request: { ...request, limit: request.limit ?? 50 },
+  });
+}
+
+export function getMobileCurrentLocation(timeoutMs = 10_000) {
+  return invoke<MobileLocation>(`${PLUGIN_COMMAND}get_current_location`, {
+    request: { timeoutMs: Math.min(30_000, Math.max(1_000, timeoutMs)) },
   });
 }
 

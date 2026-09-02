@@ -431,7 +431,7 @@ export function SettingsPage(props: SettingsPageProps) {
               detailLayerDepth > 0 ? undefined : (
                 <DialogHeader
                   title={mobileDetailOpen ? sectionLabels[section] : t("settings.title")}
-                  hasDivider
+                  hasDivider={false}
                   startContent={
                     mobileDetailOpen ? (
                       <IconButton

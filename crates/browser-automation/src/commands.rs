@@ -44,5 +44,12 @@ pub(crate) async fn action<R: Runtime>(
     app: AppHandle<R>,
     request: BrowserActionRequest,
 ) -> Result<BrowserActionResponse> {
-    app.browser_automation().action(request)
+    let request_id = request.request_id.clone();
+    app.browser_automation().action(request).map_err(|error| {
+        if request_id.is_empty() {
+            error
+        } else {
+            crate::Error::Message(format!("browser request {request_id} failed: {error}"))
+        }
+    })
 }

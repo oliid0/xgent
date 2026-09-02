@@ -4,6 +4,7 @@ import { memo, useMemo } from "react";
 
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
 import { CloudArtifactsCard } from "../../../components/chat/CloudArtifactsCard";
+import { GeneratedFilePreviewCard } from "../../../components/chat/GeneratedFilePreviewCard";
 import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
 import { collectChangedFiles } from "../../../lib/chat/messages/changedFiles";
@@ -99,6 +100,9 @@ export const AssistantBubble = memo(function AssistantBubble(props: {
             onOpenFileLink={onOpenFileLink}
           />
         ))}
+        {changedFiles && workdir ? (
+          <GeneratedFilePreviewCard summary={changedFiles} workdir={workdir} />
+        ) : null}
         {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
         {cloudArtifacts.length > 0 ? (
           <CloudArtifactsCard artifacts={cloudArtifacts} onOpenFileLink={onOpenFileLink} />
@@ -134,16 +138,27 @@ export const AssistantBubbleUnit = memo(function AssistantBubbleUnit(props: {
   if (unit.kind === "footer") return null;
 
   const normalizedStatus = normalizeLiveToolStatus(toolStatus);
-  const status =
-    unit.kind === "status" && row.live ? (
-      isCompactionRunning ? (
-        <CompactingText />
-      ) : normalizedStatus === VIBING_STATUS || !normalizedStatus ? (
-        <VibingText />
-      ) : (
-        <AssistantStatus>{normalizedStatus}</AssistantStatus>
-      )
-    ) : null;
+  const statusVisible =
+    unit.kind === "status" &&
+    row.live &&
+    (isCompactionRunning || normalizedStatus === VIBING_STATUS || !unit.hasRunningToolCall);
+  const status = statusVisible ? (
+    isCompactionRunning ? (
+      <CompactingText />
+    ) : normalizedStatus === VIBING_STATUS || !normalizedStatus ? (
+      <VibingText />
+    ) : (
+      <AssistantStatus>{normalizedStatus}</AssistantStatus>
+    )
+  ) : null;
+  const visibleRetryAttempts = row.mutable
+    ? (retryAttempts ?? EMPTY_RETRY_ATTEMPTS)
+    : EMPTY_RETRY_ATTEMPTS;
+  const retryDetailsVisible = visibleRetryAttempts.length > 0;
+
+  if ((unit.kind === "status" || unit.kind === "placeholder") && !status && !retryDetailsVisible) {
+    return null;
+  }
 
   return (
     <ChatMessage sender="assistant" density="compact">
@@ -157,9 +172,7 @@ export const AssistantBubbleUnit = memo(function AssistantBubbleUnit(props: {
             {status}
           </VStack>
         ) : null}
-        {row.mutable && retryAttempts?.length ? (
-          <RetryDetailsBlock attempts={retryAttempts} />
-        ) : null}
+        {retryDetailsVisible ? <RetryDetailsBlock attempts={visibleRetryAttempts} /> : null}
         {unit.kind === "block" ? (
           <RoundBlockContent
             block={unit.block}
