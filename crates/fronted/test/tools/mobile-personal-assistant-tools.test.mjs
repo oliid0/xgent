@@ -50,7 +50,15 @@ test("calendar reads validate ISO dates and pass a bounded native request", asyn
       allDay: false,
     },
   ];
-  const { bundle, calls } = createHarness(() => events);
+  const { bundle, calls } = createHarness((command) => {
+    if (command.endsWith("|status")) {
+      return { permissionAliases: { calendar: "calendar" } };
+    }
+    if (command.endsWith("|check_permissions")) {
+      return { calendar: "granted" };
+    }
+    return events;
+  });
 
   const result = await bundle.executeToolCall(
     toolCall("MobilePersonalData", {
@@ -64,6 +72,14 @@ test("calendar reads validate ISO dates and pass a bounded native request", asyn
   assert.equal(result.isError, false);
   assert.deepEqual(resultData(result), { events });
   assert.deepEqual(calls, [
+    {
+      command: "plugin:mobile-assistant|status",
+      args: undefined,
+    },
+    {
+      command: "plugin:mobile-assistant|check_permissions",
+      args: undefined,
+    },
     {
       command: "plugin:mobile-assistant|list_calendar_events",
       args: {

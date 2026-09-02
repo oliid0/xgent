@@ -139,12 +139,13 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
           return result(toolCall, { text: await readClipboardText() });
         }
         if (action === "list_calendar_events") {
-          await ensurePermission("calendar");
-          const events = await listMobileCalendarEvents({
+          const request = {
             startMs: dateMs(args.start, "start"),
             endMs: dateMs(args.end, "end"),
             limit: limit(args.limit),
-          });
+          };
+          await ensurePermission("calendar");
+          const events = await listMobileCalendarEvents(request);
           return result(toolCall, { events });
         }
         if (action === "list_reminders") {
@@ -160,25 +161,27 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
         throw new Error(`Unknown tool: ${toolCall.name}`);
       }
       if (action === "create_calendar_event") {
-        await ensurePermission("calendar");
-        const created = await createMobileCalendarEvent({
+        const request = {
           title: requiredText(args, "title"),
           startMs: dateMs(args.start, "start"),
           endMs: dateMs(args.end, "end"),
           allDay: args.all_day === true,
           location: text(args.location) || null,
           notes: text(args.notes) || null,
-        });
+        };
+        await ensurePermission("calendar");
+        const created = await createMobileCalendarEvent(request);
         return result(toolCall, created);
       }
       if (action === "create_reminder") {
-        await ensurePermission("reminders");
         const due = text(args.due);
-        const created = await createMobileReminder({
+        const request = {
           title: requiredText(args, "title"),
           dueMs: due ? dateMs(due, "due") : null,
           notes: text(args.notes) || null,
-        });
+        };
+        await ensurePermission("reminders");
+        const created = await createMobileReminder(request);
         return result(toolCall, created);
       }
       if (action === "write_clipboard") {
