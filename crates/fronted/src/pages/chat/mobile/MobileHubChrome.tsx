@@ -64,7 +64,7 @@ export function MobileHubSearch(props: {
   placeholder: string;
 }) {
   return (
-    <HStack paddingInline={4} paddingBlockStart={5}>
+    <HStack paddingInline={4} paddingBlock={3} className="mobile-hub-floating-search">
       <TextInput
         label={props.placeholder}
         isLabelHidden

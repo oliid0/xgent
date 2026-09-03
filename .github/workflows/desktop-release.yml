@@ -327,6 +327,7 @@ jobs:
           cp "$portable_exe_path" dist/portable/Xgent/Xgent.exe
           portable_zip="dist/Xgent-${XGENT_RELEASE_TAG}-Windows-x64-portable.zip"
           powershell -NoProfile -Command "Compress-Archive -Path 'dist/portable/Xgent/*' -DestinationPath '$portable_zip' -Force"
+          powershell -NoProfile -Command '$process = Start-Process -FilePath (Resolve-Path "dist/portable/Xgent/Xgent.exe") -PassThru -WindowStyle Hidden; Start-Sleep -Seconds 8; if ($process.HasExited) { throw "Portable Xgent exited during the launch smoke test with code $($process.ExitCode)" }; Stop-Process -Id $process.Id -Force'
           rm -rf dist/portable
           test "$(find dist -type f | wc -l)" -gt 0
 
@@ -627,8 +628,8 @@ jobs:
           unzip -l "$release_apk" | grep -F 'lib/x86_64/libxgent_proot_loader.so'
           unzip -l "$release_apk" | grep -F 'assets/xgent-proot-manifest.json'
           unzip -l "$release_apk" | grep -F 'assets/mobile-execution/rootfs/manifest.json'
-          unzip -l "$release_apk" | grep -F 'assets/mobile-execution/rootfs/alpine-3.22.5-arm64-v8a.tar.gz'
-          unzip -l "$release_apk" | grep -F 'assets/mobile-execution/rootfs/alpine-3.22.5-x86_64.tar.gz'
+          unzip -l "$release_apk" | grep -F 'assets/mobile-execution/rootfs/alpine-3.22.5-arm64-v8a.tar.gzip'
+          unzip -l "$release_apk" | grep -F 'assets/mobile-execution/rootfs/alpine-3.22.5-x86_64.tar.gzip'
           python3 - "$release_apk" <<'PY'
           import hashlib
           import json
@@ -648,8 +649,16 @@ jobs:
               manifest = json.loads(archive.read(root + "manifest.json"))
               if manifest.get("schemaVersion") != 1:
                   raise SystemExit("Unexpected Android rootfs manifest schema")
+              if len(manifest.get("archives", {})) != 2:
+                  raise SystemExit("Android rootfs manifest must contain exactly two ABIs")
               for abi, record in manifest["archives"].items():
+                  if not record["file"].endswith(".tar.gzip"):
+                      raise SystemExit(
+                          f"Rootfs asset for {abi} uses an AAPT-transformable filename: {record['file']}"
+                      )
                   payload = archive.read(root + record["file"])
+                  if not payload.startswith(b"\x1f\x8b"):
+                      raise SystemExit(f"Rootfs asset for {abi} is no longer gzip data")
                   actual = hashlib.sha256(payload).hexdigest()
                   if actual != record["sha256"]:
                       raise SystemExit(
@@ -672,6 +681,49 @@ jobs:
             done < <("$readelf" -lW "$native_library" | awk '$1 == "LOAD" { print $NF }')
           done < <(find "$native_check_dir/lib" -type f -name '*.so' -print)
           test "$alignment_failed" -eq 0
+
+      - name: Enable Android emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Smoke launch signed Android APK
+        uses: reactivecircus/android-emulator-runner@ed009f5318f15b1cf93a191b856c4f1748a2d4c1 # v2, pinned 2026-08-26
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7_pro
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: |
+            set -euo pipefail
+            release_apk="dist/Xgent-${XGENT_RELEASE_TAG}-Android-universal.apk"
+            adb logcat -c
+            adb install -r "$release_apk"
+            adb shell monkey -p com.ohi.xgent -c android.intent.category.LAUNCHER 1
+            sleep 12
+            app_pid="$(adb shell pidof com.ohi.xgent | tr -d '\r')"
+            test -n "$app_pid"
+            adb shell dumpsys window windows | grep -F 'com.ohi.xgent'
+            adb exec-out screencap -p > "$RUNNER_TEMP/xgent-android-smoke.png"
+            test "$(wc -c < "$RUNNER_TEMP/xgent-android-smoke.png")" -gt 10000
+            if adb logcat -d AndroidRuntime:E '*:S' \
+              | grep -E -A 12 'Process: com\.ohi\.xgent'; then
+              echo "Xgent emitted an Android fatal exception during launch" >&2
+              exit 1
+            fi
+
+      - name: Upload Android launch evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: xgent-android-launch-evidence
+          path: ${{ runner.temp }}/xgent-android-smoke.png
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Package PRoot corresponding source
         run: |
@@ -735,6 +787,12 @@ jobs:
           bash scripts/mobile/prepare-mobile-legal-notices.sh
           test -s crates/mobile-execution/ios-frameworks/Frameworks/python3_ios.xcframework/Info.plist
           test -s crates/mobile-execution/ios/Sources/Resources/python/lib/python3.9/os.py
+          test -s crates/mobile-execution/ios/Sources/Resources/python/lib/python3.9/ssl.py
+          test -s crates/mobile-execution/ios/Sources/Resources/bin/pkg
+          test -s crates/mobile-execution/ios/Sources/Resources/vim/syntax/syntax.vim
+          test -s crates/mobile-execution/ios/Sources/Resources/cacert.pem
+          test -s crates/mobile-execution/ios/Sources/Resources/commandDictionary.plist
+          test -s crates/mobile-execution/ios/Sources/Resources/extraCommandsDictionary.plist
 
       - name: Install Tauri iOS host dependencies
         shell: bash
@@ -805,18 +863,151 @@ jobs:
           release_ipa="dist/Xgent-${XGENT_RELEASE_TAG}-iOS-arm64-unsigned.ipa"
           cp "${ipa_candidates[0]}" "$release_ipa"
           unzip -t "$release_ipa"
-          unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/'
-          unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/Frameworks/ios_system\.framework/ios_system'
-          unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/Frameworks/ffmpeg\.framework/ffmpeg'
-          unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/Frameworks/python3_ios\.framework/python3_ios'
-          unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/Frameworks/python3_ios-_ssl\.framework/python3_ios-_ssl'
-          unzip -l "$release_ipa" | grep -E 'Payload/[^/]+\.app/Frameworks/python3_ios-_sqlite3\.framework/python3_ios-_sqlite3'
-          unzip -l "$release_ipa" | grep -E 'python/lib/python3\.9/os\.py'
-          unzip -l "$release_ipa" | grep -E 'python/lib/python3\.9/ssl\.py'
-          unzip -l "$release_ipa" | grep -E '/bin/pkg$'
+          python3 - "$release_ipa" <<'PY'
+          import plistlib
+          import sys
+          import zipfile
+
+          with zipfile.ZipFile(sys.argv[1]) as archive:
+              names = set(archive.namelist())
+              app_roots = {
+                  name.split("/", 2)[1]
+                  for name in names
+                  if name.startswith("Payload/") and ".app/" in name
+              }
+              if len(app_roots) != 1:
+                  raise SystemExit(f"Expected exactly one iOS app bundle, found {sorted(app_roots)}")
+              app = f"Payload/{app_roots.pop()}/"
+              info_path = app + "Info.plist"
+              if info_path not in names:
+                  raise SystemExit("The iOS app bundle is missing Info.plist")
+              info = plistlib.loads(archive.read(info_path))
+              executable = info.get("CFBundleExecutable")
+              if not executable or app + executable not in names:
+                  raise SystemExit("The iOS app bundle is missing its declared executable")
+
+              required = [
+                  "Frameworks/ios_system.framework/ios_system",
+                  "Frameworks/ffmpeg.framework/ffmpeg",
+                  "Frameworks/python3_ios.framework/python3_ios",
+                  "Frameworks/python3_ios-_ssl.framework/python3_ios-_ssl",
+                  "Frameworks/python3_ios-_sqlite3.framework/python3_ios-_sqlite3",
+                  "mobile-execution/commandDictionary.plist",
+                  "mobile-execution/extraCommandsDictionary.plist",
+                  "mobile-execution/python/lib/python3.9/os.py",
+                  "mobile-execution/python/lib/python3.9/ssl.py",
+                  "mobile-execution/bin/pkg",
+                  "mobile-execution/vim/syntax/syntax.vim",
+                  "mobile-execution/cacert.pem",
+              ]
+              missing = [relative for relative in required if app + relative not in names]
+              if missing:
+                  raise SystemExit("Missing required iOS app resources: " + ", ".join(missing))
+              empty = [
+                  relative
+                  for relative in required
+                  if archive.getinfo(app + relative).file_size == 0
+              ]
+              if empty:
+                  raise SystemExit("Empty required iOS app resources: " + ", ".join(empty))
+          PY
           printf '%s\n' \
             'This IPA is intentionally unsigned. Re-sign it with an Apple Developer identity or a compatible sideloading service before installation.' \
             > dist/iOS-signing.txt
+
+      - name: Build iOS simulator smoke target
+        working-directory: crates/fronted
+        shell: bash
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/ios-simulator-build.log"
+          if ! pnpm tauri ios build --ci --no-sign --target aarch64-sim --build-number "${{ github.run_number }}" --config "$XGENT_TAURI_VERSION_CONFIG" 2>&1 | tee "$log"; then
+            message="$(tail -n 160 "$log")"
+            message="${message//'%'/'%25'}"
+            message="${message//$'\r'/'%0D'}"
+            message="${message//$'\n'/'%0A'}"
+            echo "::error file=crates/fronted/src-tauri/tauri.ios.conf.json,line=1,title=iOS simulator build failed::$message"
+            exit 1
+          fi
+
+      - name: Smoke launch iOS simulator app
+        shell: bash
+        run: |
+          set -euo pipefail
+          sim_app="$(python3 - <<'PY'
+          import os
+          import plistlib
+
+          candidates = []
+          for root, directories, files in os.walk("crates/fronted/src-tauri"):
+              if root.endswith(".xcarchive"):
+                  directories.clear()
+                  continue
+              for directory in list(directories):
+                  if not directory.endswith(".app"):
+                      continue
+                  path = os.path.join(root, directory)
+                  info_path = os.path.join(path, "Info.plist")
+                  try:
+                      with open(info_path, "rb") as stream:
+                          info = plistlib.load(stream)
+                  except (FileNotFoundError, plistlib.InvalidFileException):
+                      continue
+                  platforms = info.get("CFBundleSupportedPlatforms", [])
+                  if "iPhoneSimulator" in platforms:
+                      candidates.append((os.path.getmtime(info_path), path))
+          if not candidates:
+              raise SystemExit("No iPhoneSimulator .app bundle was produced")
+          print(max(candidates)[1])
+          PY
+          )"
+          bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$sim_app/Info.plist")"
+          executable="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$sim_app/Info.plist")"
+          test -x "$sim_app/$executable"
+          simulator_udid="$(python3 - <<'PY'
+          import json
+          import subprocess
+
+          payload = json.loads(
+              subprocess.check_output(
+                  ["xcrun", "simctl", "list", "devices", "available", "--json"],
+                  text=True,
+              )
+          )
+          runtimes = sorted(
+              (runtime for runtime in payload["devices"] if ".iOS-" in runtime),
+              reverse=True,
+          )
+          for runtime in runtimes:
+              for device in payload["devices"][runtime]:
+                  if device.get("isAvailable") and "iPhone" in device.get("name", ""):
+                      print(device["udid"])
+                      raise SystemExit(0)
+          raise SystemExit("No available iPhone simulator was found")
+          PY
+          )"
+          trap 'xcrun simctl shutdown "$simulator_udid" >/dev/null 2>&1 || true' EXIT
+          xcrun simctl boot "$simulator_udid" >/dev/null 2>&1 || true
+          xcrun simctl bootstatus "$simulator_udid" -b
+          xcrun simctl install "$simulator_udid" "$sim_app"
+          launch_result="$(xcrun simctl launch --terminate-running-process "$simulator_udid" "$bundle_id")"
+          app_pid="${launch_result##*: }"
+          case "$app_pid" in
+            ''|*[!0-9]*) echo "Could not parse simulator launch PID: $launch_result" >&2; exit 1 ;;
+          esac
+          sleep 12
+          xcrun simctl spawn "$simulator_udid" ps -p "$app_pid"
+          xcrun simctl io "$simulator_udid" screenshot "$RUNNER_TEMP/xgent-ios-smoke.png"
+          test "$(wc -c < "$RUNNER_TEMP/xgent-ios-smoke.png")" -gt 10000
+
+      - name: Upload iOS launch evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: xgent-ios-launch-evidence
+          path: ${{ runner.temp }}/xgent-ios-smoke.png
+          if-no-files-found: warn
+          retention-days: 7
 
       - uses: actions/upload-artifact@v7
         with:
@@ -909,7 +1100,7 @@ jobs:
 
           rm -rf public-release-assets
           mkdir -p public-release-assets
-          find release-artifacts -maxdepth 1 -type f ! -name '*.sig' ! -name latest.json -exec cp {} public-release-assets/ \;
+          find release-artifacts -maxdepth 1 -type f ! -name '*.sig' ! -name latest.json ! -name '*-smoke.png' -exec cp {} public-release-assets/ \;
 
           shopt -s nullglob
           public_assets=(public-release-assets/*)

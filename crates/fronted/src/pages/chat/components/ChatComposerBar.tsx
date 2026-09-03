@@ -754,42 +754,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
             })
           }
         />
-        <ListItem
-          className="xgent-mobile-composer-menu-row"
-          label={webSearchTooltip}
-          startContent={
-            <MobileComposerMenuIcon>
-              {chatRuntimeControls.nativeWebSearchEnabled ? <Globe /> : <GlobeOff />}
-            </MobileComposerMenuIcon>
-          }
-          endContent={chatRuntimeControls.nativeWebSearchEnabled ? <Check /> : undefined}
-          isSelected={chatRuntimeControls.nativeWebSearchEnabled}
-          isDisabled={controlsDisabled}
-          onClick={() =>
-            onChatRuntimeControlsChange({
-              nativeWebSearchEnabled: !chatRuntimeControls.nativeWebSearchEnabled,
-            })
-          }
-        />
-        <ListItem
-          className="xgent-mobile-composer-menu-row"
-          label={
-            chatRuntimeControls.planModeEnabled ? t("chat.planMode.on") : t("chat.planMode.off")
-          }
-          startContent={
-            <MobileComposerMenuIcon>
-              <Sparkle />
-            </MobileComposerMenuIcon>
-          }
-          endContent={chatRuntimeControls.planModeEnabled ? <Check /> : undefined}
-          isSelected={chatRuntimeControls.planModeEnabled}
-          isDisabled={controlsDisabled || !isAgentMode}
-          onClick={() =>
-            onChatRuntimeControlsChange({
-              planModeEnabled: !chatRuntimeControls.planModeEnabled,
-            })
-          }
-        />
       </List>
     </VStack>
   );

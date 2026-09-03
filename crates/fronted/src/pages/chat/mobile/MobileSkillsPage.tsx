@@ -1,9 +1,9 @@
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
-import { ClickableCard } from "@astryxdesign/core/ClickableCard";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
@@ -177,9 +177,9 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
   }
 
   return (
-    <VStack as="section" gap={0} height="100%" minHeight={0}>
+    <VStack as="section" gap={0} height="100%" minHeight={0} className="relative">
       <MobileHubHeader
-        title="Skills"
+        title={t("sidebar.mobile.plugins")}
         onOpenSidebar={props.onOpenSidebar}
         trailing={
           <IconButton
@@ -194,23 +194,11 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
           />
         }
       />
-      <MobileHubSearch value={query} onChange={setQuery} placeholder="Search Skills" />
-
-      <HStack paddingInline={5} paddingBlockStart={4}>
-        <Switch
-          value={props.settings.skills.enabled}
-          label={t("settings.skillsEnable")}
-          description={
-            props.settings.skills.enabled
-              ? t("settings.skillsHubEnabled")
-              : t("settings.skillsHubDisabled")
-          }
-          labelPosition="start"
-          labelSpacing="spread"
-          width="100%"
-          onChange={(enabled) => props.setSettings((prev) => updateSkills(prev, { enabled }))}
-        />
-      </HStack>
+      <MobileHubSearch
+        value={query}
+        onChange={setQuery}
+        placeholder={t("sidebar.mobile.searchPlugins")}
+      />
       {refreshError ? (
         <HStack paddingInline={5} paddingBlockStart={3}>
           <Banner status="error" title={refreshError} collapsible={false} />
@@ -223,46 +211,21 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
       </HStack>
 
       <StackItem size="fill" isScrollable>
-        <VStack gap={3} padding={3}>
+        <VStack gap={3} padding={3} className="mobile-hub-scroll-content">
           {visibleSkills.length > 0 ? (
-            <VStack gap={2}>
+            <List density="spacious">
               {visibleSkills.map((skill) => (
-                <ClickableCard
+                <ListItem
                   key={`${skill.baseDir}:${skill.name}`}
                   label={skill.name}
+                  description={skill.description}
+                  startContent={<SkillIcon />}
+                  endContent={<MoreHorizontal />}
                   onClick={() => setSelected(skill)}
-                  padding={3}
-                  width="100%"
-                >
-                  <HStack gap={3} vAlign="center">
-                    <SkillIcon />
-                    <StackItem size="fill">
-                      <VStack gap={1}>
-                        <Text type="body" weight="medium" maxLines={1}>
-                          {skill.name}
-                        </Text>
-                        <Text type="supporting" color="secondary" maxLines={2}>
-                          {skill.description}
-                        </Text>
-                      </VStack>
-                    </StackItem>
-                    <Switch
-                      value={isSelected(skill)}
-                      isDisabled={!isUserSelectableSkill(skill)}
-                      disabledMessage={
-                        !isUserSelectableSkill(skill)
-                          ? t("settings.skillsAlwaysEnabled")
-                          : undefined
-                      }
-                      label={isSelected(skill) ? t("settings.disable") : t("settings.enable")}
-                      isLabelHidden
-                      onChange={(checked) => toggle(skill, checked)}
-                      size="md"
-                    />
-                  </HStack>
-                </ClickableCard>
+                  isSelected={isSelected(skill)}
+                />
               ))}
-            </VStack>
+            </List>
           ) : !refreshing ? (
             <EmptyState icon={<MoreHorizontal />} title={t("settings.skillsNotFound")} isCompact />
           ) : (

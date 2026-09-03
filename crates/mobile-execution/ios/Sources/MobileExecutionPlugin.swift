@@ -194,6 +194,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private let installationDirectoryName = "environment-v3"
     private let installationMarkerName = ".xgent-environment"
     private let installationProbeToken = "xgent-ios-shell-ready"
+    private let bundledResourceDirectoryName = "mobile-execution"
     private let executionQueue = DispatchQueue(label: "com.ohi.xgent.mobile-execution")
     private let stateLock = NSLock()
     private let initializationLock = NSLock()
@@ -592,11 +593,15 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         defer { initializationLock.unlock() }
         if initialized { return }
         initializeEnvironment()
+        guard let bundledResources = bundledResourcesURL() else {
+            throw MobileExecutionError.io("The a-Shell resources are unavailable in the app bundle")
+        }
         for resource in ["commandDictionary", "extraCommandsDictionary"] {
-            guard let path = Bundle.module.path(forResource: resource, ofType: "plist") else {
+            let resourceURL = bundledResources.appendingPathComponent("\(resource).plist")
+            guard FileManager.default.fileExists(atPath: resourceURL.path) else {
                 throw MobileExecutionError.io("Missing bundled \(resource).plist")
             }
-            if let error = addCommandList(path) {
+            if let error = addCommandList(resourceURL.path) {
                 throw MobileExecutionError.io("Could not load \(resource).plist: \(error.localizedDescription)")
             }
         }
@@ -637,6 +642,18 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         )
     }
 
+    private func bundledResourcesURL() -> URL? {
+        guard let appResources = Bundle.main.resourceURL else { return nil }
+        let resources = appResources.appendingPathComponent(
+            bundledResourceDirectoryName,
+            isDirectory: true
+        )
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: resources.path, isDirectory: &isDirectory),
+              isDirectory.boolValue else { return nil }
+        return resources
+    }
+
     private func installedEnvironmentResourcesAreValid() -> Bool {
         guard let root = installedEnvironmentRoot(),
               let marker = try? String(
@@ -669,7 +686,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         guard let supportRoot = mobileExecutionSupportRoot(create: true) else {
             throw MobileExecutionError.io("Could not create iOS shell application support storage")
         }
-        guard let bundledResources = Bundle.module.resourceURL else {
+        guard let bundledResources = bundledResourcesURL() else {
             throw MobileExecutionError.io("The a-Shell resource bundle is unavailable")
         }
         let operationId = UUID().uuidString
@@ -869,10 +886,13 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     }
 
     private func bundledBackendAvailable() -> Bool {
+        guard let resources = bundledResourcesURL() else { return false }
         let dictionariesAvailable = ["commandDictionary", "extraCommandsDictionary"].allSatisfy { resource in
-            Bundle.module.path(forResource: resource, ofType: "plist") != nil
+            FileManager.default.fileExists(
+                atPath: resources.appendingPathComponent("\(resource).plist").path
+            )
         }
-        guard dictionariesAvailable, let resources = Bundle.module.resourceURL else { return false }
+        guard dictionariesAvailable else { return false }
         return FileManager.default.fileExists(
             atPath: resources.appendingPathComponent("vim/syntax/syntax.vim").path
         ) && FileManager.default.fileExists(

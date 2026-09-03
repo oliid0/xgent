@@ -2006,72 +2006,86 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
 
             <AstryxStack direction="vertical" className="chat-sidebar-primary-nav mt-3">
               <SideNavSection title={t("sidebar.navigation")} isHeaderHidden>
-                {!mobileExperience ? (
-                  <SideNavItem
-                    label={t("chat.newConversation")}
-                    icon={SquarePen}
-                    isSelected={activeView === "chat"}
-                    onClick={onNewConversation}
-                    className="chat-history-new-conversation-button"
-                    size="sm"
-                  />
-                ) : null}
-                <SideNavItem
-                  label="Skills"
-                  icon={Blend}
-                  isSelected={activeView === "skills-hub"}
-                  onClick={() => onOpenSkillsHub?.()}
-                  className={cn("sidebar-hub-menu-item", desktopPanelMode && "md:hidden")}
-                  size="sm"
-                />
-                <SideNavItem
-                  label="MCP"
-                  icon={Cable}
-                  isSelected={activeView === "mcp-hub"}
-                  onClick={() => onOpenMcpHub?.()}
-                  className={cn("sidebar-hub-menu-item", desktopPanelMode && "md:hidden")}
-                  size="sm"
-                />
-                <SideNavItem
-                  label={t("sidebar.myFiles")}
-                  icon={FolderTree}
-                  isDisabled={!fileTreeAvailable || !onOpenWorkspaceTool}
-                  onClick={() => onOpenWorkspaceTool?.("fileTree")}
-                  className={cn("sidebar-hub-menu-item", desktopPanelMode && "md:hidden")}
-                  size="sm"
-                />
                 {mobileExperience ? (
                   <>
                     <SideNavItem
-                      label={t("sidebar.terminal")}
-                      icon={Terminal}
-                      isDisabled={!workspaceToolsAvailable || !onOpenWorkspaceTool}
-                      onClick={() => onOpenWorkspaceTool?.("terminal")}
+                      label={t("sidebar.mobile.library")}
+                      icon={FolderTree}
+                      isDisabled={!fileTreeAvailable || !onOpenWorkspaceTool}
+                      onClick={() => onOpenWorkspaceTool?.("fileTree")}
                       size="sm"
                     />
                     <SideNavItem
-                      label={t("sidebar.gitReview")}
-                      icon={GitBranch}
-                      isDisabled={!workspaceToolsAvailable || !onOpenWorkspaceTool}
-                      onClick={() => onOpenWorkspaceTool?.("gitReview")}
+                      label={t("sidebar.mobile.projects")}
+                      icon={FolderOpen}
+                      onClick={projectsDisclosure.toggle}
                       size="sm"
                     />
                     <SideNavItem
-                      label={t("sidebar.sshConnection")}
+                      label={t("sidebar.mobile.plugins")}
+                      icon={Blend}
+                      isSelected={activeView === "skills-hub"}
+                      onClick={() => onOpenSkillsHub?.()}
+                      size="sm"
+                    />
+                    <SideNavItem
+                      label={t("sidebar.mobile.scheduled")}
+                      icon={Cpu}
+                      isDisabled={!onOpenWorkspaceTool}
+                      onClick={() => onOpenWorkspaceTool?.("backgroundTasks")}
+                      size="sm"
+                    />
+                    <SideNavItem
+                      label={t("sidebar.mobile.remote")}
                       icon={Key}
                       isDisabled={!workspaceToolsAvailable || !onOpenWorkspaceTool}
                       onClick={() => onOpenWorkspaceTool?.("sshConnection")}
                       size="sm"
                     />
                     <SideNavItem
-                      label={t("sidebar.backgroundTasks")}
-                      icon={Cpu}
-                      isDisabled={!onOpenWorkspaceTool}
-                      onClick={() => onOpenWorkspaceTool?.("backgroundTasks")}
+                      label={t("sidebar.mobile.more")}
+                      icon={Cable}
+                      isSelected={activeView === "mcp-hub"}
+                      onClick={() => onOpenMcpHub?.()}
                       size="sm"
                     />
                   </>
-                ) : null}
+                ) : (
+                  <>
+                    <SideNavItem
+                      label={t("chat.newConversation")}
+                      icon={SquarePen}
+                      isSelected={activeView === "chat"}
+                      onClick={onNewConversation}
+                      className="chat-history-new-conversation-button"
+                      size="sm"
+                    />
+                    <SideNavItem
+                      label="Skills"
+                      icon={Blend}
+                      isSelected={activeView === "skills-hub"}
+                      onClick={() => onOpenSkillsHub?.()}
+                      className={cn("sidebar-hub-menu-item", desktopPanelMode && "md:hidden")}
+                      size="sm"
+                    />
+                    <SideNavItem
+                      label="MCP"
+                      icon={Cable}
+                      isSelected={activeView === "mcp-hub"}
+                      onClick={() => onOpenMcpHub?.()}
+                      className={cn("sidebar-hub-menu-item", desktopPanelMode && "md:hidden")}
+                      size="sm"
+                    />
+                    <SideNavItem
+                      label={t("sidebar.myFiles")}
+                      icon={FolderTree}
+                      isDisabled={!fileTreeAvailable || !onOpenWorkspaceTool}
+                      onClick={() => onOpenWorkspaceTool?.("fileTree")}
+                      className={cn("sidebar-hub-menu-item", desktopPanelMode && "md:hidden")}
+                      size="sm"
+                    />
+                  </>
+                )}
               </SideNavSection>
             </AstryxStack>
           </AstryxStack>

@@ -69,7 +69,7 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
   };
 
   return (
-    <VStack as="section" gap={0} height="100%" minHeight={0}>
+    <VStack as="section" gap={0} height="100%" minHeight={0} className="relative">
       <MobileHubHeader
         title="MCP"
         onOpenSidebar={props.onOpenSidebar}
@@ -92,7 +92,7 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
       </HStack>
 
       <StackItem size="fill" isScrollable>
-        <VStack gap={3} padding={3}>
+        <VStack gap={3} padding={3} className="mobile-hub-scroll-content">
           {visibleServers.length > 0 ? (
             <VStack gap={2}>
               {visibleServers.map(({ server, index }) => (

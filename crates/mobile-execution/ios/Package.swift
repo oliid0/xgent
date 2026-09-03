@@ -102,20 +102,7 @@ let package = Package(
                 "ffprobe",
             ],
             path: "Sources",
-            resources: [
-                // SwiftPM's `.process` rule flattens directory resources. Vim's
-                // runtime intentionally contains duplicate basenames in
-                // different subdirectories, so those trees must be copied while
-                // preserving their hierarchy.
-                .process("Resources/commandDictionary.plist"),
-                .process("Resources/extraCommandsDictionary.plist"),
-                .copy("Resources/bin"),
-                .copy("Resources/python"),
-                .copy("Resources/vim"),
-                .copy("Resources/terminfo"),
-                .copy("Resources/cacert.pem"),
-                .copy("Resources/Legal"),
-            ]
+            exclude: ["Resources"]
         ),
     ]
 )

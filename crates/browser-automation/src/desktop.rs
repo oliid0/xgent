@@ -12,9 +12,11 @@ use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use tauri::{
     plugin::PluginApi,
-    webview::{PageLoadEvent, WebviewBuilder},
+    webview::WebviewBuilder,
     AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl,
 };
+#[cfg(not(target_os = "windows"))]
+use tauri::webview::PageLoadEvent;
 use url::Url;
 
 use crate::models::*;
@@ -1198,11 +1200,13 @@ fn can_navigate_history<R: Runtime>(
                 .controller()
                 .CoreWebView2()
                 .and_then(|core| {
+                    let mut value = Default::default();
                     if forward {
-                        core.CanGoForward()
+                        core.CanGoForward(&mut value)?;
                     } else {
-                        core.CanGoBack()
+                        core.CanGoBack(&mut value)?;
                     }
+                    Ok(value)
                 })
                 .map(|value| value.as_bool())
                 .map_err(|error| format!("failed to inspect browser history: {error}"));
@@ -1325,7 +1329,6 @@ fn install_windows_navigation_lifecycle<R: Runtime>(
     session_id: String,
 ) -> crate::Result<()> {
     use webview2_com::{NavigationCompletedEventHandler, NavigationStartingEventHandler};
-    use windows::Win32::Foundation::BOOL;
 
     webview
         .with_webview(move |platform_webview| unsafe {
@@ -1377,7 +1380,10 @@ fn install_windows_navigation_lifecycle<R: Runtime>(
                             }
                             state.loading = false;
                             state.completed_sequence = state.sequence;
-                            let mut success = BOOL::default();
+                            // Let the WebView2 binding infer its own windows-core BOOL.
+                            // Importing BOOL from the separately versioned `windows` crate
+                            // makes this pointer ABI-incompatible on Windows release builds.
+                            let mut success = Default::default();
                             let succeeded = args
                                 .as_ref()
                                 .is_some_and(|args| args.IsSuccess(&mut success).is_ok())

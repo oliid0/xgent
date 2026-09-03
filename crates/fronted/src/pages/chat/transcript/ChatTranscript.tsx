@@ -55,6 +55,7 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
   const { locale } = useLocale();
   const showNoModelsState = !hasModels;
   const showStartChatState = hasModels && historyItems.length === 0 && !isSending;
+  const showMobileBlankState = mobileExperience && showStartChatState;
   const shouldReserveTranscriptBottomSpace = !(showNoModelsState || showStartChatState);
   // A reserve is only needed when a caller deliberately overlays the composer.
   // The normal chat frame keeps the composer in layout flow, so a zero reserve
@@ -207,7 +208,7 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
             className="chat-transcript-content"
             style={{ marginInline: "auto" }}
           >
-            {showNoModelsState || showStartChatState ? (
+            {(showNoModelsState || showStartChatState) && !showMobileBlankState ? (
               <Center
                 width="100%"
                 className="chat-empty-state-stage"

@@ -3373,7 +3373,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 .xgent-mobile-composer-menu-row {
-  min-height: 4.75rem;
+  min-height: calc(var(--spacing-12) + var(--spacing-9));
   border-radius: var(--radius-container);
 }
 
@@ -3396,6 +3396,25 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 .xgent-chat-mention-composer-expanded {
   height: 100%;
   max-height: none;
+}
+
+.mobile-hub-floating-search {
+  position: absolute;
+  right: 0;
+  bottom: env(safe-area-inset-bottom, 0px);
+  left: 0;
+  z-index: var(--xgent-z-chat-floating-action);
+  background: linear-gradient(to bottom, transparent, var(--color-background) 38%);
+  pointer-events: none;
+}
+
+.mobile-hub-floating-search > * {
+  pointer-events: auto;
+  box-shadow: var(--shadow-med);
+}
+
+.mobile-hub-scroll-content {
+  padding-block-end: calc(var(--size-element-lg) + var(--spacing-9));
 }
 
 /* Sidebar rows use Astryx semantic surfaces in every theme. Keeping hover

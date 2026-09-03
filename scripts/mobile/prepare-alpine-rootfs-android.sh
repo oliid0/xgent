@@ -37,7 +37,7 @@ prepare_arch() {
 
   install -Dm644 \
     "${temp_dir}/${filename}" \
-    "${OUTPUT_ROOT}/alpine-${ALPINE_VERSION}-${android_abi}.tar.gz"
+    "${OUTPUT_ROOT}/alpine-${ALPINE_VERSION}-${android_abi}.tar.gzip"
   sha256sum "${temp_dir}/${filename}" | awk '{print $1}'
 }
 
@@ -52,11 +52,11 @@ cat > "${OUTPUT_ROOT}/manifest.json" <<EOF
   "repositoryBranch": "${ALPINE_SERIES}",
   "archives": {
     "arm64-v8a": {
-      "file": "alpine-${ALPINE_VERSION}-arm64-v8a.tar.gz",
+      "file": "alpine-${ALPINE_VERSION}-arm64-v8a.tar.gzip",
       "sha256": "${arm64_sha}"
     },
     "x86_64": {
-      "file": "alpine-${ALPINE_VERSION}-x86_64.tar.gz",
+      "file": "alpine-${ALPINE_VERSION}-x86_64.tar.gzip",
       "sha256": "${x86_64_sha}"
     }
   }
