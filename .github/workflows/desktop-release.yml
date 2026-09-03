@@ -327,7 +327,7 @@ jobs:
           cp "$portable_exe_path" dist/portable/Xgent/Xgent.exe
           portable_zip="dist/Xgent-${XGENT_RELEASE_TAG}-Windows-x64-portable.zip"
           powershell -NoProfile -Command "Compress-Archive -Path 'dist/portable/Xgent/*' -DestinationPath '$portable_zip' -Force"
-          powershell -NoProfile -Command '$process = Start-Process -FilePath (Resolve-Path "dist/portable/Xgent/Xgent.exe") -PassThru -WindowStyle Hidden; Start-Sleep -Seconds 8; if ($process.HasExited) { throw "Portable Xgent exited during the launch smoke test with code $($process.ExitCode)" }; Stop-Process -Id $process.Id -Force'
+          powershell -NoProfile -File scripts/release/smoke-launch-windows.ps1 -ExecutablePath dist/portable/Xgent/Xgent.exe
           rm -rf dist/portable
           test "$(find dist -type f | wc -l)" -gt 0
 

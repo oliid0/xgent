@@ -33,6 +33,10 @@ const windowsBrowserBackend = readFileSync(
   path.join(repoRoot, "crates/browser-automation/src/desktop.rs"),
   "utf8",
 );
+const windowsLaunchSmoke = readFileSync(
+  path.join(repoRoot, "scripts/release/smoke-launch-windows.ps1"),
+  "utf8",
+);
 
 function jobSource(name, nextName) {
   const start = workflow.indexOf(`  ${name}:\n`);
@@ -174,7 +178,10 @@ test("release jobs smoke launch every newly repaired application target", () => 
   const android = jobSource("android", "ios");
   const ios = jobSource("ios", "publish");
 
-  assert.match(windows, /Portable Xgent exited during the launch smoke test/);
+  assert.match(windows, /scripts\/release\/smoke-launch-windows\.ps1/);
+  assert.match(windowsLaunchSmoke, /Start-Process[\s\S]*-WindowStyle Hidden/);
+  assert.match(windowsLaunchSmoke, /Portable Xgent exited during the launch smoke test/);
+  assert.match(windowsLaunchSmoke, /finally[\s\S]*Stop-Process/);
   assert.match(android, /android-emulator-runner@ed009f5318f15b1cf93a191b856c4f1748a2d4c1/);
   assert.match(android, /adb shell pidof com\.ohi\.xgent/);
   assert.match(android, /adb logcat -d AndroidRuntime:E '\*:S'/);
