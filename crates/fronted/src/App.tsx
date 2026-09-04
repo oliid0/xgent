@@ -729,17 +729,25 @@ export default function App() {
                       height="tall"
                     >
                       <AppErrorBoundary>
-                        <SettingsPage
-                          settings={settings}
-                          setSettings={setSettings}
-                          reloadSettings={reloadPersistedSettings}
-                          saveState={settingsSaveState}
-                          onBack={closeSettings}
-                          initialSection={settingsSection}
-                          soulCreateRequestId={soulCreateRequestId}
-                          nativeMobile={nativeMobile}
-                          appUpdate={appUpdate}
-                        />
+                        <VStack
+                          width="100%"
+                          height="100%"
+                          minHeight={0}
+                          gap={0}
+                          paddingBlockStart={5}
+                        >
+                          <SettingsPage
+                            settings={settings}
+                            setSettings={setSettings}
+                            reloadSettings={reloadPersistedSettings}
+                            saveState={settingsSaveState}
+                            onBack={closeSettings}
+                            initialSection={settingsSection}
+                            soulCreateRequestId={soulCreateRequestId}
+                            nativeMobile={nativeMobile}
+                            appUpdate={appUpdate}
+                          />
+                        </VStack>
                       </AppErrorBoundary>
                     </BottomSheet>
                   ) : (

@@ -340,7 +340,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
         gap={2}
         vAlign="center"
         paddingInline={3}
-        className="mobile-panel-header min-h-[var(--xgent-mobile-header-height)] shrink-0 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/90 backdrop-blur-xl"
+        className="mobile-panel-header min-h-[var(--xgent-mobile-header-height)] shrink-0 border-b border-[var(--color-border-subtle)] bg-[var(--color-background-surface)]"
       >
         {showingDetail ? (
           <IconButton

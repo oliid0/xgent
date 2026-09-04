@@ -2529,9 +2529,9 @@
   }
 
   .settings-memory-status-group {
-    border-color: color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
-    background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.74 * 100%), transparent);
+    border-color: var(--color-border);
+    background: var(--color-background-card);
+    box-shadow: none;
   }
 
   .settings-memory-quota-row + .settings-memory-quota-row {
@@ -2550,14 +2550,14 @@
 
   .settings-memory-entry-list > div > button,
   .settings-memory-entry-list details {
-    border-color: color-mix(in srgb, var(--border) calc(0.38 * 100%), transparent);
+    border-color: var(--color-border);
     border-radius: 14px;
-    background: color-mix(in srgb, var(--card) calc(0.78 * 100%), transparent);
+    background: var(--color-background-card);
   }
 
   .settings-memory-compact-toolbar {
-    border-color: color-mix(in srgb, var(--border) calc(0.34 * 100%), transparent);
-    background: color-mix(in srgb, var(--background) calc(0.76 * 100%), transparent);
+    border-color: var(--color-border);
+    background: var(--color-background-surface);
   }
 
   .settings-memory-detail-section > div:not(.settings-memory-compact-toolbar) {
@@ -2572,10 +2572,10 @@
   }
 
   .settings-hooks-detail {
-    border-color: color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
-    border-radius: 16px;
-    background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.74 * 100%), transparent);
+    border-color: var(--color-border);
+    border-radius: var(--radius-container);
+    background: var(--color-background-card);
+    box-shadow: none;
   }
 
   .settings-modal-header,
@@ -2675,10 +2675,10 @@
 
   .settings-cron-card,
   .settings-ssh-host-card {
-    border-color: color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
-    border-radius: 16px;
-    background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.74 * 100%), transparent);
+    border-color: var(--color-border);
+    border-radius: var(--radius-container);
+    background: var(--color-background-card);
+    box-shadow: none;
   }
 
   .settings-cron-card-row {
@@ -2725,8 +2725,8 @@
   }
 
   .settings-ssh-host-card:hover {
-    border-color: color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.74 * 100%), transparent);
+    border-color: var(--color-border);
+    box-shadow: none;
   }
 
   .settings-ssh-host-card .settings-card-row {
@@ -2788,11 +2788,11 @@
   }
 
   .settings-about-card {
-    border-color: color-mix(in srgb, var(--border) calc(0.4 * 100%), transparent);
-    border-radius: 16px;
+    border-color: var(--color-border);
+    border-radius: var(--radius-container);
     padding: 14px;
-    background: color-mix(in srgb, var(--card) calc(0.82 * 100%), transparent);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background) calc(0.74 * 100%), transparent);
+    background: var(--color-background-card);
+    box-shadow: none;
   }
 
   .settings-about-version-row {
@@ -2803,7 +2803,7 @@
   .settings-about-release-notes {
     border-width: 0;
     border-radius: 13px;
-    background: color-mix(in srgb, var(--background) calc(0.54 * 100%), transparent);
+    background: var(--color-background-muted);
   }
 }
 
@@ -2916,8 +2916,12 @@
     margin-inline: -2px;
   }
 
-  .mcp-server-card {
-    border-radius: 16px;
+  .mcp-server-card,
+  .hub-skill-card {
+    border-color: var(--color-border);
+    border-radius: var(--radius-container);
+    background: var(--color-background-card);
+    box-shadow: none;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -2951,9 +2955,6 @@
 
   .hub-skill-card {
     min-height: 112px;
-    border-radius: 16px;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
   }
 
   .settings-mcp-header,
@@ -3480,6 +3481,11 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 @media (max-width: 768px) {
+  :root {
+    --tool-card-bg: var(--color-background-card);
+    --checkpoint-bg: var(--color-background-card);
+  }
+
   [data-mobile-chat-workspace="true"] {
     background: var(--color-background-surface);
   }
@@ -3547,6 +3553,17 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   max-width: 100vw;
 }
 
+.settings-page-compact {
+  background: var(--color-background-body);
+}
+
+.settings-page-compact .mobile-panel-header {
+  background: var(--color-background-surface);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 .mobile-panel-safe-content {
   padding-block-end: env(safe-area-inset-bottom, 0px);
 }
@@ -3592,13 +3609,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   background: var(--color-background-surface);
 }
 
-.settings-page-compact .settings-section-balanced-inset {
-  padding-right: max(var(--spacing-5), env(safe-area-inset-right, 0px));
-  padding-left: max(var(--spacing-5), env(safe-area-inset-left, 0px));
-}
-
-[data-native-mobile="true"]
-  .settings-page-compact
+.settings-page-compact
   :is(
     .settings-memory-status-group,
     .settings-memory-entry-list > div > button,
@@ -3616,9 +3627,9 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   backdrop-filter: none;
 }
 
-[data-native-mobile="true"] .settings-page-compact input,
-[data-native-mobile="true"] .settings-page-compact textarea,
-[data-native-mobile="true"] .settings-page-compact select {
+.settings-page-compact input,
+.settings-page-compact textarea,
+.settings-page-compact select {
   max-width: 100%;
   font-size: 16px;
 }

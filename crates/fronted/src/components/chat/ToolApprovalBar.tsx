@@ -69,7 +69,7 @@ export function ToolApprovalBar(props: {
       width="calc(100% - var(--spacing-6))"
       maxWidth="var(--xgent-content-width-lg)"
       dividers={["top", "start", "end"]}
-      className="mx-auto overflow-hidden backdrop-blur-2xl"
+      className="mx-auto overflow-hidden"
     >
       <VStack gap={2}>
         <HStack gap={2} vAlign="center">

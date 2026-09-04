@@ -468,13 +468,9 @@ export function SettingsPage(props: SettingsPageProps) {
                 <LayoutContent
                   key={section}
                   data-settings-section={section}
-                  padding={4}
+                  padding={section === "toolPermissions" || section === "voice" ? 5 : 4}
                   isScrollable={!sectionManagesScroll}
-                  className={`settings-section-enter${
-                    section === "toolPermissions" || section === "voice"
-                      ? " settings-section-balanced-inset"
-                      : ""
-                  }`}
+                  className="settings-section-enter"
                 >
                   <VStack
                     width="100%"

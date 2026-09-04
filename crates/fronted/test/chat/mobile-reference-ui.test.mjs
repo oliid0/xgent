@@ -10,21 +10,26 @@ const chatPageSource = readSource("src/pages/ChatPage.tsx");
 const chatHeaderSource = readSource("src/pages/chat/components/ChatHeader.tsx");
 const composerSource = readSource("src/pages/chat/components/ChatComposerBar.tsx");
 const mentionComposerSource = readSource("src/components/chat/MentionComposer.tsx");
+const toolApprovalSource = readSource("src/components/chat/ToolApprovalBar.tsx");
 const mobileActionsSource = readSource("src/pages/chat/mobile/MobileQuickActions.tsx");
 const sidebarSource = readSource("src/components/chat/ChatHistorySidebar.tsx");
 const transcriptSource = readSource("src/pages/chat/transcript/ChatTranscript.tsx");
 const mobileSkillsSource = readSource("src/pages/chat/mobile/MobileSkillsPage.tsx");
 const settingsSource = readSource("src/pages/SettingsPage.tsx");
+const mobileTerminalSource = readSource("src/pages/chat/mobile/MobileTerminalPanel.tsx");
+const mobileSshSource = readSource("src/pages/chat/mobile/MobileSshPanel.tsx");
+const mobileGitSource = readSource("src/pages/chat/mobile/MobileGitReviewPanel.tsx");
 const themeSource = readSource("src/theme/xgentTheme.ts");
 const stylesSource = readSource("src/index.css");
 
 test("compact chat uses the reference-scale Astryx geometry without changing the desktop theme", () => {
   const compactTheme = themeSource.slice(themeSource.indexOf("export const xgentCompactTheme"));
-  assert.match(compactTheme, /"--size-element-lg": "56px"/);
-  assert.match(compactTheme, /"--radius-container": "20px"/);
-  assert.match(compactTheme, /"--radius-page": "28px"/);
+  assert.match(compactTheme, /"--size-element-lg": "44px"/);
+  assert.match(compactTheme, /"--radius-container": "14px"/);
+  assert.match(compactTheme, /"--radius-page": "20px"/);
   assert.match(compactTheme, /"--radius-chat": "28px"/);
   assert.match(compactTheme, /"chat-composer": \{[\s\S]*?minHeight: "52px"/);
+  assert.match(compactTheme, /section: \{[\s\S]*?backgroundColor:[\s\S]*?boxShadow: "none"/);
   assert.match(stylesSource, /--xgent-composer-width: min\(50rem,/);
 });
 
@@ -37,6 +42,7 @@ test("mobile chat keeps one accessible header action cluster and a one-line func
   assert.match(composerSource, /density=\{mobileExperience \? "balanced" : "compact"\}/);
   assert.match(composerSource, /content=\{addMenuContent\}/);
   assert.doesNotMatch(composerSource, /mobileAddMenuContent|<AtSign \/>/);
+  assert.doesNotMatch(toolApprovalSource, /backdrop-blur/);
   assert.match(composerSource, /onThreeLineOverflowChange=\{setShowComposerExpandControl\}/);
   assert.match(mentionComposerSource, /mention-composer min-h-11 max-h-\[160px\]/);
   assert.match(composerSource, /size=\{mobileExperience \? "md" : "sm"\}/);
@@ -59,6 +65,32 @@ test("mobile navigation and settings retain Astryx drawer and bottom-sheet hiera
   assert.match(mobileSkillsSource, /<List density="spacious">/);
   assert.doesNotMatch(mobileSkillsSource, /<ClickableCard/);
   assert.match(appSource, /<BottomSheet[\s\S]*?height="tall"[\s\S]*?<SettingsPage/);
+  assert.match(
+    appSource,
+    /<BottomSheet[\s\S]*?paddingBlockStart=\{5\}[\s\S]*?<SettingsPage/,
+  );
   assert.match(settingsSource, /<DialogHeader[\s\S]*?hasDivider=\{false\}/);
+  assert.match(
+    settingsSource,
+    /padding=\{section === "toolPermissions" \|\| section === "voice" \? 5 : 4\}/,
+  );
+  assert.doesNotMatch(settingsSource, /settings-section-balanced-inset/);
+  for (const panelSource of [mobileTerminalSource, mobileSshSource, mobileGitSource]) {
+    assert.match(panelSource, /bg-\[var\(--color-background-surface\)\]/);
+    assert.doesNotMatch(panelSource, /backdrop-blur|bg-\[var\(--color-bg-primary\)\]\/90/);
+  }
+  assert.match(
+    stylesSource,
+    /\.settings-page-compact \.mobile-panel-header \{[\s\S]*?backdrop-filter: none/,
+  );
+  assert.match(
+    stylesSource,
+    /\.settings-page-compact\s+:is\([\s\S]*?background: var\(--color-background-card\)/,
+  );
+  assert.match(
+    stylesSource,
+    /\.mcp-server-card,\s+\.hub-skill-card \{[\s\S]*?background: var\(--color-background-card\);[\s\S]*?backdrop-filter: none/,
+  );
+  assert.doesNotMatch(stylesSource, /\[data-native-mobile="true"\]\s+\.settings-page-compact\s+:is/);
   assert.match(chatPageSource, /data-mobile-chat-workspace=\{mobileExperience/);
 });

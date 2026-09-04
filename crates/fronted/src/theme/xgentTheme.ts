@@ -145,13 +145,13 @@ export const xgentCompactTheme = defineTheme({
     "--color-background-muted": ["#eeeeef", "#303030"],
     "--color-text-secondary": ["#6e6e73", "#b4b4b4"],
     "--color-border": ["#0000001a", "#ffffff1f"],
-    "--size-element-sm": "40px",
-    "--size-element-md": "44px",
-    "--size-element-lg": "56px",
-    "--radius-inner": "8px",
-    "--radius-element": "12px",
-    "--radius-container": "20px",
-    "--radius-page": "28px",
+    "--size-element-sm": "32px",
+    "--size-element-md": "40px",
+    "--size-element-lg": "44px",
+    "--radius-inner": "6px",
+    "--radius-element": "10px",
+    "--radius-container": "14px",
+    "--radius-page": "20px",
     "--radius-chat": "28px",
     "--shadow-low":
       "0 1px 2px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 22%)), 0 4px 12px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 30%))",
@@ -172,9 +172,10 @@ export const xgentCompactTheme = defineTheme({
     },
     section: {
       "variant:section": {
+        backgroundColor: "var(--color-background-card)",
         border: "1px solid var(--color-border)",
         borderRadius: "var(--radius-container)",
-        boxShadow: "var(--shadow-low)",
+        boxShadow: "none",
       },
     },
     list: {
@@ -188,20 +189,20 @@ export const xgentCompactTheme = defineTheme({
     },
     "list-item": {
       base: {
-        minHeight: "64px",
+        minHeight: "56px",
         padding: "var(--spacing-3) var(--spacing-4)",
         borderRadius: "0",
       },
     },
     "side-nav-item": {
       base: {
-        minHeight: "52px",
+        minHeight: "44px",
         borderRadius: "var(--radius-element)",
       },
     },
     "segmented-control": {
       base: {
-        minHeight: "52px",
+        minHeight: "44px",
         padding: "4px",
         borderRadius: "var(--radius-full)",
         backgroundColor: "var(--color-background-muted)",
@@ -209,7 +210,7 @@ export const xgentCompactTheme = defineTheme({
     },
     "segmented-control-item": {
       base: {
-        minHeight: "44px",
+        minHeight: "36px",
         borderRadius: "var(--radius-full)",
       },
       selected: {
