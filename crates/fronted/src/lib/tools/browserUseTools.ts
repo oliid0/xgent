@@ -1,6 +1,7 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import {
+  type BrowserHumanAssistanceCompletion,
   BrowserSessionController,
   browserSessionController,
   normalizeBrowserAddress,
@@ -241,11 +242,13 @@ async function waitForDomStable(
 
   while (Date.now() < deadline) {
     if (signal?.aborted) throw new Error("Cancelled");
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) break;
     try {
       latest = await controller.action(
         "page_info",
         {},
-        { sessionId, timeoutMs: Math.min(5_000, normalizedTimeout) },
+        { sessionId, timeoutMs: Math.min(5_000, remainingMs) },
       );
       latestError = null;
     } catch (error) {
@@ -255,7 +258,7 @@ async function waitForDomStable(
       latestError = error;
       stableCount = 0;
       previous = "";
-      await abortableDelay(200, signal);
+      await abortableDelay(Math.min(200, Math.max(0, deadline - Date.now())), signal);
       continue;
     }
     const info = (latest.data ?? {}) as PageInfo;
@@ -270,7 +273,7 @@ async function waitForDomStable(
         page: info,
       };
     }
-    await abortableDelay(200, signal);
+    await abortableDelay(Math.min(200, Math.max(0, deadline - Date.now())), signal);
   }
 
   return {
@@ -296,27 +299,98 @@ async function waitForSelector(
   const normalizedTimeout = Math.min(30_000, Math.max(500, timeoutMs));
   const startedAt = Date.now();
   const deadline = startedAt + normalizedTimeout;
+  let latestError: unknown = null;
   while (Date.now() < deadline) {
     if (signal?.aborted) throw new Error("Cancelled");
-    const response = await controller.action(
-      "find_elements",
-      { selector, limit: 1 },
-      { sessionId, timeoutMs: Math.min(5_000, normalizedTimeout) },
-    );
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) break;
+    let response: BrowserActionResponse;
+    try {
+      response = await controller.action(
+        "find_elements",
+        { selector, limit: 1 },
+        { sessionId, timeoutMs: Math.min(5_000, remainingMs) },
+      );
+      latestError = null;
+    } catch (error) {
+      latestError = error;
+      await abortableDelay(Math.min(200, Math.max(0, deadline - Date.now())), signal);
+      continue;
+    }
     const data = (response.data ?? {}) as { count?: number; elements?: unknown[] };
     if ((data.count ?? 0) > 0) {
       return { found: true, elapsedMs: Date.now() - startedAt, ...data };
     }
-    await abortableDelay(200, signal);
+    await abortableDelay(Math.min(200, Math.max(0, deadline - Date.now())), signal);
   }
-  return { found: false, elapsedMs: Date.now() - startedAt, selector };
+  return {
+    found: false,
+    elapsedMs: Date.now() - startedAt,
+    selector,
+    error:
+      latestError instanceof Error
+        ? latestError.message
+        : latestError
+          ? String(latestError)
+          : undefined,
+  };
 }
 
 function formatResult(action: BrowserUseAction, sessionId: string, result: unknown) {
-  const encoded = JSON.stringify(result, null, 2);
+  const encoded = JSON.stringify(result, null, 2) ?? "null";
   const body =
     encoded.length > 24_000 ? `${encoded.slice(0, 24_000)}\n… browser result truncated` : encoded;
+  if (
+    result &&
+    typeof result === "object" &&
+    "handoff" in result &&
+    result.handoff === "human_assistance_completed"
+  ) {
+    return `browser_use paused for the user's live assistance in tab "${sessionId}". Continue from the fresh post-assistance snapshot below; do not repeat the superseded action.\n${body}`;
+  }
   return `browser_use ${action} succeeded in tab "${sessionId}".\n${body}`;
+}
+
+async function postAssistanceHandoff(
+  controller: BrowserSessionController,
+  sessionId: string,
+  requestedAction: BrowserUseAction,
+  observedSequence: number,
+  requestedActionExecuted: boolean,
+  signal?: AbortSignal,
+  context?: BuiltinToolExecutionContext,
+) {
+  let completion: BrowserHumanAssistanceCompletion | undefined =
+    controller.getSnapshot().completedHumanAssistance[sessionId];
+  if ((completion?.sequence ?? 0) <= observedSequence) completion = undefined;
+
+  if (controller.isHumanAssistanceActive(sessionId)) {
+    context?.emitToolStatus?.("Browser · waiting for your assistance");
+    completion =
+      (await controller.waitForHumanAssistance(sessionId, 5 * 60_000, signal)) ?? completion;
+  }
+  if (!completion || completion.sequence <= observedSequence) return null;
+
+  context?.emitToolStatus?.("Browser · reading the assisted page");
+  const freshSnapshot = await controller.action("snapshot", {}, { sessionId, timeoutMs: 10_000 });
+  return {
+    handoff: "human_assistance_completed",
+    humanAssistance: {
+      sequence: completion.sequence,
+      startedAt: completion.startedAt,
+      finishedAt: completion.finishedAt,
+    },
+    requestedAction,
+    requestedActionExecuted,
+    instruction:
+      "The user manually operated this same live browser tab. Continue from freshState and do not repeat an action the user already completed.",
+    freshState: {
+      sessionId,
+      url: freshSnapshot.url,
+      title: freshSnapshot.title,
+      snapshot: freshSnapshot.data,
+    },
+  };
 }
 
 export type BrowserUseToolsOptions = {
@@ -328,6 +402,18 @@ export type BrowserUseToolsOptions = {
 
 export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): BuiltinToolBundle {
   const lanDelegation = options.delegateToLanPc;
+  const observedAssistanceSequences = new WeakMap<BrowserSessionController, Map<string, number>>();
+  const observedAssistanceSequence = (controller: BrowserSessionController, sessionId: string) =>
+    observedAssistanceSequences.get(controller)?.get(sessionId) ?? 0;
+  const markAssistanceObserved = (
+    controller: BrowserSessionController,
+    sessionId: string,
+    sequence: number,
+  ) => {
+    const sessions = observedAssistanceSequences.get(controller) ?? new Map<string, number>();
+    sessions.set(sessionId, sequence);
+    observedAssistanceSequences.set(controller, sessions);
+  };
   const remoteController =
     lanDelegation?.enabled && lanDelegation.baseUrl.trim()
       ? new BrowserSessionController(
@@ -346,7 +432,7 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
   const tool: Tool = {
     name: "browser_use",
     description:
-      "Operate Xgent's embedded browser. It shares the same live WebView tab with the user on PC, Android, and iOS; it is not a separate browser extension. Use open/navigate, then snapshot to receive stable element refs. Click, type, press keys, hover, or scroll with ref whenever possible. Reuse session_id for follow-up actions. Use wait_for_selector or wait_for_dom_stable after page changes and screenshot when visual layout matters.",
+      "Operate Xgent's embedded browser. It shares one live native WebView tab with the user on Windows, macOS, Linux, iOS, and Android; it is not a separate browser extension. Use open/navigate, then snapshot to receive stable element refs. Click, type, press keys, hover, or scroll with ref whenever possible. Reuse session_id for follow-up actions. When the user finishes an explicit takeover, the tool returns a fresh human_assistance_completed snapshot; continue from it and do not repeat the superseded action. Use wait_for_selector or wait_for_dom_stable after page changes and screenshot when visual layout matters.",
     parameters: BROWSER_PARAMETERS,
   };
 
@@ -359,17 +445,47 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
     const args = asArguments(toolCall.arguments);
     let action: BrowserUseAction | undefined;
     let sessionId = args.session_id?.trim() || "main";
+    let controller: BrowserSessionController | null = null;
+    let assistanceSequenceAtStart = 0;
+    let respectsHumanAssistance = false;
     try {
       if (signal?.aborted) throw new Error("Cancelled");
       if (toolCall.name !== "browser_use") throw new Error(`Unknown tool: ${toolCall.name}`);
       action = requiredAction(args.action);
       context?.emitToolStatus?.(`Browser · ${action}`);
-      const controller = await resolveController();
-      const delegated = controller !== browserSessionController;
+      controller = await resolveController();
+      const activeController = controller;
+      const delegated = activeController !== browserSessionController;
+      const revealAgentSession = () => {
+        if (!delegated) activeController.openPanel(sessionId, "agent");
+      };
+
+      respectsHumanAssistance = !["list_tabs", "new_tab", "close_tab", "show", "hide"].includes(
+        action,
+      );
+      assistanceSequenceAtStart = observedAssistanceSequence(controller, sessionId);
 
       let result: unknown;
       let screenshotBase64: string | null | undefined;
-      if (action === "list_tabs") {
+      const assistedBeforeAction = respectsHumanAssistance
+        ? await postAssistanceHandoff(
+            controller,
+            sessionId,
+            action,
+            assistanceSequenceAtStart,
+            false,
+            signal,
+            context,
+          )
+        : null;
+      if (assistedBeforeAction) {
+        result = assistedBeforeAction;
+        markAssistanceObserved(
+          controller,
+          sessionId,
+          assistedBeforeAction.humanAssistance.sequence,
+        );
+      } else if (action === "list_tabs") {
         await controller.initialize();
         result = await controller.refreshSessions();
       } else if (action === "new_tab") {
@@ -380,12 +496,14 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
             })
           : await controller.newSession(normalizeBrowserAddress(args.url || ""));
         sessionId = session.sessionId;
+        revealAgentSession();
         result = session;
       } else if (action === "open") {
         const session = await controller.ensureSession({
           sessionId,
           url: normalizeBrowserAddress(requiredString(args.url, "url")),
         });
+        revealAgentSession();
         await abortableDelay(250, signal);
         result = {
           session,
@@ -412,9 +530,11 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
         result = { visible: false, delegated, sessionId };
       } else if (action === "wait_for_dom_stable") {
         await controller.ensureSession({ sessionId });
+        revealAgentSession();
         result = await waitForDomStable(controller, sessionId, args.timeout ?? 8_000, signal);
       } else if (action === "wait_for_selector") {
         await controller.ensureSession({ sessionId });
+        revealAgentSession();
         result = await waitForSelector(
           controller,
           sessionId,
@@ -436,10 +556,14 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
           !args.ref &&
           (args.coordinate_x == null || args.coordinate_y == null)
         ) {
-          throw new Error("browser_use click requires selector or coordinate_x + coordinate_y.");
+          throw new Error(
+            "browser_use click requires ref, selector, or coordinate_x + coordinate_y.",
+          );
         }
         if (action === "execute_js") requiredString(args.script, "script");
 
+        await controller.ensureSession({ sessionId });
+        revealAgentSession();
         const response = await controller.action(runtimeAction(action), actionInput(args), {
           sessionId,
           timeoutMs: args.timeout,
@@ -479,6 +603,27 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
         }
       }
 
+      if (respectsHumanAssistance && !assistedBeforeAction) {
+        const assistedAfterAction = await postAssistanceHandoff(
+          controller,
+          sessionId,
+          action,
+          assistanceSequenceAtStart,
+          true,
+          signal,
+          context,
+        );
+        if (assistedAfterAction) {
+          result = assistedAfterAction;
+          screenshotBase64 = undefined;
+          markAssistanceObserved(
+            controller,
+            sessionId,
+            assistedAfterAction.humanAssistance.sequence,
+          );
+        }
+      }
+
       return {
         role: "toolResult",
         toolCallId: toolCall.id,
@@ -499,6 +644,45 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
         timestamp,
       };
     } catch (error) {
+      if (controller && action && respectsHumanAssistance) {
+        try {
+          const assistedAfterError = await postAssistanceHandoff(
+            controller,
+            sessionId,
+            action,
+            assistanceSequenceAtStart,
+            false,
+            signal,
+            context,
+          );
+          if (assistedAfterError) {
+            markAssistanceObserved(
+              controller,
+              sessionId,
+              assistedAfterError.humanAssistance.sequence,
+            );
+            return {
+              role: "toolResult",
+              toolCallId: toolCall.id,
+              toolName: toolCall.name,
+              content: [
+                { type: "text", text: formatResult(action, sessionId, assistedAfterError) },
+              ],
+              details: {
+                kind: "browser_use",
+                action,
+                sessionId,
+                result: assistedAfterError,
+              },
+              isError: false,
+              timestamp,
+            };
+          }
+        } catch {
+          // If reading the assisted page also fails, preserve the original
+          // correlated browser error below rather than reporting false success.
+        }
+      }
       const message = error instanceof Error ? error.message : String(error);
       return {
         role: "toolResult",

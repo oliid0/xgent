@@ -690,7 +690,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Smoke launch signed Android APK
-        uses: reactivecircus/android-emulator-runner@ed009f5318f15b1cf93a191b856c4f1748a2d4c1 # v2, pinned 2026-08-26
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
           target: google_apis
@@ -892,13 +892,13 @@ jobs:
                   "Frameworks/python3_ios.framework/python3_ios",
                   "Frameworks/python3_ios-_ssl.framework/python3_ios-_ssl",
                   "Frameworks/python3_ios-_sqlite3.framework/python3_ios-_sqlite3",
-                  "mobile-execution/commandDictionary.plist",
-                  "mobile-execution/extraCommandsDictionary.plist",
-                  "mobile-execution/python/lib/python3.9/os.py",
-                  "mobile-execution/python/lib/python3.9/ssl.py",
-                  "mobile-execution/bin/pkg",
-                  "mobile-execution/vim/syntax/syntax.vim",
-                  "mobile-execution/cacert.pem",
+                  "assets/mobile-execution/commandDictionary.plist",
+                  "assets/mobile-execution/extraCommandsDictionary.plist",
+                  "assets/mobile-execution/python/lib/python3.9/os.py",
+                  "assets/mobile-execution/python/lib/python3.9/ssl.py",
+                  "assets/mobile-execution/bin/pkg",
+                  "assets/mobile-execution/vim/syntax/syntax.vim",
+                  "assets/mobile-execution/cacert.pem",
               ]
               missing = [relative for relative in required if app + relative not in names]
               if missing:

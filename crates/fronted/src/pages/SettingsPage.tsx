@@ -429,36 +429,38 @@ export function SettingsPage(props: SettingsPageProps) {
             data-edge-swipe-ignore
             header={
               detailLayerDepth > 0 ? undefined : (
-                <DialogHeader
-                  title={mobileDetailOpen ? sectionLabels[section] : t("settings.title")}
-                  hasDivider={false}
-                  startContent={
-                    mobileDetailOpen ? (
-                      <IconButton
-                        label={t("settings.mobile.backToSettings")}
-                        tooltip={t("settings.mobile.backToSettings")}
-                        icon={<Icon icon={ArrowLeft} size="md" color="inherit" />}
-                        variant="secondary"
-                        size="lg"
-                        onClick={() => setMobileDetailOpen(false)}
-                      />
-                    ) : undefined
-                  }
-                  endContent={
-                    mobileDetailOpen ? (
-                      <SaveStatus indicator={saveIndicator} />
-                    ) : (
-                      <IconButton
-                        label={t("settings.backToChat")}
-                        tooltip={t("settings.backToChat")}
-                        icon={<Icon icon={X} size="md" color="inherit" />}
-                        variant="secondary"
-                        size="lg"
-                        onClick={onBack}
-                      />
-                    )
-                  }
-                />
+                <VStack className="mobile-panel-header" width="100%" gap={0}>
+                  <DialogHeader
+                    title={mobileDetailOpen ? sectionLabels[section] : t("settings.title")}
+                    hasDivider={false}
+                    startContent={
+                      mobileDetailOpen ? (
+                        <IconButton
+                          label={t("settings.mobile.backToSettings")}
+                          tooltip={t("settings.mobile.backToSettings")}
+                          icon={<Icon icon={ArrowLeft} size="md" color="inherit" />}
+                          variant="secondary"
+                          size="lg"
+                          onClick={() => setMobileDetailOpen(false)}
+                        />
+                      ) : undefined
+                    }
+                    endContent={
+                      mobileDetailOpen ? (
+                        <SaveStatus indicator={saveIndicator} />
+                      ) : (
+                        <IconButton
+                          label={t("settings.backToChat")}
+                          tooltip={t("settings.backToChat")}
+                          icon={<Icon icon={X} size="md" color="inherit" />}
+                          variant="secondary"
+                          size="lg"
+                          onClick={onBack}
+                        />
+                      )
+                    }
+                  />
+                </VStack>
               )
             }
             content={
@@ -468,7 +470,11 @@ export function SettingsPage(props: SettingsPageProps) {
                   data-settings-section={section}
                   padding={4}
                   isScrollable={!sectionManagesScroll}
-                  className="settings-section-enter"
+                  className={`settings-section-enter${
+                    section === "toolPermissions" || section === "voice"
+                      ? " settings-section-balanced-inset"
+                      : ""
+                  }`}
                 >
                   <VStack
                     width="100%"

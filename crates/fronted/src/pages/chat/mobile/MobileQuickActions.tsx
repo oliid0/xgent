@@ -1,11 +1,9 @@
 import { DropdownMenu, type DropdownMenuOption } from "@astryxdesign/core/DropdownMenu";
 import {
-  Activity,
   Cpu,
   GitBranch,
   Globe,
   Key,
-  MessageSquare,
   MoreHorizontal,
   Package,
   Settings,
@@ -14,8 +12,6 @@ import {
 import { useLocale } from "../../../i18n";
 
 type MobileQuickActionsProps = {
-  trajectoryOpen?: boolean;
-  onToggleTrajectory?: () => void;
   onOpenTerminal: () => void;
   onOpenRootfs: () => void;
   onOpenBrowser: () => void;
@@ -28,22 +24,6 @@ type MobileQuickActionsProps = {
 export function MobileQuickActions(props: MobileQuickActionsProps) {
   const { t } = useLocale();
   const actionGroups = [
-    props.onToggleTrajectory
-      ? [
-          {
-            id: "trajectory",
-            label: props.trajectoryOpen
-              ? t("chat.trajectory.backToChat")
-              : t("chat.trajectory.open"),
-            icon: props.trajectoryOpen ? (
-              <MessageSquare className="h-4 w-4" />
-            ) : (
-              <Activity className="h-4 w-4" />
-            ),
-            run: props.onToggleTrajectory,
-          },
-        ]
-      : [],
     [
       {
         id: "terminal",

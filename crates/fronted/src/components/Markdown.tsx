@@ -393,7 +393,6 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
         parseIncompleteMarkdown
         normalizeHtmlIndentation
         isAnimating={showCaret}
-        caret={streaming ? "block" : undefined}
         animated={false}
         linkSafety={{
           enabled: !readOnly,

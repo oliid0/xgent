@@ -6,6 +6,9 @@
   const elementRefs = new WeakMap();
   const elementsByRef = new Map();
   let nextElementRef = 1;
+  let humanInterventionSequence = 0;
+  let lastHumanIntervention = null;
+  let nativeAgentInputUntil = 0;
 
   const elementRef = (element) => {
     if (!(element instanceof Element)) return null;
@@ -130,6 +133,7 @@
   // references/selectors into viewport geometry before dispatching trusted
   // platform input. It deliberately returns data, never a DOM object.
   const prepareNativeTarget = (input) => {
+    nativeAgentInputUntil = Date.now() + 2_000;
     const point =
       Number.isFinite(input?.x) && Number.isFinite(input?.y)
         ? { x: Number(input.x), y: Number(input.y) }
@@ -156,13 +160,18 @@
   };
 
   const dispatchPointerSequence = (element, point) => {
+    const rect = element.getBoundingClientRect();
+    const resolvedPoint = point || {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
     const options = {
       bubbles: true,
       cancelable: true,
       composed: true,
       view: window,
-      clientX: point?.x,
-      clientY: point?.y,
+      clientX: resolvedPoint.x,
+      clientY: resolvedPoint.y,
     };
     element.dispatchEvent(new PointerEvent("pointerover", options));
     element.dispatchEvent(new MouseEvent("mouseover", options));
@@ -181,12 +190,19 @@
     const element = point
       ? document.elementFromPoint(point.x, point.y)
       : requireElement(input);
-    if (!element) throw new Error(`No element at (${point.x}, ${point.y})`);
+    if (!element) throw new Error(`No element at (${point?.x}, ${point?.y})`);
     if ("disabled" in element && element.disabled) throw new Error("Element is disabled");
     element.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
     element.focus?.({ preventScroll: true });
-    dispatchPointerSequence(element, point);
-    return { clicked: true, element: describeElement(element) };
+    const description = describeElement(element);
+    // A synchronous element.click() can start a navigation that destroys this
+    // document before WebView2 delivers ExecuteScript's completion callback.
+    // A new task lets the native host receive the correlated acknowledgement
+    // first, then performs the page action while navigation tracking is armed.
+    window.setTimeout(() => {
+      if (element.isConnected) dispatchPointerSequence(element, point);
+    }, 0);
+    return { clicked: true, scheduled: true, element: description };
   };
 
   const setNativeValue = (element, value) => {
@@ -209,28 +225,37 @@
     const value = String(input?.text ?? "");
     element.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
     element.focus?.({ preventScroll: true });
-    if (element instanceof HTMLSelectElement) {
-      element.value = value;
-    } else if (element.isContentEditable) {
-      element.textContent = value;
-    } else {
-      setNativeValue(element, value);
-    }
-    element.dispatchEvent(
-      new InputEvent("input", {
-        bubbles: true,
-        composed: true,
-        inputType: "insertText",
-        data: value,
-      }),
-    );
-    element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-    if (input?.submit) {
-      const form = element instanceof HTMLElement ? element.closest("form") : null;
-      if (form instanceof HTMLFormElement) form.requestSubmit();
-      else dispatchKey(element, "Enter");
-    }
-    return { typed: true, length: value.length, element: describeElement(element) };
+    const description = describeElement(element);
+    window.setTimeout(() => {
+      if (!element.isConnected) return;
+      if (element instanceof HTMLSelectElement) {
+        element.value = value;
+      } else if (element.isContentEditable) {
+        element.textContent = value;
+      } else {
+        setNativeValue(element, value);
+      }
+      element.dispatchEvent(
+        new InputEvent("input", {
+          bubbles: true,
+          composed: true,
+          inputType: "insertText",
+          data: value,
+        }),
+      );
+      element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+      if (input?.submit) {
+        const form = element instanceof HTMLElement ? element.closest("form") : null;
+        if (form instanceof HTMLFormElement) form.requestSubmit();
+        else dispatchKey(element, "Enter");
+      }
+    }, 0);
+    return {
+      typed: true,
+      scheduled: true,
+      length: value.length,
+      element: description,
+    };
   };
 
   const dispatchKey = (element, key) => {
@@ -259,7 +284,13 @@
       : document.activeElement instanceof Element
         ? document.activeElement
         : document.body;
-    return dispatchKey(target, input?.key);
+    const key = String(input?.key || "").trim();
+    if (!key) throw new Error("key is required");
+    const description = target instanceof Element ? describeElement(target) : null;
+    window.setTimeout(() => {
+      if (target.isConnected) dispatchKey(target, key);
+    }, 0);
+    return { pressed: true, scheduled: true, key, element: description };
   };
 
   const getText = (input) => {
@@ -364,9 +395,13 @@
       clientX: rect.x + rect.width / 2,
       clientY: rect.y + rect.height / 2,
     };
-    element.dispatchEvent(new PointerEvent("pointerover", options));
-    element.dispatchEvent(new MouseEvent("mouseover", options));
-    return { hovered: true, element: describeElement(element) };
+    const description = describeElement(element);
+    window.setTimeout(() => {
+      if (!element.isConnected) return;
+      element.dispatchEvent(new PointerEvent("pointerover", options));
+      element.dispatchEvent(new MouseEvent("mouseover", options));
+    }, 0);
+    return { hovered: true, scheduled: true, element: description };
   };
 
   const findElements = (input) => {
@@ -451,12 +486,31 @@
     return { result: result === undefined ? null : result };
   };
 
+  const recordHumanIntervention = (event) => {
+    if (!event.isTrusted || Date.now() <= nativeAgentInputUntil) return;
+    humanInterventionSequence += 1;
+    const target = event.target instanceof Element ? describeElement(event.target) : null;
+    lastHumanIntervention = {
+      sequence: humanInterventionSequence,
+      type: event.type,
+      target,
+      timestamp: Date.now(),
+    };
+  };
+
+  document.addEventListener("pointerdown", recordHumanIntervention, true);
+  document.addEventListener("input", recordHumanIntervention, true);
+
   const execute = (action, input = {}) => {
     try {
       let data;
       switch (action) {
         case "__native_target":
           data = prepareNativeTarget(input);
+          break;
+        case "__native_input_guard":
+          nativeAgentInputUntil = Date.now() + 2_000;
+          data = { guarded: true };
           break;
         case "click":
           data = click(input);
@@ -495,6 +549,12 @@
         default:
           throw new Error(`Unsupported DOM action: ${action}`);
       }
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        data.humanIntervention = {
+          sequence: humanInterventionSequence,
+          last: lastHumanIntervention,
+        };
+      }
       return JSON.stringify({ ok: true, data });
     } catch (error) {
       return JSON.stringify({
@@ -508,6 +568,6 @@
     configurable: true,
     enumerable: false,
     writable: false,
-    value: Object.freeze({ version: 1, execute }),
+    value: Object.freeze({ version: 2, execute }),
   });
 })();

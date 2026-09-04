@@ -6,6 +6,8 @@ use std::{
     },
     time::Duration,
 };
+#[cfg(target_os = "windows")]
+use std::time::Instant;
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::de::DeserializeOwned;
@@ -23,6 +25,7 @@ use crate::models::*;
 use crate::{Error, BROWSER_RUNTIME_SCRIPT};
 
 const WEBVIEW_LABEL_PREFIX: &str = "xgent-browser-";
+const DEFAULT_NAVIGATION_TIMEOUT: Duration = Duration::from_secs(30);
 static LEGACY_REQUEST_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone)]
@@ -36,6 +39,7 @@ struct SessionRecord {
 struct PageLoadState {
     sequence: u64,
     completed_sequence: u64,
+    document_ready_sequence: u64,
     loading: bool,
     error: Option<String>,
     url: String,
@@ -62,9 +66,11 @@ pub struct BrowserAutomation<R: Runtime> {
 impl<R: Runtime> BrowserAutomation<R> {
     pub fn status(&self) -> crate::Result<BrowserStatus> {
         #[cfg(target_os = "windows")]
-        let detail = "WebView2 sessions with CDP request/response DOM automation and trusted input";
-        #[cfg(not(target_os = "windows"))]
-        let detail = "Tauri child WebView sessions with bounded navigation and DOM automation";
+        let detail = "WebView2 sessions with CDP trusted input, DOM snapshots, and native screenshots";
+        #[cfg(target_os = "macos")]
+        let detail = "WKWebView sessions with committed-document DOM automation and native snapshots";
+        #[cfg(target_os = "linux")]
+        let detail = "WebKitGTK sessions with committed-document DOM automation and native snapshots";
         Ok(BrowserStatus {
             backend: BrowserBackend::DesktopWebview,
             available: true,
@@ -109,9 +115,14 @@ impl<R: Runtime> BrowserAutomation<R> {
             .app
             .get_window("main")
             .ok_or_else(|| Error::Message("main application window is unavailable".to_string()))?;
-        let builder = WebviewBuilder::new(label.clone(), WebviewUrl::External(url))
+        #[cfg(target_os = "windows")]
+        let initial_url = Url::parse("about:blank")
+            .map_err(|error| Error::Message(format!("failed to prepare browser: {error}")))?;
+        #[cfg(not(target_os = "windows"))]
+        let initial_url = url.clone();
+        let builder = WebviewBuilder::new(label.clone(), WebviewUrl::External(initial_url))
             .initialization_script(BROWSER_RUNTIME_SCRIPT)
-            .on_navigation(|url| matches!(url.scheme(), "http" | "https"));
+            .on_navigation(|url| matches!(url.scheme(), "about" | "http" | "https"));
         #[cfg(not(target_os = "windows"))]
         let builder = {
             let page_load_states = Arc::clone(&self.page_load_states);
@@ -121,17 +132,23 @@ impl<R: Runtime> BrowserAutomation<R> {
                 let (states, wake) = &*page_load_states;
                 if let Ok(mut states) = states.lock() {
                     let state = states.entry(page_load_session_id.clone()).or_default();
-                    state.url = payload.url().to_string();
                     match payload.event() {
                         PageLoadEvent::Started => {
                             state.sequence = state.sequence.saturating_add(1);
+                            // Wry emits Started from WKNavigationDelegate
+                            // didCommitNavigation on macOS and WebKitGTK's
+                            // LoadEvent::Committed on Linux. At that point the
+                            // new document owns an executable JS context.
+                            state.document_ready_sequence = state.sequence;
                             state.loading = true;
                             state.error = None;
+                            state.url = payload.url().to_string();
                         }
                         PageLoadEvent::Finished => {
                             if state.url == payload.url().as_str() {
                                 state.loading = false;
                                 state.completed_sequence = state.sequence;
+                                state.document_ready_sequence = state.sequence;
                             }
                         }
                     }
@@ -157,12 +174,6 @@ impl<R: Runtime> BrowserAutomation<R> {
             Arc::clone(&self.page_load_states),
             request.session_id.clone(),
         )?;
-        #[cfg(target_os = "windows")]
-        webview.reload().map_err(|error| {
-            Error::Message(format!(
-                "failed to restart initial navigation after installing WebView2 lifecycle: {error}"
-            ))
-        })?;
 
         if viewport.visible {
             webview
@@ -182,7 +193,21 @@ impl<R: Runtime> BrowserAutomation<R> {
         self.sessions
             .lock()
             .map_err(lock_error)?
-            .insert(request.session_id, record.clone());
+            .insert(request.session_id.clone(), record.clone());
+        #[cfg(target_os = "windows")]
+        {
+            // Install the native lifecycle before dispatching the first real
+            // navigation. Register the session first as well: a slow page must
+            // remain the same assistable tab instead of becoming an orphan that
+            // the next tool call tries to recreate under the same label.
+            self.mark_page_loading(&request.session_id, true)?;
+            if let Err(error) = webview.navigate(url) {
+                self.mark_page_loading(&request.session_id, false)?;
+                return Err(Error::Message(format!(
+                    "failed to navigate browser: {error}"
+                )));
+            }
+        }
         self.session_summary(&record)
     }
 
@@ -268,7 +293,7 @@ impl<R: Runtime> BrowserAutomation<R> {
                         "failed to navigate browser: {error}"
                     )));
                 }
-                self.wait_for_page_load_or_recover(
+                self.wait_for_document_ready(
                     &webview,
                     &request.session_id,
                     baseline,
@@ -285,7 +310,7 @@ impl<R: Runtime> BrowserAutomation<R> {
                     self.mark_page_loading(&request.session_id, false)?;
                     return Err(Error::Message(format!("failed to reload browser: {error}")));
                 }
-                self.wait_for_page_load_or_recover(
+                self.wait_for_document_ready(
                     &webview,
                     &request.session_id,
                     baseline,
@@ -305,7 +330,7 @@ impl<R: Runtime> BrowserAutomation<R> {
                         self.mark_page_loading(&request.session_id, false)?;
                         return Err(Error::Message(format!("failed to go back: {error}")));
                     }
-                    self.wait_for_page_load_or_recover(
+                    self.wait_for_document_ready(
                         &webview,
                         &request.session_id,
                         baseline,
@@ -326,7 +351,7 @@ impl<R: Runtime> BrowserAutomation<R> {
                         self.mark_page_loading(&request.session_id, false)?;
                         return Err(Error::Message(format!("failed to go forward: {error}")));
                     }
-                    self.wait_for_page_load_or_recover(
+                    self.wait_for_document_ready(
                         &webview,
                         &request.session_id,
                         baseline,
@@ -344,7 +369,7 @@ impl<R: Runtime> BrowserAutomation<R> {
                 webview.reload().map_err(|error| {
                     Error::Message(format!("failed to recover browser session: {error}"))
                 })?;
-                self.wait_for_page_load_or_recover(
+                self.wait_for_document_ready(
                     &webview,
                     &request.session_id,
                     baseline,
@@ -367,6 +392,11 @@ impl<R: Runtime> BrowserAutomation<R> {
                 })
             }
             _ => {
+                self.wait_for_current_document(
+                    &webview,
+                    &request.session_id,
+                    navigation_timeout,
+                )?;
                 let baseline = self.navigation_sequence(&request.session_id)?;
                 let data = evaluate_dom_action(
                     &webview,
@@ -381,7 +411,7 @@ impl<R: Runtime> BrowserAutomation<R> {
                         Duration::from_millis(300),
                     )? {
                         lifecycle.navigation_started = true;
-                        self.wait_for_page_load_or_recover(
+                        self.wait_for_document_ready(
                             &webview,
                             &request.session_id,
                             baseline,
@@ -475,9 +505,9 @@ impl<R: Runtime> BrowserAutomation<R> {
                 .unwrap_or(false))
     }
 
-    fn wait_for_page_load_or_recover(
+    fn wait_for_document_ready(
         &self,
-        webview: &tauri::Webview<R>,
+        _webview: &tauri::Webview<R>,
         session_id: &str,
         baseline: u64,
         timeout: Duration,
@@ -490,8 +520,7 @@ impl<R: Runtime> BrowserAutomation<R> {
                     .get(session_id)
                     .map(|state| {
                         state.sequence <= baseline
-                            || state.loading
-                            || state.completed_sequence < state.sequence
+                            || state.document_ready_sequence < state.sequence
                     })
                     .unwrap_or(true)
             })
@@ -504,18 +533,46 @@ impl<R: Runtime> BrowserAutomation<R> {
                 .get(session_id)
                 .map(|state| {
                     state.sequence > baseline
-                        && !state.loading
-                        && state.completed_sequence == state.sequence
+                        && state.document_ready_sequence == state.sequence
                 })
                 .unwrap_or(false)
         {
             return Ok(());
         }
-        drop(states);
-        let _ = webview.eval("window.stop()");
-        self.mark_page_loading(session_id, false)?;
         Err(Error::Message(format!(
-            "browser navigation timed out after {} ms; the pending load was stopped and the session is ready for another command",
+            "browser document did not become ready within {} ms; the live session was preserved",
+            timeout.as_millis()
+        )))
+    }
+
+    fn wait_for_current_document(
+        &self,
+        _webview: &tauri::Webview<R>,
+        session_id: &str,
+        timeout: Duration,
+    ) -> crate::Result<()> {
+        let (states, wake) = &*self.page_load_states;
+        let states = states.lock().map_err(lock_error)?;
+        let (states, wait) = wake
+            .wait_timeout_while(states, timeout, |states| {
+                states
+                    .get(session_id)
+                    .map(|state| {
+                        state.loading
+                            && (state.sequence == 0
+                                || state.document_ready_sequence < state.sequence)
+                    })
+                    .unwrap_or(true)
+            })
+            .map_err(lock_error)?;
+        if let Some(error) = states.get(session_id).and_then(|state| state.error.clone()) {
+            return Err(Error::Message(error));
+        }
+        if !wait.timed_out() {
+            return Ok(());
+        }
+        Err(Error::Message(format!(
+            "browser document was not ready after {} ms; the live session was preserved",
             timeout.as_millis()
         )))
     }
@@ -579,19 +636,97 @@ fn capture_desktop_webview<R: Runtime>(
     webview: &tauri::Webview<R>,
     timeout: Duration,
 ) -> crate::Result<Vec<u8>> {
-    let response = call_windows_cdp(
-        webview,
-        "Page.captureScreenshot",
-        &json!({ "format": "png", "fromSurface": true }),
-        timeout,
-    )?;
-    let encoded = response
-        .get("data")
-        .and_then(Value::as_str)
-        .ok_or_else(|| Error::Message("CDP screenshot response did not include data".to_string()))?;
-    BASE64_STANDARD
-        .decode(encoded)
-        .map_err(|error| Error::Message(format!("failed to decode CDP screenshot: {error}")))
+    use webview2_com::{
+        CapturePreviewCompletedHandler,
+        Microsoft::Web::WebView2::Win32::COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG,
+    };
+    use windows::Win32::{
+        Foundation::HGLOBAL,
+        System::Com::{StructuredStorage::CreateStreamOnHGlobal, IStream},
+    };
+
+    let (sender, receiver) = mpsc::sync_channel(1);
+    let pending_sender = Arc::new(Mutex::new(Some(sender)));
+    let closure_sender = Arc::clone(&pending_sender);
+    webview
+        .with_webview(move |platform_webview| unsafe {
+            let result = (|| -> Result<(), String> {
+                let core_webview = platform_webview
+                    .controller()
+                    .CoreWebView2()
+                    .map_err(|error| format!("failed to access CoreWebView2: {error}"))?;
+                let stream: IStream = CreateStreamOnHGlobal(HGLOBAL::default(), true)
+                    .map_err(|error| format!("failed to allocate screenshot stream: {error}"))?;
+                let callback_stream = stream.clone();
+                let callback_sender = Arc::clone(&closure_sender);
+                let handler = CapturePreviewCompletedHandler::create(Box::new(move |result| {
+                    let result = result
+                        .map_err(|error| format!("CapturePreview failed: {error}"))
+                        .and_then(|_| read_windows_stream(&callback_stream));
+                    if let Ok(mut slot) = callback_sender.lock() {
+                        if let Some(sender) = slot.take() {
+                            let _ = sender.send(result);
+                        }
+                    }
+                    Ok(())
+                }));
+                core_webview
+                    .CapturePreview(
+                        COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG,
+                        &stream,
+                        &handler,
+                    )
+                    .map_err(|error| format!("failed to start CapturePreview: {error}"))?;
+                Ok(())
+            })();
+            if let Err(error) = result {
+                if let Ok(mut slot) = closure_sender.lock() {
+                    if let Some(sender) = slot.take() {
+                        let _ = sender.send(Err(error));
+                    }
+                }
+            }
+        })
+        .map_err(|error| Error::Message(format!("failed to access browser WebView: {error}")))?;
+
+    receiver
+        .recv_timeout(timeout)
+        .map_err(|_| Error::Message("browser screenshot timed out".to_string()))?
+        .map_err(|error| Error::Message(format!("browser screenshot failed: {error}")))
+}
+
+#[cfg(target_os = "windows")]
+unsafe fn read_windows_stream(
+    stream: &windows::Win32::System::Com::IStream,
+) -> Result<Vec<u8>, String> {
+    use windows::Win32::System::Com::{STREAM_SEEK_END, STREAM_SEEK_SET};
+
+    stream
+        .Seek(0, STREAM_SEEK_SET, None)
+        .map_err(|error| format!("failed to seek screenshot stream: {error}"))?;
+    let mut end_position = 0_u64;
+    stream
+        .Seek(0, STREAM_SEEK_END, Some(&mut end_position))
+        .map_err(|error| format!("failed to measure screenshot stream: {error}"))?;
+    stream
+        .Seek(0, STREAM_SEEK_SET, None)
+        .map_err(|error| format!("failed to rewind screenshot stream: {error}"))?;
+    let mut bytes = vec![0_u8; end_position as usize];
+    let mut bytes_read = 0_u32;
+    stream
+        .Read(
+            bytes.as_mut_ptr().cast(),
+            bytes.len() as u32,
+            Some(&mut bytes_read),
+        )
+        .ok()
+        .map_err(|error| format!("failed to read screenshot stream: {error}"))?;
+    bytes.truncate(bytes_read as usize);
+    if bytes.is_empty() {
+        Err("CapturePreview returned an empty image".to_string())
+    } else {
+        Ok(bytes)
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -637,12 +772,7 @@ fn capture_desktop_webview<R: Runtime>(
 
     receiver
         .recv_timeout(timeout)
-        .map_err(|_| {
-            let _ = webview.reload();
-            Error::Message(
-                "browser screenshot timed out; the WebView was reloaded for recovery".to_string(),
-            )
-        })?
+        .map_err(|_| Error::Message("browser screenshot timed out".to_string()))?
         .map_err(|error| Error::Message(format!("browser screenshot failed: {error}")))
 }
 
@@ -659,7 +789,7 @@ unsafe fn ns_image_to_png(image: &objc2_app_kit::NSImage) -> Result<Vec<u8>, Str
     let png = bitmap
         .representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new())
         .ok_or_else(|| "failed to encode browser screenshot as PNG".to_string())?;
-    Ok(std::slice::from_raw_parts(png.bytes().as_ptr(), png.len()).to_vec())
+    Ok(png.to_vec())
 }
 
 #[cfg(target_os = "linux")]
@@ -693,12 +823,7 @@ fn capture_desktop_webview<R: Runtime>(
         .map_err(|error| Error::Message(format!("failed to access browser WebView: {error}")))?;
     receiver
         .recv_timeout(timeout)
-        .map_err(|_| {
-            let _ = webview.reload();
-            Error::Message(
-                "browser screenshot timed out; the WebView was reloaded for recovery".to_string(),
-            )
-        })?
+        .map_err(|_| Error::Message("browser screenshot timed out".to_string()))?
         .map_err(Error::Message)
 }
 
@@ -825,9 +950,9 @@ fn call_windows_cdp<R: Runtime>(
     let raw = receiver
         .recv_timeout(timeout)
         .map_err(|_| {
-            let _ = webview.reload();
             Error::Message(format!(
-                "CDP {method} timed out; WebView2 was reloaded so the session can recover"
+                "CDP {method} timed out after {} ms; the live WebView2 session was preserved",
+                timeout.as_millis()
             ))
         })?
         .map_err(Error::Message)?;
@@ -840,7 +965,7 @@ fn call_windows_cdp<R: Runtime>(
 }
 
 #[cfg(target_os = "windows")]
-fn evaluate_windows_runtime_action<R: Runtime>(
+fn evaluate_windows_dom_runtime_action<R: Runtime>(
     webview: &tauri::Webview<R>,
     action: &str,
     input: &Value,
@@ -850,33 +975,19 @@ fn evaluate_windows_runtime_action<R: Runtime>(
         .map_err(|error| Error::Message(format!("failed to encode browser action: {error}")))?;
     let input_json = serde_json::to_string(input)
         .map_err(|error| Error::Message(format!("failed to encode browser input: {error}")))?;
-    let expression = format!(
+    let script = format!(
         "(() => {{ if (!window.__xgentBrowserRuntime) {{ {BROWSER_RUNTIME_SCRIPT} }} return window.__xgentBrowserRuntime.execute({action_json}, {input_json}); }})()"
     );
-    let response = call_windows_cdp(
-        webview,
-        "Runtime.evaluate",
-        &json!({
-            "expression": expression,
-            "returnByValue": true,
-            "awaitPromise": true,
-            "userGesture": true,
-        }),
-        timeout,
-    )?;
-    if let Some(details) = response.get("exceptionDetails") {
-        let detail = details
-            .pointer("/exception/description")
-            .or_else(|| details.get("text"))
-            .and_then(Value::as_str)
-            .unwrap_or("unknown page exception");
-        return Err(Error::Message(format!("browser evaluation failed: {detail}")));
-    }
-    let raw = response
-        .pointer("/result/value")
-        .and_then(Value::as_str)
-        .ok_or_else(|| Error::Message("CDP evaluation returned no serialized value".to_string()))?;
-    decode_runtime_response(raw)
+    let (sender, receiver) = mpsc::sync_channel(1);
+    webview
+        .eval_with_callback(script, move |value| {
+            let _ = sender.send(value);
+        })
+        .map_err(|error| Error::Message(format!("failed to evaluate browser action: {error}")))?;
+    let raw = receiver
+        .recv_timeout(timeout)
+        .map_err(|_| Error::Message("browser action timed out".to_string()))?;
+    decode_runtime_response(&raw)
 }
 
 #[cfg(target_os = "windows")]
@@ -904,12 +1015,17 @@ fn dispatch_windows_mouse<R: Runtime>(
     extra: Value,
     timeout: Duration,
 ) -> crate::Result<()> {
-    let timeout = timeout.min(Duration::from_secs(5));
     let mut params = json!({ "type": event_type, "x": x, "y": y });
     if let (Some(target), Some(source)) = (params.as_object_mut(), extra.as_object()) {
         target.extend(source.clone());
     }
-    call_windows_cdp(webview, "Input.dispatchMouseEvent", &params, timeout).map(|_| ())
+    call_windows_cdp(
+        webview,
+        "Input.dispatchMouseEvent",
+        &params,
+        timeout.min(Duration::from_secs(5)),
+    )
+    .map(|_| ())
 }
 
 #[cfg(target_os = "windows")]
@@ -941,13 +1057,8 @@ fn dispatch_windows_key<R: Runtime>(
 ) -> crate::Result<()> {
     let timeout = timeout.min(Duration::from_secs(5));
     if key.chars().count() == 1 && key != " " {
-        return call_windows_cdp(
-            webview,
-            "Input.insertText",
-            &json!({ "text": key }),
-            timeout,
-        )
-        .map(|_| ());
+        return call_windows_cdp(webview, "Input.insertText", &json!({ "text": key }), timeout)
+            .map(|_| ());
     }
     let (key_name, code, virtual_key, text) = windows_key_identity(key)
         .ok_or_else(|| Error::Message(format!("unsupported browser key: {key}")))?;
@@ -978,21 +1089,21 @@ fn dispatch_windows_key<R: Runtime>(
 }
 
 #[cfg(target_os = "windows")]
-fn evaluate_dom_action<R: Runtime>(
+fn evaluate_windows_cdp_input_action<R: Runtime>(
     webview: &tauri::Webview<R>,
     action: &str,
     input: &Value,
-    timeout_ms: u64,
-) -> crate::Result<Value> {
-    let timeout = Duration::from_millis(timeout_ms);
+    timeout: Duration,
+) -> crate::Result<Option<Value>> {
+    // Keep each CDP acknowledgement short. A failed native command must leave
+    // enough of the caller's single deadline for the correlated DOM fallback;
+    // otherwise the frontend can expire while the native session is still
+    // processing a second full-length request.
+    let timeout = timeout.min(Duration::from_millis(1_200));
     match action {
         "click" | "hover" => {
-            let target = evaluate_windows_runtime_action(
-                webview,
-                "__native_target",
-                input,
-                timeout,
-            )?;
+            let target =
+                evaluate_windows_dom_runtime_action(webview, "__native_target", input, timeout)?;
             let (center_x, center_y) = windows_target_point(&target)?;
             let x = input.get("x").and_then(Value::as_f64).unwrap_or(center_x);
             let y = input.get("y").and_then(Value::as_f64).unwrap_or(center_y);
@@ -1015,20 +1126,13 @@ fn evaluate_dom_action<R: Runtime>(
                     timeout,
                 )?;
             }
-            let mut result = json!({
-                "nativeInput": "webview2-cdp",
-                "element": target,
-            });
+            let mut result = json!({ "element": target });
             result[if action == "click" { "clicked" } else { "hovered" }] = Value::Bool(true);
-            Ok(result)
+            Ok(Some(result))
         }
         "type" => {
-            let target = evaluate_windows_runtime_action(
-                webview,
-                "__native_target",
-                input,
-                timeout,
-            )?;
+            let target =
+                evaluate_windows_dom_runtime_action(webview, "__native_target", input, timeout)?;
             let (x, y) = windows_target_point(&target)?;
             dispatch_windows_mouse(webview, "mouseMoved", x, y, json!({}), timeout)?;
             dispatch_windows_mouse(
@@ -1047,14 +1151,17 @@ fn evaluate_dom_action<R: Runtime>(
                 json!({ "button": "left", "buttons": 0, "clickCount": 1 }),
                 timeout,
             )?;
-            let mut target_input = input.clone();
-            if let Some(object) = target_input.as_object_mut() {
+            // A real mouse release collapses an existing DOM selection. Select
+            // only after the trusted focus click so insertText replaces the
+            // current control contents consistently instead of appending.
+            let mut select_all_input = input.clone();
+            if let Some(object) = select_all_input.as_object_mut() {
                 object.insert("selectAll".to_string(), Value::Bool(true));
             }
-            evaluate_windows_runtime_action(
+            evaluate_windows_dom_runtime_action(
                 webview,
                 "__native_target",
-                &target_input,
+                &select_all_input,
                 timeout,
             )?;
             let text = input.get("text").and_then(Value::as_str).unwrap_or("");
@@ -1065,26 +1172,26 @@ fn evaluate_dom_action<R: Runtime>(
                     webview,
                     "Input.insertText",
                     &json!({ "text": text }),
-                    timeout,
+                    timeout.min(Duration::from_secs(5)),
                 )?;
             }
             if input.get("submit").and_then(Value::as_bool).unwrap_or(false) {
                 dispatch_windows_key(webview, "Enter", timeout)?;
             }
-            Ok(json!({
+            Ok(Some(json!({
                 "typed": true,
                 "length": text.chars().count(),
-                "nativeInput": "webview2-cdp",
                 "element": target,
-            }))
+            })))
         }
         "press_key" => {
-            let has_target = input.get("ref").is_some() || input.get("selector").is_some();
-            if has_target {
-                evaluate_windows_runtime_action(
+            if input.get("ref").is_some() || input.get("selector").is_some() {
+                evaluate_windows_dom_runtime_action(webview, "__native_target", input, timeout)?;
+            } else {
+                evaluate_windows_dom_runtime_action(
                     webview,
-                    "__native_target",
-                    input,
+                    "__native_input_guard",
+                    &json!({}),
                     timeout,
                 )?;
             }
@@ -1093,33 +1200,26 @@ fn evaluate_dom_action<R: Runtime>(
                 .and_then(Value::as_str)
                 .ok_or_else(|| Error::Message("press_key requires input.key".to_string()))?;
             dispatch_windows_key(webview, key, timeout)?;
-            Ok(json!({ "pressed": true, "key": key, "nativeInput": "webview2-cdp" }))
+            Ok(Some(json!({ "pressed": true, "key": key })))
         }
         "scroll" => {
             let target = if input.get("ref").is_some() || input.get("selector").is_some() {
-                evaluate_windows_runtime_action(
-                    webview,
-                    "__native_target",
-                    input,
-                    timeout,
-                )?
+                evaluate_windows_dom_runtime_action(webview, "__native_target", input, timeout)?
             } else {
-                evaluate_windows_runtime_action(webview, "page_info", &json!({}), timeout)?
+                evaluate_windows_dom_runtime_action(
+                    webview,
+                    "__native_input_guard",
+                    &json!({}),
+                    timeout,
+                )?;
+                evaluate_windows_dom_runtime_action(webview, "page_info", &json!({}), timeout)?
             };
             let (x, y) = if target.get("rect").is_some() {
                 windows_target_point(&target)?
             } else {
                 (
-                    target
-                        .get("viewportWidth")
-                        .and_then(Value::as_f64)
-                        .unwrap_or(1024.0)
-                        / 2.0,
-                    target
-                        .get("viewportHeight")
-                        .and_then(Value::as_f64)
-                        .unwrap_or(768.0)
-                        / 2.0,
+                    target.get("viewportWidth").and_then(Value::as_f64).unwrap_or(1024.0) / 2.0,
+                    target.get("viewportHeight").and_then(Value::as_f64).unwrap_or(768.0) / 2.0,
                 )
             };
             let amount = input
@@ -1127,10 +1227,7 @@ fn evaluate_dom_action<R: Runtime>(
                 .and_then(Value::as_f64)
                 .unwrap_or(600.0)
                 .clamp(1.0, 10_000.0);
-            let direction = input
-                .get("direction")
-                .and_then(Value::as_str)
-                .unwrap_or("down");
+            let direction = input.get("direction").and_then(Value::as_str).unwrap_or("down");
             let (delta_x, delta_y) = match direction {
                 "up" => (0.0, -amount),
                 "left" => (-amount, 0.0),
@@ -1145,15 +1242,57 @@ fn evaluate_dom_action<R: Runtime>(
                 json!({ "deltaX": delta_x, "deltaY": delta_y }),
                 timeout,
             )?;
-            Ok(json!({
-                "scrolled": true,
-                "direction": direction,
-                "amount": amount,
-                "nativeInput": "webview2-cdp",
-            }))
+            Ok(Some(json!({ "scrolled": true, "direction": direction, "amount": amount })))
         }
-        _ => evaluate_windows_runtime_action(webview, action, input, timeout),
+        _ => Ok(None),
     }
+}
+
+#[cfg(target_os = "windows")]
+fn evaluate_dom_action<R: Runtime>(
+    webview: &tauri::Webview<R>,
+    action: &str,
+    input: &Value,
+    timeout_ms: u64,
+) -> crate::Result<Value> {
+    let timeout = Duration::from_millis(timeout_ms);
+    if matches!(action, "click" | "type" | "press_key" | "scroll" | "hover") {
+        let started = Instant::now();
+        match evaluate_windows_cdp_input_action(webview, action, input, timeout) {
+            Ok(Some(mut result)) => {
+                if let Some(object) = result.as_object_mut() {
+                    object.insert("automationTransport".to_string(), json!("webview2-cdp"));
+                }
+                return Ok(result);
+            }
+            Ok(None) => {}
+            Err(cdp_error) => {
+                let remaining = timeout.saturating_sub(started.elapsed());
+                if remaining.is_zero() {
+                    return Err(cdp_error);
+                }
+                let mut result = evaluate_windows_dom_runtime_action(
+                    webview,
+                    action,
+                    input,
+                    remaining,
+                )?;
+                if let Some(object) = result.as_object_mut() {
+                    object.insert(
+                        "automationTransport".to_string(),
+                        json!("webview2-dom-fallback"),
+                    );
+                    object.insert("cdpError".to_string(), json!(cdp_error.to_string()));
+                }
+                return Ok(result);
+            }
+        }
+    }
+    let mut result = evaluate_windows_dom_runtime_action(webview, action, input, timeout)?;
+    if let Some(object) = result.as_object_mut() {
+        object.insert("automationTransport".to_string(), json!("webview2-dom"));
+    }
+    Ok(result)
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -1178,13 +1317,7 @@ fn evaluate_dom_action<R: Runtime>(
         .map_err(|error| Error::Message(format!("failed to evaluate browser action: {error}")))?;
     let raw = receiver
         .recv_timeout(Duration::from_millis(timeout_ms))
-        .map_err(|_| {
-            let _ = webview.reload();
-            Error::Message(
-                "browser action timed out; the WebView was reloaded so the session can recover"
-                    .to_string(),
-            )
-        })?;
+        .map_err(|_| Error::Message("browser action timed out".to_string()))?;
     decode_runtime_response(&raw)
 }
 
@@ -1328,7 +1461,10 @@ fn install_windows_navigation_lifecycle<R: Runtime>(
     page_load_states: Arc<(Mutex<HashMap<String, PageLoadState>>, Condvar)>,
     session_id: String,
 ) -> crate::Result<()> {
-    use webview2_com::{NavigationCompletedEventHandler, NavigationStartingEventHandler};
+    use webview2_com::{
+        ContentLoadingEventHandler, NavigationCompletedEventHandler,
+        NavigationStartingEventHandler,
+    };
 
     webview
         .with_webview(move |platform_webview| unsafe {
@@ -1347,20 +1483,47 @@ fn install_windows_navigation_lifecycle<R: Runtime>(
                         state.sequence = state.sequence.saturating_add(1);
                         state.loading = true;
                         state.error = None;
-                        if let Some(args) = args {
-                            let mut navigation_id = 0u64;
-                            if args.NavigationId(&mut navigation_id).is_ok() {
-                                state.native_navigation_id = Some(navigation_id);
-                            }
-                        }
+                        state.native_navigation_id = args.as_ref().and_then(|args| {
+                            let mut navigation_id = 0_u64;
+                            args.NavigationId(&mut navigation_id).ok()?;
+                            Some(navigation_id)
+                        });
                         wake.notify_all();
                     }
                     Ok(())
                 }));
-                let mut started_token = 0i64;
+                let mut started_token = 0_i64;
                 core.add_NavigationStarting(&started, &mut started_token)
                     .map_err(|error| {
                         format!("failed to subscribe to WebView2 navigation start: {error}")
+                    })?;
+
+                // Microsoft documents ContentLoading as the point after the
+                // new document's execution context exists. Waiting for this
+                // event makes DOM automation available without waiting for
+                // ads, analytics, or other network work to finish.
+                let ready_states = Arc::clone(&page_load_states);
+                let ready_session_id = session_id.clone();
+                let ready = ContentLoadingEventHandler::create(Box::new(move |_, args| {
+                    let (states, wake) = &*ready_states;
+                    if let Ok(mut states) = states.lock() {
+                        let state = states.entry(ready_session_id.clone()).or_default();
+                        let navigation_id = args.as_ref().and_then(|args| {
+                            let mut navigation_id = 0_u64;
+                            args.NavigationId(&mut navigation_id).ok()?;
+                            Some(navigation_id)
+                        });
+                        if navigation_id == state.native_navigation_id {
+                            state.document_ready_sequence = state.sequence;
+                            wake.notify_all();
+                        }
+                    }
+                    Ok(())
+                }));
+                let mut ready_token = 0_i64;
+                core.add_ContentLoading(&ready, &mut ready_token)
+                    .map_err(|error| {
+                        format!("failed to subscribe to WebView2 document readiness: {error}")
                     })?;
 
                 let completed_states = Arc::clone(&page_load_states);
@@ -1371,7 +1534,7 @@ fn install_windows_navigation_lifecycle<R: Runtime>(
                         if let Ok(mut states) = states.lock() {
                             let state = states.entry(completed_session_id.clone()).or_default();
                             let completed_navigation_id = args.as_ref().and_then(|args| {
-                                let mut navigation_id = 0u64;
+                                let mut navigation_id = 0_u64;
                                 args.NavigationId(&mut navigation_id).ok()?;
                                 Some(navigation_id)
                             });
@@ -1380,9 +1543,6 @@ fn install_windows_navigation_lifecycle<R: Runtime>(
                             }
                             state.loading = false;
                             state.completed_sequence = state.sequence;
-                            // Let the WebView2 binding infer its own windows-core BOOL.
-                            // Importing BOOL from the separately versioned `windows` crate
-                            // makes this pointer ABI-incompatible on Windows release builds.
                             let mut success = Default::default();
                             let succeeded = args
                                 .as_ref()
@@ -1397,7 +1557,7 @@ fn install_windows_navigation_lifecycle<R: Runtime>(
                         }
                         Ok(())
                     }));
-                let mut completed_token = 0i64;
+                let mut completed_token = 0_i64;
                 core.add_NavigationCompleted(&completed, &mut completed_token)
                     .map_err(|error| {
                         format!("failed to subscribe to WebView2 navigation completion: {error}")

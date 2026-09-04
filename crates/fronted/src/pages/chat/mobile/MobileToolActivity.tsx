@@ -1,15 +1,18 @@
+import { AspectRatio } from "@astryxdesign/core/AspectRatio";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { ChatToolCalls } from "@astryxdesign/core/Chat";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Icon } from "@astryxdesign/core/Icon";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Text } from "@astryxdesign/core/Text";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { AdaptiveDialog } from "../../../components/astryx/AdaptiveDialog";
-import { Wrench } from "../../../components/icons";
+import { Globe, Wrench } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
+import { browserSessionController } from "../../../lib/browser/browserSessionController";
 import type {
   LiveTranscriptState,
   LiveTranscriptStore,
@@ -109,14 +112,49 @@ export function MobileToolActivity({
     () => EMPTY_TRANSCRIPT,
   );
   const items = useMemo(() => collectActivityItems(snapshot), [snapshot]);
+  const browserState = useSyncExternalStore(
+    browserSessionController.subscribe,
+    browserSessionController.getSnapshot,
+    browserSessionController.getSnapshot,
+  );
+  const activeBrowserSession = browserState.sessions.find(
+    (session) => session.sessionId === browserState.activeSessionId,
+  );
+  const activeBrowserSessionId = activeBrowserSession?.sessionId;
   const activeItem = [...items].reverse().find((item) => item.running) ?? null;
   const latestItem = items.at(-1) ?? null;
   const capsuleItem = activeItem;
   const status = snapshot.toolStatus?.trim() || "";
-  const capsuleTitle = capsuleItem?.toolCall.name || t("chat.mobileActivity.working");
+  const capsuleKind = capsuleItem ? activityKind(capsuleItem.toolCall.name) : "tool";
+  const capsuleTitle =
+    capsuleKind === "browser" && activeBrowserSession
+      ? activeBrowserSession.title?.trim() || activeBrowserSession.url
+      : capsuleItem?.toolCall.name || t("chat.mobileActivity.working");
   const capsuleDetail = capsuleItem
     ? summarizeToolCall(capsuleItem.toolCall, { includeName: false }) || status
     : status;
+  const browserPreview = activeBrowserSession
+    ? browserState.previewDataUrls[activeBrowserSession.sessionId]
+    : undefined;
+  const assistanceActive =
+    browserState.humanAssistance?.sessionId === activeBrowserSession?.sessionId;
+
+  useEffect(() => {
+    if (capsuleKind !== "browser" || !activeBrowserSessionId) return;
+    let disposed = false;
+    let timer: number | undefined;
+    const capture = async () => {
+      await browserSessionController
+        .captureSessionPreview(activeBrowserSessionId)
+        .catch(() => undefined);
+      if (!disposed) timer = window.setTimeout(capture, 5_000);
+    };
+    void capture();
+    return () => {
+      disposed = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [activeBrowserSessionId, capsuleKind]);
   const toolCalls = [...items].reverse().map((item) => {
     const output = toolOutput(item);
     const failed = toolFailed(item.toolResult);
@@ -172,7 +210,7 @@ export function MobileToolActivity({
     <>
       {capsuleItem || status ? (
         <HStack
-          hAlign="center"
+          hAlign="start"
           width="100%"
           paddingInline={5}
           className="pointer-events-none absolute inset-x-0 z-30"
@@ -184,21 +222,48 @@ export function MobileToolActivity({
             variant="secondary"
             size="sm"
             elevation="high"
-            width="var(--xgent-mobile-activity-width)"
+            width="fit-content"
             onClick={() => {
-              const kind = capsuleItem ? activityKind(capsuleItem.toolCall.name) : "tool";
-              if (kind === "browser" && onOpenBrowser) {
+              if (capsuleKind === "browser" && onOpenBrowser) {
                 onOpenBrowser();
                 return;
               }
-              if (kind === "shell" && onOpenTerminal) {
+              if (capsuleKind === "shell" && onOpenTerminal) {
                 onOpenTerminal();
                 return;
               }
               onOpen();
             }}
-            className="pointer-events-auto"
-          />
+            className={
+              capsuleKind === "browser"
+                ? "xgent-mobile-browser-activity-button pointer-events-auto"
+                : "xgent-mobile-activity-button pointer-events-auto"
+            }
+          >
+            {capsuleKind === "browser" ? (
+              <HStack gap={2} vAlign="center" width="100%">
+                <AspectRatio ratio={100 / 65} fit="cover">
+                  {browserPreview ? (
+                    <img src={browserPreview} alt="" />
+                  ) : (
+                    <VStack width="100%" height="100%" hAlign="center" vAlign="center">
+                      <Icon icon={Globe} size="md" color="secondary" />
+                    </VStack>
+                  )}
+                </AspectRatio>
+                <VStack gap={0} hAlign="start" style={{ minWidth: 0 }}>
+                  <Text type="label" textWrap="nowrap" maxLines={1}>
+                    {capsuleTitle}
+                  </Text>
+                  <Text type="supporting" color="secondary" textWrap="nowrap" maxLines={1}>
+                    {assistanceActive ? t("browser.assistanceActive") : capsuleDetail}
+                  </Text>
+                </VStack>
+              </HStack>
+            ) : (
+              capsuleTitle
+            )}
+          </Button>
         </HStack>
       ) : null}
 

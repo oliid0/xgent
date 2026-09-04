@@ -512,11 +512,6 @@ macro_rules! app_invoke_handler {
 
 #[cfg(desktop)]
 fn show_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
-    if let Some(ready_state) = app.try_state::<Arc<commands::app::FrontendReadyState>>() {
-        if !ready_state.0.load(Ordering::SeqCst) {
-            return Ok(());
-        }
-    }
     if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
         window.show()?;
         window.unminimize()?;
@@ -790,7 +785,7 @@ fn configure_system_tray(app: &tauri::App) -> tauri::Result<()> {
             }
             TrayIconEvent::Click {
                 button: MouseButton::Left,
-                button_state: MouseButtonState::Down,
+                button_state: MouseButtonState::Up,
                 ..
             } if !TRAY_SHOW_MENU_ON_LEFT_CLICK => {
                 if let Err(error) = show_main_window(tray.app_handle()) {

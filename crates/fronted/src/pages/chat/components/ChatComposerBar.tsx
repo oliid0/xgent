@@ -16,7 +16,6 @@ import { Thumbnail } from "@astryxdesign/core/Thumbnail";
 import { Token } from "@astryxdesign/core/Token";
 import {
   memo,
-  type ReactNode,
   type RefObject,
   useCallback,
   useEffect,
@@ -31,15 +30,11 @@ import {
   type MentionComposerSkill,
 } from "../../../components/chat/MentionComposer";
 import {
-  AtSign,
   Blend,
-  Camera,
-  Check,
   ChevronUp,
   Clock3,
   Globe,
   GlobeOff,
-  ImageIcon,
   Lightbulb,
   LightbulbOff,
   Loader2,
@@ -98,20 +93,6 @@ type ReadWorkspaceImageResponse = {
   mimeType: string;
   data: string;
 };
-
-function MobileComposerMenuIcon(props: { children: ReactNode }) {
-  return (
-    <HStack
-      width="var(--xgent-mobile-composer-menu-icon-size)"
-      height="var(--xgent-mobile-composer-menu-icon-size)"
-      hAlign="center"
-      vAlign="center"
-      className="xgent-mobile-composer-menu-icon"
-    >
-      {props.children}
-    </HStack>
-  );
-}
 
 function PendingImageThumbnail(props: {
   file: PendingUploadedFile;
@@ -343,8 +324,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   onChatRuntimeControlsChange: (patch: Partial<ChatRuntimeControls>) => void;
   onCommandSafetyModeChange: (mode: CommandSafetyMode) => void;
   onPickReadableFiles: () => void;
-  onPickReadablePhotos: () => void;
-  onCaptureReadablePhoto: () => void;
   onPasteFiles: (files: File[]) => void;
   /** Prompts previously sent in this conversation for ↑/↓ recall. */
   loadHistoryPrompts?: () => readonly string[];
@@ -392,8 +371,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     onChatRuntimeControlsChange,
     onCommandSafetyModeChange,
     onPickReadableFiles,
-    onPickReadablePhotos,
-    onCaptureReadablePhoto,
     onPasteFiles,
     loadHistoryPrompts,
     pendingUploadedFiles,
@@ -412,6 +389,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const queueHadTurnsRef = useRef(false);
   const [composerIsEmpty, setComposerIsEmpty] = useState(true);
   const [isComposerExpanded, setIsComposerExpanded] = useState(false);
+  const [showComposerExpandControl, setShowComposerExpandControl] = useState(false);
   const isComposerExpandedRef = useRef(false);
   const glassCardRef = useRef<HTMLDivElement | null>(null);
 
@@ -586,6 +564,17 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
             onPickReadableFiles();
           }}
         />
+        <ListItem
+          label={t("chat.composer.plugins")}
+          description={t("chat.composer.addMentionDesc")}
+          startContent={<Blend />}
+          isDisabled={controlsDisabled || enabledSkills.length === 0}
+          onClick={() => {
+            setIsAddMenuOpen(false);
+            composerRef.current?.insertText("/");
+            composerRef.current?.focus();
+          }}
+        />
       </List>
       <VStack gap={2} width="100%">
         <Switch
@@ -657,104 +646,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           disabledMessage={gitDisabledMessage}
         />
       ) : null}
-    </VStack>
-  );
-
-  const mobileAddMenuContent = (
-    <VStack
-      gap={1}
-      padding={1}
-      width="100%"
-      isScrollable
-      className="xgent-mobile-composer-menu"
-      style={{ maxHeight: "min(31rem, calc(100dvh - 10rem))" }}
-    >
-      <List
-        density="compact"
-        style={{
-          border: "none",
-          borderRadius: 0,
-          background: "transparent",
-          boxShadow: "none",
-        }}
-      >
-        <ListItem
-          className="xgent-mobile-composer-menu-row"
-          label={t("chat.upload.camera")}
-          startContent={
-            <MobileComposerMenuIcon>
-              <Camera />
-            </MobileComposerMenuIcon>
-          }
-          isDisabled={uploadDisabled}
-          onClick={() => {
-            setIsAddMenuOpen(false);
-            onCaptureReadablePhoto();
-          }}
-        />
-        <ListItem
-          className="xgent-mobile-composer-menu-row"
-          label={t("chat.upload.photos")}
-          startContent={
-            <MobileComposerMenuIcon>
-              <ImageIcon />
-            </MobileComposerMenuIcon>
-          }
-          isDisabled={uploadDisabled}
-          onClick={() => {
-            setIsAddMenuOpen(false);
-            onPickReadablePhotos();
-          }}
-        />
-        <ListItem
-          className="xgent-mobile-composer-menu-row"
-          label={t("chat.upload.files")}
-          startContent={
-            <MobileComposerMenuIcon>
-              <Paperclip />
-            </MobileComposerMenuIcon>
-          }
-          isDisabled={uploadDisabled}
-          onClick={() => {
-            setIsAddMenuOpen(false);
-            onPickReadableFiles();
-          }}
-        />
-        <ListItem
-          className="xgent-mobile-composer-menu-row"
-          label={t("chat.composer.plugins")}
-          startContent={
-            <MobileComposerMenuIcon>
-              <Blend />
-            </MobileComposerMenuIcon>
-          }
-          isDisabled={controlsDisabled || enabledSkills.length === 0}
-          onClick={() => {
-            setIsAddMenuOpen(false);
-            composerRef.current?.insertText("/");
-            composerRef.current?.focus();
-          }}
-        />
-        <ListItem
-          className="xgent-mobile-composer-menu-row"
-          label={t("chat.runtime.thinkHarder")}
-          startContent={
-            <MobileComposerMenuIcon>
-              <Lightbulb />
-            </MobileComposerMenuIcon>
-          }
-          endContent={
-            chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn ? <Check /> : undefined
-          }
-          isSelected={chatRuntimeControls.thinkingEnabled || thinkingAlwaysOn}
-          isDisabled={controlsDisabled || !thinkingSupported || thinkingAlwaysOn}
-          onClick={() =>
-            onChatRuntimeControlsChange({
-              thinkingEnabled: !chatRuntimeControls.thinkingEnabled,
-            })
-          }
-        />
-      </List>
     </VStack>
   );
 
@@ -846,6 +737,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
       gap={0}
       hAlign="center"
       className="chat-composer-layer"
+      data-expanded={isComposerExpanded ? "true" : "false"}
       style={{
         pointerEvents: "none",
         position: isComposerExpanded ? "absolute" : "relative",
@@ -858,7 +750,8 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     >
       <VStack
         width="100%"
-        maxWidth="var(--xgent-composer-width)"
+        height={isComposerExpanded ? "100%" : undefined}
+        maxWidth={isComposerExpanded ? "100%" : "var(--xgent-composer-width)"}
         gap={0}
         style={{
           pointerEvents: "auto",
@@ -869,7 +762,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           justifyContent: isComposerExpanded ? "flex-end" : undefined,
         }}
       >
-        {queuedTurns.length > 0 ? (
+        {queuedTurns.length > 0 && !isComposerExpanded ? (
           <VStack
             ref={queuePanelRef}
             width="calc(100% - (var(--spacing-3) * 2))"
@@ -896,15 +789,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                   padding={1}
                   style={{ maxHeight: "var(--xgent-chat-queue-height)" }}
                 >
-                  <List
-                    density="compact"
-                    hasDividers
-                    header={
-                      <Text type="label" color="secondary">
-                        {t("chat.queue.title").replace("{count}", String(queuedTurns.length))}
-                      </Text>
-                    }
-                  >
+                  <List density="compact" hasDividers>
                     {queuedTurns.map((item, index) => (
                       <ListItem
                         key={item.id}
@@ -980,6 +865,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
               : undefined
           }
           className="xgent-chat-composer"
+          data-expanded={isComposerExpanded ? "true" : "false"}
           style={isComposerExpanded ? { minHeight: 0, flex: 1 } : undefined}
           drawer={
             pendingUploadedFiles.length > 0 ? (
@@ -1026,23 +912,13 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
               </ChatComposerDrawer>
             ) : undefined
           }
-          headerContext={
-            !mobileExperience && isAgentMode ? (
-              <IconButton
-                label={toggleComposerExpandTooltip}
-                tooltip={toggleComposerExpandTooltip}
-                variant="ghost"
-                size="sm"
-                icon={isComposerExpanded ? <Minimize2 /> : <Maximize2 />}
-                onClick={toggleComposerExpanded}
-              />
-            ) : undefined
-          }
           input={
             <VStack
               width="100%"
               minHeight={isComposerExpanded ? 0 : undefined}
-              style={isComposerExpanded ? { flex: 1 } : undefined}
+              className="xgent-chat-composer-input"
+              data-expand-control={showComposerExpandControl || isComposerExpanded}
+              style={{ position: "relative", ...(isComposerExpanded ? { flex: 1 } : {}) }}
             >
               <MentionComposer
                 ref={composerRef}
@@ -1057,12 +933,24 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 enabledSkills={enabledSkills}
                 preferNativeContextMenu={mobileExperience}
                 compact={mobileExperience}
+                onThreeLineOverflowChange={setShowComposerExpandControl}
                 className={
                   isComposerExpanded
                     ? "xgent-chat-mention-composer xgent-chat-mention-composer-expanded"
                     : "xgent-chat-mention-composer"
                 }
               />
+              {showComposerExpandControl || isComposerExpanded ? (
+                <IconButton
+                  label={toggleComposerExpandTooltip}
+                  tooltip={toggleComposerExpandTooltip}
+                  variant="ghost"
+                  size="sm"
+                  icon={isComposerExpanded ? <Minimize2 /> : <Maximize2 />}
+                  onClick={toggleComposerExpanded}
+                  className="xgent-chat-composer-expand"
+                />
+              ) : null}
             </VStack>
           }
           footerActions={
@@ -1077,7 +965,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                     isOpen={isAddMenuOpen}
                     onOpenChange={setIsAddMenuOpen}
                     isEnabled={!controlsDisabled}
-                    content={mobileAddMenuContent}
+                    content={addMenuContent}
                   >
                     <IconButton
                       label={addMenuTooltip}
@@ -1089,18 +977,6 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                       isDisabled={controlsDisabled}
                     />
                   </Popover>
-                  <IconButton
-                    label={t("chat.composer.addMention")}
-                    tooltip={t("chat.composer.addMentionDesc")}
-                    variant="ghost"
-                    size="sm"
-                    icon={<AtSign />}
-                    isDisabled={controlsDisabled}
-                    onClick={() => {
-                      composerRef.current?.insertText("@");
-                      composerRef.current?.focus();
-                    }}
-                  />
                   {voiceInputAvailable ? (
                     <IconButton
                       label={

@@ -121,7 +121,6 @@
     --xgent-mobile-header-action-size: 3.5rem;
     --xgent-mobile-header-height: 4.25rem;
     --xgent-mobile-composer-menu-width: min(22rem, calc(100dvw - var(--spacing-6)));
-    --xgent-mobile-composer-menu-icon-size: 3.5rem;
     --xgent-mobile-activity-width: min(26.25rem, 86vw);
     --xgent-z-mobile-panel: 74;
   }
@@ -3372,21 +3371,37 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   overflow: hidden;
 }
 
-.xgent-mobile-composer-menu-row {
-  min-height: calc(var(--spacing-12) + var(--spacing-9));
-  border-radius: var(--radius-container);
+.xgent-chat-composer[data-expanded="true"] {
+  height: 100%;
+  border-radius: 0;
 }
 
-.xgent-mobile-composer-menu-icon {
-  flex: 0 0 var(--xgent-mobile-composer-menu-icon-size);
-  border-radius: var(--radius-full);
-  color: var(--color-content-primary);
-  background: var(--color-background-muted);
+.xgent-chat-composer[data-expanded="true"] > div:last-child,
+.xgent-chat-composer[data-expanded="true"] > div:last-child > div:first-child {
+  min-height: 0;
+  flex: 1;
 }
 
-.xgent-mobile-composer-menu-icon svg {
-  width: 1.5rem;
-  height: 1.5rem;
+.xgent-chat-composer-expand {
+  position: absolute !important;
+  top: -2px;
+  right: 0;
+  z-index: 2;
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  opacity: 0.78;
+  background: var(--color-background-surface) !important;
+}
+
+.xgent-chat-composer-expand:hover,
+.xgent-chat-composer-expand:focus-visible {
+  opacity: 1;
+}
+
+.xgent-chat-composer-input[data-expand-control="true"] .mention-composer {
+  padding-inline-end: 32px;
 }
 
 .xgent-chat-mention-composer {
@@ -3396,6 +3411,28 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 .xgent-chat-mention-composer-expanded {
   height: 100%;
   max-height: none;
+}
+
+.xgent-mobile-activity-button {
+  max-width: min(72vw, var(--xgent-mobile-activity-width));
+  overflow: hidden;
+}
+
+.xgent-mobile-browser-activity-button {
+  width: min(21rem, calc(100vw - var(--spacing-10)));
+  height: auto;
+  min-height: 4.75rem;
+  padding: var(--spacing-1);
+  overflow: hidden;
+}
+
+.xgent-mobile-browser-activity-button .astryx-aspect-ratio {
+  flex: 0 0 6.25rem;
+  width: 6.25rem;
+  overflow: hidden;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-background-secondary);
 }
 
 .mobile-hub-floating-search {
@@ -3548,6 +3585,35 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   padding-right: max(var(--spacing-4), env(safe-area-inset-right, 0px));
   padding-bottom: max(var(--spacing-4), env(safe-area-inset-bottom, 0px));
   padding-left: max(var(--spacing-4), env(safe-area-inset-left, 0px));
+}
+
+[data-native-mobile="true"] .settings-page-compact .mobile-panel-header {
+  flex: 0 0 auto;
+  background: var(--color-background-surface);
+}
+
+.settings-page-compact .settings-section-balanced-inset {
+  padding-right: max(var(--spacing-5), env(safe-area-inset-right, 0px));
+  padding-left: max(var(--spacing-5), env(safe-area-inset-left, 0px));
+}
+
+[data-native-mobile="true"]
+  .settings-page-compact
+  :is(
+    .settings-memory-status-group,
+    .settings-memory-entry-list > div > button,
+    .settings-memory-entry-list details,
+    .settings-hooks-detail,
+    .settings-cron-card,
+    .settings-ssh-host-card,
+    .settings-about-card,
+    .settings-about-status-card,
+    .settings-about-release-notes
+  ) {
+  background: var(--color-background-card);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 [data-native-mobile="true"] .settings-page-compact input,

@@ -1,5 +1,6 @@
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxButton } from "@astryxdesign/core/Button";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -32,6 +33,8 @@ import {
   ExternalLink,
   FileText,
   Loader2,
+  Maximize2,
+  Minimize2,
   Minus,
   Plus,
   RefreshCw,
@@ -66,7 +69,10 @@ type ReadWorkspacePreviewResponse = {
 type WorkspaceFilePreviewOverlayProps = {
   openRequest: WorkspaceFilePreviewOpenRequest | null;
   isOpen: boolean;
-  onOpenEditor: (request: WorkspaceFilePreviewOpenRequest) => void;
+  presentation: "side" | "fullscreen";
+  width?: number | string;
+  overlay?: boolean;
+  onPresentationChange: (presentation: "side" | "fullscreen") => void;
   onRequestClose: () => void;
   onClose: () => void;
 };
@@ -163,6 +169,12 @@ function resolvePreviewKind(path: string, mimeType: string): WorkspacePreviewKin
   const mimeKind = kindFromMimeType(mimeType);
   if (mimeKind === "html" || mimeKind === "markdown" || mimeKind === "text") return mimeKind;
   return getWorkspacePreviewKind(path) ?? mimeKind ?? "text";
+}
+
+function previewLanguage(path: string, kind: WorkspacePreviewKind) {
+  if (kind === "html") return "html";
+  if (kind === "markdown") return path.toLowerCase().endsWith(".mdx") ? "mdx" : "markdown";
+  return path.split(".").pop()?.toLowerCase() || "plaintext";
 }
 
 function decodePreviewText(bytes: Uint8Array) {
@@ -289,7 +301,16 @@ function buildSpreadsheetTable(
 }
 
 export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayProps) {
-  const { openRequest, isOpen, onOpenEditor, onRequestClose, onClose } = props;
+  const {
+    openRequest,
+    isOpen,
+    presentation,
+    width,
+    overlay = false,
+    onPresentationChange,
+    onRequestClose,
+    onClose,
+  } = props;
   const { t } = useLocale();
   const closeAnimationTimeoutRef = useRef<number | null>(null);
   const loadSequenceRef = useRef(0);
@@ -304,6 +325,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
   const [error, setError] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [sourceCopied, setSourceCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<"preview" | "source">("preview");
   const [isVisible, setIsVisible] = useState(false);
 
   const replacePreview = useCallback((next: LoadedPreview | null) => {
@@ -369,6 +391,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       setLoading(true);
       setError(null);
       setRenderError(null);
+      setActiveTab("preview");
       setActiveRequest(request);
       if (!keepCurrentImagePreview) {
         replacePreview(null);
@@ -437,8 +460,13 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       kind === "image" ? normalizeImagePaths(activePreviewRequest?.imagePaths, activePath) : [],
     [activePath, activePreviewRequest?.imagePaths, kind],
   );
-  const canOpenEditor = Boolean(activePreviewRequest && isWorkspaceEditablePreviewPath(activePath));
-  const canOpenExternal = Boolean(activePreviewRequest && activePath && !canOpenEditor);
+  const canShowSource = Boolean(
+    activePreviewRequest &&
+      isWorkspaceEditablePreviewPath(activePath) &&
+      preview?.text !== null &&
+      preview?.text !== undefined,
+  );
+  const canOpenExternal = Boolean(activePreviewRequest && activePath && !canShowSource);
 
   const copyPreviewSource = useCallback(async () => {
     if (preview?.text === null || preview?.text === undefined) return;
@@ -480,14 +508,19 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       width="100%"
       height="100%"
       style={{
-        position: "absolute",
-        inset: 0,
+        position: overlay ? "absolute" : "relative",
+        inset: overlay ? 0 : undefined,
         zIndex: "var(--xgent-z-workspace-overlay)",
+        flex: presentation === "fullscreen" ? "1 1 auto" : "0 0 auto",
+        width: presentation === "fullscreen" ? "100%" : width,
+        maxWidth: "100%",
         minWidth: 0,
         minHeight: 0,
         overflow: "hidden",
         backgroundColor: "var(--color-background-body)",
-        borderInlineEnd: "var(--border-width) solid var(--color-border)",
+        borderInlineStart: overlay ? undefined : "var(--border-width) solid var(--color-border)",
+        paddingBlockStart: overlay ? "env(safe-area-inset-top, 0px)" : undefined,
+        paddingBlockEnd: overlay ? "env(safe-area-inset-bottom, 0px)" : undefined,
       }}
     >
       <MacOsTitleBarSpacer />
@@ -554,6 +587,34 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                         activePreviewRequest && void loadPreview(activePreviewRequest, 0)
                       }
                     />
+                    {!overlay ? (
+                      <IconButton
+                        label={
+                          presentation === "fullscreen"
+                            ? t("workspaceFilePreview.restoreSidePanel")
+                            : t("workspaceFilePreview.maximize")
+                        }
+                        tooltip={
+                          presentation === "fullscreen"
+                            ? t("workspaceFilePreview.restoreSidePanel")
+                            : t("workspaceFilePreview.maximize")
+                        }
+                        icon={
+                          <Icon
+                            icon={presentation === "fullscreen" ? Minimize2 : Maximize2}
+                            size="sm"
+                            color="inherit"
+                          />
+                        }
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          onPresentationChange(
+                            presentation === "fullscreen" ? "side" : "fullscreen",
+                          )
+                        }
+                      />
+                    ) : null}
                     <IconButton
                       label={t("workspaceFilePreview.close")}
                       tooltip={t("workspaceFilePreview.close")}
@@ -565,17 +626,11 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                   </HStack>
                 }
               />
-              {canOpenEditor && activePreviewRequest ? (
+              {canShowSource ? (
                 <HStack width="100%" paddingInline={3}>
                   <TabList
-                    value="preview"
-                    onChange={(value) => {
-                      if (value !== "source") return;
-                      onOpenEditor({
-                        ...activePreviewRequest,
-                        path: activePath || activePreviewRequest.path,
-                      });
-                    }}
+                    value={activeTab}
+                    onChange={(value) => setActiveTab(value === "source" ? "source" : "preview")}
                     size="sm"
                     overflow="auto"
                   >
@@ -599,7 +654,19 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
             ) : null}
             <StackItem size="fill">
               <LayoutContent padding={0} className="xgent-workspace-file-preview-stage">
-                {preview ? (
+                {preview && activeTab === "source" && preview.text !== null ? (
+                  <VStack height="100%" minHeight={0} padding={3} isScrollable>
+                    <CodeBlock
+                      code={preview.text}
+                      language={previewLanguage(activePath, preview.kind)}
+                      title={basename(activePath)}
+                      hasCopyButton
+                      hasLineNumbers
+                      width="100%"
+                      container="section"
+                    />
+                  </VStack>
+                ) : preview ? (
                   <PreviewBody
                     preview={preview}
                     workdir={activePreviewRequest?.workdir ?? ""}

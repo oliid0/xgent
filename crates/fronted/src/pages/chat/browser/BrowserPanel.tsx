@@ -1,5 +1,6 @@
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -27,7 +28,16 @@ import {
   useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Globe, Lock, Plus, RefreshCw, X } from "../../../components/icons";
+import {
+  ArrowLeft,
+  Globe,
+  Lock,
+  Maximize2,
+  Minimize2,
+  Plus,
+  RefreshCw,
+  X,
+} from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import {
   browserSessionController,
@@ -113,7 +123,10 @@ function BrowserAddressBar(props: { compact: boolean }) {
     browserSessionController.getSnapshot,
   );
   const active = state.sessions.find((session) => session.sessionId === state.activeSessionId);
-  const busy = Boolean(active && state.busySessionIds.includes(active.sessionId));
+  const assistanceActive = state.humanAssistance?.sessionId === active?.sessionId;
+  const busy = Boolean(
+    active && state.busySessionIds.includes(active.sessionId) && !assistanceActive,
+  );
   const [value, setValue] = useState(active?.url ?? "");
   useEffect(() => setValue(active?.url ?? ""), [active?.url]);
 
@@ -267,7 +280,13 @@ function BrowserViewportSlot() {
   );
 }
 
-export function BrowserPanel() {
+export type BrowserPanelPresentation = "side" | "fullscreen";
+
+export function BrowserPanel(props: {
+  presentation: BrowserPanelPresentation;
+  width?: number | string;
+  onPresentationChange: (presentation: BrowserPanelPresentation) => void;
+}) {
   const { t } = useLocale();
   const compactViewport = useCompactViewport();
   const compact = compactViewport || isNativeMobileRuntime();
@@ -276,12 +295,16 @@ export function BrowserPanel() {
     browserSessionController.getSnapshot,
     browserSessionController.getSnapshot,
   );
+  const activeSession = state.sessions.find(
+    (session) => session.sessionId === state.activeSessionId,
+  );
+  const assistanceActive = state.humanAssistance?.sessionId === activeSession?.sessionId;
   useEffect(() => {
     if (state.panelOpen) void browserSessionController.initialize();
   }, [state.panelOpen]);
-  if (!state.panelOpen) return null;
+  if (!state.panelOpen || (compact && state.panelOpenSource !== "user")) return null;
 
-  return createPortal(
+  const panel = (
     <VStack
       as="section"
       width="100%"
@@ -290,13 +313,17 @@ export function BrowserPanel() {
       data-edge-swipe-ignore
       aria-label={t("browser.title")}
       style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: "var(--xgent-z-browser-overlay)",
+        position: compact ? "fixed" : "relative",
+        inset: compact ? 0 : undefined,
+        zIndex: compact ? "var(--xgent-z-browser-overlay)" : undefined,
         isolation: "isolate",
-        paddingBlockStart: "env(safe-area-inset-top, 0px)",
-        paddingBlockEnd: "env(safe-area-inset-bottom, 0px)",
+        flex: props.presentation === "fullscreen" ? "1 1 auto" : "0 0 auto",
+        width: props.presentation === "fullscreen" ? "100%" : props.width,
+        maxWidth: "100%",
+        paddingBlockStart: compact ? "env(safe-area-inset-top, 0px)" : undefined,
+        paddingBlockEnd: compact ? "env(safe-area-inset-bottom, 0px)" : undefined,
         backgroundColor: "var(--color-background-primary)",
+        borderInlineStart: compact ? undefined : "var(--border-width) solid var(--color-border)",
       }}
     >
       <Layout
@@ -314,22 +341,70 @@ export function BrowserPanel() {
                     <VStack gap={0}>
                       <Heading level={2}>{t("browser.title")}</Heading>
                       <Text type="supporting" color="secondary">
-                        {state.busySessionIds.length > 0
-                          ? t("browser.agentOperating")
-                          : t("browser.sharedSession")}
+                        {assistanceActive
+                          ? t("browser.assistanceActive")
+                          : state.busySessionIds.length > 0
+                            ? t("browser.agentOperating")
+                            : t("browser.sharedSession")}
                       </Text>
                     </VStack>
                   </HStack>
                 }
                 endContent={
-                  <IconButton
-                    label={t("browser.close")}
-                    tooltip={t("browser.close")}
-                    icon={<Icon icon={X} size="md" color="inherit" />}
-                    variant="secondary"
-                    size="lg"
-                    onClick={() => browserSessionController.closePanel()}
-                  />
+                  <HStack gap={1} vAlign="center">
+                    <Button
+                      label={
+                        assistanceActive ? t("browser.finishAssistance") : t("browser.takeOver")
+                      }
+                      variant={assistanceActive ? "primary" : "secondary"}
+                      size="sm"
+                      isDisabled={!activeSession}
+                      onClick={() => {
+                        if (!activeSession) return;
+                        if (assistanceActive) {
+                          browserSessionController.finishHumanAssistance(activeSession.sessionId);
+                        } else {
+                          browserSessionController.beginHumanAssistance(activeSession.sessionId);
+                        }
+                      }}
+                    />
+                    {!compact ? (
+                      <IconButton
+                        label={
+                          props.presentation === "fullscreen"
+                            ? t("browser.restoreSidePanel")
+                            : t("browser.maximize")
+                        }
+                        tooltip={
+                          props.presentation === "fullscreen"
+                            ? t("browser.restoreSidePanel")
+                            : t("browser.maximize")
+                        }
+                        icon={
+                          <Icon
+                            icon={props.presentation === "fullscreen" ? Minimize2 : Maximize2}
+                            size="sm"
+                            color="inherit"
+                          />
+                        }
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          props.onPresentationChange(
+                            props.presentation === "fullscreen" ? "side" : "fullscreen",
+                          )
+                        }
+                      />
+                    ) : null}
+                    <IconButton
+                      label={t("browser.close")}
+                      tooltip={t("browser.close")}
+                      icon={<Icon icon={X} size={compact ? "md" : "sm"} color="inherit" />}
+                      variant={compact ? "secondary" : "ghost"}
+                      size={compact ? "lg" : "sm"}
+                      onClick={() => browserSessionController.closePanel()}
+                    />
+                  </HStack>
                 }
               />
               <BrowserTabs compact={compact} />
@@ -358,7 +433,8 @@ export function BrowserPanel() {
           </LayoutContent>
         }
       />
-    </VStack>,
-    document.body,
+    </VStack>
   );
+
+  return compact ? createPortal(panel, document.body) : panel;
 }

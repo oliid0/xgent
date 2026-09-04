@@ -52,7 +52,10 @@ import {
 import type { WorkspaceCodeEditorOpenRequest } from "../components/workspace-editor/WorkspaceCodeEditorOverlay";
 import type { WorkspaceFilePreviewOpenRequest } from "../components/workspace-editor/WorkspaceFilePreviewOverlay";
 import type { WorkspaceSshTerminalOpenRequest } from "../components/workspace-editor/WorkspaceSshTerminalOverlay";
-import { isWorkspacePreviewPath } from "../components/workspace-editor/workspaceImagePreview";
+import {
+  getWorkspacePreviewKind,
+  isWorkspacePreviewPath,
+} from "../components/workspace-editor/workspaceImagePreview";
 import { WorkspaceNavigationRail } from "../components/workspace-tools/WorkspaceNavigationRail";
 import { WorkspaceSidePanel } from "../components/workspace-tools/WorkspaceSidePanel";
 import { useLocale } from "../i18n";
@@ -93,6 +96,7 @@ import {
 import { memoryExtraction } from "../lib/chat/memory/extractionController";
 import type { MemoryExtractionStatusKey } from "../lib/chat/memory/extractionEngine";
 import { memoryTurnInjection } from "../lib/chat/memory/injectionController";
+import { collectChangedFiles } from "../lib/chat/messages/changedFiles";
 import { normalizeLogicalLineEndings } from "../lib/chat/messages/composerText";
 import {
   type CodeMentionReference,
@@ -709,6 +713,12 @@ export function ChatPage(props: ChatPageProps) {
     maxSizePx: 820,
     autoSaveId: "xgent-split-conversation-width",
   });
+  const auxiliaryPanelResize = useResizable({
+    defaultSize: 520,
+    minSizePx: 380,
+    maxSizePx: 900,
+    autoSaveId: "xgent-chat-auxiliary-panel-width",
+  });
   const initialConversationRef = useRef(createConversationIdentity());
   const initialConversationStateRef = useRef(createConversationStateFromContext(context));
 
@@ -896,6 +906,17 @@ export function ChatPage(props: ChatPageProps) {
   const [workspaceFilePreviewOpenRequest, setWorkspaceFilePreviewOpenRequest] =
     useState<WorkspaceFilePreviewOpenRequest | null>(null);
   const workspaceFilePreviewRequestIdRef = useRef(0);
+  const [workspaceFilePreviewPresentation, setWorkspaceFilePreviewPresentation] = useState<
+    "side" | "fullscreen"
+  >("side");
+  const [browserPanelPresentation, setBrowserPanelPresentation] = useState<"side" | "fullscreen">(
+    "side",
+  );
+  const browserPanelState = useSyncExternalStore(
+    browserSessionController.subscribe,
+    browserSessionController.getSnapshot,
+    browserSessionController.getSnapshot,
+  );
   const [workspaceSshTerminalMounted, setWorkspaceSshTerminalMounted] = useState(false);
   const [workspaceSshTerminalOpen, setWorkspaceSshTerminalOpen] = useState(false);
   const [workspaceSshTerminalOpenRequest, setWorkspaceSshTerminalOpenRequest] =
@@ -1537,10 +1558,10 @@ export function ChatPage(props: ChatPageProps) {
     isConversationRunning(currentConversationId) ||
     (!isDraftConversation && historyRenderItems.length > 0);
   useEffect(() => {
-    if (!canShowTrajectory && chatSurface === "trajectory") {
+    if ((mobileExperience || !canShowTrajectory) && chatSurface === "trajectory") {
       setChatSurface("conversation");
     }
-  }, [canShowTrajectory, chatSurface]);
+  }, [canShowTrajectory, chatSurface, mobileExperience]);
   useSyncExternalStore(subscribeToolApprovals, getToolApprovalVersion, getToolApprovalVersion);
   const pendingToolApprovals = listPendingToolApprovalsForConversation(currentConversationId);
   const currentConversationPersistedCwd =
@@ -1780,7 +1801,9 @@ export function ChatPage(props: ChatPageProps) {
   const openWorkspaceFilePreview = useCallback(
     (request: Omit<WorkspaceFilePreviewOpenRequest, "id">) => {
       hideWorkspaceSshTerminalOverlay();
+      browserSessionController.closePanel();
       setWorkspaceEditorOpen(false);
+      setWorkspaceFilePreviewPresentation("side");
       workspaceFilePreviewRequestIdRef.current += 1;
       setWorkspaceFilePreviewMounted(true);
       setWorkspaceFilePreviewOpen(true);
@@ -1791,6 +1814,54 @@ export function ChatPage(props: ChatPageProps) {
     },
     [hideWorkspaceSshTerminalOverlay],
   );
+  useEffect(() => {
+    if (!browserPanelState.panelOpen) return;
+    hideWorkspaceSshTerminalOverlay();
+    setWorkspaceEditorOpen(false);
+    setWorkspaceFilePreviewOpen(false);
+    setWorkspaceFilePreviewMounted(false);
+    setWorkspaceFilePreviewOpenRequest(null);
+    setBrowserPanelPresentation("side");
+  }, [browserPanelState.panelOpen, hideWorkspaceSshTerminalOverlay]);
+  const autoPreviewBaselineReplyRef = useRef<string | null>(null);
+  const autoPreviewArmedRef = useRef(false);
+  useEffect(() => {
+    if (mobileExperience) {
+      autoPreviewArmedRef.current = false;
+      autoPreviewBaselineReplyRef.current = null;
+      return;
+    }
+    const latestAssistant = [...historyRenderItems]
+      .reverse()
+      .find((item) => item.kind === "assistant");
+    if (isSending) {
+      if (!autoPreviewArmedRef.current) {
+        autoPreviewBaselineReplyRef.current = latestAssistant?.key ?? null;
+        autoPreviewArmedRef.current = true;
+      }
+      return;
+    }
+    if (!autoPreviewArmedRef.current || !latestAssistant) return;
+    if (latestAssistant.key === autoPreviewBaselineReplyRef.current) return;
+    autoPreviewArmedRef.current = false;
+    const changedFiles = collectChangedFiles(latestAssistant.rounds);
+    const htmlFile = [...(changedFiles?.files ?? [])]
+      .reverse()
+      .find((file) => !file.deleted && getWorkspacePreviewKind(file.path) === "html");
+    if (!htmlFile || !displayedConversationWorkdir) return;
+    openWorkspaceFilePreview({
+      projectPathKey:
+        workspaceProjectPathKey(displayedConversationWorkdir) || displayedConversationWorkdir,
+      workdir: displayedConversationWorkdir,
+      path: htmlFile.path,
+    });
+  }, [
+    displayedConversationWorkdir,
+    historyRenderItems,
+    isSending,
+    mobileExperience,
+    openWorkspaceFilePreview,
+  ]);
   useEffect(() => {
     if (!nativeMobile) return;
     return subscribeMobilePreviewRequests((request) => {
@@ -1804,10 +1875,12 @@ export function ChatPage(props: ChatPageProps) {
   }, [nativeMobile, openWorkspaceFilePreview]);
   const handleOpenWorkspaceFile = useCallback(
     (path: string, imagePaths?: string[]) => {
-      if (!terminalProjectPath || !terminalProjectPathKey) return;
+      const workdir = displayedConversationWorkdir || terminalProjectPath;
+      const projectPathKey = workspaceProjectPathKey(workdir);
+      if (!workdir || !projectPathKey) return;
       const request = {
-        projectPathKey: terminalProjectPathKey,
-        workdir: terminalProjectPath,
+        projectPathKey,
+        workdir,
         path,
         imagePaths,
       };
@@ -1820,8 +1893,8 @@ export function ChatPage(props: ChatPageProps) {
     [
       openWorkspaceEditorFile,
       openWorkspaceFilePreview,
+      displayedConversationWorkdir,
       terminalProjectPath,
-      terminalProjectPathKey,
     ],
   );
   const handleOpenMobileWorkspaceFile = useCallback(
@@ -2138,8 +2211,6 @@ export function ChatPage(props: ChatPageProps) {
     getPendingUploadsForConversation,
     setPendingUploadsForConversation,
     pickReadableFiles,
-    pickReadablePhotos,
-    captureReadablePhoto,
     importReadableFilePaths,
     importReadableFiles,
     removePendingUpload,
@@ -4835,10 +4906,16 @@ export function ChatPage(props: ChatPageProps) {
   }, []);
 
   const handleOpenBrowser = useCallback(() => {
-    setSidebarOpen(false);
+    if (mobileExperience) setSidebarOpen(false);
+    hideWorkspaceSshTerminalOverlay();
     setMobileWorkspaceDestination(null);
-    browserSessionController.openPanel();
-  }, []);
+    setWorkspaceEditorOpen(false);
+    setWorkspaceFilePreviewOpen(false);
+    setWorkspaceFilePreviewMounted(false);
+    setWorkspaceFilePreviewOpenRequest(null);
+    setBrowserPanelPresentation("side");
+    browserSessionController.openPanel(undefined, "user");
+  }, [hideWorkspaceSshTerminalOverlay, mobileExperience]);
 
   useEffect(() => {
     browserSessionController.configure({
@@ -5663,8 +5740,6 @@ export function ChatPage(props: ChatPageProps) {
         setSettings((previous) => updateSystem(previous, { commandSafetyMode }))
       }
       onPickReadableFiles={pickReadableFiles}
-      onPickReadablePhotos={pickReadablePhotos}
-      onCaptureReadablePhoto={captureReadablePhoto}
       onPasteFiles={importReadableFiles}
       loadHistoryPrompts={loadComposerHistoryPrompts}
       pendingUploadedFiles={pendingUploadedFiles}
@@ -5678,6 +5753,14 @@ export function ChatPage(props: ChatPageProps) {
       mobileExperience={mobileExperience}
     />
   );
+
+  const desktopBrowserPanelOpen = !mobileExperience && browserPanelState.panelOpen;
+  const desktopFilePreviewOpen =
+    !mobileExperience && workspaceFilePreviewMounted && !browserPanelState.panelOpen;
+  const desktopAuxiliaryOpen = desktopBrowserPanelOpen || desktopFilePreviewOpen;
+  const desktopAuxiliaryFullscreen =
+    (desktopBrowserPanelOpen && browserPanelPresentation === "fullscreen") ||
+    (desktopFilePreviewOpen && workspaceFilePreviewPresentation === "fullscreen");
 
   return (
     <HStack height="100%" width="100%" gap={0} style={{ position: "relative", overflow: "hidden" }}>
@@ -5939,306 +6022,303 @@ export function ChatPage(props: ChatPageProps) {
         }
       >
         <HStack height="100%" width="100%" gap={0}>
-          <VStack height="100%" gap={0} style={{ flex: 1, minWidth: 0 }}>
-            {activeView === "skills-hub" ? (
-              <SkillsHubPage
-                settings={settings}
-                setSettings={setSettings}
-                initialSkills={availableSkills}
-                initialRootDir={skillsRootDir}
-                isAgentMode={isAgentMode}
-                sidebarOpen={sidebarOpen}
-                onOpenSidebar={handleOpenSidebar}
-                onClose={
-                  mobileExperience
-                    ? () => {
-                        setActiveView("chat");
-                        setSidebarOpen(false);
+          {!desktopAuxiliaryFullscreen ? (
+            <VStack height="100%" gap={0} style={{ flex: 1, minWidth: 0 }}>
+              {activeView === "skills-hub" ? (
+                <SkillsHubPage
+                  settings={settings}
+                  setSettings={setSettings}
+                  initialSkills={availableSkills}
+                  initialRootDir={skillsRootDir}
+                  isAgentMode={isAgentMode}
+                  sidebarOpen={sidebarOpen}
+                  onOpenSidebar={handleOpenSidebar}
+                  onClose={
+                    mobileExperience
+                      ? () => {
+                          setActiveView("chat");
+                          setSidebarOpen(false);
+                        }
+                      : undefined
+                  }
+                />
+              ) : activeView === "mcp-hub" ? (
+                <McpHubPage
+                  settings={settings}
+                  setSettings={setSettings}
+                  isAgentMode={isAgentMode}
+                  sidebarOpen={sidebarOpen}
+                  onOpenSidebar={handleOpenSidebar}
+                  onClose={
+                    mobileExperience
+                      ? () => {
+                          setActiveView("chat");
+                          setSidebarOpen(false);
+                        }
+                      : undefined
+                  }
+                  allowStdio={!nativeMobile || lanPcCommandHostReady}
+                />
+              ) : (
+                <>
+                  <AstryxStack direction="vertical" className="relative z-20">
+                    <ChatHeader
+                      settings={settings}
+                      onSelectExecutionMode={(mode) =>
+                        setSettings((prev) =>
+                          prev.system.executionMode === mode
+                            ? prev
+                            : updateSystem(prev, { executionMode: mode }),
+                        )
                       }
-                    : undefined
-                }
-              />
-            ) : activeView === "mcp-hub" ? (
-              <McpHubPage
-                settings={settings}
-                setSettings={setSettings}
-                isAgentMode={isAgentMode}
-                sidebarOpen={sidebarOpen}
-                onOpenSidebar={handleOpenSidebar}
-                onClose={
-                  mobileExperience
-                    ? () => {
-                        setActiveView("chat");
-                        setSidebarOpen(false);
+                      sidebarOpen={sidebarOpen}
+                      onToggleTheme={onToggleTheme}
+                      onOpenSidebar={handleOpenSidebar}
+                      showExecutionMode={
+                        !(
+                          sidebarOpen &&
+                          (mobileExperience || desktopNavigationTarget === "conversations")
+                        )
                       }
-                    : undefined
-                }
-                allowStdio={!nativeMobile || lanPcCommandHostReady}
-              />
-            ) : (
-              <>
-                <AstryxStack direction="vertical" className="relative z-20">
-                  <ChatHeader
-                    settings={settings}
-                    onSelectExecutionMode={(mode) =>
-                      setSettings((prev) =>
-                        prev.system.executionMode === mode
-                          ? prev
-                          : updateSystem(prev, { executionMode: mode }),
-                      )
-                    }
-                    sidebarOpen={sidebarOpen}
-                    onToggleTheme={onToggleTheme}
-                    onOpenSidebar={handleOpenSidebar}
-                    showExecutionMode={
-                      !(
-                        sidebarOpen &&
-                        (mobileExperience || desktopNavigationTarget === "conversations")
-                      )
-                    }
-                    mobileExperience={mobileExperience}
-                    preThemeActions={
-                      canShowTrajectory ? (
-                        <ToggleButton
-                          label={
-                            chatSurface === "trajectory"
-                              ? t("chat.trajectory.backToChat")
-                              : t("chat.trajectory.open")
-                          }
-                          tooltip={
-                            chatSurface === "trajectory"
-                              ? t("chat.trajectory.backToChat")
-                              : t("chat.trajectory.open")
-                          }
-                          isIconOnly
-                          size="sm"
-                          isPressed={chatSurface === "trajectory"}
-                          icon={<Activity className="h-4 w-4" />}
-                          pressedIcon={<MessageSquare className="h-4 w-4" />}
-                          onPressedChange={(isPressed) =>
-                            setChatSurface(isPressed ? "trajectory" : "conversation")
-                          }
-                        />
-                      ) : null
-                    }
-                    trailingActions={
-                      mobileExperience ? (
-                        <>
-                          <MobileQuickActions
-                            trajectoryOpen={chatSurface === "trajectory"}
-                            onToggleTrajectory={
-                              canShowTrajectory
-                                ? () =>
-                                    setChatSurface((current) =>
-                                      current === "trajectory" ? "conversation" : "trajectory",
-                                    )
-                                : undefined
+                      mobileExperience={mobileExperience}
+                      preThemeActions={
+                        !mobileExperience && canShowTrajectory ? (
+                          <ToggleButton
+                            label={
+                              chatSurface === "trajectory"
+                                ? t("chat.trajectory.backToChat")
+                                : t("chat.trajectory.open")
                             }
-                            onOpenTerminal={() => handleOpenWorkspaceTool("terminal")}
-                            onOpenRootfs={() => {
-                              setSidebarOpen(false);
-                              setMobileWorkspaceDestination(null);
-                              onOpenSettings(nativeMobile ? "mobileExecution" : "system");
-                            }}
-                            onOpenBrowser={handleOpenBrowser}
-                            onOpenBrowserSettings={() => {
-                              setSidebarOpen(false);
-                              setMobileWorkspaceDestination({ kind: "browser-settings" });
-                            }}
-                            onOpenGitReview={() => handleOpenWorkspaceTool("gitReview")}
-                            onOpenSsh={() => handleOpenWorkspaceTool("sshConnection")}
-                            onOpenBackgroundTasks={() => handleOpenWorkspaceTool("backgroundTasks")}
+                            tooltip={
+                              chatSurface === "trajectory"
+                                ? t("chat.trajectory.backToChat")
+                                : t("chat.trajectory.open")
+                            }
+                            isIconOnly
+                            size="sm"
+                            isPressed={chatSurface === "trajectory"}
+                            icon={<Activity className="h-4 w-4" />}
+                            pressedIcon={<MessageSquare className="h-4 w-4" />}
+                            onPressedChange={(isPressed) =>
+                              setChatSurface(isPressed ? "trajectory" : "conversation")
+                            }
                           />
-                        </>
-                      ) : (
-                        <IconButton
-                          label={t("browser.open")}
-                          icon={<Icon icon={Globe} size="sm" color="inherit" />}
-                          variant="ghost"
-                          size="md"
-                          onClick={handleOpenBrowser}
-                          tooltip={t("browser.open")}
-                        />
-                      )
-                    }
-                  />
-                  <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
-                </AstryxStack>
-
-                {chatSurface === "trajectory" ? (
-                  <ConversationTrajectorySurface conversationId={currentConversationId} />
-                ) : (
-                  <DesktopCheckpointRewindProvider
-                    conversationId={currentConversationId}
-                    workspaceRoot={currentConversationWorkspaceRoot}
-                    project={
-                      workspaceProjects.find(
-                        (project) =>
-                          currentConversationWorkspaceRoot &&
-                          workspaceProjectPathKey(project.path) ===
-                            workspaceProjectPathKey(currentConversationWorkspaceRoot),
-                      ) ?? null
-                    }
-                    disabled={
-                      !desktopCommandHostAvailable ||
-                      !isAgentMode ||
-                      isSending ||
-                      isConversationRunning(currentConversationId)
-                    }
-                    onRewound={(info) => {
-                      const changed = info.result.restoredFiles + info.result.deletedFiles;
-                      const failed = info.result.conflicts.length + info.result.failed.length;
-                      addNotify(
-                        failed > 0 ? "warning" : "success",
-                        t("chat.checkpointRewind.done")
-                          .replace("{changed}", String(changed))
-                          .replace("{failed}", String(failed)),
-                      );
-                    }}
-                  >
-                    <ChangedFilesActionsProvider value={changedFilesActions}>
-                      <ChatTranscript
-                        conversationId={currentConversationId}
-                        workspaceRoot={currentConversationWorkspaceRoot}
-                        gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
-                        followRef={scrollFollowRef}
-                        hasModels={hasModels}
-                        historyItems={historyRenderItems}
-                        hasMoreHistory={conversationState.transcript.hasMoreBefore}
-                        onLoadEarlierHistory={handleLoadEarlierHistory}
-                        isHistorySwitching={conversationOpenState.showOverlay}
-                        isSending={isSending}
-                        isAgentMode={isAgentMode}
-                        showUsage={isAgentDevExecutionMode}
-                        usageContextWindow={currentModelContextWindow}
-                        liveTranscriptStore={liveTranscriptStore}
-                        isCompactionRunning={isCompactionRunning}
-                        bottomReservePx={0}
-                        onOpenFileLink={
-                          desktopCommandHostAvailable ? handleOpenChatFileLink : undefined
-                        }
-                        onResendFromEdit={handleResendFromEdit}
-                        onBranchConversation={
-                          isConversationHydrating || isConversationHydrationFailed
-                            ? undefined
-                            : handleBranchConversation
-                        }
-                        branchPendingMessageId={branchPendingMessageId}
-                        onOpenSettings={onOpenSettings}
-                        onSuggestionSelect={handleEmptyStateSuggestion}
-                        suggestionsDisabled={isSuggestionTyping}
-                        mobileExperience={mobileExperience}
-                        emptyStateComposer={
-                          shouldEmbedComposerInLanding ? renderChatComposer() : undefined
-                        }
-                      />
-                    </ChangedFilesActionsProvider>
-                  </DesktopCheckpointRewindProvider>
-                )}
-
-                {mobileExperience && chatSurface === "conversation" ? (
-                  <MobileToolActivity
-                    store={liveTranscriptStore}
-                    open={mobileActivityOpen}
-                    onOpen={handleOpenMobileActivity}
-                    onOpenBrowser={handleOpenBrowser}
-                    onOpenTerminal={() => handleOpenMobileTerminal("terminal")}
-                    onClose={handleCloseMobileActivity}
-                    bottomOffsetPx={composerOverlayHeight}
-                  />
-                ) : null}
-
-                {chatSurface === "conversation" ? (
-                  <CurrentTaskProgress
-                    historyItems={historyRenderItems}
-                    liveTranscriptStore={liveTranscriptStore}
-                    isConversationRunning={
-                      isSending ||
-                      (currentConversationId ? isConversationRunning(currentConversationId) : false)
-                    }
-                    persistedState={conversationState.meta.taskList}
-                  />
-                ) : null}
-
-                {chatSurface === "conversation" && pendingToolApprovals.length > 0 ? (
-                  <ToolApprovalBar
-                    pending={pendingToolApprovals}
-                    onDecide={(toolCallId, decision) =>
-                      Promise.resolve(
-                        answerToolApproval(toolCallId, decision, {
-                          conversationId: currentConversationId,
-                        }),
-                      )
-                    }
-                    onDecideAll={async (decision) => {
-                      for (const item of pendingToolApprovals) {
-                        answerToolApproval(item.toolCallId, decision, {
-                          conversationId: currentConversationId,
-                        });
+                        ) : null
                       }
-                    }}
-                  />
-                ) : null}
-
-                {chatSurface === "conversation" && !shouldEmbedComposerInLanding
-                  ? renderChatComposer()
-                  : null}
-                {chatSurface === "conversation" && isFileDropActive ? (
-                  <Overlay
-                    isOpen
-                    showOn="always"
-                    scrim={canDropUpload ? "light" : "dark"}
-                    position="fill"
-                    align="center"
-                    className="file-drop-overlay"
-                    aria-hidden="true"
-                    content={
-                      <Section
-                        variant={canDropUpload ? "section" : "muted"}
-                        width="fit-content"
-                        maxWidth="calc(100% - var(--spacing-8))"
-                        padding={6}
-                      >
-                        <VStack gap={3} hAlign="center">
-                          <Icon
-                            icon={canDropUpload ? Upload : Ban}
-                            size="lg"
-                            color={canDropUpload ? "primary" : "error"}
-                          />
-                          <VStack gap={1} hAlign="center">
-                            <Text type="large" justify="center">
-                              {fileDropTitle}
-                            </Text>
-                            <Text
-                              type="supporting"
-                              color="secondary"
-                              justify="center"
-                              textWrap="balance"
-                            >
-                              {fileDropDescription}
-                            </Text>
-                          </VStack>
-                          <HStack gap={1} vAlign="center">
-                            <StatusDot
-                              variant={canDropUpload ? "accent" : "error"}
-                              label={fileDropLimitHint}
-                              isPulsing={canDropUpload}
+                      trailingActions={
+                        mobileExperience ? (
+                          <>
+                            <MobileQuickActions
+                              onOpenTerminal={() => handleOpenWorkspaceTool("terminal")}
+                              onOpenRootfs={() => {
+                                setSidebarOpen(false);
+                                setMobileWorkspaceDestination(null);
+                                onOpenSettings(nativeMobile ? "mobileExecution" : "system");
+                              }}
+                              onOpenBrowser={handleOpenBrowser}
+                              onOpenBrowserSettings={() => {
+                                setSidebarOpen(false);
+                                setMobileWorkspaceDestination({ kind: "browser-settings" });
+                              }}
+                              onOpenGitReview={() => handleOpenWorkspaceTool("gitReview")}
+                              onOpenSsh={() => handleOpenWorkspaceTool("sshConnection")}
+                              onOpenBackgroundTasks={() =>
+                                handleOpenWorkspaceTool("backgroundTasks")
+                              }
                             />
-                            <Text type="supporting" color="secondary">
-                              {fileDropLimitHint}
-                            </Text>
-                          </HStack>
-                        </VStack>
-                      </Section>
-                    }
-                  >
-                    <VStack width="100%" height="100%" />
-                  </Overlay>
-                ) : null}
-              </>
-            )}
-          </VStack>
-          {!mobileExperience && splitConversationId ? (
+                          </>
+                        ) : (
+                          <IconButton
+                            label={t("browser.open")}
+                            icon={<Icon icon={Globe} size="sm" color="inherit" />}
+                            variant="ghost"
+                            size="md"
+                            onClick={handleOpenBrowser}
+                            tooltip={t("browser.open")}
+                          />
+                        )
+                      }
+                    />
+                    <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
+                  </AstryxStack>
+
+                  {chatSurface === "trajectory" ? (
+                    <ConversationTrajectorySurface conversationId={currentConversationId} />
+                  ) : (
+                    <DesktopCheckpointRewindProvider
+                      conversationId={currentConversationId}
+                      workspaceRoot={currentConversationWorkspaceRoot}
+                      project={
+                        workspaceProjects.find(
+                          (project) =>
+                            currentConversationWorkspaceRoot &&
+                            workspaceProjectPathKey(project.path) ===
+                              workspaceProjectPathKey(currentConversationWorkspaceRoot),
+                        ) ?? null
+                      }
+                      disabled={
+                        !desktopCommandHostAvailable ||
+                        !isAgentMode ||
+                        isSending ||
+                        isConversationRunning(currentConversationId)
+                      }
+                      onRewound={(info) => {
+                        const changed = info.result.restoredFiles + info.result.deletedFiles;
+                        const failed = info.result.conflicts.length + info.result.failed.length;
+                        addNotify(
+                          failed > 0 ? "warning" : "success",
+                          t("chat.checkpointRewind.done")
+                            .replace("{changed}", String(changed))
+                            .replace("{failed}", String(failed)),
+                        );
+                      }}
+                    >
+                      <ChangedFilesActionsProvider value={changedFilesActions}>
+                        <ChatTranscript
+                          conversationId={currentConversationId}
+                          workspaceRoot={currentConversationWorkspaceRoot}
+                          gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
+                          followRef={scrollFollowRef}
+                          hasModels={hasModels}
+                          historyItems={historyRenderItems}
+                          hasMoreHistory={conversationState.transcript.hasMoreBefore}
+                          onLoadEarlierHistory={handleLoadEarlierHistory}
+                          isHistorySwitching={conversationOpenState.showOverlay}
+                          isSending={isSending}
+                          isAgentMode={isAgentMode}
+                          showUsage={isAgentDevExecutionMode}
+                          usageContextWindow={currentModelContextWindow}
+                          liveTranscriptStore={liveTranscriptStore}
+                          isCompactionRunning={isCompactionRunning}
+                          bottomReservePx={0}
+                          onOpenFileLink={
+                            desktopCommandHostAvailable ? handleOpenChatFileLink : undefined
+                          }
+                          onResendFromEdit={handleResendFromEdit}
+                          onBranchConversation={
+                            isConversationHydrating || isConversationHydrationFailed
+                              ? undefined
+                              : handleBranchConversation
+                          }
+                          branchPendingMessageId={branchPendingMessageId}
+                          onOpenSettings={onOpenSettings}
+                          onSuggestionSelect={handleEmptyStateSuggestion}
+                          suggestionsDisabled={isSuggestionTyping}
+                          mobileExperience={mobileExperience}
+                          emptyStateComposer={
+                            shouldEmbedComposerInLanding ? renderChatComposer() : undefined
+                          }
+                        />
+                      </ChangedFilesActionsProvider>
+                    </DesktopCheckpointRewindProvider>
+                  )}
+
+                  {mobileExperience && chatSurface === "conversation" ? (
+                    <MobileToolActivity
+                      store={liveTranscriptStore}
+                      open={mobileActivityOpen}
+                      onOpen={handleOpenMobileActivity}
+                      onOpenBrowser={handleOpenBrowser}
+                      onOpenTerminal={() => handleOpenMobileTerminal("terminal")}
+                      onClose={handleCloseMobileActivity}
+                      bottomOffsetPx={composerOverlayHeight}
+                    />
+                  ) : null}
+
+                  {chatSurface === "conversation" ? (
+                    <CurrentTaskProgress
+                      historyItems={historyRenderItems}
+                      liveTranscriptStore={liveTranscriptStore}
+                      isConversationRunning={
+                        isSending ||
+                        (currentConversationId
+                          ? isConversationRunning(currentConversationId)
+                          : false)
+                      }
+                      persistedState={conversationState.meta.taskList}
+                    />
+                  ) : null}
+
+                  {chatSurface === "conversation" && pendingToolApprovals.length > 0 ? (
+                    <ToolApprovalBar
+                      pending={pendingToolApprovals}
+                      onDecide={(toolCallId, decision) =>
+                        Promise.resolve(
+                          answerToolApproval(toolCallId, decision, {
+                            conversationId: currentConversationId,
+                          }),
+                        )
+                      }
+                      onDecideAll={async (decision) => {
+                        for (const item of pendingToolApprovals) {
+                          answerToolApproval(item.toolCallId, decision, {
+                            conversationId: currentConversationId,
+                          });
+                        }
+                      }}
+                    />
+                  ) : null}
+
+                  {chatSurface === "conversation" && !shouldEmbedComposerInLanding
+                    ? renderChatComposer()
+                    : null}
+                  {chatSurface === "conversation" && isFileDropActive ? (
+                    <Overlay
+                      isOpen
+                      showOn="always"
+                      scrim={canDropUpload ? "light" : "dark"}
+                      position="fill"
+                      align="center"
+                      className="file-drop-overlay"
+                      aria-hidden="true"
+                      content={
+                        <Section
+                          variant={canDropUpload ? "section" : "muted"}
+                          width="fit-content"
+                          maxWidth="calc(100% - var(--spacing-8))"
+                          padding={6}
+                        >
+                          <VStack gap={3} hAlign="center">
+                            <Icon
+                              icon={canDropUpload ? Upload : Ban}
+                              size="lg"
+                              color={canDropUpload ? "primary" : "error"}
+                            />
+                            <VStack gap={1} hAlign="center">
+                              <Text type="large" justify="center">
+                                {fileDropTitle}
+                              </Text>
+                              <Text
+                                type="supporting"
+                                color="secondary"
+                                justify="center"
+                                textWrap="balance"
+                              >
+                                {fileDropDescription}
+                              </Text>
+                            </VStack>
+                            <HStack gap={1} vAlign="center">
+                              <StatusDot
+                                variant={canDropUpload ? "accent" : "error"}
+                                label={fileDropLimitHint}
+                                isPulsing={canDropUpload}
+                              />
+                              <Text type="supporting" color="secondary">
+                                {fileDropLimitHint}
+                              </Text>
+                            </HStack>
+                          </VStack>
+                        </Section>
+                      }
+                    >
+                      <VStack width="100%" height="100%" />
+                    </Overlay>
+                  ) : null}
+                </>
+              )}
+            </VStack>
+          ) : null}
+          {!mobileExperience && splitConversationId && !desktopAuxiliaryOpen ? (
             <>
               <ResizeHandle
                 direction="horizontal"
@@ -6264,10 +6344,69 @@ export function ChatPage(props: ChatPageProps) {
               />
             </>
           ) : null}
+          {!mobileExperience && desktopAuxiliaryOpen && !desktopAuxiliaryFullscreen ? (
+            <ResizeHandle
+              direction="horizontal"
+              isReversed
+              hasDivider
+              pillPlacement="center"
+              resizable={auxiliaryPanelResize.props}
+              label={t("chat.resizeAuxiliaryPanel")}
+            />
+          ) : null}
+          {desktopBrowserPanelOpen ? (
+            <BrowserPanel
+              presentation={browserPanelPresentation}
+              width={auxiliaryPanelResize.size}
+              onPresentationChange={setBrowserPanelPresentation}
+            />
+          ) : null}
+          {workspaceFilePreviewMounted && !browserPanelState.panelOpen ? (
+            <Suspense
+              fallback={
+                <AstryxStack
+                  direction="vertical"
+                  className={cn(
+                    "flex min-h-0 flex-col border-l border-border bg-background text-sm text-muted-foreground",
+                    mobileExperience && "absolute inset-0 z-50",
+                  )}
+                  style={
+                    mobileExperience || workspaceFilePreviewPresentation === "fullscreen"
+                      ? { width: "100%" }
+                      : { width: auxiliaryPanelResize.size }
+                  }
+                >
+                  <MacOsTitleBarSpacer className="bg-muted/45" />
+                  <AstryxStack
+                    direction="horizontal"
+                    className="flex min-h-0 flex-1 items-center justify-center"
+                  >
+                    {t("workspaceFilePreview.loading")}
+                  </AstryxStack>
+                </AstryxStack>
+              }
+            >
+              <WorkspaceFilePreviewOverlay
+                openRequest={workspaceFilePreviewOpenRequest}
+                isOpen={workspaceFilePreviewOpen}
+                presentation={mobileExperience ? "fullscreen" : workspaceFilePreviewPresentation}
+                width={auxiliaryPanelResize.size}
+                overlay={mobileExperience}
+                onPresentationChange={setWorkspaceFilePreviewPresentation}
+                onRequestClose={requestWorkspaceFilePreviewClose}
+                onClose={handleWorkspaceFilePreviewClosed}
+              />
+            </Suspense>
+          ) : null}
         </HStack>
       </StackItem>
 
-      <BrowserPanel />
+      {mobileExperience ? (
+        <BrowserPanel
+          presentation="fullscreen"
+          onPresentationChange={setBrowserPanelPresentation}
+        />
+      ) : null}
       {mobileExperience ? (
         <MobileBackgroundTasksPanel
           open={mobileWorkspaceDestination?.kind === "background-tasks"}
@@ -6394,32 +6533,6 @@ export function ChatPage(props: ChatPageProps) {
               setWorkspaceEditorOpenRequest(null);
               setWorkspaceEditorCloseRequestId(0);
             }}
-          />
-        </Suspense>
-      ) : null}
-      {workspaceFilePreviewMounted ? (
-        <Suspense
-          fallback={
-            <AstryxStack
-              direction="vertical"
-              className="absolute inset-0 z-50 flex min-h-0 flex-col border-r border-border bg-background text-sm text-muted-foreground shadow-2xl"
-            >
-              <MacOsTitleBarSpacer className="bg-muted/45" />
-              <AstryxStack
-                direction="horizontal"
-                className="flex min-h-0 flex-1 items-center justify-center"
-              >
-                {t("workspaceFilePreview.loading")}
-              </AstryxStack>
-            </AstryxStack>
-          }
-        >
-          <WorkspaceFilePreviewOverlay
-            openRequest={workspaceFilePreviewOpenRequest}
-            isOpen={workspaceFilePreviewOpen}
-            onOpenEditor={(request) => openWorkspaceEditorFile(request)}
-            onRequestClose={requestWorkspaceFilePreviewClose}
-            onClose={handleWorkspaceFilePreviewClosed}
           />
         </Suspense>
       ) : null}

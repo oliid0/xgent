@@ -148,17 +148,17 @@ export const xgentCompactTheme = defineTheme({
     "--size-element-sm": "40px",
     "--size-element-md": "44px",
     "--size-element-lg": "56px",
-    "--radius-inner": "12px",
-    "--radius-element": "16px",
-    "--radius-container": "30px",
-    "--radius-page": "36px",
-    "--radius-chat": "34px",
+    "--radius-inner": "8px",
+    "--radius-element": "12px",
+    "--radius-container": "20px",
+    "--radius-page": "28px",
+    "--radius-chat": "28px",
     "--shadow-low":
-      "0 1px 2px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 24%)), 0 10px 28px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 34%))",
+      "0 1px 2px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 22%)), 0 4px 12px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 30%))",
     "--shadow-med":
-      "0 4px 12px light-dark(rgb(0 0 0 / 9%), rgb(0 0 0 / 30%)), 0 20px 48px light-dark(rgb(0 0 0 / 12%), rgb(0 0 0 / 46%))",
+      "0 2px 6px light-dark(rgb(0 0 0 / 7%), rgb(0 0 0 / 28%)), 0 10px 28px light-dark(rgb(0 0 0 / 9%), rgb(0 0 0 / 42%))",
     "--shadow-high":
-      "0 10px 28px light-dark(rgb(0 0 0 / 12%), rgb(0 0 0 / 42%)), 0 28px 72px light-dark(rgb(0 0 0 / 14%), rgb(0 0 0 / 58%))",
+      "0 8px 24px light-dark(rgb(0 0 0 / 10%), rgb(0 0 0 / 38%)), 0 24px 64px light-dark(rgb(0 0 0 / 10%), rgb(0 0 0 / 55%))",
   },
   components: {
     button: {
@@ -219,10 +219,10 @@ export const xgentCompactTheme = defineTheme({
     },
     "chat-composer": {
       base: {
-        minHeight: "112px",
+        minHeight: "52px",
         backgroundColor: "var(--color-background-surface)",
         borderRadius: "var(--radius-chat)",
-        boxShadow: "var(--shadow-med)",
+        boxShadow: "var(--shadow-low)",
       },
     },
     dialog: {

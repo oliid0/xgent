@@ -644,10 +644,12 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
 
     private func bundledResourcesURL() -> URL? {
         guard let appResources = Bundle.main.resourceURL else { return nil }
-        let resources = appResources.appendingPathComponent(
-            bundledResourceDirectoryName,
-            isDirectory: true
-        )
+        let resources = appResources
+            .appendingPathComponent("assets", isDirectory: true)
+            .appendingPathComponent(
+                bundledResourceDirectoryName,
+                isDirectory: true
+            )
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: resources.path, isDirectory: &isDirectory),
               isDirectory.boolValue else { return nil }

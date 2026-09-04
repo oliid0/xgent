@@ -3,7 +3,6 @@ import { VStack } from "@astryxdesign/core/Layout";
 import { memo, useMemo } from "react";
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
 import { CloudArtifactsCard } from "../../../components/chat/CloudArtifactsCard";
-import { GeneratedFilePreviewCard } from "../../../components/chat/GeneratedFilePreviewCard";
 import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { HistoryMessageRef } from "../../../lib/chat/conversation/conversationState";
 import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
@@ -35,13 +34,11 @@ export type AssistantRenderUnitProps = {
 const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
   unit: AssistantFooterRenderUnit;
   compacted: boolean;
-  workdir?: string;
   onOpenFileLink?: AssistantRenderUnitProps["onOpenFileLink"];
   onResendFromEdit: AssistantRenderUnitProps["onResendFromEdit"];
   onBranchConversation?: AssistantRenderUnitProps["onBranchConversation"];
 }) {
-  const { unit, compacted, workdir, onOpenFileLink, onResendFromEdit, onBranchConversation } =
-    props;
+  const { unit, compacted, onOpenFileLink, onResendFromEdit, onBranchConversation } = props;
   const changedFiles = useMemo(
     () => (unit.hasChangedFilesCandidate ? collectChangedFiles(unit.rounds) : null),
     [unit.hasChangedFilesCandidate, unit.rounds],
@@ -58,9 +55,6 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
     >
       {hasCards ? (
         <VStack gap={2} width="100%">
-          {changedFiles && workdir ? (
-            <GeneratedFilePreviewCard summary={changedFiles} workdir={workdir} />
-          ) : null}
           {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
           {cloudArtifacts.length > 0 ? (
             <CloudArtifactsCard artifacts={cloudArtifacts} onOpenFileLink={onOpenFileLink} />
@@ -100,7 +94,6 @@ export const AssistantRenderUnit = memo(function AssistantRenderUnit(
       <AssistantFooterUnit
         unit={row.unit}
         compacted={row.compacted}
-        workdir={workdir}
         onOpenFileLink={onOpenFileLink}
         onResendFromEdit={onResendFromEdit}
         onBranchConversation={onBranchConversation}

@@ -95,6 +95,7 @@ private final class BrowserSession {
     var runtimeScript: String
     var title: String?
     var loading = false
+    var documentReady = false
     var visible = false
     var navigationDelegate: BrowserNavigationDelegate?
     var pendingNavigation: PendingBrowserNavigation?
@@ -130,6 +131,10 @@ private final class BrowserNavigationDelegate: NSObject, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation?) {
         owner?.pageDidStart(sessionId: sessionId, navigation: navigation)
+    }
+
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation?) {
+        owner?.pageDidCommit(sessionId: sessionId, navigation: navigation)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
@@ -199,6 +204,8 @@ private final class BrowserInvocationGate {
         timeoutWorkItem = nil
         invoke.reject(message)
     }
+
+    var isCompleted: Bool { completed }
 }
 
 private final class PendingBrowserNavigation {
@@ -270,6 +277,8 @@ final class BrowserAutomationPlugin: Plugin {
                         existing.webView.customUserAgent = userAgent
                     }
                     applyViewport(request.viewport, to: existing)
+                    existing.loading = true
+                    existing.documentReady = false
                     existing.webView.load(URLRequest(url: url))
                     invoke.resolve(summary(existing))
                     return
@@ -301,6 +310,8 @@ final class BrowserAutomationPlugin: Plugin {
                 try rootView().addSubview(webView)
                 sessions[sessionId] = session
                 applyViewport(request.viewport, to: session)
+                session.loading = true
+                session.documentReady = false
                 webView.load(URLRequest(url: url))
                 invoke.resolve(summary(session))
             } catch {
@@ -396,6 +407,7 @@ final class BrowserAutomationPlugin: Plugin {
     fileprivate func pageDidStart(sessionId: String, navigation: WKNavigation?) {
         guard let session = sessions[sessionId] else { return }
         session.loading = true
+        session.documentReady = false
         guard let pending = session.pendingNavigation,
               pending.navigation == nil || pending.navigation === navigation
         else { return }
@@ -406,7 +418,16 @@ final class BrowserAutomationPlugin: Plugin {
     fileprivate func pageDidFinish(sessionId: String, navigation: WKNavigation?) {
         guard let session = sessions[sessionId] else { return }
         session.loading = false
+        session.documentReady = true
         session.title = session.webView.title
+        session.webView.evaluateJavaScript(session.runtimeScript)
+        completeNavigation(session, navigation: navigation)
+    }
+
+    @MainActor
+    fileprivate func pageDidCommit(sessionId: String, navigation: WKNavigation?) {
+        guard let session = sessions[sessionId] else { return }
+        session.documentReady = true
         session.webView.evaluateJavaScript(session.runtimeScript)
         completeNavigation(session, navigation: navigation)
     }
@@ -576,6 +597,7 @@ final class BrowserAutomationPlugin: Plugin {
         )
         let pending = session.pendingNavigation
         session.loading = true
+        session.documentReady = false
         pending?.navigation = start()
         if pending?.navigation == nil {
             session.pendingNavigation = nil
@@ -591,7 +613,6 @@ final class BrowserAutomationPlugin: Plugin {
         else { return }
         session.pendingNavigation = nil
         session.loading = false
-        session.webView.stopLoading()
     }
 
     @MainActor
@@ -637,12 +658,7 @@ final class BrowserAutomationPlugin: Plugin {
         input: [String: Any],
         timeoutMs: UInt64
     ) {
-        let sessionId = session.sessionId
-        let gate = BrowserInvocationGate(invoke: invoke, timeoutMs: timeoutMs) { [weak self] in
-            Task { @MainActor in
-                self?.recoverTimedOutAction(sessionId: sessionId)
-            }
-        }
+        let gate = BrowserInvocationGate(invoke: invoke, timeoutMs: timeoutMs)
         do {
             let actionJSON = try jsonLiteral(action)
             let inputJSON = try jsonLiteral(input)
@@ -654,7 +670,43 @@ final class BrowserAutomationPlugin: Plugin {
               return window.__xgentBrowserRuntime.execute(\(actionJSON), \(inputJSON));
             })()
             """
-            session.webView.evaluateJavaScript(script) { [weak self] result, error in
+            evaluateDOMActionWhenReady(
+                session,
+                gate: gate,
+                requestId: requestId,
+                action: action,
+                script: script
+            )
+        } catch {
+            gate.reject("Browser action failed: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    private func evaluateDOMActionWhenReady(
+        _ session: BrowserSession,
+        gate: BrowserInvocationGate,
+        requestId: String,
+        action: String,
+        script: String
+    ) {
+        guard !gate.isCompleted else { return }
+        guard session.documentReady else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(50)) { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in
+                    self.evaluateDOMActionWhenReady(
+                        session,
+                        gate: gate,
+                        requestId: requestId,
+                        action: action,
+                        script: script
+                    )
+                }
+            }
+            return
+        }
+        session.webView.evaluateJavaScript(script) { [weak self] result, error in
                 guard let self else { return }
                 if let error {
                     gate.reject("Browser action failed: \(error.localizedDescription)")
@@ -682,9 +734,6 @@ final class BrowserAutomationPlugin: Plugin {
                     gate.reject("Browser action failed: \(error.localizedDescription)")
                 }
             }
-        } catch {
-            gate.reject("Browser action failed: \(error.localizedDescription)")
-        }
     }
 
     @MainActor
@@ -695,12 +744,7 @@ final class BrowserAutomationPlugin: Plugin {
         action: String,
         timeoutMs: UInt64
     ) {
-        let sessionId = session.sessionId
-        let gate = BrowserInvocationGate(invoke: invoke, timeoutMs: timeoutMs) { [weak self] in
-            Task { @MainActor in
-                self?.recoverTimedOutAction(sessionId: sessionId)
-            }
-        }
+        let gate = BrowserInvocationGate(invoke: invoke, timeoutMs: timeoutMs)
         let configuration = WKSnapshotConfiguration()
         configuration.rect = session.webView.bounds
         session.webView.takeSnapshot(with: configuration) { [weak self] image, error in
@@ -725,14 +769,6 @@ final class BrowserAutomationPlugin: Plugin {
                 screenshotBase64: data.base64EncodedString()
             ))
         }
-    }
-
-    @MainActor
-    private func recoverTimedOutAction(sessionId: String) {
-        guard let session = sessions[sessionId] else { return }
-        session.loading = false
-        session.webView.stopLoading()
-        session.webView.reload()
     }
 
     @MainActor

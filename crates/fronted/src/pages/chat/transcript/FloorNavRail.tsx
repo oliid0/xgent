@@ -32,7 +32,7 @@ const BASE_MARKER_WIDTH_PX = 6;
 const WAVE_MARKER_WIDTHS_PX = [26, 20, 14, 10] as const;
 const PREVIEW_CARD_HALF_HEIGHT_PX = 56;
 
-const COLLAPSE_DELAY_MS = 160;
+const COLLAPSE_DELAY_MS = 480;
 
 const TOUCH_SCROLL_REVEAL_MS = 1400;
 
@@ -154,11 +154,11 @@ export function FloorNavRail(props: {
 
   const railVisible = !touchAutoHide || touchRevealed;
 
-  const railLabel = isEn ? "Message navigation" : "楼层导航";
+  const railLabel = isEn ? "Message navigation" : "消息导航";
 
-  const pinnedTitle = isEn ? "Pinned" : "收藏";
-  const pinLabel = isEn ? "Pin" : "收藏";
-  const unpinLabel = isEn ? "Unpin" : "取消收藏";
+  const pinnedTitle = isEn ? "Pinned" : "已置顶";
+  const pinLabel = isEn ? "Pin" : "置顶";
+  const unpinLabel = isEn ? "Unpin" : "取消置顶";
 
   const bookmarkedFloors = useMemo(
     () => floors.filter((floor) => bookmarks.has(floor.messageId)),
@@ -241,6 +241,7 @@ export function FloorNavRail(props: {
   );
 
   if (floors.length < 2) return null;
+  if (isCoarsePointer) return null;
 
   const renderPanelRow = (floor: FloorEntry, isPinnedCopy = false) => {
     const isActive = floor.rowKey === activeRowKey;
@@ -401,6 +402,8 @@ export function FloorNavRail(props: {
             top: previewCardTop,
             right: "calc(100% - 2px)",
           }}
+          onPointerEnter={cancelCollapse}
+          onPointerLeave={handlePreviewLeave}
         >
           <button
             type="button"

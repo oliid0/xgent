@@ -523,7 +523,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                     url,
                     visible: false,
                   });
-                  browserSessionController.openPanel("lan-control");
+                  browserSessionController.openPanel("lan-control", "user");
                 })
               }
             />

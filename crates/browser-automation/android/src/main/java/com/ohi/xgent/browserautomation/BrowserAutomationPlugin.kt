@@ -118,6 +118,7 @@ private data class BrowserSession(
     var viewport: BrowserViewportArgs = BrowserViewportArgs(),
     var title: String? = null,
     var loading: Boolean = false,
+    var documentReady: Boolean = false,
     var visible: Boolean = false,
     var pendingNavigation: PendingBrowserNavigation? = null,
 )
@@ -161,6 +162,8 @@ private class BrowserInvocationGate(
         handler.removeCallbacks(timeout)
         invoke.reject(message)
     }
+
+    fun isCompleted(): Boolean = completed
 }
 
 @TauriPlugin
@@ -212,6 +215,8 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
                         ?.takeIf { it.isNotBlank() }
                         ?.let { existing.webView.settings.userAgentString = it }
                     applyViewport(existing, args.viewport)
+                    existing.loading = true
+                    existing.documentReady = false
                     existing.webView.loadUrl(url)
                     invoke.resolve(summary(existing))
                     return@runOnUiThread
@@ -229,6 +234,8 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
                 contentRoot().addView(webView)
                 sessions[sessionId] = session
                 applyViewport(session, args.viewport)
+                session.loading = true
+                session.documentReady = false
                 webView.loadUrl(url)
                 invoke.resolve(summary(session))
             }.onFailure { error ->
@@ -342,6 +349,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 session.loading = true
+                session.documentReady = false
                 url?.let { session.lastUrl = it }
                 session.pendingNavigation?.let { pending ->
                     navigationGeneration = navigationGeneration.inc()
@@ -368,6 +376,15 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
                 } else {
                     finishRenderedPage(session, loadedView, generation)
                 }
+            }
+
+            override fun onPageCommitVisible(view: WebView?, url: String?) {
+                val committedView = view ?: return
+                if (session.webView !== committedView) return
+                url?.let { session.lastUrl = it }
+                session.documentReady = true
+                committedView.evaluateJavascript(session.runtimeScript, null)
+                completeNavigation(session, session.pendingNavigation?.generation)
             }
 
             override fun onReceivedError(
@@ -401,6 +418,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
         generation: Long?,
     ) {
         session.loading = false
+        session.documentReady = true
         session.title = view?.title
         view?.evaluateJavascript(session.runtimeScript, null)
         completeNavigation(session, generation)
@@ -426,10 +444,12 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
 
         val replacement = WebView(activity)
         session.webView = replacement
+        session.documentReady = false
         configureWebView(session, session.userAgent)
         root.addView(replacement)
         applyViewport(session, session.viewport)
         session.lastUrl.takeIf { it.startsWith("http://") || it.startsWith("https://") }?.let {
+            session.loading = true
             replacement.loadUrl(it)
         }
     }
@@ -527,12 +547,12 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
             if (session.pendingNavigation === pending) {
                 session.pendingNavigation = null
                 session.loading = false
-                session.webView.stopLoading()
             }
         }
         pending = PendingBrowserNavigation(action, gate, requestId, requestedUrl, recovered)
         session.pendingNavigation = pending
         session.loading = true
+        session.documentReady = false
         requestedUrl?.let { session.lastUrl = it }
         runCatching(start).onFailure { error ->
             if (session.pendingNavigation === pending) session.pendingNavigation = null
@@ -578,12 +598,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
         timeoutMs: Long,
     ) {
         val actionWebView = session.webView
-        val gate = BrowserInvocationGate(invoke, timeoutMs) {
-            if (session.webView === actionWebView) {
-                actionWebView.stopLoading()
-                actionWebView.reload()
-            }
-        }
+        val gate = BrowserInvocationGate(invoke, timeoutMs)
         val script = """
             (() => {
               if (!window.__xgentBrowserRuntime) {
@@ -592,6 +607,38 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
               return window.__xgentBrowserRuntime.execute(${JSONObject.quote(action)}, ${input});
             })()
         """.trimIndent()
+        evaluateDomActionWhenReady(session, actionWebView, gate, requestId, action, script)
+    }
+
+    private fun evaluateDomActionWhenReady(
+        session: BrowserSession,
+        actionWebView: WebView,
+        gate: BrowserInvocationGate,
+        requestId: String,
+        action: String,
+        script: String,
+    ) {
+        if (gate.isCompleted()) return
+        if (session.webView !== actionWebView) {
+            gate.reject("Browser renderer changed before the action could run")
+            return
+        }
+        if (!session.documentReady) {
+            actionWebView.postDelayed(
+                {
+                    evaluateDomActionWhenReady(
+                        session,
+                        actionWebView,
+                        gate,
+                        requestId,
+                        action,
+                        script,
+                    )
+                },
+                50L,
+            )
+            return
+        }
         actionWebView.evaluateJavascript(script) { encoded ->
             runCatching {
                 val decoded = JSONTokener(encoded).nextValue()
@@ -624,12 +671,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
         timeoutMs: Long,
     ) {
         val screenshotWebView = session.webView
-        val gate = BrowserInvocationGate(invoke, timeoutMs) {
-            if (session.webView === screenshotWebView) {
-                screenshotWebView.stopLoading()
-                screenshotWebView.reload()
-            }
-        }
+        val gate = BrowserInvocationGate(invoke, timeoutMs)
         val webView = screenshotWebView
         if (webView.width <= 0 || webView.height <= 0) {
             gate.reject("Browser viewport has no drawable size")

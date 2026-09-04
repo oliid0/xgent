@@ -20,14 +20,29 @@ export type BrowserControllerState = {
   sessions: BrowserSessionSummary[];
   activeSessionId: string | null;
   panelOpen: boolean;
+  panelOpenSource: "agent" | "user" | null;
   busySessionIds: string[];
+  humanAssistance: BrowserHumanAssistance | null;
+  completedHumanAssistance: Record<string, BrowserHumanAssistanceCompletion>;
+  previewDataUrls: Record<string, string>;
   error: string | null;
+};
+
+export type BrowserHumanAssistance = {
+  sessionId: string;
+  sequence: number;
+  startedAt: number;
+};
+
+export type BrowserHumanAssistanceCompletion = BrowserHumanAssistance & {
+  finishedAt: number;
 };
 
 export type EnsureBrowserSessionOptions = {
   sessionId?: string;
   url?: string;
   visible?: boolean;
+  preserveError?: boolean;
 };
 
 type Listener = () => void;
@@ -45,16 +60,6 @@ export const HIDDEN_BROWSER_VIEWPORT: BrowserViewport = {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
-}
-
-function isRecoverableBrowserFailure(error: unknown) {
-  const message = errorMessage(error).toLowerCase();
-  return (
-    message.includes("timed out") ||
-    message.includes("did not return") ||
-    message.includes("process terminated") ||
-    message.includes("renderer crashed")
-  );
 }
 
 function normalizedSessionId(value: string | undefined) {
@@ -99,12 +104,21 @@ export class BrowserSessionController {
     sessions: [],
     activeSessionId: null,
     panelOpen: false,
+    panelOpenSource: null,
     busySessionIds: [],
+    humanAssistance: null,
+    completedHumanAssistance: {},
+    previewDataUrls: {},
     error: null,
   };
 
   private readonly listeners = new Set<Listener>();
   private readonly queues = new Map<string, Promise<unknown>>();
+  private readonly assistanceWaiters = new Map<
+    string,
+    Set<(assistance: BrowserHumanAssistanceCompletion) => void>
+  >();
+  private assistanceSequence = 0;
   private initializePromise: Promise<BrowserControllerState> | null = null;
 
   subscribe = (listener: Listener) => {
@@ -163,11 +177,11 @@ export class BrowserSessionController {
       })
       .catch((error) => {
         this.update({
-          initialized: true,
+          initialized: false,
           initializing: false,
           error: errorMessage(error),
         });
-        return this.state;
+        throw error;
       })
       .finally(() => {
         this.initializePromise = null;
@@ -197,7 +211,10 @@ export class BrowserSessionController {
     const shouldNavigate = Boolean(options.url?.trim());
     if (existing) {
       if (!shouldNavigate) {
-        this.update({ activeSessionId: sessionId, error: null });
+        this.update({
+          activeSessionId: sessionId,
+          ...(options.preserveError ? {} : { error: null }),
+        });
         return existing;
       }
       const target = normalizeBrowserAddress(options.url || existing.url);
@@ -220,20 +237,37 @@ export class BrowserSessionController {
       throw new Error(`The embedded browser supports up to ${MAX_BROWSER_SESSIONS} tabs.`);
     }
 
-    const session = await this.enqueue(sessionId, () =>
-      this.client.openSession({
-        sessionId,
-        url: normalizeBrowserAddress(options.url || this.homePage),
-        viewport: {
-          ...HIDDEN_BROWSER_VIEWPORT,
-          visible: options.visible === true,
-        },
-      }),
-    );
+    let session: BrowserSessionSummary;
+    try {
+      session = await this.enqueue(sessionId, () =>
+        this.client.openSession({
+          sessionId,
+          url: normalizeBrowserAddress(options.url || this.homePage),
+          viewport: {
+            ...HIDDEN_BROWSER_VIEWPORT,
+            visible: options.visible === true,
+          },
+        }),
+      );
+    } catch (error) {
+      // Native creation may have completed just as an IPC deadline elapsed.
+      // Reconcile once before surfacing the error so the next command reuses
+      // that exact tab instead of attempting a duplicate child-WebView label.
+      const sessions = await this.client.listSessions().catch(() => []);
+      const preserved = sessions.find((item) => item.sessionId === sessionId);
+      if (preserved) {
+        this.update({
+          sessions,
+          activeSessionId: sessionId,
+          ...(options.preserveError ? {} : { error: errorMessage(error) }),
+        });
+      }
+      throw error;
+    }
     this.update({
       sessions: mergeSession(this.state.sessions, session),
       activeSessionId: sessionId,
-      error: null,
+      ...(options.preserveError ? {} : { error: null }),
     });
     return session;
   }
@@ -251,13 +285,14 @@ export class BrowserSessionController {
     this.update({ activeSessionId: sessionId, error: null });
   }
 
-  openPanel(sessionId?: string) {
+  openPanel(sessionId?: string, source: "agent" | "user" = "agent") {
     const nextSessionId =
       sessionId && this.state.sessions.some((session) => session.sessionId === sessionId)
         ? sessionId
         : this.state.activeSessionId;
     this.update({
       panelOpen: true,
+      panelOpenSource: source,
       activeSessionId: nextSessionId,
       error: null,
     });
@@ -267,7 +302,10 @@ export class BrowserSessionController {
   }
 
   closePanel() {
-    this.update({ panelOpen: false });
+    if (this.state.humanAssistance) {
+      this.finishHumanAssistance(this.state.humanAssistance.sessionId);
+    }
+    this.update({ panelOpen: false, panelOpenSource: null });
     const activeSessionId = this.state.activeSessionId;
     if (activeSessionId) {
       void this.setViewport(activeSessionId, HIDDEN_BROWSER_VIEWPORT).catch(() => undefined);
@@ -276,13 +314,24 @@ export class BrowserSessionController {
 
   async closeSession(sessionIdInput: string) {
     const sessionId = normalizedSessionId(sessionIdInput);
+    this.finishHumanAssistance(sessionId);
     await this.enqueue(sessionId, () => this.client.closeSession(sessionId));
     const sessions = this.state.sessions.filter((session) => session.sessionId !== sessionId);
+    const previewDataUrls = { ...this.state.previewDataUrls };
+    const completedHumanAssistance = { ...this.state.completedHumanAssistance };
+    delete previewDataUrls[sessionId];
+    delete completedHumanAssistance[sessionId];
     const activeSessionId =
       this.state.activeSessionId === sessionId
         ? (sessions[0]?.sessionId ?? null)
         : this.state.activeSessionId;
-    this.update({ sessions, activeSessionId, error: null });
+    this.update({
+      sessions,
+      activeSessionId,
+      previewDataUrls,
+      completedHumanAssistance,
+      error: null,
+    });
     if (this.state.panelOpen && activeSessionId) {
       await this.ensureSession({ sessionId: activeSessionId });
     } else if (this.state.panelOpen && sessions.length === 0) {
@@ -291,6 +340,9 @@ export class BrowserSessionController {
   }
 
   async closeAllSessions() {
+    if (this.state.humanAssistance) {
+      this.finishHumanAssistance(this.state.humanAssistance.sessionId);
+    }
     const sessionIds = this.state.sessions.map((session) => session.sessionId);
     for (const sessionId of sessionIds) {
       await this.enqueue(sessionId, () => this.client.closeSession(sessionId));
@@ -299,7 +351,97 @@ export class BrowserSessionController {
       sessions: [],
       activeSessionId: null,
       busySessionIds: [],
+      humanAssistance: null,
+      completedHumanAssistance: {},
+      previewDataUrls: {},
       error: null,
+    });
+  }
+
+  beginHumanAssistance(sessionIdInput?: string) {
+    const sessionId = normalizedSessionId(
+      sessionIdInput ?? this.state.activeSessionId ?? undefined,
+    );
+    if (!this.state.sessions.some((session) => session.sessionId === sessionId)) return null;
+    if (this.state.humanAssistance?.sessionId === sessionId) return this.state.humanAssistance;
+    if (this.state.humanAssistance) {
+      this.finishHumanAssistance(this.state.humanAssistance.sessionId);
+    }
+    const assistance: BrowserHumanAssistance = {
+      sessionId,
+      sequence: ++this.assistanceSequence,
+      startedAt: Date.now(),
+    };
+    this.update({ humanAssistance: assistance, activeSessionId: sessionId, error: null });
+    return assistance;
+  }
+
+  finishHumanAssistance(sessionIdInput?: string) {
+    const assistance = this.state.humanAssistance;
+    if (!assistance) return null;
+    if (sessionIdInput && normalizedSessionId(sessionIdInput) !== assistance.sessionId) return null;
+    const completion: BrowserHumanAssistanceCompletion = {
+      ...assistance,
+      finishedAt: Date.now(),
+    };
+    this.update({
+      humanAssistance: null,
+      completedHumanAssistance: {
+        ...this.state.completedHumanAssistance,
+        [assistance.sessionId]: completion,
+      },
+    });
+    const waiters = this.assistanceWaiters.get(assistance.sessionId);
+    this.assistanceWaiters.delete(assistance.sessionId);
+    for (const resolve of waiters ?? []) resolve(completion);
+    return completion;
+  }
+
+  isHumanAssistanceActive(sessionIdInput: string) {
+    return this.state.humanAssistance?.sessionId === normalizedSessionId(sessionIdInput);
+  }
+
+  waitForHumanAssistance(
+    sessionIdInput: string,
+    timeoutMs = 5 * 60_000,
+    signal?: AbortSignal,
+  ): Promise<BrowserHumanAssistanceCompletion | null> {
+    const sessionId = normalizedSessionId(sessionIdInput);
+    const assistance = this.state.humanAssistance;
+    if (!assistance || assistance.sessionId !== sessionId) return Promise.resolve(null);
+    if (signal?.aborted) return Promise.reject(new Error("Cancelled"));
+    return new Promise((resolve, reject) => {
+      const waiters = this.assistanceWaiters.get(sessionId) ?? new Set();
+      let settled = false;
+      let timer: number | undefined;
+      const cleanup = () => {
+        if (timer !== undefined) window.clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        waiters.delete(finish);
+        if (waiters.size === 0) this.assistanceWaiters.delete(sessionId);
+      };
+      const finish = (completed: BrowserHumanAssistanceCompletion) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(completed);
+      };
+      const onAbort = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error("Cancelled"));
+      };
+      waiters.add(finish);
+      this.assistanceWaiters.set(sessionId, waiters);
+      signal?.addEventListener("abort", onAbort, { once: true });
+      timer = window.setTimeout(
+        () => {
+          const current = this.state.humanAssistance;
+          if (current?.sessionId === sessionId) this.finishHumanAssistance(sessionId);
+        },
+        Math.max(1_000, timeoutMs),
+      );
     });
   }
 
@@ -315,16 +457,22 @@ export class BrowserSessionController {
   async action(
     action: BrowserAction,
     input: BrowserActionInput = {},
-    options: { sessionId?: string; timeoutMs?: number } = {},
+    options: { sessionId?: string; timeoutMs?: number; background?: boolean } = {},
   ): Promise<BrowserActionResponse> {
     const sessionId = normalizedSessionId(options.sessionId);
-    await this.ensureSession({ sessionId });
-    this.setSessionBusy(sessionId, true);
+    await this.ensureSession({ sessionId, preserveError: options.background });
+    if (!options.background) this.setSessionBusy(sessionId, true);
     try {
       const response = await this.enqueue(sessionId, () =>
         this.client.action(sessionId, action, input, options.timeoutMs),
       );
       const existing = this.state.sessions.find((session) => session.sessionId === sessionId);
+      const previewDataUrls = response.screenshotBase64
+        ? {
+            ...this.state.previewDataUrls,
+            [sessionId]: `data:image/png;base64,${response.screenshotBase64}`,
+          }
+        : this.state.previewDataUrls;
       this.update({
         sessions: mergeSession(this.state.sessions, {
           sessionId,
@@ -334,42 +482,38 @@ export class BrowserSessionController {
           loading: false,
         }),
         activeSessionId: sessionId,
-        error: null,
+        previewDataUrls,
+        ...(options.background ? {} : { error: null }),
       });
       return response;
     } catch (error) {
-      let recoveryError: unknown = null;
-      if (action !== "recover" && isRecoverableBrowserFailure(error)) {
+      if (!options.background) {
         try {
-          const recovered = await this.client.action(sessionId, "recover", {}, 10_000);
-          const existing = this.state.sessions.find((session) => session.sessionId === sessionId);
-          this.update({
-            sessions: mergeSession(this.state.sessions, {
-              sessionId,
-              url: recovered.url || existing?.url || "",
-              title: recovered.title ?? existing?.title,
-              visible: existing?.visible ?? false,
-              loading: false,
-            }),
-          });
-        } catch (nextError) {
-          recoveryError = nextError;
-          try {
-            await this.refreshSessions();
-          } catch {
-            // Preserve the original correlated command failure for the model.
-          }
+          await this.refreshSessions();
+        } catch {
+          // A command failure must remain non-mutating. Keep the original
+          // correlated error and the last known session instead of reloading it.
         }
+        this.update({ error: errorMessage(error) });
       }
-      this.update({
-        error: recoveryError
-          ? `${errorMessage(error)} Recovery failed: ${errorMessage(recoveryError)}`
-          : errorMessage(error),
-      });
       throw error;
     } finally {
-      this.setSessionBusy(sessionId, false);
+      if (!options.background) this.setSessionBusy(sessionId, false);
     }
+  }
+
+  async captureSessionPreview(sessionIdInput: string) {
+    const sessionId = normalizedSessionId(sessionIdInput);
+    const response = await this.action(
+      "screenshot",
+      {},
+      {
+        sessionId,
+        timeoutMs: 8_000,
+        background: true,
+      },
+    );
+    return response.screenshotBase64 ? `data:image/png;base64,${response.screenshotBase64}` : null;
   }
 
   clearError() {

@@ -16,7 +16,7 @@ import { createContext, memo, useContext, useMemo } from "react";
 
 import { useLocale } from "../../i18n";
 import type { ChangedFileEntry, ChangedFilesSummary } from "../../lib/chat/messages/changedFiles";
-import { FilePenLine, FolderTree, GitCommitHorizontal } from "../icons";
+import { FolderTree, GitCommitHorizontal, Paperclip } from "../icons";
 import { FileChangeBadge } from "./FileChangeBadge";
 import { getFileTypeIcon } from "./fileTypeIcons";
 
@@ -43,12 +43,68 @@ function splitPath(path: string): { dir: string; base: string } {
 }
 
 const MAX_VISIBLE_FILES = 5;
+const DIFFABLE_EXTENSIONS = new Set([
+  "c",
+  "cc",
+  "cfg",
+  "cpp",
+  "cs",
+  "css",
+  "dart",
+  "env",
+  "ex",
+  "exs",
+  "go",
+  "gradle",
+  "graphql",
+  "h",
+  "hpp",
+  "html",
+  "ini",
+  "java",
+  "js",
+  "json",
+  "jsx",
+  "kt",
+  "kts",
+  "less",
+  "lock",
+  "lua",
+  "md",
+  "mdx",
+  "php",
+  "properties",
+  "py",
+  "rb",
+  "rs",
+  "sass",
+  "scala",
+  "scss",
+  "sh",
+  "sql",
+  "svelte",
+  "swift",
+  "toml",
+  "ts",
+  "tsx",
+  "txt",
+  "vue",
+  "xml",
+  "yaml",
+  "yml",
+]);
+
+function canDiffPath(path: string) {
+  const extension = path.split(".").pop()?.toLowerCase() ?? "";
+  return DIFFABLE_EXTENSIONS.has(extension);
+}
 
 const ChangedFileRow = memo(function ChangedFileRow({ file }: { file: ChangedFileEntry }) {
   const { t } = useLocale();
   const actions = useChangedFilesActions();
   const { dir, base } = splitPath(file.path);
   const canOpen = Boolean(actions?.onOpenFile) && !file.deleted;
+  const canDiff = Boolean(actions?.onOpenDiff) && canDiffPath(file.path);
   const FileTypeIcon = getFileTypeIcon(file.path, "file");
   const revealLabel = `${t("chat.changedFiles.reveal")}: ${file.path}`;
   const diffLabel = `${t("chat.changedFiles.diff")}: ${file.path}`;
@@ -91,14 +147,14 @@ const ChangedFileRow = memo(function ChangedFileRow({ file }: { file: ChangedFil
               onClick={() => actions.onRevealInFileTree?.(file.path)}
             />
           ) : null}
-          {actions?.onOpenDiff ? (
+          {canDiff ? (
             <IconButton
               label={diffLabel}
               tooltip={diffLabel}
               icon={<Icon icon={GitCommitHorizontal} size="sm" color="inherit" />}
               size="sm"
               variant="ghost"
-              onClick={() => actions.onOpenDiff?.(file.path)}
+              onClick={() => actions?.onOpenDiff?.(file.path)}
             />
           ) : null}
         </HStack>
@@ -120,19 +176,20 @@ export const ChangedFilesCard = memo(function ChangedFilesCard({
       summary.files.length === 1 ? "chat.changedFiles.titleOne" : "chat.changedFiles.title";
     return t(key).replace("{count}", String(summary.files.length));
   }, [summary.files.length, t]);
+  const hasDiffableFiles = summary.files.some((file) => canDiffPath(file.path));
 
   return (
     <Card padding={0} elevation="low">
       <VStack gap={0}>
         <HStack gap={3} vAlign="center" padding={3}>
-          <Icon icon={FilePenLine} size="md" color="secondary" />
+          <Icon icon={Paperclip} size="md" color="secondary" />
           <StackItem size="fill">
             <VStack gap={1}>
               <Heading level={4}>{title}</Heading>
               <FileChangeBadge added={summary.totalAdded} removed={summary.totalRemoved} />
             </VStack>
           </StackItem>
-          {actions?.onOpenDiff ? (
+          {actions?.onOpenDiff && hasDiffableFiles ? (
             <Button
               label={t("chat.changedFiles.review")}
               size="sm"

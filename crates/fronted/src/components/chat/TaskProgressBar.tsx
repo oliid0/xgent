@@ -27,7 +27,10 @@ export function TaskProgressBar(props: {
   const isOpen = expandedRunId === snapshot.runId;
 
   return (
-    <VStack className="mx-auto w-full max-w-4xl px-3 pb-2 sm:px-5">
+    <VStack
+      className="mx-auto w-full px-3 pb-2 sm:px-5"
+      style={{ maxWidth: "var(--xgent-composer-width)" }}
+    >
       <Card width="100%" padding={3} elevation="low">
         <HStack gap={2} vAlign="start">
           <StackItem size="fill">
@@ -62,7 +65,12 @@ export function TaskProgressBar(props: {
                 </VStack>
               }
             >
-              <VStack gap={2} paddingBlockStart={3}>
+              <VStack
+                gap={2}
+                paddingBlockStart={3}
+                isScrollable
+                style={{ maxHeight: "min(18rem, 38dvh)" }}
+              >
                 {snapshot.tasks.map((task) => (
                   <HStack key={task.id} gap={2} vAlign="start">
                     {task.status === "completed" ? (

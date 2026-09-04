@@ -9,6 +9,7 @@ const appSource = readSource("src/App.tsx");
 const chatPageSource = readSource("src/pages/ChatPage.tsx");
 const chatHeaderSource = readSource("src/pages/chat/components/ChatHeader.tsx");
 const composerSource = readSource("src/pages/chat/components/ChatComposerBar.tsx");
+const mentionComposerSource = readSource("src/components/chat/MentionComposer.tsx");
 const mobileActionsSource = readSource("src/pages/chat/mobile/MobileQuickActions.tsx");
 const sidebarSource = readSource("src/components/chat/ChatHistorySidebar.tsx");
 const transcriptSource = readSource("src/pages/chat/transcript/ChatTranscript.tsx");
@@ -20,31 +21,28 @@ const stylesSource = readSource("src/index.css");
 test("compact chat uses the reference-scale Astryx geometry without changing the desktop theme", () => {
   const compactTheme = themeSource.slice(themeSource.indexOf("export const xgentCompactTheme"));
   assert.match(compactTheme, /"--size-element-lg": "56px"/);
-  assert.match(compactTheme, /"--radius-container": "30px"/);
-  assert.match(compactTheme, /"--radius-page": "36px"/);
-  assert.match(compactTheme, /"--radius-chat": "34px"/);
-  assert.match(compactTheme, /"chat-composer": \{[\s\S]*?minHeight: "112px"/);
+  assert.match(compactTheme, /"--radius-container": "20px"/);
+  assert.match(compactTheme, /"--radius-page": "28px"/);
+  assert.match(compactTheme, /"--radius-chat": "28px"/);
+  assert.match(compactTheme, /"chat-composer": \{[\s\S]*?minHeight: "52px"/);
   assert.match(stylesSource, /--xgent-composer-width: min\(50rem,/);
 });
 
-test("mobile chat keeps one accessible header action cluster and a large functional composer", () => {
-  const mobileComposerMenu = composerSource.slice(
-    composerSource.indexOf("const mobileAddMenuContent"),
-    composerSource.indexOf("const toggleComposerExpanded"),
-  );
+test("mobile chat keeps one accessible header action cluster and a one-line functional composer", () => {
   assert.match(chatHeaderSource, /className="xgent-mobile-chat-toolbar w-full"/);
   assert.match(
     chatHeaderSource,
     /<SegmentedControl[\s\S]*?layout="fill"[\s\S]*?size="lg"/,
   );
   assert.match(composerSource, /density=\{mobileExperience \? "balanced" : "compact"\}/);
-  assert.match(composerSource, /className="xgent-mobile-composer-menu-row"/);
-  assert.equal(mobileComposerMenu.match(/<ListItem/g)?.length, 5);
-  assert.doesNotMatch(mobileComposerMenu, /nativeWebSearchEnabled|planModeEnabled/);
-  assert.match(composerSource, /<MobileComposerMenuIcon>[\s\S]*?<Camera \/>[\s\S]*?<\/MobileComposerMenuIcon>/);
+  assert.match(composerSource, /content=\{addMenuContent\}/);
+  assert.doesNotMatch(composerSource, /mobileAddMenuContent|<AtSign \/>/);
+  assert.match(composerSource, /onThreeLineOverflowChange=\{setShowComposerExpandControl\}/);
+  assert.match(mentionComposerSource, /mention-composer min-h-11 max-h-\[160px\]/);
   assert.match(composerSource, /size=\{mobileExperience \? "md" : "sm"\}/);
-  assert.match(chatPageSource, /onToggleTrajectory=\{/);
-  assert.match(mobileActionsSource, /id: "trajectory"/);
+  assert.doesNotMatch(chatPageSource, /<MobileQuickActions[\s\S]*?onToggleTrajectory=\{/);
+  assert.doesNotMatch(mobileActionsSource, /id: "trajectory"/);
+  assert.match(chatPageSource, /!mobileExperience && canShowTrajectory/);
   assert.match(transcriptSource, /showMobileBlankState = mobileExperience && showStartChatState/);
   assert.match(
     transcriptSource,

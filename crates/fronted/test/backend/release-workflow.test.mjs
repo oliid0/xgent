@@ -37,6 +37,10 @@ const windowsLaunchSmoke = readFileSync(
   path.join(repoRoot, "scripts/release/smoke-launch-windows.ps1"),
   "utf8",
 );
+const desktopHost = readFileSync(
+  path.join(repoRoot, "crates/fronted/src-tauri/src/lib.rs"),
+  "utf8",
+);
 
 function jobSource(name, nextName) {
   const start = workflow.indexOf(`  ${name}:\n`);
@@ -160,6 +164,10 @@ test("release packaging preserves native runtime resources without ABI drift", (
     "mobile-execution/",
   );
   assert.match(iosPlugin, /private func bundledResourcesURL\(\) -> URL\?/);
+  assert.match(
+    iosPlugin,
+    /Bundle\.main\.resourceURL[\s\S]*?appendingPathComponent\("assets", isDirectory: true\)[\s\S]*?bundledResourceDirectoryName/,
+  );
   assert.doesNotMatch(iosPlugin, /Bundle\.module/);
   assert.doesNotMatch(iosPackage, /resources:\s*\[/);
   assert.match(iosPackage, /exclude: \["Resources"\]/);
@@ -167,9 +175,28 @@ test("release packaging preserves native runtime resources without ABI drift", (
   assert.match(androidRootfsPreparation, /\.tar\.gzip/);
   assert.doesNotMatch(androidRootfsPreparation, /android_abi\}\.tar\.gz"/);
   assert.match(workflow, /payload\.startswith\(b"\\x1f\\x8b"\)/);
+  assert.match(workflow, /assets\/mobile-execution\/commandDictionary\.plist/);
 
   assert.match(windowsBrowserBackend, /core\.CanGoForward\(&mut value\)\?/);
   assert.match(windowsBrowserBackend, /core\.CanGoBack\(&mut value\)\?/);
+  assert.match(windowsBrowserBackend, /CapturePreviewCompletedHandler/);
+  assert.match(windowsBrowserBackend, /\.CapturePreview\(/);
+  assert.doesNotMatch(windowsBrowserBackend, /"Page\.captureScreenshot"/);
+  assert.match(windowsBrowserBackend, /CallDevToolsProtocolMethodCompletedHandler/);
+  assert.match(windowsBrowserBackend, /\.CallDevToolsProtocolMethod\(/);
+  assert.match(windowsBrowserBackend, /"Input\.dispatchMouseEvent"/);
+  assert.match(windowsBrowserBackend, /"Input\.dispatchKeyEvent"/);
+  assert.match(
+    windowsBrowserBackend,
+    /"automationTransport"\.to_string\(\),\s*json!\("webview2-cdp"\)/,
+  );
+  assert.match(windowsBrowserBackend, /json!\("webview2-dom-fallback"\)/);
+  assert.match(windowsBrowserBackend, /timeout\.saturating_sub\(started\.elapsed\(\)\)/);
+  const openSession = windowsBrowserBackend.slice(
+    windowsBrowserBackend.indexOf("pub fn open_session"),
+    windowsBrowserBackend.indexOf("pub fn list_sessions"),
+  );
+  assert.doesNotMatch(openSession, /webview\.reload\(\)/);
   assert.doesNotMatch(windowsBrowserBackend, /use windows::Win32::Foundation::BOOL/);
 });
 
@@ -182,7 +209,7 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(windowsLaunchSmoke, /Start-Process[\s\S]*-WindowStyle Hidden/);
   assert.match(windowsLaunchSmoke, /Portable Xgent exited during the launch smoke test/);
   assert.match(windowsLaunchSmoke, /finally[\s\S]*Stop-Process/);
-  assert.match(android, /android-emulator-runner@ed009f5318f15b1cf93a191b856c4f1748a2d4c1/);
+  assert.match(android, /android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d/);
   assert.match(android, /adb shell pidof com\.ohi\.xgent/);
   assert.match(android, /adb logcat -d AndroidRuntime:E '\*:S'/);
   assert.match(android, /xgent-android-launch-evidence/);
@@ -191,4 +218,16 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(ios, /xcrun simctl spawn "\$simulator_udid" ps -p "\$app_pid"/);
   assert.match(ios, /xgent-ios-launch-evidence/);
   assert.match(workflow, /! -name '\*-smoke\.png'/);
+});
+
+test("desktop tray click and menu actions can always reveal the main window", () => {
+  const showMainWindow = desktopHost.slice(
+    desktopHost.indexOf("fn show_main_window"),
+    desktopHost.indexOf("fn request_app_exit"),
+  );
+  assert.doesNotMatch(showMainWindow, /FrontendReadyState/);
+  assert.match(showMainWindow, /window\.show\(\)\?[\s\S]*?window\.unminimize\(\)\?[\s\S]*?window\.set_focus\(\)\?/);
+  assert.match(desktopHost, /button_state: MouseButtonState::Up/);
+  assert.doesNotMatch(desktopHost, /button_state: MouseButtonState::Down/);
+  assert.match(desktopHost, /on_menu_event\([\s\S]*?dispatch_app_action\(app, action\)/);
 });

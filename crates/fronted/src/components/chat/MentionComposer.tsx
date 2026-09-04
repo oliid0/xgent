@@ -199,6 +199,7 @@ export interface MentionComposerProps {
   className?: string;
   preferNativeContextMenu?: boolean;
   compact?: boolean;
+  onThreeLineOverflowChange?: (hasOverflow: boolean) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2044,6 +2045,7 @@ export const MentionComposer = memo(
       className,
       preferNativeContextMenu = false,
       compact = false,
+      onThreeLineOverflowChange,
     }: MentionComposerProps,
     ref,
   ) {
@@ -2302,6 +2304,42 @@ export const MentionComposer = memo(
       if (!el) return;
       applyEmptyState(editorTextIsEmpty(el), editorHasNoContent(el));
     }, [applyEmptyState]);
+
+    useEffect(() => {
+      const editor = editorRef.current;
+      if (!editor || !onThreeLineOverflowChange) return;
+      let previous: boolean | null = null;
+      let frame: number | null = null;
+      const report = () => {
+        frame = null;
+        const style = window.getComputedStyle(editor);
+        const fontSize = Number.parseFloat(style.fontSize) || 14;
+        const lineHeight = Number.parseFloat(style.lineHeight) || fontSize * 1.5;
+        const hasOverflow = editor.scrollHeight > lineHeight * 3 + 2;
+        if (hasOverflow === previous) return;
+        previous = hasOverflow;
+        onThreeLineOverflowChange(hasOverflow);
+      };
+      const schedule = () => {
+        if (frame !== null) return;
+        frame = window.requestAnimationFrame(report);
+      };
+      const resizeObserver =
+        typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
+      const mutationObserver = new MutationObserver(schedule);
+      resizeObserver?.observe(editor);
+      mutationObserver.observe(editor, { childList: true, characterData: true, subtree: true });
+      editor.addEventListener("input", schedule);
+      window.addEventListener("resize", schedule);
+      schedule();
+      return () => {
+        if (frame !== null) window.cancelAnimationFrame(frame);
+        resizeObserver?.disconnect();
+        mutationObserver.disconnect();
+        editor.removeEventListener("input", schedule);
+        window.removeEventListener("resize", schedule);
+      };
+    }, [onThreeLineOverflowChange]);
 
     // ---- Typewriter (typeText) ----
     // While a run is active the editor drops contentEditable so keyboard and
@@ -3533,8 +3571,8 @@ export const MentionComposer = memo(
             onCompositionEnd={handleCompositionEnd}
             onBlur={handleBlur}
             className={cn(
-              "mention-composer max-h-[160px] w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] outline-hidden",
-              compact ? "min-h-11" : "min-h-[70px]",
+              "mention-composer min-h-11 max-h-[160px] w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] outline-hidden",
+              compact && "mention-composer--compact",
               "text-sm",
               isDomEmpty && "is-empty",
               disabled && "cursor-not-allowed opacity-60",

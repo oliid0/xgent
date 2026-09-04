@@ -4,7 +4,6 @@ import { memo, useMemo } from "react";
 
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
 import { CloudArtifactsCard } from "../../../components/chat/CloudArtifactsCard";
-import { GeneratedFilePreviewCard } from "../../../components/chat/GeneratedFilePreviewCard";
 import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
 import { collectChangedFiles } from "../../../lib/chat/messages/changedFiles";
@@ -100,9 +99,6 @@ export const AssistantBubble = memo(function AssistantBubble(props: {
             onOpenFileLink={onOpenFileLink}
           />
         ))}
-        {changedFiles && workdir ? (
-          <GeneratedFilePreviewCard summary={changedFiles} workdir={workdir} />
-        ) : null}
         {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
         {cloudArtifacts.length > 0 ? (
           <CloudArtifactsCard artifacts={cloudArtifacts} onOpenFileLink={onOpenFileLink} />
