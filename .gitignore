@@ -26,6 +26,7 @@ target
 bin
 .serena
 chatroom
+img*
 
 # Editor directories and files
 .vscode/*
