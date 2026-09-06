@@ -132,13 +132,19 @@ export function RightSidebar(props: {
                         props.onCloseTab(tab.id);
                         return;
                       }
-                      const next = tabForKey(props.tabs.map((item) => item.id), tab.id, event.key,
-                        getComputedStyle(event.currentTarget).direction === "rtl");
+                      const next = tabForKey(
+                        props.tabs.map((item) => item.id),
+                        tab.id,
+                        event.key,
+                        getComputedStyle(event.currentTarget).direction === "rtl",
+                      );
                       if (!next) return;
                       event.preventDefault();
                       props.onSelectTab(next);
                       const index = props.tabs.findIndex((item) => item.id === next);
-                      stripRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]?.focus();
+                      stripRef.current
+                        ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+                        [index]?.focus();
                     }}
                   >
                     {tab.icon}
@@ -157,20 +163,20 @@ export function RightSidebar(props: {
               ))}
             </HStack>
           ) : null}
-        <DropdownMenu
-          button={{
-            label: t("chat.upload.add"),
-            tooltip: t("chat.upload.add"),
-            icon: <Icon icon={Plus} size="sm" color="inherit" />,
-            isIconOnly: true,
-            variant: "ghost",
-            size: "sm",
-          }}
-          items={menuItems}
-          placement="below"
-          alignment="end"
-          hasChevron={false}
-        />
+          <DropdownMenu
+            button={{
+              label: t("chat.upload.add"),
+              tooltip: t("chat.upload.add"),
+              icon: <Icon icon={Plus} size="sm" color="inherit" />,
+              isIconOnly: true,
+              variant: "ghost",
+              size: "sm",
+            }}
+            items={menuItems}
+            placement="below"
+            alignment="end"
+            hasChevron={false}
+          />
         </HStack>
         <IconButton
           label={

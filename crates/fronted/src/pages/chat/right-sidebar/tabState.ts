@@ -3,7 +3,11 @@ export function reconcileTabOrder(previous: readonly string[], available: readon
   const existing = new Set(available);
   const order = previous.filter((id) => existing.has(id));
   const known = new Set(order);
-  for (const id of available) if (!known.has(id)) { order.push(id); known.add(id); }
+  for (const id of available)
+    if (!known.has(id)) {
+      order.push(id);
+      known.add(id);
+    }
   return order;
 }
 
@@ -15,9 +19,15 @@ export function resolveActiveTab(
   if (selected && available.includes(selected)) return selected;
   const index = selected ? previous.indexOf(selected) : -1;
   if (index >= 0) {
-    return previous.slice(index + 1).find((id) => available.includes(id))
-      ?? previous.slice(0, index).reverse().find((id) => available.includes(id))
-      ?? available[0] ?? null;
+    return (
+      previous.slice(index + 1).find((id) => available.includes(id)) ??
+      previous
+        .slice(0, index)
+        .reverse()
+        .find((id) => available.includes(id)) ??
+      available[0] ??
+      null
+    );
   }
   return available[0] ?? null;
 }

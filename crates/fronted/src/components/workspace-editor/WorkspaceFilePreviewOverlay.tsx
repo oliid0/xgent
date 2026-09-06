@@ -284,10 +284,13 @@ function buildSpreadsheetTable(
     const rawRows = utils.sheet_to_json<unknown[]>(sheet, {
       header: 1,
       blankrows: true,
-      range: { s: { r: 0, c: 0 }, e: {
-        r: Math.min(sheetRange.e.r, SPREADSHEET_MAX_ROWS - 1),
-        c: Math.min(sheetRange.e.c, SPREADSHEET_MAX_COLUMNS - 1),
-      } },
+      range: {
+        s: { r: 0, c: 0 },
+        e: {
+          r: Math.min(sheetRange.e.r, SPREADSHEET_MAX_ROWS - 1),
+          c: Math.min(sheetRange.e.c, SPREADSHEET_MAX_COLUMNS - 1),
+        },
+      },
       defval: "",
       raw: false,
     });

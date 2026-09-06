@@ -562,7 +562,8 @@ export class BrowserSessionController {
         if (options.agent) this.agentObservations.set(sessionId, observe(result));
         if (options.agent && mutating) {
           // Preserve dispatch evidence even if the following observation fails.
-          const applied = (result.data as { actionApplied?: boolean } | undefined)?.actionApplied !== false;
+          const applied =
+            (result.data as { actionApplied?: boolean } | undefined)?.actionApplied !== false;
           let fresh: BrowserActionResponse;
           try {
             fresh = await this.client.action(sessionId, "snapshot", {}, options.timeoutMs);
@@ -574,7 +575,8 @@ export class BrowserSessionController {
                 result: result.data,
                 actionApplied: applied,
                 observationError: errorMessage(error),
-                reason: "Observe the page before continuing. Do not replay an action merely because its following observation failed.",
+                reason:
+                  "Observe the page before continuing. Do not replay an action merely because its following observation failed.",
               },
             };
           }

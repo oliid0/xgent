@@ -5924,14 +5924,23 @@ export function ChatPage(props: ChatPageProps) {
     t,
     rightFileTabs,
   ]);
-  const rightTabOrder = reconcileTabOrder(rightTabOrderRef.current, availableRightSidebarTabs.map((tab) => tab.id));
+  const rightTabOrder = reconcileTabOrder(
+    rightTabOrderRef.current,
+    availableRightSidebarTabs.map((tab) => tab.id),
+  );
   const rightTabsById = new Map(availableRightSidebarTabs.map((tab) => [tab.id, tab]));
   const rightSidebarTabs = rightTabOrder.flatMap((id) => {
     const tab = rightTabsById.get(id);
     return tab ? [tab] : [];
   });
-  const resolvedRightSidebarActiveTabId = resolveActiveTab(rightSidebarActiveTabId, rightTabOrderRef.current, rightTabOrder);
-  useLayoutEffect(() => { rightTabOrderRef.current = rightTabOrder; });
+  const resolvedRightSidebarActiveTabId = resolveActiveTab(
+    rightSidebarActiveTabId,
+    rightTabOrderRef.current,
+    rightTabOrder,
+  );
+  useLayoutEffect(() => {
+    rightTabOrderRef.current = rightTabOrder;
+  });
   useEffect(() => {
     if (resolvedRightSidebarActiveTabId !== rightSidebarActiveTabId) {
       setRightSidebarActiveTabId(resolvedRightSidebarActiveTabId);
@@ -5967,7 +5976,9 @@ export function ChatPage(props: ChatPageProps) {
     if (tabId.startsWith("browser:")) {
       const sessionId = tabId.slice("browser:".length);
       if (browserPanelState.sessions.length <= 1) browserSessionController.closePanel();
-      void browserSessionController.closeSession(sessionId).catch((error) => setRightBrowserError(String(error)));
+      void browserSessionController
+        .closeSession(sessionId)
+        .catch((error) => setRightBrowserError(String(error)));
     } else if (tabId?.startsWith(`${RIGHT_TAB_TERMINAL}:`)) {
       const session = rightTerminals.find((tab) => `${RIGHT_TAB_TERMINAL}:${tab.id}` === tabId);
       if (session)
@@ -6609,24 +6620,31 @@ export function ChatPage(props: ChatPageProps) {
                 </VStack>
               ))}
               {splitConversationId ? (
-                <VStack height="100%" minHeight={0} style={{ display: resolvedRightSidebarActiveTabId === RIGHT_TAB_SIDE_CHAT ? "flex" : "none" }}>
-                <SplitConversationPane
-                  key={splitConversationId}
-                  width="100%"
-                  conversationId={splitConversationId}
-                  record={splitConversationRecord}
-                  loading={splitConversationLoading}
-                  error={splitConversationError}
-                  liveTranscriptStore={getConversationLiveTranscriptStore(splitConversationId)}
-                  isRunning={isConversationRunning(splitConversationId)}
-                  isAgentMode={isAgentMode}
-                  showUsage={isAgentDevExecutionMode}
-                  onActivate={handleActivateSplitConversation}
-                  onRetry={() => setSplitConversationReload((value) => value + 1)}
-                  onClose={handleCloseSplitConversation}
-                  onSend={sendSideConversation}
-                  onStop={() => requestConversationStop(splitConversationId)}
-                />
+                <VStack
+                  height="100%"
+                  minHeight={0}
+                  style={{
+                    display:
+                      resolvedRightSidebarActiveTabId === RIGHT_TAB_SIDE_CHAT ? "flex" : "none",
+                  }}
+                >
+                  <SplitConversationPane
+                    key={splitConversationId}
+                    width="100%"
+                    conversationId={splitConversationId}
+                    record={splitConversationRecord}
+                    loading={splitConversationLoading}
+                    error={splitConversationError}
+                    liveTranscriptStore={getConversationLiveTranscriptStore(splitConversationId)}
+                    isRunning={isConversationRunning(splitConversationId)}
+                    isAgentMode={isAgentMode}
+                    showUsage={isAgentDevExecutionMode}
+                    onActivate={handleActivateSplitConversation}
+                    onRetry={() => setSplitConversationReload((value) => value + 1)}
+                    onClose={handleCloseSplitConversation}
+                    onSend={sendSideConversation}
+                    onStop={() => requestConversationStop(splitConversationId)}
+                  />
                 </VStack>
               ) : null}
               {rightFileTabs.map((file) => (
