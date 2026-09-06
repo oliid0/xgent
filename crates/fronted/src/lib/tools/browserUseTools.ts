@@ -432,7 +432,7 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
   const tool: Tool = {
     name: "browser_use",
     description:
-      "Operate Xgent's embedded browser. It shares one live native WebView tab with the user on Windows, macOS, Linux, iOS, and Android; it is not a separate browser extension. Use open/navigate, then snapshot to receive stable element refs. Click, type, press keys, hover, or scroll with ref whenever possible. Reuse session_id for follow-up actions. When the user finishes an explicit takeover, the tool returns a fresh human_assistance_completed snapshot; continue from it and do not repeat the superseded action. Use wait_for_selector or wait_for_dom_stable after page changes and screenshot when visual layout matters.",
+      "Operate Xgent's embedded browser. It shares a live native WebView session with the user on Windows, macOS, Linux, iOS, and Android. Use open/navigate, then snapshot to receive stable element refs. Click, type, press keys, hover, or scroll with ref whenever possible. Reuse session_id for follow-up actions and snapshot before each next action so user changes are observed instead of repeated. User-created tabs use separate session_ids and must not be disturbed. Agent actions stay hidden unless show is explicitly requested. Use wait_for_selector or wait_for_dom_stable after page changes and screenshot when visual layout matters.",
     parameters: BROWSER_PARAMETERS,
   };
 
@@ -456,13 +456,10 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
       controller = await resolveController();
       const activeController = controller;
       const delegated = activeController !== browserSessionController;
-      const revealAgentSession = () => {
-        if (!delegated) activeController.openPanel(sessionId, "agent");
-      };
 
-      respectsHumanAssistance = !["list_tabs", "new_tab", "close_tab", "show", "hide"].includes(
-        action,
-      );
+      // User and agent actions share the per-session queue. There is no modal
+      // takeover state: every subsequent snapshot observes the latest page.
+      respectsHumanAssistance = false;
       assistanceSequenceAtStart = observedAssistanceSequence(controller, sessionId);
 
       let result: unknown;
@@ -493,17 +490,19 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
           ? await controller.ensureSession({
               sessionId,
               url: normalizeBrowserAddress(args.url || ""),
+              preserveActive: true,
             })
-          : await controller.newSession(normalizeBrowserAddress(args.url || ""));
+          : await controller.newSession(normalizeBrowserAddress(args.url || ""), {
+              preserveActive: true,
+            });
         sessionId = session.sessionId;
-        revealAgentSession();
         result = session;
       } else if (action === "open") {
         const session = await controller.ensureSession({
           sessionId,
           url: normalizeBrowserAddress(requiredString(args.url, "url")),
+          preserveActive: true,
         });
-        revealAgentSession();
         await abortableDelay(250, signal);
         result = {
           session,
@@ -518,7 +517,7 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
         await controller.closeSession(sessionId);
         result = { closed: true, sessionId };
       } else if (action === "show") {
-        await controller.ensureSession({ sessionId });
+        await controller.ensureSession({ sessionId, preserveActive: true });
         if (delegated) {
           result = { visible: false, delegated: true, sessionId };
         } else {
@@ -529,12 +528,10 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
         if (!delegated) controller.closePanel();
         result = { visible: false, delegated, sessionId };
       } else if (action === "wait_for_dom_stable") {
-        await controller.ensureSession({ sessionId });
-        revealAgentSession();
+        await controller.ensureSession({ sessionId, preserveActive: true });
         result = await waitForDomStable(controller, sessionId, args.timeout ?? 8_000, signal);
       } else if (action === "wait_for_selector") {
-        await controller.ensureSession({ sessionId });
-        revealAgentSession();
+        await controller.ensureSession({ sessionId, preserveActive: true });
         result = await waitForSelector(
           controller,
           sessionId,
@@ -563,10 +560,11 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
         if (action === "execute_js") requiredString(args.script, "script");
 
         await controller.ensureSession({ sessionId });
-        revealAgentSession();
         const response = await controller.action(runtimeAction(action), actionInput(args), {
           sessionId,
           timeoutMs: args.timeout,
+          preserveActive: true,
+          agent: true,
         });
         screenshotBase64 = response.screenshotBase64;
         const browserResult = screenshotBase64

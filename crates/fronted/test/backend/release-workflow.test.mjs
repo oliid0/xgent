@@ -215,7 +215,9 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(android, /xgent-android-launch-evidence/);
   assert.match(ios, /--target aarch64-sim/);
   assert.match(ios, /xcrun simctl launch --terminate-running-process/);
-  assert.match(ios, /xcrun simctl spawn "\$simulator_udid" ps -p "\$app_pid"/);
+  assert.doesNotMatch(ios, /simctl spawn .* ps -p/);
+  assert.match(ios, /xcrun simctl io "\$simulator_udid" screenshot/);
+  assert.match(ios, /xcrun simctl terminate "\$simulator_udid" "\$bundle_id"/);
   assert.match(ios, /xgent-ios-launch-evidence/);
   assert.match(workflow, /! -name '\*-smoke\.png'/);
 });

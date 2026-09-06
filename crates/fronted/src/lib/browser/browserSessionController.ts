@@ -11,7 +11,7 @@ import {
 
 const DEFAULT_BROWSER_SESSION_ID = "main";
 const DEFAULT_BROWSER_HOME = "https://www.google.com/";
-export const MAX_BROWSER_SESSIONS = 3;
+export const MAX_BROWSER_SESSIONS = 16;
 
 export type BrowserControllerState = {
   initialized: boolean;
@@ -43,6 +43,8 @@ export type EnsureBrowserSessionOptions = {
   url?: string;
   visible?: boolean;
   preserveError?: boolean;
+  /** Keep a user-selected visible tab active while an agent works in another session. */
+  preserveActive?: boolean;
 };
 
 type Listener = () => void;
@@ -88,9 +90,11 @@ function mergeSession(
   sessions: BrowserSessionSummary[],
   session: BrowserSessionSummary,
 ): BrowserSessionSummary[] {
-  const next = sessions.filter((item) => item.sessionId !== session.sessionId);
-  next.push(session);
-  return next.sort((left, right) => left.sessionId.localeCompare(right.sessionId));
+  const index = sessions.findIndex((item) => item.sessionId === session.sessionId);
+  if (index < 0) return [...sessions, session];
+  const next = [...sessions];
+  next[index] = session;
+  return next;
 }
 
 export class BrowserSessionController {
@@ -114,12 +118,18 @@ export class BrowserSessionController {
 
   private readonly listeners = new Set<Listener>();
   private readonly queues = new Map<string, Promise<unknown>>();
+  private readonly agentObservations = new Map<
+    string,
+    { url: string; sequence: number; documentId?: string }
+  >();
   private readonly assistanceWaiters = new Map<
     string,
     Set<(assistance: BrowserHumanAssistanceCompletion) => void>
   >();
   private assistanceSequence = 0;
   private initializePromise: Promise<BrowserControllerState> | null = null;
+  private readonly openingSessions = new Map<string, Promise<BrowserSessionSummary>>();
+  private nextUserTabId = 0;
 
   subscribe = (listener: Listener) => {
     this.listeners.add(listener);
@@ -212,13 +222,20 @@ export class BrowserSessionController {
     if (existing) {
       if (!shouldNavigate) {
         this.update({
-          activeSessionId: sessionId,
+          activeSessionId: options.preserveActive ? this.state.activeSessionId : sessionId,
           ...(options.preserveError ? {} : { error: null }),
         });
         return existing;
       }
       const target = normalizeBrowserAddress(options.url || existing.url);
-      const response = await this.action("navigate", { url: target }, { sessionId });
+      const response = await this.action(
+        "navigate",
+        { url: target },
+        {
+          sessionId,
+          preserveActive: options.preserveActive,
+        },
+      );
       const session: BrowserSessionSummary = {
         ...existing,
         url: response.url || target,
@@ -227,19 +244,21 @@ export class BrowserSessionController {
       };
       this.update({
         sessions: mergeSession(this.state.sessions, session),
-        activeSessionId: sessionId,
+        activeSessionId: options.preserveActive ? this.state.activeSessionId : sessionId,
         error: null,
       });
       return session;
     }
 
-    if (this.state.sessions.length >= MAX_BROWSER_SESSIONS) {
+    const pending = this.openingSessions.get(sessionId);
+    if (pending) return pending;
+    if (this.state.sessions.length + this.openingSessions.size >= MAX_BROWSER_SESSIONS) {
       throw new Error(`The embedded browser supports up to ${MAX_BROWSER_SESSIONS} tabs.`);
     }
 
     let session: BrowserSessionSummary;
     try {
-      session = await this.enqueue(sessionId, () =>
+      const opening = this.enqueue(sessionId, () =>
         this.client.openSession({
           sessionId,
           url: normalizeBrowserAddress(options.url || this.homePage),
@@ -249,6 +268,8 @@ export class BrowserSessionController {
           },
         }),
       );
+      this.openingSessions.set(sessionId, opening);
+      session = await opening;
     } catch (error) {
       // Native creation may have completed just as an IPC deadline elapsed.
       // Reconcile once before surfacing the error so the next command reuses
@@ -258,26 +279,35 @@ export class BrowserSessionController {
       if (preserved) {
         this.update({
           sessions,
-          activeSessionId: sessionId,
+          activeSessionId: options.preserveActive ? this.state.activeSessionId : sessionId,
           ...(options.preserveError ? {} : { error: errorMessage(error) }),
         });
       }
       throw error;
+    } finally {
+      this.openingSessions.delete(sessionId);
     }
     this.update({
       sessions: mergeSession(this.state.sessions, session),
-      activeSessionId: sessionId,
+      activeSessionId: options.preserveActive ? this.state.activeSessionId : sessionId,
       ...(options.preserveError ? {} : { error: null }),
     });
     return session;
   }
 
-  async newSession(url = this.homePage) {
+  async newSession(url = this.homePage, options: { preserveActive?: boolean } = {}) {
     await this.initialize();
-    const used = new Set(this.state.sessions.map((session) => session.sessionId));
-    let index = 1;
-    while (used.has(`tab-${index}`)) index += 1;
-    return this.ensureSession({ sessionId: `tab-${index}`, url });
+    const used = new Set([
+      ...this.state.sessions.map((session) => session.sessionId),
+      ...this.openingSessions.keys(),
+    ]);
+    let index = ++this.nextUserTabId;
+    while (used.has(`tab-${index}`)) index = ++this.nextUserTabId;
+    return this.ensureSession({
+      sessionId: `tab-${index}`,
+      url,
+      preserveActive: options.preserveActive,
+    });
   }
 
   selectSession(sessionId: string) {
@@ -321,9 +351,11 @@ export class BrowserSessionController {
     const completedHumanAssistance = { ...this.state.completedHumanAssistance };
     delete previewDataUrls[sessionId];
     delete completedHumanAssistance[sessionId];
+    this.agentObservations.delete(sessionId);
+    const closedIndex = this.state.sessions.findIndex((session) => session.sessionId === sessionId);
     const activeSessionId =
       this.state.activeSessionId === sessionId
-        ? (sessions[0]?.sessionId ?? null)
+        ? (sessions[Math.min(closedIndex, sessions.length - 1)]?.sessionId ?? null)
         : this.state.activeSessionId;
     this.update({
       sessions,
@@ -332,11 +364,6 @@ export class BrowserSessionController {
       completedHumanAssistance,
       error: null,
     });
-    if (this.state.panelOpen && activeSessionId) {
-      await this.ensureSession({ sessionId: activeSessionId });
-    } else if (this.state.panelOpen && sessions.length === 0) {
-      await this.ensureSession({ sessionId: DEFAULT_BROWSER_SESSION_ID });
-    }
   }
 
   async closeAllSessions() {
@@ -347,6 +374,7 @@ export class BrowserSessionController {
     for (const sessionId of sessionIds) {
       await this.enqueue(sessionId, () => this.client.closeSession(sessionId));
     }
+    this.agentObservations.clear();
     this.update({
       sessions: [],
       activeSessionId: null,
@@ -457,15 +485,109 @@ export class BrowserSessionController {
   async action(
     action: BrowserAction,
     input: BrowserActionInput = {},
-    options: { sessionId?: string; timeoutMs?: number; background?: boolean } = {},
+    options: {
+      sessionId?: string;
+      timeoutMs?: number;
+      background?: boolean;
+      preserveActive?: boolean;
+      agent?: boolean;
+    } = {},
   ): Promise<BrowserActionResponse> {
     const sessionId = normalizedSessionId(options.sessionId);
-    await this.ensureSession({ sessionId, preserveError: options.background });
+    const preserveActive =
+      options.preserveActive === true ||
+      (this.state.panelOpenSource === "user" &&
+        this.state.activeSessionId !== null &&
+        this.state.activeSessionId !== sessionId);
+    await this.ensureSession({
+      sessionId,
+      preserveError: options.background,
+      preserveActive,
+    });
     if (!options.background) this.setSessionBusy(sessionId, true);
     try {
-      const response = await this.enqueue(sessionId, () =>
-        this.client.action(sessionId, action, input, options.timeoutMs),
-      );
+      const response = await this.enqueue(sessionId, async () => {
+        const mutating = [
+          "click",
+          "type",
+          "press_key",
+          "scroll",
+          "hover",
+          "navigate",
+          "reload",
+          "go_back",
+          "go_forward",
+          "execute_js",
+        ].includes(action);
+        const observe = (response: BrowserActionResponse) => {
+          const data = response.data as
+            | { humanIntervention?: { sequence?: number; documentId?: string } }
+            | undefined;
+          return {
+            url: response.url,
+            sequence: data?.humanIntervention?.sequence ?? 0,
+            documentId: data?.humanIntervention?.documentId,
+          };
+        };
+        let guardedInput = input;
+        if (options.agent && mutating) {
+          const state = await this.client.action(sessionId, "page_info", {}, options.timeoutMs);
+          const current = observe(state);
+          const previous = this.agentObservations.get(sessionId);
+          if (
+            !previous ||
+            current.url !== previous.url ||
+            current.sequence !== previous.sequence ||
+            current.documentId !== previous.documentId
+          ) {
+            const fresh = await this.client.action(sessionId, "snapshot", {}, options.timeoutMs);
+            this.agentObservations.set(sessionId, observe(fresh));
+            return {
+              ...fresh,
+              data: {
+                freshState: fresh.data,
+                actionApplied: false,
+                reason:
+                  "The page has changed or has not been observed. Inspect this fresh state and continue; do not repeat work the user already completed.",
+              },
+            };
+          }
+          guardedInput = {
+            ...input,
+            expectedHumanSequence: current.sequence,
+            expectedDocumentId: current.documentId,
+          };
+        }
+        const result = await this.client.action(sessionId, action, guardedInput, options.timeoutMs);
+        if (options.agent) this.agentObservations.set(sessionId, observe(result));
+        if (options.agent && mutating) {
+          // Preserve dispatch evidence even if the following observation fails.
+          const applied = (result.data as { actionApplied?: boolean } | undefined)?.actionApplied !== false;
+          let fresh: BrowserActionResponse;
+          try {
+            fresh = await this.client.action(sessionId, "snapshot", {}, options.timeoutMs);
+          } catch (error) {
+            this.agentObservations.delete(sessionId);
+            return {
+              ...result,
+              data: {
+                result: result.data,
+                actionApplied: applied,
+                observationError: errorMessage(error),
+                reason: "Observe the page before continuing. Do not replay an action merely because its following observation failed.",
+              },
+            };
+          }
+          this.agentObservations.set(sessionId, observe(fresh));
+          return {
+            ...result,
+            url: fresh.url,
+            title: fresh.title,
+            data: { result: result.data, freshState: fresh.data, actionApplied: applied },
+          };
+        }
+        return result;
+      });
       const existing = this.state.sessions.find((session) => session.sessionId === sessionId);
       const previewDataUrls = response.screenshotBase64
         ? {
@@ -481,7 +603,7 @@ export class BrowserSessionController {
           visible: existing?.visible ?? false,
           loading: false,
         }),
-        activeSessionId: sessionId,
+        activeSessionId: preserveActive ? this.state.activeSessionId : sessionId,
         previewDataUrls,
         ...(options.background ? {} : { error: null }),
       });

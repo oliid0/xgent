@@ -1,6 +1,5 @@
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxButton } from "@astryxdesign/core/Button";
-import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -17,14 +16,15 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Text as AstryxText, Heading, Text } from "@astryxdesign/core/Text";
+import { TextArea } from "@astryxdesign/core/TextArea";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { renderAsync } from "docx-preview";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { read, utils } from "xlsx";
+import { read, utils, write } from "xlsx";
 import { useLocale } from "../../i18n";
 import { cn } from "../../lib/shared/utils";
 import { writeClipboardText } from "../../lib/system/clipboardText";
-import { invokeFs } from "../../lib/tools/fsBackend";
+import { invokeFs, isFsBackendError } from "../../lib/tools/fsBackend";
 import { type FileTypeIconComponent, getFileTypeIcon } from "../chat/fileTypeIcons";
 import {
   Check,
@@ -39,6 +39,7 @@ import {
   Plus,
   RefreshCw,
   RotateCwSquare,
+  Save,
   X,
 } from "../icons";
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
@@ -64,6 +65,13 @@ type ReadWorkspacePreviewResponse = {
   sizeBytes: number;
   mtimeMs: number;
   contentHash: string;
+  content?: string | null;
+};
+
+type EditableAnnotationResponse = {
+  content: string;
+  mtimeMs: number;
+  contentHash: string;
 };
 
 type WorkspaceFilePreviewOverlayProps = {
@@ -72,9 +80,11 @@ type WorkspaceFilePreviewOverlayProps = {
   presentation: "side" | "fullscreen";
   width?: number | string;
   overlay?: boolean;
+  embedded?: boolean;
   onPresentationChange: (presentation: "side" | "fullscreen") => void;
   onRequestClose: () => void;
   onClose: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 type LoadedPreview = ReadWorkspacePreviewResponse & {
@@ -88,7 +98,8 @@ type SpreadsheetTable = {
   sheetNames: string[];
   rows: Array<{
     id: string;
-    cells: Array<{ id: string; value: string }>;
+    rowIndex: number;
+    cells: Array<{ id: string; columnIndex: number; value: string }>;
   }>;
   activeSheetName: string;
   truncatedRows: boolean;
@@ -139,6 +150,15 @@ function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.slice().buffer;
 }
 
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return window.btoa(binary);
+}
+
 function isTextPreviewKind(kind: WorkspacePreviewKind) {
   return kind === "html" || kind === "markdown" || kind === "text";
 }
@@ -159,6 +179,7 @@ function kindFromMimeType(mimeType: string): WorkspacePreviewKind | null {
     return "spreadsheet";
   }
   if (mime.includes("wordprocessingml")) return "document";
+  if (mime.includes("presentationml") || mime.includes("powerpoint")) return "presentation";
   if (mime.startsWith("audio/")) return "audio";
   if (mime.startsWith("video/")) return "video";
   if (mime.startsWith("text/")) return "text";
@@ -226,6 +247,8 @@ function getPreviewIcon(kind: WorkspacePreviewKind): FileTypeIconComponent {
       return getFileTypeIcon("preview.md", "file");
     case "pdf":
       return getFileTypeIcon("preview.pdf", "file");
+    case "presentation":
+      return getFileTypeIcon("preview.pptx", "file");
     case "spreadsheet":
       return getFileTypeIcon("preview.xlsx", "file");
     case "video":
@@ -257,9 +280,14 @@ function buildSpreadsheetTable(
         error: null,
       };
     }
+    const sheetRange = utils.decode_range(sheet["!ref"] || "A1");
     const rawRows = utils.sheet_to_json<unknown[]>(sheet, {
       header: 1,
-      blankrows: false,
+      blankrows: true,
+      range: { s: { r: 0, c: 0 }, e: {
+        r: Math.min(sheetRange.e.r, SPREADSHEET_MAX_ROWS - 1),
+        c: Math.min(sheetRange.e.c, SPREADSHEET_MAX_COLUMNS - 1),
+      } },
       defval: "",
       raw: false,
     });
@@ -272,11 +300,13 @@ function buildSpreadsheetTable(
         { length: Math.min(maxColumns, SPREADSHEET_MAX_COLUMNS) },
         (_, index) => ({
           id: `c${index}`,
+          columnIndex: index,
           value: String(Array.isArray(row) ? (row[index] ?? "") : ""),
         }),
       );
       return {
         id: `r${rowIndex}-${hashString(cells.map((cell) => cell.value).join("\u0000"))}`,
+        rowIndex,
         cells,
       };
     });
@@ -307,6 +337,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     presentation,
     width,
     overlay = false,
+    embedded = false,
     onPresentationChange,
     onRequestClose,
     onClose,
@@ -325,8 +356,27 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
   const [error, setError] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [sourceCopied, setSourceCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"preview" | "source">("preview");
+  const [sourceDraft, setSourceDraft] = useState("");
+  const [sourceSaved, setSourceSaved] = useState("");
+  const [sourceSaving, setSourceSaving] = useState(false);
+  const [annotationDraft, setAnnotationDraft] = useState("");
+  const [annotationSaved, setAnnotationSaved] = useState("");
+  const [annotationVersion, setAnnotationVersion] = useState<{
+    mtimeMs: number;
+    contentHash: string;
+  } | null>(null);
+  const [spreadsheetEdits, setSpreadsheetEdits] = useState<Record<string, Record<string, string>>>(
+    {},
+  );
+  const [activeTab, setActiveTab] = useState<"preview" | "source" | "annotations">("preview");
   const [isVisible, setIsVisible] = useState(false);
+  const dirty =
+    sourceDraft !== sourceSaved ||
+    annotationDraft !== annotationSaved ||
+    Object.values(spreadsheetEdits).some((edits) => Object.keys(edits).length > 0);
+  useEffect(() => {
+    props.onDirtyChange?.(dirty);
+  }, [dirty, props.onDirtyChange]);
 
   const replacePreview = useCallback((next: LoadedPreview | null) => {
     if (previewBlobUrlRef.current) {
@@ -336,6 +386,9 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     previewRef.current = next;
     setActiveSheetName("");
     setSourceCopied(false);
+    setSourceDraft(next?.text ?? "");
+    setSourceSaved(next?.text ?? "");
+    setSpreadsheetEdits({});
     setPreview(next);
   }, []);
 
@@ -404,7 +457,11 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
         if (loadSequenceRef.current !== sequence) return;
         const bytes = base64ToBytes(response.data);
         const kind = resolvePreviewKind(response.path || request.path, response.mimeType);
-        const text = isTextPreviewKind(kind) ? decodePreviewText(bytes) : null;
+        const text =
+          response.content ??
+          (isTextPreviewKind(kind) || isWorkspaceEditablePreviewPath(response.path || request.path)
+            ? decodePreviewText(bytes)
+            : null);
         const blobBytes =
           kind === "html" && text !== null
             ? new TextEncoder().encode(buildSandboxedHtmlPreviewSource(text))
@@ -460,23 +517,233 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       kind === "image" ? normalizeImagePaths(activePreviewRequest?.imagePaths, activePath) : [],
     [activePath, activePreviewRequest?.imagePaths, kind],
   );
+  const canEditDocument = Boolean(
+    preview?.kind === "document" &&
+      activePath.toLowerCase().endsWith(".docx") &&
+      preview.text !== null &&
+      preview.text !== undefined,
+  );
   const canShowSource = Boolean(
     activePreviewRequest &&
-      isWorkspaceEditablePreviewPath(activePath) &&
+      (isWorkspaceEditablePreviewPath(activePath) || canEditDocument) &&
       preview?.text !== null &&
       preview?.text !== undefined,
   );
-  const canOpenExternal = Boolean(activePreviewRequest && activePath && !canShowSource);
+  const canOpenExternal = Boolean(activePreviewRequest && activePath);
+  const canAnnotate = kind === "pdf" || kind === "presentation";
+  const canEditSpreadsheet =
+    preview?.kind === "spreadsheet" && activePath.toLowerCase().endsWith(".xlsx");
+  const spreadsheetHasEdits = Object.values(spreadsheetEdits).some(
+    (sheet) => Object.keys(sheet).length > 0,
+  );
+
+  useEffect(() => {
+    setAnnotationDraft("");
+    setAnnotationSaved("");
+    setAnnotationVersion(null);
+    if (!activePreviewRequest || !canAnnotate || !activePath) return;
+    let cancelled = false;
+    void invokeFs<EditableAnnotationResponse>("fs_read_editable_text", {
+      workdir: activePreviewRequest.workdir,
+      path: `${activePath}.xgent-annotations.md`,
+    })
+      .then((response) => {
+        if (cancelled) return;
+        setAnnotationDraft(response.content);
+        setAnnotationSaved(response.content);
+        setAnnotationVersion({
+          mtimeMs: response.mtimeMs,
+          contentHash: response.contentHash,
+        });
+      })
+      .catch((annotationError) => {
+        if (
+          cancelled ||
+          (isFsBackendError(annotationError) && annotationError.code === "not_found")
+        ) {
+          return;
+        }
+        setError(toMessage(annotationError, t("workspaceFilePreview.openFailed")));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePath, activePreviewRequest, canAnnotate, t]);
 
   const copyPreviewSource = useCallback(async () => {
     if (preview?.text === null || preview?.text === undefined) return;
-    if (await writeClipboardText(preview.text)) {
+    if (await writeClipboardText(sourceDraft)) {
       setSourceCopied(true);
       window.setTimeout(() => setSourceCopied(false), 1600);
     } else {
       setError(t("workspaceFilePreview.copyFailed"));
     }
-  }, [preview?.text, t]);
+  }, [preview?.text, sourceDraft, t]);
+
+  const saveSource = useCallback(async () => {
+    if (!activePreviewRequest || !preview || sourceDraft === sourceSaved || sourceSaving) return;
+    setSourceSaving(true);
+    setError(null);
+    try {
+      const path = activePath || activePreviewRequest.path;
+      if (canEditDocument) {
+        await invokeFs("fs_write_docx_text", {
+          workdir: activePreviewRequest.workdir,
+          path,
+          content: sourceDraft,
+          expected_mtime_ms: preview.mtimeMs,
+          expected_content_hash: preview.contentHash,
+        });
+      } else {
+        await invokeFs("fs_write_text", {
+          workdir: activePreviewRequest.workdir,
+          path,
+          content: sourceDraft,
+          mode: "rewrite",
+          expected_mtime_ms: preview.mtimeMs,
+          expected_content_hash: preview.contentHash,
+        });
+      }
+      await loadPreview(activePreviewRequest, 0);
+      setActiveTab("source");
+    } catch (saveError) {
+      setError(toMessage(saveError, t("workspaceEditor.saveFailed")));
+    } finally {
+      setSourceSaving(false);
+    }
+  }, [
+    activePath,
+    activePreviewRequest,
+    canEditDocument,
+    loadPreview,
+    preview,
+    sourceDraft,
+    sourceSaved,
+    sourceSaving,
+    t,
+  ]);
+
+  const saveSpreadsheet = useCallback(async () => {
+    if (!activePreviewRequest || !preview || !canEditSpreadsheet || !spreadsheetHasEdits) return;
+    setSourceSaving(true);
+    setError(null);
+    try {
+      const workbook = read(preview.bytes, { type: "array", cellDates: true });
+      for (const [sheetName, edits] of Object.entries(spreadsheetEdits)) {
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet) continue;
+        for (const [coordinate, value] of Object.entries(edits)) {
+          const [rowText, columnText] = coordinate.split(":");
+          const row = Number(rowText);
+          const column = Number(columnText);
+          if (!Number.isInteger(row) || !Number.isInteger(column)) continue;
+          sheet[utils.encode_cell({ r: row, c: column })] = { t: "s", v: value };
+        }
+      }
+      const output = new Uint8Array(write(workbook, { type: "array", bookType: "xlsx" }));
+      await invokeFs("fs_write_binary", {
+        workdir: activePreviewRequest.workdir,
+        path: activePath || activePreviewRequest.path,
+        content_base64: bytesToBase64(output),
+        expected_mtime_ms: preview.mtimeMs,
+        expected_content_hash: preview.contentHash,
+      });
+      await loadPreview(activePreviewRequest, 0);
+    } catch (saveError) {
+      setError(toMessage(saveError, t("workspaceEditor.saveFailed")));
+    } finally {
+      setSourceSaving(false);
+    }
+  }, [
+    activePath,
+    activePreviewRequest,
+    canEditSpreadsheet,
+    loadPreview,
+    preview,
+    spreadsheetEdits,
+    spreadsheetHasEdits,
+    t,
+  ]);
+
+  const saveAnnotations = useCallback(async () => {
+    if (!activePreviewRequest || !canAnnotate || annotationDraft === annotationSaved) return;
+    setSourceSaving(true);
+    setError(null);
+    try {
+      const response = await invokeFs<{
+        mtimeMs: number;
+        contentHash: string;
+      }>("fs_write_text", {
+        workdir: activePreviewRequest.workdir,
+        path: `${activePath || activePreviewRequest.path}.xgent-annotations.md`,
+        content: annotationDraft,
+        mode: "rewrite",
+        expected_mtime_ms: annotationVersion?.mtimeMs,
+        expected_content_hash: annotationVersion?.contentHash,
+      });
+      setAnnotationSaved(annotationDraft);
+      setAnnotationVersion({
+        mtimeMs: response.mtimeMs,
+        contentHash: response.contentHash,
+      });
+    } catch (saveError) {
+      setError(toMessage(saveError, t("workspaceEditor.saveFailed")));
+    } finally {
+      setSourceSaving(false);
+    }
+  }, [
+    activePath,
+    activePreviewRequest,
+    annotationDraft,
+    annotationSaved,
+    annotationVersion,
+    canAnnotate,
+    t,
+  ]);
+
+  const saveImageRotation = useCallback(
+    async (degrees: number) => {
+      if (!activePreviewRequest || !preview || preview.kind !== "image") return;
+      setSourceSaving(true);
+      setError(null);
+      try {
+        const image = new Image();
+        image.src = preview.blobUrl;
+        await image.decode();
+        const normalized = normalizeRotation(degrees);
+        const swapsAxes = normalized === 90 || normalized === 270;
+        const canvas = document.createElement("canvas");
+        canvas.width = swapsAxes ? image.naturalHeight : image.naturalWidth;
+        canvas.height = swapsAxes ? image.naturalWidth : image.naturalHeight;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Canvas image editing is unavailable");
+        context.translate(canvas.width / 2, canvas.height / 2);
+        context.rotate((normalized * Math.PI) / 180);
+        context.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
+        const mimeType = preview.mimeType === "image/jpg" ? "image/jpeg" : preview.mimeType;
+        const blob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob(
+            (result) => (result ? resolve(result) : reject(new Error("Image encoding failed"))),
+            mimeType,
+            mimeType === "image/jpeg" || mimeType === "image/webp" ? 0.94 : undefined,
+          );
+        });
+        await invokeFs("fs_write_binary", {
+          workdir: activePreviewRequest.workdir,
+          path: activePath || activePreviewRequest.path,
+          content_base64: bytesToBase64(new Uint8Array(await blob.arrayBuffer())),
+          expected_mtime_ms: preview.mtimeMs,
+          expected_content_hash: preview.contentHash,
+        });
+        await loadPreview(activePreviewRequest, 0);
+      } catch (saveError) {
+        setError(toMessage(saveError, t("workspaceEditor.saveFailed")));
+      } finally {
+        setSourceSaving(false);
+      }
+    },
+    [activePath, activePreviewRequest, loadPreview, preview, t],
+  );
 
   const openImagePath = useCallback(
     (path: string, transitionDirection: ImagePreviewTransitionDirection = 0) => {
@@ -511,19 +778,20 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
         position: overlay ? "absolute" : "relative",
         inset: overlay ? 0 : undefined,
         zIndex: "var(--xgent-z-workspace-overlay)",
-        flex: presentation === "fullscreen" ? "1 1 auto" : "0 0 auto",
-        width: presentation === "fullscreen" ? "100%" : width,
+        flex: embedded || presentation === "fullscreen" ? "1 1 auto" : "0 0 auto",
+        width: embedded || presentation === "fullscreen" ? "100%" : width,
         maxWidth: "100%",
         minWidth: 0,
         minHeight: 0,
         overflow: "hidden",
         backgroundColor: "var(--color-background-body)",
-        borderInlineStart: overlay ? undefined : "var(--border-width) solid var(--color-border)",
+        borderInlineStart:
+          overlay || embedded ? undefined : "var(--border-width) solid var(--color-border)",
         paddingBlockStart: overlay ? "env(safe-area-inset-top, 0px)" : undefined,
         paddingBlockEnd: overlay ? "env(safe-area-inset-bottom, 0px)" : undefined,
       }}
     >
-      <MacOsTitleBarSpacer />
+      {!embedded ? <MacOsTitleBarSpacer /> : null}
       <Layout
         height="fill"
         header={
@@ -565,6 +833,42 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                         onClick={() => void copyPreviewSource()}
                       />
                     ) : null}
+                    {canShowSource && activeTab === "source" ? (
+                      <IconButton
+                        label={t("workspaceEditor.save")}
+                        tooltip={t("workspaceEditor.save")}
+                        icon={<Icon icon={Save} size="sm" color="inherit" />}
+                        variant="ghost"
+                        size="sm"
+                        isLoading={sourceSaving}
+                        isDisabled={sourceDraft === sourceSaved || sourceSaving}
+                        onClick={() => void saveSource()}
+                      />
+                    ) : null}
+                    {canEditSpreadsheet ? (
+                      <IconButton
+                        label={t("workspaceEditor.save")}
+                        tooltip={t("workspaceEditor.save")}
+                        icon={<Icon icon={Save} size="sm" color="inherit" />}
+                        variant="ghost"
+                        size="sm"
+                        isLoading={sourceSaving}
+                        isDisabled={!spreadsheetHasEdits || sourceSaving}
+                        onClick={() => void saveSpreadsheet()}
+                      />
+                    ) : null}
+                    {canAnnotate && activeTab === "annotations" ? (
+                      <IconButton
+                        label={t("workspaceEditor.save")}
+                        tooltip={t("workspaceEditor.save")}
+                        icon={<Icon icon={Save} size="sm" color="inherit" />}
+                        variant="ghost"
+                        size="sm"
+                        isLoading={sourceSaving}
+                        isDisabled={annotationDraft === annotationSaved || sourceSaving}
+                        onClick={() => void saveAnnotations()}
+                      />
+                    ) : null}
                     {canOpenExternal ? (
                       <IconButton
                         label={t("workspaceFilePreview.openExternal")}
@@ -587,7 +891,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                         activePreviewRequest && void loadPreview(activePreviewRequest, 0)
                       }
                     />
-                    {!overlay ? (
+                    {!overlay && !embedded ? (
                       <IconButton
                         label={
                           presentation === "fullscreen"
@@ -615,27 +919,40 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                         }
                       />
                     ) : null}
-                    <IconButton
-                      label={t("workspaceFilePreview.close")}
-                      tooltip={t("workspaceFilePreview.close")}
-                      icon={<Icon icon={X} size="sm" color="inherit" />}
-                      variant="ghost"
-                      size="sm"
-                      onClick={onRequestClose}
-                    />
+                    {!embedded ? (
+                      <IconButton
+                        label={t("workspaceFilePreview.close")}
+                        tooltip={t("workspaceFilePreview.close")}
+                        icon={<Icon icon={X} size="sm" color="inherit" />}
+                        variant="ghost"
+                        size="sm"
+                        onClick={onRequestClose}
+                      />
+                    ) : null}
                   </HStack>
                 }
               />
-              {canShowSource ? (
+              {canShowSource || canAnnotate ? (
                 <HStack width="100%" paddingInline={3}>
                   <TabList
                     value={activeTab}
-                    onChange={(value) => setActiveTab(value === "source" ? "source" : "preview")}
+                    onChange={(value) =>
+                      setActiveTab(
+                        value === "source"
+                          ? "source"
+                          : value === "annotations"
+                            ? "annotations"
+                            : "preview",
+                      )
+                    }
                     size="sm"
                     overflow="auto"
                   >
                     <Tab value="preview" label={t("workspaceFilePreview.preview")} />
-                    <Tab value="source" label={t("workspaceFilePreview.source")} />
+                    {canShowSource ? (
+                      <Tab value="source" label={t("workspaceFilePreview.source")} />
+                    ) : null}
+                    {canAnnotate ? <Tab value="annotations" label="Annotations" /> : null}
                   </TabList>
                 </HStack>
               ) : null}
@@ -654,16 +971,32 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
             ) : null}
             <StackItem size="fill">
               <LayoutContent padding={0} className="xgent-workspace-file-preview-stage">
-                {preview && activeTab === "source" && preview.text !== null ? (
-                  <VStack height="100%" minHeight={0} padding={3} isScrollable>
-                    <CodeBlock
-                      code={preview.text}
-                      language={previewLanguage(activePath, preview.kind)}
-                      title={basename(activePath)}
-                      hasCopyButton
-                      hasLineNumbers
+                {preview && activeTab === "annotations" && canAnnotate ? (
+                  <VStack height="100%" minHeight={0} padding={3} gap={2}>
+                    <Text type="supporting" color="secondary">
+                      Notes are saved beside the original as {basename(activePath)}
+                      .xgent-annotations.md
+                    </Text>
+                    <TextArea
+                      label="Annotations"
+                      isLabelHidden
+                      value={annotationDraft}
+                      onChange={setAnnotationDraft}
+                      rows={30}
                       width="100%"
-                      container="section"
+                      className="h-full min-h-0 text-sm"
+                    />
+                  </VStack>
+                ) : preview && activeTab === "source" && preview.text !== null ? (
+                  <VStack height="100%" minHeight={0} padding={3}>
+                    <TextArea
+                      label={`${basename(activePath)} · ${previewLanguage(activePath, preview.kind)}`}
+                      isLabelHidden
+                      value={sourceDraft}
+                      onChange={setSourceDraft}
+                      rows={30}
+                      width="100%"
+                      className="h-full min-h-0 font-mono text-xs"
                     />
                   </VStack>
                 ) : preview ? (
@@ -678,6 +1011,18 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                     activeSheetName={activeSheetName}
                     onOpenImagePath={openImagePath}
                     onActiveSheetNameChange={setActiveSheetName}
+                    spreadsheetEdits={spreadsheetEdits}
+                    spreadsheetEditable={canEditSpreadsheet}
+                    onSpreadsheetCellChange={(sheetName, row, column, value) =>
+                      setSpreadsheetEdits((current) => ({
+                        ...current,
+                        [sheetName]: {
+                          ...current[sheetName],
+                          [`${row}:${column}`]: value,
+                        },
+                      }))
+                    }
+                    onSaveImageRotation={saveImageRotation}
                     onRenderError={setRenderError}
                   />
                 ) : loading ? (
@@ -723,8 +1068,12 @@ function PreviewBody(props: {
   isSwitchingImage: boolean;
   spreadsheet: SpreadsheetTable | null;
   activeSheetName: string;
+  spreadsheetEdits: Record<string, Record<string, string>>;
+  spreadsheetEditable: boolean;
   onOpenImagePath: (path: string, direction?: ImagePreviewTransitionDirection) => void;
   onActiveSheetNameChange: (sheetName: string) => void;
+  onSpreadsheetCellChange: (sheetName: string, row: number, column: number, value: string) => void;
+  onSaveImageRotation: (degrees: number) => Promise<void>;
   onRenderError: (message: string | null) => void;
 }) {
   const {
@@ -736,8 +1085,12 @@ function PreviewBody(props: {
     isSwitchingImage,
     spreadsheet,
     activeSheetName,
+    spreadsheetEdits,
+    spreadsheetEditable,
     onOpenImagePath,
     onActiveSheetNameChange,
+    onSpreadsheetCellChange,
+    onSaveImageRotation,
     onRenderError,
   } = props;
   const { t } = useLocale();
@@ -777,6 +1130,7 @@ function PreviewBody(props: {
         isSwitchingImage={isSwitchingImage}
         preview={preview}
         onOpenImagePath={onOpenImagePath}
+        onSaveRotation={onSaveImageRotation}
       />
     );
   }
@@ -788,6 +1142,16 @@ function PreviewBody(props: {
         src={preview.blobUrl}
         title={basename(preview.path)}
       />
+    );
+  }
+
+  if (preview.kind === "presentation") {
+    return (
+      <AstryxStack direction="vertical" className="h-full overflow-auto bg-muted/25 p-5">
+        <pre className="mx-auto w-full max-w-4xl whitespace-pre-wrap rounded-lg border border-border bg-background p-5 text-sm leading-6 text-foreground shadow-sm">
+          {preview.text || t("workspaceFilePreview.empty")}
+        </pre>
+      </AstryxStack>
     );
   }
 
@@ -873,7 +1237,24 @@ function PreviewBody(props: {
                           rowIndex === 0 && "font-semibold text-foreground",
                         )}
                       >
-                        {cell.value}
+                        <input
+                          aria-label={`${spreadsheet.activeSheetName} R${row.rowIndex + 1} C${cell.columnIndex + 1}`}
+                          className="h-full min-w-24 bg-transparent outline-none focus:ring-1 focus:ring-accent"
+                          readOnly={!spreadsheetEditable}
+                          value={
+                            spreadsheetEdits[spreadsheet.activeSheetName]?.[
+                              `${row.rowIndex}:${cell.columnIndex}`
+                            ] ?? cell.value
+                          }
+                          onChange={(event) =>
+                            onSpreadsheetCellChange(
+                              spreadsheet.activeSheetName,
+                              row.rowIndex,
+                              cell.columnIndex,
+                              event.currentTarget.value,
+                            )
+                          }
+                        />
                       </td>
                     ))}
                   </tr>
@@ -965,6 +1346,7 @@ function WorkspaceImagePreviewBody(props: {
   transitionDirection: ImagePreviewTransitionDirection;
   isSwitchingImage: boolean;
   onOpenImagePath: (path: string, direction?: ImagePreviewTransitionDirection) => void;
+  onSaveRotation: (degrees: number) => Promise<void>;
 }) {
   const {
     preview,
@@ -973,10 +1355,12 @@ function WorkspaceImagePreviewBody(props: {
     transitionDirection,
     isSwitchingImage,
     onOpenImagePath,
+    onSaveRotation,
   } = props;
   const { t } = useLocale();
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [saving, setSaving] = useState(false);
   const [isEntering, setIsEntering] = useState(true);
   const [isClippingEnterOverflow, setIsClippingEnterOverflow] = useState(true);
 
@@ -990,6 +1374,9 @@ function WorkspaceImagePreviewBody(props: {
   const counter = t("workspaceFilePreview.imageCounter")
     .replace("{index}", String(imageNumber))
     .replace("{total}", String(imageCount));
+  const canSaveRotation = ["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(
+    preview.mimeType,
+  );
 
   const openImageAt = useCallback(
     (index: number) => {
@@ -1075,6 +1462,16 @@ function WorkspaceImagePreviewBody(props: {
             onClick={() => setRotation((current) => normalizeRotation(current + 90))}
           >
             <RotateCwSquare className="h-4 w-4" />
+          </ImagePreviewToolButton>
+          <ImagePreviewToolButton
+            label={t("workspaceEditor.save")}
+            disabled={!canSaveRotation || rotation === 0 || saving}
+            onClick={() => {
+              setSaving(true);
+              void onSaveRotation(rotation).finally(() => setSaving(false));
+            }}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           </ImagePreviewToolButton>
         </AstryxStack>
       </AstryxStack>

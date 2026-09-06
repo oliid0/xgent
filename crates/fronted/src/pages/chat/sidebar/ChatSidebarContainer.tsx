@@ -79,6 +79,8 @@ type ChatSidebarContainerProps = {
   onSelectExecutionMode: (mode: ExecutionMode) => void;
   onOpenSettings: () => void;
   onCreateSoul: () => void;
+  onOpenTrajectory?: () => void;
+  trajectoryAvailable?: boolean;
   appUpdate?: AppUpdateController;
   onOpenSkillsHub: () => void;
   onOpenMcpHub: () => void;
@@ -351,6 +353,8 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         onSelectExecutionMode={props.onSelectExecutionMode}
         onOpenSettings={props.onOpenSettings}
         onCreateSoul={props.onCreateSoul}
+        onOpenTrajectory={props.onOpenTrajectory}
+        trajectoryAvailable={props.trajectoryAvailable}
         appUpdate={props.appUpdate}
         onOpenSkillsHub={props.onOpenSkillsHub}
         onOpenMcpHub={props.onOpenMcpHub}

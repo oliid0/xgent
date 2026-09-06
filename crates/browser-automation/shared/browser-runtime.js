@@ -500,9 +500,17 @@
 
   document.addEventListener("pointerdown", recordHumanIntervention, true);
   document.addEventListener("input", recordHumanIntervention, true);
+  document.addEventListener("keydown", recordHumanIntervention, true);
+  const documentId = `${Date.now()}-${Math.random()}`;
 
   const execute = (action, input = {}) => {
     try {
+      if (["click", "type", "press_key", "scroll", "hover", "execute_js", "__native_target"].includes(action)) {
+        if ((input.expectedHumanSequence !== undefined && input.expectedHumanSequence !== humanInterventionSequence) ||
+            (input.expectedDocumentId !== undefined && input.expectedDocumentId !== documentId)) {
+          throw new Error("The user changed this page before the action. Take a fresh snapshot and do not repeat completed work.");
+        }
+      }
       let data;
       switch (action) {
         case "__native_target":
@@ -551,6 +559,7 @@
       }
       if (data && typeof data === "object" && !Array.isArray(data)) {
         data.humanIntervention = {
+          documentId,
           sequence: humanInterventionSequence,
           last: lastHumanIntervention,
         };

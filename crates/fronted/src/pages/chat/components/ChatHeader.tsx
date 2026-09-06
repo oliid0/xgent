@@ -5,52 +5,30 @@ import { HStack } from "@astryxdesign/core/Stack";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { memo, type ReactNode } from "react";
 
-import { Menu, MonitorSmartphone, Moon, Sun } from "../../../components/icons";
+import { Menu } from "../../../components/icons";
 import { isMacOsTauri } from "../../../components/MacOsTitleBarSpacer";
 import { useLocale } from "../../../i18n";
-import {
-  type AppSettings,
-  type ExecutionMode,
-  getNextTheme,
-  type Theme,
-} from "../../../lib/settings";
-
-function ThemeToggleIcon(props: { theme: Theme }) {
-  if (props.theme === "light") return <Sun size={16} />;
-  if (props.theme === "dark") return <Moon size={16} />;
-  return <MonitorSmartphone size={16} />;
-}
+import type { AppSettings, ExecutionMode } from "../../../lib/settings";
 
 export const ChatHeader = memo(function ChatHeader(props: {
   settings: AppSettings;
   sidebarOpen: boolean;
   onSelectExecutionMode: (mode: ExecutionMode) => void;
-  onToggleTheme: () => void;
   onOpenSidebar: () => void;
   showExecutionMode?: boolean;
   mobileExperience?: boolean;
-  preThemeActions?: ReactNode;
   trailingActions?: ReactNode;
 }) {
   const {
     settings,
     sidebarOpen,
     onSelectExecutionMode,
-    onToggleTheme,
     onOpenSidebar,
     showExecutionMode = true,
     mobileExperience = false,
-    preThemeActions,
     trailingActions,
   } = props;
   const { t } = useLocale();
-  const nextTheme = getNextTheme(settings.theme);
-  const themeToggleTitle =
-    nextTheme === "light"
-      ? t("tooltip.switchToLight")
-      : nextTheme === "dark"
-        ? t("tooltip.switchToDark")
-        : t("tooltip.switchToAuto");
   const macOsTauri = isMacOsTauri();
   const visibleExecutionMode = settings.system.executionMode === "text" ? "text" : "tools";
 
@@ -141,15 +119,6 @@ export const ChatHeader = memo(function ChatHeader(props: {
             ) : null}
           </HStack>
           <HStack gap={1} vAlign="center" hAlign="end" style={{ minWidth: "max-content" }}>
-            {preThemeActions}
-            <IconButton
-              label={themeToggleTitle}
-              tooltip={themeToggleTitle}
-              icon={<ThemeToggleIcon theme={nextTheme} />}
-              variant="ghost"
-              size="md"
-              onClick={onToggleTheme}
-            />
             {trailingActions}
           </HStack>
         </Grid>

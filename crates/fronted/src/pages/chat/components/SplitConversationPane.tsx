@@ -6,8 +6,9 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { TextArea } from "@astryxdesign/core/TextArea";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 import { X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
@@ -35,11 +36,34 @@ export type SplitConversationPaneProps = {
   onActivate: () => void;
   onRetry: () => void;
   onClose: () => void;
+  onSend?: (text: string) => Promise<boolean>;
+  onStop?: () => void;
 };
 
 export function SplitConversationPane(props: SplitConversationPaneProps) {
   const { t } = useLocale();
   const followRef = useRef<ScrollFollowHandle | null>(null);
+  const [draft, setDraft] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const submit = async () => {
+    if (!props.onSend || !draft.trim() || submitting || props.isRunning) return;
+    const text = draft;
+    setDraft("");
+    setSubmitting(true);
+    setSendError(null);
+    try {
+      if (!(await props.onSend(text))) {
+        setDraft((current) => current || text);
+        setSendError("Message was not sent. Check the selected model and try again.");
+      }
+    } catch (error) {
+      setDraft((current) => current || text);
+      setSendError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
   const title = props.record?.title || t("chat.pendingTitle");
   const historyItems = props.record?.state.transcript.items ?? [];
 
@@ -95,10 +119,10 @@ export function SplitConversationPane(props: SplitConversationPaneProps) {
             endContent={<Button label={t("chat.split.retry")} size="sm" onClick={props.onRetry} />}
           />
         </Center>
-      ) : props.record && historyItems.length > 0 ? (
+      ) : (props.record && historyItems.length > 0) || props.isRunning ? (
         <ChatTranscript
           conversationId={props.conversationId}
-          workspaceRoot={props.record.cwd}
+          workspaceRoot={props.record?.cwd}
           followRef={followRef}
           hasModels
           historyItems={historyItems}
@@ -120,6 +144,41 @@ export function SplitConversationPane(props: SplitConversationPaneProps) {
           <Banner status="info" title={t("chat.split.empty")} container="section" />
         </Center>
       )}
+      {props.onSend ? (
+        <VStack
+          as="form"
+          gap={2}
+          padding={3}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submit();
+          }}
+        >
+          {sendError ? <Banner status="error" title={sendError} /> : null}
+          <TextArea
+            label="Message"
+            value={draft}
+            onChange={setDraft}
+            isDisabled={props.loading}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                void submit();
+              }
+            }}
+          />
+          {props.isRunning ? (
+            <Button label="Stop" onClick={props.onStop} size="sm" />
+          ) : (
+            <Button
+              label="Send"
+              type="submit"
+              size="sm"
+              isDisabled={props.loading || submitting || !draft.trim()}
+            />
+          )}
+        </VStack>
+      ) : null}
     </VStack>
   );
 }

@@ -20,13 +20,11 @@ pub(crate) const WINDOW_STATE_FLAGS: tauri_plugin_window_state::StateFlags =
     tauri_plugin_window_state::StateFlags::SIZE
         .union(tauri_plugin_window_state::StateFlags::MAXIMIZED);
 #[cfg(desktop)]
-const TRAY_SHOW_MENU_ON_LEFT_CLICK: bool = !cfg!(target_os = "windows");
+const TRAY_SHOW_MENU_ON_LEFT_CLICK: bool = false;
 #[cfg(desktop)]
 const TERMINAL_EXIT_REQUESTED_EVENT: &str = "terminal:exit-requested";
 #[cfg(desktop)]
 const APP_ACTION_EVENT: &str = "app:action";
-#[cfg(desktop)]
-const APP_ACTION_FEEDBACK_EVENT: &str = "app:action-feedback";
 
 #[cfg(desktop)]
 #[derive(Clone, serde::Serialize)]
@@ -42,20 +40,6 @@ struct AppActionEvent {
     action: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    value: Option<String>,
-}
-
-#[cfg(desktop)]
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AppActionFeedbackEvent {
-    action: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    id: Option<String>,
-    ok: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<String>,
 }
@@ -108,6 +92,8 @@ macro_rules! app_invoke_handler {
             commands::fs::fs_read_image_source,
             commands::fs::fs_read_workspace_image,
             commands::fs::fs_write_text,
+            commands::fs::fs_write_binary,
+            commands::fs::fs_write_docx_text,
             commands::fs::fs_edit_text,
             commands::fs::fs_delete,
             commands::fs::fs_open_workspace_path,
@@ -210,6 +196,9 @@ macro_rules! app_invoke_handler {
             commands::shell::shell_run,
             commands::shell::shell_cancel,
             commands::shell::runtime_cancel,
+            commands::cua::cua_call,
+            commands::cua::cua_status,
+            commands::cua::cua_install,
             commands::shell::shell_session_start,
             commands::shell::shell_session_wait,
             commands::shell::shell_session_stop,
@@ -393,6 +382,8 @@ macro_rules! app_invoke_handler {
             commands::fs::fs_read_image_source,
             commands::fs::fs_read_workspace_image,
             commands::fs::fs_write_text,
+            commands::fs::fs_write_binary,
+            commands::fs::fs_write_docx_text,
             commands::fs::fs_edit_text,
             commands::fs::fs_delete,
             commands::fs::fs_open_workspace_path,
@@ -513,9 +504,22 @@ macro_rules! app_invoke_handler {
 #[cfg(desktop)]
 fn show_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+        let pinned = app
+            .try_state::<Arc<commands::app::WindowPinState>>()
+            .map(|state| state.0.load(Ordering::SeqCst))
+            .unwrap_or(false);
         window.show()?;
         window.unminimize()?;
-        window.set_focus()?;
+        let _ = window.request_user_attention(Some(tauri::UserAttentionType::Critical));
+        if !pinned {
+            let _ = window.set_always_on_top(true);
+        }
+        let focus_result = window.set_focus();
+        if !pinned {
+            let _ = window.set_always_on_top(false);
+        }
+        let _ = window.request_user_attention(None);
+        focus_result?;
     }
 
     Ok(())
@@ -586,16 +590,6 @@ enum AppAction {
     ToggleWindow,
     TogglePin,
     NewChat,
-    OpenConversation(String),
-    ViewAllConversations,
-    SwitchWorkspace(String),
-    StopRun(String),
-    StopAllRuns,
-    ToggleCronTask(String),
-    SetTheme(&'static str),
-    OpenSettings,
-    CheckUpdates,
-    OpenDataDir,
     Quit,
 }
 
@@ -605,28 +599,8 @@ fn tray_menu_action(id: &str) -> Option<AppAction> {
     match id {
         tray_ids::TRAY_SHOW_ID => Some(AppAction::Summon),
         tray_ids::TRAY_NEW_CHAT_ID => Some(AppAction::NewChat),
-        tray_ids::TRAY_PIN_ID => Some(AppAction::TogglePin),
-        tray_ids::TRAY_RECENT_VIEW_ALL_ID => Some(AppAction::ViewAllConversations),
-        tray_ids::TRAY_RUN_STOP_ALL_ID => Some(AppAction::StopAllRuns),
-        tray_ids::TRAY_THEME_LIGHT_ID => Some(AppAction::SetTheme("light")),
-        tray_ids::TRAY_THEME_DARK_ID => Some(AppAction::SetTheme("dark")),
-        tray_ids::TRAY_THEME_SYSTEM_ID => Some(AppAction::SetTheme("system")),
-        tray_ids::TRAY_SETTINGS_ID => Some(AppAction::OpenSettings),
-        tray_ids::TRAY_CHECK_UPDATES_ID => Some(AppAction::CheckUpdates),
-        tray_ids::TRAY_OPEN_DATA_DIR_ID => Some(AppAction::OpenDataDir),
         tray_ids::TRAY_QUIT_ID => Some(AppAction::Quit),
-        _ => {
-            if let Some(rest) = id.strip_prefix(tray_ids::TRAY_RECENT_PREFIX) {
-                Some(AppAction::OpenConversation(rest.to_string()))
-            } else if let Some(rest) = id.strip_prefix(tray_ids::TRAY_WORKSPACE_PREFIX) {
-                Some(AppAction::SwitchWorkspace(rest.to_string()))
-            } else if let Some(rest) = id.strip_prefix(tray_ids::TRAY_RUN_PREFIX) {
-                Some(AppAction::StopRun(rest.to_string()))
-            } else {
-                id.strip_prefix(tray_ids::TRAY_CRON_PREFIX)
-                    .map(|rest| AppAction::ToggleCronTask(rest.to_string()))
-            }
-        }
+        _ => None,
     }
 }
 
@@ -693,67 +667,6 @@ fn dispatch_app_action(app: &tauri::AppHandle, action: AppAction) {
         AppAction::ToggleWindow => toggle_main_window(app),
         AppAction::TogglePin => toggle_main_window_pin(app),
         AppAction::NewChat => forward_app_action(app, "new-chat", None, None, true),
-        AppAction::OpenConversation(id) => {
-            forward_app_action(app, "open-conversation", Some(id), None, true);
-        }
-        AppAction::ViewAllConversations => {
-            forward_app_action(app, "view-all-conversations", None, None, true);
-        }
-        AppAction::SwitchWorkspace(id) => {
-            forward_app_action(app, "switch-workspace", Some(id), None, true);
-        }
-        AppAction::StopRun(id) => forward_app_action(app, "stop-run", Some(id), None, false),
-        AppAction::StopAllRuns => forward_app_action(app, "stop-all-runs", None, None, false),
-        AppAction::SetTheme(theme) => {
-            forward_app_action(app, "set-theme", None, Some(theme.to_string()), false);
-        }
-        AppAction::OpenSettings => forward_app_action(app, "open-settings", None, None, true),
-        AppAction::CheckUpdates => forward_app_action(app, "check-updates", None, None, true),
-        AppAction::ToggleCronTask(task_id) => {
-            let Some(store) = app.try_state::<Arc<services::automation::AutomationStore>>() else {
-                return;
-            };
-            let store = Arc::clone(store.inner());
-            let app_handle = app.clone();
-            tauri::async_runtime::spawn_blocking(move || {
-                let (value, error) = match store.toggle_cron_task_enabled(&task_id) {
-                    Ok(enabled) => (
-                        Some(if enabled { "enabled" } else { "disabled" }.to_string()),
-                        None,
-                    ),
-                    Err(error) => {
-                        eprintln!("failed to toggle cron task from tray: {error}");
-                        (None, Some(error))
-                    }
-                };
-                if let Err(emit_error) = app_handle.emit(
-                    APP_ACTION_FEEDBACK_EVENT,
-                    AppActionFeedbackEvent {
-                        action: "toggle-cron-task",
-                        id: Some(task_id),
-                        ok: error.is_none(),
-                        error,
-                        value,
-                    },
-                ) {
-                    eprintln!("failed to emit cron toggle feedback: {emit_error}");
-                }
-            });
-        }
-        AppAction::OpenDataDir => {
-            use tauri_plugin_opener::OpenerExt;
-            match commands::settings::config_dir() {
-                Ok(dir) => {
-                    if let Err(error) = app
-                        .opener()
-                        .open_path(dir.to_string_lossy().to_string(), None::<&str>)
-                    {
-                        eprintln!("failed to open Xgent data directory: {error}");
-                    }
-                }
-                Err(error) => eprintln!("failed to resolve Xgent data directory: {error}"),
-            }
-        }
         AppAction::Quit => {
             let allow_exit = app.state::<Arc<AtomicBool>>();
             exit_app_from_tray(app, allow_exit.inner());
@@ -823,15 +736,6 @@ fn configure_system_tray(app: &tauri::App) -> tauri::Result<()> {
     ));
     app.manage(tray);
     app.manage(handles);
-    Ok(())
-}
-
-#[cfg(all(desktop, target_os = "windows"))]
-fn configure_windows_window_chrome(app: &tauri::App) -> tauri::Result<()> {
-    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
-        window.set_decorations(false)?;
-    }
-
     Ok(())
 }
 
@@ -951,8 +855,6 @@ pub fn run() {
             move |app| {
                 commands::history_db::initialize_history_db()?;
                 configure_system_tray(app)?;
-                #[cfg(target_os = "windows")]
-                configure_windows_window_chrome(app)?;
                 if let Err(error) = commands::settings::initialize_system_proxy_from_db() {
                     eprintln!("failed to initialize system proxy state: {error}");
                 }

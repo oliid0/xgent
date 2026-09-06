@@ -121,6 +121,9 @@ impl<R: Runtime> BrowserAutomation<R> {
         #[cfg(not(target_os = "windows"))]
         let initial_url = url.clone();
         let builder = WebviewBuilder::new(label.clone(), WebviewUrl::External(initial_url))
+            // Reuse Tauri's default WebContext/profile across child tabs. Do not
+            // allocate a data directory, private profile or browser per label.
+            .focused(false)
             .initialization_script(BROWSER_RUNTIME_SCRIPT)
             .on_navigation(|url| matches!(url.scheme(), "about" | "http" | "https"));
         #[cfg(not(target_os = "windows"))]
@@ -789,7 +792,7 @@ unsafe fn ns_image_to_png(image: &objc2_app_kit::NSImage) -> Result<Vec<u8>, Str
     let png = bitmap
         .representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new())
         .ok_or_else(|| "failed to encode browser screenshot as PNG".to_string())?;
-    Ok(png.to_vec())
+    Ok(std::slice::from_raw_parts(png.bytes().cast::<u8>(), png.length()).to_vec())
 }
 
 #[cfg(target_os = "linux")]

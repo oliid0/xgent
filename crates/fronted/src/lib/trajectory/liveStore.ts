@@ -1,5 +1,7 @@
 import type { TrajectoryEvent } from "./types";
 
+const EMPTY_EVENTS: readonly TrajectoryEvent[] = Object.freeze([]);
+
 export function createTrajectoryLiveStore(options?: { notifyDelayMs?: number }) {
   const events = new Map<string, TrajectoryEvent[]>();
   const listeners = new Set<() => void>();
@@ -21,7 +23,7 @@ export function createTrajectoryLiveStore(options?: { notifyDelayMs?: number }) 
       notify();
     },
     getSnapshot(conversationId: string): readonly TrajectoryEvent[] {
-      return events.get(conversationId) ?? [];
+      return events.get(conversationId) ?? EMPTY_EVENTS;
     },
     subscribe(listener: () => void): () => void {
       listeners.add(listener);

@@ -71,6 +71,8 @@ export type BrowserActionInput = {
   maxDepth?: number;
   maxNodes?: number;
   smooth?: boolean;
+  expectedHumanSequence?: number;
+  expectedDocumentId?: string;
 };
 
 export type BrowserActionResponse = {

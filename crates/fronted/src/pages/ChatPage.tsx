@@ -1,3 +1,4 @@
+import { Banner } from "@astryxdesign/core/Banner";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Section } from "@astryxdesign/core/Layout";
@@ -6,7 +7,6 @@ import { ResizeHandle, useResizable } from "@astryxdesign/core/Resizable";
 import { Stack as AstryxStack, HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text as AstryxText, Text } from "@astryxdesign/core/Text";
-import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import type { Context, Message, UserMessage } from "@earendil-works/pi-ai";
 import { invoke, isBrowserRuntime, listen, listenFileDrop, revealItemInDir } from "@xgent/runtime";
 import {
@@ -16,6 +16,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -35,13 +36,21 @@ import type {
 } from "../components/chat/MentionComposer";
 import { type NotifyItem, NotifyToast } from "../components/chat/NotifyToast";
 import { ToolApprovalBar } from "../components/chat/ToolApprovalBar";
-import { Activity, Ban, Globe, MessageSquare, Terminal, Upload } from "../components/icons";
+import {
+  Ban,
+  FileText,
+  Globe,
+  MessageSquare,
+  PanelRightClose,
+  PanelRightOpen,
+  Terminal,
+  Upload,
+} from "../components/icons";
 import { MacOsTitleBarSpacer, MacOsTitleBarToggle } from "../components/MacOsTitleBarSpacer";
 import type {
   GitCommitContextPayload,
   GitFileContextPayload,
 } from "../components/project-tools/git-review";
-import type { GitReviewFocusRequest } from "../components/project-tools/WorkspaceToolsContext";
 import {
   expandedPathsForFileTreePath,
   type WorkspaceNavigationTarget,
@@ -49,11 +58,12 @@ import {
   type WorkspaceToolLaunchRequest,
   type WorkspaceToolTarget,
 } from "../components/project-tools/workspaceToolsModel";
+import { XTermViewport } from "../components/project-tools/XTermViewport";
 import type { WorkspaceCodeEditorOpenRequest } from "../components/workspace-editor/WorkspaceCodeEditorOverlay";
 import type { WorkspaceFilePreviewOpenRequest } from "../components/workspace-editor/WorkspaceFilePreviewOverlay";
 import type { WorkspaceSshTerminalOpenRequest } from "../components/workspace-editor/WorkspaceSshTerminalOverlay";
 import {
-  getWorkspacePreviewKind,
+  isWorkspaceEditablePreviewPath,
   isWorkspacePreviewPath,
 } from "../components/workspace-editor/workspaceImagePreview";
 import { WorkspaceNavigationRail } from "../components/workspace-tools/WorkspaceNavigationRail";
@@ -96,7 +106,7 @@ import {
 import { memoryExtraction } from "../lib/chat/memory/extractionController";
 import type { MemoryExtractionStatusKey } from "../lib/chat/memory/extractionEngine";
 import { memoryTurnInjection } from "../lib/chat/memory/injectionController";
-import { collectChangedFiles } from "../lib/chat/messages/changedFiles";
+import { type ChangedFileEntry, collectChangedFiles } from "../lib/chat/messages/changedFiles";
 import { normalizeLogicalLineEndings } from "../lib/chat/messages/composerText";
 import {
   type CodeMentionReference,
@@ -330,6 +340,13 @@ import {
   resolveQueuedChatTurnSlotIndex,
   takeNextQueuedChatTurn,
 } from "./chat/queue/chatTurnQueue";
+import { EditDiffPanel } from "./chat/right-sidebar/EditDiffPanel";
+import {
+  RightSidebar,
+  type RightSidebarPresentation,
+  type RightSidebarTab,
+} from "./chat/right-sidebar/RightSidebar";
+import { reconcileTabOrder, resolveActiveTab } from "./chat/right-sidebar/tabState";
 import { syncMovedConversationRuntimeWorkdir } from "./chat/runtime/chatPageRuntime";
 import { buildModelFailoverPlan } from "./chat/runtime/providerRuntimeConfig";
 import { useManualCompaction } from "./chat/runtime/useManualCompaction";
@@ -366,6 +383,17 @@ function createConversationRunId(conversationId: string) {
   return `conversation-live-${conversationId}-${createUuid()}`;
 }
 
+const RIGHT_TAB_TERMINAL = "terminal";
+const RIGHT_TAB_SIDE_CHAT = "side-chat";
+const RIGHT_TAB_PREVIEW = "preview";
+const RIGHT_TAB_DIFF = "edit-diff";
+const browserRightTabId = (sessionId: string) => `browser:${sessionId}`;
+
+function rightTabBasename(path: string) {
+  const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
+  return normalized.slice(normalized.lastIndexOf("/") + 1) || normalized;
+}
+
 type ChatPageProps = {
   settings: AppSettings;
   setSettings: (updater: (prev: AppSettings) => AppSettings) => void;
@@ -375,7 +403,6 @@ type ChatPageProps = {
   context: Context;
   setContext: (next: Context) => void;
   onOpenSettings: (section?: SectionId, options?: SettingsOpenOptions) => void;
-  onToggleTheme: () => void;
   appUpdate?: AppUpdateController;
   desktopBridgeEnabled: boolean;
   lanPcCommandHostReady: boolean;
@@ -676,7 +703,6 @@ export function ChatPage(props: ChatPageProps) {
     context,
     setContext,
     onOpenSettings,
-    onToggleTheme,
     appUpdate,
     desktopBridgeEnabled,
     lanPcCommandHostReady,
@@ -706,12 +732,6 @@ export function ChatPage(props: ChatPageProps) {
     minSizePx: 400,
     maxSizePx: 720,
     autoSaveId: "xgent-workspace-hub-panel-width",
-  });
-  const splitConversationResize = useResizable({
-    defaultSize: 520,
-    minSizePx: 360,
-    maxSizePx: 820,
-    autoSaveId: "xgent-split-conversation-width",
   });
   const auxiliaryPanelResize = useResizable({
     defaultSize: 520,
@@ -906,12 +926,31 @@ export function ChatPage(props: ChatPageProps) {
   const [workspaceFilePreviewOpenRequest, setWorkspaceFilePreviewOpenRequest] =
     useState<WorkspaceFilePreviewOpenRequest | null>(null);
   const workspaceFilePreviewRequestIdRef = useRef(0);
-  const [workspaceFilePreviewPresentation, setWorkspaceFilePreviewPresentation] = useState<
-    "side" | "fullscreen"
-  >("side");
-  const [browserPanelPresentation, setBrowserPanelPresentation] = useState<"side" | "fullscreen">(
-    "side",
+  const [rightFileTabs, setRightFileTabs] = useState<WorkspaceFilePreviewOpenRequest[]>([]);
+  const rightFileDirtyRef = useRef(new Map<number, boolean>());
+  const [rightSidebarPresentation, setRightSidebarPresentation] =
+    useState<RightSidebarPresentation>("side");
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
+  const [rightSidebarActiveTabId, setRightSidebarActiveTabId] = useState<string | null>(null);
+  const rightTabOrderRef = useRef<string[]>([]);
+  const [rightBrowserError, setRightBrowserError] = useState<string | null>(null);
+  const [rightTerminals, setRightTerminals] = useState<TerminalSession[]>([]);
+  const [rightTerminalError, setRightTerminalError] = useState<string | null>(null);
+  const rightTerminalCreatingRef = useRef(false);
+  useEffect(
+    () =>
+      tauriTerminalClient.subscribe((event) => {
+        if (event.session) {
+          const session = event.session;
+          setRightTerminals((tabs) => tabs.map((tab) => (tab.id === session.id ? session : tab)));
+        }
+        if (event.kind === "closed") {
+          setRightTerminals((tabs) => tabs.filter((tab) => tab.id !== event.sessionId));
+        }
+      }),
+    [],
   );
+  const [rightDiffFile, setRightDiffFile] = useState<ChangedFileEntry | null>(null);
   const browserPanelState = useSyncExternalStore(
     browserSessionController.subscribe,
     browserSessionController.getSnapshot,
@@ -1801,9 +1840,22 @@ export function ChatPage(props: ChatPageProps) {
   const openWorkspaceFilePreview = useCallback(
     (request: Omit<WorkspaceFilePreviewOpenRequest, "id">) => {
       hideWorkspaceSshTerminalOverlay();
-      browserSessionController.closePanel();
       setWorkspaceEditorOpen(false);
-      setWorkspaceFilePreviewPresentation("side");
+      if (!mobileExperience) {
+        setRightSidebarPresentation("side");
+        setRightSidebarOpen(true);
+        const existing = rightFileTabs.find(
+          (tab) => tab.path === request.path && tab.workdir === request.workdir,
+        );
+        if (existing) {
+          setRightSidebarActiveTabId(`${RIGHT_TAB_PREVIEW}:${existing.id}`);
+          return;
+        }
+        const tab = { ...request, id: ++workspaceFilePreviewRequestIdRef.current };
+        setRightFileTabs((tabs) => [...tabs, tab]);
+        setRightSidebarActiveTabId(`${RIGHT_TAB_PREVIEW}:${tab.id}`);
+        return;
+      }
       workspaceFilePreviewRequestIdRef.current += 1;
       setWorkspaceFilePreviewMounted(true);
       setWorkspaceFilePreviewOpen(true);
@@ -1812,55 +1864,25 @@ export function ChatPage(props: ChatPageProps) {
         ...request,
       });
     },
-    [hideWorkspaceSshTerminalOverlay],
+    [hideWorkspaceSshTerminalOverlay, mobileExperience, rightFileTabs],
   );
   useEffect(() => {
     if (!browserPanelState.panelOpen) return;
     hideWorkspaceSshTerminalOverlay();
     setWorkspaceEditorOpen(false);
-    setWorkspaceFilePreviewOpen(false);
-    setWorkspaceFilePreviewMounted(false);
-    setWorkspaceFilePreviewOpenRequest(null);
-    setBrowserPanelPresentation("side");
-  }, [browserPanelState.panelOpen, hideWorkspaceSshTerminalOverlay]);
-  const autoPreviewBaselineReplyRef = useRef<string | null>(null);
-  const autoPreviewArmedRef = useRef(false);
-  useEffect(() => {
-    if (mobileExperience) {
-      autoPreviewArmedRef.current = false;
-      autoPreviewBaselineReplyRef.current = null;
-      return;
-    }
-    const latestAssistant = [...historyRenderItems]
-      .reverse()
-      .find((item) => item.kind === "assistant");
-    if (isSending) {
-      if (!autoPreviewArmedRef.current) {
-        autoPreviewBaselineReplyRef.current = latestAssistant?.key ?? null;
-        autoPreviewArmedRef.current = true;
+    if (!mobileExperience && browserPanelState.panelOpenSource === "user") {
+      setRightSidebarPresentation("side");
+      setRightSidebarOpen(true);
+      if (browserPanelState.activeSessionId) {
+        setRightSidebarActiveTabId(browserRightTabId(browserPanelState.activeSessionId));
       }
-      return;
     }
-    if (!autoPreviewArmedRef.current || !latestAssistant) return;
-    if (latestAssistant.key === autoPreviewBaselineReplyRef.current) return;
-    autoPreviewArmedRef.current = false;
-    const changedFiles = collectChangedFiles(latestAssistant.rounds);
-    const htmlFile = [...(changedFiles?.files ?? [])]
-      .reverse()
-      .find((file) => !file.deleted && getWorkspacePreviewKind(file.path) === "html");
-    if (!htmlFile || !displayedConversationWorkdir) return;
-    openWorkspaceFilePreview({
-      projectPathKey:
-        workspaceProjectPathKey(displayedConversationWorkdir) || displayedConversationWorkdir,
-      workdir: displayedConversationWorkdir,
-      path: htmlFile.path,
-    });
   }, [
-    displayedConversationWorkdir,
-    historyRenderItems,
-    isSending,
+    browserPanelState.activeSessionId,
+    browserPanelState.panelOpen,
+    browserPanelState.panelOpenSource,
+    hideWorkspaceSshTerminalOverlay,
     mobileExperience,
-    openWorkspaceFilePreview,
   ]);
   useEffect(() => {
     if (!nativeMobile) return;
@@ -1884,7 +1906,7 @@ export function ChatPage(props: ChatPageProps) {
         path,
         imagePaths,
       };
-      if (isWorkspacePreviewPath(path)) {
+      if (isWorkspacePreviewPath(path) || isWorkspaceEditablePreviewPath(path)) {
         openWorkspaceFilePreview(request);
         return;
       }
@@ -1921,27 +1943,28 @@ export function ChatPage(props: ChatPageProps) {
     ],
   );
 
-  const gitReviewFocusNonceRef = useRef(0);
-  const [gitReviewFocusRequest, setGitReviewFocusRequest] = useState<GitReviewFocusRequest | null>(
-    null,
-  );
-  const handleGitReviewFocusRequestHandled = useCallback((nonce: number) => {
-    setGitReviewFocusRequest((current) => (current && current.nonce === nonce ? null : current));
-  }, []);
+  const latestChangedFiles = useMemo(() => {
+    const latestAssistant = [...historyRenderItems]
+      .reverse()
+      .find((item) => item.kind === "assistant");
+    return latestAssistant ? collectChangedFiles(latestAssistant.rounds) : null;
+  }, [historyRenderItems]);
   const handleChangedFileOpenDiff = useCallback(
-    (path: string | null) => {
-      if (!terminalProjectPathKey) return;
-      showDesktopWorkspaceTool("gitReview");
-      setSettings((prev) =>
-        openWorkspaceToolsSingletonTab(prev, terminalProjectPathKey, "gitReview"),
-      );
-      gitReviewFocusNonceRef.current += 1;
-      setGitReviewFocusRequest({
-        path: (path ?? "").trim(),
-        nonce: gitReviewFocusNonceRef.current,
-      });
+    (file: ChangedFileEntry | null) => {
+      const selected =
+        file ??
+        [...(latestChangedFiles?.files ?? [])]
+          .reverse()
+          .find((entry) => entry.beforeTextAvailable && entry.afterTextAvailable) ??
+        latestChangedFiles?.files.at(-1) ??
+        null;
+      if (!selected) return;
+      setRightDiffFile(selected);
+      setRightSidebarPresentation("side");
+      setRightSidebarActiveTabId(RIGHT_TAB_DIFF);
+      setRightSidebarOpen(true);
     },
-    [setSettings, showDesktopWorkspaceTool, terminalProjectPathKey],
+    [latestChangedFiles],
   );
   const handleChangedFileReveal = useCallback(
     (path: string) => {
@@ -4910,12 +4933,60 @@ export function ChatPage(props: ChatPageProps) {
     hideWorkspaceSshTerminalOverlay();
     setMobileWorkspaceDestination(null);
     setWorkspaceEditorOpen(false);
-    setWorkspaceFilePreviewOpen(false);
-    setWorkspaceFilePreviewMounted(false);
-    setWorkspaceFilePreviewOpenRequest(null);
-    setBrowserPanelPresentation("side");
+    if (mobileExperience) {
+      setWorkspaceFilePreviewOpen(false);
+      setWorkspaceFilePreviewMounted(false);
+      setWorkspaceFilePreviewOpenRequest(null);
+    } else {
+      setRightSidebarPresentation("side");
+      setRightSidebarOpen(true);
+    }
     browserSessionController.openPanel(undefined, "user");
   }, [hideWorkspaceSshTerminalOverlay, mobileExperience]);
+
+  const handleNewRightBrowser = useCallback(() => {
+    setRightBrowserError(null);
+    setRightSidebarPresentation("side");
+    setRightSidebarOpen(true);
+    void browserSessionController
+      .newSession()
+      .then((session) => {
+        browserSessionController.openPanel(session.sessionId, "user");
+        setRightSidebarActiveTabId(browserRightTabId(session.sessionId));
+      })
+      .catch((error) => setRightBrowserError(String(error)));
+  }, []);
+
+  const handleOpenRightTerminal = useCallback(() => {
+    if (!desktopCommandHostAvailable || terminalDisabledMessage || rightTerminalCreatingRef.current)
+      return;
+    rightTerminalCreatingRef.current = true;
+    setRightTerminalError(null);
+    setRightSidebarPresentation("side");
+    setRightSidebarOpen(true);
+    void tauriTerminalClient
+      .create({
+        cwd: terminalProjectPath,
+        projectPathKey: terminalProjectPathKey,
+        shell: preferredTerminalShell,
+        cols: 80,
+        rows: 24,
+      })
+      .then(({ session }) => {
+        setRightTerminals((tabs) => [...tabs, session]);
+        setRightSidebarActiveTabId(`${RIGHT_TAB_TERMINAL}:${session.id}`);
+      })
+      .catch((error) => setRightTerminalError(String(error)))
+      .finally(() => {
+        rightTerminalCreatingRef.current = false;
+      });
+  }, [
+    desktopCommandHostAvailable,
+    terminalDisabledMessage,
+    terminalProjectPath,
+    terminalProjectPathKey,
+    preferredTerminalShell,
+  ]);
 
   useEffect(() => {
     browserSessionController.configure({
@@ -4972,6 +5043,7 @@ export function ChatPage(props: ChatPageProps) {
   });
 
   const handleNewConversation = useCallback(() => {
+    setRightSidebarPresentation("side");
     openController.cancel();
     prepareComposerForConversationChange();
     startNewConversationActionRef.current({
@@ -5056,6 +5128,7 @@ export function ChatPage(props: ChatPageProps) {
       if (!targetConversationId) {
         return;
       }
+      setRightSidebarPresentation("side");
       prepareComposerForConversationChange();
       openController.open(targetConversationId);
       restoreCachedComposerDraft(targetConversationId);
@@ -5148,6 +5221,9 @@ export function ChatPage(props: ChatPageProps) {
       setSplitConversationRecord(null);
       setSplitConversationError(null);
       setSplitConversationId(nextId);
+      setRightSidebarPresentation("side");
+      setRightSidebarActiveTabId(RIGHT_TAB_SIDE_CHAT);
+      setRightSidebarOpen(true);
     },
     [currentConversationIdRef, mobileExperience],
   );
@@ -5166,6 +5242,51 @@ export function ChatPage(props: ChatPageProps) {
     setSplitConversationRecord(null);
     setSplitConversationError(null);
   }, []);
+
+  const handleNewRightSideChat = useCallback(() => {
+    const identity = createConversationIdentity();
+    ensureConversationRuntimeEntry(identity.conversationId, {
+      state: createConversationStateFromContext({ ...context, messages: [] }),
+      sessionId: identity.sessionId,
+      createdAt: identity.createdAt,
+      workdir: activeWorkspaceProjectPath,
+      selectedModel: currentConversationSelectedModel,
+    });
+    handleOpenConversationInSplit(identity.conversationId);
+  }, [
+    activeWorkspaceProjectPath,
+    context,
+    currentConversationSelectedModel,
+    ensureConversationRuntimeEntry,
+    handleOpenConversationInSplit,
+  ]);
+
+  const sendSideConversation = async (text: string) => {
+    const id = splitConversationId;
+    if (!id) return false;
+    if (splitConversationRecord) {
+      ensureConversationRuntimeEntry(id, {
+        state: splitConversationRecord.state,
+        sessionId: splitConversationRecord.sessionId || id,
+        createdAt: splitConversationRecord.createdAt,
+        workdir: splitConversationRecord.cwd,
+        selectedModel: currentConversationSelectedModel,
+      });
+    }
+    const sent = await sendActionRef.current({
+      conversationIdOverride: id,
+      textOverride: text,
+      uploadedFilesOverride: [],
+      preserveComposerOnStart: true,
+      afterInitialHistoryPersist: async () => {
+        setSplitConversationReload((value) => value + 1);
+      },
+    });
+    setSplitConversationReload((value) => value + 1);
+    const error = conversationRuntimeCacheRef.current.get(id)?.errorMessage;
+    if (error) throw new Error(error);
+    return sent;
+  };
 
   useEffect(() => {
     if (splitConversationId === currentConversationId) {
@@ -5754,13 +5875,117 @@ export function ChatPage(props: ChatPageProps) {
     />
   );
 
-  const desktopBrowserPanelOpen = !mobileExperience && browserPanelState.panelOpen;
-  const desktopFilePreviewOpen =
-    !mobileExperience && workspaceFilePreviewMounted && !browserPanelState.panelOpen;
-  const desktopAuxiliaryOpen = desktopBrowserPanelOpen || desktopFilePreviewOpen;
+  const availableRightSidebarTabs = useMemo<RightSidebarTab[]>(() => {
+    if (mobileExperience) return [];
+    const tabs: RightSidebarTab[] = browserPanelState.sessions.map((session) => ({
+      id: browserRightTabId(session.sessionId),
+      label:
+        session.title?.trim() ||
+        rightTabBasename(session.url.replace(/^https?:\/\//i, "")) ||
+        t("browser.untitled"),
+      icon: <Icon icon={Globe} size="sm" color="inherit" />,
+    }));
+    for (const session of rightTerminals) {
+      tabs.push({
+        id: `${RIGHT_TAB_TERMINAL}:${session.id}`,
+        label: session.title || t("sidebar.terminal"),
+        icon: <Icon icon={Terminal} size="sm" color="inherit" />,
+      });
+    }
+    if (splitConversationId) {
+      tabs.push({
+        id: RIGHT_TAB_SIDE_CHAT,
+        label: splitConversationRecord?.title || t("chat.newConversation"),
+        icon: <Icon icon={MessageSquare} size="sm" color="inherit" />,
+      });
+    }
+    for (const file of rightFileTabs) {
+      tabs.push({
+        id: `${RIGHT_TAB_PREVIEW}:${file.id}`,
+        label: rightTabBasename(file.path) || t("workspaceFilePreview.title"),
+        icon: <Icon icon={FileText} size="sm" color="inherit" />,
+      });
+    }
+    if (rightDiffFile) {
+      tabs.push({
+        id: RIGHT_TAB_DIFF,
+        label: `${rightTabBasename(rightDiffFile.path)} · Diff`,
+        icon: <Icon icon={FileText} size="sm" color="inherit" />,
+      });
+    }
+    return tabs;
+  }, [
+    browserPanelState.sessions,
+    mobileExperience,
+    rightDiffFile,
+    rightTerminals,
+    splitConversationId,
+    splitConversationRecord?.title,
+    t,
+    rightFileTabs,
+  ]);
+  const rightTabOrder = reconcileTabOrder(rightTabOrderRef.current, availableRightSidebarTabs.map((tab) => tab.id));
+  const rightTabsById = new Map(availableRightSidebarTabs.map((tab) => [tab.id, tab]));
+  const rightSidebarTabs = rightTabOrder.flatMap((id) => {
+    const tab = rightTabsById.get(id);
+    return tab ? [tab] : [];
+  });
+  const resolvedRightSidebarActiveTabId = resolveActiveTab(rightSidebarActiveTabId, rightTabOrderRef.current, rightTabOrder);
+  useLayoutEffect(() => { rightTabOrderRef.current = rightTabOrder; });
+  useEffect(() => {
+    if (resolvedRightSidebarActiveTabId !== rightSidebarActiveTabId) {
+      setRightSidebarActiveTabId(resolvedRightSidebarActiveTabId);
+    }
+  }, [resolvedRightSidebarActiveTabId, rightSidebarActiveTabId]);
+
+  const handleSelectRightSidebarTab = (tabId: string) => {
+    setRightSidebarActiveTabId(tabId);
+    setRightSidebarOpen(true);
+    if (tabId.startsWith("browser:")) {
+      const sessionId = tabId.slice("browser:".length);
+      browserSessionController.selectSession(sessionId);
+      browserSessionController.openPanel(sessionId, "user");
+    } else {
+      browserSessionController.closePanel();
+    }
+  };
+  const handleCloseRightFileTab = async (id: number) => {
+    if (
+      rightFileDirtyRef.current.get(id) &&
+      !(await requestConfirmDialog({
+        title: "Discard unsaved changes?",
+        description: "Closing this file discards its unsaved edits.",
+        confirmLabel: "Discard",
+        cancelLabel: "Keep editing",
+      }))
+    )
+      return;
+    rightFileDirtyRef.current.delete(id);
+    setRightFileTabs((tabs) => tabs.filter((tab) => tab.id !== id));
+  };
+  const handleCloseRightSidebarTab = (tabId: string) => {
+    if (tabId.startsWith("browser:")) {
+      const sessionId = tabId.slice("browser:".length);
+      if (browserPanelState.sessions.length <= 1) browserSessionController.closePanel();
+      void browserSessionController.closeSession(sessionId).catch((error) => setRightBrowserError(String(error)));
+    } else if (tabId?.startsWith(`${RIGHT_TAB_TERMINAL}:`)) {
+      const session = rightTerminals.find((tab) => `${RIGHT_TAB_TERMINAL}:${tab.id}` === tabId);
+      if (session)
+        void tauriTerminalClient
+          .close(session.id, session.projectPathKey)
+          .then(() => setRightTerminals((tabs) => tabs.filter((tab) => tab.id !== session.id)))
+          .catch((error) => setRightTerminalError(String(error)));
+    } else if (tabId === RIGHT_TAB_SIDE_CHAT) {
+      handleCloseSplitConversation();
+    } else if (tabId?.startsWith(`${RIGHT_TAB_PREVIEW}:`)) {
+      void handleCloseRightFileTab(Number(tabId.slice(RIGHT_TAB_PREVIEW.length + 1)));
+    } else if (tabId === RIGHT_TAB_DIFF) {
+      setRightDiffFile(null);
+    }
+  };
+  const desktopAuxiliaryOpen = !mobileExperience && rightSidebarOpen;
   const desktopAuxiliaryFullscreen =
-    (desktopBrowserPanelOpen && browserPanelPresentation === "fullscreen") ||
-    (desktopFilePreviewOpen && workspaceFilePreviewPresentation === "fullscreen");
+    desktopAuxiliaryOpen && rightSidebarPresentation === "fullscreen";
 
   return (
     <HStack height="100%" width="100%" gap={0} style={{ position: "relative", overflow: "hidden" }}>
@@ -5782,6 +6007,11 @@ export function ChatPage(props: ChatPageProps) {
             onSelect={handleDesktopNavigationSelect}
             onOpenSettings={() => onOpenSettings()}
             onCreateSoul={() => onOpenSettings("soul", { createSoul: true })}
+            onOpenTrajectory={() => {
+              setActiveView("chat");
+              setChatSurface("trajectory");
+            }}
+            trajectoryAvailable={canShowTrajectory}
           />
         </HStack>
       ) : null}
@@ -5870,6 +6100,12 @@ export function ChatPage(props: ChatPageProps) {
           if (mobileExperience) setSidebarOpen(false);
           onOpenSettings("soul", { createSoul: true });
         }}
+        onOpenTrajectory={() => {
+          setActiveView("chat");
+          setChatSurface("trajectory");
+          if (mobileExperience) setSidebarOpen(false);
+        }}
+        trajectoryAvailable={canShowTrajectory}
         appUpdate={appUpdate}
         onOpenSkillsHub={() => {
           if (mobileExperience) {
@@ -5960,8 +6196,6 @@ export function ChatPage(props: ChatPageProps) {
           onSessionsChange={handleWorkspaceToolsSessionsChange}
           onInsertFileMention={handleWorkspaceToolsInsertFileMention}
           onOpenFile={handleOpenWorkspaceFile}
-          gitReviewFocusRequest={gitReviewFocusRequest}
-          onGitReviewFocusRequestHandled={handleGitReviewFocusRequestHandled}
           onInsertCodeReviewSkill={
             codeReviewSkill ? handleWorkspaceToolsInsertCodeReviewSkill : undefined
           }
@@ -6072,7 +6306,6 @@ export function ChatPage(props: ChatPageProps) {
                         )
                       }
                       sidebarOpen={sidebarOpen}
-                      onToggleTheme={onToggleTheme}
                       onOpenSidebar={handleOpenSidebar}
                       showExecutionMode={
                         !(
@@ -6081,30 +6314,6 @@ export function ChatPage(props: ChatPageProps) {
                         )
                       }
                       mobileExperience={mobileExperience}
-                      preThemeActions={
-                        !mobileExperience && canShowTrajectory ? (
-                          <ToggleButton
-                            label={
-                              chatSurface === "trajectory"
-                                ? t("chat.trajectory.backToChat")
-                                : t("chat.trajectory.open")
-                            }
-                            tooltip={
-                              chatSurface === "trajectory"
-                                ? t("chat.trajectory.backToChat")
-                                : t("chat.trajectory.open")
-                            }
-                            isIconOnly
-                            size="sm"
-                            isPressed={chatSurface === "trajectory"}
-                            icon={<Activity className="h-4 w-4" />}
-                            pressedIcon={<MessageSquare className="h-4 w-4" />}
-                            onPressedChange={(isPressed) =>
-                              setChatSurface(isPressed ? "trajectory" : "conversation")
-                            }
-                          />
-                        ) : null
-                      }
                       trailingActions={
                         mobileExperience ? (
                           <>
@@ -6129,12 +6338,30 @@ export function ChatPage(props: ChatPageProps) {
                           </>
                         ) : (
                           <IconButton
-                            label={t("browser.open")}
-                            icon={<Icon icon={Globe} size="sm" color="inherit" />}
+                            label={t("chat.resizeAuxiliaryPanel")}
+                            icon={
+                              <Icon
+                                icon={rightSidebarOpen ? PanelRightClose : PanelRightOpen}
+                                size="sm"
+                                color="inherit"
+                              />
+                            }
                             variant="ghost"
                             size="md"
-                            onClick={handleOpenBrowser}
-                            tooltip={t("browser.open")}
+                            onClick={() => {
+                              const nextOpen = !rightSidebarOpen;
+                              setRightSidebarOpen(nextOpen);
+                              if (
+                                nextOpen &&
+                                resolvedRightSidebarActiveTabId?.startsWith("browser:")
+                              ) {
+                                browserSessionController.openPanel(
+                                  resolvedRightSidebarActiveTabId.slice("browser:".length),
+                                  "user",
+                                );
+                              }
+                            }}
+                            tooltip={t("chat.resizeAuxiliaryPanel")}
                           />
                         )
                       }
@@ -6318,32 +6545,6 @@ export function ChatPage(props: ChatPageProps) {
               )}
             </VStack>
           ) : null}
-          {!mobileExperience && splitConversationId && !desktopAuxiliaryOpen ? (
-            <>
-              <ResizeHandle
-                direction="horizontal"
-                isReversed
-                hasDivider
-                pillPlacement="center"
-                resizable={splitConversationResize.props}
-                label={t("chat.split.resize")}
-              />
-              <SplitConversationPane
-                width={splitConversationResize.size}
-                conversationId={splitConversationId}
-                record={splitConversationRecord}
-                loading={splitConversationLoading}
-                error={splitConversationError}
-                liveTranscriptStore={getConversationLiveTranscriptStore(splitConversationId)}
-                isRunning={isConversationRunning(splitConversationId)}
-                isAgentMode={isAgentMode}
-                showUsage={isAgentDevExecutionMode}
-                onActivate={handleActivateSplitConversation}
-                onRetry={() => setSplitConversationReload((value) => value + 1)}
-                onClose={handleCloseSplitConversation}
-              />
-            </>
-          ) : null}
           {!mobileExperience && desktopAuxiliaryOpen && !desktopAuxiliaryFullscreen ? (
             <ResizeHandle
               direction="horizontal"
@@ -6354,49 +6555,112 @@ export function ChatPage(props: ChatPageProps) {
               label={t("chat.resizeAuxiliaryPanel")}
             />
           ) : null}
-          {desktopBrowserPanelOpen ? (
-            <BrowserPanel
-              presentation={browserPanelPresentation}
-              width={auxiliaryPanelResize.size}
-              onPresentationChange={setBrowserPanelPresentation}
-            />
-          ) : null}
-          {workspaceFilePreviewMounted && !browserPanelState.panelOpen ? (
-            <Suspense
-              fallback={
-                <AstryxStack
-                  direction="vertical"
-                  className={cn(
-                    "flex min-h-0 flex-col border-l border-border bg-background text-sm text-muted-foreground",
-                    mobileExperience && "absolute inset-0 z-50",
-                  )}
-                  style={
-                    mobileExperience || workspaceFilePreviewPresentation === "fullscreen"
-                      ? { width: "100%" }
-                      : { width: auxiliaryPanelResize.size }
-                  }
-                >
-                  <MacOsTitleBarSpacer className="bg-muted/45" />
-                  <AstryxStack
-                    direction="horizontal"
-                    className="flex min-h-0 flex-1 items-center justify-center"
-                  >
-                    {t("workspaceFilePreview.loading")}
-                  </AstryxStack>
-                </AstryxStack>
-              }
+          {!mobileExperience ? (
+            <RightSidebar
+              visible={desktopAuxiliaryOpen}
+              tabs={rightSidebarTabs}
+              activeTabId={resolvedRightSidebarActiveTabId}
+              presentation={rightSidebarPresentation}
+              width={`min(${auxiliaryPanelResize.size}px, calc(100% - 300px))`}
+              onSelectTab={handleSelectRightSidebarTab}
+              onNewBrowser={handleNewRightBrowser}
+              onNewTerminal={handleOpenRightTerminal}
+              onNewSideChat={handleNewRightSideChat}
+              onCloseTab={handleCloseRightSidebarTab}
+              terminalDisabled={!desktopCommandHostAvailable || Boolean(terminalDisabledMessage)}
+              onPresentationChange={setRightSidebarPresentation}
+              onClose={() => {
+                setRightSidebarOpen(false);
+                browserSessionController.closePanel();
+              }}
             >
-              <WorkspaceFilePreviewOverlay
-                openRequest={workspaceFilePreviewOpenRequest}
-                isOpen={workspaceFilePreviewOpen}
-                presentation={mobileExperience ? "fullscreen" : workspaceFilePreviewPresentation}
-                width={auxiliaryPanelResize.size}
-                overlay={mobileExperience}
-                onPresentationChange={setWorkspaceFilePreviewPresentation}
-                onRequestClose={requestWorkspaceFilePreviewClose}
-                onClose={handleWorkspaceFilePreviewClosed}
-              />
-            </Suspense>
+              {rightBrowserError ? <Banner status="error" title={rightBrowserError} /> : null}
+              {desktopAuxiliaryOpen && resolvedRightSidebarActiveTabId?.startsWith("browser:") ? (
+                <BrowserPanel
+                  embedded
+                  presentation="side"
+                  width="100%"
+                  onPresentationChange={setRightSidebarPresentation}
+                />
+              ) : null}
+              {rightTerminalError ? <Banner status="error" title={rightTerminalError} /> : null}
+              {rightTerminals.map((session) => (
+                <VStack
+                  key={session.id}
+                  height="100%"
+                  minHeight={0}
+                  style={{
+                    display:
+                      resolvedRightSidebarActiveTabId === `${RIGHT_TAB_TERMINAL}:${session.id}`
+                        ? "flex"
+                        : "none",
+                  }}
+                >
+                  <XTermViewport
+                    client={tauriTerminalClient}
+                    session={session}
+                    theme={effectiveTheme}
+                    isActive={
+                      desktopAuxiliaryOpen &&
+                      resolvedRightSidebarActiveTabId === `${RIGHT_TAB_TERMINAL}:${session.id}`
+                    }
+                    onError={(_id, message) => setRightTerminalError(message)}
+                  />
+                </VStack>
+              ))}
+              {splitConversationId ? (
+                <VStack height="100%" minHeight={0} style={{ display: resolvedRightSidebarActiveTabId === RIGHT_TAB_SIDE_CHAT ? "flex" : "none" }}>
+                <SplitConversationPane
+                  key={splitConversationId}
+                  width="100%"
+                  conversationId={splitConversationId}
+                  record={splitConversationRecord}
+                  loading={splitConversationLoading}
+                  error={splitConversationError}
+                  liveTranscriptStore={getConversationLiveTranscriptStore(splitConversationId)}
+                  isRunning={isConversationRunning(splitConversationId)}
+                  isAgentMode={isAgentMode}
+                  showUsage={isAgentDevExecutionMode}
+                  onActivate={handleActivateSplitConversation}
+                  onRetry={() => setSplitConversationReload((value) => value + 1)}
+                  onClose={handleCloseSplitConversation}
+                  onSend={sendSideConversation}
+                  onStop={() => requestConversationStop(splitConversationId)}
+                />
+                </VStack>
+              ) : null}
+              {rightFileTabs.map((file) => (
+                <VStack
+                  key={file.id}
+                  height="100%"
+                  minHeight={0}
+                  style={{
+                    display:
+                      resolvedRightSidebarActiveTabId === `${RIGHT_TAB_PREVIEW}:${file.id}`
+                        ? "flex"
+                        : "none",
+                  }}
+                >
+                  <Suspense fallback={<VStack width="100%" height="100%" />}>
+                    <WorkspaceFilePreviewOverlay
+                      embedded
+                      openRequest={file}
+                      isOpen
+                      presentation="side"
+                      width={auxiliaryPanelResize.size}
+                      overlay={false}
+                      onPresentationChange={setRightSidebarPresentation}
+                      onDirtyChange={(dirty) => rightFileDirtyRef.current.set(file.id, dirty)}
+                      onRequestClose={() => void handleCloseRightFileTab(file.id)}
+                      onClose={() => void handleCloseRightFileTab(file.id)}
+                    />
+                  </Suspense>
+                </VStack>
+              ))}
+              {resolvedRightSidebarActiveTabId === RIGHT_TAB_DIFF ? (
+                <EditDiffPanel file={rightDiffFile} />
+              ) : null}
+            </RightSidebar>
           ) : null}
         </HStack>
       </StackItem>
@@ -6404,8 +6668,21 @@ export function ChatPage(props: ChatPageProps) {
       {mobileExperience ? (
         <BrowserPanel
           presentation="fullscreen"
-          onPresentationChange={setBrowserPanelPresentation}
+          onPresentationChange={setRightSidebarPresentation}
         />
+      ) : null}
+      {mobileExperience && workspaceFilePreviewMounted ? (
+        <Suspense fallback={null}>
+          <WorkspaceFilePreviewOverlay
+            openRequest={workspaceFilePreviewOpenRequest}
+            isOpen={workspaceFilePreviewOpen}
+            presentation="fullscreen"
+            overlay
+            onPresentationChange={setRightSidebarPresentation}
+            onRequestClose={requestWorkspaceFilePreviewClose}
+            onClose={handleWorkspaceFilePreviewClosed}
+          />
+        </Suspense>
       ) : null}
       {mobileExperience ? (
         <MobileBackgroundTasksPanel

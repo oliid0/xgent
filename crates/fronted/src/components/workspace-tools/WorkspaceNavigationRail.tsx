@@ -8,6 +8,7 @@ import type { AppUpdateController } from "../../lib/appUpdates";
 import { useSoul } from "../../lib/soul";
 import { AppUpdateButton } from "../AppUpdateButton";
 import {
+  Activity,
   Cable,
   Check,
   Cpu,
@@ -40,6 +41,8 @@ type WorkspaceNavigationRailProps = {
   onSelect: (target: WorkspaceNavigationTarget, shell?: string) => void;
   onOpenSettings: () => void;
   onCreateSoul: () => void;
+  onOpenTrajectory?: () => void;
+  trajectoryAvailable?: boolean;
 };
 
 type RailItem = {
@@ -123,6 +126,15 @@ export function WorkspaceNavigationRail(props: WorkspaceNavigationRailProps) {
       onClick: () => selectFromSoulMenu(item.target),
     })),
     { type: "divider" },
+    {
+      label: t("chat.trajectory.open"),
+      icon: <Icon icon={Activity} size="sm" color="inherit" />,
+      isDisabled: props.trajectoryAvailable === false,
+      onClick: () => {
+        setSoulMenuOpen(false);
+        props.onOpenTrajectory?.();
+      },
+    },
     {
       label: t("tooltip.settings"),
       icon: <Icon icon={Settings} size="sm" color="inherit" />,

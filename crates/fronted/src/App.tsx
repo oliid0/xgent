@@ -23,7 +23,6 @@ import { useConfirmDialog } from "./components/astryx/useConfirmDialog";
 import { CronPromptRunner } from "./components/cron/CronPromptRunner";
 import { useNativeInputContextMenu } from "./components/input-context-menu/NativeInputContextMenu";
 import { MemoryOrganizerHost } from "./components/memory/useMemoryOrganizer";
-import { WindowsTitleBar } from "./components/WindowsTitleBar";
 import {
   LocaleContext,
   resolveEffectiveLocale,
@@ -42,7 +41,6 @@ import {
 import {
   type AppSettings,
   getDefaultSettings,
-  getNextTheme,
   normalizeSettings,
   resolveEffectiveTheme,
   resolveWorkspaceProjects,
@@ -90,7 +88,6 @@ function AppChrome(props: { children: ReactNode; nativeMobile?: boolean }) {
         onContextMenu={onRootContextMenu}
         onMouseDownCapture={onRootMouseDownCapture}
       >
-        <WindowsTitleBar />
         <StackItem size="fill" className="app-chrome-content">
           {props.children}
         </StackItem>
@@ -547,13 +544,6 @@ export default function App() {
     setSettingsSaveState({ status: "saved" });
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    setSettings((prev) => ({
-      ...prev,
-      theme: getNextTheme(prev.theme),
-    }));
-  }, [setSettings]);
-
   const openSettings = useCallback(
     (section: SectionId = "system", options?: SettingsOpenOptions) => {
       setSettingsSection(section);
@@ -708,7 +698,6 @@ export default function App() {
                           context={context}
                           setContext={setContext}
                           onOpenSettings={openSettings}
-                          onToggleTheme={toggleTheme}
                           appUpdate={appUpdate}
                           desktopBridgeEnabled={desktopBridgeEnabled}
                           lanPcCommandHostReady={lanPcCommandHostReady}

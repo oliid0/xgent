@@ -23,8 +23,8 @@ import { getFileTypeIcon } from "./fileTypeIcons";
 export type ChangedFilesActions = {
   onOpenFile?: (path: string) => void;
   onRevealInFileTree?: (path: string) => void;
-  /** null = open the review panel without focusing a specific file. */
-  onOpenDiff?: (path: string | null) => void;
+  /** null = open the latest diffable edit; this is independent from Git state. */
+  onOpenDiff?: (file: ChangedFileEntry | null) => void;
 };
 
 const ChangedFilesActionsContext = createContext<ChangedFilesActions | null>(null);
@@ -154,7 +154,7 @@ const ChangedFileRow = memo(function ChangedFileRow({ file }: { file: ChangedFil
               icon={<Icon icon={GitCommitHorizontal} size="sm" color="inherit" />}
               size="sm"
               variant="ghost"
-              onClick={() => actions?.onOpenDiff?.(file.path)}
+              onClick={() => actions?.onOpenDiff?.(file)}
             />
           ) : null}
         </HStack>

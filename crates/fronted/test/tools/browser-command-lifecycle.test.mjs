@@ -169,12 +169,9 @@ test("browser session controller preserves the page after a timed-out command", 
   assert.equal(recoveryCalls, 0);
 });
 
-test("local browser tool activity reveals the shared agent session", () => {
-  assert.match(
-    browserToolSource,
-    /if \(!delegated\) activeController\.openPanel\(sessionId, "agent"\)/,
-  );
-  assert.match(browserToolSource, /await controller\.ensureSession\(\{ sessionId \}\);\s*revealAgentSession\(\);/);
+test("agent browser work does not automatically reveal the sidebar", () => {
+  assert.doesNotMatch(browserToolSource, /revealAgentSession/);
+  assert.match(browserToolSource, /preserveActive: true/);
 });
 
 test("browser snapshots expose trusted human assistance without counting agent DOM events", () => {

@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+  "crates/computer-use",
   "crates/browser-automation",
   "crates/fronted/src-tauri",
   "crates/mobile-assistant",

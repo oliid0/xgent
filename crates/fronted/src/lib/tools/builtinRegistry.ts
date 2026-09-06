@@ -25,6 +25,7 @@ import type {
 } from "./builtinTypes";
 import { createCloudTaskTools } from "./cloudTaskTools";
 import { createCronTools } from "./cronTools";
+import { createCuaTools } from "./cuaTools";
 import { createCustomSystemTools } from "./customSystemTools";
 import { createFileToolState, type FileToolState } from "./fileToolState";
 import { createFsTools } from "./fsTools";
@@ -314,14 +315,30 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
         (server) => capabilities.localMcpStdio || server.transport !== "stdio",
       )
     : [];
+  let mcpBundle: Awaited<ReturnType<typeof createMcpTools>> | undefined;
+  const cuaEnabled = capabilities.localMcpStdio && params.runtimeScope === "chat";
+  const driverServerIds = enabledServers.filter((server) =>
+    (!server.transport || server.transport === "stdio") &&
+    /^cua-driver(?:\.exe)?$/i.test((server.command ?? "").split(/[\\/]/).pop() ?? "") &&
+    server.args?.includes("mcp"),
+  ).map((server) => server.id);
   if (enabledServers.length > 0) {
-    baseBundles.push(
-      await createMcpTools({
+    mcpBundle = await createMcpTools({
         servers: enabledServers,
         onLoadError: params.onMcpLoadError,
         loadFailureMode: params.mcpLoadFailureMode,
-      }),
-    );
+      });
+    // Keep the driver transport private behind cua. Other MCP tools remain unchanged.
+    const driver = mcpBundle;
+    baseBundles.push({ ...driver, tools: driver.tools.filter((tool) =>
+      !cuaEnabled || !driverServerIds.includes(driver.toolNameMap.get(tool.name)?.serverId ?? "")),
+    });
+  }
+  if (cuaEnabled) {
+    baseBundles.unshift(createCuaTools({
+      driver: mcpBundle,
+      driverServerIds,
+    }));
   }
 
   return baseBundles;

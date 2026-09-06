@@ -132,10 +132,12 @@ jobs:
             runner: macos-15-intel
             target: x86_64-apple-darwin
             suffix: x64
+            cua_arch: x86_64
           - name: Apple Silicon
-            runner: macos-14
+            runner: macos-15
             target: aarch64-apple-darwin
             suffix: aarch64
+            cua_arch: arm64
     steps:
       - uses: actions/checkout@v6
         with:
@@ -209,6 +211,11 @@ jobs:
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --validate
+
+      - name: Build Xgent native macOS computer use
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_26.0.app/Contents/Developer
+        run: bash scripts/release/prepare-computer-use-macos.sh "${{ matrix.cua_arch }}"
 
       - name: Build signed and notarized DMG
         if: env.SIGNED_RELEASE == 'true'
@@ -286,6 +293,12 @@ jobs:
       - name: Install frontend dependencies
         working-directory: crates/fronted
         run: pnpm install --frozen-lockfile
+
+      - name: Build Windows computer-use component
+        shell: bash
+        run: |
+          cargo build -p xgent-computer-use --release --target x86_64-pc-windows-msvc
+          node scripts/release/stage-computer-use.mjs target/x86_64-pc-windows-msvc/release/xgent_computer_use.dll windows-x86_64 "$XGENT_RELEASE_TAG"
 
       - name: Build Windows bundles
         if: env.SIGNED_RELEASE == 'true'
@@ -378,6 +391,15 @@ jobs:
             libssl-dev \
             libwebkit2gtk-4.1-dev \
             libxdo-dev \
+            libpipewire-0.3-dev \
+            libgbm-dev \
+            libxcb1-dev \
+            libxkbcommon-dev \
+            libclang-dev \
+            libxrandr-dev \
+            libdbus-1-dev \
+            libwayland-dev \
+            libegl-dev \
             patchelf \
             rpm \
             wget
@@ -389,6 +411,11 @@ jobs:
       - name: Install frontend dependencies
         working-directory: crates/fronted
         run: pnpm install --frozen-lockfile
+
+      - name: Build Linux computer-use component
+        run: |
+          cargo build -p xgent-computer-use --release --target x86_64-unknown-linux-gnu
+          node scripts/release/stage-computer-use.mjs target/x86_64-unknown-linux-gnu/release/libxgent_computer_use.so linux-x86_64 "$XGENT_RELEASE_TAG"
 
       - name: Build Linux bundles
         if: env.SIGNED_RELEASE == 'true'
@@ -699,7 +726,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: |
-            set -euo pipefail
+            set -eu
             release_apk="dist/Xgent-${XGENT_RELEASE_TAG}-Android-universal.apk"
             adb logcat -c
             adb install -r "$release_apk"
@@ -996,9 +1023,9 @@ jobs:
             ''|*[!0-9]*) echo "Could not parse simulator launch PID: $launch_result" >&2; exit 1 ;;
           esac
           sleep 12
-          xcrun simctl spawn "$simulator_udid" ps -p "$app_pid"
           xcrun simctl io "$simulator_udid" screenshot "$RUNNER_TEMP/xgent-ios-smoke.png"
           test "$(wc -c < "$RUNNER_TEMP/xgent-ios-smoke.png")" -gt 10000
+          xcrun simctl terminate "$simulator_udid" "$bundle_id"
 
       - name: Upload iOS launch evidence
         if: always()

@@ -48,7 +48,8 @@ test("mobile chat keeps one accessible header action cluster and a one-line func
   assert.match(composerSource, /size=\{mobileExperience \? "md" : "sm"\}/);
   assert.doesNotMatch(chatPageSource, /<MobileQuickActions[\s\S]*?onToggleTrajectory=\{/);
   assert.doesNotMatch(mobileActionsSource, /id: "trajectory"/);
-  assert.match(chatPageSource, /!mobileExperience && canShowTrajectory/);
+  assert.match(chatPageSource, /trajectoryAvailable=\{canShowTrajectory\}/);
+  assert.match(sidebarSource, /onOpenTrajectory/);
   assert.match(transcriptSource, /showMobileBlankState = mobileExperience && showStartChatState/);
   assert.match(
     transcriptSource,

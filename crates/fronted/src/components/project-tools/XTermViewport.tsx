@@ -146,6 +146,7 @@ export function XTermViewport({
     let disposed = false;
     let snapshotLoaded = false;
     let loadingSnapshot = false;
+    let replayingSnapshot = false;
     let renderedOutput = false;
     let lastOutputOffset = 0;
     let streamHandle: TerminalStreamHandle | null = null;
@@ -156,6 +157,8 @@ export function XTermViewport({
     const bufferedChunks: TerminalStreamChunk[] = [];
     const encoder = new TextEncoder();
     const term = new XTerm({
+      cols: Math.max(2, session.cols),
+      rows: Math.max(1, session.rows),
       cursorBlink: true,
       cursorStyle: "block",
       cursorInactiveStyle: "outline",
@@ -200,7 +203,7 @@ export function XTermViewport({
     let lastVisualFitAt = 0;
 
     const fitVisual = () => {
-      if (disposed) return;
+      if (disposed || loadingSnapshot || replayingSnapshot) return;
       if (!terminalContainerHasSize(container)) return;
       lastVisualFitAt = Date.now();
       try {
@@ -214,7 +217,9 @@ export function XTermViewport({
       if (ptyResizeTimer !== null) window.clearTimeout(ptyResizeTimer);
       ptyResizeTimer = window.setTimeout(() => {
         ptyResizeTimer = null;
-        if (!disposed) streamHandle?.resize(term.cols, term.rows);
+        if (!disposed && !replayingSnapshot && terminalContainerHasSize(container)) {
+          streamHandle?.resize(term.cols, term.rows);
+        }
       }, PTY_RESIZE_DEBOUNCE_MS);
     };
 
@@ -259,7 +264,9 @@ export function XTermViewport({
     };
 
     const dataDisposable = term.onData((data) => {
-      if (!streamHandle || term.options.disableStdin) return;
+      // Replay includes old terminal queries. Their responses must never be
+      // injected into the live shell as commands (e.g. cursor-position replies).
+      if (!streamHandle || term.options.disableStdin || replayingSnapshot) return;
       const accepted = streamHandle.write(encoder.encode(data));
       if (!accepted && !inputPausedByStream) {
         applyInputState({
@@ -364,6 +371,10 @@ export function XTermViewport({
     };
 
     const applySnapshot = (snapshot: TerminalSnapshot) => {
+      replayingSnapshot = true;
+      if (!renderedOutput || snapshot.truncated) {
+        term.resize(Math.max(2, snapshot.session.cols), Math.max(1, snapshot.session.rows));
+      }
       const bytes = snapshotBytes(snapshot);
       const startOffset = terminalSnapshotStartOffset(snapshot);
       const endOffset = terminalSnapshotEndOffset(snapshot);
@@ -392,9 +403,13 @@ export function XTermViewport({
       }
       snapshotLoaded = true;
       loadingSnapshot = false;
-      applyStdinState();
-      replayBufferedChunks();
-      window.setTimeout(fitAndResize, 0);
+      term.write(new Uint8Array(), () => {
+        if (disposed) return;
+        replayingSnapshot = false;
+        applyStdinState();
+        replayBufferedChunks();
+        fitAndResize();
+      });
     };
 
     const replayBufferedChunks = () => {
@@ -438,7 +453,7 @@ export function XTermViewport({
           reportError(null);
           streamOutputUnsubscribe = handle.subscribeOutput((chunk) => {
             if (disposed || chunk.sessionId !== sessionRef.current.id) return;
-            if (snapshotLoaded && !loadingSnapshot) {
+            if (snapshotLoaded && !loadingSnapshot && !replayingSnapshot) {
               writeChunk(chunk);
             } else {
               bufferedChunks.push(chunk);

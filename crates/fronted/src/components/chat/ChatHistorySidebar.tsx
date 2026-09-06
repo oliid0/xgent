@@ -41,6 +41,7 @@ import { useSoul } from "../../lib/soul";
 import type { SoulDocument } from "../../lib/soul/model";
 import { AppUpdateButton } from "../AppUpdateButton";
 import {
+  Activity,
   Archive,
   ArchiveRestore,
   Blend,
@@ -163,6 +164,8 @@ type ChatHistorySidebarProps = {
   onSelectExecutionMode: (mode: ExecutionMode) => void;
   onOpenSettings: () => void;
   onCreateSoul: () => void;
+  onOpenTrajectory?: () => void;
+  trajectoryAvailable?: boolean;
   appUpdate?: AppUpdateController;
   onOpenSkillsHub?: () => void;
   onOpenMcpHub?: () => void;
@@ -214,7 +217,7 @@ function ChatSidebarSurface(props: {
       style={
         {
           "--zone-font-scale": props.fontScale,
-          "--xgent-chat-sidebar-width": `${props.desktopWidth}px`,
+          "--xgent-chat-sidebar-width": `min(${props.desktopWidth}px, 50vw)`,
         } as CSSProperties
       }
     >
@@ -1267,6 +1270,8 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     onSelectExecutionMode,
     onOpenSettings,
     onCreateSoul,
+    onOpenTrajectory,
+    trajectoryAvailable = false,
     appUpdate,
     onOpenSkillsHub,
     onOpenMcpHub,
@@ -2829,6 +2834,23 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                       direction="vertical"
                       className="mx-1 my-1 border-t border-border/50"
                     />
+                    {trajectoryAvailable && onOpenTrajectory ? (
+                      <AstryxButton
+                        variant="ghost"
+                        label={t("chat.trajectory.open")}
+                        type="button"
+                        onClick={() => {
+                          onOpenTrajectory();
+                          setSoulLauncherOpen(false);
+                        }}
+                        className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07]"
+                      >
+                        <Activity className="h-4 w-4 text-muted-foreground" />
+                        <AstryxText as="span" type="inherit">
+                          {t("chat.trajectory.open")}
+                        </AstryxText>
+                      </AstryxButton>
+                    ) : null}
                     <AstryxButton
                       variant="ghost"
                       label={t("sidebar.terminal")}
@@ -3049,6 +3071,20 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               onCreateSoul();
             }}
           />
+          {trajectoryAvailable && onOpenTrajectory ? (
+            <Button
+              label={t("chat.trajectory.open")}
+              variant="secondary"
+              onClick={() => {
+                suppressSoulClickRef.current = false;
+                setSoulLauncherOpen(false);
+                onOpenTrajectory();
+              }}
+            >
+              <Activity className="h-4 w-4" />
+              {t("chat.trajectory.open")}
+            </Button>
+          ) : null}
         </VStack>
       </BottomSheet>
     </>

@@ -11,6 +11,7 @@ import {
   StackItem,
   VStack,
 } from "@astryxdesign/core/Layout";
+import { Text } from "@astryxdesign/core/Text";
 import { openUrl } from "@xgent/runtime";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
@@ -89,6 +90,8 @@ type WorkspaceSidePanelProps = {
   initialSkillsRootDir?: string;
   isAgentMode: boolean;
   onClose: () => void;
+  /** Removes the panel chrome when hosted by the unified right-sidebar tabs. */
+  embedded?: boolean;
 };
 
 function normalizeTreePath(path: string) {
@@ -283,8 +286,12 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
         data-workspace-side-panel
         data-workspace-tool={props.target}
         className="zone-font-scale workspace-side-panel"
-        width={props.width}
-        hasDivider
+        width={
+          props.embedded
+            ? "100%"
+            : `min(${typeof props.width === "number" ? `${props.width}px` : props.width}, 50vw)`
+        }
+        hasDivider={!props.embedded}
         padding={0}
         isScrollable={false}
         style={
@@ -299,25 +306,34 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
           height="fill"
           padding={0}
           header={
-            <LayoutHeader hasDivider padding={3}>
-              <HStack gap={2} vAlign="center">
-                <Icon />
-                <StackItem size="fill">
-                  <Heading level={3} maxLines={1}>
-                    {title}
-                  </Heading>
-                </StackItem>
-                <IconButton
-                  type="button"
-                  label={t("settings.close")}
-                  tooltip={t("settings.close")}
-                  icon={<X />}
-                  variant="ghost"
-                  size="sm"
-                  onClick={props.onClose}
-                />
-              </HStack>
-            </LayoutHeader>
+            props.embedded ? undefined : (
+              <LayoutHeader hasDivider padding={3}>
+                <HStack gap={2} vAlign="center">
+                  <Icon />
+                  <StackItem size="fill">
+                    <VStack gap={0.5}>
+                      <Heading level={3} maxLines={1}>
+                        {title}
+                      </Heading>
+                      {props.target === "fileTree" && props.cwd.trim() ? (
+                        <Text type="supporting" color="secondary" maxLines={1}>
+                          {props.cwd}
+                        </Text>
+                      ) : null}
+                    </VStack>
+                  </StackItem>
+                  <IconButton
+                    type="button"
+                    label={t("settings.close")}
+                    tooltip={t("settings.close")}
+                    icon={<X />}
+                    variant="ghost"
+                    size="sm"
+                    onClick={props.onClose}
+                  />
+                </HStack>
+              </LayoutHeader>
+            )
           }
           content={
             <LayoutContent padding={0} isScrollable={false} label={title}>

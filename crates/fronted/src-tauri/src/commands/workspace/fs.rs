@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
-use std::io::{self, Cursor, Read, Seek};
+use std::io::{self, Cursor, Read, Seek, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
@@ -924,6 +924,10 @@ fn is_spreadsheet_file(path: &Path) -> bool {
     )
 }
 
+fn is_presentation_file(path: &Path) -> bool {
+    matches!(extension_lower(path).as_deref(), Some("pptx") | Some("ppt"))
+}
+
 fn is_xlsx_extractable_file(path: &Path) -> bool {
     matches!(
         extension_lower(path).as_deref(),
@@ -965,7 +969,7 @@ fn editable_text_unsupported_reason(path: &Path) -> Option<&'static str> {
     if is_notebook_file(path) {
         return Some("Notebook files are not supported in the code editor");
     }
-    if is_word_file(path) || is_spreadsheet_file(path) {
+    if is_word_file(path) || is_spreadsheet_file(path) || is_presentation_file(path) {
         return Some("Office documents are not supported in the code editor");
     }
     if is_archive_file(path) {
@@ -986,6 +990,10 @@ fn office_mime_type(path: &Path) -> Option<&'static str> {
         }
         Some("xlsm") | Some("xltm") => Some("application/vnd.ms-excel.sheet.macroEnabled.12"),
         Some("xls") => Some("application/vnd.ms-excel"),
+        Some("pptx") => {
+            Some("application/vnd.openxmlformats-officedocument.presentationml.presentation")
+        }
+        Some("ppt") => Some("application/vnd.ms-powerpoint"),
         Some("ods") => Some("application/vnd.oasis.opendocument.spreadsheet"),
         Some("zip") => Some("application/zip"),
         Some("rar") => Some("application/vnd.rar"),
@@ -1024,6 +1032,10 @@ fn infer_workspace_preview_mime(path: &Path, bytes: &[u8]) -> Option<&'static st
         Some("xlsm") | Some("xltm") => Some("application/vnd.ms-excel.sheet.macroEnabled.12"),
         Some("xls") => Some("application/vnd.ms-excel"),
         Some("ods") => Some("application/vnd.oasis.opendocument.spreadsheet"),
+        Some("pptx") => {
+            Some("application/vnd.openxmlformats-officedocument.presentationml.presentation")
+        }
+        Some("ppt") => Some("application/vnd.ms-powerpoint"),
         Some("mp3") => Some("audio/mpeg"),
         Some("wav") => Some("audio/wav"),
         Some("ogg") | Some("oga") => Some("audio/ogg"),
@@ -1416,8 +1428,13 @@ fn read_local_preview_file(target: PathBuf, logical_path: String) -> Result<Read
             message: "File type is not supported for preview".to_string(),
         }
     })?;
+    let extracted_content = match extension_lower(&target).as_deref() {
+        Some("docx") => Some(build_docx_window(&bytes).map_err(FsError::Other)?.0),
+        Some("pptx") => Some(build_pptx_window(&bytes).map_err(FsError::Other)?.0),
+        _ => None,
+    };
 
-    Ok(build_workspace_preview_response(
+    let mut response = build_workspace_preview_response(
         logical_path,
         bytes,
         mime_type,
@@ -1425,7 +1442,9 @@ fn read_local_preview_file(target: PathBuf, logical_path: String) -> Result<Read
         content_hash,
         original_size_bytes,
         file_id,
-    ))
+    );
+    response.content = extracted_content;
+    Ok(response)
 }
 
 fn truncate_text_to_byte_limit(text: &str, max_bytes: usize) -> (String, bool) {
@@ -1778,6 +1797,180 @@ fn build_docx_window(bytes: &[u8]) -> Result<(String, bool), String> {
     let text = extract_xml_text(&xml, true);
     let (content, byte_truncated) = truncate_text_to_byte_limit(&text, READ_MAX_TEXT_BYTES);
     Ok((content, zip_truncated || byte_truncated))
+}
+
+fn is_word_paragraph_start(xml: &str, index: usize) -> bool {
+    xml[index..].starts_with("<w:p")
+        && xml[index + 4..]
+            .chars()
+            .next()
+            .is_some_and(|character| character == '>' || character.is_whitespace())
+}
+
+fn word_text_paragraphs(xml: &str) -> Vec<(usize, usize)> {
+    let mut paragraphs = Vec::new();
+    let mut cursor = 0usize;
+    while cursor < xml.len() {
+        let Some(relative) = xml[cursor..].find("<w:p") else {
+            break;
+        };
+        let start = cursor + relative;
+        if !is_word_paragraph_start(xml, start) {
+            cursor = start + 4;
+            continue;
+        }
+        let Some(end_relative) = xml[start..].find("</w:p>") else {
+            break;
+        };
+        let end = start + end_relative + "</w:p>".len();
+        if xml[start..end].contains("<w:t") {
+            paragraphs.push((start, end));
+        }
+        cursor = end;
+    }
+    paragraphs
+}
+
+fn rewrite_word_paragraph(paragraph: &str, replacement: &str) -> Result<String, String> {
+    let mut output = String::with_capacity(paragraph.len() + replacement.len());
+    let mut cursor = 0usize;
+    let mut replaced = false;
+    while let Some(relative) = paragraph[cursor..].find("<w:t") {
+        let start = cursor + relative;
+        let Some(open_end_relative) = paragraph[start..].find('>') else {
+            return Err("Malformed Word text element".to_string());
+        };
+        let body_start = start + open_end_relative + 1;
+        let Some(close_relative) = paragraph[body_start..].find("</w:t>") else {
+            return Err("Malformed Word text element".to_string());
+        };
+        let close = body_start + close_relative;
+        output.push_str(&paragraph[cursor..body_start]);
+        if !replaced {
+            output.push_str(&quick_xml::escape::escape(replacement));
+            replaced = true;
+        }
+        output.push_str("</w:t>");
+        cursor = close + "</w:t>".len();
+    }
+    output.push_str(&paragraph[cursor..]);
+    if !replaced {
+        return Err("Word paragraph does not contain an editable text node".to_string());
+    }
+    Ok(output)
+}
+
+fn rewrite_docx_text(bytes: &[u8], content: &str) -> Result<Vec<u8>, String> {
+    let mut archive = open_zip_archive(bytes, "Word document")?;
+    let document_xml = {
+        let mut document = archive
+            .by_name("word/document.xml")
+            .map_err(|error| format!("Word document does not contain document.xml: {error}"))?;
+        let mut xml = String::new();
+        document
+            .read_to_string(&mut xml)
+            .map_err(|error| format!("Failed to read Word document text: {error}"))?;
+        xml
+    };
+    let paragraphs = word_text_paragraphs(&document_xml);
+    let replacements = if content.is_empty() {
+        vec![""; paragraphs.len()]
+    } else {
+        content
+            .split('\n')
+            .map(|line| line.trim_end_matches('\r'))
+            .collect::<Vec<_>>()
+    };
+    if replacements.len() != paragraphs.len() {
+        return Err(format!(
+            "Document structure changed: expected {} paragraph lines, received {}. Edit paragraph text without adding or removing lines.",
+            paragraphs.len(),
+            replacements.len()
+        ));
+    }
+
+    let mut rewritten_xml = String::with_capacity(document_xml.len() + content.len());
+    let mut cursor = 0usize;
+    for ((start, end), replacement) in paragraphs.into_iter().zip(replacements) {
+        rewritten_xml.push_str(&document_xml[cursor..start]);
+        rewritten_xml.push_str(&rewrite_word_paragraph(&document_xml[start..end], replacement)?);
+        cursor = end;
+    }
+    rewritten_xml.push_str(&document_xml[cursor..]);
+
+    let mut output = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    for index in 0..archive.len() {
+        let mut entry = archive
+            .by_index(index)
+            .map_err(|error| format!("Failed to read Word package entry: {error}"))?;
+        let name = entry.name().to_string();
+        let mut options =
+            zip::write::SimpleFileOptions::default().compression_method(entry.compression());
+        if let Some(mode) = entry.unix_mode() {
+            options = options.unix_permissions(mode);
+        }
+        if entry.is_dir() {
+            output
+                .add_directory(name, options)
+                .map_err(|error| format!("Failed to write Word package directory: {error}"))?;
+            continue;
+        }
+        output
+            .start_file(&name, options)
+            .map_err(|error| format!("Failed to write Word package entry {name}: {error}"))?;
+        if name == "word/document.xml" {
+            output
+                .write_all(rewritten_xml.as_bytes())
+                .map_err(|error| format!("Failed to write Word document text: {error}"))?;
+        } else {
+            io::copy(&mut entry, &mut output)
+                .map_err(|error| format!("Failed to copy Word package entry {name}: {error}"))?;
+        }
+    }
+    output
+        .finish()
+        .map(Cursor::into_inner)
+        .map_err(|error| format!("Failed to finish Word document: {error}"))
+}
+
+fn build_pptx_window(bytes: &[u8]) -> Result<(String, bool), String> {
+    let mut archive = open_zip_archive(bytes, "PowerPoint presentation")?;
+    let mut slide_names = archive
+        .file_names()
+        .filter(|name| {
+            name.starts_with("ppt/slides/slide") && name.ends_with(".xml") && !name.contains("/_rels/")
+        })
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    slide_names.sort_by_key(|name| {
+        name.trim_start_matches("ppt/slides/slide")
+            .trim_end_matches(".xml")
+            .parse::<usize>()
+            .unwrap_or(usize::MAX)
+    });
+
+    let mut output = String::new();
+    let mut truncated = false;
+    for (index, name) in slide_names.iter().enumerate() {
+        let Some((xml, entry_truncated)) =
+            read_zip_entry_text(&mut archive, name, MAX_ZIP_XML_ENTRY_BYTES)?
+        else {
+            continue;
+        };
+        if !output.is_empty() {
+            output.push_str("\n\n");
+        }
+        output.push_str(&format!("Slide {}\n", index + 1));
+        output.push_str(&extract_xml_text(&xml, true));
+        truncated |= entry_truncated;
+        if output.len() > READ_MAX_TEXT_BYTES {
+            let (limited, _) = truncate_text_to_byte_limit(&output, READ_MAX_TEXT_BYTES);
+            output = limited;
+            truncated = true;
+            break;
+        }
+    }
+    Ok((output, truncated))
 }
 
 fn extract_xml_elements(xml: &str, tag_name: &str) -> Vec<String> {
@@ -2798,6 +2991,29 @@ fn fs_read_text_impl(
         ));
     }
 
+    if is_presentation_file(&target) {
+        let (content, truncated) = if extension_lower(&target).as_deref() == Some("pptx") {
+            build_pptx_window(&bytes).map_err(FsError::Other)?
+        } else {
+            (
+                "Legacy PowerPoint .ppt file recognized. Open it in the system presentation app to edit or convert it to .pptx for slide text preview."
+                    .to_string(),
+                false,
+            )
+        };
+        return Ok(build_document_read_response(
+            "presentation",
+            logical_path,
+            content,
+            truncated,
+            mtime_ms,
+            content_hash,
+            office_mime_type(&target).map(str::to_string),
+            md.len() as usize,
+            file_id,
+        ));
+    }
+
     if is_archive_file(&target) {
         let (content, truncated) = build_archive_window(&target, &bytes).map_err(FsError::Other)?;
         return Ok(build_document_read_response(
@@ -3151,6 +3367,117 @@ pub async fn fs_write_text(
             expected_content_hash,
             checkpoint,
         )
+    })
+    .await
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WriteBinaryResponse {
+    pub path: String,
+    pub bytes_written: usize,
+    pub mtime_ms: u64,
+    pub content_hash: String,
+    pub file_id: Option<String>,
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn fs_write_binary(
+    workdir: String,
+    path: String,
+    content_base64: String,
+    expected_mtime_ms: Option<u64>,
+    expected_content_hash: Option<String>,
+    checkpoint: Option<CheckpointCtx>,
+) -> Result<WriteBinaryResponse, FsCommandError> {
+    run_blocking_fs("fs_write_binary", move || {
+        let scoped = resolve_scoped_fs_path(&workdir, &path)?;
+        let logical_path = scoped.logical_path.clone();
+        let target = resolve_existing_file_target(&scoped.root, &scoped.relative_path)
+            .map_err(|error| remap_scoped_path_error(&scoped, error))?;
+        let expected = parse_expected_version(expected_mtime_ms, expected_content_hash)?
+            .ok_or_else(|| FsError::RequiresFullRead {
+                path: logical_path.clone(),
+            })?;
+        ensure_expected_version_matches(&target, &logical_path, &expected)?;
+        let compact = compact_base64(&content_base64);
+        let bytes = BASE64_STANDARD
+            .decode(compact.as_bytes())
+            .map_err(|error| FsError::Other(format!("Binary content is not valid base64: {error}")))?;
+        if bytes.len() > READ_MAX_PREVIEW_BYTES {
+            return Err(FsError::TooLarge {
+                path: logical_path,
+                message: format!(
+                    "Binary file is too large to save ({} bytes, max {READ_MAX_PREVIEW_BYTES} bytes)",
+                    bytes.len()
+                ),
+            }
+            .into());
+        }
+        capture_pre_image(
+            checkpoint.as_ref(),
+            &scoped.root,
+            &checkpoint_rel(&scoped.root, &target, &scoped.relative_path),
+            PreImage::File(None),
+        );
+        fs::write(&target, &bytes).map_err(FsError::Io)?;
+        let canonical = fs::canonicalize(&target).map_err(FsError::Io)?;
+        let metadata = fs::metadata(&canonical).map_err(FsError::Io)?;
+        Ok(WriteBinaryResponse {
+            path: scoped.logical_path,
+            bytes_written: bytes.len(),
+            mtime_ms: metadata_mtime_ms(&metadata),
+            content_hash: hash_bytes(&bytes),
+            file_id: Some(file_identity(&metadata, &canonical)),
+        })
+    })
+    .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn fs_write_docx_text(
+    workdir: String,
+    path: String,
+    content: String,
+    expected_mtime_ms: Option<u64>,
+    expected_content_hash: Option<String>,
+    checkpoint: Option<CheckpointCtx>,
+) -> Result<WriteBinaryResponse, FsCommandError> {
+    run_blocking_fs("fs_write_docx_text", move || {
+        let scoped = resolve_scoped_fs_path(&workdir, &path)?;
+        let logical_path = scoped.logical_path.clone();
+        if extension_lower(&scoped.relative_path).as_deref() != Some("docx") {
+            return Err(FsError::UnsupportedTarget {
+                path: logical_path,
+                message: "Document text editing only supports .docx files".to_string(),
+            }
+            .into());
+        }
+        let target = resolve_existing_file_target(&scoped.root, &scoped.relative_path)
+            .map_err(|error| remap_scoped_path_error(&scoped, error))?;
+        let expected = parse_expected_version(expected_mtime_ms, expected_content_hash)?
+            .ok_or_else(|| FsError::RequiresFullRead {
+                path: logical_path.clone(),
+            })?;
+        ensure_expected_version_matches(&target, &logical_path, &expected)?;
+        let original = fs::read(&target).map_err(FsError::Io)?;
+        let rewritten = rewrite_docx_text(&original, &content).map_err(FsError::Other)?;
+        capture_pre_image(
+            checkpoint.as_ref(),
+            &scoped.root,
+            &checkpoint_rel(&scoped.root, &target, &scoped.relative_path),
+            PreImage::File(None),
+        );
+        fs::write(&target, &rewritten).map_err(FsError::Io)?;
+        let canonical = fs::canonicalize(&target).map_err(FsError::Io)?;
+        let metadata = fs::metadata(&canonical).map_err(FsError::Io)?;
+        Ok(WriteBinaryResponse {
+            path: scoped.logical_path,
+            bytes_written: rewritten.len(),
+            mtime_ms: metadata_mtime_ms(&metadata),
+            content_hash: hash_bytes(&rewritten),
+            file_id: Some(file_identity(&metadata, &canonical)),
+        })
     })
     .await
 }

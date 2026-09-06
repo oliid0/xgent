@@ -4,6 +4,7 @@
 // successful tool results count — a failed or still-streaming operation
 // changed nothing yet.
 import { deriveFileChangeStats, type FileChangeStats } from "./fileChangeStats";
+import { readStreamPreviewMeta } from "./toolPreview";
 import type { UiRound } from "./uiMessages";
 
 type ToolBlockItem = Extract<UiRound["blocks"][number], { kind: "tool" }>["item"];
@@ -17,6 +18,11 @@ export type ChangedFileEntry = {
   deleted: boolean;
   /** Tool call id of the last operation touching the file — stable render key. */
   lastToolCallId: string;
+  /** Exact tool-level edit snapshots, when the settled trace retained complete fields. */
+  beforeText?: string;
+  afterText?: string;
+  beforeTextAvailable: boolean;
+  afterTextAvailable: boolean;
 };
 
 export type ChangedFilesSummary = {
@@ -90,16 +96,45 @@ export function collectChangedFiles(
         removed: 0,
         deleted: false,
         lastToolCallId: "",
+        beforeTextAvailable: false,
+        afterTextAvailable: false,
       };
 
       if (toolCall.name === "Delete") {
         entry.deleted = true;
+        entry.beforeText = undefined;
+        entry.afterText = "";
+        entry.beforeTextAvailable = false;
+        entry.afterTextAvailable = true;
       } else {
         const stats = statsForToolCall(toolCall);
         entry.added += stats?.added ?? 0;
         entry.removed += stats?.removed ?? 0;
         // A Write after a Delete re-creates the file.
         entry.deleted = false;
+
+        const args = toolCall.arguments ?? {};
+        const previewMeta = readStreamPreviewMeta(args);
+        if (toolCall.name === "Write") {
+          const content = args.content;
+          const complete =
+            typeof content === "string" && previewMeta?.fields.content?.truncated !== true;
+          entry.beforeText = "";
+          entry.afterText = complete ? content : undefined;
+          entry.beforeTextAvailable = true;
+          entry.afterTextAvailable = complete;
+        } else {
+          const oldText = args.old_string;
+          const newText = args.new_string;
+          const oldComplete =
+            typeof oldText === "string" && previewMeta?.fields.old_string?.truncated !== true;
+          const newComplete =
+            typeof newText === "string" && previewMeta?.fields.new_string?.truncated !== true;
+          entry.beforeText = oldComplete ? oldText : undefined;
+          entry.afterText = newComplete ? newText : undefined;
+          entry.beforeTextAvailable = oldComplete;
+          entry.afterTextAvailable = newComplete;
+        }
       }
 
       entry.path = path;

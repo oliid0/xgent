@@ -120,7 +120,7 @@ const SCRIPT_EXTENSIONS: &[&str] = &[
 ];
 const PREVIEW_EXTENSIONS: &[&str] = &[
     "avif", "bmp", "csv", "doc", "docx", "flac", "gif", "ico", "jpeg", "jpg", "m4a", "m4v", "mov",
-    "mp3", "mp4", "ods", "oga", "ogg", "ogv", "pdf", "png", "rtf", "svg", "tsv", "wav", "webm",
+    "mp3", "mp4", "ods", "oga", "ogg", "ogv", "pdf", "png", "ppt", "pptx", "rtf", "svg", "tsv", "wav", "webm",
     "webp", "xls", "xlsm", "xlsx", "xltm", "xltx",
 ];
 const CHAT_FILE_OPEN_TIMEOUT: Duration = Duration::from_secs(25);

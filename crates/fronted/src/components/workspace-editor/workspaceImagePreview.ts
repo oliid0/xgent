@@ -29,6 +29,8 @@ const WORKSPACE_SPREADSHEET_EXTENSIONS = new Set([
   "xltx",
 ]);
 
+const WORKSPACE_PRESENTATION_EXTENSIONS = new Set(["ppt", "pptx"]);
+
 const WORKSPACE_AUDIO_EXTENSIONS = new Set(["flac", "m4a", "mp3", "oga", "ogg", "wav"]);
 
 const WORKSPACE_VIDEO_EXTENSIONS = new Set(["m4v", "mov", "mp4", "ogv", "webm"]);
@@ -42,6 +44,7 @@ export type WorkspacePreviewKind =
   | "image"
   | "markdown"
   | "pdf"
+  | "presentation"
   | "spreadsheet"
   | "text"
   | "video";
@@ -67,6 +70,7 @@ export function getWorkspacePreviewKind(path: string): WorkspacePreviewKind | nu
   if (WORKSPACE_MARKDOWN_EXTENSIONS.has(extension)) return "markdown";
   if (WORKSPACE_DOCUMENT_EXTENSIONS.has(extension)) return "document";
   if (WORKSPACE_SPREADSHEET_EXTENSIONS.has(extension)) return "spreadsheet";
+  if (WORKSPACE_PRESENTATION_EXTENSIONS.has(extension)) return "presentation";
   if (WORKSPACE_AUDIO_EXTENSIONS.has(extension)) return "audio";
   if (WORKSPACE_VIDEO_EXTENSIONS.has(extension)) return "video";
   if (WORKSPACE_TEXT_EXTENSIONS.has(extension)) return "text";
