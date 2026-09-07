@@ -282,6 +282,7 @@ export function createTsModuleLoader(options = {}) {
           Boolean(lanPcCommandHostConfig.endpoint) &&
           Boolean(lanPcCommandHostConfig.remoteWorkdir),
         LAN_PC_SESSION_CHANGED_EVENT: "xgent://lan-pc-session-changed",
+        ...mocks.get(specifier),
       };
     }
     if (mocks.has(specifier)) return mocks.get(specifier);

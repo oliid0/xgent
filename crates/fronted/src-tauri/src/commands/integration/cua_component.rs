@@ -65,7 +65,7 @@ fn install(app:&tauri::AppHandle)->Result<PathBuf,String> {
     let _guard=INSTALL.get_or_init(Mutex::default).lock().map_err(|_|"CUA installation lock poisoned")?;
     if let Some((manifest,path))=installed(app)? {
         let bytes=std::fs::read(&path).map_err(|e|e.to_string())?;
-        if bytes.len() as u64==manifest.bytes && format!("{:x}",Sha256::digest(&bytes))==manifest.sha256 { return Ok(path); }
+        if bytes.len() as u64==manifest.bytes && Sha256::digest(&bytes).iter().map(|byte|format!("{byte:02x}")).collect::<String>().eq_ignore_ascii_case(&manifest.sha256) { return Ok(path); }
         return Err("Installed CUA component failed integrity verification. Remove it through component settings and reinstall.".into());
     }
     progress(app,"checking",0,0);
@@ -100,7 +100,7 @@ fn install(app:&tauri::AppHandle)->Result<PathBuf,String> {
         digest.update(&buffer[..read]); file.write_all(&buffer[..read]).map_err(|e|e.to_string())?;
         progress(app,"downloading",total,manifest.bytes);
     }
-    if total!=manifest.bytes || format!("{:x}",digest.finalize())!=manifest.sha256 { return Err("CUA download failed SHA-256 verification".into()); }
+    if total!=manifest.bytes || !digest.finalize().iter().map(|byte|format!("{byte:02x}")).collect::<String>().eq_ignore_ascii_case(&manifest.sha256) { return Err("CUA download failed SHA-256 verification".into()); }
     file.sync_all().map_err(|e|e.to_string())?; drop(file);
     #[cfg(unix)] {
         use std::os::unix::fs::PermissionsExt;

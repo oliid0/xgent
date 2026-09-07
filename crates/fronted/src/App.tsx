@@ -32,6 +32,7 @@ import {
 import { useAppUpdateController } from "./lib/appUpdates";
 import { initAutomation } from "./lib/automation";
 import { type MobileStartupStatus, readMobileStartupStatus } from "./lib/mobileStartup";
+import { trackMobileViewport } from "./lib/mobileViewport";
 import { setRetryErrorExtension } from "./lib/providers/runtime/streamRetry";
 import {
   inferRuntimePlatform,
@@ -70,6 +71,10 @@ function getDefaultContext(): Context {
 }
 
 function AppChrome(props: { children: ReactNode; nativeMobile?: boolean }) {
+  useEffect(() => {
+    if (!props.nativeMobile) return;
+    return trackMobileViewport(window, document.documentElement.style);
+  }, [props.nativeMobile]);
   // Plain inputs get a shared cut/copy/paste menu; everything else keeps the
   // suppressed native menu (surfaces with their own menus opt out upstream).
   const { onRootContextMenu, onRootMouseDownCapture, contextMenuProps } = useNativeInputContextMenu(

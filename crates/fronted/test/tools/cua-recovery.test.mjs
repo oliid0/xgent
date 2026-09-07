@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
-function setup({ actionError = false } = {}) {
+function setup({ actionError = false, observationErrorAfterAction = false } = {}) {
   const calls = [];
   const names = ["list_windows", "get_window_state", "click", "type_text", "press_key"];
   const parameters = { type: "object", properties: Object.fromEntries(
@@ -20,7 +20,8 @@ function setup({ actionError = false } = {}) {
       return { role: "toolResult", toolCallId: call.id, toolName: call.name,
         content: [{ type: "text", text: name === "get_window_state" ? "Scene ready" : "dispatched" },
           ...(name === "get_window_state" && call.arguments.include_screenshot !== false ? [{ type: "image", data: "cG5n", mimeType: "image/png" }] : [])],
-        details: { mcp: { structuredContent: data } }, isError: actionError && name === "click", timestamp: Date.now() };
+        details: { mcp: { structuredContent: data } }, isError: (actionError && name === "click") ||
+          (observationErrorAfterAction && name === "get_window_state" && calls.some((item) => item.name.endsWith("_type_text"))), timestamp: Date.now() };
     },
   };
   const loader = createTsModuleLoader({ mocks: { "@xgent/runtime": { invoke: async (command) => {
@@ -54,6 +55,19 @@ test("native action failures never replay through the recovery transport", async
   const failed = await run("click", { state_id: "native-state", x: 1, y: 1 });
   assert.equal(failed.isError, true);
   assert.equal(calls.length, 0);
+});
+
+test("sequence counts an applied action even when its observation fails and never continues", async () => {
+  const { calls, run } = setup({ observationErrorAfterAction: true });
+  const observed = await run("get_app_state");
+  const response = await run("sequence", { state_id: observed.details.stateId, steps: [
+    { operation: "type_text", text: "hello" },
+    { operation: "press_key", key: "Enter" },
+  ] });
+  assert.equal(response.isError, true);
+  assert.equal(response.details.actionApplied, true);
+  assert.equal(response.details.completedSteps, 1);
+  assert.equal(calls.filter((call) => call.name.endsWith("_press_key")).length, 0);
 });
 
 test("a local sequence stops at an unmet precondition without issuing the next action", async () => {

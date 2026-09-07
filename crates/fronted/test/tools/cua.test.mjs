@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { setTimeout as delay } from "node:timers/promises";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 function setup(invoke) {
@@ -7,6 +8,14 @@ function setup(invoke) {
   return loader.loadModule("src/lib/tools/cuaTools.ts").createCuaTools();
 }
 const call = (id, operation = "get_app_state") => ({ id, name: "cua", arguments: { operation, app: "Blender" } });
+
+async function waitForDispatch(dispatched) {
+  const deadline = Date.now() + 5_000;
+  while (!dispatched()) {
+    assert.ok(Date.now() < deadline, "CUA never reached native invocation");
+    await delay(10);
+  }
+}
 
 test("CUA forwards native screenshots and correlated tool results to the model", async () => {
   const content = [{ type: "text", text: "state_id: 3" }, { type: "image", data: "cG5n", mimeType: "image/png" }];
@@ -21,6 +30,7 @@ test("CUA forwards native screenshots and correlated tool results to the model",
   assert.equal(result.toolCallId, "call-1");
   assert.equal(result.isError, false);
   assert.deepEqual(result.content, content);
+  assert.equal(result.details.stateId, "3");
 });
 
 test("CUA serializes calls, cancels queued work and continues after native errors", async () => {
@@ -33,7 +43,7 @@ test("CUA serializes calls, cancels queued work and continues after native error
     return { content: [{ type: "text", text: "state" }], isError: false };
   });
   const first = bundle.executeToolCall(call("first"));
-  while (!release) await new Promise((resolve) => setImmediate(resolve));
+  await waitForDispatch(() => release);
   const abort = new AbortController();
   const cancelled = bundle.executeToolCall(call("cancelled"), abort.signal);
   const second = bundle.executeToolCall(call("second"));
@@ -68,7 +78,7 @@ test("cancelling in-flight computer use keeps subsequent physical actions queued
   });
   const abort = new AbortController();
   const first = bundle.executeToolCall(call("first"), abort.signal);
-  while (!release) await new Promise((resolve) => setImmediate(resolve));
+  await waitForDispatch(() => release);
   abort.abort();
   assert.equal((await first).isError, true);
   const second = bundle.executeToolCall(call("second", "click"));

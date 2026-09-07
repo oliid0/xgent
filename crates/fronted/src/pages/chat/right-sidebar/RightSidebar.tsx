@@ -216,6 +216,7 @@ export function RightSidebar(props: {
         role="tabpanel"
         aria-label={props.tabs.find((tab) => tab.id === props.activeTabId)?.label}
         size="fill"
+        className="right-sidebar-tab-panel"
         style={{ minHeight: 0, minWidth: 0, overflow: "hidden" }}
       >
         {props.children ? (

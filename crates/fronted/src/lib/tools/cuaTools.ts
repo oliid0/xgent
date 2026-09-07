@@ -264,6 +264,9 @@ export function createCuaTools(
               toolName: toolCall.name,
               content: response.content ?? [],
               details: {
+                ...(response.details && typeof response.details === "object"
+                  ? response.details
+                  : {}),
                 kind: "cua",
                 operation,
                 native: response.details,

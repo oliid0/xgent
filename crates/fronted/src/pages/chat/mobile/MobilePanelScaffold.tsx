@@ -24,10 +24,12 @@ export function MobileFullscreenPanel(props: MobileFullscreenPanelProps) {
       as="section"
       gap={0}
       width="100vw"
-      height="100dvh"
+      height="var(--xgent-viewport-height)"
+      style={{ top: "var(--xgent-viewport-top, 0px)", bottom: "auto" }}
       data-edge-swipe-ignore
       aria-label={props.label}
       aria-hidden={!props.open}
+      inert={!props.open}
       className={cn(
         "mobile-fullscreen-panel app-safe-area fixed inset-0 z-[var(--xgent-z-mobile-panel)] min-h-0 overflow-hidden bg-background text-foreground transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--ease-standard)] motion-reduce:transition-none",
         !props.open &&

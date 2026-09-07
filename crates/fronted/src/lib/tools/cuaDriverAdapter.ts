@@ -12,7 +12,6 @@ type Target = {
   text: string;
   hasScreenshot: boolean;
 };
-const targets = new Map<string, Target>();
 const record = (value: unknown): RecordValue =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordValue) : {};
 
@@ -25,6 +24,7 @@ export function createCuaDriverAdapter(
   bundle: McpBundle | undefined,
   serverIds: readonly string[],
 ) {
+  const targets = new Map<string, Target>();
   const serverId = serverIds.find((id) =>
     [...(bundle?.toolNameMap.values() ?? [])].some(
       (tool) => tool.serverId === id && tool.toolName === "get_window_state",
@@ -176,7 +176,20 @@ export function createCuaDriverAdapter(
         const started = performance.now();
         let stateId = input.state_id;
         for (const value of steps) {
-          if (signal?.aborted || performance.now() - started > 30_000) break;
+          if (signal?.aborted || performance.now() - started > 30_000) {
+            response = {
+              ...response,
+              isError: true,
+              content: [
+                {
+                  type: "text",
+                  text: "Sequence stopped before the next step: cancelled or deadline exceeded.",
+                },
+                ...response.content,
+              ],
+            };
+            break;
+          }
           const step = record(value);
           const previous = targets.get(key(String(input.app ?? "")));
           if (
@@ -196,13 +209,13 @@ export function createCuaDriverAdapter(
             { ...input, ...step, state_id: stateId },
             signal,
           );
+          if (record(response.details).actionApplied === true) completed++;
           if (
             response.isError ||
             record(response.details).observationFailed ||
             record(response.details).actionApplied !== true
           )
             break;
-          completed++;
           stateId = record(response.details).stateId;
         }
         return {
@@ -323,6 +336,7 @@ export function createCuaDriverAdapter(
       }
       return {
         ...response,
+        isError: Boolean(fresh.isError),
         content: [...response.content, ...fresh.content],
         details: {
           kind: "cua",

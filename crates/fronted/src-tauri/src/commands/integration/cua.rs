@@ -7,8 +7,7 @@ use tauri::Manager;
 use crate::runtime::shell_runner::ShellRunRegistry;
 
 #[path = "cua_component.rs"]
-mod component;
-pub use component::{cua_install, cua_status};
+pub mod component;
 
 const OPERATIONS: &[&str] = &["list_apps", "get_app_state", "click", "perform_secondary_action", "scroll", "drag", "type_text", "press_key", "set_value", "sequence"];
 

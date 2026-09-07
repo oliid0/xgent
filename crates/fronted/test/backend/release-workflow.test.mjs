@@ -228,7 +228,8 @@ test("desktop tray click and menu actions can always reveal the main window", ()
     desktopHost.indexOf("fn request_app_exit"),
   );
   assert.doesNotMatch(showMainWindow, /FrontendReadyState/);
-  assert.match(showMainWindow, /window\.show\(\)\?[\s\S]*?window\.unminimize\(\)\?[\s\S]*?window\.set_focus\(\)\?/);
+  assert.match(showMainWindow, /window\.show\(\)\?[\s\S]*?window\.unminimize\(\)\?[\s\S]*?let focus_result = window\.set_focus\(\)/);
+  assert.match(showMainWindow, /let focus_result[\s\S]*?set_always_on_top\(false\)[\s\S]*?focus_result\?/);
   assert.match(desktopHost, /button_state: MouseButtonState::Up/);
   assert.doesNotMatch(desktopHost, /button_state: MouseButtonState::Down/);
   assert.match(desktopHost, /on_menu_event\([\s\S]*?dispatch_app_action\(app, action\)/);

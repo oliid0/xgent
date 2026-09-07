@@ -142,6 +142,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   const [previousSessionCwd, setPreviousSessionCwd] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoRunKeyRef = useRef("");
+  const activeRunRef = useRef("");
 
   const presets = useMemo<ShellPreset[]>(() => {
     if (mode === "git") {
@@ -196,7 +197,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   const runCommand = useCallback(
     async (rawCommand: string) => {
       const nextCommand = rawCommand.trim();
-      if (!nextCommand || activeRunId || !workdir.trim()) return;
+      if (!nextCommand || activeRunRef.current || !workdir.trim()) return;
       const id = createRunId();
       const cdTarget = simpleCdTarget(nextCommand);
       let nextCwd = sessionCwd;
@@ -215,9 +216,10 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           return;
         }
       }
+      activeRunRef.current = id;
       setCommand("");
       setActiveRunId(id);
-      setEntries((current) => [...current, { id, command: nextCommand }]);
+      setEntries((current) => [...current.slice(-19), { id, command: nextCommand }]);
       try {
         const response = await invoke<ShellRunResponse>("shell_run", {
           workdir,
@@ -234,7 +236,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           current.map((entry) => (entry.id === id ? { ...entry, response } : entry)),
         );
         const exitCode = response.exitCode ?? response.exit_code;
-        if (cdTarget !== null && exitCode === 0) {
+        if (activeRunRef.current === id && cdTarget !== null && exitCode === 0) {
           setPreviousSessionCwd(sessionCwd);
           setSessionCwd(nextCwd);
         }
@@ -244,10 +246,13 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           current.map((entry) => (entry.id === id ? { ...entry, error } : entry)),
         );
       } finally {
-        setActiveRunId("");
+        if (activeRunRef.current === id) {
+          activeRunRef.current = "";
+          setActiveRunId("");
+        }
       }
     },
-    [activeRunId, previousSessionCwd, sessionCwd, workdir],
+    [previousSessionCwd, sessionCwd, workdir],
   );
 
   useEffect(() => {
@@ -259,6 +264,21 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   }, [initialCommand, mode, open]);
 
   useEffect(() => {
+    if (!open && activeRunRef.current) {
+      void invoke("shell_cancel", { run_id: activeRunRef.current }).catch(() => undefined);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    return () => {
+      const runId = activeRunRef.current;
+      activeRunRef.current = "";
+      if (runId) void invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
+    };
+  }, [mode, workdir]);
+
+  useEffect(() => {
+    setActiveRunId("");
     setSessionCwd("");
     setPreviousSessionCwd("");
     setEntries([]);

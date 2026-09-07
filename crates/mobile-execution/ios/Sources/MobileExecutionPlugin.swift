@@ -504,6 +504,10 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         stdin: Data?
     ) throws -> AShellCommandResult {
         let previousCwd = FileManager.default.currentDirectoryPath
+        // Session selection restores the old directory, so do it before
+        // applying this invocation's workspace and cwd.
+        ios_switchSession(sessionIdentifier)
+        ios_setContext(UnsafeMutableRawPointer(sessionIdentifier))
         guard FileManager.default.changeCurrentDirectoryPath(cwd.path) else {
             throw MobileExecutionError.invalidRequest("Could not enter cwd")
         }
@@ -524,6 +528,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             )
         }
 
+        ios_setDirectoryURL(cwd)
         let stdinFile = try TemporaryInput(data: stdin)
         let stdout = try BoundedPOSIXPipe()
         let stderr = try BoundedPOSIXPipe()
@@ -531,8 +536,6 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         let stdoutStream = try stdout.makeWriteStream()
         let stderrStream = try stderr.makeWriteStream()
 
-        ios_switchSession(sessionIdentifier)
-        ios_setContext(UnsafeMutableRawPointer(sessionIdentifier))
         thread_stdin = nil
         thread_stdout = nil
         thread_stderr = nil
@@ -566,6 +569,11 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         activeCommand = nil
         stateLock.unlock()
 
+        // Clear borrowed FILE pointers before their storage is released.
+        ios_setStreams(nil, nil, nil)
+        thread_stdin = nil
+        thread_stdout = nil
+        thread_stderr = nil
         fclose(stdinStream)
         fclose(stdoutStream)
         fclose(stderrStream)

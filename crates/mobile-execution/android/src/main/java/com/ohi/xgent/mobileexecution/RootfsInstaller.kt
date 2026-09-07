@@ -111,6 +111,8 @@ internal class RootfsInstaller(
                 val entry = tar.nextEntry as? TarArchiveEntry ?: break
                 entryCount += 1
                 require(entryCount <= MAX_ENTRIES) { "rootfs archive contains too many entries" }
+                // Official Alpine archives include a ./ directory entry.
+                if (entry.isDirectory && entry.name in listOf(".", "./")) continue
                 val output = safeTarget(target, entry.name)
                 when {
                     entry.isDirectory -> output.mkdirs()
@@ -160,17 +162,23 @@ internal class RootfsInstaller(
         require(link.linkName.isNotBlank() && !link.linkName.contains('\u0000')) {
             "rootfs symlink has an invalid target"
         }
-        if (!File(link.linkName).isAbsolute) {
-            val resolved = File(link.target.parentFile ?: root, link.linkName).canonicalFile
-            require(resolved.isWithin(root.canonicalFile)) {
-                "rootfs symlink escapes the extraction root: ${link.target.name}"
-            }
+        val rootPath = root.canonicalFile.toPath()
+        val parent = (link.target.parentFile ?: root).canonicalFile.toPath()
+        // /bin/sh -> /bin/busybox names the guest root, not Android's /bin.
+        // Relative links remain valid after staging is renamed on activation.
+        val resolved = if (File(link.linkName).isAbsolute) {
+            rootPath.resolve(link.linkName.trimStart('/')).normalize()
+        } else {
+            parent.resolve(link.linkName).normalize()
+        }
+        require(resolved.startsWith(rootPath) && resolved.toFile().canonicalFile.isWithin(root.canonicalFile)) {
+            "rootfs symlink escapes the extraction root: ${link.target.name}"
         }
         link.target.parentFile?.mkdirs()
         link.target.delete()
         java.nio.file.Files.createSymbolicLink(
             link.target.toPath(),
-            java.nio.file.Paths.get(link.linkName),
+            parent.relativize(resolved),
         )
     }
 
