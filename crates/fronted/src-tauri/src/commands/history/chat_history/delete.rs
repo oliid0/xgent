@@ -60,6 +60,13 @@ pub(crate) async fn chat_history_delete_inner(id: String) -> Result<(), String> 
 }
 
 #[tauri::command]
-pub async fn chat_history_delete(id: String) -> Result<(), String> {
-    chat_history_delete_inner(id).await
+pub async fn chat_history_delete(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    use tauri::Emitter;
+    chat_history_delete_inner(id.clone()).await?;
+    if let Err(error) = app.emit("chat-history:changed", serde_json::json!({
+        "kind": "delete", "conversationId": id,
+    })) {
+        eprintln!("failed to publish deleted history change: {error}");
+    }
+    Ok(())
 }

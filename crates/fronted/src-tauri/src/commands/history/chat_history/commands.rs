@@ -1,3 +1,13 @@
+// Publish only committed rows: paired clients must never receive draft IDs.
+fn emit_history_upsert(app: &tauri::AppHandle, summary: &ChatHistorySummary) {
+    use tauri::Emitter;
+    if let Err(error) = app.emit("chat-history:changed", serde_json::json!({
+        "kind": "upsert", "conversationId": summary.id, "conversation": summary,
+    })) {
+        eprintln!("failed to publish committed history change: {error}");
+    }
+}
+
 #[tauri::command]
 pub async fn chat_history_list(
     page: i64,
@@ -307,9 +317,12 @@ pub(crate) async fn chat_history_upsert_inner(
 
 #[tauri::command]
 pub async fn chat_history_upsert(
+    app: tauri::AppHandle,
     input: ChatHistoryUpsertInput,
 ) -> Result<ChatHistorySummary, String> {
-    chat_history_upsert_inner(input).await
+    let summary = chat_history_upsert_inner(input).await?;
+    emit_history_upsert(&app, &summary);
+    Ok(summary)
 }
 
 pub(crate) async fn chat_history_upsert_active_segment_inner(
@@ -337,9 +350,12 @@ pub(crate) async fn chat_history_upsert_active_segment_inner(
 
 #[tauri::command]
 pub async fn chat_history_upsert_active_segment(
+    app: tauri::AppHandle,
     input: ChatHistorySegmentMutationInput,
 ) -> Result<ChatHistorySummary, String> {
-    chat_history_upsert_active_segment_inner(input).await
+    let summary = chat_history_upsert_active_segment_inner(input).await?;
+    emit_history_upsert(&app, &summary);
+    Ok(summary)
 }
 
 fn append_chat_history_segment_sync(
@@ -380,9 +396,12 @@ pub(crate) async fn chat_history_append_segment_inner(
 
 #[tauri::command]
 pub async fn chat_history_append_segment(
+    app: tauri::AppHandle,
     input: ChatHistoryAppendSegmentInput,
 ) -> Result<ChatHistorySummary, String> {
-    chat_history_append_segment_inner(input).await
+    let summary = chat_history_append_segment_inner(input).await?;
+    emit_history_upsert(&app, &summary);
+    Ok(summary)
 }
 
 pub(crate) async fn chat_history_rename_inner(
@@ -399,10 +418,13 @@ pub(crate) async fn chat_history_rename_inner(
 
 #[tauri::command]
 pub async fn chat_history_rename(
+    app: tauri::AppHandle,
     id: String,
     title: String,
 ) -> Result<ChatHistorySummary, String> {
-    chat_history_rename_inner(id, title).await
+    let summary = chat_history_rename_inner(id, title).await?;
+    emit_history_upsert(&app, &summary);
+    Ok(summary)
 }
 
 pub(crate) async fn chat_history_set_pinned_inner(
@@ -419,10 +441,13 @@ pub(crate) async fn chat_history_set_pinned_inner(
 
 #[tauri::command]
 pub async fn chat_history_set_pinned(
+    app: tauri::AppHandle,
     id: String,
     is_pinned: bool,
 ) -> Result<ChatHistorySummary, String> {
-    chat_history_set_pinned_inner(id, is_pinned).await
+    let summary = chat_history_set_pinned_inner(id, is_pinned).await?;
+    emit_history_upsert(&app, &summary);
+    Ok(summary)
 }
 
 pub(crate) async fn chat_history_set_model_inner(
@@ -439,10 +464,13 @@ pub(crate) async fn chat_history_set_model_inner(
 
 #[tauri::command]
 pub async fn chat_history_set_model(
+    app: tauri::AppHandle,
     id: String,
     selected_model_json: String,
 ) -> Result<ChatHistorySummary, String> {
-    chat_history_set_model_inner(id, selected_model_json).await
+    let summary = chat_history_set_model_inner(id, selected_model_json).await?;
+    emit_history_upsert(&app, &summary);
+    Ok(summary)
 }
 
 pub(crate) async fn chat_history_set_cwd_inner(
@@ -459,8 +487,11 @@ pub(crate) async fn chat_history_set_cwd_inner(
 
 #[tauri::command]
 pub async fn chat_history_set_cwd(
+    app: tauri::AppHandle,
     id: String,
     cwd: String,
 ) -> Result<ChatHistorySummary, String> {
-    chat_history_set_cwd_inner(id, cwd).await
+    let summary = chat_history_set_cwd_inner(id, cwd).await?;
+    emit_history_upsert(&app, &summary);
+    Ok(summary)
 }

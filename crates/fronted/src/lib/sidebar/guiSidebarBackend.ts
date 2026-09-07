@@ -2,7 +2,8 @@
 // IPC surface and the single CHAT_HISTORY_SYNC_EVENT subscription. This file
 // is NOT mirrored — it is the desktop end's platform boundary.
 
-import { listen } from "@xgent/runtime";
+import { isBrowserRuntime, listen } from "@xgent/runtime";
+import { LOCAL_ACCESS_CONNECTION_EVENT } from "../../runtime/browser";
 import type { ChatHistorySummary } from "../chat/history/chatHistory";
 import {
   deleteChatHistory,
@@ -95,8 +96,13 @@ export function createGuiSidebarBackend(): SidebarBackend {
       };
     },
 
-    // Local sqlite is always reachable: no subscribeConnection. Nothing needs
-    // protection beyond pending drafts (which reconcile retains by itself).
+    subscribeConnection: (listener) => {
+      if (!isBrowserRuntime()) return () => {};
+      const changed = (event: Event) => listener((event as CustomEvent<boolean>).detail);
+      window.addEventListener(LOCAL_ACCESS_CONNECTION_EVENT, changed);
+      return () => window.removeEventListener(LOCAL_ACCESS_CONNECTION_EVENT, changed);
+    },
+
     getProtectedConversationIds: () => [],
   };
 }

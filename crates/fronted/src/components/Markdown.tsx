@@ -24,6 +24,7 @@ import {
   type Components,
   defaultRehypePlugins,
   defaultRemarkPlugins,
+  defaultUrlTransform,
   type ExtraProps,
   type LinkSafetyModalProps,
   Streamdown,
@@ -76,8 +77,15 @@ const relativeUrlRehypePlugins = (() => {
   }
   const schema = (sanitize[1] ?? {}) as { protocols?: Record<string, unknown[]> };
   const srcProtocols = schema.protocols?.src;
+  const hrefProtocols = schema.protocols?.href;
   const protocols = {
     ...schema.protocols,
+    href: [
+      ...new Set([
+        ...(Array.isArray(hrefProtocols) ? hrefProtocols : ["http", "https", "mailto"]),
+        "file",
+      ]),
+    ],
     src: Array.isArray(srcProtocols)
       ? [...new Set([...srcProtocols, "data"])]
       : ["http", "https", "data"],
@@ -388,6 +396,11 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
           ? { rehypePlugins: relativeUrlRehypePlugins }
           : {})}
         components={components}
+        urlTransform={(url, key, node) =>
+          chatLinkComponents && key === "href" && parseChatFileLink(url)
+            ? url
+            : defaultUrlTransform(url, key, node)
+        }
         mode={streaming ? "streaming" : "static"}
         dir="auto"
         parseIncompleteMarkdown

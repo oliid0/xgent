@@ -1,4 +1,3 @@
-import { invoke } from "@xgent/runtime";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
@@ -8,6 +7,7 @@ import "./index.css";
 import "katex/dist/katex.min.css";
 import "streamdown/styles.css";
 import { inferRuntimePlatform } from "./lib/runtimePlatform";
+import { showFirstLaunch } from "./lib/system/launchScreen";
 import { installWebviewNavigationGuard } from "./lib/system/webviewNavigationGuard";
 import { isBrowserRuntime } from "./runtime";
 
@@ -29,6 +29,8 @@ if (import.meta.env.DEV) {
   });
 }
 
+showFirstLaunch();
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <AppErrorBoundary>
@@ -38,14 +40,3 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     </AppErrorBoundary>
   </React.StrictMode>,
 );
-
-if (!isBrowserRuntime()) {
-  const platform = inferRuntimePlatform();
-  if (platform === "windows" || platform === "macos" || platform === "linux") {
-    requestAnimationFrame(() => {
-      void invoke("app_frontend_ready").catch((error) => {
-        console.warn("Failed to reveal the frontend-ready window", error);
-      });
-    });
-  }
-}

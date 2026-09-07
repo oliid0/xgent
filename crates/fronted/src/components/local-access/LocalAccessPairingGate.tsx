@@ -11,6 +11,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { Theme } from "@astryxdesign/core/theme";
 import { isBrowserRuntime } from "@xgent/runtime";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { finishLaunch } from "../../lib/system/launchScreen";
 import { LOCAL_ACCESS_CSRF_KEY, LOCAL_ACCESS_SESSION_CHANGED_EVENT } from "../../runtime/browser";
 import { xgentCompactTheme, xgentTheme } from "../../theme/xgentTheme";
 
@@ -69,6 +70,10 @@ export function LocalAccessPairingGate({ children }: { children: ReactNode }) {
     });
     return request;
   }, [browser]);
+
+  useEffect(() => {
+    if (state === "pairing") finishLaunch(false);
+  }, [state]);
 
   useEffect(() => {
     void checkSession();

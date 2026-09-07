@@ -13,6 +13,13 @@ const versionScript = path.join(
   "scripts/release/prepare-app-version-from-tag.mjs",
 );
 
+test("Android zero-base repair versions produce an installable numeric base", async () => {
+  const { tauriVersionConfig } = await import("../../../../scripts/release/release-version.mjs");
+  assert.deepEqual(tauriVersionConfig("0.0.0-repair.100", "android"), { version: "0.0.1-repair.100" });
+  assert.deepEqual(tauriVersionConfig("2.3.4-beta.2", "android"), { version: "2.3.4-beta.2" });
+  assert.deepEqual(tauriVersionConfig("0.0.0-repair.100"), { version: "0.0.0-repair.100" });
+});
+
 function runVersionScript(args, env = {}) {
   return spawnSync(process.execPath, [versionScript, ...args], {
     cwd: repoRoot,

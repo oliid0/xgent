@@ -792,7 +792,7 @@ unsafe fn ns_image_to_png(image: &objc2_app_kit::NSImage) -> Result<Vec<u8>, Str
     let png = bitmap
         .representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new())
         .ok_or_else(|| "failed to encode browser screenshot as PNG".to_string())?;
-    Ok(std::slice::from_raw_parts(png.bytes().cast::<u8>(), png.length()).to_vec())
+    Ok(png.bytes().to_vec())
 }
 
 #[cfg(target_os = "linux")]

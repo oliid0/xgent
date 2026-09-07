@@ -3633,3 +3633,33 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   max-width: 100%;
   font-size: 16px;
 }
+
+@layer components {
+  .changed-files-card {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .changed-files-header {
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .changed-files-icon {
+    background: var(--muted);
+    border-radius: 12px;
+    flex-shrink: 0;
+  }
+  .changed-files-card .astryx-list-item {
+    min-width: 0;
+    padding-inline: 16px;
+  }
+  @media (max-width: 480px) {
+    .changed-files-header {
+      gap: 8px;
+      padding: 12px;
+    }
+    .changed-files-icon {
+      display: none;
+    }
+  }
+}

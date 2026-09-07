@@ -290,8 +290,11 @@ pub(crate) async fn chat_history_branch_inner(
 
 #[tauri::command]
 pub async fn chat_history_branch(
+    app: tauri::AppHandle,
     id: String,
     base_message_ref: ChatHistoryBranchAnchor,
 ) -> Result<ChatHistorySummary, String> {
-    chat_history_branch_inner(id, base_message_ref).await
+    let summary = chat_history_branch_inner(id, base_message_ref).await?;
+    emit_history_upsert(&app, &summary);
+    Ok(summary)
 }

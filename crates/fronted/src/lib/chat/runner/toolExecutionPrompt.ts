@@ -90,6 +90,7 @@ export function buildToolsSuffix(
       planModeActive
         ? `- Do not put the complete deliverable in this reply. Call ${EXIT_PLAN_MODE_TOOL_NAME} instead; the plan card is what the user reviews.`
         : "- Your reply to the user is plain text plus Markdown.",
+      "- Link completed file deliverables inline in your prose with Markdown, e.g. `Completed [report.html](report.html); you can also view [report.pdf](report.pdf)`. Use only verified paths returned by tools, percent-encode spaces, and keep the filename as the link label. Clicking the name opens the file beside the conversation. The reply footer already lists edited files and line-change totals; do not call that list attachments or duplicate it.",
       "- Never include raw tool-call JSON or raw tool arguments in your reply — describe what you did in plain words instead.",
     ].join("\n"),
   );

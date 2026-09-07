@@ -488,7 +488,9 @@ fn build_chat_file_link_plan(
     let script = has_extension(&target, SCRIPT_EXTENSIONS) || has_shebang(&target);
     let executable = has_extension(&target, EXECUTABLE_EXTENSIONS)
         || (has_executable_permission(&target, &metadata) && !script);
-    let action = if script || has_extension(&target, TEXT_EXTENSIONS) {
+    let action = if line.is_none() && has_extension(&target, &["html", "htm", "md", "mdx"]) {
+        "preview"
+    } else if script || has_extension(&target, TEXT_EXTENSIONS) {
         "editor"
     } else if has_extension(&target, PREVIEW_EXTENSIONS) {
         "preview"
@@ -733,6 +735,20 @@ mod tests {
         }
 
         fs::remove_dir_all(root).expect("remove temp workspace");
+    }
+
+    #[test]
+    fn opens_inline_html_as_preview_but_preserves_source_line_navigation() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        fs::write(root.join("report.html"), "<h1>Report</h1>").unwrap();
+        assert_eq!(plan(root, "report.html", "relative").response.action, "preview");
+        let located = build_chat_file_link_plan(
+            "conversation-test", &root.to_string_lossy(), "report.html", "relative",
+            Some(1), None, None, false,
+        ).unwrap();
+        assert_eq!(located.response.action, "editor");
+        assert_eq!(located.response.line, Some(1));
     }
 
     #[test]

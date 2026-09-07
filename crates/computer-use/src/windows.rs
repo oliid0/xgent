@@ -1,6 +1,6 @@
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
-use windows::core::{Interface, PCWSTR};
+use windows::core::Interface;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED};
 use windows::Win32::UI::Accessibility::*;
@@ -100,8 +100,8 @@ pub fn semantic_action(window:&Window, record:&Value, operation:&str, arguments:
             "set_value" => {
                 let pattern=element.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId).map_err(|_|"Element does not support setting its value")?;
                 if pattern.CurrentIsReadOnly().map_err(|e|e.to_string())?.as_bool() { return Err("Element is read-only".into()); }
-                let value: Vec<u16> = arguments["value"].as_str().ok_or("Missing value")?.encode_utf16().chain(Some(0)).collect();
-                pattern.SetValue(PCWSTR(value.as_ptr())).map_err(|e|e.to_string())?;
+                let value = windows::core::BSTR::from(arguments["value"].as_str().ok_or("Missing value")?);
+                pattern.SetValue(&value).map_err(|e|e.to_string())?;
                 return Ok(true);
             }
             "perform_secondary_action" => {

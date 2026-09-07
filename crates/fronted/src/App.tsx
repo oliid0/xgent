@@ -56,6 +56,7 @@ import {
 import { applyStoredGlobalShortcuts } from "./lib/shortcuts/globalShortcuts";
 import { SoulProvider } from "./lib/soul";
 import { applyFontFamilies } from "./lib/system/fontFamily";
+import { finishLaunch } from "./lib/system/launchScreen";
 import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { SectionId, SettingsOpenOptions } from "./pages/settings/types";
@@ -625,7 +626,10 @@ export default function App() {
   // history/settings commands and can replace the entire mobile UI with an
   // error boundary. Keep the native component tree inert until both the
   // platform and persisted settings are ready.
-  const appContentReady = platformResolved && (!nativeMobile || settingsReady);
+  const appContentReady = platformResolved && settingsReady;
+  useEffect(() => {
+    if (appContentReady) finishLaunch(settingsHydratedRef.current);
+  }, [appContentReady]);
   useEffect(() => {
     if (!desktopBridgeEnabled || nativeMobile || browserRuntime) return;
     let disposed = false;

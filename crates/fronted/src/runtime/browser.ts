@@ -8,6 +8,7 @@ import type {
 
 export const LOCAL_ACCESS_CSRF_KEY = "xgent.local-access.csrf.v1";
 export const LOCAL_ACCESS_SESSION_CHANGED_EVENT = "xgent:local-access-session-changed";
+export const LOCAL_ACCESS_CONNECTION_EVENT = "xgent:local-access-connection";
 
 type RpcResponse<T> = {
   ok?: boolean;
@@ -27,6 +28,9 @@ let eventSource: EventSource | undefined;
 function ensureEventSource() {
   if (eventSource) return;
   const source = new EventSource("/api/local-access/events", { withCredentials: true });
+  source.onopen = () => {
+    globalThis.dispatchEvent?.(new CustomEvent(LOCAL_ACCESS_CONNECTION_EVENT, { detail: true }));
+  };
   source.onmessage = (message) => {
     try {
       const envelope = JSON.parse(message.data) as BrowserEventEnvelope;
@@ -46,6 +50,7 @@ function ensureEventSource() {
     }
   };
   source.onerror = () => {
+    globalThis.dispatchEvent?.(new CustomEvent(LOCAL_ACCESS_CONNECTION_EVENT, { detail: false }));
     if (source.readyState === EventSource.CLOSED && eventSource === source) {
       eventSource = undefined;
     }
@@ -130,6 +135,10 @@ async function listenBrowser<T>(
   const subscriptionId = payload.subscriptionId;
   if (!subscriptionId) throw new Error("Local access subscription did not return an id");
   eventHandlers.set(subscriptionId, (value) => handler({ payload: value as T }));
+  // The authoritative refresh must also run after subscription registration:
+  // an event may have arrived between the initial list request and this POST.
+  globalThis.dispatchEvent?.(new CustomEvent(LOCAL_ACCESS_CONNECTION_EVENT, { detail: false }));
+  globalThis.dispatchEvent?.(new CustomEvent(LOCAL_ACCESS_CONNECTION_EVENT, { detail: true }));
   let active = true;
   return () => {
     if (!active) return;

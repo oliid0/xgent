@@ -87,8 +87,16 @@ pub fn local_access_broadcast_event(
 }
 
 #[tauri::command]
-pub fn local_access_latest_conversation_selection(
+pub async fn local_access_latest_conversation_selection(
     controller: tauri::State<'_, Arc<LocalAccessController>>,
 ) -> Result<Option<Value>, String> {
-    controller.latest_conversation_selection()
+    let selection = controller.latest_conversation_selection()?;
+    let Some(id) = selection.as_ref().and_then(|value| value["conversationId"].as_str()) else {
+        return Ok(None);
+    };
+    match crate::commands::chat_history::chat_history_get_summary_inner(id.to_string()).await {
+        Ok(_) => Ok(selection),
+        Err(error) if error == "未找到对应的历史对话" => Ok(None),
+        Err(error) => Err(error),
+    }
 }

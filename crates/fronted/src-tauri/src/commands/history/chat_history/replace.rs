@@ -169,18 +169,21 @@ pub(crate) async fn chat_history_replace_from_message_inner(
 
 #[tauri::command]
 pub async fn chat_history_replace_from_message(
+    app: tauri::AppHandle,
     id: String,
     base_message_ref: ChatHistoryMessageRef,
     replacement_message: Value,
     max_messages: i64,
     expected_revision: String,
 ) -> Result<ChatHistoryWindowRecord, String> {
-    chat_history_replace_from_message_inner(
+    let record = chat_history_replace_from_message_inner(
         id,
         base_message_ref,
         replacement_message,
         max_messages,
         expected_revision,
     )
-    .await
+    .await?;
+    emit_history_upsert(&app, &record.conversation);
+    Ok(record)
 }

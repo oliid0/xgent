@@ -2276,6 +2276,7 @@ export function ChatPage(props: ChatPageProps) {
   const remoteConversationHydratedRunsRef = useRef(new Map<string, string>());
   const previousRunningConversationIdsRef = useRef<ReadonlySet<string>>(new Set());
   const conversationSelectionInitializedRef = useRef(false);
+  const lastBroadcastConversationIdRef = useRef("");
   const conversationSelectionUpdatedAtRef = useRef(0);
   const suppressedConversationSelectionRef = useRef<{
     conversationId: string;
@@ -3634,6 +3635,10 @@ export function ChatPage(props: ChatPageProps) {
     }
     const conversationId = currentConversationId.trim();
     if (!conversationId) return;
+    const savedConversation = historyItems.find((item) => item.id === conversationId);
+    if (!savedConversation || savedConversation.isPending) return;
+    if (lastBroadcastConversationIdRef.current === conversationId) return;
+    lastBroadcastConversationIdRef.current = conversationId;
     const suppressed = suppressedConversationSelectionRef.current;
     if (suppressed?.conversationId === conversationId && suppressed.expiresAt > Date.now()) {
       suppressedConversationSelectionRef.current = null;
@@ -3652,7 +3657,13 @@ export function ChatPage(props: ChatPageProps) {
     } as any).catch((error) => {
       console.warn("local conversation selection broadcast failed", error);
     });
-  }, [browserRuntime, currentConversationId, currentConversationIdRef, desktopBridgeEnabled]);
+  }, [
+    browserRuntime,
+    currentConversationId,
+    currentConversationIdRef,
+    desktopBridgeEnabled,
+    historyItems,
+  ]);
 
   useEffect(() => {
     const currentItem = historyItems.find((item) => item.id === currentConversationId);
@@ -3766,6 +3777,8 @@ export function ChatPage(props: ChatPageProps) {
     }
 
     currentConversationHistoryUpdatedAtRef.current = currentItem.updatedAt;
+    persistedConversationStateRef.current.delete(currentConversationId);
+    conversationRuntimeCacheRef.current.delete(currentConversationId);
     openController.open(currentConversationId);
   }, [
     currentConversationId,

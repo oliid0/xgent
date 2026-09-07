@@ -73,11 +73,14 @@ export function tauriVersionConfig(appVersion, platform = "default") {
     throw new Error(`App version must be a valid semver string. Received: ${appVersion}`);
   }
 
-  if (!["default", "windows"].includes(platform)) {
+  if (!["default", "windows", "android"].includes(platform)) {
     throw new Error(`Unsupported Tauri version platform: ${platform}`);
   }
 
   return {
-    version: platform === "windows" ? windowsInstallerVersion(appVersion) : appVersion,
+    // Android rejects a zero numeric base even when semver has a prerelease.
+    version: platform === "windows" ? windowsInstallerVersion(appVersion)
+      : platform === "android" ? appVersion.replace(/^0\.0\.0(?=$|[-+])/, "0.0.1")
+      : appVersion,
   };
 }

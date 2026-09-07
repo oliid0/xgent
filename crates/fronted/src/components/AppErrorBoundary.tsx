@@ -6,6 +6,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { useLocale } from "../i18n";
 import { writeClipboardText } from "../lib/system/clipboardText";
+import { finishLaunch } from "../lib/system/launchScreen";
 
 type FallbackLabels = {
   title: string;
@@ -32,6 +33,7 @@ class ErrorBoundaryInner extends Component<ErrorBoundaryInnerProps, ErrorBoundar
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    finishLaunch(false);
     console.error("[AppErrorBoundary]", error, info.componentStack);
     this.setState({ componentStack: info.componentStack ?? "" });
   }

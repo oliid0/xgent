@@ -33,10 +33,10 @@ fn app_root(connection:&BusConnection, window:&Window)->Result<Accessible,String
         for child in children {
             if let Ok(proxy)=accessible_proxy(connection,&child,"org.a11y.atspi.Accessible") {
                 let name:String=proxy.get_property("Name").unwrap_or_default();
-                if name==window.title().unwrap_or_default() { return Ok(child); }
+                if name==window.title().unwrap_or_default() { return Ok(child.clone()); }
             }
         }
-        return Ok(app);
+        return Ok(app.clone());
     }
     Err("No accessibility tree was published by this application".into())
 }

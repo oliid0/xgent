@@ -55,7 +55,12 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
     >
       {hasCards ? (
         <VStack gap={2} width="100%">
-          {changedFiles ? <ChangedFilesCard summary={changedFiles} /> : null}
+          {changedFiles ? (
+            <ChangedFilesCard
+              summary={changedFiles}
+              turnId={unit.retryTarget?.messageRef?.messageId}
+            />
+          ) : null}
           {cloudArtifacts.length > 0 ? (
             <CloudArtifactsCard artifacts={cloudArtifacts} onOpenFileLink={onOpenFileLink} />
           ) : null}
