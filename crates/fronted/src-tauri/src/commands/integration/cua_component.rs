@@ -48,9 +48,25 @@ fn installed(app:&tauri::AppHandle)->Result<Option<(Manifest,PathBuf)>,String> {
     Ok(Some((manifest,binary)))
 }
 
+fn bundled(app:&tauri::AppHandle)->Result<Option<(Manifest,PathBuf)>,String> {
+    let directory=app.path().resource_dir().map_err(|error|error.to_string())?.join("computer-use");
+    let metadata=directory.join(format!("Xgent-CUA-abi{ABI}-{}.json",target()));
+    if !metadata.is_file() { return Ok(None); }
+    let manifest:Manifest=serde_json::from_slice(&std::fs::read(metadata).map_err(|error|error.to_string())?)
+        .map_err(|error|format!("Invalid bundled CUA metadata: {error}"))?;
+    validate_manifest(&manifest)?;
+    if manifest.revision<MIN_REVISION { return Err("The bundled CUA component is older than this application requires".into()); }
+    let binary=directory.join(&manifest.filename);
+    let bytes=std::fs::read(&binary).map_err(|error|format!("Cannot read bundled CUA component: {error}"))?;
+    if bytes.len() as u64!=manifest.bytes || !Sha256::digest(&bytes).iter().map(|byte|format!("{byte:02x}")).collect::<String>().eq_ignore_ascii_case(&manifest.sha256) {
+        return Err("Bundled CUA component failed integrity verification; reinstall this application".into());
+    }
+    Ok(Some((manifest,binary)))
+}
+
 #[tauri::command]
 pub fn cua_status(app:tauri::AppHandle)->Result<Status,String> {
-    let installed=installed(&app)?;
+    let installed=match bundled(&app)? { Some(value)=>Some(value),None=>installed(&app)? };
     let path=installed.as_ref().map(|(_,path)|path);
     let restart_required=LOADED.get().and_then(|module|module.lock().ok())
         .and_then(|module|module.as_ref().map(|module|Some(&module.path)!=path)).unwrap_or(false);
@@ -64,6 +80,10 @@ fn progress(app:&tauri::AppHandle,phase:&str,bytes:u64,total:u64) {
 
 fn install(app:&tauri::AppHandle)->Result<PathBuf,String> {
     let _guard=INSTALL.get_or_init(Mutex::default).lock().map_err(|_|"CUA installation lock poisoned")?;
+    if let Some((manifest,path))=bundled(app)? {
+        progress(app,"ready",manifest.bytes,manifest.bytes);
+        return Ok(path);
+    }
     if let Some((manifest,path))=installed(app)?.filter(|(manifest,_)|manifest.revision >= MIN_REVISION) {
         let bytes=std::fs::read(&path).map_err(|e|e.to_string())?;
         if bytes.len() as u64==manifest.bytes && Sha256::digest(&bytes).iter().map(|byte|format!("{byte:02x}")).collect::<String>().eq_ignore_ascii_case(&manifest.sha256) { return Ok(path); }
