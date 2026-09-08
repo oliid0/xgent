@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 // The filename/manifest contract is consumed by cua_component.rs.
@@ -29,8 +29,11 @@ copyFileSync("crates/fronted/src-tauri/native/computer-use/LICENSE", path.join(d
 
 // The component must be usable on first launch even when GitHub has no public
 // release or the device is offline. All desktop jobs stage before packaging.
-const configPath = process.env.XGENT_TAURI_VERSION_CONFIG;
-if (configPath) {
+const configuredPath = process.env.XGENT_TAURI_VERSION_CONFIG;
+if (configuredPath) {
+  // CI writes this path from crates/fronted but stages components at repo root.
+  const configPath = existsSync(configuredPath)
+    ? configuredPath : path.resolve("crates/fronted", configuredPath);
   const config = JSON.parse(readFileSync(configPath, "utf8"));
   config.bundle ??= {};
   const resources = config.bundle.resources ?? {};

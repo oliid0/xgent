@@ -338,6 +338,8 @@ jobs:
           fi
           mkdir -p dist/portable/Xgent
           cp "$portable_exe_path" dist/portable/Xgent/Xgent.exe
+          mkdir -p dist/portable/Xgent/computer-use
+          cp dist/Xgent-CUA-abi1-windows-x86_64.dll dist/Xgent-CUA-abi1-windows-x86_64.json dist/Xgent-CUA-LICENSE.txt dist/portable/Xgent/computer-use/
           portable_zip="dist/Xgent-${XGENT_RELEASE_TAG}-Windows-x64-portable.zip"
           powershell -NoProfile -Command "Compress-Archive -Path 'dist/portable/Xgent/*' -DestinationPath '$portable_zip' -Force"
           powershell -NoProfile -File scripts/release/smoke-launch-windows.ps1 -ExecutablePath dist/portable/Xgent/Xgent.exe
