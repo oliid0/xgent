@@ -1,4 +1,5 @@
-import { invoke } from "@xgent/runtime";
+import { invoke, isTauriRuntime } from "@xgent/runtime";
+import { isNativeMobileRuntime } from "../runtimePlatform";
 
 /**
  * Read the desktop clipboard outside the webview first. WKWebView may show a
@@ -7,10 +8,12 @@ import { invoke } from "@xgent/runtime";
  * standard Clipboard API because the desktop command is not registered there.
  */
 export async function readClipboardText(): Promise<string | null> {
-  try {
-    return await invoke<string>("system_clipboard_read_text");
-  } catch {
-    // Fall through to the webview clipboard API.
+  if (isTauriRuntime() && !isNativeMobileRuntime()) {
+    try {
+      return await invoke<string>("system_clipboard_read_text");
+    } catch {
+      // Fall through to the webview clipboard API.
+    }
   }
   try {
     return (await navigator.clipboard?.readText?.()) ?? "";
@@ -21,6 +24,13 @@ export async function readClipboardText(): Promise<string | null> {
 
 function fallbackWriteClipboardText(text: string): boolean {
   let textarea: HTMLTextAreaElement | null = null;
+  const focused = document.activeElement;
+  const selection = document.getSelection();
+  const ranges = selection
+    ? Array.from({ length: selection.rangeCount }, (_, index) =>
+        selection.getRangeAt(index).cloneRange(),
+      )
+    : [];
   try {
     textarea = document.createElement("textarea");
     textarea.value = text;
@@ -35,16 +45,24 @@ function fallbackWriteClipboardText(text: string): boolean {
     return false;
   } finally {
     textarea?.remove();
+    if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
+    if (selection && ranges.length) {
+      selection.removeAllRanges();
+      for (const range of ranges) selection.addRange(range);
+    }
   }
 }
 
 export async function writeClipboardText(text: string): Promise<boolean> {
   if (!text) return false;
-  try {
-    await invoke("system_clipboard_write_text", { text });
-    return true;
-  } catch {
-    // Browser and mobile shells fall through to their Web Clipboard API.
+  // A LAN browser must copy to the viewing device, not the server's clipboard.
+  if (isTauriRuntime() && !isNativeMobileRuntime()) {
+    try {
+      await invoke("system_clipboard_write_text", { text });
+      return true;
+    } catch {
+      // Fall through to the webview clipboard API.
+    }
   }
   try {
     if (navigator.clipboard?.writeText) {

@@ -3,11 +3,34 @@ import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
-function setup(invoke) {
+function setup(invoke, options) {
   const loader = createTsModuleLoader({ mocks: { "@xgent/runtime": { invoke: (command, args) => command === "cua_status" ? { enabled: true } : invoke(command, args) } } });
-  return loader.loadModule("src/lib/tools/cuaTools.ts").createCuaTools();
+  return loader.loadModule("src/lib/tools/cuaTools.ts").createCuaTools(options);
 }
 const call = (id, operation = "get_app_state") => ({ id, name: "cua", arguments: { operation, app: "Blender" } });
+
+test("Android advertises touch operations and cancels through its native accessibility service", async () => {
+  let release;
+  let runId;
+  const cancellations = [];
+  const bundle = setup(async (command, args) => {
+    if (command === "cua_cancel") { cancellations.push(args.run_id); return { cancelled: true }; }
+    assert.equal(command, "cua_call");
+    runId = args.run_id;
+    await new Promise((resolve) => { release = resolve; });
+    return { content: [], isError: true };
+  }, { android: true });
+  const operations = bundle.tools[0].parameters.properties.operation.enum;
+  assert.ok(operations.includes("type_text") && operations.includes("drag"));
+  assert.ok(!operations.includes("input") && !operations.includes("sequence"));
+  const abort = new AbortController();
+  const pending = bundle.executeToolCall(call("android"), abort.signal);
+  await waitForDispatch(() => release);
+  abort.abort();
+  assert.equal((await pending).isError, true);
+  assert.deepEqual(cancellations, [runId]);
+  release();
+});
 
 test("concurrent held inputs and relative motion reach one native call with final observation", async () => {
   const input = { operation: "input", app: "Blender", state_id: "7", keys: ["Shift", "W"], buttons: ["middle"], dx: 120, dy: -20, duration_ms: 160, observation: "image", settle_ms: 0 };

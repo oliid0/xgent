@@ -8,8 +8,12 @@ collect_evidence() {
 }
 trap collect_evidence EXIT
 adb logcat -c
+# Reduce software-renderer load before launching the application. Release #39
+# was blocked by Pixel Launcher's ANR dialog at the emulator's 1440x3120 size.
+adb shell wm size 1080x1920
+adb shell wm density 420
 adb install -r "$release_apk"
-adb shell monkey -p com.ohi.xgent -c android.intent.category.LAUNCHER 1
+adb shell am start -W -n com.ohi.xgent/.MainActivity
 sleep 5
 app_pid="$(adb shell pidof com.ohi.xgent | tr -d '\r')"
 test -n "$app_pid"
@@ -18,6 +22,13 @@ composer=""
 for attempt in $(seq 1 12); do
   adb shell uiautomator dump /sdcard/xgent-ui.xml >/dev/null 2>&1 || true
   adb pull /sdcard/xgent-ui.xml "$RUNNER_TEMP/xgent-android-ui.xml" >/dev/null 2>&1 || true
+  # Dismiss only the known launcher failure; an Xgent ANR must fail this test.
+  if grep -F "Pixel Launcher isn't responding" "$RUNNER_TEMP/xgent-android-ui.xml" >/dev/null; then
+    adb shell am force-stop com.google.android.apps.nexuslauncher
+    adb shell am start -W -n com.ohi.xgent/.MainActivity
+    sleep 2
+    continue
+  fi
   composer="$(python3 - "$RUNNER_TEMP/xgent-android-ui.xml" <<'PY'
 import re, sys, xml.etree.ElementTree as ET
 try:
@@ -25,7 +36,7 @@ try:
 except (OSError, ET.ParseError):
     raise SystemExit(0)
 for node in root.iter('node'):
-    if node.get('class') != 'android.widget.EditText' or node.get('enabled') != 'true':
+    if node.get('package') != 'com.ohi.xgent' or node.get('class') != 'android.widget.EditText' or node.get('enabled') != 'true':
         continue
     bounds = list(map(int, re.findall(r'\d+', node.get('bounds', ''))))
     if len(bounds) == 4 and bounds[2] > bounds[0] and bounds[3] > bounds[1]:

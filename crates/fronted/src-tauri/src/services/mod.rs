@@ -1,5 +1,7 @@
 pub mod automation;
 pub mod app_paths;
+#[cfg(windows)]
+pub mod clipboard;
 pub mod cloud_secret_vault;
 pub mod cloud_execution;
 pub mod lan_pc_client;

@@ -22,3 +22,14 @@ Finish native CUA, mobile startup, live computer viewing and browser repairs aga
 ## Verification / touched
 - Current pnpm check PASS; pnpm lint PASS (517 files); pnpm test:non-native PASS (1131 tests), plus selected registry suite PASS (8 tests including two new backend-selection cases). Logs: %TEMP%/xgent-current-*.log and xgent-driver-registry.log. git diff --check PASS. New native/rendered CI pending; no local build/dev/Cargo commands.
 - Touched native CUA/link configuration, browser desktop/iOS, mobile diagnostics/smoke, composer/activity/settings/splash, controller regression tests and release workflow. Native/rendered checks and GitHub workflows pending.
+
+## Release #39 continuation (in progress)
+- Evidence: iOS pinned OpenSSL checksum differs from downloaded asset; Android smoke artifact shows Pixel Launcher ANR covering Xgent. Tauri multi-webview main windows cannot be resolved with get_webview_window.
+- Source changes: corrected checksum and smoke fixture; native Windows clipboard, restored/focused CUA targets, Android accessibility CUA, secure-context-independent IDs, smaller desktop minimum sizes and mobile layout fixes.
+- Remaining: review Android request/response/cancellation contracts, native platform API signatures, mobile capability paths; consolidated non-native checks and GitHub CI. These source changes are not yet validated.
+
+- Follow-up: Android cancellation now reaches the accessibility service and prevents late observations from replacing current state; mobile resume uses the native window. Fixed typed Android tool schema.
+- Added verified official external-driver installation link and Android-specific accessibility settings/retry guidance. Local stdio MCP remains unavailable on native mobile; HTTP/SSE uses existing mobile MCP runtime.
+- Consolidated checks: TypeScript passes. Lint found only formatting/import order in three edited files, corrected; non-native tests running. Native CI still pending.
+- Tests exposed one obsolete assertion requiring unconditional Homebrew linking; updated it to assert the guarded linking behavior. Added Android tool/cancellation contract regression coverage.
+- Final local review: pnpm check PASS; pnpm lint PASS (517 files); complete non-native run 1132 passed, one obsolete Homebrew assertion failed, corrected and affected release/CUA suites PASS (16 tests, including Android regression). git diff --check PASS. No local build/dev/Cargo used. Preparing GitHub CI; native/rendered verification is not yet complete.

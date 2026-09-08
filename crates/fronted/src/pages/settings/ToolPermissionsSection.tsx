@@ -45,9 +45,9 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
   };
 
   return (
-    <VStack gap={5} className="settings-tool-permissions">
+    <VStack gap={5} width="100%" className="settings-tool-permissions">
       <Section padding={4} width="100%">
-        <VStack gap={3}>
+        <VStack gap={3} padding={4}>
           <HStack gap={3} vAlign="start">
             <Shield />
             <StackItem size="fill">
@@ -83,7 +83,7 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
       </Section>
 
       <Section padding={4} width="100%">
-        <VStack gap={3}>
+        <VStack gap={3} padding={4}>
           <VStack gap={1}>
             <Heading level={3}>{t("settings.commandSafety.title")}</Heading>
             <Text type="supporting" color="secondary">

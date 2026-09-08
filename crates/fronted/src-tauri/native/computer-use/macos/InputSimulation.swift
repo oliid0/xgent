@@ -56,14 +56,22 @@ enum InputSimulation {
     static var actionMouseButton: MouseButtonKind = .left
     static let maxKeyboardUnicodeChunkLength = 64
 
-    static func prepareAppForGlobalPointerInput(_ app: RunningAppDescriptor) {
-        if raiseAppWindowViaAccessibility(pid: app.pid) {
-            Thread.sleep(forTimeInterval: 0.12)
-            return
+    static func prepareAppForGlobalPointerInput(_ app: RunningAppDescriptor) throws {
+        guard AXIsProcessTrusted() else {
+            throw ComputerUseError.message("Enable Xgent in System Settings > Privacy & Security > Accessibility")
         }
-
-        _ = app.runningApplication.activate(options: [.activateAllWindows])
-        Thread.sleep(forTimeInterval: 0.25)
+        if app.runningApplication.isActive { return }
+        let activate = {
+            _ = app.runningApplication.unhide()
+            _ = app.runningApplication.activate(options: [.activateAllWindows])
+        }
+        if Thread.isMainThread { activate() } else { DispatchQueue.main.sync(execute: activate) }
+        _ = raiseAppWindowViaAccessibility(pid: app.pid)
+        for _ in 0..<25 {
+            if app.runningApplication.isActive { return }
+            Thread.sleep(forTimeInterval: 0.04)
+        }
+        throw ComputerUseError.message("Cannot activate the target app. No input was sent to another application.")
     }
 
     static func clickGlobally(at point: CGPoint, button: MouseButtonKind, clickCount: Int) throws {
@@ -180,6 +188,9 @@ enum InputSimulation {
 
     static func typeText(_ text: String, pid: pid_t) throws {
         for chunk in keyboardUnicodeChunks(for: text) {
+            guard !isCancelled(), NSRunningApplication(processIdentifier: pid)?.isActive == true else {
+                throw ComputerUseError.message("Text input stopped because the target lost focus or the operation was cancelled")
+            }
             var mutableChunk = chunk
             guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
                   let up = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) else {
@@ -194,8 +205,8 @@ enum InputSimulation {
                 down.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: baseAddress)
                 up.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: baseAddress)
             }
-            down.postToPid(pid)
-            up.postToPid(pid)
+            down.post(tap: .cghidEventTap)
+            up.post(tap: .cghidEventTap)
             Thread.sleep(forTimeInterval: 0.02)
         }
     }
@@ -224,6 +235,9 @@ enum InputSimulation {
     }
 
     static func pressKey(_ specification: String, pid: pid_t) throws {
+        guard !isCancelled(), NSRunningApplication(processIdentifier: pid)?.isActive == true else {
+            throw ComputerUseError.message("Keyboard input requires the target app to remain focused")
+        }
         let parsed = try KeyPressParser.parse(specification)
         var activeFlags: CGEventFlags = actionFlags
         var held: [ParsedKeyPress.Modifier] = []
@@ -232,7 +246,7 @@ enum InputSimulation {
                 activeFlags.remove(modifier.flag)
                 let event = CGEvent(keyboardEventSource: nil, virtualKey: modifier.keyCode, keyDown: false)
                 event?.flags = activeFlags
-                event?.postToPid(pid)
+                event?.post(tap: .cghidEventTap)
             }
         }
 
@@ -243,7 +257,7 @@ enum InputSimulation {
 
             activeFlags.insert(modifier.flag)
             event.flags = activeFlags
-            event.postToPid(pid)
+            event.post(tap: .cghidEventTap)
             held.append(modifier)
         }
 
@@ -254,8 +268,8 @@ enum InputSimulation {
 
         keyDown.flags = activeFlags
         keyUp.flags = activeFlags
-        keyDown.postToPid(pid)
-        keyUp.postToPid(pid)
+        keyDown.post(tap: .cghidEventTap)
+        keyUp.post(tap: .cghidEventTap)
 
         Thread.sleep(forTimeInterval: 0.1)
     }

@@ -494,7 +494,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4.0.1
 
       - name: Install Android SDK and native build tools
         run: |
@@ -802,7 +802,11 @@ jobs:
               brew install "$formula"
             fi
           done
-          brew link --overwrite --force xcodegen libimobiledevice cocoapods
+          for formula in xcodegen libimobiledevice cocoapods; do
+            if [ ! -L "$(brew --prefix)/var/homebrew/linked/$formula" ]; then
+              brew link "$formula"
+            fi
+          done
           brew_prefix="$(brew --prefix)"
           export PATH="$brew_prefix/bin:$PATH"
           echo "$brew_prefix/bin" >> "$GITHUB_PATH"
@@ -820,7 +824,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          log="$RUNNER_TEMP/ios-init.log"
+          log="$RUNNER_TEMP/xgent-ios-init.log"
           if ! pnpm tauri ios init --ci 2>&1 | tee "$log"; then
             message="$(tail -n 80 "$log")"
             message="${message//'%'/'%25'}"
@@ -835,7 +839,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          log="$RUNNER_TEMP/ios-build.log"
+          log="$RUNNER_TEMP/xgent-ios-build.log"
           if ! pnpm tauri ios build --ci --no-sign --target aarch64 --build-number "${{ github.run_number }}" --config "$XGENT_TAURI_VERSION_CONFIG" 2>&1 | tee "$log"; then
             message="$(tail -n 240 "$log")"
             message="${message//'%'/'%25'}"

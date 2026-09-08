@@ -10,6 +10,7 @@ import {
   sanitizePlanMarkdown,
 } from "../chat/planMode";
 import type { ToolChoice } from "../providers/runtime/types";
+import { createUuid } from "../shared/id";
 import { AGENT_TOOL_NAME, SEND_MESSAGE_TOOL_NAME } from "../subagents/types";
 import {
   type BuiltinToolBundle,
@@ -430,7 +431,7 @@ export function createPlanModeRunPolicy(params: { conversationId: string }): Pla
     registerFallbackPlan: ({ planText }) => {
       const plan = sanitizePlanMarkdown(planText);
       if (!plan) return null;
-      const toolCallId = `call_plan_fallback_${crypto.randomUUID().replaceAll("-", "")}`;
+      const toolCallId = `call_plan_fallback_${createUuid().replaceAll("-", "")}`;
       const toolCall: ToolCall = {
         type: "toolCall",
         id: toolCallId,

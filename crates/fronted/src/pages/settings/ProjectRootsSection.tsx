@@ -23,6 +23,7 @@ import {
   type WorkspaceProject,
   workspaceProjectPathKey,
 } from "../../lib/settings";
+import { createUuid } from "../../lib/shared/id";
 import { discoverSkills, type SkillSummary } from "../../lib/skills";
 import {
   applyWorkspaceRootGrants,
@@ -165,7 +166,7 @@ export function ProjectRootsSection({
     setRoots((previous) => [
       ...previous,
       {
-        localId: `draft-${crypto.randomUUID()}`,
+        localId: `draft-${createUuid()}`,
         alias: pathAlias(picked, used),
         displayPath: picked,
         access: "read",

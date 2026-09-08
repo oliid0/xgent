@@ -64,6 +64,7 @@ import {
   selectEnabledMcpServers,
   workspaceProjectPathKey,
 } from "../../../lib/settings";
+import { createUuid } from "../../../lib/shared/id";
 import {
   AGENT_TOOL_NAME,
   buildRosterIdentitySection,
@@ -587,7 +588,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     sandbox: resolveShellSandboxSettings(commandSafetyMode),
     checkpoint: {
       conversationId,
-      turnId: checkpointTurnId?.trim() || crypto.randomUUID(),
+      turnId: checkpointTurnId?.trim() || createUuid(),
     },
     taskStateStore,
     // Keep the ordinary Agent tool surface identical to the reference runtime:

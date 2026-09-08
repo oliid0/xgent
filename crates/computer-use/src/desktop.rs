@@ -183,7 +183,7 @@ impl Desktop {
         }
         let window = resolve_window(query)?;
         if operation == "get_app_state" {
-            if window.is_minimized().unwrap_or(false) { platform::focus(&window)?; }
+            platform::focus(&window)?;
             return self.snapshot(&window, query, "Current app state. Inspect before acting.");
         }
         let previous = self.snapshots.get(&query.to_lowercase()).cloned().ok_or("Call get_app_state before an action")?;

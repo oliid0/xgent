@@ -37,6 +37,8 @@ pub use history_commands::subagent_store;
 pub use integration_commands::cloud;
 #[cfg(desktop)]
 pub use integration_commands::cua;
+#[cfg(mobile)]
+pub use integration_commands::mobile_cua as cua;
 pub use integration_commands::lan_pc;
 #[cfg(desktop)]
 pub use integration_commands::local_access;

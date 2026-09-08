@@ -89,11 +89,11 @@ let package = Package(
     ],
     targets: [
         // Transitive dylibs are not embedded automatically for binary targets.
-        // Versions/checksums match the pinned a-Shell xcfs/Package.swift.
+        // Checksums are verified against these exact release asset URLs.
         .binaryTarget(
             name: "openssl",
             url: "https://github.com/holzschu/openssl-apple/releases/download/v1.1.1w/openssl-dynamic.xcframework.zip",
-            checksum: "421712e7150240d57294897bf3e2b0782246d7c687a4a82c3cd053d70a5f08b9"
+            checksum: "329e8317cf9bee8e138da5d032330a7a1bd2473cf44c9c083cb2f0636abb8b80"
         ),
         .binaryTarget(
             name: "libssh2",

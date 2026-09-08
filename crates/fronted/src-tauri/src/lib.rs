@@ -353,6 +353,11 @@ macro_rules! app_invoke_handler {
 macro_rules! app_invoke_handler {
     () => {
         tauri::generate_handler![
+            commands::cua::cua_call,
+            commands::cua::cua_cancel,
+            commands::cua::cua_status,
+            commands::cua::cua_set_enabled,
+            commands::cua::cua_preview,
             commands::chat_history::chat_history_list,
             commands::chat_history::chat_history_workdirs,
             commands::chat_history::chat_history_search,
@@ -504,7 +509,9 @@ macro_rules! app_invoke_handler {
 
 #[cfg(desktop)]
 fn show_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
-    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+    // A browser child webview makes this a multi-webview native window.
+    // get_webview_window then returns None even though the main window exists.
+    if let Some(window) = app.get_window(MAIN_WINDOW_LABEL) {
         let pinned = app
             .try_state::<Arc<commands::app::WindowPinState>>()
             .map(|state| state.0.load(Ordering::SeqCst))
@@ -552,7 +559,7 @@ fn request_app_exit(
 
 #[cfg(desktop)]
 fn toggle_main_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+    if let Some(window) = app.get_window(MAIN_WINDOW_LABEL) {
         let visible = window.is_visible().unwrap_or(false);
         let focused = window.is_focused().unwrap_or(false);
         if visible && focused {
@@ -565,7 +572,7 @@ fn toggle_main_window(app: &tauri::AppHandle) {
 
 #[cfg(desktop)]
 pub(crate) fn toggle_main_window_pin(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+    if let Some(window) = app.get_window(MAIN_WINDOW_LABEL) {
         let pin_state = app.state::<Arc<commands::app::WindowPinState>>();
         let next = !pin_state.0.load(Ordering::SeqCst);
         match window.set_always_on_top(next) {
@@ -843,7 +850,7 @@ pub fn run() {
             if let Some(ready_state) = app.try_state::<Arc<commands::app::FrontendReadyState>>() {
                 ready_state.0.store(false, Ordering::SeqCst);
             }
-            if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+            if let Some(window) = app.get_window(MAIN_WINDOW_LABEL) {
                 if window.is_visible().unwrap_or(false) {
                     let _ = window.hide();
                 }
@@ -1210,7 +1217,7 @@ pub fn run() {
 
     app.run(|app, event| {
         if matches!(event, tauri::RunEvent::Resumed) {
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_window("main") {
                 if let Err(error) = window.show() {
                     eprintln!("failed to restore Xgent window after resume: {error}");
                 }

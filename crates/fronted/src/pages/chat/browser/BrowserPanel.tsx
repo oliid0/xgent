@@ -375,7 +375,7 @@ export function BrowserPanel(props: {
         maxWidth: "100%",
         paddingBlockStart: compact ? "env(safe-area-inset-top, 0px)" : undefined,
         paddingBlockEnd: compact ? "env(safe-area-inset-bottom, 0px)" : undefined,
-        backgroundColor: "var(--color-background-primary)",
+        backgroundColor: "var(--color-background-surface)",
         borderInlineStart:
           compact || props.embedded ? undefined : "var(--border-width) solid var(--color-border)",
       }}
@@ -391,11 +391,13 @@ export function BrowserPanel(props: {
                   label={t("browser.title")}
                   size="lg"
                   startContent={
-                    <HStack gap={2} vAlign="center">
+                    <HStack gap={2} vAlign="center" style={{ minWidth: 0, flex: 1 }}>
                       <Icon icon={Globe} size="md" color="accent" />
-                      <VStack gap={0}>
-                        <Heading level={2}>{t("browser.title")}</Heading>
-                        <Text type="supporting" color="secondary">
+                      <VStack gap={0} style={{ minWidth: 0 }}>
+                        <Heading level={2} maxLines={1}>
+                          {t("browser.title")}
+                        </Heading>
+                        <Text type="supporting" color="secondary" maxLines={2}>
                           {state.busySessionIds.length > 0
                             ? t("browser.agentOperating")
                             : t("browser.sharedSession")}

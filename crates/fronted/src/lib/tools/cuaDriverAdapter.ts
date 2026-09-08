@@ -1,5 +1,6 @@
 import type { ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { invoke } from "@xgent/runtime";
+import { createUuid } from "../shared/id";
 import type { createMcpTools } from "./mcpTools";
 
 type McpBundle = Awaited<ReturnType<typeof createMcpTools>>;
@@ -119,7 +120,7 @@ export function createCuaDriverAdapter(
     const response = await callTool(call, "get_window_state", args);
     if (response.isError) return response;
     const data = structured(response);
-    const token = `cua-${crypto.randomUUID()}`;
+    const token = `cua-${createUuid()}`;
     const target = {
       pid: Number(window.pid),
       windowId: Number(window.window_id),

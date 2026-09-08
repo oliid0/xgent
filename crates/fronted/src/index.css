@@ -3427,16 +3427,26 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 
 .xgent-composer-model-controls {
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 @media (max-width: 600px) {
-  .xgent-composer-execution-controls .astryx-selector {
+  .xgent-chat-composer div:has(> div > .xgent-composer-execution-controls) {
+    flex-wrap: wrap;
+    row-gap: var(--spacing-2);
+  }
+  .xgent-chat-composer div:has(> .xgent-composer-model-controls) {
+    flex: 1 1 14rem;
     min-width: 0;
-    max-width: 5.5rem;
+    justify-content: flex-end;
   }
   .xgent-composer-model-controls .astryx-complex-selector {
-    max-width: clamp(4rem, 23vw, 9rem);
+    width: 100%;
+    max-width: 16rem;
     min-width: 0;
+  }
+  .settings-page-compact [data-settings-section] .astryx-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

@@ -127,8 +127,8 @@ export function useNativeInputContextMenu(options: { enabled?: boolean } = {}) {
 
       const target = resolveMenuTarget(event.target);
       if (!target) {
-        event.preventDefault();
-        event.stopPropagation();
+        // Preserve the engine's Copy action for selected transcript/document
+        // text and native contenteditable selection menus.
         closeMenu();
         return;
       }

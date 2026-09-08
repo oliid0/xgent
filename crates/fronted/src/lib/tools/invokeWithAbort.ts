@@ -1,4 +1,5 @@
 import { invoke } from "@xgent/runtime";
+import { createUuid } from "../shared/id";
 
 type InvokeWithAbortOptions<T> = {
   onAbort?: () => Promise<void> | void;
@@ -23,7 +24,7 @@ export function createToolRunId(prefix: string, toolCallId: string) {
   const normalizedToolCallId = toolCallId.trim() || "call";
   // Provider tool-call ids are commonly reused between conversations. A
   // UUID keeps cancellation scoped to exactly one native invocation.
-  return `${normalizedPrefix}:${normalizedToolCallId}:${crypto.randomUUID()}`;
+  return `${normalizedPrefix}:${normalizedToolCallId}:${createUuid()}`;
 }
 
 function delay(ms: number) {

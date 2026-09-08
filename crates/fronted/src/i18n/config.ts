@@ -19,6 +19,10 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
       "外部方式使用已安装的 CUA driver 或已配置的 MCP 服务。选择后直接使用该服务提供的工具，不会自动切回内置引擎。",
     "settings.cua.driverPath": "外部 cua-driver 可执行文件路径",
     "settings.cua.addDriver": "配置并选择外部 driver",
+    "settings.cua.installDriver": "打开外部 driver 安装指南",
+    "settings.cua.androidPermissions":
+      "请在 Android 设置 > 无障碍中启用 Xgent Computer Use，然后刷新状态。",
+    "settings.cua.openPermissions": "打开无障碍设置",
     "settings.cua.checkDriver": "检查连接与工具",
     "settings.cua.driverEmpty": "服务连接成功，但没有提供可用工具。",
     "settings.cua.driverMissing": "所选服务不存在，请重新选择或配置。",
@@ -28,7 +32,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.cua.enable": "启用电脑操作",
     "settings.cua.installed": "已就绪",
     "settings.cua.unavailable":
-      "本机电脑操作适用于 Windows、macOS 和 Linux。外部服务可在 MCP 设置中连接。",
+      "本机电脑操作适用于 Windows、macOS、Linux 和 Android。外部服务可在 MCP 设置中连接。",
     "settings.cua.loading": "正在读取状态…",
     "settings.cua.permissions":
       "请在 macOS 系统设置 > 隐私与安全性中允许 Xgent 使用辅助功能与屏幕录制。",
@@ -2766,6 +2770,10 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
       "Use an installed CUA driver or configured MCP service. Its native tools are exposed directly; failures do not silently switch to the built-in engine.",
     "settings.cua.driverPath": "External cua-driver executable path",
     "settings.cua.addDriver": "Configure and select external driver",
+    "settings.cua.installDriver": "Open external driver installation guide",
+    "settings.cua.androidPermissions":
+      "Enable Xgent Computer Use in Android Settings > Accessibility, then refresh status.",
+    "settings.cua.openPermissions": "Open accessibility settings",
     "settings.cua.checkDriver": "Check connection and tools",
     "settings.cua.driverEmpty": "The service connected but provided no tools.",
     "settings.cua.driverMissing": "The selected service is missing. Select or configure it again.",
@@ -2775,7 +2783,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.cua.enable": "Enable computer use",
     "settings.cua.installed": "Built into Xgent",
     "settings.cua.unavailable":
-      "Local computer use requires Windows, macOS or Linux. Connect external services in MCP settings.",
+      "Local computer use requires Windows, macOS, Linux or Android. Connect external services in MCP settings.",
     "settings.cua.loading": "Loading component status…",
     "settings.cua.permissions":
       "Allow Xgent in macOS System Settings > Privacy & Security > Accessibility and Screen Recording.",

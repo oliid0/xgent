@@ -45,6 +45,10 @@ pub fn focus(window:&Window)->Result<(),String> {
     if window.is_focused().unwrap_or(false) { return Ok(()); }
     let (connection,screen)=x11rb::connect(None).map_err(|error|format!("Cannot activate this window through X11: {error}. Activate the target app in your desktop session."))?;
     let root=connection.setup().roots[screen].root;
+    if window.is_minimized().unwrap_or(false) {
+        connection.map_window(window.id().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?
+            .check().map_err(|e|e.to_string())?;
+    }
     let atom=connection.intern_atom(false,b"_NET_ACTIVE_WINDOW").map_err(|e|e.to_string())?.reply().map_err(|e|e.to_string())?.atom;
     let event=ClientMessageEvent::new(32,window.id().map_err(|e|e.to_string())?,atom,[2,0,0,0,0]);
     connection.send_event(false,root,EventMask::SUBSTRUCTURE_REDIRECT|EventMask::SUBSTRUCTURE_NOTIFY,event).map_err(|e|e.to_string())?;

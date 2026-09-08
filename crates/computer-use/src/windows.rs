@@ -4,7 +4,8 @@ use windows::core::Interface;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED};
 use windows::Win32::UI::Accessibility::*;
-use windows::Win32::UI::WindowsAndMessaging::{SetForegroundWindow, ShowWindow, SW_RESTORE};
+use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId, PeekMessageW, SetForegroundWindow, ShowWindowAsync, MSG, PM_NOREMOVE, SW_RESTORE};
 use xcap::Window;
 
 struct Apartment(bool);
@@ -33,12 +34,30 @@ fn automation(window: &Window) -> Result<Automation, String> {
 
 pub fn focus(window: &Window) -> Result<(), String> {
     let hwnd=HWND(window.id().map_err(|e| e.to_string())? as usize as *mut _);
+    if window.is_focused().unwrap_or(false) && !window.is_minimized().unwrap_or(false) { return Ok(()); }
     unsafe {
-        if window.is_minimized().unwrap_or(false) { let _=ShowWindow(hwnd,SW_RESTORE); }
+        if window.is_minimized().unwrap_or(false) { let _=ShowWindowAsync(hwnd,SW_RESTORE); }
         let _=SetForegroundWindow(hwnd);
+        if GetForegroundWindow() != hwnd {
+            // CUA runs on a worker, outside the foreground UI thread's input
+            // queue. Join it only for activation and always detach afterwards.
+            let current = GetCurrentThreadId();
+            let foreground = GetWindowThreadProcessId(GetForegroundWindow(), None);
+            let mut message = MSG::default();
+            let _ = PeekMessageW(&mut message, None, 0, 0, PM_NOREMOVE);
+            if foreground != 0 && foreground != current && AttachThreadInput(current, foreground, true).as_bool() {
+                let _ = SetForegroundWindow(hwnd);
+                let _ = AttachThreadInput(current, foreground, false);
+            }
+        }
     }
-    for _ in 0..10 {
-        if window.is_focused().unwrap_or(false) { return Ok(()); }
+    for _ in 0..25 {
+        if window.is_focused().unwrap_or(false) && !window.is_minimized().unwrap_or(true) {
+            // ShowWindowAsync and the target app's layout complete separately.
+            // Observe a restored frame, never the iconic 187x32 caption.
+            std::thread::sleep(Duration::from_millis(80));
+            return Ok(());
+        }
         std::thread::sleep(Duration::from_millis(40));
     }
     Err("Windows did not focus the target window. Activate it and retry; no input was sent to another app.".into())

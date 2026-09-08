@@ -1647,19 +1647,8 @@ pub async fn system_append_debug_jsonl(
     .map_err(|e| format!("system_append_debug_jsonl join 失败：{e}"))?
 }
 
-#[cfg(desktop)]
+#[cfg(all(desktop, not(windows)))]
 fn system_clipboard_read_text_sync() -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    let candidates: &[(&str, &[&str])] = &[(
-        "powershell.exe",
-        &[
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            "$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); $value = Get-Clipboard -Raw; if ($null -ne $value) { [Console]::Out.Write($value) }",
-        ],
-    )];
     #[cfg(target_os = "macos")]
     let candidates: &[(&str, &[&str])] = &[("pbpaste", &[])];
     #[cfg(all(unix, not(target_os = "macos")))]
@@ -1696,24 +1685,15 @@ fn system_clipboard_read_text_sync() -> Result<String, String> {
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn system_clipboard_read_text() -> Result<String, String> {
+    #[cfg(windows)]
+    use crate::services::clipboard::read_text as system_clipboard_read_text_sync;
     tauri::async_runtime::spawn_blocking(system_clipboard_read_text_sync)
         .await
         .map_err(|error| format!("system_clipboard_read_text join failed: {error}"))?
 }
 
-#[cfg(desktop)]
+#[cfg(all(desktop, not(windows)))]
 fn system_clipboard_write_text_sync(text: String) -> Result<(), String> {
-    #[cfg(target_os = "windows")]
-    let candidates: &[(&str, &[&str])] = &[(
-        "powershell.exe",
-        &[
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            "$InputEncoding = [Console]::InputEncoding = [Text.UTF8Encoding]::new($false); $value = [Console]::In.ReadToEnd(); Set-Clipboard -Value $value",
-        ],
-    )];
     #[cfg(target_os = "macos")]
     let candidates: &[(&str, &[&str])] = &[("pbcopy", &[])];
     #[cfg(all(unix, not(target_os = "macos")))]
@@ -1771,8 +1751,21 @@ fn system_clipboard_write_text_sync(text: String) -> Result<(), String> {
 /// relying on WebView clipboard permissions.
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn system_clipboard_write_text(text: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || system_clipboard_write_text_sync(text))
+pub async fn system_clipboard_write_text(app: tauri::AppHandle, text: String) -> Result<(), String> {
+    #[cfg(windows)]
+    let owner = {
+        use tauri::Manager;
+        app.get_window("main").ok_or("Main window is unavailable")?
+            .hwnd().map_err(|error| error.to_string())?.0 as usize
+    };
+    #[cfg(not(windows))]
+    let _ = app;
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(windows)]
+        { crate::services::clipboard::write_text(owner, &text) }
+        #[cfg(not(windows))]
+        { system_clipboard_write_text_sync(text) }
+    })
         .await
         .map_err(|error| format!("system_clipboard_write_text join failed: {error}"))?
 }

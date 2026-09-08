@@ -321,7 +321,10 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       )
     : [];
   let mcpBundle: Awaited<ReturnType<typeof createMcpTools>> | undefined;
-  const cuaEnabled = capabilities.localMcpStdio && params.runtimeScope === "chat";
+  const cuaEnabled =
+    (capabilities.localMcpStdio ||
+      (params.nativeMobileRuntime === true && params.runtimePlatform === "android")) &&
+    params.runtimeScope === "chat";
   const driverServerIds = enabledServers
     .filter(
       (server) =>
@@ -370,6 +373,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
     baseBundles.unshift(
       createCuaTools({
         conversationId: params.checkpoint?.conversationId,
+        android: runtimeToolHost === "native-mobile" && params.runtimePlatform === "android",
       }),
     );
   }

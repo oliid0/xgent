@@ -179,7 +179,9 @@ func globalPointerFallbacksEnabled(environment: [String: String]) -> Bool {
         .trimmingCharacters(in: .whitespacesAndNewlines)
         .lowercased()
     else {
-        return false
+        // Native CUA is explicitly enabled by Xgent's persisted setting. Real
+        // foreground input must work without an undocumented environment flag.
+        return true
     }
 
     return ["1", "true", "yes", "on"].contains(rawValue)
@@ -461,7 +463,9 @@ public final class ComputerUseService {
         textLimit: SnapshotTextLimit = .defaults,
         treeLimits: AccessibilityTreeLimits = .defaults
     ) throws -> ToolCallResult {
-        snapshotResult(for: try refreshSnapshot(for: query, textLimit: textLimit, treeLimits: treeLimits), style: .fullState)
+        let app = try AppDiscovery.resolve(query, allowLaunch: true)
+        try InputSimulation.prepareAppForGlobalPointerInput(app)
+        return snapshotResult(for: try refreshSnapshot(for: query, textLimit: textLimit, treeLimits: treeLimits), style: .fullState)
     }
 
     public func click(
@@ -762,15 +766,9 @@ public final class ComputerUseService {
             return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
         }
 
-        if try typeTextBySettingFocusedValueIfAvailable(text, in: snapshot) {
-            Thread.sleep(forTimeInterval: 0.1)
-            return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
-        }
-
-        guard try canTypeTextUsingKeyboardFallback(in: snapshot) else {
-            throw ComputerUseError.stateUnavailable("type_text requires a focused editable text element. Click a text entry area first, or use set_value on a settable text element.")
-        }
-
+        // Keyboard input also works in canvas-based editors that publish no AX
+        // editable node. set_value remains the explicit whole-value operation.
+        try InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
         try InputSimulation.typeText(text, pid: snapshot.app.pid)
         return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
     }
@@ -778,7 +776,7 @@ public final class ComputerUseService {
     func inputBurst(app query: String, arguments: [String: Any]) throws -> ToolCallResult {
         let snapshot = try currentSnapshot(for: query)
         if !snapshot.app.runningApplication.isActive {
-            InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
+            try InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
         }
         try InputSimulation.burst(app: snapshot.app, arguments: arguments)
         return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
@@ -792,6 +790,7 @@ public final class ComputerUseService {
             return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
         }
 
+        try InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
         try InputSimulation.pressKey(key, pid: snapshot.app.pid)
         return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
     }
@@ -1819,7 +1818,7 @@ public final class ComputerUseService {
                 targetDescription: targetDescription,
                 snapshot: snapshot
             )
-            InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
+            try InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
             try InputSimulation.scrollGlobally(at: eventPoint, direction: direction, pages: pages)
             return
         }
@@ -1842,7 +1841,7 @@ public final class ComputerUseService {
                 targetDescription: targetDescription,
                 snapshot: snapshot
             )
-            InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
+            try InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
             try InputSimulation.dragGlobally(from: eventStart, to: eventEnd)
             return
         }
@@ -1865,7 +1864,7 @@ public final class ComputerUseService {
                 targetDescription: targetDescription,
                 snapshot: snapshot
             )
-            InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
+            try InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
             try InputSimulation.clickGlobally(at: eventPoint, button: button, clickCount: clickCount)
             return
         }
@@ -1929,7 +1928,7 @@ public final class ComputerUseService {
                 )
             }
             debugClickDecision("requested=global executed=global_hid target=\(targetDescription)")
-            InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
+            try InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
             try InputSimulation.clickGlobally(at: eventPoint, button: button, clickCount: clickCount)
         case .auto, .accessibility:
             throw ComputerUseError.message(

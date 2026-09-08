@@ -9,6 +9,8 @@ import {
   localBrowserAutomationClient,
 } from "../browserAutomation";
 
+import { createUuid } from "../shared/id";
+
 const DEFAULT_BROWSER_SESSION_ID = "main";
 const DEFAULT_BROWSER_HOME = "about:blank";
 export const MAX_BROWSER_SESSIONS = 16;
@@ -120,7 +122,7 @@ export class BrowserSessionController {
     const key = JSON.stringify([conversationId, requested]);
     let id = this.sessionAliases.get(key);
     if (!id) {
-      id = `c-${crypto.randomUUID()}`;
+      id = `c-${createUuid()}`;
       this.sessionAliases.set(key, id);
       this.sessionOwners.set(id, conversationId);
     }

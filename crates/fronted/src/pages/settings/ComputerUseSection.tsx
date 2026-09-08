@@ -5,7 +5,7 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { invoke, isBrowserRuntime } from "@xgent/runtime";
+import { invoke, isBrowserRuntime, openUrl } from "@xgent/runtime";
 import { useEffect, useState } from "react";
 import { useLocale } from "../../i18n";
 import { updateMcp } from "../../lib/settings";
@@ -56,7 +56,7 @@ export function ComputerUseSection({ settings, setSettings }: SettingsSectionPro
     void invoke<{ platform: string }>("app_runtime_platform")
       .then(async ({ platform }) => {
         if (disposed) return;
-        if (!["windows", "linux", "macos"].includes(platform)) {
+        if (!["windows", "linux", "macos", "android"].includes(platform)) {
           setSupported(false);
           return;
         }
@@ -86,7 +86,7 @@ export function ComputerUseSection({ settings, setSettings }: SettingsSectionPro
 
   return (
     <Section padding={4} width="100%">
-      <VStack gap={3}>
+      <VStack gap={3} padding={4}>
         <Heading level={3}>{t("settings.cua.title")}</Heading>
         <Text type="supporting" color="secondary">
           {t("settings.cua.description")}
@@ -118,7 +118,9 @@ export function ComputerUseSection({ settings, setSettings }: SettingsSectionPro
         />
         <Button
           label={t("settings.cua.addDriver")}
-          isDisabled={!driverPath.trim() || busy || supported !== true}
+          isDisabled={
+            !driverPath.trim() || busy || supported !== true || status?.target === "android"
+          }
           onClick={() =>
             setSettings((prev) =>
               updateMcp(prev, {
@@ -139,6 +141,15 @@ export function ComputerUseSection({ settings, setSettings }: SettingsSectionPro
               }),
             )
           }
+        />
+        <Button
+          label={t("settings.cua.installDriver")}
+          variant="ghost"
+          onClick={() => {
+            void openUrl("https://cua.ai/docs/how-to-guides/driver/install").catch((cause) =>
+              setError(String(cause)),
+            );
+          }}
         />
         {selectedDriver ? (
           <VStack gap={2}>
@@ -177,7 +188,27 @@ export function ComputerUseSection({ settings, setSettings }: SettingsSectionPro
                 : t("settings.cua.loading")}
             </Text>
             {status?.permissionsRequired && status.enabled ? (
-              <Text type="supporting">{t("settings.cua.permissions")}</Text>
+              <VStack gap={2}>
+                <Text type="supporting">
+                  {t(
+                    status.target === "android"
+                      ? "settings.cua.androidPermissions"
+                      : "settings.cua.permissions",
+                  )}
+                </Text>
+                {status.target === "android" ? (
+                  <Button
+                    label={t("settings.cua.openPermissions")}
+                    isDisabled={busy}
+                    onClick={() => void run("cua_set_enabled", true)}
+                  />
+                ) : null}
+                <Button
+                  label={t("settings.cua.refresh")}
+                  isDisabled={busy}
+                  onClick={() => void run("cua_status")}
+                />
+              </VStack>
             ) : null}
           </VStack>
         )}
