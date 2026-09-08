@@ -13,6 +13,16 @@ export const SUPPORTED_LOCALES = ["system", "zh-CN", "en-US"] as const satisfies
 export const translations: Record<ResolvedLocale, Record<string, string>> = {
   "zh-CN": {
     "settings.cua.title": "电脑操作",
+    "settings.cua.backend": "操作方式",
+    "settings.cua.native": "Xgent 内置电脑操作",
+    "settings.cua.driverDescription":
+      "外部方式使用已安装的 CUA driver 或已配置的 MCP 服务。选择后直接使用该服务提供的工具，不会自动切回内置引擎。",
+    "settings.cua.driverPath": "外部 cua-driver 可执行文件路径",
+    "settings.cua.addDriver": "配置并选择外部 driver",
+    "settings.cua.checkDriver": "检查连接与工具",
+    "settings.cua.driverEmpty": "服务连接成功，但没有提供可用工具。",
+    "settings.cua.driverMissing": "所选服务不存在，请重新选择或配置。",
+    "settings.cua.driverDisabled": "此服务已在 MCP 设置中停用。",
     "settings.cua.description":
       "本地操作引擎随桌面应用内置，无需另外下载。第三方电脑操作服务可在 MCP 设置中连接。关闭后将停止本地电脑操作。",
     "settings.cua.enable": "启用电脑操作",
@@ -2750,6 +2760,16 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
 
   "en-US": {
     "settings.cua.title": "Computer use",
+    "settings.cua.backend": "Control backend",
+    "settings.cua.native": "Xgent built-in computer use",
+    "settings.cua.driverDescription":
+      "Use an installed CUA driver or configured MCP service. Its native tools are exposed directly; failures do not silently switch to the built-in engine.",
+    "settings.cua.driverPath": "External cua-driver executable path",
+    "settings.cua.addDriver": "Configure and select external driver",
+    "settings.cua.checkDriver": "Check connection and tools",
+    "settings.cua.driverEmpty": "The service connected but provided no tools.",
+    "settings.cua.driverMissing": "The selected service is missing. Select or configure it again.",
+    "settings.cua.driverDisabled": "This service is disabled in MCP settings.",
     "settings.cua.description":
       "The local engine is included with the desktop app and works offline. Connect third-party computer-use services in MCP settings. Disabling stops local computer use.",
     "settings.cua.enable": "Enable computer use",

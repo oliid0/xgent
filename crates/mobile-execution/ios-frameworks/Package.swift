@@ -70,7 +70,7 @@ private let pythonFrameworks = [
 
 private let nativeTargetNames = [
     "ios_system", "awk", "curl_ios", "files", "shell", "tar", "text", "ssh_cmd",
-    "dash", "vim", "lg2", "ffmpeg", "ffprobe",
+    "dash", "vim", "lg2", "ffmpeg", "ffprobe", "openssl", "libssh2",
 ]
 
 // Tauri compiles the Swift plugin into libapp.a, but binary dependencies of
@@ -88,6 +88,18 @@ let package = Package(
         ),
     ],
     targets: [
+        // Transitive dylibs are not embedded automatically for binary targets.
+        // Versions/checksums match the pinned a-Shell xcfs/Package.swift.
+        .binaryTarget(
+            name: "openssl",
+            url: "https://github.com/holzschu/openssl-apple/releases/download/v1.1.1w/openssl-dynamic.xcframework.zip",
+            checksum: "421712e7150240d57294897bf3e2b0782246d7c687a4a82c3cd053d70a5f08b9"
+        ),
+        .binaryTarget(
+            name: "libssh2",
+            url: "https://github.com/holzschu/libssh2-apple/releases/download/v1.11.0/libssh2-dynamic.xcframework.zip",
+            checksum: "cacfe1789b197b727119f7e32f561eaf9acc27bf38cd19975b74fce107f868a6"
+        ),
         .binaryTarget(
             name: "ios_system",
             url: "https://github.com/holzschu/ios_system/releases/download/v3.0.2/ios_system.xcframework.zip",

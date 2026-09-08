@@ -23,7 +23,7 @@ struct PermissionDiagnostics {
 }
 
 @_cdecl("xgent_cua_call")
-public func xgentCuaCall(_ request: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>? {
+public func xgentCuaCall(_ request: UnsafePointer<CChar>, _ cancelled: @escaping @convention(c) (UnsafeRawPointer?) -> Bool, _ context: UnsafeRawPointer?) -> UnsafeMutablePointer<CChar>? {
     autoreleasepool {
         let result: ToolCallResult
         do {
@@ -51,6 +51,8 @@ public func xgentCuaCall(_ request: UnsafePointer<CChar>) -> UnsafeMutablePointe
                 let data = try JSONSerialization.data(withJSONObject: response)
                 return strdup(String(decoding: data, as: UTF8.self))
             }
+            InputSimulation.isCancelled = { cancelled(context) }
+            defer { InputSimulation.isCancelled = { false } }
             result = xgentDispatcher.callToolAsResult(name: operation, arguments: arguments)
         } catch {
             result = .text(error.localizedDescription, isError: true)

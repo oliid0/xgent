@@ -66,6 +66,8 @@ public final class ComputerUseToolDispatcher {
         // Accessibility actions cannot represent modifier-assisted clicks.
         if !modifiers.isEmpty && name == "click" { arguments["click_method"] = "app_post" }
         switch name {
+        case "input":
+            return try service.inputBurst(app: requireString("app", in: arguments), arguments: arguments)
         case "list_apps":
             return service.listApps()
         case "get_app_state", "launch_app":

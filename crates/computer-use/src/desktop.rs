@@ -155,7 +155,7 @@ impl Desktop {
         Ok(json!({"content":content,"isError":false,"details":details}))
     }
 
-    pub fn call(&mut self, operation: &str, arguments: &Value) -> Result<Value, String> {
+    pub fn call(&mut self, operation: &str, arguments: &Value, cancelled: &dyn Fn() -> bool) -> Result<Value, String> {
         self.observation = arguments["observation"].as_str().unwrap_or("auto").to_string();
         self.max_image_size = arguments["max_image_size"].as_u64().unwrap_or(1280).clamp(320,1920) as u32;
         self.settle_ms = arguments["settle_ms"].as_u64().unwrap_or(80).min(1000);
@@ -217,7 +217,10 @@ impl Desktop {
         if previous.bounds != bounds(&window)? {
             return self.snapshot(&window, query, "ACTION NOT APPLIED: focusing changed the window geometry. Inspect this new state.");
         }
-        let mut input = Enigo::new(&Settings::default()).map_err(|error| format!("Input permission unavailable: {error}"))?;
+        let settings = if operation == "input" {
+            Settings { linux_delay: 0, windows_subject_to_mouse_speed_and_acceleration_level: true, ..Settings::default() }
+        } else { Settings::default() };
+        let mut input = Enigo::new(&settings).map_err(|error| format!("Input permission unavailable: {error}"))?;
         let point = |x: &str, y: &str| -> Result<(i32,i32),String> {
             let (x,y) = if let Some(element) = element.as_ref().filter(|_| x == "x") {
                 let frame = &element["frame"];
@@ -236,6 +239,7 @@ impl Desktop {
         let action_result=(|| {
         for modifier in modifiers { input.key(modifier,Direction::Press).map_err(fail)?; held.push(modifier); }
         match operation {
+            "input" => input_burst(&mut input, &window, arguments, cancelled)?,
             "click" => {
                 let (x,y)=point("x","y")?;
                 let button=match arguments["mouse_button"].as_str().unwrap_or("left") { "left"=>Button::Left,"right"=>Button::Right,"middle"=>Button::Middle,_=>return Err("Unknown mouse_button".into()) };
@@ -281,6 +285,47 @@ impl Desktop {
         std::thread::sleep(Duration::from_millis(self.settle_ms));
         self.after_input(&window, query, &previous, arguments["_defer_observation"].as_bool()==Some(true))
     }
+}
+
+// A burst holds keys/buttons together while moving the pointer. One local
+// timing loop replaces model/IPC round trips between down, move and up events.
+fn input_burst(input: &mut Enigo, window: &Window, arguments: &Value, cancelled: &dyn Fn() -> bool) -> Result<(), String> {
+    let duration = arguments["duration_ms"].as_u64().filter(|value| (1..=2000).contains(value))
+        .ok_or("duration_ms must be 1-2000")?;
+    let keys = arguments["keys"].as_array().map(|keys| keys.iter().map(|key| parse_key(key.as_str().unwrap_or(""))).collect::<Result<Vec<_>,_>>()).transpose()?.unwrap_or_default();
+    let buttons = arguments["buttons"].as_array().map(|buttons| buttons.iter().map(|button| match button.as_str() {
+        Some("left") => Ok(Button::Left), Some("middle") => Ok(Button::Middle), Some("right") => Ok(Button::Right),
+        _ => Err("Unknown held mouse button".to_string()),
+    }).collect::<Result<Vec<_>,_>>()).transpose()?.unwrap_or_default();
+    if keys.len() > 8 || buttons.len() > 3 { return Err("Too many held inputs".into()); }
+    let delta = |name: &str| -> Result<i32,String> {
+        if arguments.get(name).is_none() { return Ok(0); }
+        arguments[name].as_i64().filter(|value| (-4096..=4096).contains(value)).map(|value| value as i32).ok_or(format!("{name} must be an integer from -4096 to 4096"))
+    };
+    let (dx,dy) = (delta("dx")?,delta("dy")?);
+    struct Held<'a> { input: &'a mut Enigo, keys: Vec<Key>, buttons: Vec<Button> }
+    impl Drop for Held<'_> {
+        fn drop(&mut self) {
+            for button in self.buttons.iter().rev() { let _ = self.input.button(*button,Direction::Release); }
+            for key in self.keys.iter().rev() { let _ = self.input.key(*key,Direction::Release); }
+        }
+    }
+    let mut held = Held { input, keys: Vec::new(), buttons: Vec::new() };
+    for key in keys { held.keys.push(key); held.input.key(key,Direction::Press).map_err(fail)?; }
+    for button in buttons { held.buttons.push(button); held.input.button(button,Direction::Press).map_err(fail)?; }
+    let start = std::time::Instant::now();
+    let steps = duration.div_ceil(8) as i32;
+    let (mut sent_x, mut sent_y) = (0,0);
+    for step in 1..=steps {
+        if cancelled() { return Err("Input burst cancelled; held inputs released".into()); }
+        if !window.is_focused().unwrap_or(false) { return Err("Input burst stopped after focus changed; held inputs released".into()); }
+        let (x,y) = (dx*step/steps,dy*step/steps);
+        if x != sent_x || y != sent_y { held.input.move_mouse(x-sent_x,y-sent_y,Coordinate::Rel).map_err(fail)?; }
+        (sent_x,sent_y) = (x,y);
+        let deadline = start + Duration::from_millis(duration * step as u64 / steps as u64);
+        std::thread::sleep(deadline.saturating_duration_since(std::time::Instant::now()));
+    }
+    Ok(())
 }
 
 fn parse_key(text: &str) -> Result<Key, String> {

@@ -1,4 +1,4 @@
-import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { addPluginListener, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen as tauriListen } from "@tauri-apps/api/event";
 import { homeDir as tauriHomeDir } from "@tauri-apps/api/path";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -21,6 +21,15 @@ import type {
   RuntimeUnlisten,
   XgentRuntime,
 } from "./types";
+
+export async function listenNativePlugin<T>(
+  plugin: string,
+  event: string,
+  handler: (event: T) => void,
+) {
+  const listener = await addPluginListener<T>(plugin, event, handler);
+  return () => listener.unregister();
+}
 
 export const tauriRuntime: XgentRuntime = {
   invoke<T>(command: string, args?: RuntimeInvokeArgs) {

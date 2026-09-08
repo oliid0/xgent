@@ -73,7 +73,7 @@ export function applyMcpOps(prev: McpSettings, ops: McpSettingsOp[]): McpSetting
     servers = applyOp(servers, op);
   }
   if (servers === prev.servers) return prev;
-  return normalizeMcpSettings({ servers, selected: prev.selected });
+  return normalizeMcpSettings({ ...prev, servers });
 }
 
 export function applyMcpOpsToAppSettings(prev: AppSettings, ops: McpSettingsOp[]): AppSettings {

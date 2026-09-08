@@ -717,7 +717,7 @@ jobs:
         with:
           name: xgent-android-launch-evidence
           path: |
-            ${{ runner.temp }}/xgent-android-smoke.png
+            ${{ runner.temp }}/xgent-android-*.png
             ${{ runner.temp }}/xgent-android-*.log
             ${{ runner.temp }}/xgent-android-ui.xml
           if-no-files-found: warn
@@ -886,6 +886,8 @@ jobs:
 
               required = [
                   "Frameworks/ios_system.framework/ios_system",
+                  "Frameworks/openssl.framework/openssl",
+                  "Frameworks/libssh2.framework/libssh2",
                   "Frameworks/ffmpeg.framework/ffmpeg",
                   "Frameworks/python3_ios.framework/python3_ios",
                   "Frameworks/python3_ios-_ssl.framework/python3_ios-_ssl",

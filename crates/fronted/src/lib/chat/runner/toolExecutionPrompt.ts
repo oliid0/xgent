@@ -333,6 +333,7 @@ export function buildToolsSuffix(
       [
         "## Embedded Browser",
         "- Choose browser_use for web navigation, research requiring interaction, and generated HTML verification. Do not launch the external browser with shell/open/xdg-open/Start-Process unless the user explicitly requests it.",
+        "- A request to use the browser means browser_use and its embedded tabs. Do not use cua or external desktop-driver tools to open/control Chrome, Edge, Safari or Firefox for that request. Desktop-browser control is reserved for an explicit request involving that external application or its existing session; report embedded-browser errors rather than silently switching tools.",
         "- For documents requiring current information or sourced facts, search the web before drafting using available search tools or browser_use, read the sources, and cite them. Do not invent facts or links. Pure formatting of provided content does not need web research.",
         "- browser_use operates Xgent's user-visible embedded browser on desktop, Android, and iOS. It is the same live tab the user can inspect, not a mock or a separate extension session.",
         "- Start with open/navigate, then call snapshot. Prefer the returned stable element refs for click, type, press_key, hover, and scroll instead of guessing selectors or coordinates.",
@@ -340,6 +341,17 @@ export function buildToolsSuffix(
         "- Reuse session_id for follow-up actions so navigation, cookies, and page state stay in the same tab. Use list_tabs/new_tab only when the task genuinely needs another tab.",
         "- After navigation or an action that changes the page, use wait_for_dom_stable and inspect again before the next interaction. Use screenshot only when visual layout matters.",
         "- Treat authenticated pages as acting on the user's behalf. Do not submit, purchase, publish, or delete unless that external side effect is clearly within the request.",
+      ].join("\n"),
+    );
+  }
+
+  if (has("cua")) {
+    sections.push(
+      [
+        "## Desktop applications",
+        "- For native apps, discover the target, inspect an image-bearing state, act against that state and verify the visible result. A missing accessibility tree is normal for games and 3D viewports; use image observations and coordinates.",
+        "- Choose semantic controls for app forms; use keyboard shortcuts, middle/right-button drags and modifiers for 3D navigation. For Blender bulk geometry, use its Python API through an available script/console workflow, then inspect the viewport and saved scene. Do not replace exact modeling work with hundreds of blind clicks.",
+        "- For games use short input bursts and fresh observations. Inspect the actual controls, focus and pointer-lock state first; do not assume WASD or a screen coordinate works for every game. Report input rejection or unsupported controls instead of treating a dispatched event as success.",
       ].join("\n"),
     );
   }

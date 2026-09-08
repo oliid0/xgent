@@ -9,6 +9,23 @@ function setup(invoke) {
 }
 const call = (id, operation = "get_app_state") => ({ id, name: "cua", arguments: { operation, app: "Blender" } });
 
+test("concurrent held inputs and relative motion reach one native call with final observation", async () => {
+  const input = { operation: "input", app: "Blender", state_id: "7", keys: ["Shift", "W"], buttons: ["middle"], dx: 120, dy: -20, duration_ms: 160, observation: "image", settle_ms: 0 };
+  const calls = [];
+  const bundle = setup(async (command, args) => {
+    calls.push({ command, args });
+    return { content: [{ type: "text", text: "state_id: 8" }], isError: false, details: { stateId: "8" } };
+  });
+  const result = await bundle.executeToolCall({ id: "burst", name: "cua", arguments: input });
+  assert.equal(result.isError, false);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].command, "cua_call");
+  assert.equal(calls[0].args.operation, "input");
+  const { operation, ...argumentsOnly } = input;
+  assert.deepEqual(calls[0].args.arguments, argumentsOnly);
+  assert.equal(result.details.stateId, "8");
+});
+
 async function waitForDispatch(dispatched) {
   const deadline = Date.now() + 5_000;
   while (!dispatched()) {
@@ -109,6 +126,6 @@ test("disabled CUA cannot invoke native input or install a component", async () 
   const bundle = loader.loadModule("src/lib/tools/cuaTools.ts").createCuaTools();
   const result = await bundle.executeToolCall(call("disabled"));
   assert.equal(result.isError, true);
-  assert.match(result.content[0].text, /Settings > Tool permissions/);
+  assert.match(result.content[0].text, /Settings > Computer use/);
   assert.deepEqual(calls, ["cua_status"]);
 });

@@ -19,6 +19,16 @@ function baseSettings() {
   return normalizeMcpSettings({ servers: [serverA, serverB], selected: ["a", "b"] });
 }
 
+test("computer-use backend survives unrelated MCP changes and workspace restrictions", () => {
+  const { filterMcpSettingsForWorkspace } = loader.loadModule("src/lib/settings/index.ts");
+  const prev = normalizeMcpSettings({ ...baseSettings(), computerUseDriverId: "a" });
+  const next = applyMcpOps(prev, [{ kind: "setEnabled", serverIds: ["b"], enabled: false }]);
+  assert.equal(next.computerUseDriverId, "a");
+  const restricted = filterMcpSettingsForWorkspace(next, { mode: "custom", mcpServerIds: [] });
+  assert.equal(restricted.computerUseDriverId, "a", "must not silently fall back to native control");
+  assert.deepEqual(selectEnabledMcpServers(restricted), []);
+});
+
 test("applyMcpOps is pure: same input twice yields deep-equal output and never mutates prev", () => {
   const prev = baseSettings();
   const snapshot = JSON.stringify(prev);

@@ -1,5 +1,6 @@
 import type { ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { homeDir } from "@xgent/runtime";
+import { activityObservation, executionActivityStore } from "../chat/executionActivityStore";
 import type { RuntimePlatform } from "../runtimePlatform";
 import {
   type AccessSettings,
@@ -312,8 +313,10 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       : []),
   ];
 
+  const mcpSettings = params.getMcpSettings();
+  const selectedDriverId = mcpSettings.computerUseDriverId;
   const enabledServers = capabilities.mcp
-    ? selectEnabledMcpServers(params.getMcpSettings()).filter(
+    ? selectEnabledMcpServers(mcpSettings).filter(
         (server) => capabilities.localMcpStdio || server.transport !== "stdio",
       )
     : [];
@@ -333,23 +336,40 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       onLoadError: params.onMcpLoadError,
       loadFailureMode: params.mcpLoadFailureMode,
     });
-    // Keep the driver transport private behind cua. Other MCP tools remain unchanged.
+    // The selected external backend exposes its actual schemas, including
+    // advanced gestures. Do not squeeze it through a lossy click-only adapter.
     const driver = mcpBundle;
     baseBundles.push({
       ...driver,
       tools: driver.tools.filter(
         (tool) =>
-          !cuaEnabled ||
+          driver.toolNameMap.get(tool.name)?.serverId === selectedDriverId ||
           !driverServerIds.includes(driver.toolNameMap.get(tool.name)?.serverId ?? ""),
       ),
+      async executeToolCall(call, signal, context) {
+        const isDriver = driver.toolNameMap.get(call.name)?.serverId === selectedDriverId;
+        const response = await driver.executeToolCall(call, signal, context);
+        if (isDriver)
+          executionActivityStore.record(params.checkpoint?.conversationId, {
+            id: call.id,
+            kind: "cua",
+            title: call.name,
+            ...activityObservation(response.content),
+            status: response.isError ? "error" : "complete",
+          });
+        return response;
+      },
     });
   }
-  if (cuaEnabled) {
+  if (selectedDriverId && !enabledServers.some((server) => server.id === selectedDriverId)) {
+    params.onMcpLoadError?.(
+      "The selected computer-use driver is unavailable or disabled for this workspace. Check Settings > Computer use.",
+    );
+  }
+  if (cuaEnabled && !selectedDriverId) {
     baseBundles.unshift(
       createCuaTools({
         conversationId: params.checkpoint?.conversationId,
-        driver: mcpBundle,
-        driverServerIds,
       }),
     );
   }

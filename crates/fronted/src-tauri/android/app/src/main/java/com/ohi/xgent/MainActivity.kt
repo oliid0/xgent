@@ -3,7 +3,12 @@ package com.ohi.xgent
 import android.os.Bundle
 import android.webkit.WebView
 import android.util.Log
+import android.view.View
+import android.view.WindowManager
 import androidx.activity.enableEdgeToEdge
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 
@@ -11,6 +16,24 @@ class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+    // WebView <139 does not resize its visual viewport for edge-to-edge IME.
+    // Resize the native content instead, and zero handled insets so newer
+    // WebViews do not subtract the keyboard or safe areas a second time.
+    val content = findViewById<View>(android.R.id.content)
+    ViewCompat.setOnApplyWindowInsetsListener(content) { view, windowInsets ->
+      val types = WindowInsetsCompat.Type.ime() or WindowInsetsCompat.Type.systemBars() or
+        WindowInsetsCompat.Type.displayCutout()
+      val insets = windowInsets.getInsets(types)
+      view.setPadding(insets.left, insets.top, insets.right, insets.bottom)
+      view.post {
+        val position = IntArray(2)
+        view.getLocationOnScreen(position)
+        Log.i("XgentViewport", "ime=${windowInsets.isVisible(WindowInsetsCompat.Type.ime())} visibleBottom=${position[1] + view.height - insets.bottom}")
+      }
+      WindowInsetsCompat.Builder(windowInsets).setInsets(types, Insets.NONE).build()
+    }
+    ViewCompat.requestApplyInsets(content)
     Log.i("XgentStartup", "Activity created")
   }
 

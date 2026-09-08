@@ -71,6 +71,8 @@ export type McpServerConfig = {
 export type McpSettings = {
   servers: McpServerConfig[];
   selected: string[];
+  /** Undefined selects Xgent's built-in engine; an ID selects that external driver. */
+  computerUseDriverId?: string;
 };
 
 export type SkillsSettings = {
@@ -2072,6 +2074,9 @@ export function normalizeMcpSettings(input: unknown): McpSettings {
   return {
     servers,
     selected: normalizeMcpSelection(obj.selected, servers),
+    ...(typeof obj.computerUseDriverId === "string" && obj.computerUseDriverId.trim()
+      ? { computerUseDriverId: obj.computerUseDriverId.trim() }
+      : {}),
   };
 }
 
@@ -2806,6 +2811,7 @@ export function filterMcpSettingsForWorkspace(
   if (resources.mode !== "custom") return mcp;
   const allowed = new Set(resources.mcpServerIds);
   return normalizeMcpSettings({
+    ...mcp,
     servers: mcp.servers.map((server) => ({
       ...server,
       enabled: server.enabled && allowed.has(server.id),

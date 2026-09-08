@@ -47,13 +47,12 @@ test("mobile shell displays split UTF-8 output before completion and releases it
   const dispatched = new Promise((resolve) => { entered = resolve; });
   const pending = new Promise((resolve) => { release = resolve; });
   const loader = createTsModuleLoader({ mocks: {
-    "@tauri-apps/api/core": {
-      addPluginListener: async (_plugin, _event, callback) => {
+    "@xgent/runtime": {
+      listenNativePlugin: async (_plugin, _event, callback) => {
         handler = callback;
-        return { unregister: async () => { removed = true; } };
+        return async () => { removed = true; };
       },
-    },
-    "@xgent/runtime": { invoke: async (command, args) => {
+      invoke: async (command, args) => {
       assert.equal(command, "shell_run");
       assert.ok(handler, "listener must exist before dispatch");
       handler({ runId: "other", stream: "stdout", data: Buffer.from("wrong").toString("base64") });

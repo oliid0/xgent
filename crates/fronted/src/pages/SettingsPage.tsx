@@ -410,7 +410,7 @@ export function SettingsPage(props: SettingsPageProps) {
           />
         );
       case "computerUse":
-        return <ComputerUseSection />;
+        return <ComputerUseSection settings={settings} setSettings={setSettings} />;
       case "toolPermissions":
         return <ToolPermissionsSection settings={settings} setSettings={setSettings} />;
       case "projectRoots":

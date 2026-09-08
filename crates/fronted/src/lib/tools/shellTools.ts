@@ -1541,9 +1541,9 @@ export function createShellTools(params: {
       recordOutput("running");
       if ((runtimePlatform === "android" || runtimePlatform === "ios") && params.conversationId) {
         try {
-          const { addPluginListener } = await import("@tauri-apps/api/core");
+          const { listenNativePlugin } = await import("@xgent/runtime");
           const decoders = { stdout: new TextDecoder(), stderr: new TextDecoder() };
-          const listener = await addPluginListener<{
+          const listener = await listenNativePlugin<{
             runId: string;
             stream: "stdout" | "stderr";
             data: string;
@@ -1559,7 +1559,7 @@ export function createShellTools(params: {
               /* The final command result still contains the bounded output. */
             }
           });
-          removeOutputListener = () => listener.unregister();
+          removeOutputListener = listener;
         } catch {
           // Observation transport failure must not prevent command execution.
           recordOutput("running", "Live output is unavailable; waiting for the command result.");

@@ -11,11 +11,14 @@ Finish native CUA, mobile startup, live computer viewing and browser repairs aga
 - Fixed Release #37 iOS WKNavigation? return mismatch. Android logs bounded DOM/geometry diagnostics; smoke now requires visible input and actual text entry, saves screenshot/log/XML evidence.
 
 ## Evidence and remaining
+- Release #38: desktop builds and Android launch passed; iOS IPA/simulator builds passed but launch crashed because ssh_cmd requires missing openssl.framework. Added openssl/libssh2 binary product dependencies using pinned a-Shell checksums and IPA presence checks.
+- Android #38 screenshot is no longer white, but WebView 124 leaves the composer behind the IME. Added native content insets with zeroed propagation to prevent double application on newer WebViews. Smoke now asserts composer bounds above the keyboard and saves before/open/closed screenshots.
+- CUA now has bounded concurrent held-key/button and relative-motion input bursts with cancellation/focus checks and guaranteed release. Settings persist explicit native/external backend selection; selected MCP driver schemas are exposed directly without silently falling back. Embedded browser routing is explicit. Native/game/Blender performance remains unverified.
 - Release #37 Android job passed while artifact screenshot was entirely white: prior process-only smoke was invalid. Actual Android cause and usable startup must be verified from new CI evidence.
 - Local app discovery/control, performance under games, all desktop platforms, browser context-menu crashes and native mobile startup remain to be verified/fixed. WebView engine defaults provide actual runtime identity; a WebView is not a complete Chrome installation.
 - Read yy/pi-cua scheduling/state/observation design, yy/cua native input and xx external driver paths. Astryx MCP and CLI discovery completed. Tauri 2.11.5 source confirms user_agent/devtools/on_new_window APIs; Swift compiler static archive/link behavior researched.
 - Existing document/file/mobile shell repairs preserved. No local build/dev/Cargo commands run.
 
 ## Verification / touched
-- pnpm check PASS; pnpm lint PASS (517 files); pnpm test:non-native PASS (1129 tests). Logs: %TEMP%/xgent-integrated-*.log. git diff --check PASS.
+- Current pnpm check PASS; pnpm lint PASS (517 files); pnpm test:non-native PASS (1131 tests), plus selected registry suite PASS (8 tests including two new backend-selection cases). Logs: %TEMP%/xgent-current-*.log and xgent-driver-registry.log. git diff --check PASS. New native/rendered CI pending; no local build/dev/Cargo commands.
 - Touched native CUA/link configuration, browser desktop/iOS, mobile diagnostics/smoke, composer/activity/settings/splash, controller regression tests and release workflow. Native/rendered checks and GitHub workflows pending.

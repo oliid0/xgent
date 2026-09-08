@@ -30,6 +30,7 @@ const CUA_OPERATIONS = [
   "press_key",
   "set_value",
   "sequence",
+  "input",
 ] as const;
 
 type CuaOperation = (typeof CUA_OPERATIONS)[number];
@@ -73,6 +74,32 @@ const cuaTool: Tool = {
         type: "string",
         enum: CUA_OPERATIONS,
         description: "Computer-use operation to perform.",
+      },
+      keys: {
+        type: "array",
+        maxItems: 8,
+        items: { type: "string" },
+        description: "Keys held together for an input burst, e.g. W, A, Shift.",
+      },
+      buttons: {
+        type: "array",
+        maxItems: 3,
+        items: { type: "string", enum: ["left", "middle", "right"] },
+      },
+      dx: {
+        type: "integer",
+        minimum: -4096,
+        maximum: 4096,
+        description:
+          "Relative pointer motion during input for captured game cameras and 3D viewports.",
+      },
+      dy: { type: "integer", minimum: -4096, maximum: 4096 },
+      duration_ms: {
+        type: "integer",
+        minimum: 1,
+        maximum: 2000,
+        description:
+          "Required for input. Holds keys/buttons concurrently, moves locally, then releases inputs and observes.",
       },
       observation: {
         type: "string",
@@ -222,7 +249,7 @@ export function createCuaTools(
             const status = await invoke<{ enabled: boolean }>("cua_status");
             if (!status.enabled) {
               throw new Error(
-                "CUA is disabled. Enable Computer use in Settings > Tool permissions. This is not evidence that the target application is missing.",
+                "CUA is disabled. Enable it in Settings > Computer use. This is not evidence that the target application is missing.",
               );
             }
             const started = performance.now();

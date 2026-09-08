@@ -775,6 +775,15 @@ public final class ComputerUseService {
         return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
     }
 
+    func inputBurst(app query: String, arguments: [String: Any]) throws -> ToolCallResult {
+        let snapshot = try currentSnapshot(for: query)
+        if !snapshot.app.runningApplication.isActive {
+            InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
+        }
+        try InputSimulation.burst(app: snapshot.app, arguments: arguments)
+        return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
+    }
+
     public func pressKey(app query: String, key: String) throws -> ToolCallResult {
         let snapshot = try currentSnapshot(for: query)
         if snapshot.mode == .fixture {

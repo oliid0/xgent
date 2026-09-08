@@ -45,6 +45,15 @@ export async function openUrl(url: string): Promise<void> {
   return (await loadRuntime()).openUrl(url);
 }
 
+export async function listenNativePlugin<T>(
+  plugin: string,
+  event: string,
+  handler: (event: T) => void,
+): Promise<() => Promise<void>> {
+  if (!isTauriRuntime()) throw new Error("Native plugin events require the native app");
+  return (await import("./tauri")).listenNativePlugin(plugin, event, handler);
+}
+
 export async function revealItemInDir(path: string): Promise<void> {
   return (await loadRuntime()).revealItemInDir(path);
 }

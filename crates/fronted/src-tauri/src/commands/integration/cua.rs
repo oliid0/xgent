@@ -9,7 +9,7 @@ use crate::runtime::shell_runner::ShellRunRegistry;
 #[path = "cua_component.rs"]
 pub mod component;
 
-const OPERATIONS: &[&str] = &["list_apps", "launch_app", "get_app_state", "click", "perform_secondary_action", "scroll", "drag", "type_text", "press_key", "set_value", "sequence"];
+const OPERATIONS: &[&str] = &["list_apps", "launch_app", "get_app_state", "click", "perform_secondary_action", "scroll", "drag", "type_text", "press_key", "set_value", "sequence", "input"];
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn cua_preview(app: tauri::AppHandle, target: String, max_image_size: Option<u32>) -> Result<CuaResponse,String> {
@@ -19,7 +19,7 @@ pub async fn cua_preview(app: tauri::AppHandle, target: String, max_image_size: 
         static CAPTURE:OnceLock<Mutex<()>>=OnceLock::new();
         let Ok(_guard)=CAPTURE.get_or_init(Mutex::default).try_lock() else { return Err("Preview capture is busy".into()); };
         component::ensure_available(&app)?;
-        component::call("capture_preview",&arguments)
+        component::call("capture_preview",&arguments,&||false)
     }).await.map_err(|error|error.to_string())?
 }
 
@@ -42,6 +42,18 @@ fn validate(operation: &str, input: &Value) -> Result<(), String> {
     if operation == "list_apps" { return Ok(()); }
     let app = input["app"].as_str().unwrap_or("").trim();
     if app.is_empty() { return Err("Missing required argument: app".into()); }
+    if operation == "input" {
+        if input["duration_ms"].as_u64().is_none_or(|value| !(1..=2000).contains(&value)) { return Err("duration_ms must be 1-2000".into()); }
+        for field in ["dx","dy"] {
+            if input.get(field).is_some_and(|value| value.as_i64().is_none_or(|value| !(-4096..=4096).contains(&value))) { return Err(format!("Invalid {field}")); }
+        }
+        for (field,limit) in [("keys",8),("buttons",3)] {
+            if let Some(value)=input.get(field) {
+                let values=value.as_array().ok_or(format!("{field} must be an array"))?;
+                if values.len()>limit || values.iter().any(|value| value.as_str().is_none_or(str::is_empty)) { return Err(format!("Invalid {field}")); }
+            }
+        }
+    }
     if let Some(mode) = input.get("observation") {
         if !["auto","text","image"].contains(&mode.as_str().unwrap_or("")) { return Err("Unknown observation mode".into()); }
     }
@@ -127,15 +139,15 @@ pub async fn cua_call(app: tauri::AppHandle, operation: String, arguments: Value
         if run_token.is_cancelled() { return Err("Cancelled".into()); }
         component::ensure_available(&app)?;
         if run_token.is_cancelled() { return Err("Cancelled".into()); }
-        if operation != "sequence" { return component::call(&operation,&arguments); }
-        let mut current = component::call("get_cached_state",&arguments)?;
+        if operation != "sequence" { return component::call(&operation,&arguments,&||run_token.is_cancelled()); }
+        let mut current = component::call("get_cached_state",&arguments,&||run_token.is_cancelled())?;
         let state_id = |response:&CuaResponse| -> Option<String> {
             response.details["stateId"].as_str().map(str::to_string).or_else(|| response.content.iter()
                 .filter_map(|item|item["text"].as_str()).flat_map(str::lines)
                 .find_map(|line|line.strip_prefix("state_id: ").map(|value|value.trim().to_string())))
         };
         if current.is_error || state_id(&current).as_deref() != arguments["state_id"].as_str() {
-            let mut fresh = component::call("get_app_state",&arguments)?;
+            let mut fresh = component::call("get_app_state",&arguments,&||run_token.is_cancelled())?;
             fresh.content.insert(0,json!({"type":"text","text":"ACTION NOT APPLIED: stale sequence state. Inspect this observation."}));
             return Ok(fresh);
         }
@@ -166,7 +178,7 @@ pub async fn cua_call(app: tauri::AppHandle, operation: String, arguments: Value
             input.insert("_defer_observation".into(),json!(index+1<steps.len() && steps[index+1].get("expected_text").is_none()));
             input.insert("state_id".into(),json!(state_id(&current).ok_or("No state returned after the previous step")?));
             let action=input.remove("operation").ok_or("Missing step operation")?;
-            let next=component::call(action.as_str().ok_or("Invalid operation")?,&Value::Object(input));
+            let next=component::call(action.as_str().ok_or("Invalid operation")?,&Value::Object(input),&||run_token.is_cancelled());
             match next { Ok(response)=>current=response, Err(error)=>{current=CuaResponse::error(format!("Action outcome uncertain: {error}. Observe before retrying."));break;} }
             let _ = app.emit("cua-activity", json!({"runId":activity_run_id,"step":completed,"operation":action,"response":&current}));
             if current.is_error || current.content.iter().any(|item|item["text"].as_str().is_some_and(|text|text.contains("ACTION NOT APPLIED"))) { break; }

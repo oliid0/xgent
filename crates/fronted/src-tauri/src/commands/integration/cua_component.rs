@@ -2,6 +2,7 @@
 use super::CuaResponse;
 use serde::Serialize;
 use serde_json::Value;
+#[cfg(target_os = "macos")]
 use std::ffi::{CStr, CString};
 use std::path::PathBuf;
 use tauri::Manager;
@@ -20,7 +21,7 @@ fn disabled_marker(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 pub fn ensure_available(app: &tauri::AppHandle) -> Result<(), String> {
     if disabled_marker(app)?.is_file() {
-        return Err("Computer use is disabled. Enable it in Settings > Tool permissions > Computer use.".into());
+        return Err("Computer use is disabled. Enable it in Settings > Computer use.".into());
     }
     Ok(())
 }
@@ -45,16 +46,22 @@ pub fn cua_set_enabled(app: tauri::AppHandle, enabled: bool) -> Result<Status, S
     cua_status(app)
 }
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-use xgent_computer_use::{xgent_cua_call, xgent_cua_free};
+pub fn call(operation: &str, arguments: &Value, cancelled: &dyn Fn() -> bool) -> Result<CuaResponse, String> {
+    serde_json::from_value(xgent_computer_use::call(operation, arguments, cancelled)).map_err(|error| error.to_string())
+}
 #[cfg(target_os = "macos")]
 extern "C" {
-    fn xgent_cua_call(request: *const std::ffi::c_char) -> *mut std::ffi::c_char;
+    fn xgent_cua_call(request: *const std::ffi::c_char, cancelled: extern "C" fn(*const std::ffi::c_void) -> bool, context: *const std::ffi::c_void) -> *mut std::ffi::c_char;
     fn xgent_cua_free(result: *mut std::ffi::c_char);
 }
-pub fn call(operation: &str, arguments: &Value) -> Result<CuaResponse, String> {
+#[cfg(target_os = "macos")]
+pub fn call(operation: &str, arguments: &Value, cancelled: &dyn Fn() -> bool) -> Result<CuaResponse, String> {
     let request = CString::new(serde_json::json!({"operation":operation,"arguments":arguments}).to_string()).map_err(|error| error.to_string())?;
     unsafe {
-        let result = xgent_cua_call(request.as_ptr());
+        extern "C" fn probe(context: *const std::ffi::c_void) -> bool {
+            unsafe { (*(context as *const &dyn Fn() -> bool))() }
+        }
+        let result = xgent_cua_call(request.as_ptr(), probe, &cancelled as *const _ as *const std::ffi::c_void);
         if result.is_null() { return Err("Computer use returned no state".into()); }
         let response = serde_json::from_slice(CStr::from_ptr(result).to_bytes()).map_err(|error| format!("Invalid computer-use response: {error}"));
         xgent_cua_free(result);

@@ -101,11 +101,11 @@ function createRegistryHarness() {
   return { loader, runnerCalls, listedServerIds, listedServerCommands };
 }
 
-async function buildRegistry(harness, { withSubagentRuntime, storeIpc } = {}) {
+async function buildRegistry(harness, { withSubagentRuntime, storeIpc, computerUseDriverId } = {}) {
   const { loader } = harness;
   const { buildBuiltinToolRegistry } = loader.loadModule("src/lib/tools/builtinRegistry.ts");
   const { createFileToolState } = loader.loadModule("src/lib/tools/fileToolState.ts");
-  const mcpSettingsHolder = { value: { selected: ["docs"], servers: [DOCS_SERVER] } };
+  const mcpSettingsHolder = { value: { selected: ["docs"], servers: [DOCS_SERVER], computerUseDriverId } };
   const baseParams = {
     workdir: "/tmp/xgent-subagent-registry-test",
     providerId: "codex",
@@ -157,6 +157,21 @@ test("registry without a subagent runtime exposes neither Agent nor SendMessage"
   // Sanity: the base surface is otherwise intact.
   assert.ok(names.includes("Read"));
   assert.ok(names.includes("mcp_docs_search"));
+});
+
+test("selected external computer use exposes its actual tools without competing native CUA", async () => {
+  const harness = createRegistryHarness();
+  const { registry } = await buildRegistry(harness, { computerUseDriverId: "docs" });
+  assert.equal(registry.hasTool("cua"), false);
+  assert.equal(registry.hasTool("mcp_docs_search"), true);
+  assert.equal(registry.hasTool("browser_use"), true);
+});
+
+test("missing selected driver does not silently switch the computer-use backend", async () => {
+  const harness = createRegistryHarness();
+  const { registry } = await buildRegistry(harness, { computerUseDriverId: "missing-driver" });
+  assert.equal(registry.hasTool("cua"), false);
+  assert.equal(registry.hasTool("browser_use"), true);
 });
 
 test("registry with a subagent runtime exposes Agent and the parent SendMessage", async () => {
