@@ -50,11 +50,8 @@ test("mobile chat keeps one accessible header action cluster and a one-line func
   assert.doesNotMatch(mobileActionsSource, /id: "trajectory"/);
   assert.match(chatPageSource, /trajectoryAvailable=\{canShowTrajectory\}/);
   assert.match(sidebarSource, /onOpenTrajectory/);
-  assert.match(transcriptSource, /showMobileBlankState = mobileExperience && showStartChatState/);
-  assert.match(
-    transcriptSource,
-    /\(showNoModelsState \|\| showStartChatState\) && !showMobileBlankState/,
-  );
+  assert.doesNotMatch(transcriptSource, /showMobileBlankState/);
+  assert.match(transcriptSource, /showNoModelsState \|\| showStartChatState \? \(/);
   assert.doesNotMatch(chatPageSource, /size="lg"\s+isPressed=\{chatSurface === "trajectory"\}/);
 });
 

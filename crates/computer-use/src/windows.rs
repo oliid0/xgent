@@ -54,6 +54,19 @@ pub fn elements(window: &Window) -> (Vec<Value>,String) {
             let name=element.CurrentName().map(|s| s.to_string()).unwrap_or_default();
             let automation_id=element.CurrentAutomationId().map(|s| s.to_string()).unwrap_or_default();
             let control=element.CurrentControlType().map(|id|id.0).unwrap_or(0);
+            let enabled=element.CurrentIsEnabled().map(|value|value.as_bool()).unwrap_or(false);
+            let focused=element.CurrentHasKeyboardFocus().map(|value|value.as_bool()).unwrap_or(false);
+            let password=element.CurrentIsPassword().map(|value|value.as_bool()).unwrap_or(true);
+            // Names identify controls, but editable document contents live in Value/Text patterns.
+            // Return bounded text so the next observation can verify typing and sequence conditions.
+            let value=if password { String::new() } else {
+                element.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId)
+                    .and_then(|pattern|pattern.CurrentValue()).map(|value|value.to_string())
+                    .or_else(|_|element.GetCurrentPatternAs::<IUIAutomationTextPattern>(UIA_TextPatternId)
+                        .and_then(|pattern|pattern.DocumentRange()).and_then(|range|range.GetText(2000))
+                        .map(|value|value.to_string())).unwrap_or_default()
+                    .chars().take(2000).collect::<String>()
+            };
             let mut actions=Vec::new();
             if element.GetCurrentPatternAs::<IUIAutomationInvokePattern>(UIA_InvokePatternId).is_ok(){actions.push("Invoke");}
             if element.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId).is_ok(){actions.push("SetValue");}
@@ -62,7 +75,9 @@ pub fn elements(window: &Window) -> (Vec<Value>,String) {
             let rect=element.CurrentBoundingRectangle().ok();
             let frame=rect.map(|rect|json!([rect.left,rect.top,rect.right-rect.left,rect.bottom-rect.top])).unwrap_or(Value::Null);
             output.push(json!({"path":path,"name":name,"automationId":automation_id,"controlType":control,"frame":frame,
-                "label":format!("{} (type {}, actions: {})",name,control,actions.join(", "))}));
+                "value":value,"enabled":enabled,"focused":focused,
+                "label":format!("{} (type {}, enabled: {}, focused: {}, actions: {}){}",name,control,enabled,focused,actions.join(", "),
+                    if value.is_empty() { String::new() } else { format!(" value: {value:?}") })}));
             let mut child=walker.GetFirstChildElement(element).ok();
             let mut index=0;
             while let Some(current)=child {

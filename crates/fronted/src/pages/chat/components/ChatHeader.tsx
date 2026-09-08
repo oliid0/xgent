@@ -110,7 +110,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
                 value={visibleExecutionMode}
                 onChange={(value) => onSelectExecutionMode(value as "text" | "tools")}
                 label={t("settings.executionMode")}
-                layout="fill"
+                layout="hug"
                 size="md"
               >
                 <SegmentedControlItem value="text" label={t("chat.mode.chat")} />

@@ -16,11 +16,16 @@ Finish mobile startup/CI, reliable CUA discovery/control, real file previews/edi
 - Preserve native file formats with guarded saves; no sidecar-only annotation success. Legacy Office conversion requires installed conversion software.
 
 ## Remaining
+- Rendered artifact 59a377d exposed two additional UI defects: compact new chats deliberately hid the welcome content, and desktop fill-mode segments clipped the Agent label. Restored responsive welcome and content-sized desktop segments after Astryx MCP/CLI discovery. Verification of these follow-ups pending.
+- Follow-up evidence: compared xx/agent-gui and yy/cua Windows runtime; our UIA tree omitted ValuePattern/TextPattern contents, preventing text-mode verification. Added bounded document text plus enabled/focus state using official windows 0.62.2 APIs; native validation pending.
 - Push and run CI/release checks; diagnose any remaining iOS runtime failure.
 - Verify actual rendered wide/narrow layouts, interactions and console from CI artifact; run CUA against real application with updated component.
 - Address new evidence, then final handoff. Do not claim all requested behavior verified yet.
 
 ## Touched / verification
+- Updated the inherited mobile UI assertion to require a visible welcome instead of a blank new conversation.
 - Frontend chat/browser/preview/runtime/settings/theme; native browser/CUA/workspace/shell; release workflow/scripts and regression tests.
 - 2026-09-07: pnpm check PASS; pnpm lint PASS (515 files); pnpm test:non-native PASS (1123 tests, Cargo excluded); git diff --check PASS.
 - Logs: %TEMP%/xgent-final-{check,lint,test}.log. CI and rendered verification pending.
+
+- User clarified: CUA remains unverified; compare xx and yy/cua end-to-end. Also repair mobile shell using yy mobile reference, and add conversation-scoped live browser/CUA/command feedback with composer thumbnail and expandable activity viewer. These remain required before completion.
