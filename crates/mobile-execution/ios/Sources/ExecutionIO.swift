@@ -14,11 +14,13 @@ final class BoundedPOSIXPipe {
     private var data = Data()
     private var didTruncate = false
     private var writerClosed = false
+    private let onOutput: ((Data) -> Void)?
 
     let writeDescriptor: Int32
 
-    init(limit: Int = 400 * 1024) throws {
+    init(limit: Int = 400 * 1024, onOutput: ((Data) -> Void)? = nil) throws {
         self.limit = limit
+        self.onOutput = onOutput
         var descriptors: [Int32] = [0, 0]
         guard Darwin.pipe(&descriptors) == 0 else {
             throw MobileExecutionError.io("Could not create output pipe: \(String(cString: strerror(errno)))")
@@ -36,6 +38,7 @@ final class BoundedPOSIXPipe {
             if duplicate >= 0 { Darwin.close(duplicate) }
             throw MobileExecutionError.io("Could not create command output stream")
         }
+        setvbuf(stream, nil, _IONBF, 0)
         return stream
     }
 
@@ -70,6 +73,7 @@ final class BoundedPOSIXPipe {
                 if remaining > 0 { data.append(chunk.prefix(remaining)) }
                 if chunk.count > remaining { didTruncate = true }
                 lock.unlock()
+                if remaining > 0 { onOutput?(Data(chunk.prefix(remaining))) }
             } catch {
                 break
             }

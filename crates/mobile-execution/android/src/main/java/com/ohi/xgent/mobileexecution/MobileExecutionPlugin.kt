@@ -267,7 +267,13 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                     invoke.resolve(cancelledPayload(request))
                     return@execute
                 }
-                invoke.resolve(runner.execute(request).toPayload())
+                invoke.resolve(runner.execute(request) { stream, bytes ->
+                    trigger("output", JSObject().apply {
+                        put("runId", request.runId)
+                        put("stream", stream)
+                        put("data", Base64.encodeToString(bytes, Base64.NO_WRAP))
+                    })
+                }.toPayload())
             } catch (error: Exception) {
                 invoke.reject("Mobile command failed: ${error.message}")
             } finally {

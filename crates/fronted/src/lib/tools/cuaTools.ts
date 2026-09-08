@@ -5,6 +5,8 @@ import type {
   ToolCall,
   ToolResultMessage,
 } from "@earendil-works/pi-ai";
+import { listen } from "@xgent/runtime";
+import { activityObservation, executionActivityStore } from "../chat/executionActivityStore";
 
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
 import { createCuaDriverAdapter } from "./cuaDriverAdapter";
@@ -183,6 +185,7 @@ function errorResult(toolCall: ToolCall, error: unknown): ToolResultMessage {
 
 export function createCuaTools(
   params: {
+    conversationId?: string;
     driver?: Awaited<ReturnType<typeof createMcpTools>>;
     driverServerIds?: readonly string[];
   } = {},
@@ -217,11 +220,43 @@ export function createCuaTools(
         return await waitForAbortablePromise(
           withCuaLock(async () => {
             const started = performance.now();
-            if (adapter?.owns(String(input.app ?? ""), input.state_id)) {
-              const response = await adapter.execute(toolCall, operation, input, signal);
-              return { ...response, toolName: toolCall.name };
-            }
             const runId = createToolRunId("cua", toolCall.id);
+            const record = (response?: CuaCallResponse, step?: number) => {
+              executionActivityStore.record(params.conversationId, {
+                id: step === undefined ? runId : `${runId}:${step}`,
+                kind: "cua",
+                title: `${operation} · ${String(input.app ?? "")}`,
+                ...activityObservation(response?.content ?? []),
+                status: response ? (response.isError ? "error" : "complete") : "running",
+              });
+            };
+            record();
+            if (adapter?.owns(String(input.app ?? ""), input.state_id)) {
+              try {
+                const response = await adapter.execute(toolCall, operation, input, signal);
+                record({
+                  content: response.content,
+                  isError: response.isError,
+                  details: response.details,
+                });
+                return { ...response, toolName: toolCall.name };
+              } catch (error) {
+                record({
+                  content: [{ type: "text", text: String(error) }],
+                  isError: true,
+                  details: null,
+                });
+                throw error;
+              }
+            }
+            const unlisten = params.conversationId
+              ? await listen<{ runId: string; step: number; response: CuaCallResponse }>(
+                  "cua-activity",
+                  ({ payload }) => {
+                    if (payload.runId === runId) record(payload.response, payload.step);
+                  },
+                ).catch(() => undefined)
+              : undefined;
             const cancel = () => requestRuntimeCancel(runId);
             signal?.addEventListener("abort", cancel, { once: true });
             let response: CuaCallResponse;
@@ -244,8 +279,10 @@ export function createCuaTools(
                 };
               }
             } finally {
+              unlisten?.();
               signal?.removeEventListener("abort", cancel);
             }
+            record(response);
             if (
               response.isError &&
               adapter &&
@@ -254,7 +291,14 @@ export function createCuaTools(
             ) {
               try {
                 const recovered = await adapter.execute(toolCall, operation, input);
-                if (!recovered.isError) return { ...recovered, toolName: toolCall.name };
+                if (!recovered.isError) {
+                  record({
+                    content: recovered.content,
+                    isError: false,
+                    details: recovered.details,
+                  });
+                  return { ...recovered, toolName: toolCall.name };
+                }
               } catch {
                 /* Preserve the original correlated error if observation recovery fails. */
               }

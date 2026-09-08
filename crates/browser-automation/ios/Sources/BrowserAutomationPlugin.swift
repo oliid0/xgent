@@ -288,6 +288,9 @@ final class BrowserAutomationPlugin: Plugin {
                 configuration.websiteDataStore = .nonPersistent()
                 configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
                 configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+                configuration.userContentController.addUserScript(
+                    WKUserScript(source: request.runtimeScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+                )
                 let webView = WKWebView(frame: .zero, configuration: configuration)
                 webView.allowsBackForwardNavigationGestures = true
                 webView.allowsLinkPreview = false

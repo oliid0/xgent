@@ -1,5 +1,51 @@
 (() => {
   "use strict";
+  // Native page-commit callbacks can inject twice into one document. Preserve
+  // references, diagnostics and input listeners instead of stacking wrappers.
+  if (window.__xgentBrowserRuntime?.version === 3) return;
+
+  const consoleEntries = [];
+  const diagnosticsStartedAt = Date.now();
+  const rememberConsole = (level, values) => {
+    const message = values.map((value) => {
+      try {
+        if (typeof value === "string") return value;
+        if (value instanceof Error) return value.stack || value.message;
+        return JSON.stringify(value) ?? String(value);
+      } catch { return "[unserializable value]"; }
+    }).join(" ").slice(0, 4_000);
+    consoleEntries.push({ level, message, timestamp: Date.now() });
+    if (consoleEntries.length > 100) consoleEntries.shift();
+  };
+  for (const level of ["debug", "log", "info", "warn", "error"]) {
+    const original = window.console?.[level];
+    if (typeof original !== "function") continue;
+    try {
+      window.console[level] = function (...values) {
+        rememberConsole(level, values);
+        return Reflect.apply(original, this, values);
+      };
+    } catch { /* A page may expose a read-only console. */ }
+  }
+  window.addEventListener("error", (event) => rememberConsole("error", [event.message || "Resource error", event.filename || ""]));
+  window.addEventListener("unhandledrejection", (event) => rememberConsole("error", [event.reason]));
+
+  const getNetwork = (input) => ({
+    // Resource Timing is available on every supported WebView. Cross-origin
+    // fields may be zero without Timing-Allow-Origin; do not invent headers,
+    // status or response bodies that this API did not expose.
+    source: "resource-timing",
+    entries: [
+      ...(window.performance?.getEntriesByType("navigation") || []),
+      ...(window.performance?.getEntriesByType("resource") || []),
+    ].slice(-Math.min(100, Math.max(1, Number(input.limit) || 100))).map((entry) => ({
+      url: entry.name, type: entry.initiatorType || "navigation",
+      startTime: entry.startTime, duration: entry.duration,
+      transferSize: entry.transferSize, encodedBodySize: entry.encodedBodySize,
+      responseStatus: entry.responseStatus || null,
+      protocol: entry.nextHopProtocol || null,
+    })),
+  });
 
   const MAX_TEXT = 20_000;
   const MAX_ELEMENTS = 100;
@@ -554,6 +600,12 @@
         case "execute_js":
           data = executeScript(input);
           break;
+        case "get_console":
+          data = { startedAt: diagnosticsStartedAt, entries: consoleEntries.slice(-Math.min(100, Math.max(1, Number(input.limit) || 100))) };
+          break;
+        case "get_network":
+          data = getNetwork(input);
+          break;
         default:
           throw new Error(`Unsupported DOM action: ${action}`);
       }
@@ -577,6 +629,6 @@
     configurable: true,
     enumerable: false,
     writable: false,
-    value: Object.freeze({ version: 2, execute }),
+    value: Object.freeze({ version: 3, execute }),
   });
 })();

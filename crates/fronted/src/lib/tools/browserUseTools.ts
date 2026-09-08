@@ -12,6 +12,8 @@ import type {
   BrowserActionResponse,
 } from "../browserAutomation";
 import { createLanPcBrowserAutomationClient } from "../browserAutomation";
+import { executionActivityStore } from "../chat/executionActivityStore";
+import { createUuid } from "../shared/id";
 import {
   type BuiltinToolBundle,
   type BuiltinToolExecutionContext,
@@ -44,6 +46,8 @@ const BROWSER_ACTIONS = [
   "wait_for_selector",
   "wait_for_dom_stable",
   "execute_js",
+  "get_console",
+  "get_network",
 ] as const;
 
 type BrowserUseAction = (typeof BROWSER_ACTIONS)[number];
@@ -87,7 +91,8 @@ const BROWSER_PARAMETERS = Type.Object({
   ),
   url: Type.Optional(
     Type.String({
-      description: "HTTP(S) URL or a search phrase for open, navigate, or new_tab.",
+      description:
+        "HTTP(S), localhost, file:// URL, absolute local path, or a search phrase for open, navigate, or new_tab.",
     }),
   ),
   selector: Type.Optional(
@@ -433,7 +438,7 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
   const tool: Tool = {
     name: "browser_use",
     description:
-      "Operate Xgent's embedded browser. It shares a live native WebView session with the user on Windows, macOS, Linux, iOS, and Android. Use open/navigate, then snapshot to receive stable element refs. Click, type, press keys, hover, or scroll with ref whenever possible. Reuse session_id for follow-up actions and snapshot before each next action so user changes are observed instead of repeated. User-created tabs use separate session_ids and must not be disturbed. Agent actions stay hidden unless show is explicitly requested. Use wait_for_selector or wait_for_dom_stable after page changes and screenshot when visual layout matters.",
+      "Operate Xgent's embedded browser on Windows, macOS, Linux, iOS, and Android for research, local previews and website tasks. Use open/navigate with a URL, localhost address, file:// path or search phrase, then snapshot for stable element refs. Click, type, press keys, hover or scroll with ref whenever possible. Reuse session_id and inspect fresh state so completed work and user changes are not repeated. User-created tabs use separate session_ids. The activity viewer shows agent observations; show opens the interactive browser. Use wait_for_selector or wait_for_dom_stable after page changes, screenshot for visual layout, execute_js for synchronous page scripts, get_console for captured page logs/errors, and get_network for Resource Timing URLs/durations/sizes/status when exposed. Network diagnostics do not expose request/response bodies or headers; cross-origin timing may be restricted.",
     parameters: BROWSER_PARAMETERS,
   };
 
@@ -449,10 +454,18 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
     let controller: BrowserSessionController | null = null;
     let assistanceSequenceAtStart = 0;
     let respectsHumanAssistance = false;
+    const activityId = `browser:${createUuid()}`;
     try {
       if (signal?.aborted) throw new Error("Cancelled");
       if (toolCall.name !== "browser_use") throw new Error(`Unknown tool: ${toolCall.name}`);
       action = requiredAction(args.action);
+      executionActivityStore.record(options.conversationId, {
+        id: activityId,
+        kind: "browser",
+        title: `${action} · ${args.url ?? sessionId}`,
+        text: "",
+        status: "running",
+      });
       context?.emitToolStatus?.(`Browser · ${action}`);
       controller = await resolveController();
       sessionId = controller.sessionIdForConversation(options.conversationId ?? "", sessionId);
@@ -626,6 +639,14 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
         }
       }
 
+      executionActivityStore.record(options.conversationId, {
+        id: activityId,
+        kind: "browser",
+        title: `${action} · ${sessionId}`,
+        text: formatResult(action, sessionId, result),
+        imageUrl: screenshotBase64 ? `data:image/png;base64,${screenshotBase64}` : undefined,
+        status: "complete",
+      });
       return {
         role: "toolResult",
         toolCallId: toolCall.id,
@@ -686,6 +707,13 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
         }
       }
       const message = error instanceof Error ? error.message : String(error);
+      executionActivityStore.record(options.conversationId, {
+        id: activityId,
+        kind: "browser",
+        title: `${action ?? "browser"} · ${sessionId}`,
+        text: message,
+        status: "error",
+      });
       return {
         role: "toolResult",
         toolCallId: toolCall.id,

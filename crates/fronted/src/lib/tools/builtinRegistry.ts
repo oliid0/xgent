@@ -209,6 +209,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       resolveHomeDir,
     }),
     createShellTools({
+      conversationId: params.checkpoint?.conversationId,
       workdir: params.workdir,
       providerId: params.providerId,
       runtimePlatform: params.runtimePlatform,
@@ -346,6 +347,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
   if (cuaEnabled) {
     baseBundles.unshift(
       createCuaTools({
+        conversationId: params.checkpoint?.conversationId,
         driver: mcpBundle,
         driverServerIds,
       }),

@@ -1,6 +1,7 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { invoke } from "@xgent/runtime";
 import { type TProperties, Type } from "typebox";
+import { executionActivityStore } from "../chat/executionActivityStore";
 import {
   inferRuntimePlatform,
   normalizeRuntimePlatform,
@@ -512,6 +513,7 @@ export type ShellSandboxSettings = {
 };
 
 export function createShellTools(params: {
+  conversationId?: string;
   workdir: string;
   providerId: ProviderId;
   runtimePlatform?: RuntimePlatform;
@@ -1520,11 +1522,49 @@ export function createShellTools(params: {
 
     const timeout_ms = normalizeBashTimeoutMs(timeoutRaw, timeoutPolicy);
     const run_id = createShellRunId(toolCall.id);
+    let removeOutputListener: (() => Promise<void>) | undefined;
+    let liveOutput = "";
+    const recordOutput = (status: "running" | "complete" | "error", text = liveOutput) => {
+      executionActivityStore.record(params.conversationId, {
+        id: run_id,
+        kind: "shell",
+        title: command,
+        text,
+        status,
+      });
+    };
     const abortHandler = () => {
       requestRuntimeCancel(run_id);
     };
 
     try {
+      recordOutput("running");
+      if ((runtimePlatform === "android" || runtimePlatform === "ios") && params.conversationId) {
+        try {
+          const { addPluginListener } = await import("@tauri-apps/api/core");
+          const decoders = { stdout: new TextDecoder(), stderr: new TextDecoder() };
+          const listener = await addPluginListener<{
+            runId: string;
+            stream: "stdout" | "stderr";
+            data: string;
+          }>("mobile-execution", "output", (event) => {
+            if (event.runId !== run_id || !(event.stream in decoders)) return;
+            try {
+              const bytes = Uint8Array.from(atob(event.data), (char) => char.charCodeAt(0));
+              liveOutput = (
+                liveOutput + decoders[event.stream].decode(bytes, { stream: true })
+              ).slice(-65_536);
+              recordOutput("running");
+            } catch {
+              /* The final command result still contains the bounded output. */
+            }
+          });
+          removeOutputListener = () => listener.unregister();
+        } catch {
+          // Observation transport failure must not prevent command execution.
+          recordOutput("running", "Live output is unavailable; waiting for the command result.");
+        }
+      }
       if (signal) {
         signal.addEventListener("abort", abortHandler, { once: true });
         if (signal.aborted) {
@@ -1575,6 +1615,10 @@ export function createShellTools(params: {
         `${stderrLabel}:`,
         res.stderr || "",
       ].join("\n");
+      recordOutput(
+        res.exit_code === 0 && !res.cancelled && !res.timed_out ? "complete" : "error",
+        [res.stdout, res.stderr].filter(Boolean).join("\n"),
+      );
       const hint =
         res.exit_code !== 0 || res.timed_out || res.cancelled
           ? buildShellFailureHint({
@@ -1600,6 +1644,7 @@ export function createShellTools(params: {
         timestamp: now,
       };
     } catch (err) {
+      recordOutput("error", [liveOutput, asErrorMessage(err)].filter(Boolean).join("\n"));
       if (signal?.aborted) {
         return buildCancelledResult({
           toolCall,
@@ -1621,6 +1666,7 @@ export function createShellTools(params: {
         timestamp: now,
       };
     } finally {
+      await removeOutputListener?.().catch(() => undefined);
       signal?.removeEventListener("abort", abortHandler);
     }
   }

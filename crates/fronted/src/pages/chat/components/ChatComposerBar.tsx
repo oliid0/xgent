@@ -957,7 +957,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
             </VStack>
           }
           footerActions={
-            <HStack gap={1} vAlign="center" wrap="wrap">
+            <HStack gap={1} vAlign="center" className="xgent-composer-execution-controls">
               {mobileExperience ? (
                 <>
                   <Popover
@@ -1041,7 +1041,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
             </HStack>
           }
           sendActions={
-            <HStack gap={1} vAlign="center">
+            <HStack gap={1} vAlign="center" className="xgent-composer-model-controls">
               {contextUsageTokensSource ? (
                 <ContextUsageIndicator
                   source={contextUsageTokensSource}

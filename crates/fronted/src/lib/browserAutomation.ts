@@ -53,6 +53,8 @@ export type BrowserAction =
   | "backbone"
   | "snapshot"
   | "execute_js"
+  | "get_console"
+  | "get_network"
   | "recover";
 
 export type BrowserActionInput = {

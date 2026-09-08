@@ -10,7 +10,7 @@ use std::time::Duration;
 use tauri::{Emitter, Manager};
 
 const ABI: u32=1;
-const MIN_REVISION: u32=1;
+const MIN_REVISION: u32=2;
 const MAX_BYTES:u64=64*1024*1024;
 static INSTALL:OnceLock<Mutex<()>>=OnceLock::new();
 
@@ -83,7 +83,7 @@ fn install(app:&tauri::AppHandle)->Result<PathBuf,String> {
     let manifest:Manifest=client.get(format!("{base}/{manifest_name}")).send().and_then(|response|response.error_for_status())
         .map_err(|e|format!("This release does not provide a CUA component for {}: {e}",target()))?.json().map_err(|e|e.to_string())?;
     validate_manifest(&manifest)?;
-    if manifest.revision < MIN_REVISION { return Err("The published CUA component predates installed-app discovery. Update to a release with CUA revision 1 or later.".into()); }
+    if manifest.revision < MIN_REVISION { return Err("The published CUA component predates readable document observations. Update to a release with CUA revision 2 or later.".into()); }
     let mut response=client.get(format!("{base}/{}",manifest.filename)).send().and_then(|response|response.error_for_status()).map_err(|e|e.to_string())?;
     if response.content_length().is_some_and(|size|size>MAX_BYTES) { return Err("CUA download exceeds the component size limit".into()); }
     let root=root(app)?;

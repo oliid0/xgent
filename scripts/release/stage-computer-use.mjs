@@ -22,7 +22,7 @@ const filename = `${stem}.${extension}`;
 mkdirSync(destination, { recursive: true });
 copyFileSync(source, path.join(destination, filename));
 writeFileSync(path.join(destination, `${stem}.json`), `${JSON.stringify({
-  revision: 1, abi: 1, target, filename, version, bytes: binary.length,
+  revision: 2, abi: 1, target, filename, version, bytes: binary.length,
   sha256: createHash("sha256").update(binary).digest("hex"),
 }, null, 2)}\n`);
 copyFileSync("crates/fronted/src-tauri/native/computer-use/LICENSE", path.join(destination, "Xgent-CUA-LICENSE.txt"));

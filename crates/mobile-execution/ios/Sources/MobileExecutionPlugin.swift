@@ -530,8 +530,15 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
 
         ios_setDirectoryURL(cwd)
         let stdinFile = try TemporaryInput(data: stdin)
-        let stdout = try BoundedPOSIXPipe()
-        let stderr = try BoundedPOSIXPipe()
+        let emitOutput: (String, Data) -> Void = { [weak self] stream, bytes in
+            self?.trigger("output", data: [
+                "runId": request.runId,
+                "stream": stream,
+                "data": bytes.base64EncodedString()
+            ])
+        }
+        let stdout = try BoundedPOSIXPipe(onOutput: { emitOutput("stdout", $0) })
+        let stderr = try BoundedPOSIXPipe(onOutput: { emitOutput("stderr", $0) })
         let stdinStream = try stdinFile.duplicateStream()
         let stdoutStream = try stdout.makeWriteStream()
         let stderrStream = try stderr.makeWriteStream()
@@ -1073,7 +1080,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         setenv("TMPDIR", temporary.path, 1)
         setenv(
             "PATH",
-            "\(workspace.path)/bin:\(documentsBin):\(applicationBin):/usr/bin:/bin",
+            "\(workspace.path)/.xgent/python/bin:\(workspace.path)/bin:\(documentsBin):\(applicationBin):/usr/bin:/bin",
             1
         )
         setenv("APPDIR", resources?.path ?? "", 1)
@@ -1084,6 +1091,13 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         setenv("SSH_HOME", home?.appendingPathComponent("Documents").path ?? "", 1)
         setenv("PYTHONHOME", home?.appendingPathComponent("Library").path ?? "", 1)
         setenv("PYTHONUSERBASE", home?.appendingPathComponent("Library").path ?? "", 1)
+        // Keep the signed interpreter's standard library, but install/import
+        // task dependencies from this workspace rather than shared app storage.
+        let packages = workspace.appendingPathComponent(".xgent/python", isDirectory: true)
+        setenv("PIP_TARGET", packages.path, 1)
+        setenv("PYTHONPATH", packages.path, 1)
+        setenv("PIP_USER", "false", 1)
+        setenv("PYTHONUNBUFFERED", "1", 1)
         setenv("TERM", "xterm-256color", 1)
         setenv("LANG", "C.UTF-8", 1)
     }

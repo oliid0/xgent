@@ -5094,22 +5094,6 @@ export function ChatPage(props: ChatPageProps) {
     });
   }, [settings.customSettings.browser.homePage]);
 
-  const handleOpenMobileTerminal = useCallback(
-    (mode: MobileShellPanelMode = "terminal", initialCommand = "", autoRun = false) => {
-      void ensureNativeMobileShellReady().then((ready) => {
-        if (!ready) return;
-        setSidebarOpen(false);
-        setMobileWorkspaceDestination({
-          kind: "terminal",
-          mode,
-          initialCommand,
-          autoRun,
-        });
-      });
-    },
-    [ensureNativeMobileShellReady],
-  );
-
   const handleOpenMobileSidebar = useCallback(() => {
     setMobileWorkspaceDestination(null);
     setSidebarOpen(true);
@@ -6587,13 +6571,15 @@ export function ChatPage(props: ChatPageProps) {
                     </DesktopCheckpointRewindProvider>
                   )}
 
-                  {mobileExperience && chatSurface === "conversation" ? (
+                  {chatSurface === "conversation" ? (
                     <MobileToolActivity
+                      key={currentConversationId ?? "new"}
+                      conversationId={currentConversationId ?? ""}
+                      mobileExperience={mobileExperience}
                       store={liveTranscriptStore}
                       open={mobileActivityOpen}
                       onOpen={handleOpenMobileActivity}
                       onOpenBrowser={handleOpenBrowser}
-                      onOpenTerminal={() => handleOpenMobileTerminal("terminal")}
                       onClose={handleCloseMobileActivity}
                       bottomOffsetPx={composerOverlayHeight}
                     />

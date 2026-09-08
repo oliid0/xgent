@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex, OnceLock};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use crate::runtime::shell_runner::ShellRunRegistry;
 
 #[path = "cua_component.rs"]
@@ -108,6 +108,7 @@ pub async fn cua_call(app: tauri::AppHandle, operation: String, arguments: Value
     let registry=app.state::<Arc<ShellRunRegistry>>().inner().clone();
     let token=registry.register(&run_id);
     let run_token=token.clone();
+    let activity_run_id=run_id.clone();
     let result=tauri::async_runtime::spawn_blocking(move || {
         static EXECUTION: OnceLock<Mutex<()>>=OnceLock::new();
         let _guard=EXECUTION.get_or_init(Mutex::default).lock().map_err(|_|"Computer-use state lock poisoned".to_string())?;
@@ -150,6 +151,7 @@ pub async fn cua_call(app: tauri::AppHandle, operation: String, arguments: Value
             let action=input.remove("operation").ok_or("Missing step operation")?;
             let next=component::call(&module,action.as_str().ok_or("Invalid operation")?,&Value::Object(input));
             match next { Ok(response)=>current=response, Err(error)=>{current=CuaResponse::error(format!("Action outcome uncertain: {error}. Observe before retrying."));break;} }
+            let _ = app.emit("cua-activity", json!({"runId":activity_run_id,"step":completed,"operation":action,"response":&current}));
             if current.is_error || current.content.iter().any(|item|item["text"].as_str().is_some_and(|text|text.contains("ACTION NOT APPLIED"))) { break; }
             completed+=1;
         }

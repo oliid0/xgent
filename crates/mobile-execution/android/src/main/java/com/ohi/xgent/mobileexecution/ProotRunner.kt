@@ -53,7 +53,7 @@ internal class ProotRunner(
 ) {
     private val binaries = ProotBinaries.resolve(nativeLibraryDir)
 
-    fun execute(request: AndroidRunRequest): AndroidRunResult {
+    fun execute(request: AndroidRunRequest, onOutput: ((String, ByteArray) -> Unit)? = null): AndroidRunResult {
         require(binaries.available) { "PRoot binaries are unavailable for this Android ABI" }
         require(File(rootfsDir, "bin/sh").isFile) { "Alpine rootfs is not installed" }
 
@@ -87,8 +87,8 @@ internal class ProotRunner(
             process.destroyForcibly()
         }
 
-        val stdout = BoundedStreamCollector(process.inputStream)
-        val stderr = BoundedStreamCollector(process.errorStream)
+        val stdout = BoundedStreamCollector(process.inputStream, onOutput = { onOutput?.invoke("stdout", it) })
+        val stderr = BoundedStreamCollector(process.errorStream, onOutput = { onOutput?.invoke("stderr", it) })
         val stdinWriter = request.stdin?.let { bytes ->
             thread(name = "xgent-proot-stdin", isDaemon = true) {
                 runCatching {
@@ -163,13 +163,21 @@ internal class ProotRunner(
             "/usr/bin/env",
             "-i",
             "HOME=/root",
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "PATH=$WORKSPACE_PATH/node_modules/.bin:$WORKSPACE_PATH/.xgent/npm/bin:$WORKSPACE_PATH/.xgent/python/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "PYTHONUNBUFFERED=1",
+            "PIP_USER=false",
+            "npm_config_prefix=$WORKSPACE_PATH/.xgent/npm",
+            "npm_config_cache=$WORKSPACE_PATH/.xgent/npm-cache",
             "TERM=xterm-256color",
             "LANG=C.UTF-8",
             "LC_ALL=C.UTF-8",
             "/bin/sh",
             "-c",
-            "cd -- \"\$1\" && if [ -x /bin/bash ]; then exec /bin/bash -lc \"\$2\"; else exec /bin/sh -c \"\$2\"; fi",
+            "cd -- \"\$1\" || exit; " +
+                "if [ -f /workspace/.venv/pyvenv.cfg ]; then " +
+                "export VIRTUAL_ENV=/workspace/.venv PATH=/workspace/.venv/bin:\"\$PATH\"; " +
+                "else export PIP_TARGET=/workspace/.xgent/python PYTHONPATH=/workspace/.xgent/python; fi; " +
+                "if [ -x /bin/bash ]; then exec /bin/bash -c \"\$2\"; else exec /bin/sh -c \"\$2\"; fi",
             "xgent",
             cwd.guestPath,
             request.command,
@@ -178,7 +186,14 @@ internal class ProotRunner(
     }
 
     private fun resolveCwd(raw: String, workdir: File): ResolvedCwd {
-        val value = raw.trim()
+        // Tool observations report guest paths. Resolve /workspace back to the
+        // bound host directory before applying the existing canonical boundary.
+        val input = raw.trim()
+        val value = when {
+            input == WORKSPACE_PATH -> ""
+            input.startsWith("$WORKSPACE_PATH/") -> input.removePrefix("$WORKSPACE_PATH/")
+            else -> input
+        }
         require(!value.contains('\u0000') && !value.contains('\\')) {
             "cwd contains an invalid character"
         }
@@ -245,6 +260,7 @@ private data class ResolvedCwd(
 private class BoundedStreamCollector(
     stream: InputStream,
     private val limit: Int = 400 * 1024,
+    private val onOutput: ((ByteArray) -> Unit)? = null,
 ) {
     private val bytes = ByteArrayOutputStream(minOf(limit, 16 * 1024))
 
@@ -258,11 +274,13 @@ private class BoundedStreamCollector(
             while (true) {
                 val count = runCatching { input.read(buffer) }.getOrDefault(-1)
                 if (count < 0) break
-                synchronized(bytes) {
+                val retained = synchronized(bytes) {
                     val remaining = limit - bytes.size()
                     if (remaining > 0) bytes.write(buffer, 0, minOf(remaining, count))
                     if (count > remaining) truncated = true
+                    minOf(remaining, count).coerceAtLeast(0)
                 }
+                if (retained > 0) runCatching { onOutput?.invoke(buffer.copyOf(retained)) }
             }
         }
     }

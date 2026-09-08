@@ -3419,6 +3419,27 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   overflow: hidden;
 }
 
+.xgent-composer-execution-controls {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.xgent-composer-model-controls {
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .xgent-composer-execution-controls .astryx-selector {
+    min-width: 0;
+    max-width: 5.5rem;
+  }
+  .xgent-composer-model-controls .astryx-complex-selector {
+    max-width: clamp(4rem, 23vw, 9rem);
+    min-width: 0;
+  }
+}
+
 .xgent-mobile-browser-activity-button {
   width: min(21rem, calc(100vw - var(--spacing-10)));
   height: auto;
