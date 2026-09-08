@@ -11,8 +11,6 @@ Complete the remaining desktop/mobile repairs. User reports progress about 50%; 
 - Shared browser console/errors and Resource Timing diagnostics; iOS document-start injection; duplicate runtime injection is idempotent.
 
 ## Evidence / decisions
-- Packaging follow-up: version config is relative to crates/fronted in CI while CUA staging runs at repository root; resolve that existing path correctly. Windows portable ZIP now includes the component directory as well as Xgent.exe.
-- Actual local chat-history evidence: the latest three CUA calls failed before discovery because releases/latest returns 404. Desktop release staging now embeds the exact manifest/binary/license; the loader validates ABI/target/revision/hash and prefers bundled CUA before any network request. Native packaging verification pending.
 - Read xx driver/catalog, yy/cua Windows runtime and yy Android ShellExecutor/PRootKernel plus iOS shell/browser references. Current Android lacks persistent process/GUI bridge and local mobile CUA is disabled: enabling a tool alone cannot supply a desktop.
 - Windows Get-StartApps confirms Notepad installed. Real native component discovery/control still needs validation.
 - Astryx MCP search/get and CLI manifest/build discovery completed; no local build/dev/Cargo commands.
