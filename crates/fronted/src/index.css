@@ -3663,3 +3663,130 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     }
   }
 }
+
+/* File links remain recognizable within generated Markdown. */
+.xgent-file-link,
+.xgent-file-link:visited {
+  color: #63a7d8;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.changed-files-card {
+  width: 100%;
+  min-width: 0;
+}
+
+.workspace-pdf-preview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.workspace-document-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  flex-wrap: wrap;
+}
+.workspace-document-toolbar button,
+.workspace-document-toolbar select {
+  padding: 6px 12px;
+  background: var(--color-background-secondary);
+  border-radius: 6px;
+}
+.workspace-document-pages {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  background: var(--color-background-secondary);
+}
+.workspace-document-pages canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+.generated-file-cards {
+  width: 100%;
+}
+.generated-file-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  margin-block: 8px;
+}
+.generated-file-card > svg {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+}
+.generated-file-card-name {
+  text-align: start;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.generated-file-card-name span {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.assistant-footer-message {
+  width: 100%;
+  max-width: none;
+}
+.assistant-footer-message > div {
+  width: 100%;
+  max-width: none;
+}
+
+.chat-empty-state {
+  padding-block: clamp(24px, 6vh, 80px);
+}
+.chat-suggestion-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+  margin-block: 16px 40px;
+}
+.chat-suggestion-grid button {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  text-align: start;
+  padding: 20px;
+  min-height: 120px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: 0 3px 8px #00000005;
+  background: var(--color-background-primary);
+}
+.chat-suggestion-grid svg {
+  width: 20px;
+  height: 20px;
+  color: var(--color-text-secondary);
+}
+.chat-suggestion-grid button:hover {
+  background: var(--color-background-secondary);
+}
+.chat-suggestion-grid button:focus-visible {
+  outline: 2px solid var(--color-text-accent);
+  outline-offset: 3px;
+}
+@media (max-width: 760px) {
+  .chat-suggestion-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-block: 8px 16px;
+    gap: 10px;
+  }
+  .chat-suggestion-grid button {
+    padding: 16px;
+  }
+}

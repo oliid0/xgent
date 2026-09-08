@@ -7,7 +7,6 @@ import "./index.css";
 import "katex/dist/katex.min.css";
 import "streamdown/styles.css";
 import { inferRuntimePlatform } from "./lib/runtimePlatform";
-import { showFirstLaunch } from "./lib/system/launchScreen";
 import { installWebviewNavigationGuard } from "./lib/system/webviewNavigationGuard";
 import { isBrowserRuntime } from "./runtime";
 
@@ -28,8 +27,6 @@ if (import.meta.env.DEV) {
     devWindow.__seedLongConversation = seedLongConversation;
   });
 }
-
-showFirstLaunch();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

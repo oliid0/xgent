@@ -1,30 +1,26 @@
-# Current objective
-Repair failing CI, improve state-grounded CUA, mobile shell reliability, and mobile/right-sidebar layout. User tested the latest build; reports remain valid.
+﻿# Current objective
+Finish mobile startup/CI, reliable CUA discovery/control, real file previews/editing, conversation panels, attachment/open-with actions and launch/chat UX.
 
-## Completed (2026-09-07)
-- CI #99: fixed Tauri command macro registration and sha2 0.11 digest encoding. Removed competing CI auto-push jobs; added finite frontend timeouts and a preview artifact for rendered verification.
-- Fixed test-loader runtime overrides that caused CUA tests to spin for six hours. Bounded dispatch waits; updated obsolete tray assertion to retain pin restoration before propagating focus errors.
-- CUA preserves native state IDs/action evidence. Recovery state is scoped to its adapter; failed post-action observation is an error and completed actions remain counted; cancelled/deadline sequences cannot report success.
-- Android: verified SHA-256 of the exact Alpine 3.22.5 aarch64 archive; bin/sh points to /bin/busybox. Translate guest absolute symlinks into relocatable rootfs-relative links, preserve containment checks, and accept root directory entries.
-- iOS: select session before applying cwd; use ios_setDirectoryURL from pinned ios_system v3.0.2; clear borrowed FILE pointers before closing them.
-- Mobile panels follow keyboard visual viewport geometry, ignore pinch zoom, clean up listeners, and make hidden retained panels inert. Terminal prevents duplicate dispatch, cancels on close/workspace change/unmount, ignores stale cwd updates, and bounds successful command history to 20 entries.
-- Right sidebar allocates remaining height after error banners instead of clipping the active panel. Existing mixed tab ordering and editable previews preserved.
+## Completed
+- Attachment IPC uses snake_case; blue underlined file links and generated file cards above full-width diffs.
+- PDF.js page rendering with offline assets, real PPTX slides, DOCX rendering/text editing, XLSX cells, native PDF/PPTX annotations and image rotation. Legacy DOC/RTF/PPT use installed OS/LibreOffice conversion.
+- Installed Windows application catalog and launch_app; macOS directory discovery and localized aliases; CUA component capability upgrade.
+- Conversation-scoped browser/file/terminal/side-chat panels, bounded inactive resources and retained unsaved drafts. My Files/code open in chat column.
+- Native open-with chooser, local/file URL routing, browser menu surface occlusion, empty browser landing, side-chat draft initialization, collapsed reasoning and Ctrl/Cmd+Enter steering.
+- Native Windows PowerShell/project dependency paths, embedded-browser/research tool policy, lightweight paint-gated launch bootstrap and revised welcome layout.
+- Android emulator smoke moved to one shell script. iOS launch captures stdout/stderr/system diagnostics.
 
 ## Evidence / decisions
-- Started at 278b410 with clean tree; integrated remote formatting-only f428862 before final checks.
-- Astryx MCP search/get plus CLI manifest/build discovery completed; installed Stack source confirms styling hook.
-- ios_system pinned header: https://raw.githubusercontent.com/holzschu/ios_system/v3.0.2/ios_system/ios_system.h
-- No local build/dev/Cargo commands. Remote CI handles native checks.
-
-## Verification / CI
-- pnpm check passed; pnpm lint passed after normalizing Windows checkout line endings.
-- pnpm test:non-native: 1115/1116 passed; only failure was the obsolete tray assertion. Corrected assertion; pnpm test:release then passed all 19 tests. Architecture and diff hygiene passed.
-- Push, GitHub workflow tracking and rendered verification pending.
+- Base 003b1c1: CI #101 passed; Release #35 failed mobile launch checks after successful packaging. Android action lost variables between script lines; iOS process exited without usable crash evidence.
+- Astryx MCP search/get and CLI manifest/build discovery completed before UI edits. No local build/dev/Cargo commands.
+- Preserve native file formats with guarded saves; no sidecar-only annotation success. Legacy Office conversion requires installed conversion software.
 
 ## Remaining
-- Verify CI on the repair commit and inspect its actual rendered wide/narrow output.
-- Android/iOS device startup, cancellation and shell smoke tests still require native target execution; no claim that every crash is fixed.
-- Real CSGO/Dota wins, Blender modeling, Unity development and AE animation remain unverified. These require task-level app/asset/postcondition evidence, not mocked clicks.
+- Push and run CI/release checks; diagnose any remaining iOS runtime failure.
+- Verify actual rendered wide/narrow layouts, interactions and console from CI artifact; run CUA against real application with updated component.
+- Address new evidence, then final handoff. Do not claim all requested behavior verified yet.
 
-## Touched files
-CI workflow; native CUA registration/component; CUA tool/adapter and tests; test loader/release assertion; App/mobileViewport; mobile panel/terminal; right-sidebar component/CSS; Android RootfsInstaller; iOS MobileExecutionPlugin; history.md.
+## Touched / verification
+- Frontend chat/browser/preview/runtime/settings/theme; native browser/CUA/workspace/shell; release workflow/scripts and regression tests.
+- 2026-09-07: pnpm check PASS; pnpm lint PASS (515 files); pnpm test:non-native PASS (1123 tests, Cargo excluded); git diff --check PASS.
+- Logs: %TEMP%/xgent-final-{check,lint,test}.log. CI and rendered verification pending.

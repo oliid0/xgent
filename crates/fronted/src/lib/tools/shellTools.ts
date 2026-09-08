@@ -540,7 +540,7 @@ export function createShellTools(params: {
     : "";
   const shellPolicy =
     runtimePlatform === "windows"
-      ? "Windows runs Bash commands with Git Bash (POSIX semantics) when available, falling back to pwsh, then Windows PowerShell, then cmd only if Git Bash is not installed. Write POSIX/bash syntax by default: `export NAME=value`, `&&`, `/dev/null`, forward-slash paths. If the result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing on this machine — switch to PowerShell syntax and suggest installing Git for Windows or setting XGENT_GIT_BASH_PATH."
+      ? "The tool name Bash is historical: Windows executes in pwsh, then Windows PowerShell, then cmd. Write PowerShell-compatible syntax: $env:NAME='value', native cmdlets, and literal quoted paths. Do not use export, /dev/null, POSIX redirections, or bash scripts unless explicitly invoking a verified installed bash executable. Inspect the returned shell_family before follow-up commands. Dependencies belong to this project: use local npm installs and a project Python .venv, never pip --user or npm -g."
       : runtimePlatform === "macos"
         ? "macOS runs Bash commands with POSIX shell syntax: zsh first, then Bash, then sh."
         : runtimePlatform === "android"
@@ -549,9 +549,11 @@ export function createShellTools(params: {
             ? "iOS/iPadOS runs a restricted a-Shell-compatible native command set. Use POSIX syntax, do not assume Linux process APIs, Node.js, npm, arbitrary native packages, or arbitrary WASI execution, and inspect the reported mobile capabilities before choosing tools."
             : "Linux runs Bash commands with POSIX shell syntax: Bash first, then zsh, then sh.";
   const backgroundPolicy =
-    runtimePlatform === "android" || runtimePlatform === "ios"
-      ? "Mobile operating systems can suspend Xgent; keep commands foreground and bounded, and do not start detached services or background jobs."
-      : "Background commands using `&` must detach stdout and stderr first, for example `nohup command > /tmp/xgent-task.log 2>&1 < /dev/null &`; otherwise the tool rejects them because inherited pipes can keep Bash running forever. Prefer ManagedProcess for dev servers, watchers, or anything long-running.";
+    runtimePlatform === "windows"
+      ? "Use ManagedProcess for background work. Do not use nohup or POSIX detached-process syntax on Windows."
+      : runtimePlatform === "android" || runtimePlatform === "ios"
+        ? "Mobile operating systems can suspend Xgent; keep commands foreground and bounded, and do not start detached services or background jobs."
+        : "Background commands using `&` must detach stdout and stderr first, for example `nohup command > /tmp/xgent-task.log 2>&1 < /dev/null &`; otherwise the tool rejects them because inherited pipes can keep Bash running forever. Prefer ManagedProcess for dev servers, watchers, or anything long-running.";
   const workdir = params.workdir;
   const allowSkillsRoot = params.skillsRootEnabled === true;
   const allowManagedProcess = params.managedProcessEnabled !== false;
@@ -748,9 +750,7 @@ export function createShellTools(params: {
       (params.shellFamily === "powershell" || params.shellFamily === "cmd")
     ) {
       hints.push(
-        `Hint: Git Bash was not found, so this command ran under ${
-          params.shellFamily === "cmd" ? "cmd" : "PowerShell"
-        } where POSIX syntax like \`export\`, \`nohup\`, and \`/dev/null\` fails. Rewrite the command in PowerShell syntax for now, and suggest installing Git for Windows or setting XGENT_GIT_BASH_PATH to restore Bash semantics.`,
+        `Hint: This command ran under ${params.shellFamily === "cmd" ? "cmd" : "PowerShell"}. Use that native Windows shell syntax; POSIX export, nohup and /dev/null are not supported. Use ManagedProcess for background work.`,
       );
     }
 

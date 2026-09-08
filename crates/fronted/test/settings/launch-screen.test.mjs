@@ -29,6 +29,8 @@ for (const warm of [false, true]) {
       globalThis.matchMedia = () => ({ matches: false });
       globalThis.localStorage = { setItem: (key, value) => saved.set(key, value) };
       launch.showFirstLaunch();
+      assert.deepEqual(events, []);
+      while (frames.length) frames.shift()();
       assert.deepEqual(events, warm ? [] : ["splash"]);
       launch.finishLaunch();
       launch.finishLaunch(); // StrictMode cannot finish or animate twice.

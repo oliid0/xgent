@@ -82,7 +82,7 @@ function BrowserTabs(props: { compact: boolean }) {
           size="sm"
           overflow="scroll"
         >
-          {state.sessions.map((session) => (
+          {browserSessionController.sessionsForConversation().map((session) => (
             <Tab
               key={session.sessionId}
               value={session.sessionId}
@@ -123,8 +123,11 @@ function BrowserAddressBar(props: { compact: boolean }) {
   );
   const active = state.sessions.find((session) => session.sessionId === state.activeSessionId);
   const busy = Boolean(active && state.busySessionIds.includes(active.sessionId));
-  const [value, setValue] = useState(active?.url ?? "");
-  useEffect(() => setValue(active?.url ?? ""), [active?.url]);
+  const [value, setValue] = useState(active?.url === "about:blank" ? "" : (active?.url ?? ""));
+  useEffect(
+    () => setValue(active?.url === "about:blank" ? "" : (active?.url ?? "")),
+    [active?.url],
+  );
 
   const run = (action: "navigate" | "reload" | "go_back" | "go_forward") => {
     if (!active) return;
@@ -198,6 +201,8 @@ function BrowserViewportSlot() {
     browserSessionController.getSnapshot,
   );
   const activeSessionId = state.activeSessionId;
+  const blank =
+    state.sessions.find((session) => session.sessionId === activeSessionId)?.url === "about:blank";
   const localNativeSurface = isTauriRuntime();
   const syncViewport = useCallback(() => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
@@ -213,12 +218,12 @@ function BrowserViewportSlot() {
           y: rect.top,
           width: rect.width,
           height: rect.height,
-          visible: rect.width > 1 && rect.height > 1,
+          visible: !blank && rect.width > 1 && rect.height > 1,
           scaleFactor: window.devicePixelRatio || 1,
         })
         .catch(() => undefined);
     });
-  }, [localNativeSurface]);
+  }, [localNativeSurface, blank]);
 
   useLayoutEffect(() => {
     if (!localNativeSurface) return;
@@ -268,6 +273,12 @@ function BrowserViewportSlot() {
           icon={<Icon icon={Globe} size="lg" color="secondary" />}
           title={t("browser.remoteHostTitle")}
           description={t("browser.remoteHostDescription")}
+        />
+      ) : blank ? (
+        <EmptyState
+          icon={<Icon icon={Globe} size="lg" color="secondary" />}
+          title={t("browser.startBrowsing")}
+          description={t("browser.startBrowsingDescription")}
         />
       ) : !activeSessionId ? (
         <Spinner size="lg" label={t("browser.preparing")} />

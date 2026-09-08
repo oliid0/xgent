@@ -273,6 +273,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
         ]
       : []),
     createBrowserUseTools({
+      conversationId: params.checkpoint?.conversationId,
       delegateToLanPc: {
         enabled:
           params.nativeMobileRuntime === true &&

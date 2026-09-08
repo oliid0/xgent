@@ -2586,7 +2586,7 @@ export function normalizeBrowserExperienceSettings(input: unknown): BrowserExper
   const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const homePage = typeof obj.homePage === "string" ? obj.homePage.trim() : "";
   return {
-    homePage: homePage || "https://www.google.com/",
+    homePage: homePage || "about:blank",
   };
 }
 

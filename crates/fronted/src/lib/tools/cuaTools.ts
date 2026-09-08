@@ -18,6 +18,7 @@ import type { createMcpTools } from "./mcpTools";
 
 const CUA_OPERATIONS = [
   "list_apps",
+  "launch_app",
   "get_app_state",
   "click",
   "perform_secondary_action",
@@ -60,7 +61,7 @@ async function withCuaLock<T>(run: () => Promise<T>, signal?: AbortSignal) {
 const cuaTool: Tool = {
   name: "cua",
   description:
-    "Operate desktop applications through one state-grounded computer-use engine. Prefer reliable app APIs/scripts for bulk work, semantic controls for forms, and screenshot input for visual surfaces. Use list_apps then get_app_state before actions; inspect every returned state and never repeat completed work. Use sequence for up to 20 known dependent steps on one app, with optional expected_text preconditions. Sequences run locally and stop at the first stale state, unmet condition, cancellation or error. Use observation=text for semantic work and observation=image for canvas/3D surfaces to reduce capture or accessibility cost. A dispatched action is not proof of task success: verify its postcondition in the returned state. Failures may have side effects; observe before retrying. Do not target Xgent itself.",
+    "Operate desktop applications through one state-grounded computer-use engine. Prefer reliable app APIs/scripts for bulk work, semantic controls for forms, and screenshot input for visual surfaces. Use list_apps to discover running windows and installed applications; an absent window does not mean an application is not installed. On Windows, use launch_app with an installed app_id, then list_apps to obtain its window target. On macOS get_app_state can launch by bundle ID. Use get_app_state before actions; inspect every returned state and never repeat completed work. Use sequence for up to 20 known dependent steps on one app, with optional expected_text preconditions. Sequences run locally and stop at the first stale state, unmet condition, cancellation or error. Use observation=text for semantic work and observation=image for canvas/3D surfaces to reduce capture or accessibility cost. A dispatched action is not proof of task success: verify its postcondition in the returned state. Failures may have side effects; observe before retrying. Do not target Xgent itself.",
   parameters: {
     type: "object",
     additionalProperties: false,

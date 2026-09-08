@@ -14,7 +14,7 @@ function createBashCall(command = "echo ready") {
   };
 }
 
-test("Bash tool keeps one Bash entry and uses Git Bash-first policy for Claude Code", async () => {
+test("Bash tool keeps one Bash entry and uses native PowerShell policy for Claude Code", async () => {
   const calls = [];
   const loader = createTsModuleLoader({
     mocks: {
@@ -24,10 +24,10 @@ test("Bash tool keeps one Bash entry and uses Git Bash-first policy for Claude C
           assert.equal(command, "shell_run");
           return {
             exit_code: 0,
-            shell: "bash",
+            shell: "pwsh",
             platform: "windows",
-            profile: "windows-git-bash",
-            shell_family: "posix",
+            profile: "windows-pwsh",
+            shell_family: "powershell",
             stdout: "ready\n",
             stderr: "",
             stdout_truncated: false,
@@ -49,9 +49,9 @@ test("Bash tool keeps one Bash entry and uses Git Bash-first policy for Claude C
     runtimePlatform: "windows",
   });
 
-  assert.match(bundle.tools[0].description, /Windows runs Bash commands/);
-  assert.match(bundle.tools[0].description, /Git Bash \(POSIX semantics\)/);
-  assert.match(bundle.tools[0].description, /Write POSIX\/bash syntax by default/);
+  assert.match(bundle.tools[0].description, /Windows executes in pwsh/);
+  assert.match(bundle.tools[0].description, /Windows PowerShell/);
+  assert.match(bundle.tools[0].description, /Write PowerShell-compatible syntax/);
   assert.doesNotMatch(bundle.tools[0].description, /native Windows shell chain/);
 
   const result = await bundle.executeToolCall(createBashCall());
@@ -61,10 +61,10 @@ test("Bash tool keeps one Bash entry and uses Git Bash-first policy for Claude C
   assert.equal(calls[0].args.provider_id, "claude_code");
   assert.equal(calls[0].args.max_timeout_ms, 600_000);
   assert.match(result.content[0].text, /platform: windows/);
-  assert.match(result.content[0].text, /profile: windows-git-bash/);
+  assert.match(result.content[0].text, /profile: windows-pwsh/);
 });
 
-test("Bash tool uses the same Git Bash-first policy for Codex", async () => {
+test("Bash tool uses the same native PowerShell policy for Codex", async () => {
   const calls = [];
   const loader = createTsModuleLoader({
     mocks: {
@@ -74,10 +74,10 @@ test("Bash tool uses the same Git Bash-first policy for Codex", async () => {
           assert.equal(command, "shell_run");
           return {
             exit_code: 0,
-            shell: "bash",
+            shell: "pwsh",
             platform: "windows",
-            profile: "windows-git-bash",
-            shell_family: "posix",
+            profile: "windows-pwsh",
+            shell_family: "powershell",
             stdout: "ready\n",
             stderr: "",
             stdout_truncated: false,
@@ -99,8 +99,8 @@ test("Bash tool uses the same Git Bash-first policy for Codex", async () => {
     runtimePlatform: "windows",
   });
 
-  assert.match(bundle.tools[0].description, /Windows runs Bash commands/);
-  assert.match(bundle.tools[0].description, /Git Bash \(POSIX semantics\)/);
+  assert.match(bundle.tools[0].description, /Windows executes in pwsh/);
+  assert.match(bundle.tools[0].description, /Windows PowerShell/);
   assert.doesNotMatch(bundle.tools[0].description, /Codex-style auto shell selection/);
 
   const result = await bundle.executeToolCall(createBashCall());
@@ -318,10 +318,10 @@ test("Bash tool allows detached background commands on Windows", async () => {
           assert.equal(command, "shell_run");
           return {
             exit_code: 0,
-            shell: "bash",
+            shell: "pwsh",
             platform: "windows",
-            profile: "windows-git-bash",
-            shell_family: "posix",
+            profile: "windows-pwsh",
+            shell_family: "powershell",
             stdout: "ok\n",
             stderr: "",
             stdout_truncated: false,
@@ -378,7 +378,7 @@ function createWindowsFailureLoader(shellFamily, shell) {
   });
 }
 
-test("Bash tool hints about missing Git Bash when Windows falls back to PowerShell", async () => {
+test("Bash tool explains native Windows syntax on PowerShell failures", async () => {
   const loader = createWindowsFailureLoader("powershell", "pwsh");
   const { createShellTools } = loader.loadModule("src/lib/tools/shellTools.ts");
   const bundle = createShellTools({
@@ -390,8 +390,8 @@ test("Bash tool hints about missing Git Bash when Windows falls back to PowerShe
   const result = await bundle.executeToolCall(createBashCall("export NAME=value"));
 
   assert.equal(result.isError, true);
-  assert.match(result.content[0].text, /Git Bash was not found/);
-  assert.match(result.content[0].text, /XGENT_GIT_BASH_PATH/);
+  assert.match(result.content[0].text, /ran under PowerShell/);
+  assert.match(result.content[0].text, /native Windows shell syntax/);
 });
 
 test("Bash tool does not hint about Git Bash when a Windows failure ran under Git Bash", async () => {

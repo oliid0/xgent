@@ -318,6 +318,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   onManualCompact?: () => void;
   manualCompactionDisabled?: boolean;
   onSend: () => void;
+  onSteer?: () => void;
   onStop: () => void;
   onComposerBusyChange: (isBusy: boolean) => void;
   onSelectModel: (selection: SelectedModel) => void;
@@ -365,6 +366,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     onManualCompact,
     manualCompactionDisabled,
     onSend,
+    onSteer,
     onStop,
     onComposerBusyChange,
     onSelectModel,
@@ -923,6 +925,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
               <MentionComposer
                 ref={composerRef}
                 onSend={handleComposerSend}
+                onSteer={onSteer}
                 onEmptyChange={setComposerIsEmpty}
                 onBusyChange={onComposerBusyChange}
                 onPasteFiles={onPasteFiles}

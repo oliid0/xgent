@@ -90,7 +90,7 @@ export type UseFileTreeDataResult = {
   createEntry: (kind: FileTreeKind, targetDir: string, name: string) => Promise<string>;
   renameEntry: (fromPath: string, name: string) => Promise<string>;
   deleteEntry: (path: string) => Promise<void>;
-  openWorkspacePath: (path: string, mode: "open" | "reveal") => Promise<void>;
+  openWorkspacePath: (path: string, mode: "open" | "reveal" | "choose") => Promise<void>;
   search: FileTreeSearchState;
 };
 
@@ -475,7 +475,7 @@ export function useFileTreeData(options: UseFileTreeDataOptions): UseFileTreeDat
   // Desktop-only (see FILE_TREE_HAS_OS_INTEGRATION); callers hide the entry
   // points on the web where the command does not exist.
   const openWorkspacePath = useCallback(
-    async (path: string, mode: "open" | "reveal") => {
+    async (path: string, mode: "open" | "reveal" | "choose") => {
       try {
         await invokeFs("fs_open_workspace_path", { workdir: cwd, path, mode });
       } catch (error) {

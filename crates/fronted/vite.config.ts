@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import Icons from "unplugin-icons/vite";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const packageJson = JSON.parse(
@@ -15,7 +15,17 @@ const host = env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [react(), Icons({ compiler: "jsx", jsx: "react" })],
+  plugins: [react(), Icons({ compiler: "jsx", jsx: "react" }), {
+    name: "pdfjs-offline-resources",
+    generateBundle() {
+      for (const directory of ["cmaps", "standard_fonts", "wasm", "iccs"]) {
+        const root = new URL(`./node_modules/pdfjs-dist/${directory}/`, import.meta.url);
+        for (const entry of readdirSync(root, { withFileTypes: true })) {
+          if (entry.isFile()) this.emitFile({ type: "asset", fileName: `pdfjs/${directory}/${entry.name}`, source: readFileSync(new URL(entry.name, root)) });
+        }
+      }
+    },
+  }],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

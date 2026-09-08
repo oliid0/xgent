@@ -182,6 +182,7 @@ export type MentionComposerDraft = {
 export interface MentionComposerProps {
   /** Called when user presses Enter (without Shift). */
   onSend: () => void;
+  onSteer?: () => void;
   /** Called only when empty/non-empty state flips. */
   onEmptyChange?: (isEmpty: boolean) => void;
   onBusyChange?: (isBusy: boolean) => void;
@@ -2034,6 +2035,7 @@ export const MentionComposer = memo(
   forwardRef<MentionComposerHandle, MentionComposerProps>(function MentionComposer(
     {
       onSend,
+      onSteer,
       onEmptyChange,
       onBusyChange,
       onPasteFiles,
@@ -3367,7 +3369,8 @@ export const MentionComposer = memo(
           compositionEnterKeyRef.current = false;
           lastCompositionEndAtRef.current = 0;
           e.preventDefault();
-          onSend();
+          if ((e.ctrlKey || e.metaKey) && onSteer) onSteer();
+          else onSend();
           return;
         }
 
@@ -3392,6 +3395,7 @@ export const MentionComposer = memo(
         disabled,
         closeMentionSession,
         onSend,
+        onSteer,
         refreshEmptyState,
         refreshMention,
         loadHistoryPrompts,

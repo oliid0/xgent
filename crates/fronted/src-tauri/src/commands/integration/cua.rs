@@ -9,7 +9,7 @@ use crate::runtime::shell_runner::ShellRunRegistry;
 #[path = "cua_component.rs"]
 pub mod component;
 
-const OPERATIONS: &[&str] = &["list_apps", "get_app_state", "click", "perform_secondary_action", "scroll", "drag", "type_text", "press_key", "set_value", "sequence"];
+const OPERATIONS: &[&str] = &["list_apps", "launch_app", "get_app_state", "click", "perform_secondary_action", "scroll", "drag", "type_text", "press_key", "set_value", "sequence"];
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

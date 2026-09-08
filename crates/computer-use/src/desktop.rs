@@ -41,13 +41,45 @@ fn windows() -> Result<Vec<Window>, String> {
             && window.height().unwrap_or(0) > 0).collect()).map_err(fail)
 }
 
+fn normalized_app_name(query: &str) -> String {
+    let name = query.trim().to_lowercase();
+    match name.as_str() {
+        "\u{8bb0}\u{4e8b}\u{672c}" | "notepad.exe" => "notepad".into(),
+        "\u{4fbf}\u{7b7e}" | "\u{5907}\u{5fd8}\u{5f55}" | "sticky notes" => "microsoft notes".into(),
+        _ => name.trim_end_matches(".exe").to_string(),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn installed_apps() -> Result<Vec<Value>, String> {
+    use std::os::windows::process::CommandExt;
+    let output = std::process::Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); @(Get-StartApps) | ConvertTo-Json -Compress"])
+        .creation_flags(0x08000000).output().map_err(fail)?;
+    if !output.status.success() { return Err(String::from_utf8_lossy(&output.stderr).into_owned()); }
+    let value: Value = serde_json::from_slice(&output.stdout).map_err(fail)?;
+    Ok(match value { Value::Array(items) => items, Value::Object(_) => vec![value], _ => Vec::new() })
+}
+
+#[cfg(target_os = "windows")]
+fn launch_app(query: &str) -> Result<(), String> {
+    let name = normalized_app_name(query);
+    let matches: Vec<_> = installed_apps()?.into_iter().filter(|item|
+        item["AppID"].as_str().is_some_and(|id| id.eq_ignore_ascii_case(query))
+        || item["Name"].as_str().is_some_and(|label| normalized_app_name(label) == name)).collect();
+    if matches.len() != 1 { return Err("Choose an unambiguous installed AppID from list_apps; the app may be installed under a different name.".into()); }
+    let id = matches[0]["AppID"].as_str().ok_or("Installed app has no AppID")?;
+    std::process::Command::new("explorer.exe").arg(format!("shell:AppsFolder\\{id}")).spawn().map_err(fail)?;
+    Ok(())
+}
+
 fn resolve_window(query: &str) -> Result<Window, String> {
     let query = query.trim();
     let windows = windows()?;
     let candidates: Vec<_> = windows.iter().filter(|window|
         format!("window:{}", window.id().unwrap_or(0)).eq_ignore_ascii_case(query)
-        || window.app_name().unwrap_or_default().eq_ignore_ascii_case(query)
-        || window.title().unwrap_or_default().eq_ignore_ascii_case(query)
+        || normalized_app_name(&window.app_name().unwrap_or_default()) == normalized_app_name(query)
+        || window.title().unwrap_or_default().to_lowercase().contains(&normalized_app_name(query))
         || window.pid().ok().map(|pid| pid.to_string()).as_deref() == Some(query)).collect();
     if candidates.len() == 1 { return Ok(candidates[0].clone()); }
     if let Some(window) = candidates.iter().find(|window| window.is_focused().unwrap_or(false)) { return Ok((*window).clone()); }
@@ -103,12 +135,22 @@ impl Desktop {
         self.settle_ms = arguments["settle_ms"].as_u64().unwrap_or(80).min(1000);
         if operation == "status" { return Ok(json!({"content":[],"isError":false,"details":{"abi":1,"platform":std::env::consts::OS}})); }
         if operation == "list_apps" {
-            let apps: Vec<_> = windows()?.iter().map(|window| json!({"app":window.app_name().unwrap_or_default(),
+            let mut apps: Vec<_> = windows()?.iter().map(|window| json!({"app":window.app_name().unwrap_or_default(),
                 "target":format!("window:{}",window.id().unwrap_or(0)),"pid":window.pid().unwrap_or(0),
                 "title":window.title().unwrap_or_default(),"minimized":window.is_minimized().unwrap_or(false)})).collect();
+            #[cfg(target_os = "windows")]
+            match installed_apps() {
+                Ok(installed) => apps.extend(installed.into_iter().map(|item| json!({"app":item["Name"],"app_id":item["AppID"],"installed":true,"hint":"Use launch_app with app_id, then list_apps to find its window target."}))),
+                Err(error) => apps.push(json!({"catalog_error":error,"hint":"This is only the open-window list; absence does not mean an app is uninstalled."})),
+            }
             return Ok(json!({"content":[{"type":"text","text":serde_json::to_string_pretty(&apps).map_err(fail)?}],"isError":false}));
         }
         let query = arguments["app"].as_str().filter(|app| !app.trim().is_empty()).ok_or("Missing app")?;
+        #[cfg(target_os = "windows")]
+        if operation == "launch_app" {
+            launch_app(query)?;
+            return Ok(json!({"content":[{"type":"text","text":"Launch requested. Call list_apps and get_app_state to verify the resulting window before acting."}],"isError":false}));
+        }
         if operation == "get_cached_state" {
             let state = self.snapshots.get(&query.to_lowercase()).ok_or("Call get_app_state before a sequence")?;
             return Ok(json!({"content":[{"type":"text","text":state.text}],"isError":false,"details":{"stateId":state.id.to_string()}}));

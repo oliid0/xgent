@@ -1,7 +1,6 @@
 import { Button } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { VStack } from "@astryxdesign/core/Layout";
-import { List, ListItem } from "@astryxdesign/core/List";
 import { Heading } from "@astryxdesign/core/Text";
 import type { ReactNode } from "react";
 
@@ -17,6 +16,13 @@ const SUGGESTION_CARDS = [
     variant: "blue",
     titleKey: "chat.suggestExploreTitle",
     promptKey: "chat.suggestExplorePrompt",
+  },
+  {
+    key: "build",
+    icon: Wrench,
+    variant: "purple",
+    titleKey: "chat.suggestBuildTitle",
+    promptKey: "chat.suggestBuildPrompt",
   },
   {
     key: "fix",
@@ -85,25 +91,26 @@ export function ChatEmptyState({
 
   return (
     <VStack width="100%" gap={6} hAlign="center" className="chat-empty-state">
+      <ProductMark />
       <Heading level={1} className="chat-empty-state-heading">
         {t("chat.greetingSubtitle")}
       </Heading>
-      {composer}
       {onSuggestionSelect ? (
-        <VStack width="100%" maxWidth="var(--xgent-chat-landing-suggestions-width)">
-          <List density="balanced">
-            {SUGGESTION_CARDS.map((card) => (
-              <ListItem
-                key={card.key}
-                label={t(card.titleKey)}
-                startContent={<card.icon />}
-                isDisabled={suggestionsDisabled}
-                onClick={() => onSuggestionSelect(t(card.promptKey))}
-              />
-            ))}
-          </List>
-        </VStack>
+        <div className="chat-suggestion-grid">
+          {SUGGESTION_CARDS.map((card) => (
+            <button
+              type="button"
+              key={card.key}
+              disabled={suggestionsDisabled}
+              onClick={() => onSuggestionSelect(t(card.promptKey))}
+            >
+              <card.icon />
+              <span>{t(card.titleKey)}</span>
+            </button>
+          ))}
+        </div>
       ) : null}
+      {composer}
     </VStack>
   );
 }

@@ -914,7 +914,7 @@ fn is_word_extractable_file(path: &Path) -> bool {
 }
 
 fn is_convertible_document_preview_file(path: &Path) -> bool {
-    matches!(extension_lower(path).as_deref(), Some("doc") | Some("rtf"))
+    matches!(extension_lower(path).as_deref(), Some("doc") | Some("rtf") | Some("ppt"))
 }
 
 fn is_spreadsheet_file(path: &Path) -> bool {
@@ -1062,6 +1062,11 @@ fn truncate_process_error(bytes: &[u8]) -> String {
 
 #[cfg(target_os = "macos")]
 fn convert_document_to_html_preview(target: &Path) -> Result<Vec<u8>, String> {
+    if extension_lower(target).as_deref() == Some("ppt") {
+        let soffice = find_soffice_binary().ok_or("Legacy PPT preview requires LibreOffice")?;
+        let directory = tempfile::tempdir().map_err(|error| error.to_string())?;
+        return run_soffice_document_conversion(&soffice, target, directory.path());
+    }
     let output = Command::new("/usr/bin/textutil")
         .arg("-convert")
         .arg("html")
@@ -1095,7 +1100,6 @@ fn convert_document_to_html_preview(target: &Path) -> Result<Vec<u8>, String> {
     Ok(output.stdout)
 }
 
-#[cfg(not(target_os = "macos"))]
 fn soffice_candidate_names() -> &'static [&'static str] {
     if cfg!(windows) {
         &["soffice.exe", "soffice.com"]
@@ -1104,7 +1108,6 @@ fn soffice_candidate_names() -> &'static [&'static str] {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
 fn find_soffice_binary() -> Option<PathBuf> {
     if let Ok(raw) = std::env::var("XGENT_SOFFICE_PATH") {
         let trimmed = raw.trim().trim_matches('"');
@@ -1146,6 +1149,7 @@ fn find_soffice_binary() -> Option<PathBuf> {
     #[cfg(not(windows))]
     {
         for candidate in [
+            "/Applications/LibreOffice.app/Contents/MacOS/soffice",
             "/usr/bin/soffice",
             "/usr/local/bin/soffice",
             "/opt/libreoffice/program/soffice",
@@ -1160,7 +1164,6 @@ fn find_soffice_binary() -> Option<PathBuf> {
     None
 }
 
-#[cfg(not(target_os = "macos"))]
 fn path_to_file_url(path: &Path) -> String {
     let raw = path.to_string_lossy().replace('\\', "/");
     let mut encoded = String::with_capacity(raw.len());
@@ -1184,7 +1187,6 @@ fn path_to_file_url(path: &Path) -> String {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
 fn run_soffice_document_conversion(
     soffice: &Path,
     target: &Path,
@@ -1200,7 +1202,7 @@ fn run_soffice_document_conversion(
         .arg("--headless")
         .arg("--norestore")
         .arg("--convert-to")
-        .arg("html")
+        .arg(if extension_lower(target).as_deref() == Some("ppt") { "pdf" } else { "html" })
         .arg("--outdir")
         .arg(out_dir)
         .arg(target)
@@ -1219,7 +1221,7 @@ fn run_soffice_document_conversion(
     let stem = target
         .file_stem()
         .ok_or_else(|| "Document preview target has no file name".to_string())?;
-    let html_path = out_dir.join(stem).with_extension("html");
+    let html_path = out_dir.join(stem).with_extension(if extension_lower(target).as_deref() == Some("ppt") { "pdf" } else { "html" });
     let bytes = fs::read(&html_path)
         .map_err(|e| format!("LibreOffice did not produce a document preview: {e}"))?;
     if bytes.is_empty() {
@@ -1414,7 +1416,7 @@ fn read_local_preview_file(target: PathBuf, logical_path: String) -> Result<Read
         return Ok(build_workspace_preview_response(
             logical_path,
             html_bytes,
-            "text/html",
+            if extension_lower(&target).as_deref() == Some("ppt") { "application/pdf" } else { "text/html" },
             mtime_ms,
             content_hash,
             original_size_bytes,
@@ -3788,6 +3790,58 @@ pub(crate) fn spawn_workspace_open_command(target: &Path, mode: &str) -> Result<
         .map_err(|e| format!("Failed to open path with xdg-open: {e}"))
 }
 
+#[cfg(target_os = "windows")]
+fn choose_workspace_application(target: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    #[repr(C)]
+    struct OpenAsInfo { file: *const u16, class: *const u16, flags: u32 }
+    #[link(name = "shell32")]
+    extern "system" { fn SHOpenWithDialog(parent: *mut std::ffi::c_void, info: *const OpenAsInfo) -> i32; }
+    #[link(name = "ole32")]
+    extern "system" { fn CoInitializeEx(reserved: *mut std::ffi::c_void, flags: u32) -> i32; fn CoUninitialize(); }
+    let file: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
+    // OAIF_EXEC: open once with the selected registered app, without changing defaults.
+    let info = OpenAsInfo { file: file.as_ptr(), class: std::ptr::null(), flags: 4 };
+    unsafe {
+        let initialized = CoInitializeEx(std::ptr::null_mut(), 2);
+        if initialized < 0 { return Err(format!("Cannot initialize application chooser: {initialized:#x}")); }
+        let result = SHOpenWithDialog(std::ptr::null_mut(), &info);
+        CoUninitialize();
+        if result < 0 && result as u32 != 0x800704c7 { return Err(format!("Application chooser failed: {result:#x}")); }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn choose_workspace_application(target: &Path) -> Result<(), String> {
+    let output = Command::new("osascript").args(["-e", r#"on run argv
+set selectedApp to choose application with prompt "Open with" as alias
+set targetFile to POSIX file (item 1 of argv)
+tell application "Finder" to open targetFile using selectedApp
+end run"#]).arg(target).output().map_err(|error| error.to_string())?;
+    if !output.status.success() && !String::from_utf8_lossy(&output.stderr).contains("(-128)") {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn choose_workspace_application(target: &Path) -> Result<(), String> {
+    let selected = Command::new("zenity").args(["--file-selection", "--title=Open with", "--filename=/usr/share/applications/", "--file-filter=Applications | *.desktop"])
+        .output().map_err(|error| format!("Application chooser requires Zenity: {error}"))?;
+    if !selected.status.success() { return Ok(()); }
+    let app = String::from_utf8_lossy(&selected.stdout).trim().to_string();
+    if !Path::new(&app).is_file() || !app.ends_with(".desktop") { return Err("Select an installed .desktop application".into()); }
+    let status = Command::new("gio").arg("launch").arg(app).arg(target).status().map_err(|error| error.to_string())?;
+    if !status.success() { return Err("The selected application could not open this file".into()); }
+    Ok(())
+}
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
+fn choose_workspace_application(_target: &Path) -> Result<(), String> {
+    Err("Choose an application on the connected desktop host".into())
+}
+
 pub(crate) fn fs_open_workspace_path_sync(
     workdir: String,
     path: String,
@@ -3822,6 +3876,7 @@ fn fs_open_workspace_path_impl(
         .to_ascii_lowercase();
     let normalized_mode = match normalized_mode.as_str() {
         "" | "open" => "open",
+        "choose" => "choose",
         "reveal" | "containing_dir" | "containing-directory" => "reveal",
         other => {
             return Err(FsError::Other(format!(
@@ -3830,7 +3885,11 @@ fn fs_open_workspace_path_impl(
         }
     };
 
-    spawn_workspace_open_command(&target, normalized_mode).map_err(FsError::Other)?;
+    if normalized_mode == "choose" && meta.is_file() {
+        choose_workspace_application(&target).map_err(FsError::Other)?;
+    } else {
+        spawn_workspace_open_command(&target, normalized_mode).map_err(FsError::Other)?;
+    }
 
     Ok(OpenWorkspacePathResponse {
         path: logical_path,

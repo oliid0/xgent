@@ -42,6 +42,36 @@ test("closing the last visible browser tab leaves an empty workspace without spa
   assert.equal(opens(), 1);
 });
 
+test("new conversations cannot inherit or select another conversation's browser tabs", async () => {
+  const { controller } = setup();
+  controller.selectConversation("chat-a");
+  const a = await controller.newSession("https://example.com/a");
+  controller.selectConversation("chat-b");
+  assert.equal(controller.getSnapshot().activeSessionId, null);
+  assert.equal(controller.sessionsForConversation().length, 0);
+  controller.openPanel(a.sessionId);
+  assert.equal(controller.getSnapshot().panelOpen, false);
+  const b = await controller.newSession();
+  assert.equal(b.url, "about:blank");
+  await controller.ensureSession({ sessionId: a.sessionId });
+  assert.equal(controller.getSnapshot().activeSessionId, b.sessionId);
+  await controller.closeSession(b.sessionId);
+  assert.equal(controller.getSnapshot().activeSessionId, null);
+  controller.selectConversation("chat-a");
+  assert.equal(controller.getSnapshot().activeSessionId, a.sessionId);
+});
+
+test("local addresses are navigations and file names retain spaces and fragments", () => {
+  const loader = createTsModuleLoader({ mocks: { "../browserAutomation": { localBrowserAutomationClient: {} } } });
+  const { normalizeBrowserAddress } = loader.loadModule("src/lib/browser/browserSessionController.ts");
+  assert.equal(normalizeBrowserAddress("locahost:3000/test"), "http://localhost:3000/test");
+  assert.equal(normalizeBrowserAddress("[::1]:8080"), "http://[::1]:8080");
+  assert.equal(normalizeBrowserAddress("C:\\Users\\test\\a #1.html"), "file:///C:/Users/test/a%20%231.html");
+  assert.equal(normalizeBrowserAddress("/tmp/a #1.html"), "file:///tmp/a%20%231.html");
+  assert.equal(normalizeBrowserAddress("file:///tmp/a.html"), "file:///tmp/a.html");
+  assert.match(normalizeBrowserAddress("search words"), /search\?q=search%20words/);
+});
+
 test("a user intervention suppresses stale agent input and returns the current page", async () => {
   let sequence = 0;
   let clicks = 0;

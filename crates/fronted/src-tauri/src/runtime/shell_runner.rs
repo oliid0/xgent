@@ -507,20 +507,6 @@ fn platform_shell_candidates(cmd: &str) -> Vec<ShellCandidate> {
     #[cfg(windows)]
     {
         let mut candidates = Vec::new();
-        if let Some(bash) = find_git_bash() {
-            candidates.push(ShellCandidate {
-                profile: ShellExecutionProfile {
-                    platform: "windows",
-                    profile: "windows-git-bash",
-                    shell_family: "posix",
-                    display_shell: "bash",
-                },
-                program: bash,
-
-                args: vec!["-c".to_string(), cmd.to_string()],
-                augment_macos_path: false,
-            });
-        }
         let powershell_command = windows_powershell_command(cmd);
         candidates.push(ShellCandidate {
             profile: ShellExecutionProfile {
@@ -941,6 +927,32 @@ where
         if candidate.augment_macos_path {
             maybe_augment_macos_path(&mut c);
         }
+        // Package commands and their children share this project's interpreter and bins.
+        // Per-command env assignments can still explicitly override these defaults.
+        let local_tools = cwd.join(".xgent");
+        let venv = cwd.join(".venv");
+        let venv_bin = venv.join(if cfg!(windows) { "Scripts" } else { "bin" });
+        let mut paths = vec![cwd.join("node_modules").join(".bin")];
+        if venv.join("pyvenv.cfg").is_file() {
+            paths.insert(0, venv_bin);
+            c.env("VIRTUAL_ENV", &venv);
+            c.env_remove("PIP_TARGET");
+        } else {
+            let python_packages = local_tools.join("python");
+            c.env("PIP_TARGET", &python_packages);
+            let mut python_paths = vec![python_packages.clone()];
+            python_paths.extend(std::env::split_paths(&std::env::var_os("PYTHONPATH").unwrap_or_default()));
+            if let Ok(value) = std::env::join_paths(python_paths) { c.env("PYTHONPATH", value); }
+            paths.push(python_packages.join(if cfg!(windows) { "Scripts" } else { "bin" }));
+        }
+        c.env("PIP_USER", "false");
+        c.env("npm_config_prefix", local_tools.join("npm"));
+        paths.push(if cfg!(windows) { local_tools.join("npm") } else { local_tools.join("npm/bin") });
+        let inherited_path = c.get_envs().find(|(key,_)|key.as_encoded_bytes().eq_ignore_ascii_case(b"PATH"))
+            .and_then(|(_,value)|value.map(|value|value.to_os_string()))
+            .unwrap_or_else(||std::env::var_os("PATH").unwrap_or_default());
+        paths.extend(std::env::split_paths(&inherited_path));
+        if let Ok(value) = std::env::join_paths(paths) { c.env("PATH", value); }
         configure_child_process_group(&mut c);
         let spawn_result = c
             .current_dir(cwd)
@@ -1233,20 +1245,12 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn windows_shell_chain_orders_git_bash_before_powershell_fallbacks() {
+    fn windows_shell_chain_uses_native_powershell() {
         let profiles: Vec<&'static str> = super::platform_shell_candidates("echo hi")
             .iter()
             .map(|candidate| candidate.profile.profile)
             .collect();
-        let tail = ["windows-pwsh", "windows-powershell", "windows-cmd"];
-        match profiles.len() {
-            4 => {
-                assert_eq!(profiles[0], "windows-git-bash");
-                assert_eq!(profiles[1..], tail);
-            }
-            3 => assert_eq!(profiles[..], tail),
-            other => panic!("unexpected windows candidate count: {other}"),
-        }
+        assert_eq!(profiles, ["windows-pwsh", "windows-powershell", "windows-cmd"]);
     }
 
     #[cfg(windows)]

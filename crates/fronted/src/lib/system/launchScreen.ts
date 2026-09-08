@@ -17,7 +17,12 @@ function revealWindow() {
 }
 
 export function showFirstLaunch() {
-  if (document.documentElement.dataset.warmLaunch !== "true") revealWindow();
+  if (document.documentElement.dataset.warmLaunch === "true") return;
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      if (!finishing) revealWindow();
+    }),
+  );
 }
 
 /** Keep the HTML launch surface alive across React mounting and settings hydration. */
@@ -47,4 +52,10 @@ export function finishLaunch(success = true) {
       revealWindow();
     });
   });
+}
+
+export function showLaunchFailure() {
+  const message = document.getElementById("launch-error");
+  if (message) message.hidden = false;
+  revealWindow();
 }

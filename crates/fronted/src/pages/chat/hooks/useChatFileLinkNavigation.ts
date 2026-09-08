@@ -51,14 +51,14 @@ export function useChatFileLinkNavigation(params: {
       }
       try {
         const response = await invoke<ChatFileLinkOpenResponse>("open_chat_file_link", {
-          conversationId,
+          conversation_id: conversationId,
           workdir: conversationWorkdir,
           path: link.path,
           source: link.source,
           line: link.line,
-          endLine: link.endLine,
+          end_line: link.endLine,
           column: link.column,
-          openInFileManager: false,
+          open_in_file_manager: false,
         });
         if (response.action === "opened" || response.action === "revealed") return;
         const workdir = response.workdir?.trim();
@@ -71,14 +71,14 @@ export function useChatFileLinkNavigation(params: {
             return;
           }
           await invoke("open_chat_file_link", {
-            conversationId,
+            conversation_id: conversationId,
             workdir: conversationWorkdir,
             path: link.path,
             source: link.source,
             line: link.line,
-            endLine: link.endLine,
+            end_line: link.endLine,
             column: link.column,
-            openInFileManager: true,
+            open_in_file_manager: true,
           });
           return;
         }

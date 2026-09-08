@@ -24,7 +24,7 @@ import { read, utils, write } from "xlsx";
 import { useLocale } from "../../i18n";
 import { cn } from "../../lib/shared/utils";
 import { writeClipboardText } from "../../lib/system/clipboardText";
-import { invokeFs, isFsBackendError } from "../../lib/tools/fsBackend";
+import { invokeFs } from "../../lib/tools/fsBackend";
 import { type FileTypeIconComponent, getFileTypeIcon } from "../chat/fileTypeIcons";
 import {
   Check,
@@ -43,7 +43,11 @@ import {
   X,
 } from "../icons";
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
+import { annotateDocument } from "./documentAnnotations";
+import { previewDraftKey, previewDrafts } from "./previewDrafts";
 import { WorkspaceMarkdownPreview } from "./WorkspaceMarkdownPreview";
+import { WorkspacePdfPreview } from "./WorkspacePdfPreview";
+import { WorkspacePresentationPreview } from "./WorkspacePresentationPreview";
 import { buildSandboxedHtmlPreviewSource } from "./workspaceHtmlPreview";
 import {
   getWorkspacePreviewKind,
@@ -52,6 +56,7 @@ import {
 } from "./workspaceImagePreview";
 export type WorkspaceFilePreviewOpenRequest = {
   id: number;
+  ownerId?: string;
   projectPathKey: string;
   workdir: string;
   path: string;
@@ -66,12 +71,6 @@ type ReadWorkspacePreviewResponse = {
   mtimeMs: number;
   contentHash: string;
   content?: string | null;
-};
-
-type EditableAnnotationResponse = {
-  content: string;
-  mtimeMs: number;
-  contentHash: string;
 };
 
 type WorkspaceFilePreviewOverlayProps = {
@@ -188,7 +187,7 @@ function kindFromMimeType(mimeType: string): WorkspacePreviewKind | null {
 
 function resolvePreviewKind(path: string, mimeType: string): WorkspacePreviewKind {
   const mimeKind = kindFromMimeType(mimeType);
-  if (mimeKind === "html" || mimeKind === "markdown" || mimeKind === "text") return mimeKind;
+  if (mimeKind) return mimeKind;
   return getWorkspacePreviewKind(path) ?? mimeKind ?? "text";
 }
 
@@ -317,8 +316,8 @@ function buildSpreadsheetTable(
       sheetNames,
       rows,
       activeSheetName: selectedSheetName,
-      truncatedRows: rawRows.length > SPREADSHEET_MAX_ROWS,
-      truncatedColumns: maxColumns > SPREADSHEET_MAX_COLUMNS,
+      truncatedRows: sheetRange.e.r >= SPREADSHEET_MAX_ROWS,
+      truncatedColumns: sheetRange.e.c >= SPREADSHEET_MAX_COLUMNS,
       error: null,
     };
   } catch (error) {
@@ -363,11 +362,8 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
   const [sourceSaved, setSourceSaved] = useState("");
   const [sourceSaving, setSourceSaving] = useState(false);
   const [annotationDraft, setAnnotationDraft] = useState("");
+  const [annotationPage, setAnnotationPage] = useState(1);
   const [annotationSaved, setAnnotationSaved] = useState("");
-  const [annotationVersion, setAnnotationVersion] = useState<{
-    mtimeMs: number;
-    contentHash: string;
-  } | null>(null);
   const [spreadsheetEdits, setSpreadsheetEdits] = useState<Record<string, Record<string, string>>>(
     {},
   );
@@ -392,6 +388,9 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     setSourceDraft(next?.text ?? "");
     setSourceSaved(next?.text ?? "");
     setSpreadsheetEdits({});
+    setAnnotationDraft("");
+    setAnnotationSaved("");
+    setAnnotationPage(1);
     setPreview(next);
   }, []);
 
@@ -477,7 +476,23 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
           kind,
           text,
         };
+        const draft = previewDrafts.get(previewDraftKey(request));
         replacePreview(loaded);
+        if (draft) {
+          setSourceDraft(draft.source);
+          setSourceSaved(draft.savedSource);
+          setAnnotationDraft(draft.annotation);
+          setAnnotationPage(draft.annotationPage);
+          setSpreadsheetEdits(draft.cells);
+          if (draft.contentHash !== loaded.contentHash) {
+            // Retain the original version guard; saves must reject external modifications.
+            loaded.contentHash = draft.contentHash;
+            loaded.mtimeMs = draft.mtimeMs;
+            setError(
+              "The file changed outside this editor. Your draft is retained; copy it before reloading to discard it.",
+            );
+          }
+        }
       } catch (loadError) {
         if (loadSequenceRef.current !== sequence) return;
         if (!keepCurrentImagePreview) {
@@ -533,7 +548,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       preview?.text !== undefined,
   );
   const canOpenExternal = Boolean(activePreviewRequest && activePath);
-  const canAnnotate = kind === "pdf" || kind === "presentation";
+  const canAnnotate = /\.(pdf|pptx)$/i.test(activePath);
   const canEditSpreadsheet =
     preview?.kind === "spreadsheet" && activePath.toLowerCase().endsWith(".xlsx");
   const spreadsheetHasEdits = Object.values(spreadsheetEdits).some(
@@ -541,37 +556,32 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
   );
 
   useEffect(() => {
-    setAnnotationDraft("");
-    setAnnotationSaved("");
-    setAnnotationVersion(null);
-    if (!activePreviewRequest || !canAnnotate || !activePath) return;
-    let cancelled = false;
-    void invokeFs<EditableAnnotationResponse>("fs_read_editable_text", {
-      workdir: activePreviewRequest.workdir,
-      path: `${activePath}.xgent-annotations.md`,
-    })
-      .then((response) => {
-        if (cancelled) return;
-        setAnnotationDraft(response.content);
-        setAnnotationSaved(response.content);
-        setAnnotationVersion({
-          mtimeMs: response.mtimeMs,
-          contentHash: response.contentHash,
-        });
-      })
-      .catch((annotationError) => {
-        if (
-          cancelled ||
-          (isFsBackendError(annotationError) && annotationError.code === "not_found")
-        ) {
-          return;
-        }
-        setError(toMessage(annotationError, t("workspaceFilePreview.openFailed")));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activePath, activePreviewRequest, canAnnotate, t]);
+    if (!preview || !activePreviewRequest || loading) return;
+    const key = previewDraftKey(activePreviewRequest);
+    if (!dirty) {
+      previewDrafts.delete(key);
+      return;
+    }
+    previewDrafts.set(key, {
+      contentHash: preview.contentHash,
+      mtimeMs: preview.mtimeMs,
+      source: sourceDraft,
+      savedSource: sourceSaved,
+      annotation: annotationDraft,
+      annotationPage,
+      cells: spreadsheetEdits,
+    });
+  }, [
+    preview,
+    activePreviewRequest,
+    loading,
+    dirty,
+    sourceDraft,
+    sourceSaved,
+    annotationDraft,
+    annotationPage,
+    spreadsheetEdits,
+  ]);
 
   const copyPreviewSource = useCallback(async () => {
     if (preview?.text === null || preview?.text === undefined) return;
@@ -607,6 +617,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
           expected_content_hash: preview.contentHash,
         });
       }
+      previewDrafts.delete(previewDraftKey(activePreviewRequest));
       await loadPreview(activePreviewRequest, 0);
       setActiveTab("source");
     } catch (saveError) {
@@ -651,6 +662,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
         expected_mtime_ms: preview.mtimeMs,
         expected_content_hash: preview.contentHash,
       });
+      previewDrafts.delete(previewDraftKey(activePreviewRequest));
       await loadPreview(activePreviewRequest, 0);
     } catch (saveError) {
       setError(toMessage(saveError, t("workspaceEditor.saveFailed")));
@@ -669,26 +681,27 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
   ]);
 
   const saveAnnotations = useCallback(async () => {
-    if (!activePreviewRequest || !canAnnotate || annotationDraft === annotationSaved) return;
+    if (!activePreviewRequest || !preview || !canAnnotate || !annotationDraft.trim()) return;
     setSourceSaving(true);
     setError(null);
     try {
-      const response = await invokeFs<{
-        mtimeMs: number;
-        contentHash: string;
-      }>("fs_write_text", {
+      const output = await annotateDocument(
+        preview.bytes,
+        kind === "pdf" ? "pdf" : "pptx",
+        annotationPage,
+        annotationDraft,
+      );
+      await invokeFs("fs_write_binary", {
         workdir: activePreviewRequest.workdir,
-        path: `${activePath || activePreviewRequest.path}.xgent-annotations.md`,
-        content: annotationDraft,
-        mode: "rewrite",
-        expected_mtime_ms: annotationVersion?.mtimeMs,
-        expected_content_hash: annotationVersion?.contentHash,
+        path: activePath,
+        content_base64: bytesToBase64(output),
+        expected_mtime_ms: preview.mtimeMs,
+        expected_content_hash: preview.contentHash,
       });
-      setAnnotationSaved(annotationDraft);
-      setAnnotationVersion({
-        mtimeMs: response.mtimeMs,
-        contentHash: response.contentHash,
-      });
+      setAnnotationDraft("");
+      setAnnotationSaved("");
+      previewDrafts.delete(previewDraftKey(activePreviewRequest));
+      await loadPreview(activePreviewRequest);
     } catch (saveError) {
       setError(toMessage(saveError, t("workspaceEditor.saveFailed")));
     } finally {
@@ -698,9 +711,11 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     activePath,
     activePreviewRequest,
     annotationDraft,
-    annotationSaved,
-    annotationVersion,
+    annotationPage,
     canAnnotate,
+    kind,
+    loadPreview,
+    preview,
     t,
   ]);
 
@@ -738,6 +753,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
           expected_mtime_ms: preview.mtimeMs,
           expected_content_hash: preview.contentHash,
         });
+        previewDrafts.delete(previewDraftKey(activePreviewRequest));
         await loadPreview(activePreviewRequest, 0);
       } catch (saveError) {
         setError(toMessage(saveError, t("workspaceEditor.saveFailed")));
@@ -764,7 +780,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       await invokeFs("fs_open_workspace_path", {
         workdir: activePreviewRequest.workdir,
         path,
-        mode: "open",
+        mode: "choose",
       });
     } catch (openError) {
       setError(toMessage(openError, t("workspaceFilePreview.openExternalFailed")));
@@ -890,9 +906,15 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                       size="sm"
                       isLoading={loading}
                       isDisabled={!activePreviewRequest || loading}
-                      onClick={() =>
-                        activePreviewRequest && void loadPreview(activePreviewRequest, 0)
-                      }
+                      onClick={() => {
+                        if (
+                          !activePreviewRequest ||
+                          (dirty && !window.confirm("Discard unsaved edits and reload the file?"))
+                        )
+                          return;
+                        previewDrafts.delete(previewDraftKey(activePreviewRequest));
+                        void loadPreview(activePreviewRequest, 0);
+                      }}
                     />
                     {!overlay && !embedded ? (
                       <IconButton
@@ -977,9 +999,19 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                 {preview && activeTab === "annotations" && canAnnotate ? (
                   <VStack height="100%" minHeight={0} padding={3} gap={2}>
                     <Text type="supporting" color="secondary">
-                      Notes are saved beside the original as {basename(activePath)}
-                      .xgent-annotations.md
+                      {kind === "pdf"
+                        ? "Save a comment in the PDF."
+                        : "Save an editable annotation text box on the slide."}
                     </Text>
+                    <label>
+                      Page / slide{" "}
+                      <input
+                        type="number"
+                        min={1}
+                        value={annotationPage}
+                        onChange={(event) => setAnnotationPage(Number(event.target.value))}
+                      />
+                    </label>
                     <TextArea
                       label="Annotations"
                       isLabelHidden
@@ -1104,9 +1136,10 @@ function PreviewBody(props: {
     const container = docxContainerRef.current;
     if (!container) return;
     let cancelled = false;
-    container.innerHTML = "";
+    const surface = document.createElement("div");
+    container.replaceChildren(surface);
     onRenderError(null);
-    void renderAsync(bytesToArrayBuffer(preview.bytes), container, undefined, {
+    void renderAsync(bytesToArrayBuffer(preview.bytes), surface, undefined, {
       className: "workspace-docx-preview",
       inWrapper: true,
       ignoreFonts: false,
@@ -1119,7 +1152,7 @@ function PreviewBody(props: {
     });
     return () => {
       cancelled = true;
-      container.innerHTML = "";
+      surface.remove();
     };
   }, [onRenderError, preview, t]);
 
@@ -1139,23 +1172,10 @@ function PreviewBody(props: {
   }
 
   if (preview.kind === "pdf") {
-    return (
-      <iframe
-        className="h-full w-full border-0 bg-background"
-        src={preview.blobUrl}
-        title={basename(preview.path)}
-      />
-    );
+    return <WorkspacePdfPreview bytes={preview.bytes} title={basename(preview.path)} />;
   }
-
   if (preview.kind === "presentation") {
-    return (
-      <AstryxStack direction="vertical" className="h-full overflow-auto bg-muted/25 p-5">
-        <pre className="mx-auto w-full max-w-4xl whitespace-pre-wrap rounded-lg border border-border bg-background p-5 text-sm leading-6 text-foreground shadow-sm">
-          {preview.text || t("workspaceFilePreview.empty")}
-        </pre>
-      </AstryxStack>
-    );
+    return <WorkspacePresentationPreview bytes={preview.bytes} />;
   }
 
   if (preview.kind === "html") {

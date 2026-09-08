@@ -878,18 +878,18 @@ fn normalized_request_id(request_id: &str) -> crate::Result<String> {
 
 fn parse_browser_url(raw: &str) -> crate::Result<Url> {
     let trimmed = raw.trim();
-    let normalized = if trimmed.contains("://") {
+    let normalized = if trimmed.contains("://") || trimmed == "about:blank" {
         trimmed.to_string()
     } else {
         format!("https://{trimmed}")
     };
     let url = Url::parse(&normalized)
         .map_err(|error| Error::Message(format!("invalid browser URL: {error}")))?;
-    if matches!(url.scheme(), "http" | "https") {
+    if matches!(url.scheme(), "http" | "https" | "file") || url.as_str() == "about:blank" {
         Ok(url)
     } else {
         Err(Error::Message(
-            "browser navigation only supports http and https URLs".to_string(),
+            "browser navigation supports http, https, file and about:blank URLs".to_string(),
         ))
     }
 }

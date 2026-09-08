@@ -126,7 +126,7 @@ private final class BrowserNavigationDelegate: NSObject, WKNavigationDelegate {
             decisionHandler(.cancel)
             return
         }
-        decisionHandler(["http", "https"].contains(url.scheme?.lowercased() ?? "") ? .allow : .cancel)
+        decisionHandler((["http", "https", "file"].contains(url.scheme?.lowercased() ?? "") || url.absoluteString == "about:blank") ? .allow : .cancel)
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation?) {
@@ -279,7 +279,7 @@ final class BrowserAutomationPlugin: Plugin {
                     applyViewport(request.viewport, to: existing)
                     existing.loading = true
                     existing.documentReady = false
-                    existing.webView.load(URLRequest(url: url))
+                    loadBrowserURL(url, in: existing.webView)
                     invoke.resolve(summary(existing))
                     return
                 }
@@ -312,7 +312,7 @@ final class BrowserAutomationPlugin: Plugin {
                 applyViewport(request.viewport, to: session)
                 session.loading = true
                 session.documentReady = false
-                webView.load(URLRequest(url: url))
+                loadBrowserURL(url, in: webView)
                 invoke.resolve(summary(session))
             } catch {
                 invoke.reject("Failed to create browser session: \(error.localizedDescription)")
@@ -479,7 +479,7 @@ final class BrowserAutomationPlugin: Plugin {
                     requestedURL: url.absoluteString,
                     timeoutMs: timeoutMs
                 ) {
-                    session.webView.load(URLRequest(url: url))
+                    loadBrowserURL(url, in: session.webView)
                 }
             } catch {
                 invoke.reject(error.localizedDescription)
@@ -883,16 +883,24 @@ final class BrowserAutomationPlugin: Plugin {
         return requestId
     }
 
+    @MainActor
+    private func loadBrowserURL(_ url: URL, in webView: WKWebView) {
+        if url.isFileURL {
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        } else {
+            webView.load(URLRequest(url: url))
+        }
+    }
+
     private func validatedURL(_ raw: String) throws -> URL {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalized = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
+        let normalized = (trimmed.contains("://") || trimmed == "about:blank") ? trimmed : "https://\(trimmed)"
         guard let url = URL(string: normalized),
               let scheme = url.scheme?.lowercased(),
-              ["http", "https"].contains(scheme),
-              url.host != nil
+              (url.absoluteString == "about:blank" || scheme == "file" || (["http", "https"].contains(scheme) && url.host != nil))
         else {
             throw BrowserAutomationError.invalidRequest(
-                "Browser navigation only supports valid http and https URLs"
+                "Browser navigation supports http, https, local file URLs and about:blank"
             )
         }
         return url

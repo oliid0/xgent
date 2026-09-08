@@ -210,8 +210,10 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(windowsLaunchSmoke, /Portable Xgent exited during the launch smoke test/);
   assert.match(windowsLaunchSmoke, /finally[\s\S]*Stop-Process/);
   assert.match(android, /android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d/);
-  assert.match(android, /adb shell pidof com\.ohi\.xgent/);
-  assert.match(android, /adb logcat -d AndroidRuntime:E '\*:S'/);
+  assert.match(android, /script: bash scripts\/release\/smoke-launch-android\.sh/);
+  const androidSmoke = readFileSync(path.join(repoRoot, "scripts/release/smoke-launch-android.sh"), "utf8");
+  assert.match(androidSmoke, /adb shell pidof com\.ohi\.xgent/);
+  assert.match(androidSmoke, /adb logcat -d AndroidRuntime:E '\*:S'/);
   assert.match(android, /xgent-android-launch-evidence/);
   assert.match(ios, /--target aarch64-sim/);
   assert.match(ios, /xcrun simctl launch --terminate-running-process/);

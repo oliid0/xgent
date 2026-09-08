@@ -394,6 +394,7 @@ async function postAssistanceHandoff(
 }
 
 export type BrowserUseToolsOptions = {
+  conversationId?: string;
   delegateToLanPc?: {
     enabled: boolean;
     baseUrl: string;
@@ -454,6 +455,7 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
       action = requiredAction(args.action);
       context?.emitToolStatus?.(`Browser · ${action}`);
       controller = await resolveController();
+      sessionId = controller.sessionIdForConversation(options.conversationId ?? "", sessionId);
       const activeController = controller;
       const delegated = activeController !== browserSessionController;
 
@@ -484,7 +486,8 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
         );
       } else if (action === "list_tabs") {
         await controller.initialize();
-        result = await controller.refreshSessions();
+        await controller.refreshSessions();
+        result = controller.sessionsForConversation(options.conversationId ?? "");
       } else if (action === "new_tab") {
         const session = args.session_id?.trim()
           ? await controller.ensureSession({
@@ -493,6 +496,7 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
               preserveActive: true,
             })
           : await controller.newSession(normalizeBrowserAddress(args.url || ""), {
+              conversationId: options.conversationId,
               preserveActive: true,
             });
         sessionId = session.sessionId;

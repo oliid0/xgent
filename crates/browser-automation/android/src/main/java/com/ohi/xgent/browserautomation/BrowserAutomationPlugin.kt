@@ -325,7 +325,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
             javaScriptEnabled = true
             domStorageEnabled = true
             databaseEnabled = true
-            allowFileAccess = false
+            allowFileAccess = true
             allowContentAccess = false
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             mediaPlaybackRequiresUserGesture = true
@@ -815,10 +815,10 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
 
     private fun validateUrl(invoke: Invoke, raw: String?): String? {
         val value = raw?.trim().orEmpty()
-        val normalized = if ("://" in value) value else "https://$value"
+        val normalized = if ("://" in value || value == "about:blank") value else "https://$value"
         val uri = runCatching { Uri.parse(normalized) }.getOrNull()
-        if (uri == null || uri.host.isNullOrBlank() || uri.scheme !in setOf("http", "https")) {
-            invoke.reject("Browser navigation only supports valid http and https URLs")
+        if (uri == null || !(normalized == "about:blank" || uri.scheme == "file" || (!uri.host.isNullOrBlank() && uri.scheme in setOf("http", "https")))) {
+            invoke.reject("Browser navigation supports http, https, local file URLs and about:blank")
             return null
         }
         return normalized

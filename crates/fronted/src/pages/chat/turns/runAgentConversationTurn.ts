@@ -1070,7 +1070,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
             (prev) =>
               updateLiveRound(prev, round, (target) => ({
                 ...appendThinkingDeltaToRound(target, delta),
-                thinkingOpen: true,
+                thinkingOpen: false,
               })),
             transcriptStore,
           );
@@ -1544,7 +1544,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           (prev) =>
             updateLiveRound(prev, round, (target) => ({
               ...appendThinkingDeltaToRound(target, delta),
-              thinkingOpen: true,
+              thinkingOpen: false,
             })),
           transcriptStore,
         );

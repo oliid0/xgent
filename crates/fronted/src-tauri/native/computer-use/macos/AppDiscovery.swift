@@ -52,7 +52,6 @@ enum AppDiscovery {
     private static let listAppsQuery = #"kMDItemContentType == "com.apple.application-bundle" && kMDItemFSName == "*.app""#
     private static let lastUsedDateRankingAttribute = "kMDItemLastUsedDate_Ranking"
     private static let useCountAttribute = "kMDItemUseCount"
-    private static let maxRecentNonRunningApps = 10
     private static let fixtureListBundleIdentifier = "dev.opencodex.opencomputeruse.fixture"
     private static let standardApplicationSearchRoots: [URL] = [
         URL(fileURLWithPath: "/Applications", isDirectory: true),
@@ -115,9 +114,21 @@ enum AppDiscovery {
             )
         }
 
+        // Usage history omits installed applications that have never been opened.
+        for root in standardApplicationSearchRoots {
+            guard let urls = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { continue }
+            for case let url as URL in urls where url.pathExtension == "app" {
+                guard let bundle = Bundle(url: url), let identifier = bundle.bundleIdentifier,
+                      !AppSafetyPolicy.isBlocked(bundleIdentifier: identifier) else { continue }
+                let key = identifier.lowercased()
+                if entriesByBundle[key] == nil {
+                    entriesByBundle[key] = ListedAppDescriptor(name: FileManager.default.displayName(atPath: url.path), bundleIdentifier: identifier, isRunning: false, isFrontmost: false, lastUsed: nil, uses: nil)
+                }
+            }
+        }
         let sorted = entriesByBundle.values.sorted(by: compareListedApps)
         let runningEntries = sorted.filter(\.isRunning)
-        let recentEntries = sorted.filter { !$0.isRunning }.prefix(maxRecentNonRunningApps)
+        let recentEntries = sorted.filter { !$0.isRunning }
         return runningEntries + recentEntries
     }
 
@@ -142,7 +153,9 @@ enum AppDiscovery {
     }
 
     static func resolve(_ query: String) throws -> RunningAppDescriptor {
-        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let aliases = ["\u{5907}\u{5fd8}\u{5f55}": "com.apple.Notes", "notes": "com.apple.Notes", "\u{6587}\u{672c}\u{7f16}\u{8f91}": "com.apple.TextEdit", "\u{8bb0}\u{4e8b}\u{672c}": "com.apple.TextEdit", "textedit": "com.apple.TextEdit"]
+        let normalizedQuery = aliases[rawQuery.lowercased()] ?? rawQuery
         let running = runningApps()
 
         if let bundleIdentifier = blockedBundleIdentifier(forQuery: normalizedQuery) {

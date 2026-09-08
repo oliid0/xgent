@@ -49,7 +49,7 @@ public final class ComputerUseToolDispatcher {
         service.observationMode = arguments["observation"] as? String ?? "auto"
         service.maxImageSize = CGFloat(arguments["max_image_size"] as? Double ?? 1280)
         if name == "get_cached_state" { return try service.cachedState(app: requireString("app", in: arguments)) }
-        if name != "list_apps" && name != "get_app_state" {
+        if name != "list_apps" && name != "get_app_state" && name != "launch_app" {
             if let fresh = try service.validateActionState(
                 app: requireString("app", in: arguments),
                 stateID: arguments["state_id"] as? String
@@ -68,7 +68,7 @@ public final class ComputerUseToolDispatcher {
         switch name {
         case "list_apps":
             return service.listApps()
-        case "get_app_state":
+        case "get_app_state", "launch_app":
             return try service.getAppState(
                 app: requireString("app", in: arguments),
                 textLimit: try optionalTextLimit("text_limit", in: arguments) ?? .defaults,

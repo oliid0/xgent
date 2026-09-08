@@ -4,6 +4,7 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { type ReactNode, useEffect, useRef } from "react";
+import { browserSessionController } from "../../../lib/browser/browserSessionController";
 import { tabForKey } from "./tabState";
 import "./rightSidebar.css";
 
@@ -173,6 +174,7 @@ export function RightSidebar(props: {
               size: "sm",
             }}
             items={menuItems}
+            onOpenChange={browserSessionController.setSurfaceOccluded}
             placement="below"
             alignment="end"
             hasChevron={false}

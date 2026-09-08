@@ -725,23 +725,7 @@ jobs:
           profile: pixel_7_pro
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
-          script: |
-            set -eu
-            release_apk="dist/Xgent-${XGENT_RELEASE_TAG}-Android-universal.apk"
-            adb logcat -c
-            adb install -r "$release_apk"
-            adb shell monkey -p com.ohi.xgent -c android.intent.category.LAUNCHER 1
-            sleep 12
-            app_pid="$(adb shell pidof com.ohi.xgent | tr -d '\r')"
-            test -n "$app_pid"
-            adb shell dumpsys window windows | grep -F 'com.ohi.xgent'
-            adb exec-out screencap -p > "$RUNNER_TEMP/xgent-android-smoke.png"
-            test "$(wc -c < "$RUNNER_TEMP/xgent-android-smoke.png")" -gt 10000
-            if adb logcat -d AndroidRuntime:E '*:S' \
-              | grep -E -A 12 'Process: com\.ohi\.xgent'; then
-              echo "Xgent emitted an Android fatal exception during launch" >&2
-              exit 1
-            fi
+          script: bash scripts/release/smoke-launch-android.sh
 
       - name: Upload Android launch evidence
         if: always()
@@ -1017,7 +1001,7 @@ jobs:
           xcrun simctl boot "$simulator_udid" >/dev/null 2>&1 || true
           xcrun simctl bootstatus "$simulator_udid" -b
           xcrun simctl install "$simulator_udid" "$sim_app"
-          launch_result="$(xcrun simctl launch --terminate-running-process "$simulator_udid" "$bundle_id")"
+          launch_result="$(xcrun simctl launch --terminate-running-process --stdout="$RUNNER_TEMP/xgent-ios-stdout.log" --stderr="$RUNNER_TEMP/xgent-ios-stderr.log" "$simulator_udid" "$bundle_id")"
           app_pid="${launch_result##*: }"
           case "$app_pid" in
             ''|*[!0-9]*) echo "Could not parse simulator launch PID: $launch_result" >&2; exit 1 ;;
@@ -1028,7 +1012,13 @@ jobs:
           mkdir -p "$RUNNER_TEMP/xgent-ios-crashes"
           find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -iname '*xgent*' \
             -exec cp {} "$RUNNER_TEMP/xgent-ios-crashes/" \; || true
-          kill -0 "$app_pid"
+          if ! kill -0 "$app_pid"; then
+            cat "$RUNNER_TEMP/xgent-ios-stdout.log" "$RUNNER_TEMP/xgent-ios-stderr.log" || true
+            xcrun simctl spawn "$simulator_udid" log show --last 3m --style compact \
+              --predicate "eventMessage CONTAINS '$bundle_id' OR eventMessage CONTAINS '$executable'" \
+              > "$RUNNER_TEMP/xgent-ios-system.log" 2>&1 || true
+            exit 1
+          fi
           xcrun simctl io "$simulator_udid" screenshot "$RUNNER_TEMP/xgent-ios-smoke.png"
           test "$(wc -c < "$RUNNER_TEMP/xgent-ios-smoke.png")" -gt 10000
           xcrun simctl terminate "$simulator_udid" "$bundle_id"
@@ -1040,7 +1030,7 @@ jobs:
           name: xgent-ios-launch-evidence
           path: |
             ${{ runner.temp }}/xgent-ios-smoke.png
-            ${{ runner.temp }}/xgent-ios-launch.log
+            ${{ runner.temp }}/xgent-ios-*.log
             ${{ runner.temp }}/xgent-ios-crashes
           if-no-files-found: warn
           retention-days: 7

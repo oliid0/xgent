@@ -351,7 +351,7 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
           <Link
             href={href}
             color="inherit"
-            className={className}
+            className={fileLink ? `${className ?? ""} xgent-file-link` : className}
             rel={rel}
             target={target}
             tooltip={title}

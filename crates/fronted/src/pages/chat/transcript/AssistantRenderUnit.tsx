@@ -3,6 +3,7 @@ import { VStack } from "@astryxdesign/core/Layout";
 import { memo, useMemo } from "react";
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
 import { CloudArtifactsCard } from "../../../components/chat/CloudArtifactsCard";
+import { GeneratedFilePreviewCard } from "../../../components/chat/GeneratedFilePreviewCard";
 import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { HistoryMessageRef } from "../../../lib/chat/conversation/conversationState";
 import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
@@ -33,6 +34,7 @@ export type AssistantRenderUnitProps = {
 
 const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
   unit: AssistantFooterRenderUnit;
+  workdir?: string;
   compacted: boolean;
   onOpenFileLink?: AssistantRenderUnitProps["onOpenFileLink"];
   onResendFromEdit: AssistantRenderUnitProps["onResendFromEdit"];
@@ -50,11 +52,18 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
     <ChatMessage
       sender="assistant"
       density="compact"
-      className="group/assistant"
+      className="group/assistant assistant-footer-message"
       style={compacted ? { opacity: "var(--xgent-opacity-compacted)" } : undefined}
     >
       {hasCards ? (
         <VStack gap={2} width="100%">
+          {changedFiles && props.workdir ? (
+            <GeneratedFilePreviewCard
+              summary={changedFiles}
+              workdir={props.workdir}
+              onOpenFileLink={onOpenFileLink}
+            />
+          ) : null}
           {changedFiles ? (
             <ChangedFilesCard
               summary={changedFiles}
@@ -98,6 +107,7 @@ export const AssistantRenderUnit = memo(function AssistantRenderUnit(
     return (
       <AssistantFooterUnit
         unit={row.unit}
+        workdir={workdir}
         compacted={row.compacted}
         onOpenFileLink={onOpenFileLink}
         onResendFromEdit={onResendFromEdit}
@@ -109,7 +119,7 @@ export const AssistantRenderUnit = memo(function AssistantRenderUnit(
   return (
     <VStack
       width="100%"
-      className="group/assistant"
+      className="group/assistant assistant-footer-message"
       style={row.compacted ? { opacity: "var(--xgent-opacity-compacted)" } : undefined}
     >
       <AssistantBubbleUnit

@@ -10,7 +10,7 @@ import {
 } from "../browserAutomation";
 
 const DEFAULT_BROWSER_SESSION_ID = "main";
-const DEFAULT_BROWSER_HOME = "https://www.google.com/";
+const DEFAULT_BROWSER_HOME = "about:blank";
 export const MAX_BROWSER_SESSIONS = 16;
 
 export type BrowserControllerState = {
@@ -73,12 +73,17 @@ function normalizedSessionId(value: string | undefined) {
 }
 
 export function normalizeBrowserAddress(value: string) {
-  const address = value.trim();
+  const address = value.trim().replace(/^locahost(?=[:/]|$)/i, "localhost");
   if (!address) return DEFAULT_BROWSER_HOME;
-  if (/^https?:\/\//i.test(address)) return address;
+  if (/^(?:https?|file):\/\//i.test(address) || address === "about:blank") return address;
+  if (/^[a-z]:[\\/]/i.test(address) || address.startsWith("/")) {
+    const url = new URL("file:///");
+    url.pathname = address.replace(/\\/g, "/");
+    return url.href;
+  }
 
   const localHost =
-    /^(localhost|127(?:\.\d{1,3}){3}|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})(:\d+)?(?:\/|$)/i.test(
+    /^(localhost|0\.0\.0\.0|\[::1\]|127(?:\.\d{1,3}){3}|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})(:\d+)?(?:\/|$)/i.test(
       address,
     );
   if (localHost) return `http://${address}`;
@@ -101,6 +106,46 @@ export class BrowserSessionController {
   constructor(private readonly client: BrowserAutomationClient = localBrowserAutomationClient) {}
 
   private homePage = DEFAULT_BROWSER_HOME;
+  private conversationId = "";
+  private readonly sessionOwners = new Map<string, string>();
+  private readonly sessionAliases = new Map<string, string>();
+  private surfaceOccluded = false;
+  private readonly viewports = new Map<string, BrowserViewport>();
+
+  sessionIdForConversation(conversationId: string, requested = "main") {
+    if (!conversationId) return requested;
+    if (this.sessionOwners.get(requested) === conversationId) return requested;
+    const key = JSON.stringify([conversationId, requested]);
+    let id = this.sessionAliases.get(key);
+    if (!id) {
+      id = `c-${crypto.randomUUID()}`;
+      this.sessionAliases.set(key, id);
+      this.sessionOwners.set(id, conversationId);
+    }
+    return id;
+  }
+
+  sessionsForConversation(conversationId = this.conversationId) {
+    return this.state.sessions.filter(
+      (session) => !conversationId || this.sessionOwners.get(session.sessionId) === conversationId,
+    );
+  }
+
+  selectConversation(conversationId: string) {
+    if (this.conversationId === conversationId) return;
+    this.closePanel();
+    this.conversationId = conversationId;
+    this.update({
+      activeSessionId: this.sessionsForConversation(conversationId)[0]?.sessionId ?? null,
+    });
+  }
+
+  setSurfaceOccluded = (occluded: boolean) => {
+    this.surfaceOccluded = occluded;
+    const id = this.state.activeSessionId;
+    const viewport = id ? this.viewports.get(id) : null;
+    if (id && viewport) void this.setViewport(id, viewport).catch(() => undefined);
+  };
   private state: BrowserControllerState = {
     initialized: false,
     initializing: false,
@@ -174,7 +219,11 @@ export class BrowserSessionController {
           this.state.activeSessionId &&
           sessions.some((session) => session.sessionId === this.state.activeSessionId)
             ? this.state.activeSessionId
-            : (sessions[0]?.sessionId ?? null);
+            : (sessions.find(
+                (session) =>
+                  !this.conversationId ||
+                  this.sessionOwners.get(session.sessionId) === this.conversationId,
+              )?.sessionId ?? null);
         this.update({
           initialized: true,
           initializing: false,
@@ -205,7 +254,11 @@ export class BrowserSessionController {
       this.state.activeSessionId &&
       sessions.some((session) => session.sessionId === this.state.activeSessionId)
         ? this.state.activeSessionId
-        : (sessions[0]?.sessionId ?? null);
+        : (sessions.find(
+            (session) =>
+              !this.conversationId ||
+              this.sessionOwners.get(session.sessionId) === this.conversationId,
+          )?.sessionId ?? null);
     this.update({ sessions, activeSessionId, error: null });
     return sessions;
   }
@@ -216,7 +269,11 @@ export class BrowserSessionController {
       throw new Error(this.state.status.detail || "The embedded browser is unavailable.");
     }
 
-    const sessionId = normalizedSessionId(options.sessionId);
+    const sessionId = normalizedSessionId(
+      options.sessionId ?? this.sessionIdForConversation(this.conversationId),
+    );
+    if (this.conversationId && this.sessionOwners.get(sessionId) !== this.conversationId)
+      options = { ...options, preserveActive: true };
     const existing = this.state.sessions.find((session) => session.sessionId === sessionId);
     const shouldNavigate = Boolean(options.url?.trim());
     if (existing) {
@@ -295,7 +352,10 @@ export class BrowserSessionController {
     return session;
   }
 
-  async newSession(url = this.homePage, options: { preserveActive?: boolean } = {}) {
+  async newSession(
+    url = this.homePage,
+    options: { preserveActive?: boolean; conversationId?: string } = {},
+  ) {
     await this.initialize();
     const used = new Set([
       ...this.state.sessions.map((session) => session.sessionId),
@@ -304,18 +364,27 @@ export class BrowserSessionController {
     let index = ++this.nextUserTabId;
     while (used.has(`tab-${index}`)) index = ++this.nextUserTabId;
     return this.ensureSession({
-      sessionId: `tab-${index}`,
+      sessionId: this.sessionIdForConversation(
+        options.conversationId ?? this.conversationId,
+        `tab-${index}`,
+      ),
       url,
       preserveActive: options.preserveActive,
     });
   }
 
   selectSession(sessionId: string) {
-    if (!this.state.sessions.some((session) => session.sessionId === sessionId)) return;
+    if (!this.sessionsForConversation().some((session) => session.sessionId === sessionId)) return;
     this.update({ activeSessionId: sessionId, error: null });
   }
 
   openPanel(sessionId?: string, source: "agent" | "user" = "agent") {
+    if (
+      sessionId &&
+      this.conversationId &&
+      this.sessionOwners.get(sessionId) !== this.conversationId
+    )
+      return;
     const nextSessionId =
       sessionId && this.state.sessions.some((session) => session.sessionId === sessionId)
         ? sessionId
@@ -352,10 +421,18 @@ export class BrowserSessionController {
     delete previewDataUrls[sessionId];
     delete completedHumanAssistance[sessionId];
     this.agentObservations.delete(sessionId);
-    const closedIndex = this.state.sessions.findIndex((session) => session.sessionId === sessionId);
+    this.viewports.delete(sessionId);
+    this.sessionOwners.delete(sessionId);
+    for (const [alias, id] of this.sessionAliases) {
+      if (id === sessionId) this.sessionAliases.delete(alias);
+    }
+    const remaining = sessions.filter(
+      (session) =>
+        !this.conversationId || this.sessionOwners.get(session.sessionId) === this.conversationId,
+    );
     const activeSessionId =
       this.state.activeSessionId === sessionId
-        ? (sessions[Math.min(closedIndex, sessions.length - 1)]?.sessionId ?? null)
+        ? (remaining[0]?.sessionId ?? null)
         : this.state.activeSessionId;
     this.update({
       sessions,
@@ -375,6 +452,9 @@ export class BrowserSessionController {
       await this.enqueue(sessionId, () => this.client.closeSession(sessionId));
     }
     this.agentObservations.clear();
+    this.viewports.clear();
+    this.sessionOwners.clear();
+    this.sessionAliases.clear();
     this.update({
       sessions: [],
       activeSessionId: null,
@@ -475,8 +555,15 @@ export class BrowserSessionController {
 
   async setViewport(sessionIdInput: string, viewport: BrowserViewport) {
     const sessionId = normalizedSessionId(sessionIdInput);
+    this.viewports.set(sessionId, viewport);
     const session = await this.enqueue(sessionId, () =>
-      this.client.setViewport(sessionId, viewport),
+      this.client.setViewport(sessionId, {
+        ...viewport,
+        visible:
+          viewport.visible &&
+          !this.surfaceOccluded &&
+          (!this.conversationId || this.sessionOwners.get(sessionId) === this.conversationId),
+      }),
     );
     this.update({ sessions: mergeSession(this.state.sessions, session), error: null });
     return session;
@@ -493,9 +580,12 @@ export class BrowserSessionController {
       agent?: boolean;
     } = {},
   ): Promise<BrowserActionResponse> {
-    const sessionId = normalizedSessionId(options.sessionId);
+    const sessionId = normalizedSessionId(
+      options.sessionId ?? this.sessionIdForConversation(this.conversationId),
+    );
     const preserveActive =
       options.preserveActive === true ||
+      (Boolean(this.conversationId) && this.sessionOwners.get(sessionId) !== this.conversationId) ||
       (this.state.panelOpenSource === "user" &&
         this.state.activeSessionId !== null &&
         this.state.activeSessionId !== sessionId);
@@ -569,6 +659,11 @@ export class BrowserSessionController {
             fresh = await this.client.action(sessionId, "snapshot", {}, options.timeoutMs);
           } catch (error) {
             this.agentObservations.delete(sessionId);
+            this.viewports.delete(sessionId);
+            this.sessionOwners.delete(sessionId);
+            for (const [alias, id] of this.sessionAliases) {
+              if (id === sessionId) this.sessionAliases.delete(alias);
+            }
             return {
               ...result,
               data: {
@@ -590,6 +685,8 @@ export class BrowserSessionController {
         }
         return result;
       });
+      if (this.conversationId && this.sessionOwners.get(sessionId) !== this.conversationId)
+        options = { ...options, preserveActive: true };
       const existing = this.state.sessions.find((session) => session.sessionId === sessionId);
       const previewDataUrls = response.screenshotBase64
         ? {

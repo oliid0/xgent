@@ -388,7 +388,7 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
   const handleOpenExternal = useCallback(
     (path: string) => {
       setActionError(null);
-      void openWorkspacePath(path, "open").catch((error: unknown) => {
+      void openWorkspacePath(path, "choose").catch((error: unknown) => {
         setActionError(error instanceof Error ? error.message : String(error));
       });
     },

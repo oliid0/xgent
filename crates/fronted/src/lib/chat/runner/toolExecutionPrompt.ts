@@ -223,10 +223,9 @@ export function buildToolsSuffix(
     const bashPlatformLines =
       runtimePlatform === "windows"
         ? [
-            `- Current platform: ${platformLabel}. Bash runs through Git Bash with POSIX semantics; pwsh, Windows PowerShell, and cmd are fallbacks used only when Git Bash is not installed.`,
-            "- Write POSIX/bash-compatible commands by default: `export`, `&&`, `/dev/null`, forward-slash paths.",
-            "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xgent-task.log 2>&1 < /dev/null &`.",
-            "- If a Bash result header reports `shell_family: powershell` or `shell_family: cmd`, Git Bash is missing: switch to PowerShell syntax and suggest installing Git for Windows or setting `XGENT_GIT_BASH_PATH`.",
+            `- Current platform: ${platformLabel}. The Bash tool executes in native PowerShell (pwsh, then Windows PowerShell; cmd is the last fallback).`,
+            "- Use PowerShell syntax, $env:NAME='value', native cmdlets and quoted literal paths; do not assume export, /dev/null, bash, or POSIX operators.",
+            "- Read shell_family in command results. Use ManagedProcess for background work. Only invoke a separate bash explicitly when the task requires a verified installed POSIX tool.",
           ]
         : [
             `- Current platform: ${platformLabel}. Bash runs through POSIX shells.`,
@@ -240,6 +239,8 @@ export function buildToolsSuffix(
         "## Bash",
         "- Bash.cwd follows the path rules in **Workspace & Paths**.",
         ...bashPlatformLines,
+        "- Install dependencies in the active project: npm/pnpm installs must use project node_modules. For Python create/use .venv and invoke its Python explicitly. Never use pip --user, global installs, or unrelated working directories unless the user requests that scope.",
+        "- Environment assignments apply to the current command and its children, not future tool calls. Use the same project interpreter on subsequent calls; inspect tools and versions before installing.",
         '- To run installed Skill scripts, use cwd="skill://<enabled-skill>/scripts" plus a relative command.',
         "- Passing an absolute Skill script path inside the command is also accepted as long as the referenced Skill is enabled in this conversation.",
         "- For endpoint tests with curl, include an explicit timeout such as `--max-time 30` so a stalled local server or upstream request cannot hold the whole turn indefinitely.",
@@ -269,8 +270,8 @@ export function buildToolsSuffix(
   sections.push(
     [
       "## File Preview",
-      "- The Xgent interface automatically renders successfully written HTML and Markdown files beneath the assistant reply, with Preview and Source tabs and source copying.",
-      "- Do not start a local/dev/preview server and do not open the embedded or external browser merely to preview one HTML or Markdown file.",
+      "- Successfully generated documents appear as file cards above the diff. Link the actual file path. PDF, PPTX, DOCX, spreadsheets, images, HTML and Markdown open in the integrated viewer; never claim a file exists or renders correctly without verifying it.",
+      "- Use browser_use for HTML visual and interaction verification, including file:// and localhost pages. Prefer the integrated preview for passive document reading; start a managed server only when required by page behavior.",
       "- Start a managed server only when the user's task explicitly requires a running multi-file application or server behavior that a single-file preview cannot provide.",
     ].join("\n"),
   );
@@ -331,6 +332,8 @@ export function buildToolsSuffix(
     sections.push(
       [
         "## Embedded Browser",
+        "- Choose browser_use for web navigation, research requiring interaction, and generated HTML verification. Do not launch the external browser with shell/open/xdg-open/Start-Process unless the user explicitly requests it.",
+        "- For documents requiring current information or sourced facts, search the web before drafting using available search tools or browser_use, read the sources, and cite them. Do not invent facts or links. Pure formatting of provided content does not need web research.",
         "- browser_use operates Xgent's user-visible embedded browser on desktop, Android, and iOS. It is the same live tab the user can inspect, not a mock or a separate extension session.",
         "- Start with open/navigate, then call snapshot. Prefer the returned stable element refs for click, type, press_key, hover, and scroll instead of guessing selectors or coordinates.",
         "- type can submit the containing form; press_key handles keyboard actions. wait_for_selector is preferred for content that appears asynchronously.",
