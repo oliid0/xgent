@@ -56,7 +56,7 @@ export function ComputerUseSection({ settings, setSettings }: SettingsSectionPro
     void invoke<{ platform: string }>("app_runtime_platform")
       .then(async ({ platform }) => {
         if (disposed) return;
-        if (!["windows", "linux", "macos", "android"].includes(platform)) {
+        if (!["windows", "linux", "macos"].includes(platform)) {
           setSupported(false);
           return;
         }

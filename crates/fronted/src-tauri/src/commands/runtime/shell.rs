@@ -396,6 +396,8 @@ pub async fn shell_run(
     sandbox: bool,
     sandbox_allow_network: bool,
 ) -> Result<ShellRunResponse, String> {
+    // Mobile uses the PRoot/a-Shell boundary rather than the desktop sandbox.
+    let _ = (sandbox, sandbox_allow_network);
     let lan_pc_client = app
         .try_state::<Arc<LanPcClient>>()
         .map(|state| Arc::clone(state.inner()));

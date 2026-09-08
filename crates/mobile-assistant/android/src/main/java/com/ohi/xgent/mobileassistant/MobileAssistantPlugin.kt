@@ -83,13 +83,6 @@ class ComposeMessageArgs {
     var body: String? = null
 }
 
-@InvokeArg
-class ComputerUseArgs {
-    var operation: String = "status"
-    var runId: String = ""
-    var arguments: JSObject = JSObject()
-}
-
 @TauriPlugin(
     permissions = [
         Permission(strings = [Manifest.permission.RECORD_AUDIO], alias = ALIAS_MICROPHONE),
@@ -113,34 +106,6 @@ class ComputerUseArgs {
     ],
 )
 class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
-    @Command
-    fun computerUse(invoke: Invoke) {
-        val request = invoke.parseArgs(ComputerUseArgs::class.java)
-        activity.runOnUiThread {
-            val preferences = activity.getSharedPreferences("xgent-cua", Context.MODE_PRIVATE)
-            if (request.operation == "cancel") {
-                invoke.resolve(JSObject().put("cancelled", ComputerUseService.instance?.cancel(request.runId) == true))
-                return@runOnUiThread
-            }
-            if (request.operation == "set_enabled") {
-                val enabled = request.arguments.optBoolean("enabled", false)
-                preferences.edit().putBoolean("enabled", enabled).apply()
-                if (!enabled) ComputerUseService.instance?.cancel(null)
-                if (enabled && ComputerUseService.instance == null) {
-                    activity.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                }
-            }
-            if (request.operation == "status" || request.operation == "set_enabled") {
-                invoke.resolve(JSObject().put("enabled", preferences.getBoolean("enabled", false))
-                    .put("installed", true).put("target", "android").put("version", Build.VERSION.RELEASE)
-                    .put("permissionsRequired", ComputerUseService.instance == null))
-            } else {
-                val service = ComputerUseService.instance
-                if (service == null) invoke.reject("Enable Xgent Computer Use in Android Settings > Accessibility, then retry")
-                else service.call(request.operation, request.arguments, request.runId) { result -> invoke.resolve(JSObject(result.toString())) }
-            }
-        }
-    }
     private val mainHandler = Handler(Looper.getMainLooper())
     private var speechRecognizer: SpeechRecognizer? = null
     private var pendingVoiceInvoke: Invoke? = null

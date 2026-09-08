@@ -353,11 +353,6 @@ macro_rules! app_invoke_handler {
 macro_rules! app_invoke_handler {
     () => {
         tauri::generate_handler![
-            commands::cua::cua_call,
-            commands::cua::cua_cancel,
-            commands::cua::cua_status,
-            commands::cua::cua_set_enabled,
-            commands::cua::cua_preview,
             commands::chat_history::chat_history_list,
             commands::chat_history::chat_history_workdirs,
             commands::chat_history::chat_history_search,
@@ -1217,7 +1212,7 @@ pub fn run() {
 
     app.run(|app, event| {
         if matches!(event, tauri::RunEvent::Resumed) {
-            if let Some(window) = app.get_window("main") {
+            if let Some(window) = app.get_webview_window("main") {
                 if let Err(error) = window.show() {
                     eprintln!("failed to restore Xgent window after resume: {error}");
                 }

@@ -42,12 +42,6 @@ struct NativePermissionRequest {
 }
 
 impl<R: Runtime> MobileAssistant<R> {
-    pub fn computer_use(&self, request: serde_json::Value) -> crate::Result<serde_json::Value> {
-        #[cfg(target_os = "android")]
-        { self.0.run_mobile_plugin("computerUse", request).map_err(Into::into) }
-        #[cfg(not(target_os = "android"))]
-        { let _ = request; Err(crate::Error::Unavailable("iOS does not expose cross-app input automation to installed apps".into())) }
-    }
     pub fn status(&self) -> crate::Result<MobileAssistantStatus> {
         self.0.run_mobile_plugin("status", ()).map_err(Into::into)
     }

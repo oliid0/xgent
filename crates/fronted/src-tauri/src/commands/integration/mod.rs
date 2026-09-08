@@ -1,6 +1,4 @@
 pub mod cloud;
-#[cfg(mobile)]
-pub mod mobile_cua;
 #[cfg(desktop)]
 pub mod cua;
 pub mod lan_pc;

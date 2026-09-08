@@ -61,7 +61,7 @@ async function withCuaLock<T>(run: () => Promise<T>, signal?: AbortSignal) {
   }
 }
 
-const cuaTool = {
+const cuaTool: Tool = {
   name: "cua",
   description:
     "Operate desktop applications through one state-grounded computer-use engine. Prefer reliable app APIs/scripts for bulk work, semantic controls for forms, and screenshot input for visual surfaces. Use list_apps to discover running windows and installed applications; an absent window does not mean an application is not installed. On Windows, use launch_app with an installed app_id, then list_apps to obtain its window target. On macOS get_app_state can launch by bundle ID. Use get_app_state before actions; inspect every returned state and never repeat completed work. Use sequence for up to 20 known dependent steps on one app, with optional expected_text preconditions. Sequences run locally and stop at the first stale state, unmet condition, cancellation or error. Use observation=text for semantic work and observation=image for canvas/3D surfaces to reduce capture or accessibility cost. A dispatched action is not proof of task success: verify its postcondition in the returned state. Failures may have side effects; observe before retrying. Do not target Xgent itself.",
@@ -195,7 +195,7 @@ const cuaTool = {
       max_tree_depth: { type: "integer", minimum: 1 },
     },
   },
-} satisfies Tool;
+};
 
 function errorResult(toolCall: ToolCall, error: unknown): ToolResultMessage {
   const message = error instanceof Error ? error.message : String(error);
@@ -213,35 +213,14 @@ function errorResult(toolCall: ToolCall, error: unknown): ToolResultMessage {
 export function createCuaTools(
   params: {
     conversationId?: string;
-    android?: boolean;
     driver?: Awaited<ReturnType<typeof createMcpTools>>;
     driverServerIds?: readonly string[];
   } = {},
 ): BuiltinToolBundle {
   const adapter = createCuaDriverAdapter(params.driver, params.driverServerIds ?? []);
-  const tool = params.android
-    ? {
-        ...cuaTool,
-        description:
-          "Operate apps on this Android device using native accessibility and touch input. Enable Xgent Computer Use in Android Accessibility settings first. Use list_apps to obtain package IDs, then get_app_state with app=package ID to launch and observe. Coordinates are full-screen screenshot pixels. Use the latest state_id for every action and inspect its returned state. type_text inserts into the focused text field; set_value replaces its value. press_key supports Back, Home, Enter and Control+A. Touch clicks are left-button taps. Use scroll once per observed screen. Screenshots require Android 11 or later; protected screens may only expose semantic elements.",
-        parameters: {
-          ...cuaTool.parameters,
-          properties: {
-            ...cuaTool.parameters.properties,
-            operation: {
-              type: "string",
-              enum: CUA_OPERATIONS.filter(
-                (operation) =>
-                  !["input", "sequence", "perform_secondary_action"].includes(operation),
-              ),
-            },
-          },
-        },
-      }
-    : cuaTool;
   return {
     groupId: "system",
-    tools: [tool],
+    tools: [cuaTool],
     metadataByName: createBuiltinMetadataMap([
       [
         cuaTool.name,
@@ -312,10 +291,7 @@ export function createCuaTools(
                   },
                 ).catch(() => undefined)
               : undefined;
-            const cancel = () =>
-              params.android
-                ? void invoke("cua_cancel", { run_id: runId }).catch(() => undefined)
-                : requestRuntimeCancel(runId);
+            const cancel = () => requestRuntimeCancel(runId);
             signal?.addEventListener("abort", cancel, { once: true });
             let response: CuaCallResponse;
             try {
