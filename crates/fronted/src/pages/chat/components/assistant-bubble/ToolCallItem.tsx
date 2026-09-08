@@ -1,16 +1,15 @@
 import { Banner } from "@astryxdesign/core/Banner";
-import {
-  type ChatToolCallItem as AstryxToolCallItem,
-  ChatToolCalls,
-} from "@astryxdesign/core/Chat";
+import { Button } from "@astryxdesign/core/Button";
+import type { ChatToolCallItem as AstryxToolCallItem } from "@astryxdesign/core/Chat";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
-import { VStack } from "@astryxdesign/core/Stack";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import { memo, type ReactNode, useCallback } from "react";
 
 import { AskUserQuestionCard } from "../../../../components/chat/AskUserQuestionCard";
+import { Wrench, X } from "../../../../components/icons";
 import { useLocale } from "../../../../i18n";
 import {
   ASK_USER_QUESTION_TOOL_NAME,
@@ -31,6 +30,7 @@ import {
   toolCallArgsForDisplay,
   toolResultMessageToText,
 } from "../../../../lib/chat/messages/uiMessages";
+import { requestToolActivity, toolStepLabel } from "../../../../lib/chat/toolActivityNavigation";
 import { isSubagentCardToolCall } from "../../../../lib/subagents/card";
 import {
   answerAskUserQuestion,
@@ -223,7 +223,15 @@ export function createAstryxToolCall(
   };
 }
 
-export function ToolCallDetail({ item, isRunning }: { item: ToolTraceItem; isRunning?: boolean }) {
+export function ToolCallDetail({
+  item,
+  isRunning,
+  expanded = false,
+}: {
+  item: ToolTraceItem;
+  isRunning?: boolean;
+  expanded?: boolean;
+}) {
   const { t } = useLocale();
   const result = item.toolResult;
   const builtinResultKind = getBuiltinResultKind(result);
@@ -300,7 +308,7 @@ export function ToolCallDetail({ item, isRunning }: { item: ToolTraceItem; isRun
                 );
               }
               return (
-                <Collapsible trigger={t("chat.tool.viewReturn")} defaultIsOpen={false}>
+                <Collapsible trigger={t("chat.tool.viewReturn")} defaultIsOpen={expanded}>
                   <CodeBlock
                     code={code}
                     language="plaintext"
@@ -321,19 +329,48 @@ export function ToolCallDetail({ item, isRunning }: { item: ToolTraceItem; isRun
 }
 
 function ToolCallItem({ item, isRunning }: { item: ToolTraceItem; isRunning?: boolean }) {
-  const { t } = useLocale();
-  const pinned = shouldPinToolDetail(item, isRunning);
+  const pinned =
+    item.toolCall.name === ASK_USER_QUESTION_TOOL_NAME && shouldPinToolDetail(item, isRunning);
   const detail = hasToolCallDetail(item) ? (
     <ToolCallDetail item={item} isRunning={isRunning} />
   ) : undefined;
-  const name = getLocalizedToolTitle(item, t);
-  const call = createAstryxToolCall(item, Boolean(isRunning), pinned ? undefined : detail, name);
 
   return (
     <VStack gap={1}>
-      <ChatToolCalls calls={[call]} />
+      <ToolStepRow item={item} isRunning={isRunning} />
       {pinned ? detail : null}
     </VStack>
+  );
+}
+
+export function ToolStepRow({ item, isRunning }: { item: ToolTraceItem; isRunning?: boolean }) {
+  const { t } = useLocale();
+  const label = toolStepLabel(item, getLocalizedToolTitle(item, t));
+  return (
+    <Button
+      label={label}
+      variant="ghost"
+      width="100%"
+      className="xgent-tool-step"
+      onClick={() => requestToolActivity(item)}
+    >
+      <HStack gap={2} vAlign="start" width="100%">
+        {isRunning ? (
+          <span className="xgent-thinking-orb" aria-hidden="true" />
+        ) : item.toolResult?.isError ? (
+          <X />
+        ) : (
+          <Wrench />
+        )}
+        <Text
+          type="body"
+          color={isRunning ? "primary" : "secondary"}
+          style={{ textAlign: "start", overflowWrap: "anywhere" }}
+        >
+          {label}
+        </Text>
+      </HStack>
+    </Button>
   );
 }
 

@@ -82,7 +82,6 @@ fn resolve_window(query: &str) -> Result<Window, String> {
         || window.title().unwrap_or_default().to_lowercase().contains(&normalized_app_name(query))
         || window.pid().ok().map(|pid| pid.to_string()).as_deref() == Some(query)).collect();
     if candidates.len() == 1 { return Ok(candidates[0].clone()); }
-    if let Some(window) = candidates.iter().find(|window| window.is_focused().unwrap_or(false)) { return Ok((*window).clone()); }
     Err(if candidates.is_empty() { format!("No visible window matches {query:?}. Use list_apps, launch or restore the app, then get_app_state.") }
         else { "Several windows match this app. Use the window:<id> identifier from list_apps.".into() })
 }
@@ -119,9 +118,19 @@ impl Desktop {
         Ok(json!({"content":[{"type":"text","text":state.text}],"isError":false,"details":{"stateId":state.id.to_string(),"observationDeferred":true}}))
     }
     fn snapshot(&mut self, window: &Window, query: &str, note: &str) -> Result<Value, String> {
-        let capture = self.observation != "text";
-        let mut image = if capture { window.capture_image().map_err(|error| format!("Cannot capture app window: {error}. Check screen-capture permission."))? }
-            else { image::RgbaImage::new(0, 0) };
+        let mut capture = self.observation != "text";
+        let mut capture_note=String::new();
+        let mut image = if capture {
+            match window.capture_image() {
+                Ok(image) => image,
+                Err(error) if self.observation == "auto" => {
+                    capture=false;
+                    capture_note=format!("\nScreenshot unavailable ({error}); accessibility observation is still available. Request focus=true to restore a minimized window, or observation=text for background semantic work.");
+                    image::RgbaImage::new(0,0)
+                },
+                Err(error) => return Err(format!("Cannot capture app window: {error}. Use observation=text for accessibility or explicitly restore the window with focus=true.")),
+            }
+        } else { image::RgbaImage::new(0, 0) };
         if capture && (image.width() == 0 || image.height() == 0) { return Err("Window capture was empty".into()); }
         let rect = bounds(window)?;
         if image.width().max(image.height()) > self.max_image_size {
@@ -140,6 +149,8 @@ impl Desktop {
         for (index, element) in snapshot.elements.iter().enumerate() {
             text.push_str(&format!("\n[{index}] {}", element["label"].as_str().unwrap_or("")));
         }
+        text.push_str(&capture_note);
+        text.push_str("\nBackground: accessibility actions do not activate the window. Keyboard/pointer fallback requires foreground; set allow_foreground=false to prevent it.");
         if !capture { text.push_str("\nNo screenshot was captured. Use element_index for actions, or observe with observation=auto/image before using coordinates."); }
         snapshot.text = text.clone();
         let mut content = vec![json!({"type":"text","text":text})];
@@ -183,7 +194,7 @@ impl Desktop {
         }
         let window = resolve_window(query)?;
         if operation == "get_app_state" {
-            platform::focus(&window)?;
+            if arguments["focus"].as_bool() == Some(true) { platform::focus(&window)?; }
             return self.snapshot(&window, query, "Current app state. Inspect before acting.");
         }
         let previous = self.snapshots.get(&query.to_lowercase()).cloned().ok_or("Call get_app_state before an action")?;
@@ -213,9 +224,15 @@ impl Desktop {
         if ["set_value", "perform_secondary_action"].contains(&operation) {
             return Err("This element does not expose the requested accessibility action. Use a screenshot-targeted click and keyboard input instead.".into());
         }
+        if arguments["allow_foreground"].as_bool() == Some(false) {
+            return Err("This action requires foreground input. No input was sent. Use a supported accessibility action or allow foreground input.".into());
+        }
         platform::focus(&window)?;
         if previous.bounds != bounds(&window)? {
             return self.snapshot(&window, query, "ACTION NOT APPLIED: focusing changed the window geometry. Inspect this new state.");
+        }
+        if ["type_text", "press_key"].contains(&operation) {
+            if let Some(element) = element.as_ref() { platform::focus_element(&window, element)?; }
         }
         let settings = if operation == "input" {
             Settings { linux_delay: 0, windows_subject_to_mouse_speed_and_acceleration_level: true, ..Settings::default() }
@@ -237,6 +254,7 @@ impl Desktop {
             parse_key(value.as_str().unwrap_or(""))).collect::<Result<Vec<_>,_>>()).transpose()?.unwrap_or_default();
         let mut held=Vec::new();
         let action_result=(|| {
+        if cancelled() || !window.is_focused().unwrap_or(false) { return Err("Cancelled or target lost focus; no input was sent".into()); }
         for modifier in modifiers { input.key(modifier,Direction::Press).map_err(fail)?; held.push(modifier); }
         match operation {
             "input" => input_burst(&mut input, &window, arguments, cancelled)?,
@@ -247,6 +265,7 @@ impl Desktop {
                 if !(1..=3).contains(&count) { return Err("click_count must be 1, 2 or 3".into()); }
                 input.move_mouse(x,y,Coordinate::Abs).map_err(fail)?;
                 for index in 0..count {
+                    if cancelled() || !window.is_focused().unwrap_or(false) { return Err("Target lost focus or click cancelled".into()); }
                     input.button(button,Direction::Click).map_err(fail)?;
                     if index+1<count { std::thread::sleep(Duration::from_millis(70)); }
                 }
@@ -258,7 +277,9 @@ impl Desktop {
                 let button=match arguments["mouse_button"].as_str().unwrap_or("left") { "left"=>Button::Left,"middle"=>Button::Middle,"right"=>Button::Right,_=>return Err("Unknown mouse_button".into()) };
                 input.button(button,Direction::Press).map_err(fail)?;
                 let drag = (|| {
-                    for step in 1..=20 { input.move_mouse(from_x+(to_x-from_x)*step/20,from_y+(to_y-from_y)*step/20,Coordinate::Abs).map_err(fail)?; std::thread::sleep(Duration::from_millis(15)); }
+                    for step in 1..=20 {
+                        if cancelled() || !window.is_focused().unwrap_or(false) { return Err("Target lost focus or drag cancelled".into()); }
+                        input.move_mouse(from_x+(to_x-from_x)*step/20,from_y+(to_y-from_y)*step/20,Coordinate::Abs).map_err(fail)?; std::thread::sleep(Duration::from_millis(15)); }
                     Ok::<(),String>(())
                 })();
                 let release=input.button(button,Direction::Release).map_err(fail);

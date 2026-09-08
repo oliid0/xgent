@@ -52,11 +52,13 @@ enum MouseButtonKind: String {
 
 enum InputSimulation {
     // Scoped to one call by the serialized native dispatcher.
+    static var allowForeground = true
     static var actionFlags: CGEventFlags = []
     static var actionMouseButton: MouseButtonKind = .left
     static let maxKeyboardUnicodeChunkLength = 64
 
     static func prepareAppForGlobalPointerInput(_ app: RunningAppDescriptor) throws {
+        guard allowForeground else { throw ComputerUseError.message("This action requires foreground input; no input was sent. Use a supported accessibility action or allow foreground input.") }
         guard AXIsProcessTrusted() else {
             throw ComputerUseError.message("Enable Xgent in System Settings > Privacy & Security > Accessibility")
         }

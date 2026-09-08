@@ -1,14 +1,11 @@
-import { Card } from "@astryxdesign/core/Card";
-import { Collapsible } from "@astryxdesign/core/Collapsible";
-import { IconButton } from "@astryxdesign/core/IconButton";
+import { Button } from "@astryxdesign/core/Button";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
-import { ProgressBar } from "@astryxdesign/core/ProgressBar";
-import { Spinner } from "@astryxdesign/core/Spinner";
+import { Popover } from "@astryxdesign/core/Popover";
 import { Text } from "@astryxdesign/core/Text";
 import { useState } from "react";
 import { useLocale } from "../../i18n";
 import type { TaskProgressSnapshot } from "../../lib/chat/taskProgress";
-import { Check, ChevronDown, ChevronUp, Circle, X } from "../icons";
+import { Check, ChevronDown, ChevronUp, Clock3 } from "../icons";
 
 export function TaskProgressBar(props: {
   snapshot: TaskProgressSnapshot | null;
@@ -17,100 +14,80 @@ export function TaskProgressBar(props: {
   const { t } = useLocale();
   const { snapshot, isConversationRunning } = props;
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
-  const [dismissedRunId, setDismissedRunId] = useState<string | null>(null);
   if (!snapshot || snapshot.tasks.length === 0) return null;
-  if (dismissedRunId === snapshot.runId) return null;
-
   const completed = snapshot.tasks.filter((task) => task.status === "completed").length;
   const active = snapshot.tasks.find((task) => task.status === "in_progress");
-  const label = active?.activeForm || active?.subject || t("chat.tasks.ready");
+  const allDone = completed === snapshot.tasks.length;
+  const label = allDone
+    ? t("chat.tasks.completed")
+    : active?.activeForm || active?.subject || t("chat.tasks.ready");
+  const position = active ? snapshot.tasks.indexOf(active) + 1 : completed;
   const isOpen = expandedRunId === snapshot.runId;
-
   return (
-    <VStack
-      className="mx-auto w-full px-3 pb-2 sm:px-5"
-      style={{ maxWidth: "var(--xgent-composer-width)" }}
-    >
-      <Card width="100%" padding={3} elevation="low">
-        <HStack gap={2} vAlign="start">
-          <StackItem size="fill">
-            <Collapsible
-              isOpen={isOpen}
-              onOpenChange={(nextOpen) => setExpandedRunId(nextOpen ? snapshot.runId : null)}
-              trigger={
-                <VStack gap={2} width="100%">
-                  <HStack gap={2} vAlign="center">
-                    {active && isConversationRunning ? (
-                      <Spinner aria-label={label} size="sm" />
-                    ) : (
-                      <Check />
-                    )}
-                    <StackItem size="fill">
-                      <Text type="label" maxLines={1}>
-                        {label}
-                      </Text>
-                    </StackItem>
-                    <Text type="supporting" color="secondary" hasTabularNumbers>
-                      {completed}/{snapshot.tasks.length}
-                    </Text>
-                    {isOpen ? <ChevronUp /> : <ChevronDown />}
-                  </HStack>
-                  <ProgressBar
-                    label={t("chat.tasks.progress")}
-                    value={completed}
-                    max={snapshot.tasks.length}
-                    isLabelHidden
-                    variant={completed === snapshot.tasks.length ? "success" : "accent"}
+    <Popover
+      isOpen={isOpen}
+      onOpenChange={(open) => setExpandedRunId(open ? snapshot.runId : null)}
+      placement="above"
+      label={t("chat.tasks.todo")}
+      width="min(42rem, calc(100vw - 2rem))"
+      content={
+        <VStack gap={3} className="xgent-task-popover">
+          <HStack hAlign="between" vAlign="center">
+            <Text color="secondary">{t("chat.tasks.todo")}</Text>
+            <Text color="secondary" hasTabularNumbers>
+              {position} / {snapshot.tasks.length}
+            </Text>
+          </HStack>
+          <VStack gap={3} isScrollable style={{ maxHeight: "min(24rem, 50dvh)" }}>
+            {snapshot.tasks.map((task) => (
+              <HStack key={task.id} gap={3} vAlign="start">
+                {task.status === "completed" ? (
+                  <Check className="xgent-task-check" aria-label={t("chat.tasks.completed")} />
+                ) : task.status === "in_progress" ? (
+                  <span
+                    className="xgent-thinking-orb"
+                    data-paused={!isConversationRunning}
+                    aria-label={t("chat.mobileActivity.working")}
                   />
-                </VStack>
-              }
-            >
-              <VStack
-                gap={2}
-                paddingBlockStart={3}
-                isScrollable
-                style={{ maxHeight: "min(18rem, 38dvh)" }}
-              >
-                {snapshot.tasks.map((task) => (
-                  <HStack key={task.id} gap={2} vAlign="start">
-                    {task.status === "completed" ? (
-                      <Check aria-hidden="true" />
-                    ) : task.status === "in_progress" && isConversationRunning ? (
-                      <Spinner aria-label={task.activeForm || task.subject} size="sm" />
-                    ) : (
-                      <Circle aria-hidden="true" />
-                    )}
-                    <StackItem size="fill">
-                      <VStack gap={0.5}>
-                        <Text
-                          type="body"
-                          color={task.status === "completed" ? "secondary" : "primary"}
-                        >
-                          {task.subject}
-                        </Text>
-                        {task.description ? (
-                          <Text type="supporting" color="secondary">
-                            {task.description}
-                          </Text>
-                        ) : null}
-                      </VStack>
-                    </StackItem>
-                  </HStack>
-                ))}
-              </VStack>
-            </Collapsible>
+                ) : (
+                  <Clock3 aria-label={t("chat.tasks.todo")} />
+                )}
+                <Text
+                  color={task.status === "pending" ? "secondary" : "primary"}
+                  style={{ overflowWrap: "anywhere" }}
+                >
+                  {task.subject}
+                </Text>
+              </HStack>
+            ))}
+          </VStack>
+        </VStack>
+      }
+    >
+      <Button label={label} variant="ghost" width="100%" className="xgent-task-trigger">
+        <HStack gap={2} vAlign="center" width="100%">
+          {allDone ? (
+            <Check />
+          ) : active ? (
+            <span
+              className="xgent-thinking-orb"
+              data-paused={!isConversationRunning}
+              aria-hidden="true"
+            />
+          ) : (
+            <Clock3 />
+          )}
+          <StackItem size="fill">
+            <Text maxLines={1} style={{ textAlign: "start" }}>
+              {label}
+            </Text>
           </StackItem>
-          <IconButton
-            type="button"
-            label={t("chat.tasks.close")}
-            tooltip={t("chat.tasks.close")}
-            icon={<X />}
-            variant="ghost"
-            size="sm"
-            onClick={() => setDismissedRunId(snapshot.runId)}
-          />
+          <Text type="supporting" color="secondary" hasTabularNumbers>
+            {position} / {snapshot.tasks.length}
+          </Text>
+          {isOpen ? <ChevronUp /> : <ChevronDown />}
         </HStack>
-      </Card>
-    </VStack>
+      </Button>
+    </Popover>
   );
 }

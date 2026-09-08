@@ -1,5 +1,6 @@
 export type ExecutionActivity = {
   id: string;
+  toolCallId?: string;
   kind: "shell" | "cua" | "browser";
   title: string;
   text: string;

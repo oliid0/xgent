@@ -30,13 +30,15 @@ fn app_root(connection:&BusConnection, window:&Window)->Result<Accessible,String
         if app_pid.ok()!=Some(pid) { continue; }
         let proxy=accessible_proxy(connection,&app,"org.a11y.atspi.Accessible")?;
         let children:Vec<Accessible>=proxy.call("GetChildren",&()).unwrap_or_default();
+        let mut matching=Vec::new();
         for child in children {
             if let Ok(proxy)=accessible_proxy(connection,&child,"org.a11y.atspi.Accessible") {
                 let name:String=proxy.get_property("Name").unwrap_or_default();
-                if name==window.title().unwrap_or_default() { return Ok(child.clone()); }
+                if name==window.title().unwrap_or_default() { matching.push(child.clone()); }
             }
         }
-        return Ok(app.clone());
+        if matching.len()==1 { return Ok(matching.remove(0)); }
+        return Err("No unambiguous accessibility window matches this target; inspect its window title before acting".into());
     }
     Err("No accessibility tree was published by this application".into())
 }
@@ -77,9 +79,17 @@ pub fn elements(window:&Window)->(Vec<Value>,String) {
                 .and_then(|proxy|proxy.call("GetActions",&()).ok()).unwrap_or_default();
             let frame:Option<(i32,i32,i32,i32)>=accessible_proxy(&connection,&node,"org.a11y.atspi.Component").ok()
                 .and_then(|proxy|proxy.call("GetExtents",&(0u32,)).ok());
+            let value = if role != "password text" && interfaces.iter().any(|interface|interface.ends_with(".Text")) {
+                accessible_proxy(&connection,&node,"org.a11y.atspi.Text").ok()
+                    .and_then(|proxy| {
+                        let length:i32=proxy.get_property("CharacterCount").unwrap_or(0);
+                        proxy.call::<_,_,String>("GetText",&(0i32,length.clamp(0,2000))).ok()
+                    }).unwrap_or_default()
+            } else { String::new() };
+            let writable=interfaces.iter().any(|interface|interface.ends_with("EditableText"));
             output.push(serde_json::json!({"bus":node.0,"path":node.1.as_str(),"name":name,"role":role,"interfaces":interfaces,
-                "frame":frame,"actions":actions.iter().map(|action|&action.0).collect::<Vec<_>>(),
-                "label":format!("{role}: {name} (actions: {})",actions.iter().map(|action|action.0.as_str()).collect::<Vec<_>>().join(", "))}));
+                "frame":frame,"value":value,"actions":actions.iter().map(|action|&action.0).collect::<Vec<_>>(),
+                "label":format!("{role}: {name} (actions: {}; set_value: {writable}) value: {value:?}",actions.iter().map(|action|action.0.as_str()).collect::<Vec<_>>().join(", "))}));
             if depth<32 {
                 let children:Vec<Accessible>=proxy.call("GetChildren",&()).unwrap_or_default();
                 pending.extend(children.into_iter().rev().map(|child|(child,depth+1)));
@@ -93,7 +103,18 @@ pub fn elements(window:&Window)->(Vec<Value>,String) {
     }
 }
 
+pub fn focus_element(_window:&Window,element:&Value)->Result<(),String> {
+    let connection=accessibility_bus()?;
+    let node=(element["bus"].as_str().ok_or("Missing accessibility bus")?.to_string(),
+        OwnedObjectPath::try_from(element["path"].as_str().ok_or("Missing accessibility path")?).map_err(|e|e.to_string())?);
+    let proxy=accessible_proxy(&connection,&node,"org.a11y.atspi.Component")?;
+    let focused:bool=proxy.call("GrabFocus",&()).map_err(|e|e.to_string())?;
+    if !focused { return Err("Target control rejected keyboard focus; no text was sent".into()); }
+    Ok(())
+}
+
 pub fn semantic_action(_window:&Window,element:&Value,operation:&str,arguments:&Value)->Result<bool,String> {
+    if !["click","set_value","perform_secondary_action"].contains(&operation) { return Ok(false); }
     let connection=accessibility_bus()?;
     let node=(element["bus"].as_str().ok_or("Missing accessibility bus")?.to_string(),
         OwnedObjectPath::try_from(element["path"].as_str().ok_or("Missing accessibility path")?).map_err(|e|e.to_string())?);

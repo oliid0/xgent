@@ -129,3 +129,19 @@ test("disabled CUA cannot invoke native input or install a component", async () 
   assert.match(result.content[0].text, /Settings > Computer use/);
   assert.deepEqual(calls, ["cua_status"]);
 });
+
+test("background-only and precise editor targeting reach the native dispatcher without dropping intent", async () => {
+  const calls = [];
+  const bundle = setup(async (_command, args) => {
+    calls.push(args);
+    return { content: [{ type: "text", text: "Background value written" }], isError: false, details: { stateId: "9", windowId: 42 } };
+  });
+  const arguments_ = { operation: "set_value", app: "window:42", state_id: "8", element_index: "6", value: "你好123", allow_foreground: false, observation: "text", brief: "Record the requested text" };
+  const result = await bundle.executeToolCall({ id: "targeted", name: "cua", arguments: arguments_ });
+  assert.equal(result.isError, false);
+  assert.equal(calls[0].arguments.allow_foreground, false);
+  assert.equal(calls[0].arguments.element_index, "6");
+  assert.equal(calls[0].arguments.value, "你好123");
+  assert.equal(result.details.windowId, 42);
+  assert.ok(bundle.tools[0].parameters.properties.allow_foreground);
+});

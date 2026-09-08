@@ -104,6 +104,11 @@ import {
   listChatHistory,
   setChatHistoryModel,
 } from "../lib/chat/history/chatHistory";
+import {
+  type ImageActivity,
+  imageActivitySelection,
+  OPEN_IMAGE_ACTIVITY,
+} from "../lib/chat/imageActivityNavigation";
 import { memoryExtraction } from "../lib/chat/memory/extractionController";
 import type { MemoryExtractionStatusKey } from "../lib/chat/memory/extractionEngine";
 import { memoryTurnInjection } from "../lib/chat/memory/injectionController";
@@ -116,6 +121,7 @@ import {
   formatFileMentionToken,
   formatMarkdownReferenceDestination,
 } from "../lib/chat/messages/mentionReferences";
+import type { ToolTraceItem } from "../lib/chat/messages/uiMessages";
 import {
   createUserMessageWithUploads,
   mergePendingUploadedFiles,
@@ -133,6 +139,7 @@ import {
 } from "../lib/chat/page/chatPageHelpers";
 import type { AgentRunnerFailoverParams } from "../lib/chat/runner/agentRunner";
 import { skillMentionInjection } from "../lib/chat/skills/mentionInjection";
+import { OPEN_TOOL_ACTIVITY, toolActivitySelection } from "../lib/chat/toolActivityNavigation";
 import type { ScrollFollowHandle } from "../lib/chat-scroll/useScrollFollow";
 import { createStreamDebugLogger } from "../lib/debug/agentDebug";
 import { tauriGitClient } from "../lib/git/tauriGitClient";
@@ -5034,6 +5041,32 @@ export function ChatPage(props: ChatPageProps) {
     if (!mobileExperience) setRightSidebarOpen(false);
   }, [mobileExperience]);
 
+  useEffect(() => {
+    const open = (event: Event) => {
+      if (!currentConversationId) return;
+      imageActivitySelection.select(currentConversationId, null);
+      toolActivitySelection.select(
+        currentConversationId,
+        (event as CustomEvent<ToolTraceItem>).detail,
+      );
+      handleOpenMobileActivity();
+    };
+    window.addEventListener(OPEN_TOOL_ACTIVITY, open);
+    return () => window.removeEventListener(OPEN_TOOL_ACTIVITY, open);
+  }, [currentConversationId, handleOpenMobileActivity]);
+
+  useEffect(() => {
+    const open = (event: Event) => {
+      imageActivitySelection.select(
+        currentConversationId ?? "",
+        (event as CustomEvent<ImageActivity>).detail,
+      );
+      handleOpenMobileActivity();
+    };
+    window.addEventListener(OPEN_IMAGE_ACTIVITY, open);
+    return () => window.removeEventListener(OPEN_IMAGE_ACTIVITY, open);
+  }, [currentConversationId, handleOpenMobileActivity]);
+
   const handleOpenBrowser = useCallback(() => {
     if (mobileExperience) setSidebarOpen(false);
     hideWorkspaceSshTerminalOverlay();
@@ -5952,18 +5985,23 @@ export function ChatPage(props: ChatPageProps) {
           open={mobileActivityOpen}
           onOpen={handleOpenMobileActivity}
           onOpenBrowser={handleOpenBrowser}
-          onClose={handleCloseMobileActivity}
-        />
-      }
-      progressContent={
-        <CurrentTaskProgress
-          historyItems={historyRenderItems}
-          liveTranscriptStore={liveTranscriptStore}
-          isConversationRunning={
+          progressContent={
+            historyRenderItems.length > 0 ||
             isSending ||
-            (currentConversationId ? isConversationRunning(currentConversationId) : false)
+            conversationState.meta.taskList?.tasks.length ? (
+              <CurrentTaskProgress
+                historyItems={historyRenderItems}
+                liveTranscriptStore={liveTranscriptStore}
+                isConversationRunning={
+                  isSending ||
+                  (currentConversationId ? isConversationRunning(currentConversationId) : false)
+                }
+                onOpenActivity={handleOpenMobileActivity}
+                persistedState={conversationState.meta.taskList}
+              />
+            ) : undefined
           }
-          persistedState={conversationState.meta.taskList}
+          onClose={handleCloseMobileActivity}
         />
       }
       conversationId={currentConversationId}

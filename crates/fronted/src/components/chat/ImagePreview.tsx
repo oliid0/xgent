@@ -2,15 +2,22 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { ButtonGroup } from "@astryxdesign/core/ButtonGroup";
 import { Center } from "@astryxdesign/core/Center";
-import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
-import { HStack, Layout, LayoutContent, LayoutFooter, VStack } from "@astryxdesign/core/Layout";
+import {
+  HStack,
+  Layout,
+  LayoutContent,
+  LayoutFooter,
+  LayoutHeader,
+  StackItem,
+  VStack,
+} from "@astryxdesign/core/Layout";
 import { Slider } from "@astryxdesign/core/Slider";
 import { Text } from "@astryxdesign/core/Text";
 import { memo, useCallback, useEffect, useRef, useState, type WheelEvent } from "react";
-
 import { useLocale } from "../../i18n";
+import { requestImageActivity } from "../../lib/chat/imageActivityNavigation";
 import { ArrowLeft, ChevronRight, X } from "../icons";
 
 export type ImagePreviewSlide = {
@@ -46,9 +53,21 @@ function clampZoom(value: number) {
   return Math.min(Math.max(value, 1), 3);
 }
 
+// All transcript image sources use the same sidebar destination.
 export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps) {
+  const sent = useRef(false);
+  useEffect(() => {
+    if (!props.open || !props.slides.length || sent.current) return;
+    sent.current = true;
+    requestImageActivity(props.slides, props.index ?? 0);
+    props.onClose();
+  }, [props.open, props.slides, props.index, props.onClose]);
+  return null;
+});
+
+export const ImagePreviewPanel = memo(function ImagePreviewPanel(props: ImagePreviewProps) {
   const { t } = useLocale();
-  const { open, slides, index = 0, closeLabel = "关闭预览", onClose } = props;
+  const { open, slides, index = 0, closeLabel = t("chat.mobileActivity.close"), onClose } = props;
   const requestedIndex = normalizeImagePreviewIndex(index);
   const clampedRequestedIndex = clampImagePreviewIndex(requestedIndex, slides.length);
   const [activeIndex, setActiveIndex] = useState(clampedRequestedIndex);
@@ -162,23 +181,19 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
   );
 
   return (
-    <Dialog
-      isOpen={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) onClose();
-      }}
-      variant="fullscreen"
-      purpose="info"
-      padding={0}
-    >
+    <VStack height="100%" width="100%" style={{ minHeight: 0, minWidth: 0, overflow: "hidden" }}>
       <Layout
+        height="fill"
         defaultHasDividers
         header={
-          <DialogHeader
-            title={dialogTitle}
-            subtitle={slides.length > 1 ? positionLabel : undefined}
-            endContent={
-              <HStack gap={2} vAlign="center">
+          <LayoutHeader padding={3} hasDivider>
+            <HStack gap={2} vAlign="center" wrap="wrap">
+              <StackItem size="fill">
+                <Text type="label" maxLines={2}>
+                  {dialogTitle}
+                </Text>
+              </StackItem>
+              <HStack gap={2} vAlign="center" wrap="wrap">
                 {actionButtons}
                 <IconButton
                   label={closeLabel}
@@ -189,8 +204,8 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
                   onClick={onClose}
                 />
               </HStack>
-            }
-          />
+            </HStack>
+          </LayoutHeader>
         }
         content={
           <LayoutContent padding={0} isScrollable>
@@ -249,7 +264,7 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
                 max={3}
                 step={0.1}
                 valueDisplay="text"
-                width="min(40vw, var(--xgent-image-preview-slider-max-width))"
+                width="min(10rem, 35vw)"
                 formatValue={(value) => `${Math.round(value * 100)}%`}
                 onChange={(value: number) => setZoom(value)}
               />
@@ -269,6 +284,6 @@ export const ImagePreview = memo(function ImagePreview(props: ImagePreviewProps)
           </LayoutFooter>
         }
       />
-    </Dialog>
+    </VStack>
   );
 });

@@ -46,6 +46,8 @@ public final class ComputerUseToolDispatcher {
 
     public func callTool(name: String, arguments: [String: Any]) throws -> ToolCallResult {
         var arguments = arguments
+        InputSimulation.allowForeground = arguments["allow_foreground"] as? Bool ?? true
+        defer { InputSimulation.allowForeground = true }
         service.observationMode = arguments["observation"] as? String ?? "auto"
         service.maxImageSize = CGFloat(arguments["max_image_size"] as? Double ?? 1280)
         if name == "get_cached_state" { return try service.cachedState(app: requireString("app", in: arguments)) }
@@ -77,7 +79,8 @@ public final class ComputerUseToolDispatcher {
                 treeLimits: AccessibilityTreeLimits.defaults.replacing(
                     maxNodeCount: try optionalPositiveInt("max_tree_nodes", in: arguments),
                     maxDepth: try optionalPositiveInt("max_tree_depth", in: arguments)
-                )
+                ),
+                focus: arguments["focus"] as? Bool ?? false
             )
         case "click":
             return try service.click(
@@ -115,12 +118,14 @@ public final class ComputerUseToolDispatcher {
         case "type_text":
             return try service.typeText(
                 app: requireString("app", in: arguments),
-                text: requireString("text", in: arguments)
+                text: requireString("text", in: arguments),
+                elementIndex: optionalElementIndex(in: arguments)
             )
         case "press_key":
             return try service.pressKey(
                 app: requireString("app", in: arguments),
-                key: requireString("key", in: arguments)
+                key: requireString("key", in: arguments),
+                elementIndex: optionalElementIndex(in: arguments)
             )
         case "set_value":
             return try service.setValue(

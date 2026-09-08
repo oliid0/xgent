@@ -1,34 +1,61 @@
-import { ChatToolCalls } from "@astryxdesign/core/Chat";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { VStack } from "@astryxdesign/core/Layout";
+import { Text } from "@astryxdesign/core/Text";
 import { memo, useMemo, useState } from "react";
 import { useLocale } from "../../../../i18n";
 import type { ToolTraceItem } from "../../../../lib/chat/messages/uiMessages";
-import {
-  areToolTraceItemsEqual,
-  createAstryxToolCall,
-  getLocalizedToolTitle,
-  ToolCallDetail,
-} from "./ToolCallItem";
+import { areToolTraceItemsEqual, ToolStepRow } from "./ToolCallItem";
 
 function ToolTraceGroupInner(props: { items: ToolTraceItem[]; runningToolCallIds?: string[] }) {
   const { items, runningToolCallIds = [] } = props;
   const { t } = useLocale();
   const [isExpanded, setIsExpanded] = useState(false);
   const runningIds = useMemo(() => new Set(runningToolCallIds), [runningToolCallIds]);
-  const calls = useMemo(
-    () =>
-      items.map((item) => {
-        const isRunning = Boolean(item.toolCall.id && runningIds.has(item.toolCall.id));
-        return createAstryxToolCall(
-          item,
-          isRunning,
-          <ToolCallDetail item={item} isRunning={isRunning} />,
-          getLocalizedToolTitle(item, t),
-        );
-      }),
-    [items, runningIds, t],
+  const edited = new Set<string>();
+  const read = new Set<string>();
+  let commands = false;
+  let tools = false;
+  for (const { toolCall, toolResult } of items) {
+    const path = String(toolCall.arguments?.path ?? toolCall.arguments?.file_path ?? toolCall.id);
+    if (toolResult && !toolResult.isError && ["Edit", "Write", "Delete"].includes(toolCall.name))
+      edited.add(path);
+    else if (toolResult && !toolResult.isError && toolCall.name === "Read") read.add(path);
+    else if (["Bash", "ManagedProcess"].includes(toolCall.name)) commands = true;
+    else tools = true;
+  }
+  const summary = [
+    edited.size ? t("chat.activity.edited").replace("{count}", String(edited.size)) : "",
+    read.size ? t("chat.activity.read").replace("{count}", String(read.size)) : "",
+    commands ? t("chat.activity.commands") : "",
+    tools ? t("chat.activity.tools") : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const active = [...items].reverse().find((item) => runningIds.has(item.toolCall.id));
+  return (
+    <VStack gap={1} width="100%">
+      <Collapsible
+        isOpen={isExpanded}
+        onOpenChange={setIsExpanded}
+        trigger={
+          <Text type="supporting" color="secondary">
+            {summary}
+          </Text>
+        }
+      >
+        <VStack gap={1} paddingBlock={2} width="100%">
+          {items.map((item) => (
+            <ToolStepRow
+              key={item.toolCall.id}
+              item={item}
+              isRunning={runningIds.has(item.toolCall.id)}
+            />
+          ))}
+        </VStack>
+      </Collapsible>
+      {!isExpanded && active ? <ToolStepRow item={active} isRunning /> : null}
+    </VStack>
   );
-
-  return <ChatToolCalls calls={calls} isExpanded={isExpanded} onExpandedChange={setIsExpanded} />;
 }
 
 function areRunningIdsEqual(previous?: string[], next?: string[]) {

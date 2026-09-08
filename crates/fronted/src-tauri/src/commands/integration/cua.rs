@@ -175,7 +175,7 @@ pub async fn cua_call(app: tauri::AppHandle, operation: String, arguments: Value
             // Intermediate image encoding/tree traversal is unnecessary for a
             // known gesture sequence. Observe at text preconditions and at the
             // final boundary; the independent monitoring stream stays live.
-            input.insert("_defer_observation".into(),json!(index+1<steps.len() && steps[index+1].get("expected_text").is_none()));
+            input.insert("_defer_observation".into(),json!(index+1<steps.len() && steps[index+1].get("expected_text").is_none() && steps[index+1].get("element_index").is_none()));
             input.insert("state_id".into(),json!(state_id(&current).ok_or("No state returned after the previous step")?));
             let action=input.remove("operation").ok_or("Missing step operation")?;
             let next=component::call(action.as_str().ok_or("Invalid operation")?,&Value::Object(input),&||run_token.is_cancelled());
@@ -185,7 +185,9 @@ pub async fn cua_call(app: tauri::AppHandle, operation: String, arguments: Value
             completed+=1;
         }
         current.content.insert(0,json!({"type":"text","text":format!("Sequence dispatched {completed}/{} steps. Verify the final app state before continuing.",steps.len())}));
-        current.details=json!({"completedSteps":completed,"totalSteps":steps.len(),"elapsedMs":started.elapsed().as_millis(),"stateId":state_id(&current)});
+        let mut details=current.details.as_object().cloned().unwrap_or_default();
+        details.extend(json!({"completedSteps":completed,"totalSteps":steps.len(),"elapsedMs":started.elapsed().as_millis(),"stateId":state_id(&current)}).as_object().unwrap().clone());
+        current.details=Value::Object(details);
         Ok(current)
     }).await;
     // The native call retains serialization until it returns, even if the

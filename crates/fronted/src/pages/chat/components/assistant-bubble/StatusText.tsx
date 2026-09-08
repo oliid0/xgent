@@ -3,10 +3,17 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { Text } from "@astryxdesign/core/Text";
 import type { ReactNode } from "react";
 import { useLocale } from "../../../../i18n";
-import { VIBING_STATUS } from "../../../../lib/chat/page/chatPageHelpers";
 
 export function VibingText() {
-  return <AssistantStatus>{VIBING_STATUS}</AssistantStatus>;
+  const { t } = useLocale();
+  return (
+    <HStack as="span" gap={2} vAlign="center" role="status">
+      <span className="xgent-thinking-orb" aria-hidden="true" />
+      <Text type="supporting" color="secondary">
+        {t("chat.thinking")}
+      </Text>
+    </HStack>
+  );
 }
 
 export function CompactingText() {

@@ -352,6 +352,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
         if (isDriver)
           executionActivityStore.record(params.checkpoint?.conversationId, {
             id: call.id,
+            toolCallId: call.id,
             kind: "cua",
             title: call.name,
             ...activityObservation(response.content),

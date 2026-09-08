@@ -64,7 +64,7 @@ async function withCuaLock<T>(run: () => Promise<T>, signal?: AbortSignal) {
 const cuaTool: Tool = {
   name: "cua",
   description:
-    "Operate desktop applications through one state-grounded computer-use engine. Prefer reliable app APIs/scripts for bulk work, semantic controls for forms, and screenshot input for visual surfaces. Use list_apps to discover running windows and installed applications; an absent window does not mean an application is not installed. On Windows, use launch_app with an installed app_id, then list_apps to obtain its window target. On macOS get_app_state can launch by bundle ID. Use get_app_state before actions; inspect every returned state and never repeat completed work. Use sequence for up to 20 known dependent steps on one app, with optional expected_text preconditions. Sequences run locally and stop at the first stale state, unmet condition, cancellation or error. Use observation=text for semantic work and observation=image for canvas/3D surfaces to reduce capture or accessibility cost. A dispatched action is not proof of task success: verify its postcondition in the returned state. Failures may have side effects; observe before retrying. Do not target Xgent itself.",
+    "Operate desktop applications through one state-grounded computer-use engine. Prefer reliable app APIs/scripts for bulk work, semantic controls for forms, and screenshot input for visual surfaces. Use list_apps to discover running windows and installed applications; an absent window does not mean an application is not installed. On Windows, use launch_app with an installed app_id, then list_apps to obtain its window target. On macOS get_app_state can launch by bundle ID. Prefer exact window:<id> targets on Windows/Linux when operating multiple windows; ambiguous app names are rejected. get_app_state observes without activation unless focus=true. Use set_value with an advertised writable element for background replacement; for keyboard-only editors use type_text with element_index to focus the editor precisely in one call. Set allow_foreground=false to prohibit foreground fallback. Background semantic control depends on the app accessibility provider; arbitrary canvas/keyboard operations need a foreground or isolated desktop. Use get_app_state before actions; inspect every returned state and never repeat completed work. Use sequence for up to 20 known dependent steps on one app, with optional expected_text preconditions. Sequences run locally and stop at the first stale state, unmet condition, cancellation or error. Use observation=text for semantic work and observation=image for canvas/3D surfaces to reduce capture or accessibility cost. A dispatched action is not proof of task success: verify its postcondition in the returned state. Failures may have side effects; observe before retrying. Do not target Xgent itself.",
   parameters: {
     type: "object",
     additionalProperties: false,
@@ -74,6 +74,20 @@ const cuaTool: Tool = {
         type: "string",
         enum: CUA_OPERATIONS,
         description: "Computer-use operation to perform.",
+      },
+      brief: {
+        type: "string",
+        description:
+          "Concise user-facing purpose of this step, e.g. Record the requested text in Notepad.",
+      },
+      focus: {
+        type: "boolean",
+        description: "Explicitly activate/restore the app when getting its state. Default false.",
+      },
+      allow_foreground: {
+        type: "boolean",
+        description:
+          "Set false to reject input requiring activation. Semantic actions can run in the background.",
       },
       keys: {
         type: "array",
@@ -166,7 +180,11 @@ const cuaTool: Tool = {
         description:
           "Modifier keys held only during this mouse/keyboard action and always released afterward.",
       },
-      element_index: { type: "string", description: "Element identifier from get_app_state." },
+      element_index: {
+        type: "string",
+        description:
+          "Element identifier from get_app_state. For type_text/press_key, targets the exact editor before keyboard input.",
+      },
       action: { type: "string", description: "Secondary accessibility action name." },
       x: { type: "number", description: "Click X in screenshot pixels." },
       y: { type: "number", description: "Click Y in screenshot pixels." },
@@ -255,10 +273,20 @@ export function createCuaTools(
             const started = performance.now();
             const runId = createToolRunId("cua", toolCall.id);
             const record = (response?: CuaCallResponse, step?: number) => {
+              const details =
+                response?.details && typeof response.details === "object"
+                  ? (response.details as Record<string, unknown>)
+                  : {};
               executionActivityStore.record(params.conversationId, {
                 id: step === undefined ? runId : `${runId}:${step}`,
                 kind: "cua",
-                app: typeof input.app === "string" ? input.app : undefined,
+                toolCallId: toolCall.id,
+                app:
+                  typeof details.windowId === "number"
+                    ? `window:${details.windowId}`
+                    : typeof input.app === "string"
+                      ? input.app
+                      : undefined,
                 title: `${operation} · ${String(input.app ?? "")}`,
                 ...activityObservation(response?.content ?? []),
                 status: response ? (response.isError ? "error" : "complete") : "running",

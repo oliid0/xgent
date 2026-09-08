@@ -461,10 +461,11 @@ public final class ComputerUseService {
     public func getAppState(
         app query: String,
         textLimit: SnapshotTextLimit = .defaults,
-        treeLimits: AccessibilityTreeLimits = .defaults
+        treeLimits: AccessibilityTreeLimits = .defaults,
+        focus: Bool = false
     ) throws -> ToolCallResult {
         let app = try AppDiscovery.resolve(query, allowLaunch: true)
-        try InputSimulation.prepareAppForGlobalPointerInput(app)
+        if focus { try InputSimulation.prepareAppForGlobalPointerInput(app) }
         return snapshotResult(for: try refreshSnapshot(for: query, textLimit: textLimit, treeLimits: treeLimits), style: .fullState)
     }
 
@@ -758,7 +759,7 @@ public final class ComputerUseService {
         return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
     }
 
-    public func typeText(app query: String, text: String) throws -> ToolCallResult {
+    public func typeText(app query: String, text: String, elementIndex: String? = nil) throws -> ToolCallResult {
         let snapshot = try currentSnapshot(for: query)
         if snapshot.mode == .fixture {
             try FixtureBridge.post(FixtureCommand(kind: "type_text", identifier: "fixture-input", value: text))
@@ -769,6 +770,7 @@ public final class ComputerUseService {
         // Keyboard input also works in canvas-based editors that publish no AX
         // editable node. set_value remains the explicit whole-value operation.
         try InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
+        if let elementIndex { try focusKeyboardElement(snapshot: snapshot, index: elementIndex) }
         try InputSimulation.typeText(text, pid: snapshot.app.pid)
         return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
     }
@@ -782,7 +784,7 @@ public final class ComputerUseService {
         return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
     }
 
-    public func pressKey(app query: String, key: String) throws -> ToolCallResult {
+    public func pressKey(app query: String, key: String, elementIndex: String? = nil) throws -> ToolCallResult {
         let snapshot = try currentSnapshot(for: query)
         if snapshot.mode == .fixture {
             try FixtureBridge.post(FixtureCommand(kind: "press_key", identifier: "fixture-key-capture", value: key))
@@ -791,6 +793,7 @@ public final class ComputerUseService {
         }
 
         try InputSimulation.prepareAppForGlobalPointerInput(snapshot.app)
+        if let elementIndex { try focusKeyboardElement(snapshot: snapshot, index: elementIndex) }
         try InputSimulation.pressKey(key, pid: snapshot.app.pid)
         return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
     }
@@ -837,6 +840,13 @@ public final class ComputerUseService {
 
         settleVisualCursor(at: cursorTarget)
         return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
+    }
+
+    private func focusKeyboardElement(snapshot: AppSnapshot, index: String) throws {
+        let record = try lookupElement(snapshot: snapshot, index: index)
+        guard let element = record.element else { throw ComputerUseError.stateUnavailable("Target has no accessibility object") }
+        let result = AXUIElementSetAttributeValue(element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+        guard result == .success else { throw ComputerUseError.message("Cannot focus target editor; no keyboard input was sent") }
     }
 
     private func currentSnapshot(for query: String) throws -> AppSnapshot {

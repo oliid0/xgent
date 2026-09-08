@@ -1527,6 +1527,7 @@ export function createShellTools(params: {
     const recordOutput = (status: "running" | "complete" | "error", text = liveOutput) => {
       executionActivityStore.record(params.conversationId, {
         id: run_id,
+        toolCallId: toolCall.id,
         kind: "shell",
         title: command,
         text,

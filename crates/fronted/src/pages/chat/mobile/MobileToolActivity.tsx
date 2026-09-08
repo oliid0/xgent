@@ -1,15 +1,14 @@
 import { AspectRatio } from "@astryxdesign/core/AspectRatio";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
-import { ChatToolCalls } from "@astryxdesign/core/Chat";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Text } from "@astryxdesign/core/Text";
-import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import { invoke } from "@xgent/runtime";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { ImagePreviewPanel } from "../../../components/chat/ImagePreview";
 import { ArrowLeft, Globe, Wrench } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import { browserSessionController } from "../../../lib/browser/browserSessionController";
@@ -21,12 +20,10 @@ import {
   activityObservation,
   executionActivityStore,
 } from "../../../lib/chat/executionActivityStore";
-import {
-  safeStringify,
-  summarizeToolCall,
-  type ToolTraceItem,
-  toolResultMessageToText,
-} from "../../../lib/chat/messages/uiMessages";
+import { imageActivitySelection } from "../../../lib/chat/imageActivityNavigation";
+import { summarizeToolCall, type ToolTraceItem } from "../../../lib/chat/messages/uiMessages";
+import { toolActivitySelection, toolStepLabel } from "../../../lib/chat/toolActivityNavigation";
+import { ToolCallDetail } from "../components/assistant-bubble/ToolCallItem";
 
 type MobileToolActivityProps = {
   conversationId: string;
@@ -37,6 +34,7 @@ type MobileToolActivityProps = {
   onOpenBrowser?: () => void;
   onClose: () => void;
   view?: "capsule" | "panel";
+  progressContent?: ReactNode;
 };
 
 type ActivityItem = ToolTraceItem & {
@@ -92,16 +90,6 @@ function activityKind(name: string): "shell" | "browser" | "cua" | "tool" {
   return "tool";
 }
 
-function toolOutput(item: ActivityItem) {
-  if (!item.toolResult) return "";
-  const output = toolResultMessageToText(item.toolResult);
-  return output.trim();
-}
-
-function toolFailed(result: ToolResultMessage | undefined) {
-  return Boolean(result && "isError" in result && result.isError);
-}
-
 export function MobileToolActivity({
   conversationId,
   mobileExperience = false,
@@ -111,6 +99,7 @@ export function MobileToolActivity({
   onOpenBrowser,
   onClose,
   view = "capsule",
+  progressContent,
 }: MobileToolActivityProps) {
   const { t } = useLocale();
   const panelRef = useRef<HTMLElement>(null);
@@ -127,17 +116,40 @@ export function MobileToolActivity({
     () => executionActivityStore.getSnapshot(conversationId),
     () => executionActivityStore.getSnapshot(conversationId),
   );
+  const imageSelection = useSyncExternalStore(
+    imageActivitySelection.subscribe,
+    () => imageActivitySelection.get(conversationId),
+    () => null,
+  );
+  const selection = useSyncExternalStore(
+    toolActivitySelection.subscribe,
+    () => toolActivitySelection.get(conversationId),
+    () => null,
+  );
   const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
+  useEffect(() => {
+    if (selection) setSelectedFrameId(null);
+  }, [selection]);
   const frameIndex = selectedFrameId
     ? frames.findIndex((frame) => frame.id === selectedFrameId)
     : -1;
-  const selectedFrame = frameIndex >= 0 ? frames[frameIndex] : frames.at(-1);
+  const selectedFrame =
+    frameIndex >= 0
+      ? frames[frameIndex]
+      : selection
+        ? [...frames].reverse().find((frame) => frame.toolCallId === selection.toolCall.id)
+        : frames.at(-1);
   const snapshot = useSyncExternalStore(
     store?.subscribe ?? subscribeNoop,
     store?.getSnapshot ?? (() => EMPTY_TRANSCRIPT),
     () => EMPTY_TRANSCRIPT,
   );
   const items = useMemo(() => collectActivityItems(snapshot), [snapshot]);
+  useEffect(() => {
+    const current = selection && items.find((item) => item.toolCall.id === selection.toolCall.id);
+    if (current && current.toolResult !== selection?.toolResult)
+      toolActivitySelection.select(conversationId, current);
+  }, [conversationId, items, selection]);
   const browserState = useSyncExternalStore(
     browserSessionController.subscribe,
     browserSessionController.getSnapshot,
@@ -155,6 +167,12 @@ export function MobileToolActivity({
   const hasActiveItem = Boolean(activeItem);
   const latestItem = items.at(-1) ?? null;
   const capsuleItem = activeItem;
+  const selectedItem = selection
+    ? (items.find((item) => item.toolCall.id === selection.toolCall.id) ?? selection)
+    : (activeItem ?? latestItem);
+  const selectedRunning = selectedItem
+    ? items.some((item) => item.toolCall.id === selectedItem.toolCall.id && item.running)
+    : false;
   const status = snapshot.toolStatus?.trim() || "";
   const capsuleKind = capsuleItem
     ? activityKind(capsuleItem.toolCall.name)
@@ -266,60 +284,10 @@ export function MobileToolActivity({
     capsuleDetail,
     view,
   ]);
-  const toolCalls = [...items].reverse().map((item) => {
-    const output = toolOutput(item);
-    const failed = toolFailed(item.toolResult);
-    return {
-      key: item.toolCall.id,
-      name: item.toolCall.name,
-      target:
-        summarizeToolCall(item.toolCall, { includeName: false }) ||
-        t("chat.mobileActivity.noArguments"),
-      node: t("chat.mobileActivity.round").replace("{round}", String(item.round)),
-      status: item.running
-        ? ("running" as const)
-        : failed
-          ? ("error" as const)
-          : ("complete" as const),
-      errorMessage: failed && output ? output : undefined,
-      resultDetail: (
-        <VStack gap={3}>
-          <Text type="label" color="secondary">
-            {t("chat.mobileActivity.input")}
-          </Text>
-          <CodeBlock
-            code={safeStringify(item.toolCall.arguments || {})}
-            language="json"
-            size="sm"
-            width="100%"
-            maxHeight="var(--xgent-tool-input-max-height)"
-            isWrapped
-            container="section"
-          />
-          {output ? (
-            <>
-              <Text type="label" color="secondary">
-                {t("chat.mobileActivity.output")}
-              </Text>
-              <CodeBlock
-                code={output}
-                language="plaintext"
-                size="sm"
-                width="100%"
-                maxHeight="var(--xgent-tool-output-max-height)"
-                isWrapped
-                container="section"
-              />
-            </>
-          ) : null}
-        </VStack>
-      ),
-    };
-  });
 
   return (
     <>
-      {view === "capsule" && (capsuleItem || status || frames.length > 0) ? (
+      {view === "capsule" && (progressContent || capsuleItem || status || frames.length > 0) ? (
         <HStack hAlign="start" width="100%" paddingInline={5} className="xgent-activity-strip">
           <Button
             label={capsuleTitle}
@@ -329,6 +297,8 @@ export function MobileToolActivity({
             width="fit-content"
             onClick={() => {
               setSelectedFrameId(null);
+              imageActivitySelection.select(conversationId, null);
+              toolActivitySelection.select(conversationId, null);
               onOpen();
             }}
             className="xgent-mobile-browser-activity-button pointer-events-auto"
@@ -346,22 +316,40 @@ export function MobileToolActivity({
                   </VStack>
                 )}
               </AspectRatio>
-              <VStack gap={0} hAlign="start" style={{ minWidth: 0 }}>
-                <Text type="label" textWrap="nowrap" maxLines={1}>
-                  <span
-                    className="xgent-activity-dot"
-                    data-running={Boolean(activeItem)}
-                    aria-hidden="true"
-                  />
-                  {activeItem ? t("chat.mobileActivity.working") : t("chat.mobileActivity.recent")}
-                </Text>
-              </VStack>
             </HStack>
           </Button>
+          <div className="xgent-activity-progress">{progressContent}</div>
         </HStack>
       ) : null}
 
-      {view === "panel" && open ? (
+      {view === "panel" && open && imageSelection ? (
+        <section
+          ref={panelRef}
+          tabIndex={-1}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              imageActivitySelection.select(conversationId, null);
+              onClose();
+            }
+          }}
+          className={
+            mobileExperience ? "xgent-activity-panel xgent-activity-page" : "xgent-activity-panel"
+          }
+          aria-label={t("chat.image.preview")}
+        >
+          <ImagePreviewPanel
+            key={imageSelection.slides[0]?.src}
+            open
+            slides={imageSelection.slides}
+            index={imageSelection.index}
+            onClose={() => {
+              imageActivitySelection.select(conversationId, null);
+              onClose();
+            }}
+          />
+        </section>
+      ) : view === "panel" && open ? (
         <VStack
           as="section"
           ref={panelRef}
@@ -384,9 +372,13 @@ export function MobileToolActivity({
               </Button>
             ) : null}
             <VStack gap={0} style={{ minWidth: 0 }}>
-              <Text type="label">{t("chat.mobileActivity.title")}</Text>
+              <Text type="label">{t("chat.activity.title")}</Text>
               <Text type="supporting" color="secondary" maxLines={1}>
-                {assistanceActive ? t("browser.assistanceActive") : capsuleDetail || capsuleTitle}
+                {assistanceActive
+                  ? t("browser.assistanceActive")
+                  : selectedItem
+                    ? toolStepLabel(selectedItem, selectedItem.toolCall.name)
+                    : capsuleDetail || capsuleTitle}
               </Text>
             </VStack>
           </HStack>
@@ -403,7 +395,8 @@ export function MobileToolActivity({
                     alt={selectedFrame.title}
                   />
                 ) : null}
-                {selectedFrame.text ? (
+                {selectedFrame.text &&
+                (selectedFrame.status === "running" || !selectedItem || selectedFrameId) ? (
                   <CodeBlock
                     code={selectedFrame.text}
                     language="plaintext"
@@ -416,28 +409,34 @@ export function MobileToolActivity({
                 ) : selectedFrame.status === "running" ? (
                   <Text color="secondary">{t("chat.mobileActivity.running")}</Text>
                 ) : null}
-                <HStack gap={2} width="100%" vAlign="center">
-                  <input
-                    type="range"
-                    min={0}
-                    max={Math.max(0, frames.length - 1)}
-                    value={frameIndex >= 0 ? frameIndex : Math.max(0, frames.length - 1)}
-                    aria-label={t("chat.mobileActivity.recent")}
-                    onChange={(event) =>
-                      setSelectedFrameId(frames[Number(event.target.value)]?.id ?? null)
-                    }
-                    style={{ flex: 1, minWidth: 0 }}
-                  />
-                  <Button
-                    label={t("chat.mobileActivity.live")}
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setSelectedFrameId(null)}
-                  />
-                  <Text type="supporting" color="secondary">
-                    {new Date(selectedFrame.updatedAt).toLocaleTimeString()}
-                  </Text>
-                </HStack>
+                {!selectedItem ? (
+                  <HStack gap={2} width="100%" vAlign="center">
+                    <input
+                      type="range"
+                      min={0}
+                      max={Math.max(0, frames.length - 1)}
+                      value={frameIndex >= 0 ? frameIndex : Math.max(0, frames.length - 1)}
+                      aria-label={t("chat.mobileActivity.recent")}
+                      onChange={(event) => {
+                        toolActivitySelection.select(conversationId, null);
+                        setSelectedFrameId(frames[Number(event.target.value)]?.id ?? null);
+                      }}
+                      style={{ flex: 1, minWidth: 0 }}
+                    />
+                    <Button
+                      label={t("chat.mobileActivity.live")}
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setSelectedFrameId(null);
+                        toolActivitySelection.select(conversationId, null);
+                      }}
+                    />
+                    <Text type="supporting" color="secondary">
+                      {new Date(selectedFrame.updatedAt).toLocaleTimeString()}
+                    </Text>
+                  </HStack>
+                ) : null}
                 {selectedFrame.kind === "browser" && onOpenBrowser ? (
                   <Button
                     label={t("browser.title")}
@@ -448,19 +447,63 @@ export function MobileToolActivity({
                 ) : null}
               </VStack>
             ) : null}
-            {toolCalls.length > 0 ? (
-              <ChatToolCalls
-                calls={toolCalls}
-                label={t("chat.mobileActivity.title")}
-                defaultIsExpanded
-              />
-            ) : (
+            {selectedItem ? (
+              <VStack gap={3} width="100%">
+                <Text type="label">{selectedItem.toolCall.name}</Text>
+                <ToolCallDetail
+                  key={selectedItem.toolCall.id}
+                  item={selectedItem}
+                  isRunning={selectedRunning}
+                  expanded
+                />
+                {!selectedItem.toolResult ? (
+                  <Text color="secondary">
+                    {t(
+                      selectedRunning
+                        ? "chat.mobileActivity.running"
+                        : "chat.mobileActivity.awaitingResult",
+                    )}
+                  </Text>
+                ) : null}
+              </VStack>
+            ) : !selectedFrame ? (
               <EmptyState
                 icon={<Wrench />}
                 title={t("chat.mobileActivity.empty")}
                 description={t("chat.mobileActivity.emptyDescription")}
               />
-            )}
+            ) : null}
+            {items.length > 0 ? (
+              <HStack gap={2} width="100%" vAlign="center">
+                <input
+                  type="range"
+                  min={0}
+                  max={items.length - 1}
+                  value={Math.max(
+                    0,
+                    items.findIndex((item) => item.toolCall.id === selectedItem?.toolCall.id),
+                  )}
+                  aria-label={t("chat.mobileActivity.recent")}
+                  onChange={(event) => {
+                    setSelectedFrameId(null);
+                    toolActivitySelection.select(
+                      conversationId,
+                      items[Number(event.target.value)] ?? null,
+                    );
+                  }}
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+                <Button
+                  label={t("chat.mobileActivity.live")}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setSelectedFrameId(null);
+                    toolActivitySelection.select(conversationId, null);
+                  }}
+                />
+              </HStack>
+            ) : null}
             {!activeItem && latestItem && status ? (
               <Banner status="info" title={status} collapsible={false} />
             ) : null}

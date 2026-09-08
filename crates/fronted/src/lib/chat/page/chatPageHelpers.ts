@@ -12,7 +12,7 @@ const TITLE_MAX_CJK_CHARS = 24;
 const CJK_CHAR_PATTERN = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/g;
 const MODEL_GENERATING_STATUS_PATTERN = /^第\s*\d+\s*轮：模型生成中\.\.\.$/;
 
-export const VIBING_STATUS = "Vibing...";
+export const VIBING_STATUS = "Thinking...";
 
 // Must match BRANCH_DEFAULT_TITLE in src-tauri/src/commands/history/chat_history/branch.rs.
 export const BRANCH_CONVERSATION_DEFAULT_TITLE = "新分支";
@@ -123,7 +123,8 @@ export function buildFallbackConversationTitle(content: string) {
 }
 
 export function normalizeLiveToolStatus(status: string | null) {
-  if (status && MODEL_GENERATING_STATUS_PATTERN.test(status)) return VIBING_STATUS;
+  if (status === "Vibing..." || (status && MODEL_GENERATING_STATUS_PATTERN.test(status)))
+    return VIBING_STATUS;
   return status;
 }
 

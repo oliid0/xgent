@@ -3881,3 +3881,58 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     padding: 16px;
   }
 }
+
+.xgent-thinking-orb {
+  display: inline-block;
+  flex: 0 0 1rem;
+  width: 1rem;
+  height: 1rem;
+  margin-block-start: 0.2rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 28% 25%, #d2fff6, transparent 50%),
+    conic-gradient(from 30deg, #42dce6, #218ff2, #8775f6, #2cc9ed, #42dce6);
+  box-shadow:
+    inset -1px -2px 3px #127bc550,
+    inset 1px 1px 2px #ffffffa0;
+  animation: xgent-thinking-orbit 3s linear infinite;
+}
+@keyframes xgent-thinking-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.xgent-thinking-orb[data-paused="true"] {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .xgent-thinking-orb {
+    animation: none;
+  }
+}
+.xgent-tool-step,
+.xgent-task-trigger {
+  height: auto;
+  min-height: 2.25rem;
+  white-space: normal;
+  justify-content: flex-start;
+}
+.xgent-tool-step svg {
+  flex: 0 0 1rem;
+  width: 1rem;
+  height: 1rem;
+  margin-block-start: 0.25rem;
+}
+.xgent-task-popover {
+  padding: var(--spacing-2);
+}
+.xgent-task-check {
+  color: var(--color-text-success, #20b757);
+}
+.xgent-activity-progress {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.xgent-activity-progress > * {
+  width: 100%;
+}

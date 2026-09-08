@@ -1,5 +1,7 @@
+import { Button } from "@astryxdesign/core/Button";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { TaskProgressBar } from "../../../components/chat/TaskProgressBar";
+import { useLocale } from "../../../i18n";
 import type { RenderTimelineItem } from "../../../lib/chat/conversation/conversationState";
 import type { LiveTranscriptStore } from "../../../lib/chat/conversation/liveTranscriptStore";
 import { selectLatestTaskProgress } from "../../../lib/chat/taskProgress";
@@ -10,8 +12,10 @@ export function CurrentTaskProgress(props: {
   liveTranscriptStore: LiveTranscriptStore;
   isConversationRunning: boolean;
   persistedState?: TaskListState;
+  onOpenActivity?: () => void;
 }) {
   const { historyItems, liveTranscriptStore, isConversationRunning, persistedState } = props;
+  const { t } = useLocale();
   const getLiveRoundsSnapshot = useCallback(
     () => liveTranscriptStore.getSnapshot().liveRounds,
     [liveTranscriptStore],
@@ -25,5 +29,14 @@ export function CurrentTaskProgress(props: {
     () => selectLatestTaskProgress(historyItems, liveRounds, persistedState),
     [historyItems, liveRounds, persistedState],
   );
-  return <TaskProgressBar snapshot={snapshot} isConversationRunning={isConversationRunning} />;
+  return snapshot?.tasks.length ? (
+    <TaskProgressBar snapshot={snapshot} isConversationRunning={isConversationRunning} />
+  ) : (
+    <Button
+      label={t("chat.mobileActivity.recent")}
+      variant="ghost"
+      size="sm"
+      onClick={props.onOpenActivity}
+    />
+  );
 }
