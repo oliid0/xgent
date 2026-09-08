@@ -111,6 +111,8 @@ export class BrowserSessionController {
   private readonly sessionAliases = new Map<string, string>();
   private surfaceOccluded = false;
   private readonly viewports = new Map<string, BrowserViewport>();
+  private readonly viewportUpdates = new Map<string, Promise<BrowserSessionSummary | undefined>>();
+  private readonly previewRequests = new Map<string, Promise<string | null>>();
 
   sessionIdForConversation(conversationId: string, requested = "main") {
     if (!conversationId) return requested;
@@ -556,17 +558,35 @@ export class BrowserSessionController {
   async setViewport(sessionIdInput: string, viewport: BrowserViewport) {
     const sessionId = normalizedSessionId(sessionIdInput);
     this.viewports.set(sessionId, viewport);
-    const session = await this.enqueue(sessionId, () =>
-      this.client.setViewport(sessionId, {
-        ...viewport,
-        visible:
-          viewport.visible &&
-          !this.surfaceOccluded &&
-          (!this.conversationId || this.sessionOwners.get(sessionId) === this.conversationId),
-      }),
-    );
-    this.update({ sessions: mergeSession(this.state.sessions, session), error: null });
-    return session;
+    const pending = this.viewportUpdates.get(sessionId);
+    if (pending) return pending;
+    // Geometry cannot wait behind network navigation or an agent command.
+    // Keep one request in flight and discard superseded drag positions.
+    const update = async () => {
+      let session: BrowserSessionSummary | undefined;
+      let desired: BrowserViewport | undefined;
+      do {
+        desired = this.viewports.get(sessionId);
+        if (!desired) break;
+        session = await this.client.setViewport(sessionId, {
+          ...desired,
+          visible:
+            desired.visible &&
+            !this.surfaceOccluded &&
+            (!this.conversationId || this.sessionOwners.get(sessionId) === this.conversationId),
+        });
+        const visible = session.visible;
+        this.update({
+          sessions: this.state.sessions.map((current) =>
+            current.sessionId === sessionId ? { ...current, visible } : current,
+          ),
+        });
+      } while (this.viewports.get(sessionId) !== desired);
+      return session;
+    };
+    const request = update().finally(() => this.viewportUpdates.delete(sessionId));
+    this.viewportUpdates.set(sessionId, request);
+    return request;
   }
 
   async action(
@@ -659,11 +679,6 @@ export class BrowserSessionController {
             fresh = await this.client.action(sessionId, "snapshot", {}, options.timeoutMs);
           } catch (error) {
             this.agentObservations.delete(sessionId);
-            this.viewports.delete(sessionId);
-            this.sessionOwners.delete(sessionId);
-            for (const [alias, id] of this.sessionAliases) {
-              if (id === sessionId) this.sessionAliases.delete(alias);
-            }
             return {
               ...result,
               data: {
@@ -725,16 +740,22 @@ export class BrowserSessionController {
 
   async captureSessionPreview(sessionIdInput: string) {
     const sessionId = normalizedSessionId(sessionIdInput);
-    const response = await this.action(
-      "screenshot",
-      {},
-      {
-        sessionId,
-        timeoutMs: 8_000,
-        background: true,
-      },
-    );
-    return response.screenshotBase64 ? `data:image/png;base64,${response.screenshotBase64}` : null;
+    const pending = this.previewRequests.get(sessionId);
+    if (pending) return pending;
+    const request = this.client
+      .action(sessionId, "screenshot", {}, 8_000)
+      .then((response) => {
+        const image = response.screenshotBase64
+          ? `data:image/png;base64,${response.screenshotBase64}`
+          : null;
+        if (image && this.state.sessions.some((session) => session.sessionId === sessionId)) {
+          this.update({ previewDataUrls: { ...this.state.previewDataUrls, [sessionId]: image } });
+        }
+        return image;
+      })
+      .finally(() => this.previewRequests.delete(sessionId));
+    this.previewRequests.set(sessionId, request);
+    return request;
   }
 
   clearError() {

@@ -55,6 +55,7 @@ export type BrowserAction =
   | "execute_js"
   | "get_console"
   | "get_network"
+  | "open_devtools"
   | "recover";
 
 export type BrowserActionInput = {

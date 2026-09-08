@@ -46,11 +46,13 @@
       <p id="launch-error" hidden>加载失败，请重新打开应用。<a href="">重新加载</a></p>
     </div>
     <script>
-      window.addEventListener("error", (event) => {
-        if (event.target instanceof HTMLScriptElement) {
-          document.getElementById("launch-error").hidden = false;
-        }
-      }, true);
+      function revealLaunchError() {
+        const message = document.getElementById("launch-error");
+        if (message) message.hidden = false;
+      }
+      window.addEventListener("error", revealLaunchError, true);
+      window.addEventListener("unhandledrejection", revealLaunchError);
+      window.setTimeout(revealLaunchError, 20000);
     </script>
     <script type="module" src="/src/boot.ts"></script>
   </body>

@@ -91,7 +91,33 @@ fn bounds(window: &Window) -> Result<(i32, i32, u32, u32), String> {
     Ok((window.x().map_err(fail)?, window.y().map_err(fail)?, window.width().map_err(fail)?, window.height().map_err(fail)?))
 }
 
+// Monitoring must not consume an agent state token, focus a window, enumerate
+// accessibility nodes, or wait behind a long input sequence.
+pub fn capture_preview(arguments: &Value) -> Result<Value, String> {
+    let window = resolve_window(arguments["app"].as_str().ok_or("Missing preview target")?)?;
+    let captured = window.capture_image().map_err(fail)?;
+    if captured.width() == 0 || captured.height() == 0 { return Err("Preview capture was empty".into()); }
+    let max_size = arguments["max_image_size"].as_u64().unwrap_or(768).clamp(320,1280) as u32;
+    let image = image::DynamicImage::ImageRgba8(captured).thumbnail(max_size, max_size);
+    let mut encoded = Cursor::new(Vec::new());
+    image.write_to(&mut encoded, image::ImageFormat::Png).map_err(fail)?;
+    Ok(json!({"content":[{"type":"image","data":STANDARD.encode(encoded.into_inner()),"mimeType":"image/png"}],"isError":false}))
+}
+
 impl Desktop {
+    fn after_input(&mut self, window: &Window, query: &str, previous: &Snapshot, defer: bool) -> Result<Value,String> {
+        if !defer { return self.snapshot(window, query, "Input dispatched. Verify the returned state before continuing."); }
+        // Only the native sequence coordinator requests this between known
+        // coordinate/keyboard gestures. Bounds and process identity are still
+        // checked on the next action; no stale accessibility index is reused.
+        self.next_id += 1;
+        let mut state=previous.clone();
+        state.id=self.next_id;
+        state.elements.clear();
+        state.text="Input dispatched; observation deferred until the sequence boundary.".into();
+        for key in [query.to_lowercase(),format!("window:{}",state.window_id)] { self.snapshots.insert(key,state.clone()); }
+        Ok(json!({"content":[{"type":"text","text":state.text}],"isError":false,"details":{"stateId":state.id.to_string(),"observationDeferred":true}}))
+    }
     fn snapshot(&mut self, window: &Window, query: &str, note: &str) -> Result<Value, String> {
         let capture = self.observation != "text";
         let mut image = if capture { window.capture_image().map_err(|error| format!("Cannot capture app window: {error}. Check screen-capture permission."))? }
@@ -216,7 +242,10 @@ impl Desktop {
                 let count=arguments["click_count"].as_u64().unwrap_or(1);
                 if !(1..=3).contains(&count) { return Err("click_count must be 1, 2 or 3".into()); }
                 input.move_mouse(x,y,Coordinate::Abs).map_err(fail)?;
-                for _ in 0..count { input.button(button,Direction::Click).map_err(fail)?; std::thread::sleep(Duration::from_millis(70)); }
+                for index in 0..count {
+                    input.button(button,Direction::Click).map_err(fail)?;
+                    if index+1<count { std::thread::sleep(Duration::from_millis(70)); }
+                }
             }
             "drag" => {
                 let (from_x,from_y)=point("from_x","from_y")?;
@@ -250,7 +279,7 @@ impl Desktop {
         action_result?;
         if let Some(error)=release_error { return Err(error); }
         std::thread::sleep(Duration::from_millis(self.settle_ms));
-        self.snapshot(&window, query, "Input dispatched. Verify the actual result in this fresh state; do not repeat an action already completed.")
+        self.after_input(&window, query, &previous, arguments["_defer_observation"].as_bool()==Some(true))
     }
 }
 

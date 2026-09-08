@@ -20,6 +20,7 @@ export type SectionId =
   | "access"
   | "shortcuts"
   | "backup"
+  | "computerUse"
   | "toolPermissions"
   | "voice"
   | "usage"

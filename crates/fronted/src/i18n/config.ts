@@ -12,6 +12,19 @@ export const SUPPORTED_LOCALES = ["system", "zh-CN", "en-US"] as const satisfies
 
 export const translations: Record<ResolvedLocale, Record<string, string>> = {
   "zh-CN": {
+    "settings.cua.title": "电脑操作",
+    "settings.cua.description":
+      "本地操作引擎随桌面应用内置，无需另外下载。第三方电脑操作服务可在 MCP 设置中连接。关闭后将停止本地电脑操作。",
+    "settings.cua.enable": "启用电脑操作",
+    "settings.cua.installed": "已就绪",
+    "settings.cua.unavailable":
+      "本机电脑操作适用于 Windows、macOS 和 Linux。外部服务可在 MCP 设置中连接。",
+    "settings.cua.loading": "正在读取状态…",
+    "settings.cua.permissions":
+      "请在 macOS 系统设置 > 隐私与安全性中允许 Xgent 使用辅助功能与屏幕录制。",
+    "settings.cua.working": "正在处理…",
+    "settings.cua.refresh": "刷新状态",
+
     "workspaceFiles.openWith": "\u6253\u5f00\u65b9\u5f0f",
     "workspaceFiles.revealInFinder": "\u5728\u6587\u4ef6\u7ba1\u7406\u5668\u4e2d\u663e\u793a",
     "browser.startBrowsing": "\u5f00\u59cb\u6d4f\u89c8",
@@ -2736,6 +2749,19 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
   },
 
   "en-US": {
+    "settings.cua.title": "Computer use",
+    "settings.cua.description":
+      "The local engine is included with the desktop app and works offline. Connect third-party computer-use services in MCP settings. Disabling stops local computer use.",
+    "settings.cua.enable": "Enable computer use",
+    "settings.cua.installed": "Built into Xgent",
+    "settings.cua.unavailable":
+      "Local computer use requires Windows, macOS or Linux. Connect external services in MCP settings.",
+    "settings.cua.loading": "Loading component status…",
+    "settings.cua.permissions":
+      "Allow Xgent in macOS System Settings > Privacy & Security > Accessibility and Screen Recording.",
+    "settings.cua.working": "Working…",
+    "settings.cua.refresh": "Refresh status",
+
     "workspaceFiles.openWith": "Open with",
     "workspaceFiles.revealInFinder": "Show in file manager",
     "browser.startBrowsing": "Start browsing",

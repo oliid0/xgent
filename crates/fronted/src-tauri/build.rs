@@ -26,6 +26,9 @@ fn main() {
     println!("cargo:rustc-env=XGENT_APP_VERSION={app_version}");
 
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    if target_os == "macos" {
+        link_computer_use(std::path::Path::new(&manifest_dir));
+    }
     let is_windows_msvc = target_os == "windows"
         && std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc");
     if is_windows_msvc {
@@ -63,4 +66,32 @@ fn main() {
     } else {
         tauri_build::build();
     }
+}
+
+// Compile the app's Swift implementation into the main executable, never a
+// separately distributed driver. This runs only as part of the macOS app build.
+fn link_computer_use(manifest_dir: &std::path::Path) {
+    use std::process::Command;
+    let sources = manifest_dir.join("native/computer-use/macos");
+    println!("cargo:rerun-if-changed={}", sources.display());
+    let output = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
+    let sdk = Command::new("xcrun").args(["--sdk", "macosx", "--show-sdk-path"])
+        .output().expect("locate macOS SDK");
+    assert!(sdk.status.success(), "locate macOS SDK failed");
+    let sdk = String::from_utf8(sdk.stdout).expect("SDK path");
+    let arch = std::env::var("CARGO_CFG_TARGET_ARCH").expect("target architecture");
+    let arch = if arch == "aarch64" { "arm64" } else { &arch };
+    let mut files: Vec<_> = std::fs::read_dir(&sources).expect("Swift sources")
+        .map(|entry| entry.expect("Swift source").path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "swift")).collect();
+    files.sort();
+    let status = Command::new("xcrun").args(["swiftc", "-swift-version", "5", "-O", "-emit-library", "-static",
+        "-module-name", "XgentComputerUse", "-target", &format!("{arch}-apple-macosx14.0"), "-sdk", sdk.trim()])
+        .args(files).arg("-o").arg(output.join("libXgentComputerUse.a"))
+        .status().expect("compile built-in computer use");
+    assert!(status.success(), "built-in computer-use compilation failed");
+    println!("cargo:rustc-link-search=native={}", output.display());
+    println!("cargo:rustc-link-search=native={}/usr/lib/swift", sdk.trim());
+    println!("cargo:rustc-link-lib=static=XgentComputerUse");
+    println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/lib/swift");
 }

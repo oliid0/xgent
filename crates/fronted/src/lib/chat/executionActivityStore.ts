@@ -4,6 +4,7 @@ export type ExecutionActivity = {
   title: string;
   text: string;
   imageUrl?: string;
+  app?: string;
   status: "running" | "complete" | "error";
   updatedAt: number;
 };

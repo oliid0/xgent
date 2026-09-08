@@ -424,7 +424,7 @@ private func enableBestEffortAccessibilityModes(_ appElement: AXUIElement) {
     _ = AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
 }
 
-private struct WindowCapture {
+struct WindowCapture {
     let windowID: CGWindowID
     let layer: Int
     let bounds: CGRect

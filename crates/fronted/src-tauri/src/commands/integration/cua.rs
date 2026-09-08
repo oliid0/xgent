@@ -1,5 +1,5 @@
-//! Xgent native computer use. The optional platform component is installed in
-//! app data, keeping accessibility/capture dependencies out of the main package.
+//! Xgent native computer use. Local platform drivers ship with the application;
+//! external computer-use services remain separately configured integrations.
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -10,6 +10,18 @@ use crate::runtime::shell_runner::ShellRunRegistry;
 pub mod component;
 
 const OPERATIONS: &[&str] = &["list_apps", "launch_app", "get_app_state", "click", "perform_secondary_action", "scroll", "drag", "type_text", "press_key", "set_value", "sequence"];
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn cua_preview(app: tauri::AppHandle, target: String, max_image_size: Option<u32>) -> Result<CuaResponse,String> {
+    let arguments=json!({"app":target,"max_image_size":max_image_size.unwrap_or(768).clamp(320,1280)});
+    validate("get_app_state",&arguments)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        static CAPTURE:OnceLock<Mutex<()>>=OnceLock::new();
+        let Ok(_guard)=CAPTURE.get_or_init(Mutex::default).try_lock() else { return Err("Preview capture is busy".into()); };
+        component::ensure_available(&app)?;
+        component::call("capture_preview",&arguments)
+    }).await.map_err(|error|error.to_string())?
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -113,24 +125,25 @@ pub async fn cua_call(app: tauri::AppHandle, operation: String, arguments: Value
         static EXECUTION: OnceLock<Mutex<()>>=OnceLock::new();
         let _guard=EXECUTION.get_or_init(Mutex::default).lock().map_err(|_|"Computer-use state lock poisoned".to_string())?;
         if run_token.is_cancelled() { return Err("Cancelled".into()); }
-        let module=component::ensure_installed(&app)?;
+        component::ensure_available(&app)?;
         if run_token.is_cancelled() { return Err("Cancelled".into()); }
-        if operation != "sequence" { return component::call(&module,&operation,&arguments); }
-        let mut current = component::call(&module,"get_cached_state",&arguments)?;
+        if operation != "sequence" { return component::call(&operation,&arguments); }
+        let mut current = component::call("get_cached_state",&arguments)?;
         let state_id = |response:&CuaResponse| -> Option<String> {
             response.details["stateId"].as_str().map(str::to_string).or_else(|| response.content.iter()
                 .filter_map(|item|item["text"].as_str()).flat_map(str::lines)
                 .find_map(|line|line.strip_prefix("state_id: ").map(|value|value.trim().to_string())))
         };
         if current.is_error || state_id(&current).as_deref() != arguments["state_id"].as_str() {
-            let mut fresh = component::call(&module,"get_app_state",&arguments)?;
+            let mut fresh = component::call("get_app_state",&arguments)?;
             fresh.content.insert(0,json!({"type":"text","text":"ACTION NOT APPLIED: stale sequence state. Inspect this observation."}));
             return Ok(fresh);
         }
         let steps=arguments["steps"].as_array().ok_or("Missing steps")?;
         let mut completed=0usize;
         let started=std::time::Instant::now();
-        for step in steps {
+        for (index,step) in steps.iter().enumerate() {
+            component::ensure_available(&app)?;
             if run_token.is_cancelled() || started.elapsed() > std::time::Duration::from_secs(30) {
                 current.is_error=true;
                 current.content.insert(0,json!({"type":"text","text":"Sequence stopped before the next step: cancelled or deadline exceeded."}));
@@ -147,9 +160,13 @@ pub async fn cua_call(app: tauri::AppHandle, operation: String, arguments: Value
             let mut input=arguments.as_object().ok_or("Invalid sequence arguments")?.clone();
             input.remove("steps");
             input.extend(step.as_object().ok_or("Invalid step")?.clone());
+            // Intermediate image encoding/tree traversal is unnecessary for a
+            // known gesture sequence. Observe at text preconditions and at the
+            // final boundary; the independent monitoring stream stays live.
+            input.insert("_defer_observation".into(),json!(index+1<steps.len() && steps[index+1].get("expected_text").is_none()));
             input.insert("state_id".into(),json!(state_id(&current).ok_or("No state returned after the previous step")?));
             let action=input.remove("operation").ok_or("Missing step operation")?;
-            let next=component::call(&module,action.as_str().ok_or("Invalid operation")?,&Value::Object(input));
+            let next=component::call(action.as_str().ok_or("Invalid operation")?,&Value::Object(input));
             match next { Ok(response)=>current=response, Err(error)=>{current=CuaResponse::error(format!("Action outcome uncertain: {error}. Observe before retrying."));break;} }
             let _ = app.emit("cua-activity", json!({"runId":activity_run_id,"step":completed,"operation":action,"response":&current}));
             if current.is_error || current.content.iter().any(|item|item["text"].as_str().is_some_and(|text|text.contains("ACTION NOT APPLIED"))) { break; }

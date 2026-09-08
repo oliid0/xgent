@@ -21,7 +21,7 @@ function setup(action) {
   };
   const loader = createTsModuleLoader({ mocks: { "../browserAutomation": { localBrowserAutomationClient: client } } });
   const { BrowserSessionController } = loader.loadModule("src/lib/browser/browserSessionController.ts");
-  return { controller: new BrowserSessionController(client), opens: () => opens };
+  return { controller: new BrowserSessionController(client), client, opens: () => opens };
 }
 
 test("concurrent tab creation reserves distinct ids and deduplicates the same agent tab", async () => {
@@ -31,6 +31,39 @@ test("concurrent tab creation reserves distinct ids and deduplicates the same ag
   await Promise.all([controller.ensureSession({ sessionId: "main" }), controller.ensureSession({ sessionId: "main" })]);
   assert.equal(opens(), 3);
   assert.equal(controller.getSnapshot().sessions.length, 3);
+});
+
+test("viewport and monitor frames do not wait behind a navigation and drag updates coalesce", async () => {
+  let finishNavigation;
+  let navigationStarted;
+  const started = new Promise(resolve => { navigationStarted = resolve; });
+  const { controller, client } = setup(async (sessionId, action) => {
+    if (action === "screenshot") return { sessionId, action, screenshotBase64: "cG5n" };
+    navigationStarted();
+    return new Promise(resolve => { finishNavigation = () => resolve({ sessionId, action, url: "https://example.com/final", data: {} }); });
+  });
+  const tab = await controller.newSession();
+  const navigation = controller.action("navigate", { url: "https://example.com/final" }, { sessionId: tab.sessionId });
+  await started;
+  let finishResize;
+  const sizes = [];
+  client.setViewport = async (sessionId, viewport) => {
+    sizes.push(viewport.width);
+    if (sizes.length === 1) await new Promise(resolve => { finishResize = resolve; });
+    return { ...tab, sessionId, visible: viewport.visible };
+  };
+  const viewport = { x: 0, y: 0, width: 300, height: 400, visible: true, scaleFactor: 1 };
+  const first = controller.setViewport(tab.sessionId, viewport);
+  const middle = controller.setViewport(tab.sessionId, { ...viewport, width: 400 });
+  const last = controller.setViewport(tab.sessionId, { ...viewport, width: 500 });
+  assert.equal(await controller.captureSessionPreview(tab.sessionId), "data:image/png;base64,cG5n");
+  assert.deepEqual(sizes, [300]);
+  finishResize();
+  await Promise.all([first, middle, last]);
+  assert.deepEqual(sizes, [300, 500]);
+  finishNavigation();
+  await navigation;
+  assert.equal(controller.getSnapshot().sessions[0].url, "https://example.com/final");
 });
 
 test("closing the last visible browser tab leaves an empty workspace without spawning another", async () => {

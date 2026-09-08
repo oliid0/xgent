@@ -1,29 +1,21 @@
 # Current objective
-Complete the remaining desktop/mobile repairs. User reports progress about 50%; CUA, mobile Shell/GUI and native startup remain unverified.
+Finish native CUA, mobile startup, live computer viewing and browser repairs against the supplied five references. Do not claim native or visual completion from unit tests.
 
-## Implemented
-- Real PDF/PPTX/DOCX/XLSX previews, guarded document/cell/annotation/image saves; legacy Office conversion through installed converters.
-- Attachment IPC/links, generated-file cards/open-with, chat-column My Files, conversation-scoped panels and bounded inactive resources.
-- Thinking collapsed, immediate steering, welcome/boot UI, local browser navigation and menu occlusion; Windows native shell and project dependency paths.
-- CUA installed-app discovery/launch and Windows UIA document text. Revision 2 requires updated component rather than silently retaining an old binary.
-- Android/iOS project-local Python paths; Android npm paths, existing .venv, preserved PATH and guest /workspace cwd.
-- Mobile command pipe events, incremental UTF-8 output and cleanup; conversation-scoped bounded activity/replay on desktop/mobile, CUA per-step events and real browser captures/results. Narrow composer controls no longer wrap.
-- Shared browser console/errors and Resource Timing diagnostics; iOS document-start injection; duplicate runtime injection is idempotent.
+## Completed in source
+- Local CUA is part of the executable: Windows/Linux Rust dependency and macOS static Swift linkage. Removed dynamic loading, component downloads, standalone release/staging. External services remain integrations.
+- Dedicated Settings > Computer use entry with persisted enable state, platform/app version, macOS permission guidance, loading/error/unavailable states.
+- Composer uses normal flow: bounded task/queue area, compact live thumbnail strip, input. Desktop opens right activity tab; mobile opens a returnable page with background inertness and focus restoration.
+- Independent bounded screenshot monitoring bypasses input serialization; inactive/hidden views stop captures. Known Windows/Linux sequences defer intermediate screenshots/tree traversal, retain state/geometry checks and final observation.
+- Browser geometry coalesces independently of navigation; previews are independent and deduplicated. Desktop user-agent request is honored, native devtools/F12 and F11 pane presentation work through shared events; popup links create tabs. Failed post-action snapshots preserve tab ownership.
+- Splash uses centered logo and pale glows without a spinner. Startup failure exposes recovery.
+- Fixed Release #37 iOS WKNavigation? return mismatch. Android logs bounded DOM/geometry diagnostics; smoke now requires visible input and actual text entry, saves screenshot/log/XML evidence.
 
-## Evidence / decisions
-- Read xx driver/catalog, yy/cua Windows runtime and yy Android ShellExecutor/PRootKernel plus iOS shell/browser references. Current Android lacks persistent process/GUI bridge and local mobile CUA is disabled: enabling a tool alone cannot supply a desktop.
-- Windows Get-StartApps confirms Notepad installed. Real native component discovery/control still needs validation.
-- Astryx MCP search/get and CLI manifest/build discovery completed; no local build/dev/Cargo commands.
-- CI #103 (7101f4a) passed. Previous Release #36 is no longer listed and its ID returns 404; current GitHub MCP repository access works. Trigger a fresh release against the next commit.
-
-## Remaining
-- Native CUA end-to-end test in disposable Notepad; fix actual runtime failures; macOS/Linux verification.
-- Android persistent Shell/local servers, configurable environment and Linux GUI/CUA integration; iOS a-Shell limits and startup failure.
-- Verify activity viewer/compact layout and file editors from compiled CI artifact, across wide/narrow sizes, interactions, console and accessibility.
-- Finish embedded browser automation/debugging gaps, mobile release smoke and all requested remaining behavior. Do not claim complete from unit checks alone.
+## Evidence and remaining
+- Release #37 Android job passed while artifact screenshot was entirely white: prior process-only smoke was invalid. Actual Android cause and usable startup must be verified from new CI evidence.
+- Local app discovery/control, performance under games, all desktop platforms, browser context-menu crashes and native mobile startup remain to be verified/fixed. WebView engine defaults provide actual runtime identity; a WebView is not a complete Chrome installation.
+- Read yy/pi-cua scheduling/state/observation design, yy/cua native input and xx external driver paths. Astryx MCP and CLI discovery completed. Tauri 2.11.5 source confirms user_agent/devtools/on_new_window APIs; Swift compiler static archive/link behavior researched.
+- Existing document/file/mobile shell repairs preserved. No local build/dev/Cargo commands run.
 
 ## Verification / touched
-- Latest check PASS; lint PASS (516 files); non-native suite PASS (1126 tests), then new streaming regression PASS (3 activity tests). Cargo excluded; git diff --check PASS.
-- Activity tests cover isolation/bounds, CUA event correlation/cleanup and split UTF-8 visibility before completion. Browser test covers diagnostics limits and duplicate injection.
-- Logs: %TEMP%/xgent-activity-{check,lint,test-non-native}.log. Native/rendered verification pending.
-- Touched browser shared/iOS runtime, mobile Kotlin/Swift runners, frontend tool registry/tools/activity/composer/i18n/styles, CUA IPC/component revision, release staging and regression tests.
+- pnpm check PASS; pnpm lint PASS (517 files); pnpm test:non-native PASS (1129 tests). Logs: %TEMP%/xgent-integrated-*.log. git diff --check PASS.
+- Touched native CUA/link configuration, browser desktop/iOS, mobile diagnostics/smoke, composer/activity/settings/splash, controller regression tests and release workflow. Native/rendered checks and GitHub workflows pending.

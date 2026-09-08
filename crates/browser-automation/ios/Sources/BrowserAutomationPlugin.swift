@@ -887,11 +887,12 @@ final class BrowserAutomationPlugin: Plugin {
     }
 
     @MainActor
-    private func loadBrowserURL(_ url: URL, in webView: WKWebView) {
+    @discardableResult
+    private func loadBrowserURL(_ url: URL, in webView: WKWebView) -> WKNavigation? {
         if url.isFileURL {
-            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+            return webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
         } else {
-            webView.load(URLRequest(url: url))
+            return webView.load(URLRequest(url: url))
         }
     }
 

@@ -39,6 +39,7 @@ import { useCompactViewport } from "../lib/responsive/compactViewport";
 import { AboutSection } from "./settings/AboutSection";
 import { AccessSection } from "./settings/AccessSection";
 import { BackupSyncSection } from "./settings/BackupSyncSection";
+import { ComputerUseSection } from "./settings/ComputerUseSection";
 import { GlobalShortcutsSection } from "./settings/GlobalShortcutsSection";
 import { McpSettingsSection } from "./settings/McpSettingsSection";
 import { MobileAssistantSection } from "./settings/MobileAssistantSection";
@@ -158,6 +159,11 @@ const NAV_ITEMS: NavDefinition[] = [
     descriptionKey: "settings.backupSyncDesc",
   },
   {
+    id: "computerUse",
+    icon: Cpu,
+    descriptionKey: "settings.cua.description",
+  },
+  {
     id: "toolPermissions",
     icon: Shield,
     descriptionKey: "settings.toolPermissionsDesc",
@@ -255,6 +261,7 @@ export function SettingsPage(props: SettingsPageProps) {
     access: t("settings.navAccess"),
     shortcuts: t("settings.navShortcuts"),
     backup: t("settings.navBackup"),
+    computerUse: t("settings.cua.title"),
     toolPermissions: t("settings.navToolPermissions"),
     voice: t("settings.navVoice"),
     usage: t("settings.navUsage"),
@@ -300,6 +307,7 @@ export function SettingsPage(props: SettingsPageProps) {
           label: t("settings.mobile.capabilitiesGroup"),
           ids: new Set<SectionId>([
             "mobileExecution",
+            "computerUse",
             "toolPermissions",
             "shortcuts",
             "voice",
@@ -401,6 +409,8 @@ export function SettingsPage(props: SettingsPageProps) {
             reloadSettings={reloadSettings}
           />
         );
+      case "computerUse":
+        return <ComputerUseSection />;
       case "toolPermissions":
         return <ToolPermissionsSection settings={settings} setSettings={setSettings} />;
       case "projectRoots":

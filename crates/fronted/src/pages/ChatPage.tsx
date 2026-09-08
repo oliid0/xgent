@@ -2334,7 +2334,6 @@ export function ChatPage(props: ChatPageProps) {
     nativeMobileRuntime: nativeMobile,
   });
   const [isFileDropActive, setIsFileDropActive] = useState(false);
-  const [composerOverlayHeight, setComposerOverlayHeight] = useState(0);
   const [queuedChatTurns, setQueuedChatTurns] = useState<QueuedChatTurn[]>([]);
   const queuedChatTurnsRef = useRef<QueuedChatTurn[]>([]);
   const queuedChatProcessingConversationIdsRef = useRef(new Set<string>());
@@ -5022,11 +5021,18 @@ export function ChatPage(props: ChatPageProps) {
   const handleOpenMobileActivity = useCallback(() => {
     setSidebarOpen(false);
     setMobileWorkspaceDestination({ kind: "activity" });
-  }, []);
+    if (!mobileExperience) {
+      browserSessionController.closePanel();
+      setRightSidebarPresentation("side");
+      setRightSidebarActiveTabId("activity");
+      setRightSidebarOpen(true);
+    }
+  }, [mobileExperience]);
 
   const handleCloseMobileActivity = useCallback(() => {
     setMobileWorkspaceDestination((current) => (current?.kind === "activity" ? null : current));
-  }, []);
+    if (!mobileExperience) setRightSidebarOpen(false);
+  }, [mobileExperience]);
 
   const handleOpenBrowser = useCallback(() => {
     if (mobileExperience) setSidebarOpen(false);
@@ -5937,6 +5943,29 @@ export function ChatPage(props: ChatPageProps) {
     !isSending;
   const renderChatComposer = () => (
     <ChatComposerBar
+      activityContent={
+        <MobileToolActivity
+          key={currentConversationId ?? "new"}
+          conversationId={currentConversationId ?? ""}
+          mobileExperience={mobileExperience}
+          store={liveTranscriptStore}
+          open={mobileActivityOpen}
+          onOpen={handleOpenMobileActivity}
+          onOpenBrowser={handleOpenBrowser}
+          onClose={handleCloseMobileActivity}
+        />
+      }
+      progressContent={
+        <CurrentTaskProgress
+          historyItems={historyRenderItems}
+          liveTranscriptStore={liveTranscriptStore}
+          isConversationRunning={
+            isSending ||
+            (currentConversationId ? isConversationRunning(currentConversationId) : false)
+          }
+          persistedState={conversationState.meta.taskList}
+        />
+      }
       conversationId={currentConversationId}
       composerRef={composerRef}
       isSending={isSending}
@@ -5980,7 +6009,6 @@ export function ChatPage(props: ChatPageProps) {
       onMoveQueuedTurnUp={moveQueuedTurnUp}
       onEditQueuedTurn={editQueuedTurn}
       onRemoveQueuedTurn={removeQueuedTurn}
-      onHeightChange={setComposerOverlayHeight}
       mobileExperience={mobileExperience}
     />
   );
@@ -5997,6 +6025,13 @@ export function ChatPage(props: ChatPageProps) {
           t("browser.untitled"),
         icon: <Icon icon={Globe} size="sm" color="inherit" />,
       }));
+    if (mobileActivityOpen) {
+      tabs.unshift({
+        id: "activity",
+        label: t("chat.mobileActivity.title"),
+        icon: <Icon icon={Globe} size="sm" />,
+      });
+    }
     for (const session of rightTerminals) {
       tabs.push({
         id: `${RIGHT_TAB_TERMINAL}:${session.id}`,
@@ -6031,6 +6066,7 @@ export function ChatPage(props: ChatPageProps) {
     currentConversationId,
     mobileExperience,
     rightDiffFile,
+    mobileActivityOpen,
     rightTerminals,
     splitConversationId,
     splitConversationRecord?.title,
@@ -6089,7 +6125,9 @@ export function ChatPage(props: ChatPageProps) {
     setRightFileTabs((tabs) => tabs.filter((tab) => tab.id !== id));
   };
   const handleCloseRightSidebarTab = (tabId: string) => {
-    if (tabId.startsWith("browser:")) {
+    if (tabId === "activity") {
+      handleCloseMobileActivity();
+    } else if (tabId.startsWith("browser:")) {
       const sessionId = tabId.slice("browser:".length);
       if (browserPanelState.sessions.length <= 1) browserSessionController.closePanel();
       void browserSessionController
@@ -6367,6 +6405,7 @@ export function ChatPage(props: ChatPageProps) {
             像素字号，整列缩放会造成混排（聊天区设置也只应影响聊天区）。 */}
       <StackItem
         size="fill"
+        inert={mobileExperience && mobileActivityOpen ? true : undefined}
         data-mobile-chat-workspace={mobileExperience ? "true" : undefined}
         className={cn(
           "chat-workspace-main zone-scroll-region",
@@ -6571,34 +6610,6 @@ export function ChatPage(props: ChatPageProps) {
                     </DesktopCheckpointRewindProvider>
                   )}
 
-                  {chatSurface === "conversation" ? (
-                    <MobileToolActivity
-                      key={currentConversationId ?? "new"}
-                      conversationId={currentConversationId ?? ""}
-                      mobileExperience={mobileExperience}
-                      store={liveTranscriptStore}
-                      open={mobileActivityOpen}
-                      onOpen={handleOpenMobileActivity}
-                      onOpenBrowser={handleOpenBrowser}
-                      onClose={handleCloseMobileActivity}
-                      bottomOffsetPx={composerOverlayHeight}
-                    />
-                  ) : null}
-
-                  {chatSurface === "conversation" ? (
-                    <CurrentTaskProgress
-                      historyItems={historyRenderItems}
-                      liveTranscriptStore={liveTranscriptStore}
-                      isConversationRunning={
-                        isSending ||
-                        (currentConversationId
-                          ? isConversationRunning(currentConversationId)
-                          : false)
-                      }
-                      persistedState={conversationState.meta.taskList}
-                    />
-                  ) : null}
-
                   {chatSurface === "conversation" && pendingToolApprovals.length > 0 ? (
                     <ToolApprovalBar
                       pending={pendingToolApprovals}
@@ -6757,6 +6768,17 @@ export function ChatPage(props: ChatPageProps) {
               }}
             >
               {rightBrowserError ? <Banner status="error" title={rightBrowserError} /> : null}
+              {desktopAuxiliaryOpen && resolvedRightSidebarActiveTabId === "activity" ? (
+                <MobileToolActivity
+                  view="panel"
+                  conversationId={currentConversationId ?? ""}
+                  store={liveTranscriptStore}
+                  open
+                  onOpen={handleOpenMobileActivity}
+                  onClose={handleCloseMobileActivity}
+                  onOpenBrowser={handleOpenBrowser}
+                />
+              ) : null}
               {desktopAuxiliaryOpen && resolvedRightSidebarActiveTabId?.startsWith("browser:") ? (
                 <BrowserPanel
                   embedded
@@ -6866,6 +6888,18 @@ export function ChatPage(props: ChatPageProps) {
         </HStack>
       </StackItem>
 
+      {mobileExperience ? (
+        <MobileToolActivity
+          view="panel"
+          mobileExperience
+          conversationId={currentConversationId ?? ""}
+          store={liveTranscriptStore}
+          open={mobileActivityOpen}
+          onOpen={handleOpenMobileActivity}
+          onClose={handleCloseMobileActivity}
+          onOpenBrowser={handleOpenBrowser}
+        />
+      ) : null}
       {mobileExperience ? (
         <BrowserPanel
           presentation="fullscreen"

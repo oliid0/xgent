@@ -100,3 +100,6 @@ windows-sys = { version = "0.61", features = [
 
 [dev-dependencies]
 tauri = { version = "2.11.5", features = ["test"] }
+
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
+xgent-computer-use = { path = "../../computer-use" }

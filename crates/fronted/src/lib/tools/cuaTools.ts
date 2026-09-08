@@ -5,7 +5,7 @@ import type {
   ToolCall,
   ToolResultMessage,
 } from "@earendil-works/pi-ai";
-import { listen } from "@xgent/runtime";
+import { invoke, listen } from "@xgent/runtime";
 import { activityObservation, executionActivityStore } from "../chat/executionActivityStore";
 
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
@@ -219,12 +219,19 @@ export function createCuaTools(
 
         return await waitForAbortablePromise(
           withCuaLock(async () => {
+            const status = await invoke<{ enabled: boolean }>("cua_status");
+            if (!status.enabled) {
+              throw new Error(
+                "CUA is disabled. Enable Computer use in Settings > Tool permissions. This is not evidence that the target application is missing.",
+              );
+            }
             const started = performance.now();
             const runId = createToolRunId("cua", toolCall.id);
             const record = (response?: CuaCallResponse, step?: number) => {
               executionActivityStore.record(params.conversationId, {
                 id: step === undefined ? runId : `${runId}:${step}`,
                 kind: "cua",
+                app: typeof input.app === "string" ? input.app : undefined,
                 title: `${operation} · ${String(input.app ?? "")}`,
                 ...activityObservation(response?.content ?? []),
                 status: response ? (response.isError ? "error" : "complete") : "running",

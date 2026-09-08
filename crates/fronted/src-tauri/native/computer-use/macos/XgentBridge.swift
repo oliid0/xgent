@@ -38,6 +38,19 @@ public func xgentCuaCall(_ request: UnsafePointer<CChar>) -> UnsafeMutablePointe
                 .contains(target.lowercased()) {
                 throw ComputerUseError.message("Choose a target application other than Xgent")
             }
+            if operation == "capture_preview" {
+                guard CGPreflightScreenCaptureAccess() else {
+                    throw ComputerUseError.message("Screen recording permission is required for the live preview")
+                }
+                let app = try AppDiscovery.resolve(arguments["app"] as? String ?? "", allowLaunch: false)
+                guard let capture = WindowCapture.resolve(for: app.pid, titleHint: nil),
+                      let png = capture.pngDataIfAvailable(maxDimension: CGFloat(arguments["max_image_size"] as? Int ?? 768)) else {
+                    throw ComputerUseError.message("Unable to capture the target window")
+                }
+                let response: [String: Any] = ["content": [["type": "image", "data": png.base64EncodedString(), "mimeType": "image/png"]], "isError": false]
+                let data = try JSONSerialization.data(withJSONObject: response)
+                return strdup(String(decoding: data, as: UTF8.self))
+            }
             result = xgentDispatcher.callToolAsResult(name: operation, arguments: arguments)
         } catch {
             result = .text(error.localizedDescription, isError: true)

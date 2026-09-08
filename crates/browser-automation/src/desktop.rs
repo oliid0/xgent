@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 use tauri::{
     plugin::PluginApi,
     webview::WebviewBuilder,
-    AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl,
 };
 #[cfg(not(target_os = "windows"))]
 use tauri::webview::PageLoadEvent;
@@ -120,12 +120,39 @@ impl<R: Runtime> BrowserAutomation<R> {
             .map_err(|error| Error::Message(format!("failed to prepare browser: {error}")))?;
         #[cfg(not(target_os = "windows"))]
         let initial_url = url.clone();
+        let shortcut_app=self.app.clone();
+        let shortcut_session=request.session_id.clone();
+        let popup_app=self.app.clone();
+        let popup_session=request.session_id.clone();
         let builder = WebviewBuilder::new(label.clone(), WebviewUrl::External(initial_url))
             // Reuse Tauri's default WebContext/profile across child tabs. Do not
             // allocate a data directory, private profile or browser per label.
             .focused(false)
+            .devtools(true)
             .initialization_script(BROWSER_RUNTIME_SCRIPT)
-            .on_navigation(|url| matches!(url.scheme(), "about" | "http" | "https"));
+            .initialization_script(r#"addEventListener('keydown', event => {
+                if (event.isTrusted && (event.key === 'F11' || event.key === 'F12')) {
+                    event.preventDefault(); event.stopImmediatePropagation();
+                    location.href = 'xgent-browser://shortcut/' + event.key;
+                }
+            }, true);"#)
+            .on_navigation(move |url| {
+                if url.scheme()=="xgent-browser" && url.host_str()==Some("shortcut") {
+                    let key=url.path().trim_start_matches('/');
+                    if matches!(key,"F11"|"F12") { let _=shortcut_app.emit("browser-shortcut",json!({"sessionId":shortcut_session,"key":key})); }
+                    return false;
+                }
+                matches!(url.scheme(), "about" | "http" | "https" | "file")
+            })
+            .on_new_window(move |url,_features| {
+                if matches!(url.scheme(),"http"|"https") {
+                    let _=popup_app.emit("browser-open-tab",json!({"sessionId":popup_session,"url":url.as_str()}));
+                }
+                tauri::webview::NewWindowResponse::Deny
+            });
+        let builder=if let Some(agent)=request.user_agent.as_deref().filter(|agent| !agent.trim().is_empty()) {
+            builder.user_agent(agent)
+        } else { builder };
         #[cfg(not(target_os = "windows"))]
         let builder = {
             let page_load_states = Arc::clone(&self.page_load_states);
@@ -281,6 +308,10 @@ impl<R: Runtime> BrowserAutomation<R> {
         let mut screenshot_base64 = None;
         let mut lifecycle = BrowserCommandLifecycle::default();
         let data = match action.as_str() {
+            "open_devtools" => {
+                webview.open_devtools();
+                json!({"requested":true})
+            }
             "navigate" => {
                 let target = request
                     .input

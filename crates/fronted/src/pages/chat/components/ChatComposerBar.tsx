@@ -16,6 +16,7 @@ import { Thumbnail } from "@astryxdesign/core/Thumbnail";
 import { Token } from "@astryxdesign/core/Token";
 import {
   memo,
+  type ReactNode,
   type RefObject,
   useCallback,
   useEffect,
@@ -291,6 +292,8 @@ function prefersReducedMotion() {
 }
 
 export const ChatComposerBar = memo(function ChatComposerBar(props: {
+  activityContent?: ReactNode;
+  progressContent?: ReactNode;
   conversationId: string;
   composerRef: RefObject<MentionComposerHandle | null>;
   isSending: boolean;
@@ -764,91 +767,97 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           justifyContent: isComposerExpanded ? "flex-end" : undefined,
         }}
       >
-        {queuedTurns.length > 0 && !isComposerExpanded ? (
-          <VStack
-            ref={queuePanelRef}
-            width="calc(100% - (var(--spacing-3) * 2))"
-            maxWidth="var(--xgent-chat-queue-width)"
-            gap={0}
-            style={{ position: "relative", zIndex: "var(--xgent-z-chat-queue)" }}
-          >
-            <Section variant="muted" width="100%" padding={0} dividers={["bottom"]}>
-              <Collapsible
-                isOpen={!queueCollapsed}
-                onOpenChange={(isOpen) => setQueueCollapsed(!isOpen)}
-                trigger={
-                  <HStack gap={2} vAlign="center" width="100%">
-                    <Clock3 size={16} />
-                    <Text type="supporting" weight="medium">
-                      {t("chat.queue.title").replace("{count}", String(queuedTurns.length))}
-                    </Text>
-                  </HStack>
-                }
-              >
-                <VStack
-                  width="100%"
-                  isScrollable
-                  padding={1}
-                  style={{ maxHeight: "var(--xgent-chat-queue-height)" }}
+        <VStack
+          width="100%"
+          style={{ maxHeight: "min(22rem, 28dvh)", overflow: "auto", flexShrink: 0 }}
+        >
+          {!isComposerExpanded ? props.progressContent : null}
+          {queuedTurns.length > 0 && !isComposerExpanded ? (
+            <VStack
+              ref={queuePanelRef}
+              width="calc(100% - (var(--spacing-3) * 2))"
+              maxWidth="var(--xgent-chat-queue-width)"
+              gap={0}
+              style={{ position: "relative", zIndex: "var(--xgent-z-chat-queue)" }}
+            >
+              <Section variant="muted" width="100%" padding={0} dividers={["bottom"]}>
+                <Collapsible
+                  isOpen={!queueCollapsed}
+                  onOpenChange={(isOpen) => setQueueCollapsed(!isOpen)}
+                  trigger={
+                    <HStack gap={2} vAlign="center" width="100%">
+                      <Clock3 size={16} />
+                      <Text type="supporting" weight="medium">
+                        {t("chat.queue.title").replace("{count}", String(queuedTurns.length))}
+                      </Text>
+                    </HStack>
+                  }
                 >
-                  <List density="compact" hasDividers>
-                    {queuedTurns.map((item, index) => (
-                      <ListItem
-                        key={item.id}
-                        label={item.previewText || t("chat.queue.emptyMessage")}
-                        description={
-                          item.fileCount > 0
-                            ? t("chat.queue.fileCount").replace("{count}", String(item.fileCount))
-                            : undefined
-                        }
-                        startContent={<Clock3 size={16} />}
-                        endContent={
-                          <HStack gap={0.5} vAlign="center">
-                            {index > 0 ? (
+                  <VStack
+                    width="100%"
+                    isScrollable
+                    padding={1}
+                    style={{ maxHeight: "var(--xgent-chat-queue-height)" }}
+                  >
+                    <List density="compact" hasDividers>
+                      {queuedTurns.map((item, index) => (
+                        <ListItem
+                          key={item.id}
+                          label={item.previewText || t("chat.queue.emptyMessage")}
+                          description={
+                            item.fileCount > 0
+                              ? t("chat.queue.fileCount").replace("{count}", String(item.fileCount))
+                              : undefined
+                          }
+                          startContent={<Clock3 size={16} />}
+                          endContent={
+                            <HStack gap={0.5} vAlign="center">
+                              {index > 0 ? (
+                                <IconButton
+                                  label={t("chat.queue.moveUp")}
+                                  tooltip={t("chat.queue.moveUp")}
+                                  icon={<ChevronUp />}
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => onMoveQueuedTurnUp(item.id)}
+                                />
+                              ) : null}
                               <IconButton
-                                label={t("chat.queue.moveUp")}
-                                tooltip={t("chat.queue.moveUp")}
-                                icon={<ChevronUp />}
+                                label={t("chat.queue.edit")}
+                                tooltip={t("chat.queue.edit")}
+                                icon={<SquarePen />}
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => onMoveQueuedTurnUp(item.id)}
+                                onClick={() => onEditQueuedTurn(item.id)}
                               />
-                            ) : null}
-                            <IconButton
-                              label={t("chat.queue.edit")}
-                              tooltip={t("chat.queue.edit")}
-                              icon={<SquarePen />}
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onEditQueuedTurn(item.id)}
-                            />
-                            <IconButton
-                              label={t("chat.queue.runNow")}
-                              tooltip={t("chat.queue.runNow")}
-                              icon={<Play />}
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onRunQueuedTurnNow(item.id)}
-                            />
-                            <IconButton
-                              label={t("chat.queue.delete")}
-                              tooltip={t("chat.queue.delete")}
-                              icon={<Trash2 />}
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => onRemoveQueuedTurn(item.id)}
-                            />
-                          </HStack>
-                        }
-                      />
-                    ))}
-                  </List>
-                </VStack>
-              </Collapsible>
-            </Section>
-          </VStack>
-        ) : null}
-
+                              <IconButton
+                                label={t("chat.queue.runNow")}
+                                tooltip={t("chat.queue.runNow")}
+                                icon={<Play />}
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onRunQueuedTurnNow(item.id)}
+                              />
+                              <IconButton
+                                label={t("chat.queue.delete")}
+                                tooltip={t("chat.queue.delete")}
+                                icon={<Trash2 />}
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => onRemoveQueuedTurn(item.id)}
+                              />
+                            </HStack>
+                          }
+                        />
+                      ))}
+                    </List>
+                  </VStack>
+                </Collapsible>
+              </Section>
+            </VStack>
+          ) : null}
+        </VStack>
+        {!isComposerExpanded ? props.activityContent : null}
         <ChatComposer
           ref={glassCardRef}
           onSubmit={() => handleComposerSend()}

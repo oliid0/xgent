@@ -26,6 +26,7 @@ test("CUA native sequence events correlate to their invocation and listeners are
   const loader = createTsModuleLoader({ mocks: { "@xgent/runtime": {
     listen: async (_name, callback) => { handler = callback; return () => { removed = true; }; },
     invoke: async (_name, args) => {
+      if (_name === "cua_status") return { enabled: true };
       handler({ payload: { runId: "another-run", step: 0, response: { content: [{ type: "text", text: "wrong" }] } } });
       handler({ payload: { runId: args.run_id, step: 0, response: { content: [{ type: "text", text: "typed" }] } } });
       return { content: [{ type: "text", text: "verified" }], isError: false };

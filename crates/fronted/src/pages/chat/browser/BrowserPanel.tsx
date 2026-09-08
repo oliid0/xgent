@@ -16,7 +16,7 @@ import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
-import { isTauriRuntime } from "@xgent/runtime";
+import { isTauriRuntime, listen } from "@xgent/runtime";
 import {
   type FormEvent,
   useCallback,
@@ -35,6 +35,7 @@ import {
   Minimize2,
   Plus,
   RefreshCw,
+  Terminal,
   X,
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
@@ -129,10 +130,12 @@ function BrowserAddressBar(props: { compact: boolean }) {
     [active?.url],
   );
 
-  const run = (action: "navigate" | "reload" | "go_back" | "go_forward") => {
+  const run = (action: "navigate" | "reload" | "go_back" | "go_forward" | "open_devtools") => {
     if (!active) return;
     const input = action === "navigate" ? { url: normalizeBrowserAddress(value) } : {};
-    void browserSessionController.action(action, input, { sessionId: active.sessionId });
+    void browserSessionController
+      .action(action, input, { sessionId: active.sessionId })
+      .catch(() => undefined);
   };
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -160,6 +163,17 @@ function BrowserAddressBar(props: { compact: boolean }) {
         onClick={() => run("go_forward")}
       />
       {!props.compact ? <Icon icon={Lock} size="sm" color="secondary" /> : null}
+      {!isNativeMobileRuntime() && isTauriRuntime() ? (
+        <IconButton
+          label="Developer tools (F12)"
+          tooltip="Developer tools (F12)"
+          icon={<Icon icon={Terminal} size="sm" />}
+          size="sm"
+          variant="ghost"
+          isDisabled={!active}
+          onClick={() => run("open_devtools")}
+        />
+      ) : null}
       <StackItem size="fill">
         <TextInput
           label={t("browser.addressPlaceholder")}
@@ -306,6 +320,41 @@ export function BrowserPanel(props: {
   useEffect(() => {
     if (state.panelOpen) void browserSessionController.initialize().catch(() => undefined);
   }, [state.panelOpen]);
+  useEffect(() => {
+    if (!state.panelOpen || !isTauriRuntime() || isNativeMobileRuntime()) return;
+    const shortcut = (key: string) => {
+      if (key === "F11")
+        props.onPresentationChange(props.presentation === "fullscreen" ? "side" : "fullscreen");
+      if (key === "F12")
+        void browserSessionController.action("open_devtools").catch(() => undefined);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "F11" && event.key !== "F12") return;
+      event.preventDefault();
+      shortcut(event.key);
+    };
+    window.addEventListener("keydown", onKey);
+    const subscriptions = [
+      listen<{ sessionId: string; key: string }>("browser-shortcut", ({ payload }) => {
+        if (payload.sessionId === browserSessionController.getSnapshot().activeSessionId)
+          shortcut(payload.key);
+      }),
+      listen<{ sessionId: string; url: string }>("browser-open-tab", ({ payload }) => {
+        if (
+          browserSessionController
+            .sessionsForConversation()
+            .some((session) => session.sessionId === payload.sessionId)
+        ) {
+          void browserSessionController.newSession(payload.url).catch(() => undefined);
+        }
+      }),
+    ];
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      for (const subscription of subscriptions)
+        void subscription.then((unlisten) => unlisten()).catch(() => undefined);
+    };
+  }, [state.panelOpen, props.presentation, props.onPresentationChange]);
   if (!state.panelOpen || (compact && state.panelOpenSource !== "user")) return null;
 
   const panel = (

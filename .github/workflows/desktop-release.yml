@@ -212,11 +212,6 @@ jobs:
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --validate
 
-      - name: Build Xgent native macOS computer use
-        env:
-          DEVELOPER_DIR: /Applications/Xcode_26.0.app/Contents/Developer
-        run: bash scripts/release/prepare-computer-use-macos.sh "${{ matrix.cua_arch }}"
-
       - name: Build signed and notarized DMG
         if: env.SIGNED_RELEASE == 'true'
         env:
@@ -293,12 +288,6 @@ jobs:
       - name: Install frontend dependencies
         working-directory: crates/fronted
         run: pnpm install --frozen-lockfile
-
-      - name: Build Windows computer-use component
-        shell: bash
-        run: |
-          cargo build -p xgent-computer-use --release --target x86_64-pc-windows-msvc
-          node scripts/release/stage-computer-use.mjs target/x86_64-pc-windows-msvc/release/xgent_computer_use.dll windows-x86_64 "$XGENT_RELEASE_TAG"
 
       - name: Build Windows bundles
         if: env.SIGNED_RELEASE == 'true'
@@ -411,11 +400,6 @@ jobs:
       - name: Install frontend dependencies
         working-directory: crates/fronted
         run: pnpm install --frozen-lockfile
-
-      - name: Build Linux computer-use component
-        run: |
-          cargo build -p xgent-computer-use --release --target x86_64-unknown-linux-gnu
-          node scripts/release/stage-computer-use.mjs target/x86_64-unknown-linux-gnu/release/libxgent_computer_use.so linux-x86_64 "$XGENT_RELEASE_TAG"
 
       - name: Build Linux bundles
         if: env.SIGNED_RELEASE == 'true'
@@ -732,7 +716,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: xgent-android-launch-evidence
-          path: ${{ runner.temp }}/xgent-android-smoke.png
+          path: |
+            ${{ runner.temp }}/xgent-android-smoke.png
+            ${{ runner.temp }}/xgent-android-*.log
+            ${{ runner.temp }}/xgent-android-ui.xml
           if-no-files-found: warn
           retention-days: 7
 

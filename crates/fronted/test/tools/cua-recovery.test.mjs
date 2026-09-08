@@ -25,7 +25,7 @@ function setup({ actionError = false, observationErrorAfterAction = false } = {}
     },
   };
   const loader = createTsModuleLoader({ mocks: { "@xgent/runtime": { invoke: async (command) => {
-    if (command === "cua_status") return { hostPid: 1 };
+    if (command === "cua_status") return { hostPid: 1, enabled: true };
     return { content: [{ type: "text", text: "Native capture unavailable" }], isError: true };
   } } } });
   const bundle = loader.loadModule("src/lib/tools/cuaTools.ts").createCuaTools({ driver, driverServerIds: ["cua"] });

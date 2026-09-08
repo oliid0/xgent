@@ -4,7 +4,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 function setup(invoke) {
-  const loader = createTsModuleLoader({ mocks: { "@xgent/runtime": { invoke } } });
+  const loader = createTsModuleLoader({ mocks: { "@xgent/runtime": { invoke: (command, args) => command === "cua_status" ? { enabled: true } : invoke(command, args) } } });
   return loader.loadModule("src/lib/tools/cuaTools.ts").createCuaTools();
 }
 const call = (id, operation = "get_app_state") => ({ id, name: "cua", arguments: { operation, app: "Blender" } });
@@ -97,4 +97,18 @@ test("the model receives one unified tool without driver selection or provider-s
   assert.equal(schema.properties.backend, undefined);
   assert.ok(schema.properties.operation.enum.includes("sequence"));
   assert.equal(schema.properties.steps.maxItems, 20);
+});
+
+
+test("disabled CUA cannot invoke native input or install a component", async () => {
+  const calls = [];
+  const loader = createTsModuleLoader({ mocks: { "@xgent/runtime": { invoke: async (command) => {
+    calls.push(command);
+    return { enabled: false };
+  } } } });
+  const bundle = loader.loadModule("src/lib/tools/cuaTools.ts").createCuaTools();
+  const result = await bundle.executeToolCall(call("disabled"));
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /Settings > Tool permissions/);
+  assert.deepEqual(calls, ["cua_status"]);
 });

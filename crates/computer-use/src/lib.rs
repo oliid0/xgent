@@ -20,6 +20,9 @@ pub unsafe extern "C" fn xgent_cua_call(request: *const c_char) -> *mut c_char {
         };
         #[cfg(any(target_os = "windows", target_os = "linux"))]
         {
+            if input["operation"].as_str() == Some("capture_preview") {
+                return desktop::capture_preview(&input["arguments"]).unwrap_or_else(error);
+            }
             static STATE: OnceLock<Mutex<desktop::Desktop>> = OnceLock::new();
             let Ok(mut state) = STATE.get_or_init(Mutex::default).lock() else { return error("Computer-use state is unavailable; restart Xgent"); };
             state.call(input["operation"].as_str().unwrap_or(""), &input["arguments"])

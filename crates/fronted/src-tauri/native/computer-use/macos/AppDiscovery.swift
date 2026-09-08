@@ -152,7 +152,7 @@ enum AppDiscovery {
             }
     }
 
-    static func resolve(_ query: String) throws -> RunningAppDescriptor {
+    static func resolve(_ query: String, allowLaunch: Bool = true) throws -> RunningAppDescriptor {
         let rawQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let aliases = ["\u{5907}\u{5fd8}\u{5f55}": "com.apple.Notes", "notes": "com.apple.Notes", "\u{6587}\u{672c}\u{7f16}\u{8f91}": "com.apple.TextEdit", "\u{8bb0}\u{4e8b}\u{672c}": "com.apple.TextEdit", "textedit": "com.apple.TextEdit"]
         let normalizedQuery = aliases[rawQuery.lowercased()] ?? rawQuery
@@ -166,6 +166,7 @@ enum AppDiscovery {
             return match
         }
 
+        guard allowLaunch else { throw ComputerUseError.appNotFound(normalizedQuery) }
         try launchIfPossible(normalizedQuery)
 
         for _ in 0..<20 {
