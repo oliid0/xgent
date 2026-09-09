@@ -4,18 +4,9 @@ import type { ReactNode } from "react";
 import { useLocale } from "../../i18n";
 import type { AppUpdateController } from "../../lib/appUpdates";
 import { AppUpdateButton } from "../AppUpdateButton";
-import {
-  Cable,
-  FolderTree,
-  MessageSquare,
-  PanelLeft,
-  SkillIcon,
-  SquarePen,
-} from "../icons";
+import { Cable, FolderTree, MessageSquare, PanelLeft, SkillIcon, SquarePen } from "../icons";
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
-import type {
-  WorkspaceNavigationTarget,
-} from "../project-tools/workspaceToolsModel";
+import type { WorkspaceNavigationTarget } from "../project-tools/workspaceToolsModel";
 
 import { SidebarActionMenu } from "./SidebarActionMenu";
 

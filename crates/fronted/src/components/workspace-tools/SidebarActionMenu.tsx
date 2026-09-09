@@ -3,7 +3,18 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { useState } from "react";
 import { useLocale } from "../../i18n";
 import { useSoul } from "../../lib/soul";
-import { Activity, Check, Cpu, GitBranch, Key, MessageSquare, Plus, Settings, Sparkles, Terminal } from "../icons";
+import {
+  Activity,
+  Check,
+  Cpu,
+  GitBranch,
+  Key,
+  MessageSquare,
+  Plus,
+  Settings,
+  Sparkles,
+  Terminal,
+} from "../icons";
 import type { WorkspaceToolTarget } from "../project-tools/workspaceToolsModel";
 
 type SidebarActionMenuProps = {
@@ -95,23 +106,22 @@ export function SidebarActionMenu(props: SidebarActionMenuProps) {
   ];
 
   return (
-      <DropdownMenu
-        button={{
-          label: t("sidebar.soulMenu"),
-          icon: <Icon icon={Sparkles} size="sm" color="accent" />,
-          isIconOnly: true,
-          variant: "ghost",
-          size: "sm",
-          tooltip: t("sidebar.soulMenu"),
-        }}
-        items={soulMenuItems}
-        isMenuOpen={soulMenuOpen}
-        onOpenChange={setSoulMenuOpen}
-        menuWidth="var(--xgent-soul-menu-width)"
-        placement="end"
-        alignment="end"
-        hasChevron={false}
-      />
+    <DropdownMenu
+      button={{
+        label: t("sidebar.soulMenu"),
+        icon: <Icon icon={Sparkles} size="sm" color="accent" />,
+        isIconOnly: true,
+        variant: "ghost",
+        size: "sm",
+        tooltip: t("sidebar.soulMenu"),
+      }}
+      items={soulMenuItems}
+      isMenuOpen={soulMenuOpen}
+      onOpenChange={setSoulMenuOpen}
+      menuWidth="var(--xgent-soul-menu-width)"
+      placement="end"
+      alignment="end"
+      hasChevron={false}
+    />
   );
 }
-
