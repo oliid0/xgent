@@ -5968,12 +5968,6 @@ export function ChatPage(props: ChatPageProps) {
     ],
   );
 
-  const shouldEmbedComposerInLanding =
-    !mobileExperience &&
-    chatSurface === "conversation" &&
-    hasModels &&
-    historyRenderItems.length === 0 &&
-    !isSending;
   const renderChatComposer = () => (
     <ChatComposerBar
       activityContent={
@@ -6186,7 +6180,8 @@ export function ChatPage(props: ChatPageProps) {
       setRightDiffFile(null);
     }
   };
-  const desktopAuxiliaryOpen = !mobileExperience && rightSidebarOpen;
+  const desktopAuxiliaryOpen =
+    rightSidebarOpen && (!mobileExperience || mobileWorkspaceDestination === null);
   const desktopAuxiliaryFullscreen =
     desktopAuxiliaryOpen && rightSidebarPresentation === "fullscreen";
 
@@ -6626,9 +6621,6 @@ export function ChatPage(props: ChatPageProps) {
                           onSuggestionSelect={handleEmptyStateSuggestion}
                           suggestionsDisabled={isSuggestionTyping}
                           mobileExperience={mobileExperience}
-                          emptyStateComposer={
-                            shouldEmbedComposerInLanding ? renderChatComposer() : undefined
-                          }
                         />
                       </ChangedFilesActionsProvider>
                     </DesktopCheckpointRewindProvider>
@@ -6654,9 +6646,7 @@ export function ChatPage(props: ChatPageProps) {
                     />
                   ) : null}
 
-                  {chatSurface === "conversation" && !shouldEmbedComposerInLanding
-                    ? renderChatComposer()
-                    : null}
+                  {chatSurface === "conversation" ? renderChatComposer() : null}
                   {chatSurface === "conversation" && isFileDropActive ? (
                     <Overlay
                       isOpen
@@ -6772,12 +6762,13 @@ export function ChatPage(props: ChatPageProps) {
               label={t("chat.resizeAuxiliaryPanel")}
             />
           ) : null}
-          {!mobileExperience ? (
+          {!mobileExperience || desktopAuxiliaryOpen ? (
             <RightSidebar
+              compact={mobileExperience}
               visible={desktopAuxiliaryOpen}
               tabs={rightSidebarTabs}
               activeTabId={resolvedRightSidebarActiveTabId}
-              presentation={rightSidebarPresentation}
+              presentation={mobileExperience ? "fullscreen" : rightSidebarPresentation}
               width={`min(${auxiliaryPanelResize.size}px, calc(100% - 300px))`}
               onSelectTab={handleSelectRightSidebarTab}
               onNewBrowser={handleNewRightBrowser}

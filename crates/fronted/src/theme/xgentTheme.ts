@@ -37,7 +37,7 @@ export const xgentTheme = defineTheme({
     easing: "cubic-bezier(0.2, 0, 0, 1)",
   },
   tokens: {
-    "--color-background-body": ["#edf3f8", "#171717"],
+    "--color-background-body": ["#eff2f5", "#171717"],
     "--color-background-surface": ["#ffffff", "#212121"],
     "--color-background-card": ["#ffffff", "#2f2f2f"],
     "--color-background-popover": ["#ffffff", "#2f2f2f"],

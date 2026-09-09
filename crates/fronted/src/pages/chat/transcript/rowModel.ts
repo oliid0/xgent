@@ -101,6 +101,8 @@ export type AssistantActivityRow = {
   anchorUserKey: string | null;
   live: boolean;
   units: AssistantUnitRow[];
+  startedAt?: number;
+  endedAt?: number;
 };
 
 export type TranscriptRow = SummaryRow | UserRow | AssistantUnitRow | AssistantActivityRow;
@@ -568,7 +570,19 @@ export function createTranscriptRowModel(options?: TranscriptRowModelOptions): T
         retryTarget,
         anchorUserKey,
       });
-      rows = originKey ? [buildAssistantActivityRow(originKey, assistantUnits)] : assistantUnits;
+      const hasWork = assistantUnits.some(
+        ({ unit }) => unit.kind === "block" && unit.block.kind !== "text",
+      );
+      rows =
+        originKey || hasWork
+          ? [
+              {
+                ...buildAssistantActivityRow(originKey ?? item.key, assistantUnits),
+                startedAt: retryTarget?.timestamp,
+                endedAt: item.timestamp,
+              },
+            ]
+          : assistantUnits;
     }
     rowCache.set(item, { anchorUserKey, retryTarget, rows });
     return rows;

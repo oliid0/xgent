@@ -21,7 +21,7 @@ export function TaskProgressBar(props: {
   const label = allDone
     ? t("chat.tasks.completed")
     : active?.activeForm || active?.subject || t("chat.tasks.ready");
-  const position = active ? snapshot.tasks.indexOf(active) + 1 : completed;
+  const position = completed;
   const isOpen = expandedRunId === snapshot.runId;
   return (
     <Popover
@@ -29,9 +29,14 @@ export function TaskProgressBar(props: {
       onOpenChange={(open) => setExpandedRunId(open ? snapshot.runId : null)}
       placement="above"
       label={t("chat.tasks.todo")}
-      width="min(42rem, calc(100vw - 2rem))"
+      width="max-content"
+      hasCloseButton={false}
       content={
-        <VStack gap={3} className="xgent-task-popover">
+        <VStack
+          gap={3}
+          className="xgent-task-popover"
+          style={{ maxWidth: "min(32rem, calc(100vw - 3rem))" }}
+        >
           <HStack hAlign="between" vAlign="center">
             <Text color="secondary">{t("chat.tasks.todo")}</Text>
             <Text color="secondary" hasTabularNumbers>
@@ -64,7 +69,7 @@ export function TaskProgressBar(props: {
         </VStack>
       }
     >
-      <Button label={label} variant="ghost" width="100%" className="xgent-task-trigger">
+      <Button label={label} variant="ghost" width="fit-content" className="xgent-task-trigger">
         <HStack gap={2} vAlign="center" width="100%">
           {allDone ? (
             <Check />
@@ -78,7 +83,7 @@ export function TaskProgressBar(props: {
             <Clock3 />
           )}
           <StackItem size="fill">
-            <Text maxLines={1} style={{ textAlign: "start" }}>
+            <Text maxLines={1} hasTruncateTooltip={false} style={{ textAlign: "start" }}>
               {label}
             </Text>
           </StackItem>

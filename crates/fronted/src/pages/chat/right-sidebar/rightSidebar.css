@@ -12,10 +12,12 @@
 }
 
 .right-sidebar-tab-panel > * {
-  flex-shrink: 0;
+  min-width: 0;
+  min-height: 0;
 }
 
-.right-sidebar-tab-panel > .astryx-stack {
+.right-sidebar-tab-panel > .astryx-stack,
+.right-sidebar-tab-panel > .xgent-activity-panel {
   flex: 1 1 0;
   min-height: 0;
 }
@@ -25,13 +27,13 @@
   min-width: 96px;
   max-width: 220px;
   border-radius: 8px;
-  background: var(--color-background-secondary);
+  background: var(--color-background-muted);
   border: 1px solid transparent;
 }
 
 .right-sidebar-tab[data-active="true"] {
   border-color: var(--color-border);
-  background: var(--color-background-primary);
+  background: var(--color-background-surface);
 }
 
 .right-sidebar-tab > button[role="tab"] {

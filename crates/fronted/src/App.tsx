@@ -57,6 +57,7 @@ import { SoulProvider } from "./lib/soul";
 import { applyFontFamilies } from "./lib/system/fontFamily";
 import { finishLaunch } from "./lib/system/launchScreen";
 import { ChatPage } from "./pages/ChatPage";
+import { TranscriptPreferences } from "./pages/chat/transcript/TranscriptPreferences";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { SectionId, SettingsOpenOptions } from "./pages/settings/types";
 import { startLocalAccessHostBridge } from "./runtime/localAccessHostBridge";
@@ -689,61 +690,92 @@ export default function App() {
   }, [desktopBridgeEnabled, lanPcCommandHostReady, nativeMobile, settingsReady]);
 
   return (
-    <Theme theme={appearanceTheme} mode={effectiveTheme}>
-      <ToastViewport position="topEnd" maxVisible={4}>
-        <LocaleContext.Provider value={localeContextValue}>
-          <AppChrome nativeMobile={nativeMobile}>
-            <SoulProvider>
-              {appContentReady ? (
-                <>
-                  {settingsReady ? <CronPromptRunner settings={settings} /> : null}
-                  {settingsReady ? (
-                    <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
-                  ) : null}
-                  <AppErrorBoundary>
-                    <VStack width="100%" height="100%" gap={0}>
-                      {nativeMobile && mobileStartup.failures.length > 0 ? (
-                        <MobileStartupWarning
-                          failures={mobileStartup.failures}
-                          locale={settings.locale}
-                        />
-                      ) : null}
-                      <StackItem size="fill">
-                        <ChatPage
-                          settings={settings}
-                          setSettings={setSettings}
-                          getMcpSettings={getMcpSettings}
-                          getToolPolicies={getToolPolicies}
-                          context={context}
-                          setContext={setContext}
-                          onOpenSettings={openSettings}
-                          appUpdate={appUpdate}
-                          desktopBridgeEnabled={desktopBridgeEnabled}
-                          lanPcCommandHostReady={lanPcCommandHostReady}
-                          nativeMobile={nativeMobile}
-                          onRunningConversationCountChange={handleRunningConversationCountChange}
-                        />
-                      </StackItem>
-                    </VStack>
-                  </AppErrorBoundary>
-                  {compactSettingsDialog ? (
-                    <BottomSheet
-                      isOpen={settingsOpen}
-                      onOpenChange={(isOpen) => {
-                        if (!isOpen) closeSettings();
-                      }}
-                      label={translate("settings.title", settings.locale)}
-                      purpose="info"
-                      height="tall"
-                    >
-                      <AppErrorBoundary>
-                        <VStack
-                          width="100%"
-                          height="100%"
-                          minHeight={0}
-                          gap={0}
-                          paddingBlockStart={5}
-                        >
+    <TranscriptPreferences.Provider
+      value={{ showThinking: settings.customSettings.appearance.showThinking }}
+    >
+      <Theme theme={appearanceTheme} mode={effectiveTheme}>
+        <ToastViewport position="topEnd" maxVisible={4}>
+          <LocaleContext.Provider value={localeContextValue}>
+            <AppChrome nativeMobile={nativeMobile}>
+              <SoulProvider>
+                {appContentReady ? (
+                  <>
+                    {settingsReady ? <CronPromptRunner settings={settings} /> : null}
+                    {settingsReady ? (
+                      <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
+                    ) : null}
+                    <AppErrorBoundary>
+                      <VStack width="100%" height="100%" gap={0}>
+                        {nativeMobile && mobileStartup.failures.length > 0 ? (
+                          <MobileStartupWarning
+                            failures={mobileStartup.failures}
+                            locale={settings.locale}
+                          />
+                        ) : null}
+                        <StackItem size="fill">
+                          <ChatPage
+                            settings={settings}
+                            setSettings={setSettings}
+                            getMcpSettings={getMcpSettings}
+                            getToolPolicies={getToolPolicies}
+                            context={context}
+                            setContext={setContext}
+                            onOpenSettings={openSettings}
+                            appUpdate={appUpdate}
+                            desktopBridgeEnabled={desktopBridgeEnabled}
+                            lanPcCommandHostReady={lanPcCommandHostReady}
+                            nativeMobile={nativeMobile}
+                            onRunningConversationCountChange={handleRunningConversationCountChange}
+                          />
+                        </StackItem>
+                      </VStack>
+                    </AppErrorBoundary>
+                    {compactSettingsDialog ? (
+                      <BottomSheet
+                        isOpen={settingsOpen}
+                        onOpenChange={(isOpen) => {
+                          if (!isOpen) closeSettings();
+                        }}
+                        label={translate("settings.title", settings.locale)}
+                        purpose="info"
+                        height="tall"
+                      >
+                        <AppErrorBoundary>
+                          <VStack
+                            width="100%"
+                            height="100%"
+                            minHeight={0}
+                            gap={0}
+                            paddingBlockStart={5}
+                          >
+                            <SettingsPage
+                              settings={settings}
+                              setSettings={setSettings}
+                              reloadSettings={reloadPersistedSettings}
+                              saveState={settingsSaveState}
+                              onBack={closeSettings}
+                              initialSection={settingsSection}
+                              soulCreateRequestId={soulCreateRequestId}
+                              nativeMobile={nativeMobile}
+                              appUpdate={appUpdate}
+                            />
+                          </VStack>
+                        </AppErrorBoundary>
+                      </BottomSheet>
+                    ) : (
+                      <Dialog
+                        isOpen={settingsOpen}
+                        onOpenChange={(isOpen) => {
+                          if (!isOpen) closeSettings();
+                        }}
+                        purpose="info"
+                        variant="standard"
+                        width="var(--xgent-settings-dialog-width)"
+                        maxHeight="var(--xgent-settings-dialog-height)"
+                        padding={0}
+                        aria-label={translate("settings.title", settings.locale)}
+                      >
+                        <AppErrorBoundary>
                           <SettingsPage
                             settings={settings}
                             setSettings={setSettings}
@@ -755,46 +787,19 @@ export default function App() {
                             nativeMobile={nativeMobile}
                             appUpdate={appUpdate}
                           />
-                        </VStack>
-                      </AppErrorBoundary>
-                    </BottomSheet>
-                  ) : (
-                    <Dialog
-                      isOpen={settingsOpen}
-                      onOpenChange={(isOpen) => {
-                        if (!isOpen) closeSettings();
-                      }}
-                      purpose="info"
-                      variant="standard"
-                      width="var(--xgent-settings-dialog-width)"
-                      maxHeight="var(--xgent-settings-dialog-height)"
-                      padding={0}
-                      aria-label={translate("settings.title", settings.locale)}
-                    >
-                      <AppErrorBoundary>
-                        <SettingsPage
-                          settings={settings}
-                          setSettings={setSettings}
-                          reloadSettings={reloadPersistedSettings}
-                          saveState={settingsSaveState}
-                          onBack={closeSettings}
-                          initialSection={settingsSection}
-                          soulCreateRequestId={soulCreateRequestId}
-                          nativeMobile={nativeMobile}
-                          appUpdate={appUpdate}
-                        />
-                      </AppErrorBoundary>
-                    </Dialog>
-                  )}
-                  {restartConfirmDialog}
-                </>
-              ) : (
-                <AppStartupSurface locale={settings.locale} failures={mobileStartup.failures} />
-              )}
-            </SoulProvider>
-          </AppChrome>
-        </LocaleContext.Provider>
-      </ToastViewport>
-    </Theme>
+                        </AppErrorBoundary>
+                      </Dialog>
+                    )}
+                    {restartConfirmDialog}
+                  </>
+                ) : (
+                  <AppStartupSurface locale={settings.locale} failures={mobileStartup.failures} />
+                )}
+              </SoulProvider>
+            </AppChrome>
+          </LocaleContext.Provider>
+        </ToastViewport>
+      </Theme>
+    </TranscriptPreferences.Provider>
   );
 }

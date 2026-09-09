@@ -2,6 +2,7 @@ export const UI_THEME_PRESETS = ["current", "stone", "matcha"] as const;
 export type AppearanceSettings = {
   preset: (typeof UI_THEME_PRESETS)[number];
   customized: boolean;
+  showThinking: boolean;
   accentLight: string;
   accentDark: string;
   sidebarLight: string;
@@ -16,9 +17,10 @@ export function normalizeAppearance(input: unknown): AppearanceSettings {
   return {
     preset: obj.preset === "stone" || obj.preset === "matcha" ? obj.preset : "current",
     customized: obj.customized === true,
+    showThinking: obj.showThinking === true,
     accentLight: color(obj.accentLight, "#2563eb"),
     accentDark: color(obj.accentDark, "#93c5fd"),
-    sidebarLight: color(obj.sidebarLight, "#edf3f8"),
+    sidebarLight: color(obj.sidebarLight, "#eff2f5"),
     sidebarDark: color(obj.sidebarDark, "#171717"),
     radius:
       typeof obj.radius === "number" && Number.isFinite(obj.radius)

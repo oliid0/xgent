@@ -44,6 +44,7 @@ export function RightSidebar(props: {
   onPresentationChange: (presentation: RightSidebarPresentation) => void;
   onClose: () => void;
   visible?: boolean;
+  compact?: boolean;
 }) {
   const { t } = useLocale();
   const stripRef = useRef<HTMLDivElement>(null);
@@ -75,6 +76,8 @@ export function RightSidebar(props: {
   return (
     <VStack
       as="aside"
+      className="xgent-right-sidebar"
+      data-compact={props.compact || undefined}
       width={props.presentation === "fullscreen" ? "100%" : props.width}
       height="100%"
       minHeight={0}
@@ -87,7 +90,7 @@ export function RightSidebar(props: {
         maxWidth: "100%",
         display: props.visible === false ? "none" : undefined,
         borderInlineStart: "var(--border-width) solid var(--color-border)",
-        background: "var(--color-background-primary)",
+        background: "var(--color-background-surface)",
       }}
     >
       <HStack

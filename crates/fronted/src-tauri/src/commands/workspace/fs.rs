@@ -3852,6 +3852,19 @@ pub(crate) fn fs_open_workspace_path_sync(
         .map_err(|e| FsCommandError::from(e).with_workdir(&target.root))
 }
 
+#[tauri::command(rename_all = "snake_case")]
+pub async fn fs_file_applications(workdir: String, path: String) -> Result<Vec<serde_json::Value>, FsCommandError> {
+    run_blocking_fs("fs_file_applications", move || {
+        let scoped = resolve_scoped_fs_path(&workdir, &path)?;
+        let target = resolve_target(&scoped.root, &scoped.relative_path)?;
+        if !target.is_file() { return Err(FsError::Other("Choose a regular file".into()).into()); }
+        #[cfg(target_os = "windows")]
+        { xgent_computer_use::file_handlers::applications(&target, None).map_err(|error| FsError::Other(error).into()) }
+        #[cfg(not(target_os = "windows"))]
+        { Ok(Vec::new()) }
+    }).await
+}
+
 fn fs_open_workspace_path_impl(
     path: &ScopedFsPath,
     mode: Option<String>,
@@ -3877,6 +3890,7 @@ fn fs_open_workspace_path_impl(
     let normalized_mode = match normalized_mode.as_str() {
         "" | "open" => "open",
         "choose" => "choose",
+        value if value.starts_with("app:") => value,
         "reveal" | "containing_dir" | "containing-directory" => "reveal",
         other => {
             return Err(FsError::Other(format!(
@@ -3885,7 +3899,13 @@ fn fs_open_workspace_path_impl(
         }
     };
 
-    if normalized_mode == "choose" && meta.is_file() {
+    if let Some(selected) = normalized_mode.strip_prefix("app:") {
+        if !meta.is_file() { return Err(FsError::Other("Choose a regular file".into())); }
+        #[cfg(target_os = "windows")]
+        { xgent_computer_use::file_handlers::applications(&target, Some(selected)).map_err(FsError::Other)?; }
+        #[cfg(not(target_os = "windows"))]
+        { let _ = selected; return Err(FsError::Other("Use the system application chooser on this platform".into())); }
+    } else if normalized_mode == "choose" && meta.is_file() {
         choose_workspace_application(&target).map_err(FsError::Other)?;
     } else {
         spawn_workspace_open_command(&target, normalized_mode).map_err(FsError::Other)?;

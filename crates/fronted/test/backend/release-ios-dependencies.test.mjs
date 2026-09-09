@@ -36,6 +36,24 @@ def ipa(include_lua, valid_rpath=True, weak=False):
 
 assert module.inspect_ipa(ipa(True)) == 3
 assert module.inspect_ipa(ipa(False, weak=True)) == 2
+
+# iOS ABI stability is insufficient when @rpath cannot reach /usr/lib/swift.
+def swift_ipa(system_rpath):
+    data = io.BytesIO()
+    with zipfile.ZipFile(data, 'w') as z:
+        z.writestr('Payload/Xgent.app/Info.plist', plistlib.dumps({'CFBundleExecutable': 'Xgent', 'MinimumOSVersion': '14.0'}))
+        paths = ['@executable_path/Frameworks'] + (['/usr/lib/swift'] if system_rpath else [])
+        z.writestr('Payload/Xgent.app/Xgent', macho([(12, '@rpath/libswift_Concurrency.dylib')], paths))
+        z.writestr('Payload/Xgent.app/Frameworks/libswift_Concurrency.dylib', macho([(12, '@rpath/libswiftCore.dylib')]))
+    data.seek(0)
+    return data
+assert module.inspect_ipa(swift_ipa(True)) == 2
+try:
+    module.inspect_ipa(swift_ipa(False))
+    raise AssertionError('Broken Swift runtime search path was accepted')
+except ValueError as error:
+    assert 'libswiftCore.dylib' in str(error)
+
 for archive, expected in [(ipa(False), 'lua_ios'), (ipa(True, valid_rpath=False), 'vim.framework')]:
     try:
         module.inspect_ipa(archive)

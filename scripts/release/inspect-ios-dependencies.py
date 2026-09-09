@@ -87,13 +87,15 @@ def inspect_ipa(path):
             for dependency, weak in dependencies:
                 if dependency.startswith(("/usr/lib/", "/System/Library/")):
                     continue
-                # iOS 12.2+ supplies the ABI-stable Swift core in the dyld cache.
-                # Back-deployment libraries (e.g. Concurrency) still need embedding.
-                if dependency == "@rpath/libswiftCore.dylib" and minimum_ios >= (12, 2):
-                    continue
                 candidates = [expand(dependency, binary)]
                 if dependency.startswith("@rpath/"):
                     candidates = [posixpath.normpath(base + "/" + dependency[7:]) for base in search_paths]
+                # ABI stability does not make @rpath resolution automatic. The
+                # device crash in yy resolves only Frameworks and /usr/lib;
+                # accepting Swift core without /usr/lib/swift hid that failure.
+                if (minimum_ios >= (12, 2)
+                        and "/usr/lib/swift/libswiftCore.dylib" in candidates):
+                    continue
                 if not weak and not any(candidate in binaries for candidate in candidates):
                     errors.append(f"{binary}: missing {dependency}")
         if errors:

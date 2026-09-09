@@ -3335,8 +3335,8 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 .workspace-navigation-rail-shell {
-  width: var(--spacing-12);
-  max-width: var(--spacing-12);
+  width: 44px;
+  max-width: 44px;
   min-width: 0;
   flex: 0 0 auto;
   overflow: hidden;
@@ -3465,14 +3465,14 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   overflow: hidden;
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: var(--color-background-secondary);
+  background: var(--color-background-muted);
 }
 
 .xgent-activity-strip {
   flex: 0 0 auto;
   min-width: 0;
   padding-block: var(--spacing-1);
-  background: var(--color-background-primary);
+  background: var(--color-background-surface);
   max-width: var(--xgent-composer-width);
   margin-inline: auto;
 }
@@ -3482,7 +3482,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     radial-gradient(ellipse 150px 150px at 36% 14%, #fffcc760, transparent),
     radial-gradient(ellipse 230px 180px at 66% 2%, #aaffff75, transparent),
     radial-gradient(ellipse 160px 150px at 64% 15%, #ffe3d340, transparent),
-    var(--color-background-primary);
+    var(--color-background-surface);
 }
 .xgent-activity-dot {
   display: inline-block;
@@ -3524,7 +3524,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   z-index: var(--xgent-z-browser-overlay);
   height: var(--xgent-viewport-height, 100dvh);
   padding-block: env(safe-area-inset-top, 0px) env(safe-area-inset-bottom, 0px);
-  background: var(--color-background-primary);
+  background: var(--color-background-surface);
 }
 
 .mobile-hub-floating-search {
@@ -3784,7 +3784,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 .workspace-document-toolbar button,
 .workspace-document-toolbar select {
   padding: 6px 12px;
-  background: var(--color-background-secondary);
+  background: var(--color-background-muted);
   border-radius: 6px;
 }
 .workspace-document-pages {
@@ -3792,7 +3792,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   min-height: 0;
   overflow: auto;
   padding: 16px;
-  background: var(--color-background-secondary);
+  background: var(--color-background-muted);
 }
 .workspace-document-pages canvas {
   display: block;
@@ -3857,7 +3857,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   border: 1px solid var(--color-border);
   border-radius: 16px;
   box-shadow: 0 3px 8px #00000005;
-  background: var(--color-background-primary);
+  background: var(--color-background-surface);
 }
 .chat-suggestion-grid svg {
   width: 20px;
@@ -3865,7 +3865,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   color: var(--color-text-secondary);
 }
 .chat-suggestion-grid button:hover {
-  background: var(--color-background-secondary);
+  background: var(--color-background-muted);
 }
 .chat-suggestion-grid button:focus-visible {
   outline: 2px solid var(--color-text-accent);
@@ -3934,7 +3934,8 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   min-width: 0;
 }
 .xgent-activity-progress > * {
-  width: 100%;
+  max-width: 100%;
+  width: fit-content;
 }
 
 .chat-brand-menu {
@@ -3987,5 +3988,82 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   }
   .xgent-composer-model-controls .astryx-complex-selector > .astryx-icon:first-child {
     display: none;
+  }
+}
+
+/* Each activity region owns its height across orientation changes. */
+.xgent-activity-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-background-surface);
+}
+.xgent-activity-content {
+  width: 100%;
+  min-width: 0;
+}
+.xgent-activity-content > * {
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+.xgent-activity-terminal {
+  min-height: 18rem;
+  height: 50dvh;
+  width: 100%;
+  background: var(--color-background-surface);
+  color: var(--color-text-primary);
+  overflow: hidden;
+}
+.xgent-activity-header {
+  min-height: 64px;
+  max-width: 100%;
+}
+.xgent-right-sidebar[data-compact="true"] {
+  position: fixed;
+  inset: 0;
+  z-index: var(--xgent-z-browser-overlay);
+  padding-block: env(safe-area-inset-top) env(safe-area-inset-bottom);
+}
+.xgent-work-record {
+  padding-block: var(--spacing-2);
+}
+.xgent-task-trigger {
+  max-width: 100%;
+}
+.xgent-task-popover svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+.settings-page [data-settings-section] {
+  min-width: 0;
+}
+.settings-page [data-settings-section] .astryx-section {
+  min-width: 0;
+  max-width: 100%;
+}
+.settings-page [data-settings-section] .astryx-field {
+  min-width: 0;
+  width: 100%;
+}
+.settings-page-compact .astryx-dialog-header .astryx-button {
+  background: transparent;
+  box-shadow: none;
+}
+.chat-history-sidebar,
+.workspace-navigation-rail-shell {
+  background: var(--color-background-body);
+}
+.workspace-navigation-rail-shell .astryx-side-nav {
+  width: 100%;
+  min-width: 0;
+  background: var(--color-background-body);
+}
+.xgent-workspace-preview-overlay {
+  background: var(--color-background-surface);
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-navigation-rail-shell {
+    transition: none;
   }
 }

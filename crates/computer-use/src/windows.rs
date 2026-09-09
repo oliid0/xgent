@@ -125,6 +125,7 @@ pub fn elements(window: &Window) -> (Vec<Value>,String) {
             let frame=rect.map(|rect|json!([rect.left,rect.top,rect.right-rect.left,rect.bottom-rect.top])).unwrap_or(Value::Null);
             output.push(json!({"path":path,"name":name,"automationId":automation_id,"className":class_name,"controlType":control,"frame":frame,"actions":actions,
                 "value":value,"enabled":enabled,"focused":focused,
+                "editable":!password && [UIA_EditControlTypeId.0,UIA_DocumentControlTypeId.0].contains(&control),
                 "label":format!("{} (type {}, enabled: {}, focused: {}, actions: {}){}",name,control,enabled,focused,actions.join(", "),
                     if value.is_empty() { String::new() } else { format!(" value: {value:?}") })}));
             let mut child=walker.GetFirstChildElementBuildCache(element,cache).ok();

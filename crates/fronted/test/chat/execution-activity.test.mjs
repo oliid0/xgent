@@ -2,6 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
+test("terminal output merges overlapping waits without duplicating UTF-8 and preserves terminal status", () => {
+  const { executionActivityStore: store, recordShellActivity } = createTsModuleLoader().loadModule("src/lib/chat/executionActivityStore.ts");
+  store.record("stream", { id: "session", sessionId: "session", kind: "shell", title: "echo", text: "", status: "running", outputCursor: 0 });
+  const record = (text, cursor, status = "running") => recordShellActivity("stream", { session_id: "session", output: [{ text }], cursor, status });
+  record("你好", 6);
+  record("你好 world", 12);
+  record("你好", 6);
+  record("", 12, "completed");
+  assert.equal(store.getSnapshot("stream")[0].text, "你好 world");
+  assert.equal(store.getSnapshot("stream")[0].status, "complete");
+  recordShellActivity("other", { session_id: "session", output: [{ text: "wrong" }], cursor: 20, status: "running" });
+  assert.equal(store.getSnapshot("other").length, 0);
+});
+
 test("activity observations survive transcript settlement without crossing conversations and remain bounded", () => {
   const { executionActivityStore: store } = createTsModuleLoader().loadModule("src/lib/chat/executionActivityStore.ts");
   const activity = { id: "same-provider-id", kind: "shell", title: "python task.py", text: "A", status: "running" };

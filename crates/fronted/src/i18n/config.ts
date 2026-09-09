@@ -51,6 +51,12 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.cua.working": "正在处理…",
     "settings.cua.refresh": "刷新状态",
 
+    "settings.ui.showThinking": "显示思考过程",
+    "settings.ui.showThinkingDesc": "默认关闭。开启后可在工作记录中查看模型提供的思考摘要。",
+    "chat.activity.worked": "工作了 {duration}",
+    "chat.activity.stopped": "已停止",
+    "workspaceFiles.defaultApp": "默认应用",
+    "workspaceFiles.chooseApp": "选择其他应用…",
     "workspaceFiles.openWith": "\u6253\u5f00\u65b9\u5f0f",
     "workspaceFiles.revealInFinder": "\u5728\u6587\u4ef6\u7ba1\u7406\u5668\u4e2d\u663e\u793a",
     "browser.startBrowsing": "\u5f00\u59cb\u6d4f\u89c8",
@@ -2823,6 +2829,13 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.cua.working": "Working…",
     "settings.cua.refresh": "Refresh status",
 
+    "settings.ui.showThinking": "Show reasoning",
+    "settings.ui.showThinkingDesc":
+      "Off by default. Show model-provided reasoning summaries in the work record.",
+    "chat.activity.worked": "Worked for {duration}",
+    "chat.activity.stopped": "Stopped",
+    "workspaceFiles.defaultApp": "Default application",
+    "workspaceFiles.chooseApp": "Choose another application…",
     "workspaceFiles.openWith": "Open with",
     "workspaceFiles.revealInFinder": "Show in file manager",
     "browser.startBrowsing": "Start browsing",

@@ -148,6 +148,8 @@ pub async fn cua_call(app: tauri::AppHandle, operation: String, arguments: Value
         };
         if current.is_error || state_id(&current).as_deref() != arguments["state_id"].as_str() {
             let mut fresh = component::call("get_app_state",&arguments,&||run_token.is_cancelled())?;
+            fresh.is_error = true;
+            fresh.details["actionApplied"] = json!(false);
             fresh.content.insert(0,json!({"type":"text","text":"ACTION NOT APPLIED: stale sequence state. Inspect this observation."}));
             return Ok(fresh);
         }

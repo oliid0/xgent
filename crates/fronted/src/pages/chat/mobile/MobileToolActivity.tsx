@@ -1,7 +1,7 @@
 import { AspectRatio } from "@astryxdesign/core/AspectRatio";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
-import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
@@ -9,7 +9,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { invoke } from "@xgent/runtime";
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ImagePreviewPanel } from "../../../components/chat/ImagePreview";
-import { ArrowLeft, Globe, Wrench } from "../../../components/icons";
+import { ArrowLeft, Globe, MonitorSmartphone, Terminal, Wrench } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import { browserSessionController } from "../../../lib/browser/browserSessionController";
 import type {
@@ -19,11 +19,18 @@ import type {
 import {
   activityObservation,
   executionActivityStore,
+  recordShellActivity,
+  type ShellActivityResponse,
 } from "../../../lib/chat/executionActivityStore";
 import { imageActivitySelection } from "../../../lib/chat/imageActivityNavigation";
-import { summarizeToolCall, type ToolTraceItem } from "../../../lib/chat/messages/uiMessages";
+import {
+  summarizeToolCall,
+  type ToolTraceItem,
+  toolResultMessageToText,
+} from "../../../lib/chat/messages/uiMessages";
 import { toolActivitySelection, toolStepLabel } from "../../../lib/chat/toolActivityNavigation";
 import { ToolCallDetail } from "../components/assistant-bubble/ToolCallItem";
+import { ActivityTerminal } from "./ActivityTerminal";
 
 type MobileToolActivityProps = {
   conversationId: string;
@@ -76,7 +83,8 @@ function activityKind(name: string): "shell" | "browser" | "cua" | "tool" {
   if (
     normalized.includes("bash") ||
     normalized.includes("shell") ||
-    normalized.includes("terminal")
+    normalized.includes("terminal") ||
+    normalized.includes("process")
   ) {
     return "shell";
   }
@@ -193,9 +201,54 @@ export function MobileToolActivity({
     .reverse()
     .find((frame) => frame.kind === "cua" && frame.app)?.app;
   const monitoring = open || !snapshot.isSettled;
+  const selectedKind =
+    selectedFrame?.kind ?? (selectedItem ? activityKind(selectedItem.toolCall.name) : "tool");
+  const shellDetails = selectedItem?.toolResult?.details as Record<string, unknown> | undefined;
+  const shellOutput =
+    selectedFrame?.text ??
+    (Array.isArray(shellDetails?.output)
+      ? shellDetails.output.map((chunk: { text?: string }) => chunk.text ?? "").join("")
+      : shellDetails && typeof shellDetails.stdout === "string"
+        ? `${shellDetails.stdout}${shellDetails.stderr ?? ""}`
+        : selectedItem?.toolResult
+          ? toolResultMessageToText(selectedItem.toolResult)
+          : "");
+  const shellCommand =
+    selectedFrame?.title ??
+    String(selectedItem?.toolCall.arguments?.command ?? selectedItem?.toolCall.name ?? "");
   const [previewError, setPreviewError] = useState("");
+  const shellSessionId = [...frames].reverse().find((frame) => frame.kind === "shell")?.sessionId;
   useEffect(() => {
-    if (view !== "capsule" || !previewTarget || !monitoring || capsuleKind === "browser") return;
+    if (view !== "capsule" || !monitoring || !shellSessionId) return;
+    let disposed = false;
+    let cursor = 0;
+    let timer: number | undefined;
+    let failures = 0;
+    const read = async () => {
+      try {
+        const response = await invoke<ShellActivityResponse>("shell_session_wait", {
+          session_id: shellSessionId,
+          cursor,
+          yield_time_ms: 5000,
+        });
+        if (disposed) return;
+        recordShellActivity(conversationId, response);
+        cursor = response.cursor;
+        failures = 0;
+        if (response.status !== "running" && !response.has_more) return;
+      } catch {
+        if (disposed || ++failures >= 10) return;
+      }
+      if (!disposed) timer = window.setTimeout(read, 500);
+    };
+    void read();
+    return () => {
+      disposed = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [conversationId, view, monitoring, shellSessionId]);
+  useEffect(() => {
+    if (view !== "capsule" || !previewTarget || !monitoring || capsuleKind !== "cua") return;
     let disposed = false;
     let timer: number | undefined;
     const capture = async () => {
@@ -218,7 +271,7 @@ export function MobileToolActivity({
             title: previewTarget,
             text: "",
             imageUrl: observation.imageUrl,
-            status: "running",
+            status: snapshot.isSettled ? "complete" : "running",
           });
         } catch (error) {
           if (disposed) return;
@@ -233,7 +286,7 @@ export function MobileToolActivity({
       disposed = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [conversationId, previewTarget, monitoring, open, view, capsuleKind]);
+  }, [conversationId, previewTarget, monitoring, open, view, capsuleKind, snapshot.isSettled]);
 
   useEffect(() => {
     if (
@@ -291,7 +344,7 @@ export function MobileToolActivity({
         <HStack hAlign="start" width="100%" paddingInline={5} className="xgent-activity-strip">
           <Button
             label={capsuleTitle}
-            tooltip={previewError || capsuleDetail || capsuleTitle}
+            tooltip={t("chat.activity.title")}
             variant="ghost"
             size="sm"
             width="fit-content"
@@ -312,7 +365,17 @@ export function MobileToolActivity({
                   />
                 ) : (
                   <VStack width="100%" height="100%" hAlign="center" vAlign="center">
-                    <Icon icon={Globe} size="md" color="secondary" />
+                    <Icon
+                      icon={
+                        capsuleKind === "shell"
+                          ? Terminal
+                          : capsuleKind === "browser"
+                            ? Globe
+                            : MonitorSmartphone
+                      }
+                      size="md"
+                      color="secondary"
+                    />
                   </VStack>
                 )}
               </AspectRatio>
@@ -355,6 +418,8 @@ export function MobileToolActivity({
           ref={panelRef}
           tabIndex={-1}
           aria-label={t("chat.mobileActivity.title")}
+          role={mobileExperience ? "dialog" : undefined}
+          aria-modal={mobileExperience ? true : undefined}
           className={
             mobileExperience ? "xgent-activity-panel xgent-activity-page" : "xgent-activity-panel"
           }
@@ -371,43 +436,38 @@ export function MobileToolActivity({
                 <Icon icon={ArrowLeft} size="sm" />
               </Button>
             ) : null}
-            <VStack gap={0} style={{ minWidth: 0 }}>
+            <VStack gap={0} style={{ minWidth: 0, flex: "1 1 0" }}>
               <Text type="label">{t("chat.activity.title")}</Text>
-              <Text type="supporting" color="secondary" maxLines={1}>
+              <Text type="supporting" color="secondary" maxLines={1} hasTruncateTooltip={false}>
                 {assistanceActive
                   ? t("browser.assistanceActive")
                   : selectedItem
-                    ? toolStepLabel(selectedItem, selectedItem.toolCall.name)
-                    : capsuleDetail || capsuleTitle}
+                    ? toolStepLabel(selectedItem, selectedItem.toolCall.name).slice(0, 100)
+                    : (capsuleDetail || capsuleTitle).slice(0, 100)}
               </Text>
             </VStack>
           </HStack>
           <VStack gap={4} padding={3} className="xgent-activity-content">
+            {previewError ? <Banner status="warning" title={previewError} /> : null}
+            {selectedKind === "shell" ? (
+              <ActivityTerminal
+                key={selectedFrame?.id ?? selectedItem?.toolCall.id}
+                command={shellCommand}
+                output={shellOutput}
+              />
+            ) : null}
             {selectedFrame ? (
-              <VStack gap={3} width="100%">
-                <Text type="label" maxLines={2}>
-                  {selectedFrame.title}
-                </Text>
+              <VStack gap={3} width="100%" style={{ flexShrink: 0 }}>
                 {selectedFrame.imageUrl ? (
                   <img
                     className="xgent-activity-screen"
                     src={selectedFrame.imageUrl}
-                    alt={selectedFrame.title}
+                    alt={selectedFrame.app ?? selectedFrame.title}
                   />
-                ) : null}
-                {selectedFrame.text &&
-                (selectedFrame.status === "running" || !selectedItem || selectedFrameId) ? (
-                  <CodeBlock
-                    code={selectedFrame.text}
-                    language="plaintext"
-                    size="sm"
-                    width="100%"
-                    maxHeight="45dvh"
-                    isWrapped
-                    container="section"
-                  />
-                ) : selectedFrame.status === "running" ? (
-                  <Text color="secondary">{t("chat.mobileActivity.running")}</Text>
+                ) : selectedFrame.kind !== "shell" ? (
+                  <Text type="supporting" color="secondary">
+                    {t("chat.mobileActivity.awaitingResult")}
+                  </Text>
                 ) : null}
                 {!selectedItem ? (
                   <HStack gap={2} width="100%" vAlign="center">
@@ -449,13 +509,21 @@ export function MobileToolActivity({
             ) : null}
             {selectedItem ? (
               <VStack gap={3} width="100%">
-                <Text type="label">{selectedItem.toolCall.name}</Text>
-                <ToolCallDetail
-                  key={selectedItem.toolCall.id}
-                  item={selectedItem}
-                  isRunning={selectedRunning}
-                  expanded
-                />
+                <Collapsible
+                  defaultIsOpen={selectedKind === "tool"}
+                  trigger={
+                    <Text type="supporting" color="secondary">
+                      {selectedItem.toolCall.name}
+                    </Text>
+                  }
+                >
+                  <ToolCallDetail
+                    key={selectedItem.toolCall.id}
+                    item={selectedItem}
+                    isRunning={selectedRunning}
+                    expanded
+                  />
+                </Collapsible>
                 {!selectedItem.toolResult ? (
                   <Text color="secondary">
                     {t(

@@ -6,9 +6,44 @@ export type ExecutionActivity = {
   text: string;
   imageUrl?: string;
   app?: string;
-  status: "running" | "complete" | "error";
+  status: "running" | "complete" | "error" | "stopped";
+  sessionId?: string;
+  outputCursor?: number;
   updatedAt: number;
 };
+
+export type ShellActivityResponse = {
+  session_id: string;
+  cursor: number;
+  output: { text: string }[];
+  status: string;
+  has_more?: boolean;
+};
+
+// Tool waits and the viewer have independent cursors. Merge byte ranges once,
+// so overlapping responses cannot duplicate output or roll the terminal back.
+export function recordShellActivity(conversationId: string, response: ShellActivityResponse) {
+  const previous = executionActivityStore
+    .getSnapshot(conversationId)
+    .find((item) => item.sessionId === response.session_id);
+  if (!previous || response.cursor < (previous.outputCursor ?? 0)) return;
+  const bytes = new TextEncoder().encode(response.output.map((item) => item.text).join(""));
+  const unseen = Math.min(bytes.length, response.cursor - (previous.outputCursor ?? 0));
+  const text = previous.text + new TextDecoder().decode(bytes.subarray(bytes.length - unseen));
+  executionActivityStore.record(conversationId, {
+    ...previous,
+    text,
+    outputCursor: response.cursor,
+    status:
+      response.status === "running"
+        ? "running"
+        : response.status === "completed"
+          ? "complete"
+          : response.status === "cancelled"
+            ? "stopped"
+            : "error",
+  });
+}
 
 const EMPTY: readonly ExecutionActivity[] = [];
 const conversations = new Map<string, readonly ExecutionActivity[]>();

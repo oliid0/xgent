@@ -293,7 +293,11 @@ export function createCuaTools(
               });
             };
             record();
-            if (adapter?.owns(String(input.app ?? ""), input.state_id)) {
+            if (
+              adapter &&
+              (["list_apps", "get_app_state"].includes(operation) ||
+                adapter.owns(String(input.app ?? ""), input.state_id))
+            ) {
               try {
                 const response = await adapter.execute(toolCall, operation, input, signal);
                 record({

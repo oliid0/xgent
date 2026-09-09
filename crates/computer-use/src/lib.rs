@@ -2,6 +2,8 @@ use serde_json::{json, Value};
 use std::sync::{Mutex, OnceLock};
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod desktop;
+#[cfg(target_os = "windows")]
+pub mod file_handlers;
 fn error(message: impl ToString) -> Value {
     json!({"content":[{"type":"text","text":message.to_string()}],"isError":true})
 }

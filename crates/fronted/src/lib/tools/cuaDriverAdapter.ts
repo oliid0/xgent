@@ -111,6 +111,13 @@ export function createCuaDriverAdapter(
     const window = candidates[0];
     const args: RecordValue = { pid: window.pid, window_id: window.window_id };
     const properties = record(record(tools.get("get_window_state")?.parameters).properties);
+    if (input.focus === true) {
+      if (!("focus" in properties))
+        throw new Error(
+          "The configured driver cannot request focus during observation. Activate the target app or choose the built-in engine.",
+        );
+      args.focus = true;
+    }
     if ("max_elements" in properties) args.max_elements = input.max_tree_nodes ?? 300;
     if ("max_depth" in properties) args.max_depth = input.max_tree_depth ?? 16;
     if ("max_dimension" in properties) args.max_dimension = input.max_image_size ?? 1280;
@@ -143,7 +150,7 @@ export function createCuaDriverAdapter(
         },
         ...response.content,
       ],
-      details: { kind: "cua", stateId: token, native: response.details },
+      details: { kind: "cua", stateId: token, windowId: target.windowId, native: response.details },
     };
   };
   const adapter = {
@@ -252,6 +259,8 @@ export function createCuaDriverAdapter(
         const fresh = await observe(call, input);
         return {
           ...fresh,
+          isError: true,
+          details: { ...record(fresh.details), actionApplied: false },
           content: [
             { type: "text", text: "ACTION NOT APPLIED: stale state. Inspect this observation." },
             ...fresh.content,
@@ -326,6 +335,14 @@ export function createCuaDriverAdapter(
       }
       // Consume before dispatch. A transport timeout is an unknown outcome,
       // never permission to replay the same physical action through another route.
+      if (input.allow_foreground === false) {
+        const properties = record(record(tools.get(name)?.parameters).properties);
+        if (!("allow_foreground" in properties))
+          throw new Error(
+            "The configured driver cannot guarantee background-only input. No action was sent.",
+          );
+        args.allow_foreground = false;
+      }
       target.token = "";
       const response = await callTool(call, name, args);
       if (response.isError) return response;

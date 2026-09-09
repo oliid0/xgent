@@ -86,7 +86,7 @@ export function ComputerUseSection({ settings, setSettings }: SettingsSectionPro
 
   return (
     <Section padding={4} width="100%">
-      <VStack gap={3} padding={4}>
+      <VStack gap={3} width="100%">
         <Heading level={3}>{t("settings.cua.title")}</Heading>
         <Text type="supporting" color="secondary">
           {t("settings.cua.description")}

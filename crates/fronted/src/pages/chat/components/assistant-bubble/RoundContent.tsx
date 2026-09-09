@@ -11,6 +11,7 @@ import type { ChatFileLink } from "../../../../lib/chat/chatFileLinks";
 import type { RetryAttemptRecord } from "../../../../lib/chat/conversation/liveTranscriptStore";
 import type { ToolTraceItem, UiRound } from "../../../../lib/chat/messages/uiMessages";
 import { normalizeLiveToolStatus, VIBING_STATUS } from "../../../../lib/chat/page/chatPageHelpers";
+import { useTranscriptPreferences } from "../../transcript/TranscriptPreferences";
 import { type GroupedRoundBlock, groupRoundBlocks } from "./assistantBubbleUtils";
 import { HostedSearchGroupView } from "./HostedSearchGroupView";
 import { AssistantStatus, CompactingText, VibingText } from "./StatusText";
@@ -31,6 +32,7 @@ const ThinkingBlock = memo(function ThinkingBlock({
   renderMode: "streaming" | "static";
 }) {
   const hasText = /\S/.test(text || "");
+  const { showThinking } = useTranscriptPreferences();
   const { t } = useLocale();
   const [isOpen, setIsOpen] = useState(typeof open === "boolean" ? open : false);
   const userInteractedRef = useRef(false);
@@ -40,7 +42,7 @@ const ThinkingBlock = memo(function ThinkingBlock({
     }
   }, [open]);
 
-  if (!hasText) return null;
+  if (!hasText || !showThinking) return null;
 
   return (
     <Collapsible

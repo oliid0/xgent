@@ -1,20 +1,19 @@
 ﻿# Current objective
-Improve CUA latency/control, match the supplied desktop/mobile references, add Astryx appearance settings, and repair Windows/iOS releases.
+Fix the supplied iOS launch crash, improve observable CUA control, and align chat/activity/settings layouts with yy references and Astryx.
 
 ## Completed in source
-- Windows UIA observations cache properties/patterns during bounded tree traversal; live document text is limited to editors/documents/focused controls. Observations report capture/accessibility/total milliseconds. Prior nonactivating, exact-window and semantic targeting fixes remain.
-- Settings persist Current/Stone/Matcha themes and optional light/dark accent/sidebar colors and corner radius through Astryx defineTheme. Sidebar brand dropdown owns XChat/XGent switching on desktop/mobile; duplicate chat header tabs removed; expanded sidebar settings restored.
-- Mobile composer keeps footer controls on one row, uses an icon permission menu and truncates long model labels while retaining reasoning and full title.
-- Windows date/named prereleases use the bounded GitHub run revision. iOS embeds freetype, lua_ios, harfbuzz and libpng; release validation inspects the arm64 Mach-O dependency graph, including transitive dependencies.
+- iOS app enables Swift runtime embedding and explicitly searches /usr/lib/swift. IPA inspection now rejects unresolved @rpath/libswiftCore.dylib instead of assuming ABI stability resolves it.
+- CUA launch waits for an observable window; typing uses the focused editable control; stale/changed states and stale sequences report unapplied errors. Configured external drivers own observations and their input tokens, preserving focus/background capabilities.
+- Work records group intermediate operations and collapse after settlement; the final answer and questions remain visible. Model-provided reasoning is hidden by default with a persisted appearance setting.
+- Activity renders actual shell output in a read-only terminal and monitors browser/CUA previews. Progress counts completed tasks, fits its content, removes the redundant popover close control and suppresses long hover overlays.
+- Neutral gray sidebar, narrower rail, bottom-aligned new-chat composer, bounded activity/settings layout, compact right-panel presentation and plain settings back controls.
+- Open with enumerates Windows file associations and invokes the chosen registered handler; default app, system chooser, preview and reveal remain available.
 
-## Evidence / remaining
-- GitHub MCP searched computer-use projects and Microsoft UFO UIA caching code; Microsoft UIA caching docs and installed windows-rs 0.62.2 APIs support the implementation. Astryx MCP theme/component docs plus CLI manifest/build/docs and installed 0.5.0 source grounded UI/theme APIs.
-- Release run 34274194162 failed Windows version preparation on 0.0.0-cua-activity-20260908. Its actual IPA lacks freetype (ffmpeg/ffprobe) and lua_ios (vim). Downloaded checksum-verified upstream frameworks close the 79-binary device dependency graph; Swift core is system-provided on iOS 12.2+.
-- Native latency/control, final rendered wide/narrow UI and iOS 27 physical launch need verification; missing libraries explain a pre-UI crash but are not proof that all device issues are resolved. Android Linux-in-PRoot GUI work remains separate.
+## Evidence / decisions
+- yy/Xgent-2026-09-09-182412.ips: DYLD abort at launch, embedded libswift_Concurrency cannot resolve @rpath/libswiftCore.dylib; device trusted the developer signature. Earlier history incorrectly treated Swift ABI stability as sufficient.
+- yy/1.html, yy/2.html, supplied screenshots and xx computer-use implementation informed behavior. Astryx MCP search/get and CLI manifest/build discovery used; installed 0.5.0 types take precedence over newer MCP documentation. Windows association APIs checked against windows-rs 0.62.2.
 
-## Verification / CI
-- pnpm check PASS; pnpm lint PASS (523 files); pnpm test:non-native PASS (1141 tests). No local build/dev/Cargo commands. git diff --check PASS.
-- Touched computer-use Windows/desktop; frontend themes/settings/sidebar/header/composer/i18n/tests; iOS framework manifest; release version/dependency scripts/workflow.
-- CI 34328290420 PASS for e46f39c. Release 34328307470 is compiling all five platforms; native checks remain pending.
-- Browser review of the CI artifact with local RPC fixtures verified 1440/768/390/320px layouts, sidebar settings, XChat/XGent menus, all three themes and custom color/radius persistence/reset; console errors: zero. Rendered review exposed an unconstrained Astryx Field and inherited main background; corrected CSS and verified the exact overrides, plus 14 affected tests and CSS lint PASS. Final artifact confirmation follows this CSS commit.
-
+## Verification / remaining
+- pnpm check PASS; pnpm lint PASS (527 files); non-native suite 1142/1143 initially, sole obsolete padding assertion removed; all 9 affected checks PASS. Swift rpath, stale CUA, work grouping and UTF-8 stream regressions covered. No local build/dev/Cargo commands.
+- Push and GitHub CI/release checks, rendered artifact wide/narrow interactions, Windows native control and iOS physical launch remain to verify. Advanced Blender/video/FPS completion is not established by these source changes.
+- Touched computer-use native/driver routing; iOS project/dependency inspection; frontend appearance, transcript/activity, shell stream, preview Open with, navigation/settings and related tests.

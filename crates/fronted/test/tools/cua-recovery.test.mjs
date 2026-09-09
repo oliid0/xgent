@@ -46,7 +46,9 @@ test("observation recovery selects the exact target and hides transport-specific
   const stateId = visual.details.stateId;
   const acted = await run("click", { state_id: stateId, x: 1, y: 1 });
   assert.equal(acted.details.actionApplied, true);
-  await run("click", { state_id: stateId, x: 1, y: 1 });
+  const stale = await run("click", { state_id: stateId, x: 1, y: 1 });
+  assert.equal(stale.isError, true);
+  assert.equal(stale.details.actionApplied, false);
   assert.equal(calls.filter((call) => call.name.endsWith("_click")).length, 1);
 });
 

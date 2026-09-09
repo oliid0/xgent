@@ -33,7 +33,13 @@ export function CurrentTaskProgress(props: {
     <TaskProgressBar snapshot={snapshot} isConversationRunning={isConversationRunning} />
   ) : (
     <Button
-      label={t("chat.mobileActivity.recent")}
+      label={t(
+        isConversationRunning
+          ? "chat.mobileActivity.working"
+          : historyItems.at(-1)?.kind === "assistant"
+            ? "chat.tasks.completed"
+            : "chat.activity.stopped",
+      )}
       variant="ghost"
       size="sm"
       onClick={props.onOpenActivity}

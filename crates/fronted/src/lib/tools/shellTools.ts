@@ -1,7 +1,7 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { invoke } from "@xgent/runtime";
 import { type TProperties, Type } from "typebox";
-import { executionActivityStore } from "../chat/executionActivityStore";
+import { executionActivityStore, recordShellActivity } from "../chat/executionActivityStore";
 import {
   inferRuntimePlatform,
   normalizeRuntimePlatform,
@@ -1019,6 +1019,7 @@ export function createShellTools(params: {
       } else {
         clearSessionAbort(response.session_id);
       }
+      if (params.conversationId) recordShellActivity(params.conversationId, response);
       return buildShellSessionToolResult({
         toolCall,
         response,
@@ -1451,6 +1452,16 @@ export function createShellTools(params: {
         30_000,
       );
       const session_id = createShellSessionId();
+      executionActivityStore.record(params.conversationId, {
+        id: session_id,
+        sessionId: session_id,
+        toolCallId: toolCall.id,
+        kind: "shell",
+        title: command,
+        text: "",
+        status: "running",
+        outputCursor: 0,
+      });
       try {
         const response = await invokeWithAbort<ShellSessionResponse>(
           "shell_session_start",
@@ -1478,6 +1489,7 @@ export function createShellTools(params: {
         if (response.status === "running") {
           registerSessionAbort(response.session_id, response.cursor, signal);
         }
+        if (params.conversationId) recordShellActivity(params.conversationId, response);
         return buildShellSessionToolResult({
           toolCall,
           response,

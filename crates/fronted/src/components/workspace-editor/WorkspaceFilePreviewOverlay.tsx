@@ -30,7 +30,6 @@ import {
   Check,
   ChevronRight,
   Copy,
-  ExternalLink,
   FileText,
   Loader2,
   Maximize2,
@@ -44,6 +43,7 @@ import {
 } from "../icons";
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
 import { annotateDocument } from "./documentAnnotations";
+import { OpenWithMenu } from "./OpenWithMenu";
 import { previewDraftKey, previewDrafts } from "./previewDrafts";
 import { WorkspaceMarkdownPreview } from "./WorkspaceMarkdownPreview";
 import { WorkspacePdfPreview } from "./WorkspacePdfPreview";
@@ -772,21 +772,6 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     [activePath, activePreviewRequest, loadPreview],
   );
 
-  const openExternal = useCallback(async () => {
-    if (!activePreviewRequest) return;
-    const path = activePath || activePreviewRequest.path;
-    try {
-      setError(null);
-      await invokeFs("fs_open_workspace_path", {
-        workdir: activePreviewRequest.workdir,
-        path,
-        mode: "choose",
-      });
-    } catch (openError) {
-      setError(toMessage(openError, t("workspaceFilePreview.openExternalFailed")));
-    }
-  }, [activePath, activePreviewRequest, t]);
-
   return (
     <VStack
       className="xgent-workspace-preview-overlay"
@@ -803,7 +788,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
         minWidth: 0,
         minHeight: 0,
         overflow: "hidden",
-        backgroundColor: "var(--color-background-body)",
+        backgroundColor: "var(--color-background-surface)",
         borderInlineStart:
           overlay || embedded ? undefined : "var(--border-width) solid var(--color-border)",
         paddingBlockStart: overlay ? "env(safe-area-inset-top, 0px)" : undefined,
@@ -888,14 +873,11 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                         onClick={() => void saveAnnotations()}
                       />
                     ) : null}
-                    {canOpenExternal ? (
-                      <IconButton
-                        label={t("workspaceFilePreview.openExternal")}
-                        tooltip={t("workspaceFilePreview.openExternal")}
-                        icon={<Icon icon={ExternalLink} size="sm" color="inherit" />}
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void openExternal()}
+                    {canOpenExternal && activePreviewRequest ? (
+                      <OpenWithMenu
+                        workdir={activePreviewRequest.workdir}
+                        path={activePath || activePreviewRequest.path}
+                        onError={setError}
                       />
                     ) : null}
                     <IconButton

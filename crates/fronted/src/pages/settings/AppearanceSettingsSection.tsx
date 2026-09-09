@@ -22,6 +22,16 @@ export function AppearanceSettingsSection({ settings, setSettings }: SettingsSec
   const colors = ["accentLight", "accentDark", "sidebarLight", "sidebarDark"] as const;
   return (
     <SettingsRowGroup title={t("settings.ui.title")}>
+      <SettingsRow
+        label={t("settings.ui.showThinking")}
+        description={t("settings.ui.showThinkingDesc")}
+      >
+        <AgentActivationSwitch
+          title={t("settings.ui.showThinking")}
+          checked={appearance.showThinking}
+          onToggle={() => update({ showThinking: !appearance.showThinking })}
+        />
+      </SettingsRow>
       <SettingsRow label={t("settings.ui.preset")}>
         <Selector
           label={t("settings.ui.preset")}

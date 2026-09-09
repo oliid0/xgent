@@ -190,6 +190,8 @@ export function WorkspaceNavigationRail(props: WorkspaceNavigationRailProps) {
       footerIcons={footerIcons}
       collapsible={{ isCollapsed: true, onCollapsedChange: () => undefined, hasButton: false }}
       style={{
+        width: "100%",
+        minWidth: 0,
         height: "100%",
         flexShrink: 0,
         zIndex: "var(--xgent-z-workspace-navigation)",

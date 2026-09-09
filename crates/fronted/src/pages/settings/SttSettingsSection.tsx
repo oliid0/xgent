@@ -111,7 +111,7 @@ export function SttSettingsSection({ settings, setSettings }: SettingsSectionPro
   return (
     <VStack gap={5} width="100%">
       <Section padding={4} width="100%">
-        <HStack gap={3} vAlign="start" padding={4}>
+        <HStack gap={3} vAlign="start" width="100%">
           <Mic />
           <StackItem size="fill">
             <VStack gap={1}>
@@ -133,7 +133,7 @@ export function SttSettingsSection({ settings, setSettings }: SettingsSectionPro
       </Section>
 
       <Section padding={4} width="100%">
-        <VStack gap={4} padding={4}>
+        <VStack gap={4} width="100%">
           <Selector
             label={t("settings.stt.provider")}
             value={providerId}

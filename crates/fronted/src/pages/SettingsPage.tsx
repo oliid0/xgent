@@ -449,7 +449,7 @@ export function SettingsPage(props: SettingsPageProps) {
                           label={t("settings.mobile.backToSettings")}
                           tooltip={t("settings.mobile.backToSettings")}
                           icon={<Icon icon={ArrowLeft} size="md" color="inherit" />}
-                          variant="secondary"
+                          variant="ghost"
                           size="lg"
                           onClick={() => setMobileDetailOpen(false)}
                         />
@@ -463,7 +463,7 @@ export function SettingsPage(props: SettingsPageProps) {
                           label={t("settings.backToChat")}
                           tooltip={t("settings.backToChat")}
                           icon={<Icon icon={X} size="md" color="inherit" />}
-                          variant="secondary"
+                          variant="ghost"
                           size="lg"
                           onClick={onBack}
                         />
@@ -478,7 +478,7 @@ export function SettingsPage(props: SettingsPageProps) {
                 <LayoutContent
                   key={section}
                   data-settings-section={section}
-                  padding={section === "toolPermissions" || section === "voice" ? 5 : 4}
+                  padding={4}
                   isScrollable={!sectionManagesScroll}
                   className="settings-section-enter"
                 >

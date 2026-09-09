@@ -62,7 +62,7 @@ fn installed_apps() -> Result<Vec<Value>, String> {
 }
 
 #[cfg(target_os = "windows")]
-fn launch_app(query: &str) -> Result<(), String> {
+fn launch_app(query: &str) -> Result<String, String> {
     let name = normalized_app_name(query);
     let matches: Vec<_> = installed_apps()?.into_iter().filter(|item|
         item["AppID"].as_str().is_some_and(|id| id.eq_ignore_ascii_case(query))
@@ -70,7 +70,7 @@ fn launch_app(query: &str) -> Result<(), String> {
     if matches.len() != 1 { return Err("Choose an unambiguous installed AppID from list_apps; the app may be installed under a different name.".into()); }
     let id = matches[0]["AppID"].as_str().ok_or("Installed app has no AppID")?;
     std::process::Command::new("explorer.exe").arg(format!("shell:AppsFolder\\{id}")).spawn().map_err(fail)?;
-    Ok(())
+    Ok(matches[0]["Name"].as_str().unwrap_or(query).to_string())
 }
 
 fn resolve_window(query: &str) -> Result<Window, String> {
@@ -104,6 +104,12 @@ pub fn capture_preview(arguments: &Value) -> Result<Value, String> {
 }
 
 impl Desktop {
+    fn rejected_state(&mut self, window: &Window, query: &str, note: &str) -> Result<Value, String> {
+        let mut response = self.snapshot(window, query, note)?;
+        response["isError"] = json!(true);
+        response["details"]["actionApplied"] = json!(false);
+        Ok(response)
+    }
     fn after_input(&mut self, window: &Window, query: &str, previous: &Snapshot, defer: bool) -> Result<Value,String> {
         if !defer { return self.snapshot(window, query, "Input dispatched. Verify the returned state before continuing."); }
         // Only the native sequence coordinator requests this between known
@@ -189,8 +195,19 @@ impl Desktop {
         let query = arguments["app"].as_str().filter(|app| !app.trim().is_empty()).ok_or("Missing app")?;
         #[cfg(target_os = "windows")]
         if operation == "launch_app" {
-            launch_app(query)?;
-            return Ok(json!({"content":[{"type":"text","text":"Launch requested. Call list_apps and get_app_state to verify the resulting window before acting."}],"isError":false}));
+            let app_name = launch_app(query)?;
+            // Get-StartApps is the launch catalog; wait for its real window
+            // instead of making the model race Explorer's asynchronous launch.
+            for _ in 0..50 {
+                if cancelled() { return Err("Launch requested, but observation cancelled. Inspect before retrying.".into()); }
+                if let Ok(window) = resolve_window(&app_name) {
+                    if !window.is_minimized().unwrap_or(true) {
+                        return self.snapshot(&window, query, "Application window is available. Inspect this state before acting.");
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            return Err("Launch requested but no unambiguous window appeared within 5 seconds. Use list_apps before retrying; do not launch again blindly.".into());
         }
         if operation == "get_cached_state" {
             let state = self.snapshots.get(&query.to_lowercase()).ok_or("Call get_app_state before a sequence")?;
@@ -204,16 +221,23 @@ impl Desktop {
         let previous = self.snapshots.get(&query.to_lowercase()).cloned().ok_or("Call get_app_state before an action")?;
         let state_id = arguments["state_id"].as_str().unwrap_or("");
         if state_id != previous.id.to_string() {
-            return self.snapshot(&window, query, "ACTION NOT APPLIED: state_id is missing or stale. Inspect this state and use its state_id for the next action.");
+            return self.rejected_state(&window, query, "ACTION NOT APPLIED: state_id is missing or stale. Inspect this state and use its state_id for the next action.");
         }
         if previous.window_id != window.id().map_err(fail)? || previous.pid != window.pid().map_err(fail)? || previous.bounds != bounds(&window)? {
-            return self.snapshot(&window, query, "ACTION NOT APPLIED: the window moved, resized or changed. Re-evaluate the new screenshot.");
+            return self.rejected_state(&window, query, "ACTION NOT APPLIED: the window moved, resized or changed. Re-evaluate the new screenshot.");
         }
         // State tokens are single-use, including errors after partial delivery.
         self.snapshots.retain(|_, state| state.window_id != previous.window_id);
-        let element = arguments.get("element_index").map(|index| index.as_str().map(str::to_string).unwrap_or_else(|| index.to_string()))
+        let mut element = arguments.get("element_index").map(|index| index.as_str().map(str::to_string).unwrap_or_else(|| index.to_string()))
             .map(|index| index.parse::<usize>().ok().and_then(|index| previous.elements.get(index)).cloned().ok_or("Unknown element_index; call get_app_state"))
             .transpose()?;
+        #[cfg(target_os = "windows")]
+        if operation == "type_text" && element.is_none() && !previous.elements.is_empty() {
+            element = previous.elements.iter().find(|item| item["focused"] == true && item["editable"] == true).cloned();
+            if element.is_none() {
+                return Err("No focused editable control in the observed window. Use type_text with the editor's element_index, or click the editor and observe before typing.".into());
+            }
+        }
         if let Some(element) = element.as_ref() {
             let modified = arguments["modifiers"].as_array().is_some_and(|keys| !keys.is_empty());
             let semantic_click = operation != "click" || (!modified
@@ -233,7 +257,7 @@ impl Desktop {
         }
         platform::focus(&window)?;
         if previous.bounds != bounds(&window)? {
-            return self.snapshot(&window, query, "ACTION NOT APPLIED: focusing changed the window geometry. Inspect this new state.");
+            return self.rejected_state(&window, query, "ACTION NOT APPLIED: focusing changed the window geometry. Inspect this new state.");
         }
         if ["type_text", "press_key"].contains(&operation) {
             if let Some(element) = element.as_ref() { platform::focus_element(&window, element)?; }

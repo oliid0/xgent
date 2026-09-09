@@ -7,6 +7,9 @@ const { normalizeAppearance } = createTsModuleLoader().loadModule("src/lib/setti
 test("older settings use the current theme and customized settings survive JSON persistence", () => {
   assert.equal(normalizeAppearance(undefined).preset, "current");
   assert.equal(normalizeAppearance(undefined).customized, false);
+  assert.equal(normalizeAppearance(undefined).showThinking, false);
+  assert.equal(normalizeAppearance({ showThinking: true }).showThinking, true);
+  assert.equal(normalizeAppearance({ showThinking: "true" }).showThinking, false);
   for (const preset of ["current", "stone", "matcha"]) {
     const settings = { ...normalizeAppearance({}), preset, customized: true,
       accentLight: "#123456", sidebarDark: "#222222", radius: 24 };
