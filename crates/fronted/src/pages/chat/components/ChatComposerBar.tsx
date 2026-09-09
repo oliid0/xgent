@@ -2,6 +2,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { Carousel } from "@astryxdesign/core/Carousel";
 import { ChatComposer, ChatComposerDrawer, ChatSendButton } from "@astryxdesign/core/Chat";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { Heading } from "@astryxdesign/core/Heading";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
@@ -1028,25 +1029,48 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 </Popover>
               )}
 
-              <Selector
-                label={t("settings.commandSafety.title")}
-                isLabelHidden
-                options={(["auto", "ask", "sandbox", "sandboxOffline"] as CommandSafetyMode[]).map(
-                  (mode) => ({
+              {mobileExperience ? (
+                <DropdownMenu
+                  button={{
+                    label: t(`settings.commandSafety.${commandSafetyMode}`),
+                    icon: <Shield />,
+                    isIconOnly: true,
+                    variant: "ghost",
+                    size: "sm",
+                    isDisabled: controlsDisabled || !isAgentMode,
+                  }}
+                  placement="above"
+                  alignment="start"
+                  items={(["auto", "ask", "sandbox", "sandboxOffline"] as CommandSafetyMode[]).map(
+                    (mode) => ({
+                      id: mode,
+                      label: t(`settings.commandSafety.${mode}`),
+                      description: t(`settings.commandSafety.${mode}Desc`),
+                      onClick: () => onCommandSafetyModeChange(mode),
+                    }),
+                  )}
+                />
+              ) : (
+                <Selector
+                  label={t("settings.commandSafety.title")}
+                  isLabelHidden
+                  options={(
+                    ["auto", "ask", "sandbox", "sandboxOffline"] as CommandSafetyMode[]
+                  ).map((mode) => ({
                     value: mode,
                     label: t(`settings.commandSafety.${mode}`),
                     description: t(`settings.commandSafety.${mode}Desc`),
-                  }),
-                )}
-                value={commandSafetyMode}
-                onChange={(value) => onCommandSafetyModeChange(value as CommandSafetyMode)}
-                variant="ghost"
-                size="sm"
-                placement="above"
-                startIcon={<Shield />}
-                isDisabled={controlsDisabled || !isAgentMode}
-                statusVariant="tooltip"
-              />
+                  }))}
+                  value={commandSafetyMode}
+                  onChange={(value) => onCommandSafetyModeChange(value as CommandSafetyMode)}
+                  variant="ghost"
+                  size="sm"
+                  placement="above"
+                  startIcon={<Shield />}
+                  isDisabled={controlsDisabled || !isAgentMode}
+                  statusVariant="tooltip"
+                />
+              )}
             </HStack>
           }
           sendActions={

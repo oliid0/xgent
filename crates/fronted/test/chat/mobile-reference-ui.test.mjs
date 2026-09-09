@@ -35,10 +35,8 @@ test("compact chat uses the reference-scale Astryx geometry without changing the
 
 test("mobile chat keeps one accessible header action cluster and a one-line functional composer", () => {
   assert.match(chatHeaderSource, /className="xgent-mobile-chat-toolbar w-full"/);
-  assert.match(
-    chatHeaderSource,
-    /<SegmentedControl[\s\S]*?layout="fill"[\s\S]*?size="lg"/,
-  );
+  assert.doesNotMatch(chatHeaderSource, /SegmentedControl|centerContent=/);
+  assert.match(sidebarSource, /<ExecutionModeMenu value=\{executionMode\} onChange=\{onSelectExecutionMode\}/);
   assert.match(composerSource, /density=\{mobileExperience \? "balanced" : "compact"\}/);
   assert.match(composerSource, /content=\{addMenuContent\}/);
   assert.doesNotMatch(composerSource, /mobileAddMenuContent|<AtSign \/>/);

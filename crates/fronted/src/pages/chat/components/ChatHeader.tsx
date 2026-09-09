@@ -1,6 +1,5 @@
 import { Grid } from "@astryxdesign/core/Grid";
 import { IconButton } from "@astryxdesign/core/IconButton";
-import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { HStack } from "@astryxdesign/core/Stack";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { memo, type ReactNode } from "react";
@@ -8,29 +7,16 @@ import { memo, type ReactNode } from "react";
 import { Menu } from "../../../components/icons";
 import { isMacOsTauri } from "../../../components/MacOsTitleBarSpacer";
 import { useLocale } from "../../../i18n";
-import type { AppSettings, ExecutionMode } from "../../../lib/settings";
 
 export const ChatHeader = memo(function ChatHeader(props: {
-  settings: AppSettings;
   sidebarOpen: boolean;
-  onSelectExecutionMode: (mode: ExecutionMode) => void;
   onOpenSidebar: () => void;
-  showExecutionMode?: boolean;
   mobileExperience?: boolean;
   trailingActions?: ReactNode;
 }) {
-  const {
-    settings,
-    sidebarOpen,
-    onSelectExecutionMode,
-    onOpenSidebar,
-    showExecutionMode = true,
-    mobileExperience = false,
-    trailingActions,
-  } = props;
+  const { sidebarOpen, onOpenSidebar, mobileExperience = false, trailingActions } = props;
   const { t } = useLocale();
   const macOsTauri = isMacOsTauri();
-  const visibleExecutionMode = settings.system.executionMode === "text" ? "text" : "tools";
 
   return (
     <HStack
@@ -75,21 +61,6 @@ export const ChatHeader = memo(function ChatHeader(props: {
               ) : null}
             </HStack>
           }
-          centerContent={
-            showExecutionMode ? (
-              <SegmentedControl
-                value={visibleExecutionMode}
-                onChange={(value) => onSelectExecutionMode(value as "text" | "tools")}
-                label={t("settings.executionMode")}
-                layout="fill"
-                size="lg"
-                className="xgent-mobile-chat-mode"
-              >
-                <SegmentedControlItem value="text" label={t("chat.mode.chat")} />
-                <SegmentedControlItem value="tools" label={t("chat.mode.agent")} />
-              </SegmentedControl>
-            ) : null
-          }
           endContent={
             <HStack gap={1} vAlign="center" hAlign="end">
               {trailingActions}
@@ -98,26 +69,13 @@ export const ChatHeader = memo(function ChatHeader(props: {
         />
       ) : (
         <Grid
-          columns={3}
+          columns={2}
           width="100%"
           align="center"
-          style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(max-content, 1fr)" }}
+          style={{ gridTemplateColumns: "minmax(0, 1fr) auto" }}
         >
           <HStack gap={1} vAlign="center" hAlign="start" />
-          <HStack hAlign="center" vAlign="center">
-            {showExecutionMode ? (
-              <SegmentedControl
-                value={visibleExecutionMode}
-                onChange={(value) => onSelectExecutionMode(value as "text" | "tools")}
-                label={t("settings.executionMode")}
-                layout="hug"
-                size="md"
-              >
-                <SegmentedControlItem value="text" label={t("chat.mode.chat")} />
-                <SegmentedControlItem value="tools" label={t("chat.mode.agent")} />
-              </SegmentedControl>
-            ) : null}
-          </HStack>
+
           <HStack gap={1} vAlign="center" hAlign="end" style={{ minWidth: "max-content" }}>
             {trailingActions}
           </HStack>

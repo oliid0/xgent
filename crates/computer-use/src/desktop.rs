@@ -118,6 +118,7 @@ impl Desktop {
         Ok(json!({"content":[{"type":"text","text":state.text}],"isError":false,"details":{"stateId":state.id.to_string(),"observationDeferred":true}}))
     }
     fn snapshot(&mut self, window: &Window, query: &str, note: &str) -> Result<Value, String> {
+        let started = std::time::Instant::now();
         let mut capture = self.observation != "text";
         let mut capture_note=String::new();
         let mut image = if capture {
@@ -138,9 +139,11 @@ impl Desktop {
             image = image::imageops::resize(&image, (image.width() as f64 * scale).round() as u32,
                 (image.height() as f64 * scale).round() as u32, image::imageops::FilterType::Triangle);
         }
+        let capture_ms = started.elapsed().as_millis();
         self.next_id += 1;
         let (elements, accessibility_note) = if self.observation == "image" { (Vec::new(), "Screenshot-only observation; accessibility traversal skipped.".into()) }
             else { platform::elements(window) };
+        let accessibility_ms = started.elapsed().as_millis().saturating_sub(capture_ms);
         let mut snapshot = Snapshot { id: self.next_id, window_id: window.id().map_err(fail)?, pid: window.pid().map_err(fail)?,
             bounds: rect, image_size: image.dimensions(), elements, text: String::new() };
         let mut text = format!("{note}\nApp: {}\nWindow: {}\nTarget: window:{}\nstate_id: {}\nScreenshot: {} x {}. Coordinates are relative to the top-left of this screenshot.\n{}",
@@ -160,6 +163,7 @@ impl Desktop {
             content.push(json!({"type":"image","data":STANDARD.encode(encoded.into_inner()),"mimeType":"image/png"}));
         }
         let details = json!({"stateId":snapshot.id.to_string(),"windowId":snapshot.window_id,
+            "observationMs":started.elapsed().as_millis(),"captureMs":capture_ms,"accessibilityMs":accessibility_ms,
             "pid":snapshot.pid,"coordinateSpace":"screenshot","width":image.width(),"height":image.height()});
         for key in [query.to_lowercase(), format!("window:{}", snapshot.window_id)] { self.snapshots.insert(key, snapshot.clone()); }
         self.snapshots.retain(|_, snapshot| self.next_id.saturating_sub(snapshot.id) < 128);

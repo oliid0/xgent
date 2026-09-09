@@ -230,7 +230,16 @@ export const ChatModelSelector = memo(function ChatModelSelector(props: {
         const parsed = parseModelValue(value);
         if (parsed) props.onSelectModel(parsed);
       }}
-      triggerLabel={triggerLabel}
+      triggerLabel={
+        <span className="xgent-model-trigger" title={triggerLabel}>
+          <span className="xgent-model-name">
+            {selectedOption?.model || props.currentModelLabel || t("chat.model")}
+          </span>
+          {selectedReasoningLabel ? (
+            <span className="xgent-model-reasoning">{selectedReasoningLabel}</span>
+          ) : null}
+        </span>
+      }
       startIcon={
         selectedOption ? <ProviderBrandIcon type={selectedOption.providerType} /> : <Sparkle />
       }

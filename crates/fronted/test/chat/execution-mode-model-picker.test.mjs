@@ -25,7 +25,9 @@ const railSource = readFileSync(
   "utf8",
 );
 
-const visibleExecutionModes = ["text", "tools"];
+const modeMenuSource = readFileSync(
+  new URL("../../src/components/chat/ExecutionModeMenu.tsx", import.meta.url), "utf8",
+);
 
 test("model pickers use popover semantics instead of menu semantics", () => {
   assert.match(
@@ -40,24 +42,18 @@ test("model pickers use popover semantics instead of menu semantics", () => {
   assert.doesNotMatch(modelSelectorSource, /@base-ui\/react/);
 });
 
-test("execution mode switchers use Astryx single-select semantics", () => {
-  assert.match(headerSource, /import \{ SegmentedControl, SegmentedControlItem \}/);
-  assert.match(headerSource, /<SegmentedControl/);
-  assert.match(
-    headerSource,
-    /const visibleExecutionMode = settings\.system\.executionMode === "text" \? "text" : "tools"/,
-  );
-  assert.match(headerSource, /value=\{visibleExecutionMode\}/);
-  assert.match(headerSource, /label=\{t\("settings\.executionMode"\)\}/);
-  for (const mode of visibleExecutionModes) {
-    assert.match(headerSource, new RegExp(`<SegmentedControlItem value="${mode}"`));
-  }
-  assert.match(headerSource, /onChange=\{\(value\) => onSelectExecutionMode/);
+test("sidebar brand dropdown changes mode without a second switch in the chat header", () => {
+  assert.doesNotMatch(headerSource, /SegmentedControl|ExecutionModeMenu/);
+  assert.match(modeMenuSource, /<DropdownMenu/);
+  assert.match(modeMenuSource, /label: mode === "text" \? "XChat" : "XGent"/);
+  assert.match(modeMenuSource, /onClick: \(\) => props\.onChange\("text"\)/);
+  assert.match(modeMenuSource, /onClick: \(\) => props\.onChange\("tools"\)/);
+  assert.equal((sidebarSource.match(/<ExecutionModeMenu/g) ?? []).length, 2);
 });
 
 test("expanded sidebar owns mode, search, and collapse controls", () => {
   assert.match(sidebarSource, /className="chat-sidebar-mode-bar/);
-  assert.match(sidebarSource, /<SegmentedControl/);
+  assert.match(sidebarSource, /<ExecutionModeMenu/);
   assert.match(sidebarSource, /label=\{t\("chat\.history\.search"\)\}/);
   assert.match(sidebarSource, /label=\{t\("sidebar\.closeSidebar"\)\}/);
   assert.match(chatPageSource, /className="workspace-navigation-rail-shell"/);

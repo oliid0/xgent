@@ -65,52 +65,79 @@ pub fn focus(window: &Window) -> Result<(), String> {
 
 pub fn elements(window: &Window) -> (Vec<Value>,String) {
     let automation=match automation(window) { Ok(value)=>value, Err(error)=>return (Vec::new(),format!("Accessibility unavailable ({error}); use screenshot coordinates.")) };
+    // Cache one control at a time: bounded traversal, one cross-process fetch
+    // per node instead of a remote call for each property and pattern probe.
+    let cache = unsafe { (|| -> windows::core::Result<IUIAutomationCacheRequest> {
+        let cache = automation._automation.CreateCacheRequest()?;
+        cache.SetTreeScope(TreeScope_Element)?;
+        for property in [UIA_NamePropertyId, UIA_AutomationIdPropertyId,
+            UIA_ClassNamePropertyId, UIA_ControlTypePropertyId, UIA_IsEnabledPropertyId,
+            UIA_HasKeyboardFocusPropertyId, UIA_IsPasswordPropertyId,
+            UIA_BoundingRectanglePropertyId, UIA_ValueValuePropertyId, UIA_ValueIsReadOnlyPropertyId] {
+            cache.AddProperty(property)?;
+        }
+        for pattern in [UIA_InvokePatternId, UIA_ValuePatternId, UIA_TextPatternId,
+            UIA_LegacyIAccessiblePatternId, UIA_TogglePatternId, UIA_ExpandCollapsePatternId] {
+            cache.AddPattern(pattern)?;
+        }
+        Ok(cache)
+    })() };
+    let cache = match cache { Ok(value) => value, Err(error) => return (Vec::new(),
+        format!("Accessibility cache unavailable ({error}); use screenshot coordinates.")) };
+    let root = match unsafe { automation.root.BuildUpdatedCache(&cache) } {
+        Ok(value) => value,
+        Err(error) => return (Vec::new(), format!("Accessibility snapshot unavailable ({error}); use screenshot coordinates.")),
+    };
     let mut output=Vec::new();
     let started=Instant::now();
-    fn walk(element:&IUIAutomationElement, walker:&IUIAutomationTreeWalker, path:Vec<usize>, output:&mut Vec<Value>, started:Instant) {
+    fn walk(element:&IUIAutomationElement, walker:&IUIAutomationTreeWalker, cache:&IUIAutomationCacheRequest, path:Vec<usize>, output:&mut Vec<Value>, started:Instant) {
         if output.len()>=400 || path.len()>32 || started.elapsed()>Duration::from_secs(4) { return; }
         unsafe {
-            let name=element.CurrentName().map(|s| s.to_string()).unwrap_or_default();
-            let automation_id=element.CurrentAutomationId().map(|s| s.to_string()).unwrap_or_default();
-            let class_name=element.CurrentClassName().map(|s| s.to_string()).unwrap_or_default();
-            let control=element.CurrentControlType().map(|id|id.0).unwrap_or(0);
-            let enabled=element.CurrentIsEnabled().map(|value|value.as_bool()).unwrap_or(false);
-            let focused=element.CurrentHasKeyboardFocus().map(|value|value.as_bool()).unwrap_or(false);
-            let password=element.CurrentIsPassword().map(|value|value.as_bool()).unwrap_or(true);
+            let name=element.CachedName().map(|s| s.to_string()).unwrap_or_default();
+            let automation_id=element.CachedAutomationId().map(|s| s.to_string()).unwrap_or_default();
+            let class_name=element.CachedClassName().map(|s| s.to_string()).unwrap_or_default();
+            let control=element.CachedControlType().map(|id|id.0).unwrap_or(0);
+            let enabled=element.CachedIsEnabled().map(|value|value.as_bool()).unwrap_or(false);
+            let focused=element.CachedHasKeyboardFocus().map(|value|value.as_bool()).unwrap_or(false);
+            let password=element.CachedIsPassword().map(|value|value.as_bool()).unwrap_or(true);
             // Names identify controls, but editable document contents live in Value/Text patterns.
             // Return bounded text so the next observation can verify typing and sequence conditions.
             let value=if password { String::new() } else {
-                element.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId)
-                    .and_then(|pattern|pattern.CurrentValue()).map(|value|value.to_string())
-                    .or_else(|_|element.GetCurrentPatternAs::<IUIAutomationTextPattern>(UIA_TextPatternId)
-                        .and_then(|pattern|pattern.DocumentRange()).and_then(|range|range.GetText(2000))
-                        .map(|value|value.to_string())).unwrap_or_default()
+                element.GetCachedPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId)
+                    .and_then(|pattern|pattern.CachedValue()).map(|value|value.to_string())
+                    .or_else(|error| {
+                        // Only editors/documents need expensive live document ranges.
+                        if !focused && ![UIA_EditControlTypeId.0, UIA_DocumentControlTypeId.0].contains(&control) { return Err(error); }
+                        element.GetCachedPatternAs::<IUIAutomationTextPattern>(UIA_TextPatternId)
+                            .and_then(|pattern|pattern.DocumentRange()).and_then(|range|range.GetText(2000))
+                            .map(|value|value.to_string())
+                    }).unwrap_or_default()
                     .chars().take(2000).collect::<String>()
             };
             let mut actions=Vec::new();
-            if element.GetCurrentPatternAs::<IUIAutomationInvokePattern>(UIA_InvokePatternId).is_ok(){actions.push("Invoke");}
-            if element.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId).is_ok_and(|p|p.CurrentIsReadOnly().is_ok_and(|v|!v.as_bool())){actions.push("SetValue");}
+            if element.GetCachedPatternAs::<IUIAutomationInvokePattern>(UIA_InvokePatternId).is_ok(){actions.push("Invoke");}
+            if element.GetCachedPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId).is_ok_and(|p|p.CachedIsReadOnly().is_ok_and(|v|!v.as_bool())){actions.push("SetValue");}
             else if [UIA_EditControlTypeId.0,UIA_DocumentControlTypeId.0].contains(&control)
-                && element.GetCurrentPatternAs::<IUIAutomationLegacyIAccessiblePattern>(UIA_LegacyIAccessiblePatternId).is_ok() { actions.push("SetValue (legacy; provider may reject)"); }
-            if element.GetCurrentPatternAs::<IUIAutomationTogglePattern>(UIA_TogglePatternId).is_ok(){actions.push("Toggle");}
-            if element.GetCurrentPatternAs::<IUIAutomationExpandCollapsePattern>(UIA_ExpandCollapsePatternId).is_ok(){actions.extend(["Expand","Collapse"]);}
-            let rect=element.CurrentBoundingRectangle().ok();
+                && element.GetCachedPatternAs::<IUIAutomationLegacyIAccessiblePattern>(UIA_LegacyIAccessiblePatternId).is_ok() { actions.push("SetValue (legacy; provider may reject)"); }
+            if element.GetCachedPatternAs::<IUIAutomationTogglePattern>(UIA_TogglePatternId).is_ok(){actions.push("Toggle");}
+            if element.GetCachedPatternAs::<IUIAutomationExpandCollapsePattern>(UIA_ExpandCollapsePatternId).is_ok(){actions.extend(["Expand","Collapse"]);}
+            let rect=element.CachedBoundingRectangle().ok();
             let frame=rect.map(|rect|json!([rect.left,rect.top,rect.right-rect.left,rect.bottom-rect.top])).unwrap_or(Value::Null);
             output.push(json!({"path":path,"name":name,"automationId":automation_id,"className":class_name,"controlType":control,"frame":frame,"actions":actions,
                 "value":value,"enabled":enabled,"focused":focused,
                 "label":format!("{} (type {}, enabled: {}, focused: {}, actions: {}){}",name,control,enabled,focused,actions.join(", "),
                     if value.is_empty() { String::new() } else { format!(" value: {value:?}") })}));
-            let mut child=walker.GetFirstChildElement(element).ok();
+            let mut child=walker.GetFirstChildElementBuildCache(element,cache).ok();
             let mut index=0;
             while let Some(current)=child {
                 if output.len()>=400 || started.elapsed()>Duration::from_secs(4) { break; }
                 let mut child_path=path.clone(); child_path.push(index);
-                walk(&current,walker,child_path,output,started);
-                child=walker.GetNextSiblingElement(&current).ok(); index+=1;
+                walk(&current,walker,cache,child_path,output,started);
+                child=walker.GetNextSiblingElementBuildCache(&current,cache).ok(); index+=1;
             }
         }
     }
-    walk(&automation.root,&automation.walker,vec![],&mut output,started);
+    walk(&root,&automation.walker,&cache,vec![],&mut output,started);
     let note=if output.len()>=400 || started.elapsed()>Duration::from_secs(4) { "Accessibility tree is partial; screenshot remains authoritative." } else { "Prefer an element_index when its label and action match the target." };
     (output,note.into())
 }

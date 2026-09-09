@@ -60,7 +60,7 @@ import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { SectionId, SettingsOpenOptions } from "./pages/settings/types";
 import { startLocalAccessHostBridge } from "./runtime/localAccessHostBridge";
-import { xgentCompactTheme, xgentTheme } from "./theme/xgentTheme";
+import { createAppearanceTheme } from "./theme/appearanceTheme";
 
 const MOBILE_SETTINGS_HYDRATION_TIMEOUT_MS = 2_500;
 
@@ -231,6 +231,10 @@ export default function App() {
   const [soulCreateRequestId, setSoulCreateRequestId] = useState(0);
   const [settingsReady, setSettingsReady] = useState(false);
   const [settings, setSettingsState] = useState<AppSettings>(() => getDefaultSettings());
+  const appearanceTheme = useMemo(
+    () => createAppearanceTheme(settings.customSettings.appearance, compactSettingsDialog),
+    [settings.customSettings.appearance, compactSettingsDialog],
+  );
   const [lanPcCommandHostReady, setLanPcCommandHostReady] = useState(false);
   const [lanPcSessionRevision, setLanPcSessionRevision] = useState(0);
   const [settingsSaveState, setSettingsSaveState] = useState<SettingsSaveState>({
@@ -685,7 +689,7 @@ export default function App() {
   }, [desktopBridgeEnabled, lanPcCommandHostReady, nativeMobile, settingsReady]);
 
   return (
-    <Theme theme={compactSettingsDialog ? xgentCompactTheme : xgentTheme} mode={effectiveTheme}>
+    <Theme theme={appearanceTheme} mode={effectiveTheme}>
       <ToastViewport position="topEnd" maxVisible={4}>
         <LocaleContext.Provider value={localeContextValue}>
           <AppChrome nativeMobile={nativeMobile}>

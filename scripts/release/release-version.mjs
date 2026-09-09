@@ -31,7 +31,7 @@ export function parseReleaseVersion(input) {
   };
 }
 
-export function windowsInstallerVersion(appVersion) {
+export function windowsInstallerVersion(appVersion, buildNumber) {
   if (!SEMVER_PATTERN.test(appVersion)) {
     throw new Error(`App version must be a valid semver string. Received: ${appVersion}`);
   }
@@ -45,9 +45,16 @@ export function windowsInstallerVersion(appVersion) {
   const baseVersion = versionWithoutBuildMetadata.slice(0, prereleaseSeparator);
   const prerelease = versionWithoutBuildMetadata.slice(prereleaseSeparator + 1);
   const identifiers = prerelease.split(".");
-  const numericIdentifier = [...identifiers]
+  let numericIdentifier = [...identifiers]
     .reverse()
     .find((identifier) => /^\d+$/.test(identifier));
+
+  // Date/named release labels cannot fit MSI's 16-bit revision. CI supplies a
+  // monotonic run number; retain the existing mapping for representable tags.
+  if ((numericIdentifier === undefined || Number(numericIdentifier) > 65_535)
+      && /^\d+$/.test(String(buildNumber)) && Number(buildNumber) <= 65_535) {
+    numericIdentifier = String(buildNumber);
+  }
 
   if (numericIdentifier === undefined) {
     throw new Error(
@@ -68,7 +75,7 @@ export function windowsInstallerVersion(appVersion) {
   return `${baseVersion}-${numericValue}`;
 }
 
-export function tauriVersionConfig(appVersion, platform = "default") {
+export function tauriVersionConfig(appVersion, platform = "default", buildNumber) {
   if (!SEMVER_PATTERN.test(appVersion)) {
     throw new Error(`App version must be a valid semver string. Received: ${appVersion}`);
   }
@@ -79,7 +86,7 @@ export function tauriVersionConfig(appVersion, platform = "default") {
 
   return {
     // Android rejects a zero numeric base even when semver has a prerelease.
-    version: platform === "windows" ? windowsInstallerVersion(appVersion)
+    version: platform === "windows" ? windowsInstallerVersion(appVersion, buildNumber)
       : platform === "android" ? appVersion.replace(/^0\.0\.0(?=$|[-+])/, "0.0.1")
       : appVersion,
   };

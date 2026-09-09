@@ -70,7 +70,8 @@ private let pythonFrameworks = [
 
 private let nativeTargetNames = [
     "ios_system", "awk", "curl_ios", "files", "shell", "tar", "text", "ssh_cmd",
-    "dash", "vim", "lg2", "ffmpeg", "ffprobe", "openssl", "libssh2",
+    "dash", "vim", "lg2", "ffmpeg", "ffprobe", "openssl", "libssh2", "freetype", "lua_ios",
+    "harfbuzz", "libpng",
 ]
 
 // Tauri compiles the Swift plugin into libapp.a, but binary dependencies of
@@ -88,6 +89,28 @@ let package = Package(
         ),
     ],
     targets: [
+        .binaryTarget(
+            name: "harfbuzz",
+            url: "https://github.com/holzschu/Python-aux/releases/download/1.0/harfbuzz.xcframework.zip",
+            checksum: "9a983795826d1662ba354f563b19a7b980e4c744138b3afb68491991e2c8a66a"
+        ),
+        .binaryTarget(
+            name: "libpng",
+            url: "https://github.com/holzschu/Python-aux/releases/download/1.0/libpng.xcframework.zip",
+            checksum: "30ff80e9a2c20d7f266e7f788e94e44b2e105ac9c8107b44eb91f6869d6d8aa4"
+        ),
+        // Required by ffmpeg/ffprobe and vim on iphoneos. Their simulator
+        // slices do not expose the same dependency graph.
+        .binaryTarget(
+            name: "freetype",
+            url: "https://github.com/holzschu/Python-aux/releases/download/1.0/freetype.xcframework.zip",
+            checksum: "8fdf22c7911a2ea47c60df723a0ee268bd5606a1153023f338b3e6395149089e"
+        ),
+        .binaryTarget(
+            name: "lua_ios",
+            url: "https://github.com/holzschu/lua_ios/releases/download/1.0/lua_ios.xcframework.zip",
+            checksum: "0ccdab671f31c20daf8833452cc36598b49f84441851d7142b305443425bc527"
+        ),
         // Transitive dylibs are not embedded automatically for binary targets.
         // Checksums are verified against these exact release asset URLs.
         .binaryTarget(

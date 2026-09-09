@@ -33,6 +33,7 @@ import {
 import { tauriTerminalClient } from "../../lib/terminal/tauriTerminalClient";
 import type { TerminalShellOption } from "../../lib/terminal/types";
 import { useTrayPrefs, writeTrayPrefs } from "../../lib/tray/trayPrefs";
+import { AppearanceSettingsSection } from "./AppearanceSettingsSection";
 import { SecretTextInput } from "./SecretTextInput";
 import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
@@ -299,6 +300,8 @@ export function SystemSettingsForm({ settings, setSettings }: SystemSettingsForm
           />
         </SettingsRow>
       </SettingsRowGroup>
+
+      <AppearanceSettingsSection settings={settings} setSettings={setSettings} />
 
       <SettingsRowGroup title={t("settings.fontFamily")} hideTitle>
         <FormLayout direction="vertical">

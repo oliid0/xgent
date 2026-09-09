@@ -1,5 +1,6 @@
 import { invoke } from "@xgent/runtime";
 import { type Locale, normalizeLocale } from "../../i18n/config";
+import { normalizeAppearance } from "./appearance";
 
 import {
   type AppSettings,
@@ -101,6 +102,7 @@ function readLocalUiSettings(): {
       codeFontFamily: normalizeFontFamily(obj.codeFontFamily),
       fontScale: normalizeFontScaleSettings(obj.fontScale),
       browser: normalizeBrowserExperienceSettings(obj.browser),
+      appearance: normalizeAppearance(obj.appearance),
     };
   }
 

@@ -865,6 +865,7 @@ jobs:
           release_ipa="dist/Xgent-${XGENT_RELEASE_TAG}-iOS-arm64-unsigned.ipa"
           cp "${ipa_candidates[0]}" "$release_ipa"
           unzip -t "$release_ipa"
+          python3 scripts/release/inspect-ios-dependencies.py "$release_ipa"
           python3 - "$release_ipa" <<'PY'
           import plistlib
           import sys
@@ -893,6 +894,10 @@ jobs:
                   "Frameworks/openssl.framework/openssl",
                   "Frameworks/libssh2.framework/libssh2",
                   "Frameworks/ffmpeg.framework/ffmpeg",
+                  "Frameworks/freetype.framework/freetype",
+                  "Frameworks/lua_ios.framework/lua_ios",
+                  "Frameworks/harfbuzz.framework/harfbuzz",
+                  "Frameworks/libpng.framework/libpng",
                   "Frameworks/python3_ios.framework/python3_ios",
                   "Frameworks/python3_ios-_ssl.framework/python3_ios-_ssl",
                   "Frameworks/python3_ios-_sqlite3.framework/python3_ios-_sqlite3",

@@ -1,18 +1,18 @@
 ﻿# Current objective
-Make CUA accurate for editor tasks and multiple windows; implement the five supplied activity/Thinking/progress references and route chat images into the right activity sidebar.
+Improve CUA latency/control, match the supplied desktop/mobile references, add Astryx appearance settings, and repair Windows/iOS releases.
 
 ## Completed in source
-- Windows/Linux observations no longer activate windows by default. Exact window targets reject ambiguous names; semantic actions precede foreground fallback. `allow_foreground=false` rejects global input, and `focus=true` explicitly restores/activates for observation.
-- Windows supports writable ValuePattern and LegacyIAccessible SetValue; targeted keyboard input focuses the indexed editor. Linux exposes bounded text and writable capability, rejects ambiguous accessibility roots. macOS observation is nonactivating and indexed keyboard targeting is wired through AX.
-- Activity steps show supplied purpose; grouped summaries count successful file operations. Clicking selects the corresponding tool detail, receives live results, and correlates CUA/shell frames by toolCallId. Pending questions retain transcript controls.
-- Composer thumbnail and current task share one strip; task list opens upward. Thinking is localized with an animated gradient orb and reduced-motion fallback. User/tool images share the sidebar preview, preserving slide/zoom/copy/save actions.
+- Windows UIA observations cache properties/patterns during bounded tree traversal; live document text is limited to editors/documents/focused controls. Observations report capture/accessibility/total milliseconds. Prior nonactivating, exact-window and semantic targeting fixes remain.
+- Settings persist Current/Stone/Matcha themes and optional light/dark accent/sidebar colors and corner radius through Astryx defineTheme. Sidebar brand dropdown owns XChat/XGent switching on desktop/mobile; duplicate chat header tabs removed; expanded sidebar settings restored.
+- Mobile composer keeps footer controls on one row, uses an icon permission menu and truncates long model labels while retaining reasoning and full title.
+- Windows date/named prereleases use the bounded GitHub run revision. iOS embeds freetype, lua_ios, harfbuzz and libpng; release validation inspects the arm64 Mach-O dependency graph, including transitive dependencies.
 
-## Evidence / limitations / remaining
-- Root causes: unconditional get_app_state activation; foreground-selected ambiguous windows; unconnected step selection; old fullscreen image calls. Microsoft windows-rs 0.62.2/UI Automation and GNOME AT-SPI docs grounded native APIs. Astryx MCP search/get plus CLI manifest/build discovery grounded Popover/Collapsible.
-- Some rich editors expose read-only TextPattern and require targeted keyboard input. This is not universal background automation or an isolated desktop. Native Notepad and multiwindow performance, final rendered layouts/interactions and platform CI still require verification.
-- Prior work preserved: native CUA linkage/settings, mobile startup fixes, browser ownership/geometry fixes. Android Linux-in-PRoot GUI backend remains separate unfinished work; do not restore Android AccessibilityService.
+## Evidence / remaining
+- GitHub MCP searched computer-use projects and Microsoft UFO UIA caching code; Microsoft UIA caching docs and installed windows-rs 0.62.2 APIs support the implementation. Astryx MCP theme/component docs plus CLI manifest/build/docs and installed 0.5.0 source grounded UI/theme APIs.
+- Release run 34274194162 failed Windows version preparation on 0.0.0-cua-activity-20260908. Its actual IPA lacks freetype (ffmpeg/ffprobe) and lua_ios (vim). Downloaded checksum-verified upstream frameworks close the 79-binary device dependency graph; Swift core is system-provided on iOS 12.2+.
+- Native latency/control, final rendered wide/narrow UI and iOS 27 physical launch need verification; missing libraries explain a pre-UI crash but are not proof that all device issues are resolved. Android Linux-in-PRoot GUI work remains separate.
 
 ## Verification / CI
-- `pnpm check` PASS after correcting HStack alignment and unsupported findLast. `pnpm lint` PASS (519 files); affected files checked after corrections.
-- `pnpm test:non-native`: 1136 PASS, one translation-key failure; corrected missing Chinese keys, affected translation suite 3/3 PASS. New navigation and background-target forwarding regressions PASS. No local build/dev/Cargo tools used. Full diff review and git diff --check PASS.
-- Touched computer-use Windows/Linux, Swift dispatcher/service/input, CUA sequence metadata, chat activity/progress/image/navigation/styles/i18n and regression tests. New commit/platform verification pending.
+- pnpm check PASS; pnpm lint PASS (523 files); pnpm test:non-native PASS (1141 tests). No local build/dev/Cargo commands. git diff --check PASS.
+- Touched computer-use Windows/desktop; frontend themes/settings/sidebar/header/composer/i18n/tests; iOS framework manifest; release version/dependency scripts/workflow.
+- Push, GitHub MCP workflow checks, and rendered CI artifact verification are next.

@@ -92,7 +92,7 @@ function appendLines(path, lines) {
 
 function writeTauriConfig(path, appVersion, platform) {
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(tauriVersionConfig(appVersion, platform), null, 2)}\n`);
+  writeFileSync(path, `${JSON.stringify(tauriVersionConfig(appVersion, platform, process.env.GITHUB_RUN_NUMBER), null, 2)}\n`);
 }
 
 try {

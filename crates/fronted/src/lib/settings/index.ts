@@ -23,6 +23,7 @@ import { createUuid } from "../shared/id";
 import { mergeAlwaysEnabledSkillNames } from "../skills/builtin";
 import { normalizeFontFamily } from "../system/fontFamily";
 import { SYSTEM_TOOL_OPTIONS, type SystemToolId } from "../tools/systemToolOptions";
+import { type AppearanceSettings, normalizeAppearance } from "./appearance";
 import { normalizeApiKey, normalizeBaseUrl, normalizeModels } from "./normalize";
 
 export { normalizeFontFamily } from "../system/fontFamily";
@@ -164,6 +165,7 @@ export type BrowserExperienceSettings = {
 };
 
 export type CustomSettings = {
+  appearance: AppearanceSettings;
   conversationTitleModel?: SelectedModel;
   commitMessageModel?: SelectedModel;
   chatSidebar: ChatSidebarSettings;
@@ -2571,6 +2573,7 @@ export function normalizeCustomSettings(
     codeFontFamily: normalizeFontFamily(obj.codeFontFamily),
     fontScale: normalizeFontScaleSettings(obj.fontScale),
     browser: normalizeBrowserExperienceSettings(obj.browser),
+    appearance: normalizeAppearance(obj.appearance),
   };
 }
 

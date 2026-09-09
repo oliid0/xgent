@@ -12,6 +12,18 @@ export const SUPPORTED_LOCALES = ["system", "zh-CN", "en-US"] as const satisfies
 
 export const translations: Record<ResolvedLocale, Record<string, string>> = {
   "zh-CN": {
+    "settings.ui.title": "界面自定义",
+    "settings.ui.preset": "主题预设",
+    "settings.ui.current": "当前主题",
+    "settings.ui.customize": "自定义外观",
+    "settings.ui.customizeDesc": "在预设基础上调整颜色和圆角；切换预设会恢复预设外观。",
+    "settings.ui.accentLight": "强调色 · 浅色",
+    "settings.ui.accentDark": "强调色 · 深色",
+    "settings.ui.sidebarLight": "侧栏背景 · 浅色",
+    "settings.ui.sidebarDark": "侧栏背景 · 深色",
+    "settings.ui.radius": "圆角大小",
+    "settings.ui.reset": "恢复预设外观",
+
     "settings.cua.title": "电脑操作",
     "settings.cua.backend": "操作方式",
     "settings.cua.native": "Xgent 内置电脑操作",
@@ -2771,6 +2783,19 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
   },
 
   "en-US": {
+    "settings.ui.title": "Customize interface",
+    "settings.ui.preset": "Theme preset",
+    "settings.ui.current": "Current theme",
+    "settings.ui.customize": "Custom appearance",
+    "settings.ui.customizeDesc":
+      "Adjust colors and corners on the selected preset. Switching presets restores their original appearance.",
+    "settings.ui.accentLight": "Accent - light",
+    "settings.ui.accentDark": "Accent - dark",
+    "settings.ui.sidebarLight": "Sidebar background - light",
+    "settings.ui.sidebarDark": "Sidebar background - dark",
+    "settings.ui.radius": "Corner radius",
+    "settings.ui.reset": "Restore preset appearance",
+
     "settings.cua.title": "Computer use",
     "settings.cua.backend": "Control backend",
     "settings.cua.native": "Xgent built-in computer use",

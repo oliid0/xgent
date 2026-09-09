@@ -26,6 +26,7 @@ function runVersionScript(args, env = {}) {
     encoding: "utf8",
     env: {
       ...process.env,
+      GITHUB_RUN_NUMBER: "",
       ...env,
     },
   });
@@ -144,4 +145,12 @@ test("Windows prerelease tags require a bounded numeric identifier", () => {
   ]);
   assert.notEqual(outOfRange.status, 0);
   assert.match(outOfRange.stderr, /cannot be greater than 65535/);
+});
+
+test("Windows date labels use the explicit CI revision without changing release metadata", async () => {
+  const { tauriVersionConfig } = await import("../../../../scripts/release/release-version.mjs");
+  assert.deepEqual(tauriVersionConfig("0.0.0-cua-activity-20260908", "windows", "43"), { version: "0.0.0-43" });
+  assert.deepEqual(tauriVersionConfig("0.1.0-beta.20260908", "windows", "44"), { version: "0.1.0-44" });
+  assert.deepEqual(tauriVersionConfig("0.1.0-beta.2", "windows", "44"), { version: "0.1.0-2" });
+  assert.throws(() => tauriVersionConfig("0.1.0-beta", "windows", "65536"));
 });

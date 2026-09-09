@@ -6505,22 +6505,8 @@ export function ChatPage(props: ChatPageProps) {
                 <>
                   <AstryxStack direction="vertical" className="relative z-20">
                     <ChatHeader
-                      settings={settings}
-                      onSelectExecutionMode={(mode) =>
-                        setSettings((prev) =>
-                          prev.system.executionMode === mode
-                            ? prev
-                            : updateSystem(prev, { executionMode: mode }),
-                        )
-                      }
                       sidebarOpen={sidebarOpen}
                       onOpenSidebar={handleOpenSidebar}
-                      showExecutionMode={
-                        !(
-                          sidebarOpen &&
-                          (mobileExperience || desktopNavigationTarget === "conversations")
-                        )
-                      }
                       mobileExperience={mobileExperience}
                       trailingActions={
                         mobileExperience ? (

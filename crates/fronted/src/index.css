@@ -3432,11 +3432,11 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 
 @media (max-width: 600px) {
   .xgent-chat-composer div:has(> div > .xgent-composer-execution-controls) {
-    flex-wrap: wrap;
-    row-gap: var(--spacing-2);
+    flex-wrap: nowrap;
+    gap: var(--spacing-1);
   }
   .xgent-chat-composer div:has(> .xgent-composer-model-controls) {
-    flex: 1 1 14rem;
+    flex: 1 1 0;
     min-width: 0;
     justify-content: flex-end;
   }
@@ -3935,4 +3935,54 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 .xgent-activity-progress > * {
   width: 100%;
+}
+
+.chat-brand-menu {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+.chat-history-sidebar-inner {
+  overflow: hidden;
+}
+.chat-sidebar-footer {
+  position: relative;
+  z-index: 1;
+}
+.xgent-composer-model-controls {
+  justify-content: flex-end;
+  overflow: hidden;
+}
+.xgent-composer-model-controls .astryx-complex-selector {
+  min-width: 0;
+  max-width: 22rem;
+}
+.xgent-composer-model-controls .astryx-complex-selector button {
+  min-width: 0;
+  overflow: hidden;
+}
+.xgent-model-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.xgent-model-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.xgent-model-reasoning {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+@media (max-width: 600px) {
+  .xgent-composer-model-controls .astryx-complex-selector {
+    max-width: 100%;
+  }
+  .xgent-composer-model-controls .astryx-complex-selector > .astryx-icon:first-child {
+    display: none;
+  }
 }

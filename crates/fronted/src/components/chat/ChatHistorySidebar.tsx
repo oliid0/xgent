@@ -6,7 +6,6 @@ import { Icon as AstryxIcon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { MobileNav } from "@astryxdesign/core/MobileNav";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
-import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { Stack as AstryxStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { Text as AstryxText, Text } from "@astryxdesign/core/Text";
@@ -72,6 +71,7 @@ import {
 } from "../icons";
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
 import type { WorkspaceToolTarget } from "../project-tools/workspaceToolsModel";
+import { ExecutionModeMenu } from "./ExecutionModeMenu";
 
 type ChatHistorySidebarProps = {
   items: readonly SidebarConversation[];
@@ -1906,16 +1906,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
       className="chat-sidebar-mode-bar"
     >
       <StackItem size="fill">
-        <SegmentedControl
-          value={executionMode === "text" ? "text" : "tools"}
-          onChange={(value) => onSelectExecutionMode(value as "text" | "tools")}
-          label={t("settings.executionMode")}
-          layout="fill"
-          size="sm"
-        >
-          <SegmentedControlItem value="text" label={t("chat.mode.chat")} />
-          <SegmentedControlItem value="tools" label={t("chat.mode.agent")} />
-        </SegmentedControl>
+        <ExecutionModeMenu value={executionMode} onChange={onSelectExecutionMode} />
       </StackItem>
       <AstryxStack direction="horizontal" gap={0.5} vAlign="center">
         <IconButton
@@ -1954,9 +1945,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   const mobileSidebarHeader = (
     <AstryxStack direction="horizontal" width="100%" gap={2} vAlign="center">
       <StackItem size="fill">
-        <AstryxText as="span" type="large" className="tracking-[-0.02em]">
-          XGent
-        </AstryxText>
+        <ExecutionModeMenu value={executionMode} onChange={onSelectExecutionMode} />
       </StackItem>
       <IconButton
         label={t("chat.history.search")}
@@ -2805,10 +2794,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
           </AstryxGrid>
           <AstryxStack
             direction="vertical"
-            className={cn(
-              "shrink-0 border-t border-border bg-body px-2 py-1.5",
-              desktopPanelMode && "md:hidden",
-            )}
+            className="chat-sidebar-footer shrink-0 border-t border-border bg-body px-2 py-1.5"
           >
             {soulLauncherOpen && !mobileExperience ? (
               <AstryxStack
@@ -2976,6 +2962,15 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                 </Button>
               )}
               <AstryxStack direction="horizontal" gap={1} vAlign="center">
+                {!mobileExperience ? (
+                  <IconButton
+                    label={t("tooltip.settings")}
+                    tooltip={t("tooltip.settings")}
+                    icon={<Settings />}
+                    variant="ghost"
+                    onClick={onOpenSettings}
+                  />
+                ) : null}
                 {mobileExperience ? (
                   <Button
                     label={t("tooltip.settings")}
