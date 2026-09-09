@@ -216,7 +216,6 @@ export function MobileToolActivity({
   const shellCommand =
     selectedFrame?.title ??
     String(selectedItem?.toolCall.arguments?.command ?? selectedItem?.toolCall.name ?? "");
-  const [previewError, setPreviewError] = useState("");
   const shellSessionId = [...frames].reverse().find((frame) => frame.kind === "shell")?.sessionId;
   useEffect(() => {
     if (view !== "capsule" || !monitoring || !shellSessionId) return;
@@ -263,7 +262,6 @@ export function MobileToolActivity({
           const observation = activityObservation(result.content);
           if (result.isError || !observation.imageUrl)
             throw new Error(observation.text || "Preview unavailable");
-          setPreviewError("");
           executionActivityStore.record(conversationId, {
             id: `monitor:${previewTarget}`,
             kind: "cua",
@@ -275,7 +273,20 @@ export function MobileToolActivity({
           });
         } catch (error) {
           if (disposed) return;
-          setPreviewError(String(error));
+          const id = `monitor:${previewTarget}`;
+          const previous = executionActivityStore
+            .getSnapshot(conversationId)
+            .find((frame) => frame.id === id);
+          executionActivityStore.record(conversationId, {
+            ...previous,
+            id,
+            kind: "cua",
+            app: previewTarget,
+            title: previewTarget,
+            text: "",
+            previewError: String(error),
+            status: "error",
+          });
           delay = 4000;
         }
       }
@@ -448,7 +459,9 @@ export function MobileToolActivity({
             </VStack>
           </HStack>
           <VStack gap={4} padding={3} className="xgent-activity-content">
-            {previewError ? <Banner status="warning" title={previewError} /> : null}
+            {selectedFrame?.previewError ? (
+              <Banner status="warning" title={selectedFrame.previewError} />
+            ) : null}
             {selectedKind === "shell" ? (
               <ActivityTerminal
                 key={selectedFrame?.id ?? selectedItem?.toolCall.id}

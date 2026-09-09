@@ -18,6 +18,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.ui.customize": "自定义外观",
     "settings.ui.customizeDesc": "在预设基础上调整颜色和圆角；切换预设会恢复预设外观。",
     "settings.ui.accentLight": "强调色 · 浅色",
+    "settings.ui.accentDescription": "应用于聊天气泡、主按钮、开关、选择状态和焦点边框。",
     "settings.ui.accentDark": "强调色 · 深色",
     "settings.ui.sidebarLight": "侧栏背景 · 浅色",
     "settings.ui.sidebarDark": "侧栏背景 · 深色",
@@ -2796,6 +2797,8 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.ui.customizeDesc":
       "Adjust colors and corners on the selected preset. Switching presets restores their original appearance.",
     "settings.ui.accentLight": "Accent - light",
+    "settings.ui.accentDescription":
+      "Applies to chat bubbles, primary buttons, switches, selected states and focus rings.",
     "settings.ui.accentDark": "Accent - dark",
     "settings.ui.sidebarLight": "Sidebar background - light",
     "settings.ui.sidebarDark": "Sidebar background - dark",

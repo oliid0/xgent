@@ -61,7 +61,13 @@ export function AppearanceSettingsSection({ settings, setSettings }: SettingsSec
       {appearance.customized ? (
         <>
           {colors.map((key) => (
-            <SettingsRow key={key} label={t(`settings.ui.${key}`)}>
+            <SettingsRow
+              key={key}
+              label={t(`settings.ui.${key}`)}
+              description={
+                key.startsWith("accent") ? t("settings.ui.accentDescription") : undefined
+              }
+            >
               <input
                 type="color"
                 aria-label={t(`settings.ui.${key}`)}

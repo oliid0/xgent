@@ -5,6 +5,7 @@ export type ExecutionActivity = {
   title: string;
   text: string;
   imageUrl?: string;
+  previewError?: string;
   app?: string;
   status: "running" | "complete" | "error" | "stopped";
   sessionId?: string;

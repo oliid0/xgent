@@ -43,6 +43,16 @@ export function createAppearanceTheme(appearance: AppearanceSettings, compact: b
         : { "--radius-chat": "26px" }),
     },
     components: {
+      ...(appearance.customized
+        ? {
+            "chat-message-bubble": {
+              "sender:user": {
+                backgroundColor: "var(--color-accent-muted)",
+                color: "var(--color-text-primary)",
+              },
+            },
+          }
+        : {}),
       "chat-composer": {
         base: {
           backgroundColor: "var(--color-background-surface)",
