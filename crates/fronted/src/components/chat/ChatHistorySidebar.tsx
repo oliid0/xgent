@@ -52,7 +52,6 @@ import {
   FolderClosed,
   FolderOpen,
   FolderTree,
-  GitBranch,
   Key,
   Loader2,
   PanelLeftClose,
@@ -65,12 +64,12 @@ import {
   Settings2,
   Sparkles,
   SquarePen,
-  Terminal,
   Trash2,
   X,
 } from "../icons";
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
 import type { WorkspaceToolTarget } from "../project-tools/workspaceToolsModel";
+import { SidebarActionMenu } from "../workspace-tools/SidebarActionMenu";
 import { ExecutionModeMenu } from "./ExecutionModeMenu";
 
 type ChatHistorySidebarProps = {
@@ -1283,7 +1282,6 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   } = props;
   const { t } = useLocale();
   const soul = useSoul();
-  const soulDocument = soul.document;
   const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false);
   const projectsCollapsed = !workspaceManagerOpen;
   const projectsDisclosure = useCollapsible({
@@ -2796,118 +2794,6 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
             direction="vertical"
             className="chat-sidebar-footer shrink-0 border-t border-border bg-body px-2 py-1.5"
           >
-            {soulLauncherOpen && !mobileExperience ? (
-              <AstryxStack
-                direction="vertical"
-                className="mb-1.5 space-y-0.5 rounded-xl border border-border bg-background p-1.5 shadow-sm"
-              >
-                <SoulPresetPicker
-                  presets={soul.presets}
-                  activeId={soul.activeId}
-                  saving={soul.saving}
-                  onSelect={(presetId) => {
-                    void soul.select(presetId).catch(() => undefined);
-                    setSoulLauncherOpen(false);
-                  }}
-                  onCreate={() => {
-                    setSoulLauncherOpen(false);
-                    onCreateSoul();
-                  }}
-                />
-                {!mobileExperience ? (
-                  <>
-                    <AstryxStack
-                      direction="vertical"
-                      className="mx-1 my-1 border-t border-border/50"
-                    />
-                    {trajectoryAvailable && onOpenTrajectory ? (
-                      <AstryxButton
-                        variant="ghost"
-                        label={t("chat.trajectory.open")}
-                        type="button"
-                        onClick={() => {
-                          onOpenTrajectory();
-                          setSoulLauncherOpen(false);
-                        }}
-                        className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07]"
-                      >
-                        <Activity className="h-4 w-4 text-muted-foreground" />
-                        <AstryxText as="span" type="inherit">
-                          {t("chat.trajectory.open")}
-                        </AstryxText>
-                      </AstryxButton>
-                    ) : null}
-                    <AstryxButton
-                      variant="ghost"
-                      label={t("sidebar.terminal")}
-                      type="button"
-                      onClick={() => {
-                        onOpenWorkspaceTool?.("terminal");
-                        setSoulLauncherOpen(false);
-                      }}
-                      isDisabled={!workspaceToolsAvailable || !onOpenWorkspaceTool}
-                      className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07] disabled:opacity-45"
-                    >
-                      <Terminal className="h-4 w-4 text-muted-foreground" />
-                      <AstryxText as="span" type="inherit" className="min-w-0 flex-1">
-                        {t("sidebar.terminal")}
-                      </AstryxText>
-                    </AstryxButton>
-                    {[
-                      {
-                        target: "gitReview" as const,
-                        label: t("sidebar.gitReview"),
-                        icon: <GitBranch className="h-4 w-4 text-muted-foreground" />,
-                      },
-                      {
-                        target: "sshConnection" as const,
-                        label: t("sidebar.sshConnection"),
-                        icon: <Key className="h-4 w-4 text-muted-foreground" />,
-                      },
-                      {
-                        target: "backgroundTasks" as const,
-                        label: t("sidebar.backgroundTasks"),
-                        icon: <Cpu className="h-4 w-4 text-muted-foreground" />,
-                      },
-                    ].map((item) => (
-                      <AstryxButton
-                        variant="ghost"
-                        label={item.label}
-                        key={item.target}
-                        type="button"
-                        onClick={() => {
-                          onOpenWorkspaceTool?.(item.target);
-                          setSoulLauncherOpen(false);
-                        }}
-                        isDisabled={!workspaceToolsAvailable || !onOpenWorkspaceTool}
-                        className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07] disabled:opacity-45"
-                      >
-                        {item.icon}
-                        <AstryxText as="span" type="inherit">
-                          {item.label}
-                        </AstryxText>
-                      </AstryxButton>
-                    ))}
-                    <AstryxStack
-                      direction="vertical"
-                      className="mx-1 my-1 border-t border-border/50"
-                    />
-                    <AstryxButton
-                      variant="ghost"
-                      label={t("tooltip.settings")}
-                      type="button"
-                      onClick={onOpenSettings}
-                      className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[calc(13px*var(--zone-font-scale,1))] text-foreground/85 transition-colors hover:bg-foreground/[0.07]"
-                    >
-                      <Settings className="h-4 w-4 text-muted-foreground" />
-                      <AstryxText as="span" type="inherit">
-                        {t("tooltip.settings")}
-                      </AstryxText>
-                    </AstryxButton>
-                  </>
-                ) : null}
-              </AstryxStack>
-            ) : null}
             <AstryxGrid className="mobile-chat-sidebar-footer grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
               {mobileExperience ? (
                 <Button
@@ -2923,54 +2809,16 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   </AstryxText>
                 </Button>
               ) : (
-                <Button
-                  label={t("sidebar.soulMenu")}
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setSoulLauncherOpen((open) => !open);
-                  }}
-                  aria-expanded={soulLauncherOpen}
-                  className="h-10 w-full min-w-0 justify-start gap-2.5 rounded-xl px-2 text-[calc(13px*var(--zone-font-scale,1))] font-normal text-foreground/85 shadow-none hover:bg-foreground/[0.08] hover:text-foreground"
-                  tooltip={t("sidebar.soulMenu")}
-                >
-                  <AstryxStack
-                    as="span"
-                    direction="horizontal"
-                    className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500/25 via-sky-500/20 to-amber-500/25 ring-1 ring-border/70"
-                  >
-                    <Sparkles className="h-3.5 w-3.5 text-violet-500" />
-                  </AstryxStack>
-                  <AstryxText as="span" type="inherit" className="min-w-0 flex-1 text-left">
-                    <AstryxText as="span" type="inherit" className="block truncate font-medium">
-                      {soulDocument?.metadata.name.trim() || "XGent"}
-                    </AstryxText>
-                    <AstryxText
-                      as="span"
-                      type="inherit"
-                      className="block truncate text-[10px] leading-3 text-muted-foreground"
-                    >
-                      {t("sidebar.soul")}
-                    </AstryxText>
-                  </AstryxText>
-                  <ChevronRight
-                    className={cn(
-                      "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
-                      soulLauncherOpen && "-rotate-90",
-                    )}
-                  />
-                </Button>
+                <SidebarActionMenu
+                  workspaceToolsAvailable={workspaceToolsAvailable && !!onOpenWorkspaceTool}
+                  onSelect={(target, shell) => onOpenWorkspaceTool?.(target, shell)}
+                  onOpenSettings={onOpenSettings}
+                  onCreateSoul={onCreateSoul}
+                  onOpenTrajectory={onOpenTrajectory}
+                  trajectoryAvailable={trajectoryAvailable}
+                />
               )}
               <AstryxStack direction="horizontal" gap={1} vAlign="center">
-                {!mobileExperience ? (
-                  <IconButton
-                    label={t("tooltip.settings")}
-                    tooltip={t("tooltip.settings")}
-                    icon={<Settings />}
-                    variant="ghost"
-                    onClick={onOpenSettings}
-                  />
-                ) : null}
                 {mobileExperience ? (
                   <Button
                     label={t("tooltip.settings")}
