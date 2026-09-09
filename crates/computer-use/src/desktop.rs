@@ -94,6 +94,7 @@ fn bounds(window: &Window) -> Result<(i32, i32, u32, u32), String> {
 // accessibility nodes, or wait behind a long input sequence.
 pub fn capture_preview(arguments: &Value) -> Result<Value, String> {
     let window = resolve_window(arguments["app"].as_str().ok_or("Missing preview target")?)?;
+    if window.is_minimized().map_err(fail)? { return Err("The app is minimized; restore it to resume the live preview.".into()); }
     let captured = window.capture_image().map_err(fail)?;
     if captured.width() == 0 || captured.height() == 0 { return Err("Preview capture was empty".into()); }
     let max_size = arguments["max_image_size"].as_u64().unwrap_or(768).clamp(320,1280) as u32;
@@ -127,6 +128,11 @@ impl Desktop {
         let started = std::time::Instant::now();
         let mut capture = self.observation != "text";
         let mut capture_note=String::new();
+        if capture && window.is_minimized().map_err(fail)? {
+            if self.observation == "image" { return Err("The app is minimized. Request get_app_state with focus=true to restore it before capturing.".into()); }
+            capture=false;
+            capture_note="\nThe app is minimized; accessibility observation is available. Request focus=true to restore it before using screenshot coordinates.".into();
+        }
         let mut image = if capture {
             match window.capture_image() {
                 Ok(image) => image,

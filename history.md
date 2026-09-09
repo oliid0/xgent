@@ -2,6 +2,7 @@
 Fix the supplied iOS launch crash, improve observable CUA control, and align chat/activity/settings layouts with yy references and Astryx.
 
 ## Completed in source
+- Minimized apps now yield semantic observations in auto mode and explicit capture errors in image/live-preview mode, instead of exposing the native 187x32 minimized thumbnail as an actionable screen. Grounded in the production probe on this desktop.
 - Desktop expanded/rail footers now share the same Astryx action menu, icon, actions and sizing; removed the expanded-only inline menu, two-line Soul identity, duplicate settings control and obsolete imports. Final verification pending.
 - iOS app enables Swift runtime embedding and explicitly searches /usr/lib/swift. IPA inspection now rejects unresolved @rpath/libswiftCore.dylib instead of assuming ABI stability resolves it.
 - CUA launch waits for an observable window; typing uses the focused editable control; stale/changed states and stale sequences report unapplied errors. Configured external drivers own observations and their input tokens, preserving focus/background capabilities.
