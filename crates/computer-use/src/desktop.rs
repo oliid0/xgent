@@ -90,12 +90,47 @@ fn bounds(window: &Window) -> Result<(i32, i32, u32, u32), String> {
     Ok((window.x().map_err(fail)?, window.y().map_err(fail)?, window.width().map_err(fail)?, window.height().map_err(fail)?))
 }
 
+fn capture_window(window: &Window) -> Result<image::RgbaImage, String> {
+    #[cfg(target_os = "windows")]
+    if window.is_focused().map_err(fail)? {
+        // PrintWindow omits owned menu/popover surfaces. For the foreground
+        // app, capture its actual screen region in the same physical-pixel
+        // bounds used by input, including intersections on multiple monitors.
+        let rect = bounds(window)?;
+        let (x, y, width, height) = (i64::from(rect.0), i64::from(rect.1), rect.2, rect.3);
+        if width == 0 || height == 0 || u64::from(width) * u64::from(height) > 64_000_000 {
+            return Err("Window capture dimensions are empty or too large".into());
+        }
+        let mut composite = image::RgbaImage::new(width, height);
+        let mut captured = false;
+        for monitor in xcap::Monitor::all().map_err(fail)? {
+            let mx = i64::from(monitor.x().map_err(fail)?);
+            let my = i64::from(monitor.y().map_err(fail)?);
+            let left = x.max(mx);
+            let top = y.max(my);
+            let right = (x + i64::from(width)).min(mx + i64::from(monitor.width().map_err(fail)?));
+            let bottom = (y + i64::from(height)).min(my + i64::from(monitor.height().map_err(fail)?));
+            if right <= left || bottom <= top { continue; }
+            let tile = monitor.capture_region((left-mx) as u32, (top-my) as u32,
+                (right-left) as u32, (bottom-top) as u32).map_err(fail)?;
+            image::imageops::replace(&mut composite, &tile, left-x, top-y);
+            captured = true;
+        }
+        if !captured { return Err("Window is outside the visible desktop".into()); }
+        if !window.is_focused().map_err(fail)? || bounds(window)? != rect {
+            return Err("Window focus or geometry changed during capture; observe again".into());
+        }
+        return Ok(composite);
+    }
+    window.capture_image().map_err(fail)
+}
+
 // Monitoring must not consume an agent state token, focus a window, enumerate
 // accessibility nodes, or wait behind a long input sequence.
 pub fn capture_preview(arguments: &Value) -> Result<Value, String> {
     let window = resolve_window(arguments["app"].as_str().ok_or("Missing preview target")?)?;
     if window.is_minimized().map_err(fail)? { return Err("The app is minimized; restore it to resume the live preview.".into()); }
-    let captured = window.capture_image().map_err(fail)?;
+    let captured = capture_window(&window)?;
     if captured.width() == 0 || captured.height() == 0 { return Err("Preview capture was empty".into()); }
     let max_size = arguments["max_image_size"].as_u64().unwrap_or(768).clamp(320,1280) as u32;
     let image = image::DynamicImage::ImageRgba8(captured).thumbnail(max_size, max_size);
@@ -134,7 +169,7 @@ impl Desktop {
             capture_note="\nThe app is minimized; accessibility observation is available. Request focus=true to restore it before using screenshot coordinates.".into();
         }
         let mut image = if capture {
-            match window.capture_image() {
+            match capture_window(window) {
                 Ok(image) => image,
                 Err(error) if self.observation == "auto" => {
                     capture=false;

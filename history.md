@@ -3,6 +3,7 @@ Fix the supplied iOS launch crash, improve observable CUA control, and align cha
 Priority: right sidebar, CUA, live activity and chat display; continue improving custom UI/colors. Full goal remains active.
 
 ## Completed in source
+- Foreground Windows observations/live previews capture the app's actual physical screen region across monitor intersections. Production probe proved PrintWindow omitted an open Notepad File menu despite accessibility seeing it. Background capture remains non-activating; focus/geometry changes during screen capture reject the frame. CI/native visual verification pending.
 - Appearance colors now pair the native picker with editable/copyable HEX fields, localized validation and Escape-to-revert. Only complete valid colors enter persisted settings; invalid drafts leave the applied theme intact. Grounded in rendered settings and Astryx TextInput documentation.
 - Minimized apps now yield semantic observations in auto mode and explicit capture errors in image/live-preview mode, instead of exposing the native 187x32 minimized thumbnail as an actionable screen. Grounded in the production probe on this desktop.
 - Desktop expanded/rail footers now share the same Astryx action menu, icon, actions and sizing; removed the expanded-only inline menu, two-line Soul identity, duplicate settings control and obsolete imports. Final verification pending.
