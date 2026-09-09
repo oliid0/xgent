@@ -23,6 +23,8 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.ui.sidebarLight": "侧栏背景 · 浅色",
     "settings.ui.sidebarDark": "侧栏背景 · 深色",
     "settings.ui.radius": "圆角大小",
+    "settings.ui.colorFormat":
+      "请输入 # 加六位十六进制颜色值，例如 #2563eb。按 Esc 恢复已保存的颜色。",
     "settings.ui.reset": "恢复预设外观",
 
     "settings.cua.title": "电脑操作",
@@ -2803,6 +2805,8 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.ui.sidebarLight": "Sidebar background - light",
     "settings.ui.sidebarDark": "Sidebar background - dark",
     "settings.ui.radius": "Corner radius",
+    "settings.ui.colorFormat":
+      "Enter # followed by six hexadecimal digits, such as #2563eb. Press Esc to restore the saved color.",
     "settings.ui.reset": "Restore preset appearance",
 
     "settings.cua.title": "Computer use",

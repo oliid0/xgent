@@ -1,5 +1,8 @@
 import { Button } from "@astryxdesign/core/Button";
 import { Selector } from "@astryxdesign/core/Selector";
+import { HStack } from "@astryxdesign/core/Stack";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { useEffect, useState } from "react";
 import { useLocale } from "../../i18n";
 import { updateCustomSettings } from "../../lib/settings";
 import {
@@ -9,6 +12,55 @@ import {
 } from "../../lib/settings/appearance";
 import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
+
+function AppearanceColorInput(props: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const { t } = useLocale();
+  const [draft, setDraft] = useState(props.value);
+  useEffect(() => setDraft(props.value), [props.value]);
+  const valid = /^#[\da-f]{6}$/i.test(draft);
+  return (
+    <HStack gap={2} vAlign="center" style={{ minWidth: 0, maxWidth: "100%" }}>
+      <input
+        type="color"
+        aria-label={props.label}
+        value={props.value}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          props.onChange(event.target.value);
+        }}
+        style={{
+          width: 36,
+          height: 36,
+          flexShrink: 0,
+          cursor: "pointer",
+          borderRadius: "var(--radius-element)",
+        }}
+      />
+      <TextInput
+        label={`${props.label} · HEX`}
+        isLabelHidden
+        width={120}
+        value={draft}
+        onChange={(value) => {
+          setDraft(value);
+          if (/^#[\da-f]{6}$/i.test(value)) props.onChange(value.toLowerCase());
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            setDraft(props.value);
+          }
+        }}
+        status={valid ? undefined : { type: "error", message: t("settings.ui.colorFormat") }}
+        statusVariant="tooltip"
+      />
+    </HStack>
+  );
+}
 
 export function AppearanceSettingsSection({ settings, setSettings }: SettingsSectionProps) {
   const { t } = useLocale();
@@ -68,11 +120,10 @@ export function AppearanceSettingsSection({ settings, setSettings }: SettingsSec
                 key.startsWith("accent") ? t("settings.ui.accentDescription") : undefined
               }
             >
-              <input
-                type="color"
-                aria-label={t(`settings.ui.${key}`)}
+              <AppearanceColorInput
+                label={t(`settings.ui.${key}`)}
                 value={appearance[key]}
-                onChange={(event) => update({ [key]: event.target.value })}
+                onChange={(value) => update({ [key]: value })}
               />
             </SettingsRow>
           ))}
