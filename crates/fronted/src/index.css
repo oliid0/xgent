@@ -3331,7 +3331,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 
 /* Main conversation chrome shared by desktop and compact runtimes. */
 .chat-workspace-main {
-  background: var(--color-background);
+  background: var(--color-background-surface);
 }
 
 .workspace-navigation-rail-shell {
@@ -3951,7 +3951,10 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 .xgent-composer-model-controls {
   justify-content: flex-end;
-  overflow: hidden;
+}
+.xgent-composer-model-controls > .astryx-field {
+  min-width: 0;
+  max-width: 100%;
 }
 .xgent-composer-model-controls .astryx-complex-selector {
   min-width: 0;

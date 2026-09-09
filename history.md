@@ -15,4 +15,6 @@ Improve CUA latency/control, match the supplied desktop/mobile references, add A
 ## Verification / CI
 - pnpm check PASS; pnpm lint PASS (523 files); pnpm test:non-native PASS (1141 tests). No local build/dev/Cargo commands. git diff --check PASS.
 - Touched computer-use Windows/desktop; frontend themes/settings/sidebar/header/composer/i18n/tests; iOS framework manifest; release version/dependency scripts/workflow.
-- Push, GitHub MCP workflow checks, and rendered CI artifact verification are next.
+- CI 34328290420 PASS for e46f39c. Release 34328307470 is compiling all five platforms; native checks remain pending.
+- Browser review of the CI artifact with local RPC fixtures verified 1440/768/390/320px layouts, sidebar settings, XChat/XGent menus, all three themes and custom color/radius persistence/reset; console errors: zero. Rendered review exposed an unconstrained Astryx Field and inherited main background; corrected CSS and verified the exact overrides, plus 14 affected tests and CSS lint PASS. Final artifact confirmation follows this CSS commit.
+
