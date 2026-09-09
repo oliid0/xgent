@@ -16,6 +16,8 @@ Fix the supplied iOS launch crash, improve observable CUA control, and align cha
 - yy/1.html, yy/2.html, supplied screenshots and xx computer-use implementation informed behavior. Astryx MCP search/get and 0.5.4 CLI manifest/build discovery used; installed themeProps and color-scale code confirm sender:user/accent-muted overrides. Windows association APIs checked against windows-rs 0.62.2.
 
 ## Verification / remaining
+- Updated the existing navigation contract test to inspect the extracted shared menu. Full non-native run found this stale location assertion; rerun only the affected test after correction.
+- CI 34370279257 (07ff0e9) all six jobs PASS; release 34369748134 (bebf64b) PASS. Native DPI artifact on 150% desktop restores/captures full Notepad at 1280x741; coordinate click needs stronger post-action evidence. A minimized window still returned a misleading tiny capture, requiring follow-up.
 - Shared sidebar menu typecheck PASS; initial lint reported formatting only, normalized both extracted files with the installed formatter. Rendered interaction verification remains.
 - Native probe on this 150% Windows desktop: launch 1.8s, precise typing + screenshot 0.24s, Chinese document text/8-character count and stale-token rejection PASS. Screenshot revealed DPI-unaware hosts mixed GetWindowRect logical bounds with DWM physical bounds. Added a per-call RAII DPI context for capture/input, restored on all exits; awaiting native screenshot/click verification.
 - CI e292630 found Monaco 0.56's old language-pack import no longer exists. Updated language pack and five worker imports through 0.56's exports map (maps package subpaths to esm/vs), removed obsolete ambient declaration. Adopted CI's resolved Cargo.lock for the locked Windows diagnostic job.

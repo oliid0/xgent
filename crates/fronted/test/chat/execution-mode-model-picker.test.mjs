@@ -24,6 +24,10 @@ const railSource = readFileSync(
   new URL("../../src/components/workspace-tools/WorkspaceNavigationRail.tsx", import.meta.url),
   "utf8",
 );
+const sidebarMenuSource = readFileSync(
+  new URL("../../src/components/workspace-tools/SidebarActionMenu.tsx", import.meta.url),
+  "utf8",
+);
 
 const modeMenuSource = readFileSync(
   new URL("../../src/components/chat/ExecutionModeMenu.tsx", import.meta.url), "utf8",
@@ -63,7 +67,7 @@ test("expanded sidebar owns mode, search, and collapse controls", () => {
 test("permanent rail keeps hubs and files while duplicate workspace tools stay in the Soul menu", () => {
   const railItems = railSource.slice(
     railSource.indexOf("const items: RailItem[]"),
-    railSource.indexOf("const selectFromSoulMenu"),
+    railSource.indexOf("const footerIcons"),
   );
   assert.match(railItems, /target: "conversations"/);
   assert.match(railItems, /target: "mcp"/);
@@ -72,9 +76,9 @@ test("permanent rail keeps hubs and files while duplicate workspace tools stay i
   for (const target of ["terminal", "gitReview", "sshConnection", "backgroundTasks"]) {
     assert.doesNotMatch(railItems, new RegExp(`target: "${target}"`));
     if (target === "terminal") {
-      assert.match(railSource, /selectFromSoulMenu\("terminal"\)/);
+      assert.match(sidebarMenuSource, /selectFromSoulMenu\("terminal"\)/);
     } else {
-      assert.match(railSource, new RegExp(`target: "${target}"`));
+      assert.match(sidebarMenuSource, new RegExp(`target: "${target}"`));
     }
   }
 });
