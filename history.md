@@ -1,5 +1,6 @@
 ﻿# Current objective
 Fix the supplied iOS launch crash, improve observable CUA control, and align chat/activity/settings layouts with yy references and Astryx.
+Priority: right sidebar, CUA, live activity and chat display; continue improving custom UI/colors. Full goal remains active.
 
 ## Completed in source
 - Minimized apps now yield semantic observations in auto mode and explicit capture errors in image/live-preview mode, instead of exposing the native 187x32 minimized thumbnail as an actionable screen. Grounded in the production probe on this desktop.
@@ -19,10 +20,10 @@ Fix the supplied iOS launch crash, improve observable CUA control, and align cha
 ## Verification / remaining
 - Updated the existing navigation contract test to inspect the extracted shared menu. Full non-native run found this stale location assertion; rerun only the affected test after correction.
 - CI 34370279257 (07ff0e9) all six jobs PASS; release 34369748134 (bebf64b) PASS. Native DPI artifact on 150% desktop restores/captures full Notepad at 1280x741; coordinate click needs stronger post-action evidence. A minimized window still returned a misleading tiny capture, requiring follow-up.
-- Shared sidebar menu typecheck PASS; initial lint reported formatting only, normalized both extracted files with the installed formatter. Rendered interaction verification remains.
+- Shared sidebar menu typecheck/lint PASS; affected navigation tests 11/11 PASS after the full non-native run exposed a stale source-location assertion. Rendered interaction verification remains.
 - Native probe on this 150% Windows desktop: launch 1.8s, precise typing + screenshot 0.24s, Chinese document text/8-character count and stale-token rejection PASS. Screenshot revealed DPI-unaware hosts mixed GetWindowRect logical bounds with DWM physical bounds. Added a per-call RAII DPI context for capture/input, restored on all exits; awaiting native screenshot/click verification.
 - CI e292630 found Monaco 0.56's old language-pack import no longer exists. Updated language pack and five worker imports through 0.56's exports map (maps package subpaths to esm/vs), removed obsolete ambient declaration. Adopted CI's resolved Cargo.lock for the locked Windows diagnostic job.
 - pnpm 10.32.1 check PASS; lint PASS (527 files); non-native suite 1143/1143 PASS; 4 activity tests PASS after shared preview fix; architecture and diff hygiene PASS. Use CI's pnpm 10.32.1 (global 12 ignores package pnpm settings). No local build/dev/Cargo commands.
-- Prior iOS fix 002d579 release run 34363971526 succeeded. Push/current CI, rendered artifact wide/narrow interactions and Windows production-engine probe remain. CI compiles the probe; local execution requires no build tools. iOS personal-signature physical launch and advanced Blender/video/FPS completion are not yet established.
+- Latest code e7a50fe pushed; CI 34381804027 pending (tracked with GitHub MCP); preceding sidebar CI 34381692795 running. Release 34381102663 on 07ff0e9 running. Next: inspect artifacts for shared-menu wide/narrow interactions and minimized CUA capture behavior. Prior rendered chat layouts passed, but do not establish these new changes. iOS personal-signature physical launch and advanced Blender/video/FPS completion remain unverified.
 - Touched computer-use native/driver routing; iOS project/dependency inspection; frontend appearance, transcript/activity, shell stream, preview Open with, navigation/settings and related tests.
 - Cargo.lock taken from CI artifact 10111165895: adds the previously missing xgent-computer-use dependency graph; existing package versions/checksums retained.
