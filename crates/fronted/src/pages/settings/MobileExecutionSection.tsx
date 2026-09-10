@@ -66,7 +66,11 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
     try {
       const [next, mounted] = await Promise.all([
         mobileExecutionStatus(),
-        listExternalMobileWorkspaces(),
+        listExternalMobileWorkspaces().catch((cause) => {
+          // A revoked folder grant must not hide the independent Shell installer.
+          setError(cause instanceof Error ? cause.message : String(cause));
+          return [];
+        }),
       ]);
       setStatus(next);
       setExternalWorkspaces(mounted);

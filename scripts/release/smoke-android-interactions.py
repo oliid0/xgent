@@ -45,12 +45,12 @@ def capture(name):
 
 # These labels come from the same zh/en dictionaries as the installed controls.
 tap({"打开边栏", "Open Sidebar"})
-tap({"打开 Soul 与工作工具", "Open Soul and workspace tools"})
 tap({"设置", "Settings"})
 capture("settings")
 tap({"返回对话", "Back to Chat"})
 tap({"工作工具", "Workspace tools"})
 tap({"Shell 管理", "Shell management"})
+tap({"刷新状态", "Refresh status"})
 capture("shell-settings")
 nodes = list(snapshot().iter("node"))
 if any(matches(node, {"安装基础环境", "Install base environment"}) for node in nodes):
@@ -63,6 +63,7 @@ if any(matches(node, {"安装基础环境", "Install base environment"}) for nod
         time.sleep(2)
     else:
         raise AssertionError("The bundled Shell environment did not become ready")
+tap({"返回设置", "Back to Settings"})
 tap({"返回对话", "Back to Chat"})
 tap({"工作工具", "Workspace tools"})
 tap({"打开终端", "Open terminal"})

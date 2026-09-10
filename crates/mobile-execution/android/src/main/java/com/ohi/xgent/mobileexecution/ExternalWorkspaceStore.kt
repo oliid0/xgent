@@ -105,8 +105,17 @@ internal class ExternalWorkspaceStore(private val context: Context) {
         put("detail", if (entry.writable) null else "The selected folder is mounted read-only")
     }
 
-    fun payload(): JSONArray = JSONArray().apply {
-        list().forEach { put(payload(it)) }
+    // Invoke.resolveObject uses Jackson, which treats org.json.JSONArray as
+    // a bean rather than a JSON sequence. Supply ordinary Kotlin collections.
+    fun payload(): List<Map<String, Any?>> = list().map { entry ->
+        mapOf(
+            "id" to entry.id,
+            "name" to entry.name,
+            "path" to entry.path,
+            "writable" to entry.writable,
+            "active" to (File(entry.path).isDirectory && hasPersistedGrant(entry.uri)),
+            "detail" to if (entry.writable) null else "The selected folder is mounted read-only",
+        )
     }
 
     private fun hasPersistedGrant(uri: String): Boolean =
