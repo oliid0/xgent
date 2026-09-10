@@ -14,11 +14,12 @@
     "windows": [
       {
         "title": "",
-        "width": 1400,
-        "height": 800,
+        "width": 1600,
+        "height": 1000,
         "minWidth": 320,
         "minHeight": 360,
         "visible": false,
+        "backgroundColor": "#f7f7f5",
         "backgroundThrottling": "disabled"
       }
     ],

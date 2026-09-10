@@ -69,6 +69,40 @@ for binary in [b'not Mach-O', macho()[:20], macho([(12, '@rpath/missing')])[:-4]
 arm64 = macho()
 fat = struct.pack('>7I', 0xcafebabe, 1, module.ARM64, 0, 28, len(arm64), 0) + arm64
 assert module.load_commands(fat) == ([], [])
+
+# The libraries may all exist while their two-level symbol ABI is incompatible.
+def with_symbols(binary, entries):
+    names = b'\0'
+    records = b''
+    for name, kind, desc in entries:
+        records += struct.pack('<IBBHQ', len(names), kind, 1 if kind == 15 else 0, desc, 0)
+        names += name.encode() + b'\0'
+    count, size = struct.unpack_from('<II', binary, 16)
+    start = len(binary) + 24
+    header = bytearray(binary[:32])
+    struct.pack_into('<II', header, 16, count + 1, size + 24)
+    return bytes(header) + binary[32:] + struct.pack('<6I', 2, 24, start, len(entries), start + len(records), len(names)) + records + names
+
+def symbol_ipa(exported, weak=False):
+    data = io.BytesIO()
+    with zipfile.ZipFile(data, 'w') as z:
+        z.writestr('Payload/Xgent.app/Info.plist', plistlib.dumps({'CFBundleExecutable': 'Xgent'}))
+        z.writestr('Payload/Xgent.app/Xgent', macho([(12, '@rpath/dash.framework/dash')], ['@executable_path/Frameworks']))
+        dash = with_symbols(macho([(12, '@rpath/ios_system.framework/ios_system')]), [('_ios_storeInteractive', 1, 0x100 | (0x40 if weak else 0))])
+        core = with_symbols(macho(), [(name, 15, 0) for name in exported])
+        for name, binary in [('dash', dash), ('ios_system', core)]:
+            root = 'Payload/Xgent.app/Frameworks/' + name + '.framework/'
+            z.writestr(root + 'Info.plist', plistlib.dumps({'CFBundleExecutable': name}))
+            z.writestr(root + name, binary)
+    data.seek(0)
+    return data
+assert module.inspect_ipa(symbol_ipa(['_ios_storeInteractive'])) == 3
+assert module.inspect_ipa(symbol_ipa([], weak=True)) == 3
+try:
+    module.inspect_ipa(symbol_ipa(['_ios_stopInteractive']))
+    raise AssertionError('Incompatible ios_system ABI was accepted')
+except ValueError as error:
+    assert '_ios_storeInteractive' in str(error) and 'dash.framework' in str(error)
 print('device dependency graph cases passed')
 `, fileURLToPath(new URL("../../../../scripts/release/inspect-ios-dependencies.py", import.meta.url))], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr || result.error?.message);

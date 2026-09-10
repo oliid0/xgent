@@ -32,7 +32,29 @@ pub fn app_frontend_ready(
     window: tauri::WebviewWindow,
     ready_state: State<'_, Arc<FrontendReadyState>>,
 ) -> Result<(), String> {
-    ready_state.0.store(true, Ordering::SeqCst);
+    if !ready_state.0.swap(true, Ordering::SeqCst) {
+        use tauri::Manager;
+        use tauri_plugin_window_state::AppHandleExt;
+        let app = window.app_handle();
+        let saved = app.path().app_config_dir().ok()
+            .map(|path| path.join(app.filename()).is_file()).unwrap_or(false);
+        if !window.is_maximized().unwrap_or(false) {
+            if let Ok(Some(monitor)) = window.current_monitor() {
+                let scale = monitor.scale_factor();
+                let area = monitor.work_area();
+                let current = window.inner_size().map_err(|error| error.to_string())?;
+                let width = if saved { current.width as f64 / scale } else { 1600.0 };
+                let height = if saved { current.height as f64 / scale } else { 1000.0 };
+                let ratio = if saved { 1.0 } else { 0.85 };
+                let fitted = tauri::LogicalSize::new(
+                    width.min(area.size.width as f64 / scale * ratio),
+                    height.min(area.size.height as f64 / scale * ratio),
+                );
+                window.set_size(fitted).map_err(|error| error.to_string())?;
+                if !saved { let _ = window.center(); }
+            }
+        }
+    }
     if window.is_visible().unwrap_or(false) {
         return Ok(());
     }

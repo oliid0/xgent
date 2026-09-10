@@ -39,3 +39,12 @@ test("translation lookup falls back to the key for unknown entries", () => {
   assert.equal(i18n.t("app.name", "en-US"), "Xgent");
   assert.equal(i18n.t("missing.key", "en-US"), "missing.key");
 });
+
+test("translations do not contain encoding replacement characters or question-mark placeholders", () => {
+  for (const [locale, messages] of Object.entries(i18n.translations)) {
+    for (const [key, value] of Object.entries(messages)) {
+      assert.doesNotMatch(value, /\uFFFD|\?{2,}/, `${locale}:${key} contains damaged text`);
+    }
+  }
+  assert.equal(i18n.t("search.title", "zh-CN"), "搜索");
+});

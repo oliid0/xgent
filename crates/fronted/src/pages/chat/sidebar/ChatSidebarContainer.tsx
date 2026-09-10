@@ -1,18 +1,16 @@
+import { WorkspaceSearchPalette } from "../../../components/chat/WorkspaceSearchPalette";
+import type { SectionId } from "../../settings/types";
 // Container between the sidebar store and the GUI sidebar view. Owns every
 // rendering subscription to the store (so sidebar commits never re-render
 // ChatPage), the conversation-rename UI state, the delete flow, and the
 // error-code → i18n mapping for every frontend target.
 
 import { Button as AstryxButton } from "@astryxdesign/core/Button";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import { ChatHistorySidebar } from "../../../components/chat/ChatHistorySidebar";
 import type { WorkspaceToolTarget } from "../../../components/project-tools/workspaceToolsModel";
 import { useLocale } from "../../../i18n";
 import type { AppUpdateController } from "../../../lib/appUpdates";
-import {
-  type ChatHistorySearchMatch,
-  searchChatHistory,
-} from "../../../lib/chat/history/chatHistory";
 import { normalizeConversationTitle } from "../../../lib/chat/page/chatPageHelpers";
 import type { ExecutionMode, WorkspaceProject, WorkspaceProjectGroup } from "../../../lib/settings";
 import {
@@ -77,7 +75,9 @@ type ChatSidebarContainerProps = {
   onCloseSidebar: () => void;
   executionMode: ExecutionMode;
   onSelectExecutionMode: (mode: ExecutionMode) => void;
-  onOpenSettings: () => void;
+  onOpenSettings: (section?: SectionId) => void;
+  searchWorkdir?: string;
+  onOpenSearchFile: (path: string) => void;
   onCreateSoul: () => void;
   onOpenTrajectory?: () => void;
   trajectoryAvailable?: boolean;
@@ -117,37 +117,7 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<ChatHistorySearchMatch[]>([]);
-  const [searchStatus, setSearchStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
-
-  useEffect(() => {
-    const query = searchQuery.trim();
-    if (!query) {
-      setSearchResults([]);
-      setSearchStatus("idle");
-      return;
-    }
-    let active = true;
-    setSearchStatus("loading");
-    const timer = window.setTimeout(() => {
-      void searchChatHistory(query)
-        .then((matches) => {
-          if (!active) return;
-          setSearchResults(matches);
-          setSearchStatus("ready");
-        })
-        .catch(() => {
-          if (!active) return;
-          setSearchResults([]);
-          setSearchStatus("error");
-        });
-    }, 250);
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [searchQuery]);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const sortedProjects = useMemo(
     () =>
@@ -280,6 +250,17 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
             : "pointer-events-none fixed inset-0 z-40 bg-black/25 opacity-0 transition-opacity duration-200 md:hidden"
         }
       />
+      <WorkspaceSearchPalette
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        conversations={items}
+        workdir={props.searchWorkdir}
+        onSelectConversation={props.onSelectConversation}
+        onOpenFile={props.onOpenSearchFile}
+        onOpenSettings={props.onOpenSettings}
+        onNewConversation={props.onNewConversation}
+        onCreateProject={props.onCreateProject}
+      />
       <ChatHistorySidebar
         items={items}
         currentConversationId={props.currentConversationId}
@@ -293,10 +274,7 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         errorMessage={errorMessage}
         errorDetail={errorDetail}
         onDismissError={handleDismissError}
-        searchQuery={searchQuery}
-        searchResults={searchResults}
-        searchStatus={searchStatus}
-        onSearchQueryChange={setSearchQuery}
+        onOpenSearch={() => setSearchOpen(true)}
         renamingId={renamingId}
         renameDraft={renameDraft}
         isOpen={props.isOpen}

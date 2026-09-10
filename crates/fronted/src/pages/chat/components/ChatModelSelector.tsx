@@ -225,6 +225,7 @@ export const ChatModelSelector = memo(function ChatModelSelector(props: {
     <ComplexSelector<string>
       label={t("chat.selectModel")}
       isLabelHidden
+      className="xgent-model-selector"
       value={selectedValue}
       onChange={(value) => {
         const parsed = parseModelValue(value);
@@ -232,6 +233,13 @@ export const ChatModelSelector = memo(function ChatModelSelector(props: {
       }}
       triggerLabel={
         <span className="xgent-model-trigger" title={triggerLabel}>
+          <span className="xgent-model-icon" aria-hidden="true">
+            {selectedOption ? (
+              <ProviderBrandIcon type={selectedOption.providerType} />
+            ) : (
+              <Sparkle />
+            )}
+          </span>
           <span className="xgent-model-name">
             {selectedOption?.model || props.currentModelLabel || t("chat.model")}
           </span>
@@ -239,9 +247,6 @@ export const ChatModelSelector = memo(function ChatModelSelector(props: {
             <span className="xgent-model-reasoning">{selectedReasoningLabel}</span>
           ) : null}
         </span>
-      }
-      startIcon={
-        selectedOption ? <ProviderBrandIcon type={selectedOption.providerType} /> : <Sparkle />
       }
       isDisabled={props.isDisabled || !props.hasModels}
       variant="ghost"

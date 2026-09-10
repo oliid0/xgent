@@ -255,6 +255,9 @@ impl Desktop {
             return Ok(json!({"content":[{"type":"text","text":state.text}],"isError":false,"details":{"stateId":state.id.to_string()}}));
         }
         let window = resolve_window(query)?;
+        if operation == "_target_is_focused" {
+            return Ok(json!({"content":[{"type":"text","text":window.is_focused().map_err(fail)?.to_string()}],"isError":false}));
+        }
         if operation == "get_app_state" {
             if arguments["focus"].as_bool() == Some(true) { platform::focus(&window)?; }
             return self.snapshot(&window, query, "Current app state. Inspect before acting.");

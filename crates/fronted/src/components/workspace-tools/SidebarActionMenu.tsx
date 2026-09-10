@@ -9,7 +9,7 @@ import {
   Cpu,
   GitBranch,
   Key,
-  MessageSquare,
+  type MessageSquare,
   Plus,
   Settings,
   Sparkles,
@@ -24,6 +24,7 @@ type SidebarActionMenuProps = {
   onCreateSoul: () => void;
   onOpenTrajectory?: () => void;
   trajectoryAvailable?: boolean;
+  withinSidebar?: boolean;
 };
 
 export function SidebarActionMenu(props: SidebarActionMenuProps) {
@@ -118,8 +119,13 @@ export function SidebarActionMenu(props: SidebarActionMenuProps) {
       items={soulMenuItems}
       isMenuOpen={soulMenuOpen}
       onOpenChange={setSoulMenuOpen}
-      menuWidth="var(--xgent-soul-menu-width)"
-      placement="end"
+      menuWidth={
+        props.withinSidebar
+          ? "min(240px, var(--xgent-soul-menu-width))"
+          : "var(--xgent-soul-menu-width)"
+      }
+      placement={props.withinSidebar ? "above" : "end"}
+      style={props.withinSidebar ? { maxWidth: 240, overflowWrap: "anywhere" } : undefined}
       alignment="end"
       hasChevron={false}
     />

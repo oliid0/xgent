@@ -181,7 +181,12 @@ export const ImagePreviewPanel = memo(function ImagePreviewPanel(props: ImagePre
   );
 
   return (
-    <VStack height="100%" width="100%" style={{ minHeight: 0, minWidth: 0, overflow: "hidden" }}>
+    <VStack
+      className="xgent-image-preview"
+      height="100%"
+      width="100%"
+      style={{ minHeight: 0, minWidth: 0, overflow: "hidden" }}
+    >
       <Layout
         height="fill"
         defaultHasDividers
@@ -264,7 +269,7 @@ export const ImagePreviewPanel = memo(function ImagePreviewPanel(props: ImagePre
                 max={3}
                 step={0.1}
                 valueDisplay="text"
-                width="min(10rem, 35vw)"
+                width="min(10rem, 40cqw)"
                 formatValue={(value) => `${Math.round(value * 100)}%`}
                 onChange={(value: number) => setZoom(value)}
               />

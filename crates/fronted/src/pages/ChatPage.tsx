@@ -5968,10 +5968,25 @@ export function ChatPage(props: ChatPageProps) {
     ],
   );
 
+  const taskProgressContent =
+    historyRenderItems.length > 0 || isSending || conversationState.meta.taskList?.tasks.length ? (
+      <CurrentTaskProgress
+        historyItems={historyRenderItems}
+        liveTranscriptStore={liveTranscriptStore}
+        isConversationRunning={
+          isSending ||
+          (currentConversationId ? isConversationRunning(currentConversationId) : false)
+        }
+        onOpenActivity={handleOpenMobileActivity}
+        persistedState={conversationState.meta.taskList}
+      />
+    ) : undefined;
+
   const renderChatComposer = () => (
     <ChatComposerBar
       activityContent={
         <MobileToolActivity
+          historyItems={historyRenderItems}
           key={currentConversationId ?? "new"}
           conversationId={currentConversationId ?? ""}
           mobileExperience={mobileExperience}
@@ -5979,22 +5994,7 @@ export function ChatPage(props: ChatPageProps) {
           open={mobileActivityOpen}
           onOpen={handleOpenMobileActivity}
           onOpenBrowser={handleOpenBrowser}
-          progressContent={
-            historyRenderItems.length > 0 ||
-            isSending ||
-            conversationState.meta.taskList?.tasks.length ? (
-              <CurrentTaskProgress
-                historyItems={historyRenderItems}
-                liveTranscriptStore={liveTranscriptStore}
-                isConversationRunning={
-                  isSending ||
-                  (currentConversationId ? isConversationRunning(currentConversationId) : false)
-                }
-                onOpenActivity={handleOpenMobileActivity}
-                persistedState={conversationState.meta.taskList}
-              />
-            ) : undefined
-          }
+          progressContent={taskProgressContent}
           onClose={handleCloseMobileActivity}
         />
       }
@@ -6290,9 +6290,11 @@ export function ChatPage(props: ChatPageProps) {
               : updateSystem(previous, { executionMode: mode }),
           )
         }
-        onOpenSettings={() => {
+        searchWorkdir={displayedConversationWorkdir || terminalProjectPath}
+        onOpenSearchFile={handleOpenWorkspaceFile}
+        onOpenSettings={(section) => {
           if (mobileExperience) setSidebarOpen(false);
-          onOpenSettings();
+          onOpenSettings(section);
         }}
         onCreateSoul={() => {
           if (mobileExperience) setSidebarOpen(false);
@@ -6785,7 +6787,9 @@ export function ChatPage(props: ChatPageProps) {
               {rightBrowserError ? <Banner status="error" title={rightBrowserError} /> : null}
               {desktopAuxiliaryOpen && resolvedRightSidebarActiveTabId === "activity" ? (
                 <MobileToolActivity
+                  historyItems={historyRenderItems}
                   view="panel"
+                  progressContent={taskProgressContent}
                   conversationId={currentConversationId ?? ""}
                   store={liveTranscriptStore}
                   open
@@ -6905,7 +6909,9 @@ export function ChatPage(props: ChatPageProps) {
 
       {mobileExperience ? (
         <MobileToolActivity
+          historyItems={historyRenderItems}
           view="panel"
+          progressContent={taskProgressContent}
           mobileExperience
           conversationId={currentConversationId ?? ""}
           store={liveTranscriptStore}

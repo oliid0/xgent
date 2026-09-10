@@ -391,6 +391,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   } = props;
   const { t } = useLocale();
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const [narrowComposer, setNarrowComposer] = useState(false);
   const queuePanelRef = useRef<HTMLDivElement | null>(null);
   const queueHadTurnsRef = useRef(false);
   const [composerIsEmpty, setComposerIsEmpty] = useState(true);
@@ -698,16 +699,17 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
 
   useEffect(() => {
     const root = rootRef.current;
-    if (!root || !onHeightChange) return;
+    if (!root) return;
 
     let animationFrame: number | null = null;
     const measure = () => {
       animationFrame = null;
 
+      setNarrowComposer(root.getBoundingClientRect().width < 460);
       if (isComposerExpandedRef.current || expandAnimationRef.current) return;
       const rootHeight = root.getBoundingClientRect().height;
       const queueHeight = queuePanelRef.current?.getBoundingClientRect().height ?? 0;
-      onHeightChange(Math.ceil(Math.max(0, rootHeight - queueHeight)));
+      onHeightChange?.(Math.ceil(Math.max(0, rootHeight - queueHeight)));
     };
     const scheduleMeasure = () => {
       if (animationFrame !== null) return;
@@ -730,7 +732,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
       }
       resizeObserver?.disconnect();
       window.removeEventListener("resize", scheduleMeasure);
-      onHeightChange(0);
+      onHeightChange?.(0);
     };
   }, [onHeightChange]);
 
@@ -1029,7 +1031,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 </Popover>
               )}
 
-              {mobileExperience ? (
+              {mobileExperience || narrowComposer ? (
                 <DropdownMenu
                   button={{
                     label: t(`settings.commandSafety.${commandSafetyMode}`),

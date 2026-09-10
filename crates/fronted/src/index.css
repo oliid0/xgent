@@ -3956,6 +3956,8 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 .xgent-composer-model-controls > .astryx-field {
   min-width: 0;
   max-width: 100%;
+  flex: 1 1 12rem;
+  container: model-control / inline-size;
 }
 .xgent-composer-model-controls .astryx-complex-selector {
   min-width: 0;
@@ -3972,6 +3974,39 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
+}
+.xgent-model-icon {
+  display: inline-flex;
+  flex: 0 0 16px;
+}
+.xgent-model-icon svg {
+  width: 16px;
+  height: 16px;
+}
+@container model-control (max-width: 14rem) {
+  .xgent-model-reasoning {
+    display: none;
+  }
+}
+@container model-control (max-width: 7em) {
+  .xgent-model-name {
+    display: none;
+  }
+  .xgent-model-selector > .astryx-icon:last-child {
+    display: none;
+  }
+}
+.xgent-chat-composer div:has(> div > .xgent-composer-execution-controls) {
+  min-width: 0;
+  gap: var(--spacing-1);
+}
+.xgent-chat-composer div:has(> .xgent-composer-model-controls) {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: flex-end;
+}
+.xgent-composer-model-controls .astryx-complex-selector {
+  width: 100%;
 }
 .xgent-model-name {
   overflow: hidden;
@@ -4037,10 +4072,26 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 .settings-page [data-settings-section] {
   min-width: 0;
+  container: settings-detail / inline-size;
+  overflow-wrap: anywhere;
 }
 .settings-page [data-settings-section] .astryx-section {
   min-width: 0;
   max-width: 100%;
+}
+@container settings-detail (max-width: 480px) {
+  .astryx-section {
+    padding: var(--spacing-3);
+  }
+  .astryx-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-tool-permissions-category-header {
+    flex-wrap: wrap;
+  }
+  .settings-tool-permissions .astryx-list-item {
+    flex-wrap: wrap;
+  }
 }
 .settings-page [data-settings-section] .astryx-field {
   min-width: 0;
@@ -4065,5 +4116,21 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 @media (prefers-reduced-motion: reduce) {
   .workspace-navigation-rail-shell {
     transition: none;
+  }
+}
+
+.xgent-image-preview {
+  container: image-preview / inline-size;
+}
+.xgent-image-preview .astryx-layout-footer {
+  flex-shrink: 0;
+}
+@container image-preview (max-width: 360px) {
+  .astryx-button-group {
+    flex-wrap: wrap;
+  }
+  .astryx-layout-header,
+  .astryx-layout-footer {
+    padding: var(--spacing-2);
   }
 }

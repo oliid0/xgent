@@ -12,6 +12,17 @@ export const SUPPORTED_LOCALES = ["system", "zh-CN", "en-US"] as const satisfies
 
 export const translations: Record<ResolvedLocale, Record<string, string>> = {
   "zh-CN": {
+    "search.title": "搜索",
+    "search.placeholder": "搜索聊天、文件和设置…",
+    "search.settings": "设置",
+    "search.actions": "操作",
+    "search.openFolder": "打开文件夹",
+    "search.chats": "聊天",
+    "search.files": "当前工作区的文件",
+    "search.errors": "搜索未完成",
+    "search.retry": "修改关键词以重试",
+    "search.filesFailed": "文件搜索失败",
+
     "settings.ui.title": "界面自定义",
     "settings.ui.preset": "主题预设",
     "settings.ui.current": "当前主题",
@@ -2792,6 +2803,17 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
   },
 
   "en-US": {
+    "search.title": "Search",
+    "search.placeholder": "Search chats, files and settings…",
+    "search.settings": "Settings",
+    "search.actions": "Actions",
+    "search.openFolder": "Open folder",
+    "search.chats": "Chats",
+    "search.files": "Files in current workspace",
+    "search.errors": "Search incomplete",
+    "search.retry": "Change the query to retry",
+    "search.filesFailed": "File search failed",
+
     "settings.ui.title": "Customize interface",
     "settings.ui.preset": "Theme preset",
     "settings.ui.current": "Current theme",

@@ -51,6 +51,10 @@ public final class ComputerUseToolDispatcher {
         service.observationMode = arguments["observation"] as? String ?? "auto"
         service.maxImageSize = CGFloat(arguments["max_image_size"] as? Double ?? 1280)
         if name == "get_cached_state" { return try service.cachedState(app: requireString("app", in: arguments)) }
+        if name == "_target_is_focused" {
+            let app = try AppDiscovery.resolve(requireString("app", in: arguments), allowLaunch: false)
+            return ToolCallResult(content: [.text(app.runningApplication.isActive ? "true" : "false")])
+        }
         if name != "list_apps" && name != "get_app_state" && name != "launch_app" {
             if let fresh = try service.validateActionState(
                 app: requireString("app", in: arguments),

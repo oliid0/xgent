@@ -11,6 +11,47 @@ pub mod component;
 
 const OPERATIONS: &[&str] = &["list_apps", "launch_app", "get_app_state", "click", "perform_secondary_action", "scroll", "drag", "type_text", "press_key", "set_value", "sequence", "input"];
 
+// TOPMOST changes Z order without taking the target's keyboard focus. Limit
+// this to keyboard/semantic work: an overlay would intercept physical clicks.
+struct VisibleHost {
+    window: tauri::Window,
+    was_topmost: bool,
+    restore_focus: bool,
+    target: String,
+}
+
+impl VisibleHost {
+    fn begin(app: &tauri::AppHandle, operation: &str, arguments: &Value) -> Result<Option<Self>, String> {
+        if !["type_text", "press_key", "set_value"].contains(&operation)
+            || arguments["keep_xgent_visible"].as_bool() == Some(false) {
+            return Ok(None);
+        }
+        let target = arguments["app"].as_str().filter(|value| !value.is_empty());
+        let (Some(window), Some(target)) = (app.get_window(crate::MAIN_WINDOW_LABEL), target) else { return Ok(None); };
+        if !window.is_visible().unwrap_or(false) || window.is_minimized().unwrap_or(true) { return Ok(None); }
+        let guard = Self {
+            was_topmost: window.is_always_on_top().map_err(|error| error.to_string())?,
+            restore_focus: window.is_focused().unwrap_or(false),
+            window,
+            target: target.to_string(),
+        };
+        guard.window.set_always_on_top(true).map_err(|error| error.to_string())?;
+        Ok(Some(guard))
+    }
+}
+
+impl Drop for VisibleHost {
+    fn drop(&mut self) {
+        // A user who switched to a third app during execution owns that focus.
+        if self.restore_focus {
+            let target_focused = component::call("_target_is_focused", &json!({"app": self.target}), &|| false)
+                .is_ok_and(|response| !response.is_error && response.content.iter().any(|item| item["text"].as_str() == Some("true")));
+            if target_focused { let _ = self.window.set_focus(); }
+        }
+        let _ = self.window.set_always_on_top(self.was_topmost);
+    }
+}
+
 #[tauri::command(rename_all = "snake_case")]
 pub async fn cua_preview(app: tauri::AppHandle, target: String, max_image_size: Option<u32>) -> Result<CuaResponse,String> {
     let arguments=json!({"app":target,"max_image_size":max_image_size.unwrap_or(768).clamp(320,1280)});
@@ -127,7 +168,7 @@ fn validate(operation: &str, input: &Value) -> Result<(), String> {
 
 
 #[tauri::command(rename_all = "snake_case")]
-pub async fn cua_call(app: tauri::AppHandle, operation: String, arguments: Value, run_id: String) -> Result<CuaResponse, String> {
+pub async fn cua_call(app: tauri::AppHandle, operation: String, mut arguments: Value, run_id: String) -> Result<CuaResponse, String> {
     if let Err(error)=validate(&operation,&arguments) { return Ok(CuaResponse::error(error)); }
     let registry=app.state::<Arc<ShellRunRegistry>>().inner().clone();
     let token=registry.register(&run_id);
@@ -139,6 +180,12 @@ pub async fn cua_call(app: tauri::AppHandle, operation: String, arguments: Value
         if run_token.is_cancelled() { return Err("Cancelled".into()); }
         component::ensure_available(&app)?;
         if run_token.is_cancelled() { return Err("Cancelled".into()); }
+        let _visible_host = VisibleHost::begin(&app, &operation, &arguments)?;
+        if _visible_host.is_some() {
+            // The overlay can cover screen pixels. Verify keyboard edits via
+            // the target's accessibility data, never an occluded screenshot.
+            arguments["observation"] = json!("text");
+        }
         if operation != "sequence" { return component::call(&operation,&arguments,&||run_token.is_cancelled()); }
         let mut current = component::call("get_cached_state",&arguments,&||run_token.is_cancelled())?;
         let state_id = |response:&CuaResponse| -> Option<String> {

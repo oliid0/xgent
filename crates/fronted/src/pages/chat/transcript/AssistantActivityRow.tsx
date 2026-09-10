@@ -98,26 +98,26 @@ export const AssistantActivityRow = memo(function AssistantActivityRow(props: {
         ) : null}
       </VStack>
     ));
-  const active = [...work]
-    .reverse()
-    .find(({ unit }) => unit.kind === "block" && unit.hasRunningToolCall);
+  const liveUnits = row.units.filter(
+    ({ unit }) => showThinking || unit.kind !== "block" || unit.block.kind !== "thinking",
+  );
   return (
     <VStack
       data-live-activity={row.live ? "true" : undefined}
       gap={2}
       className="min-w-0 w-full max-w-full"
     >
-      {work.length ? (
+      {row.live ? (
+        renderUnits(liveUnits)
+      ) : work.length ? (
         <Collapsible
           isOpen={expanded}
           onOpenChange={setExpanded}
           trigger={
             <Text type="supporting" color="secondary">
-              {row.live
-                ? t("chat.mobileActivity.working")
-                : duration
-                  ? t("chat.activity.worked").replace("{duration}", duration)
-                  : t("chat.activity.tools")}
+              {duration
+                ? t("chat.activity.worked").replace("{duration}", duration)
+                : t("chat.activity.tools")}
             </Text>
           }
         >
@@ -126,8 +126,7 @@ export const AssistantActivityRow = memo(function AssistantActivityRow(props: {
           </VStack>
         </Collapsible>
       ) : null}
-      {!expanded && row.live && active ? renderUnits([active], true) : null}
-      {renderUnits(answer)}
+      {!row.live ? renderUnits(answer) : null}
     </VStack>
   );
 });

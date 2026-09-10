@@ -2,6 +2,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { ButtonGroup } from "@astryxdesign/core/ButtonGroup";
 import { Code } from "@astryxdesign/core/CodeBlock";
 import { Grid } from "@astryxdesign/core/Grid";
+import { Icon } from "@astryxdesign/core/Icon";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Section } from "@astryxdesign/core/Section";
@@ -48,8 +49,8 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
     <VStack gap={5} width="100%" className="settings-tool-permissions">
       <Section padding={4} width="100%">
         <VStack gap={3} width="100%">
-          <HStack gap={3} vAlign="start">
-            <Shield />
+          <HStack gap={3} vAlign="start" wrap="wrap">
+            <Icon icon={Shield} size="md" />
             <StackItem size="fill">
               <VStack gap={1}>
                 <Heading level={2}>{t("settings.toolPermissionsTitle")}</Heading>
@@ -68,14 +69,14 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
               />
             ) : null}
           </HStack>
-          <Grid columns={3} gap={2} width="100%">
-            <Text type="supporting" color="secondary" justify="center">
+          <Grid columns={{ minWidth: 140, max: 3, repeat: "fit" }} gap={2} width="100%">
+            <Text type="supporting" color="secondary">
               {t("settings.toolPolicyAllowDesc")}
             </Text>
-            <Text type="supporting" color="secondary" justify="center">
+            <Text type="supporting" color="secondary">
               {t("settings.toolPolicyAskDesc")}
             </Text>
-            <Text type="supporting" color="secondary" justify="center">
+            <Text type="supporting" color="secondary">
               {t("settings.toolPolicyDenyDesc")}
             </Text>
           </Grid>

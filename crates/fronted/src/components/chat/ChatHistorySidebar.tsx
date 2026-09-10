@@ -90,17 +90,7 @@ type ChatHistorySidebarProps = {
   errorMessage: string | null;
   errorDetail?: string | null;
   onDismissError?: () => void;
-  searchQuery: string;
-  searchResults: readonly {
-    conversationId: string;
-    title: string;
-    cwd?: string;
-    snippet: string;
-    role?: string;
-    updatedAt: number;
-  }[];
-  searchStatus: "idle" | "loading" | "ready" | "error";
-  onSearchQueryChange: (query: string) => void;
+  onOpenSearch: () => void;
   renamingId: string | null;
   renameDraft: string;
   isOpen: boolean;
@@ -1213,10 +1203,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     errorMessage,
     errorDetail,
     onDismissError,
-    searchQuery,
-    searchResults,
-    searchStatus,
-    onSearchQueryChange,
+    onOpenSearch,
     renamingId,
     renameDraft,
     isOpen,
@@ -1302,7 +1289,6 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   const [batchMutationRunning, setBatchMutationRunning] = useState(false);
   const [pendingProjectRemoveId, setPendingProjectRemoveId] = useState<string | null>(null);
   const [showAllProjects, setShowAllProjects] = useState(false);
-  const [historySearchOpen, setHistorySearchOpen] = useState(false);
   const [creatingWorkspaceGroup, setCreatingWorkspaceGroup] = useState(false);
   const [workspaceGroupDraft, setWorkspaceGroupDraft] = useState("");
   const [renamingWorkspaceGroupId, setRenamingWorkspaceGroupId] = useState<string | null>(null);
@@ -1368,8 +1354,6 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   });
   const enterConversationSelection = useStableEvent((conversationId: string) => {
     setBatchDeleteConfirm(false);
-    setHistorySearchOpen(false);
-    onSearchQueryChange("");
     onRecentCollapsedChange?.(false);
     setSelectedConversationIds(new Set([conversationId]));
   });
@@ -1910,21 +1894,10 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
         <IconButton
           label={t("chat.history.search")}
           tooltip={t("chat.history.search")}
-          icon={
-            searchStatus === "loading" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Search className="h-4 w-4" />
-            )
-          }
+          icon={<Search className="h-4 w-4" />}
           variant="ghost"
           size="sm"
-          onClick={() => {
-            setHistorySearchOpen((open) => {
-              if (open) onSearchQueryChange("");
-              return !open;
-            });
-          }}
+          onClick={onOpenSearch}
         />
         {!mobileExperience ? (
           <IconButton
@@ -1948,21 +1921,10 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
       <IconButton
         label={t("chat.history.search")}
         tooltip={t("chat.history.search")}
-        icon={
-          searchStatus === "loading" ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Search className="h-4 w-4" />
-          )
-        }
+        icon={<Search className="h-4 w-4" />}
         variant="secondary"
         size="lg"
-        onClick={() => {
-          setHistorySearchOpen((open) => {
-            if (open) onSearchQueryChange("");
-            return !open;
-          });
-        }}
+        onClick={onOpenSearch}
       />
     </AstryxStack>
   );
@@ -2577,41 +2539,6 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
             </AstryxGrid>
 
             <AstryxStack direction="vertical" className="flex min-h-0 flex-col">
-              {historySearchOpen ? (
-                <AstryxStack direction="vertical" className="shrink-0 px-2 pb-2">
-                  <AstryxStack direction="vertical" className="relative">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      label={t("chat.history.search")}
-                      isLabelHidden
-                      hasAutoFocus
-                      value={searchQuery}
-                      onChange={(nextValue) => onSearchQueryChange(nextValue)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Escape") {
-                          onSearchQueryChange("");
-                          setHistorySearchOpen(false);
-                        }
-                      }}
-                      placeholder={t("chat.history.searchPlaceholder")}
-                      aria-label={t("chat.history.search")}
-                      className="h-8 pl-8 pr-8 text-xs"
-                    />
-                    {searchQuery ? (
-                      <AstryxButton
-                        variant="ghost"
-                        label={t("chat.history.searchClear")}
-                        type="button"
-                        onClick={() => onSearchQueryChange("")}
-                        className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                        aria-label={t("chat.history.searchClear")}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </AstryxButton>
-                    ) : null}
-                  </AstryxStack>
-                </AstryxStack>
-              ) : null}
               {errorMessage ? (
                 <AstryxStack direction="vertical" className="shrink-0 px-2 pb-2">
                   <SidebarStateCard
@@ -2634,72 +2561,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   error. The error banner above never replaces the rows. The
                   scope-keyed wrapper replays a soft enter transition when the
                   workspace scope changes. */}
-                {searchQuery.trim() ? (
-                  <AstryxStack direction="vertical" className="space-y-1 pt-1">
-                    {searchStatus === "loading" ? (
-                      <AstryxStack
-                        direction="horizontal"
-                        className="flex items-center gap-2 px-2 py-4 text-xs text-muted-foreground"
-                      >
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        {t("chat.history.searching")}
-                      </AstryxStack>
-                    ) : searchStatus === "error" ? (
-                      <AstryxText
-                        as="p"
-                        type="inherit"
-                        display="block"
-                        className="px-2 py-4 text-xs text-destructive"
-                      >
-                        {t("chat.history.searchFailed")}
-                      </AstryxText>
-                    ) : searchStatus === "ready" && searchResults.length === 0 ? (
-                      <AstryxText
-                        as="p"
-                        type="inherit"
-                        display="block"
-                        className="px-2 py-4 text-center text-xs text-muted-foreground"
-                      >
-                        {t("chat.history.searchEmpty")}
-                      </AstryxText>
-                    ) : (
-                      searchResults.map((result, index) => (
-                        <AstryxButton
-                          variant="ghost"
-                          label={result.snippet.replaceAll("[", "").replaceAll("]", "")}
-                          key={`${result.conversationId}:${result.updatedAt}:${index}`}
-                          type="button"
-                          onClick={() => onSelectConversation(result.conversationId)}
-                          className="w-full rounded-lg px-2 py-2 text-left transition-colors hover:bg-foreground/[0.05] focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          <AstryxText
-                            as="span"
-                            type="inherit"
-                            className="block truncate text-xs font-medium text-foreground/90"
-                          >
-                            {result.title || t("tray.untitledConversation")}
-                          </AstryxText>
-                          <AstryxText
-                            as="span"
-                            type="inherit"
-                            className="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-muted-foreground"
-                          >
-                            {result.snippet.replaceAll("[", "").replaceAll("]", "")}
-                          </AstryxText>
-                          {result.cwd ? (
-                            <AstryxText
-                              as="span"
-                              type="inherit"
-                              className="mt-0.5 block truncate text-[10px] text-muted-foreground/65"
-                            >
-                              {result.cwd}
-                            </AstryxText>
-                          ) : null}
-                        </AstryxButton>
-                      ))
-                    )}
-                  </AstryxStack>
-                ) : isListLoading && items.length === 0 ? (
+                {isListLoading && items.length === 0 ? (
                   <HistoryListLoadingSkeleton />
                 ) : (
                   <AstryxStack
@@ -2777,7 +2639,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     )}
                   </AstryxStack>
                 )}
-                {!searchQuery.trim() && items.length > 0 && (hasMore || isLoadingMore) ? (
+                {items.length > 0 && (hasMore || isLoadingMore) ? (
                   <AstryxStack
                     direction="vertical"
                     className="px-2 pb-2 pt-1 text-center text-[calc(11px*var(--zone-font-scale,1))] leading-5 text-muted-foreground/70"
@@ -2809,16 +2671,23 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   </AstryxText>
                 </Button>
               ) : (
-                <SidebarActionMenu
-                  workspaceToolsAvailable={workspaceToolsAvailable && !!onOpenWorkspaceTool}
-                  onSelect={(target, shell) => onOpenWorkspaceTool?.(target, shell)}
-                  onOpenSettings={onOpenSettings}
-                  onCreateSoul={onCreateSoul}
-                  onOpenTrajectory={onOpenTrajectory}
-                  trajectoryAvailable={trajectoryAvailable}
-                />
+                <AstryxText type="label">
+                  {soul.presets.find((preset) => preset.id === soul.activeId)?.metadata.name ||
+                    "XGent"}
+                </AstryxText>
               )}
               <AstryxStack direction="horizontal" gap={1} vAlign="center">
+                {!mobileExperience ? (
+                  <SidebarActionMenu
+                    withinSidebar
+                    workspaceToolsAvailable={workspaceToolsAvailable && !!onOpenWorkspaceTool}
+                    onSelect={(target, shell) => onOpenWorkspaceTool?.(target, shell)}
+                    onOpenSettings={onOpenSettings}
+                    onCreateSoul={onCreateSoul}
+                    onOpenTrajectory={onOpenTrajectory}
+                    trajectoryAvailable={trajectoryAvailable}
+                  />
+                ) : null}
                 {mobileExperience ? (
                   <Button
                     label={t("tooltip.settings")}

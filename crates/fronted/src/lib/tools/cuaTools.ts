@@ -89,6 +89,11 @@ const cuaTool: Tool = {
         description:
           "Set false to reject input requiring activation. Semantic actions can run in the background.",
       },
+      keep_xgent_visible: {
+        type: "boolean",
+        description:
+          "Desktop native targets (Windows, Linux, macOS): keep Xgent above the target during text/key/semantic value actions, then restore its previous stacking and focus if the user did not switch apps. Default true. Uses text observations while covered. Physical pointer actions still need an unobscured target; this is not an isolated desktop.",
+      },
       keys: {
         type: "array",
         maxItems: 8,

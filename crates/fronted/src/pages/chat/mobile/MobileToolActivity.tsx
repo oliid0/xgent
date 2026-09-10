@@ -12,6 +12,8 @@ import { ImagePreviewPanel } from "../../../components/chat/ImagePreview";
 import { ArrowLeft, Globe, MonitorSmartphone, Terminal, Wrench } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import { browserSessionController } from "../../../lib/browser/browserSessionController";
+import { collectActivityItems } from "../../../lib/chat/activityTimeline";
+import type { RenderTimelineItem } from "../../../lib/chat/conversation/conversationState";
 import type {
   LiveTranscriptState,
   LiveTranscriptStore,
@@ -23,11 +25,7 @@ import {
   type ShellActivityResponse,
 } from "../../../lib/chat/executionActivityStore";
 import { imageActivitySelection } from "../../../lib/chat/imageActivityNavigation";
-import {
-  summarizeToolCall,
-  type ToolTraceItem,
-  toolResultMessageToText,
-} from "../../../lib/chat/messages/uiMessages";
+import { summarizeToolCall, toolResultMessageToText } from "../../../lib/chat/messages/uiMessages";
 import { toolActivitySelection, toolStepLabel } from "../../../lib/chat/toolActivityNavigation";
 import { ToolCallDetail } from "../components/assistant-bubble/ToolCallItem";
 import { ActivityTerminal } from "./ActivityTerminal";
@@ -36,17 +34,13 @@ type MobileToolActivityProps = {
   conversationId: string;
   mobileExperience?: boolean;
   store: LiveTranscriptStore;
+  historyItems: readonly RenderTimelineItem[];
   open: boolean;
   onOpen: () => void;
   onOpenBrowser?: () => void;
   onClose: () => void;
   view?: "capsule" | "panel";
   progressContent?: ReactNode;
-};
-
-type ActivityItem = ToolTraceItem & {
-  running: boolean;
-  round: number;
 };
 
 function subscribeNoop() {
@@ -60,22 +54,6 @@ const EMPTY_TRANSCRIPT: LiveTranscriptState = {
   retryAttempts: [],
   isSettled: true,
 };
-
-function collectActivityItems(snapshot: LiveTranscriptState): ActivityItem[] {
-  const items: ActivityItem[] = [];
-  for (const round of snapshot.liveRounds) {
-    const runningIds = new Set(round.runningToolCallIds);
-    for (const block of round.blocks) {
-      if (block.kind !== "tool") continue;
-      items.push({
-        ...block.item,
-        running: runningIds.has(block.item.toolCall.id),
-        round: round.round,
-      });
-    }
-  }
-  return items;
-}
 
 function activityKind(name: string): "shell" | "browser" | "cua" | "tool" {
   const normalized = name.toLowerCase();
@@ -102,6 +80,7 @@ export function MobileToolActivity({
   conversationId,
   mobileExperience = false,
   store,
+  historyItems,
   open,
   onOpen,
   onOpenBrowser,
@@ -141,18 +120,15 @@ export function MobileToolActivity({
   const frameIndex = selectedFrameId
     ? frames.findIndex((frame) => frame.id === selectedFrameId)
     : -1;
-  const selectedFrame =
-    frameIndex >= 0
-      ? frames[frameIndex]
-      : selection
-        ? [...frames].reverse().find((frame) => frame.toolCallId === selection.toolCall.id)
-        : frames.at(-1);
   const snapshot = useSyncExternalStore(
     store?.subscribe ?? subscribeNoop,
     store?.getSnapshot ?? (() => EMPTY_TRANSCRIPT),
     () => EMPTY_TRANSCRIPT,
   );
-  const items = useMemo(() => collectActivityItems(snapshot), [snapshot]);
+  const items = useMemo(
+    () => collectActivityItems(historyItems, snapshot),
+    [historyItems, snapshot],
+  );
   useEffect(() => {
     const current = selection && items.find((item) => item.toolCall.id === selection.toolCall.id);
     if (current && current.toolResult !== selection?.toolResult)
@@ -174,10 +150,39 @@ export function MobileToolActivity({
   const activeItem = [...items].reverse().find((item) => item.running) ?? null;
   const hasActiveItem = Boolean(activeItem);
   const latestItem = items.at(-1) ?? null;
-  const capsuleItem = activeItem;
-  const selectedItem = selection
-    ? (items.find((item) => item.toolCall.id === selection.toolCall.id) ?? selection)
-    : (activeItem ?? latestItem);
+  const capsuleItem = activeItem ?? latestItem;
+  const selectedItem = selectedFrameId
+    ? null
+    : selection
+      ? (items.find((item) => item.toolCall.id === selection.toolCall.id) ?? selection)
+      : (activeItem ?? latestItem);
+  const recordedFrame =
+    frameIndex >= 0
+      ? frames[frameIndex]
+      : !selection && activeItem
+        ? [...frames]
+            .reverse()
+            .find(
+              (frame) =>
+                frame.toolCallId === activeItem.toolCall.id ||
+                (frame.kind === "cua" && frame.id.startsWith("monitor:")),
+            )
+        : selectedItem
+          ? [...frames].reverse().find((frame) => frame.toolCallId === selectedItem.toolCall.id)
+          : frames.at(-1);
+  const selectedFrame =
+    recordedFrame ??
+    (selectedItem?.toolResult
+      ? {
+          id: selectedItem.toolCall.id,
+          kind: activityKind(selectedItem.toolCall.name),
+          title: selectedItem.toolCall.name,
+          app: undefined,
+          previewError: undefined,
+          updatedAt: selectedItem.toolResult.timestamp,
+          ...activityObservation(selectedItem.toolResult.content),
+        }
+      : undefined);
   const selectedRunning = selectedItem
     ? items.some((item) => item.toolCall.id === selectedItem.toolCall.id && item.running)
     : false;
@@ -351,7 +356,9 @@ export function MobileToolActivity({
 
   return (
     <>
-      {view === "capsule" && (progressContent || capsuleItem || status || frames.length > 0) ? (
+      {view === "capsule" &&
+      !open &&
+      (progressContent || capsuleItem || status || frames.length > 0) ? (
         <HStack hAlign="start" width="100%" paddingInline={5} className="xgent-activity-strip">
           <Button
             label={capsuleTitle}
@@ -456,6 +463,7 @@ export function MobileToolActivity({
                     ? toolStepLabel(selectedItem, selectedItem.toolCall.name).slice(0, 100)
                     : (capsuleDetail || capsuleTitle).slice(0, 100)}
               </Text>
+              {progressContent}
             </VStack>
           </HStack>
           <VStack gap={4} padding={3} className="xgent-activity-content">
@@ -482,7 +490,7 @@ export function MobileToolActivity({
                     {t("chat.mobileActivity.awaitingResult")}
                   </Text>
                 ) : null}
-                {!selectedItem ? (
+                {frames.length > 1 && items.length === 0 ? (
                   <HStack gap={2} width="100%" vAlign="center">
                     <input
                       type="range"
@@ -565,6 +573,11 @@ export function MobileToolActivity({
                     items.findIndex((item) => item.toolCall.id === selectedItem?.toolCall.id),
                   )}
                   aria-label={t("chat.mobileActivity.recent")}
+                  aria-valuetext={
+                    selectedItem
+                      ? toolStepLabel(selectedItem, selectedItem.toolCall.name)
+                      : undefined
+                  }
                   onChange={(event) => {
                     setSelectedFrameId(null);
                     toolActivitySelection.select(

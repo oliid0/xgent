@@ -22,9 +22,16 @@ composer=""
 for attempt in $(seq 1 12); do
   adb shell uiautomator dump /sdcard/xgent-ui.xml >/dev/null 2>&1 || true
   adb pull /sdcard/xgent-ui.xml "$RUNNER_TEMP/xgent-android-ui.xml" >/dev/null 2>&1 || true
-  # Dismiss only the known launcher failure; an Xgent ANR must fail this test.
+  # These emulator setup/launcher ANRs obscure a healthy app. Never dismiss
+  # an Xgent ANR: it must still fail the usability check below.
   if grep -F "Pixel Launcher isn't responding" "$RUNNER_TEMP/xgent-android-ui.xml" >/dev/null; then
     adb shell am force-stop com.google.android.apps.nexuslauncher
+    adb shell am start -W -n com.ohi.xgent/.MainActivity
+    sleep 2
+    continue
+  fi
+  if grep -F "com.google.android.googlesdksetup isn't responding" "$RUNNER_TEMP/xgent-android-ui.xml" >/dev/null; then
+    adb shell am force-stop com.google.android.googlesdksetup
     adb shell am start -W -n com.ohi.xgent/.MainActivity
     sleep 2
     continue

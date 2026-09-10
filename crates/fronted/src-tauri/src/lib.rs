@@ -844,9 +844,8 @@ pub fn run() {
                 return;
             }
             let app = webview.app_handle();
-            if let Some(ready_state) = app.try_state::<Arc<commands::app::FrontendReadyState>>() {
-                ready_state.0.store(false, Ordering::SeqCst);
-            }
+            // Fit the native window once per process. Reloading the WebView
+            // must preserve a size the user has already chosen.
             if let Some(window) = app.get_window(MAIN_WINDOW_LABEL) {
                 if window.is_visible().unwrap_or(false) {
                     let _ = window.hide();
@@ -931,6 +930,12 @@ pub fn run() {
 
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
+                    // Closing normally hides to tray, so the plugin's exit
+                    // hook may never run before the OS ends the process.
+                    use tauri_plugin_window_state::AppHandleExt;
+                    if let Err(error) = window.app_handle().save_window_state(WINDOW_STATE_FLAGS) {
+                        eprintln!("failed to save window size before close: {error}");
+                    }
                     if commands::app::is_close_window_exit(&close_window_behavior) {
                         request_app_exit(window.app_handle(), &allow_exit, &terminal_registry);
                     } else if let Err(error) = window.hide() {

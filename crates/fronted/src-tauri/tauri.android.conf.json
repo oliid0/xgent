@@ -9,6 +9,7 @@
         "minWidth": 320,
         "minHeight": 568,
         "visible": true,
+        "backgroundColor": "#f7f7f5",
         "backgroundThrottling": "disabled"
       }
     ]

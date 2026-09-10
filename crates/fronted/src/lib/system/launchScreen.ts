@@ -17,7 +17,6 @@ function revealWindow() {
 }
 
 export function showFirstLaunch() {
-  if (document.documentElement.dataset.warmLaunch === "true") return;
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
       if (!finishing) revealWindow();

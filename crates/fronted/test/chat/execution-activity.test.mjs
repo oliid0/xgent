@@ -91,3 +91,18 @@ test("mobile shell displays split UTF-8 output before completion and releases it
   assert.equal(removed, true);
   assert.equal(store.getSnapshot("shell-test")[0].status, "complete");
 });
+
+
+test("activity replay restores persisted results and merges live steps without duplicates", () => {
+  const { collectActivityItems } = createTsModuleLoader().loadModule("src/lib/chat/activityTimeline.ts");
+  const tool = (id, text) => ({ kind: "tool", item: { toolCall: { id, name: "Bash" }, ...(text ? { toolResult: { content: [{ type: "text", text }] } } : {}) } });
+  const history = [{ kind: "assistant", rounds: [{ round: 0, blocks: [tool("a", "finished")] }] }];
+  const settled = { isSettled: true, liveRounds: [] };
+  assert.equal(collectActivityItems(history, settled)[0].toolResult.content[0].text, "finished");
+  const live = { isSettled: false, liveRounds: [{ round: 1, runningToolCallIds: ["b"], blocks: [tool("a"), tool("b")] }] };
+  const items = collectActivityItems(history, live);
+  assert.deepEqual(items.map(item => [item.toolCall.id, item.running]), [["a", false], ["b", true]]);
+  assert.equal(items[0].toolResult.content[0].text, "finished");
+  assert.equal(collectActivityItems(history, { ...live, isSettled: true })[1].running, false);
+  assert.deepEqual(collectActivityItems([], settled), []);
+});
