@@ -4019,6 +4019,15 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   flex-shrink: 0;
   color: var(--color-text-secondary);
 }
+@media (min-width: 601px) {
+  .xgent-composer-model-controls > .astryx-field {
+    flex: 0 1 auto;
+    container-type: normal;
+  }
+  .xgent-composer-model-controls .astryx-complex-selector {
+    width: auto;
+  }
+}
 @media (max-width: 600px) {
   .xgent-composer-model-controls .astryx-complex-selector {
     max-width: 100%;

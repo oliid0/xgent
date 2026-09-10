@@ -1,12 +1,11 @@
 import { Center } from "@astryxdesign/core/Center";
 import { ChatMessageList } from "@astryxdesign/core/Chat";
-import { ContextMenu } from "@astryxdesign/core/ContextMenu";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { VStack } from "@astryxdesign/core/Layout";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { ChevronDown, Copy } from "../../../components/icons";
+import { ChevronDown } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import { buildFloorEntries } from "../../../lib/chat-floor-nav/floorModel";
 import { BOTTOM_REATTACH_ZONE_PX } from "../../../lib/chat-scroll/scrollFollowCore";
@@ -17,7 +16,6 @@ import { RowInteractionProvider, useRowInteractionStore } from "./rowInteraction
 import { TranscriptList, type TranscriptNavHandle } from "./TranscriptList";
 import { HistorySwitchLoadingOverlay } from "./TranscriptLoadingStates";
 import type { ChatTranscriptProps } from "./transcriptTypes";
-import { resolveTranscriptSelectionText, writeTextToClipboard } from "./transcriptUtils";
 
 export type { ChatTranscriptProps } from "./transcriptTypes";
 
@@ -67,8 +65,6 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
   // ScrollArea geometry work on every WebKit scroll while retaining the same
   // content container and visual layout.
   const [scrollViewport, setScrollViewport] = useState<HTMLDivElement | null>(null);
-  const transcriptRootRef = useRef<HTMLElement | null>(null);
-  const [selectedTranscriptText, setSelectedTranscriptText] = useState("");
 
   const { handle: scrollFollowHandle, following } = useScrollFollow({
     viewport: scrollViewport,
@@ -165,18 +161,10 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
     scrollFollowHandle.stickToBottom();
   }, [conversationId, scrollFollowHandle]);
 
-  const copySelectedTextLabel = locale === "en-US" ? "Copy selected text" : "复制选中文本";
   const jumpToBottomLabel = locale === "en-US" ? "Scroll to bottom" : "回到底部";
 
   return (
-    <VStack
-      ref={transcriptRootRef}
-      minHeight={0}
-      style={{ position: "relative", flex: 1 }}
-      onContextMenuCapture={() => {
-        setSelectedTranscriptText(resolveTranscriptSelectionText(transcriptRootRef.current));
-      }}
-    >
+    <VStack minHeight={0} style={{ position: "relative", flex: 1 }}>
       <VStack
         ref={(element) => setScrollViewport(element as HTMLDivElement | null)}
         data-scroll-viewport
@@ -185,100 +173,86 @@ export const ChatTranscript = memo(function ChatTranscript(props: ChatTranscript
         isScrollable
         style={{ overflowAnchor: "none" }}
       >
-        <ContextMenu
-          data-transcript-context-trigger=""
-          label={copySelectedTextLabel}
-          size="sm"
-          items={[
-            {
-              label: copySelectedTextLabel,
-              icon: <Icon icon={Copy} size="sm" color="inherit" />,
-              isDisabled: !selectedTranscriptText,
-              onClick: () => writeTextToClipboard(selectedTranscriptText),
-            },
-          ]}
+        <VStack
+          width="100%"
+          minHeight="100%"
+          maxWidth="var(--xgent-content-width-md)"
+          paddingInline={5}
+          paddingBlock={4}
+          className="chat-transcript-content"
+          style={{ marginInline: "auto" }}
         >
-          <VStack
-            width="100%"
-            minHeight="100%"
-            maxWidth="var(--xgent-content-width-md)"
-            paddingInline={5}
-            paddingBlock={4}
-            className="chat-transcript-content"
-            style={{ marginInline: "auto" }}
-          >
-            {showNoModelsState || showStartChatState ? (
-              <Center
-                width="100%"
-                className="chat-empty-state-stage"
-                style={{
-                  flex: 1,
-                  minHeight: 0,
-                  justifyContent: mobileExperience && showStartChatState ? "flex-end" : undefined,
-                  paddingBlockEnd:
-                    mobileExperience && showStartChatState ? "var(--spacing-4)" : undefined,
-                }}
-              >
-                {/* Keyed per conversation so the hero entrance replays when
-                  switching between empty conversations, not just on mount. */}
-                <ChatEmptyState
-                  key={conversationId ?? "empty"}
-                  variant={showNoModelsState ? "no-models" : "start-chat"}
-                  onOpenSettings={onOpenSettings}
-                  onSuggestionSelect={onSuggestionSelect}
-                  suggestionsDisabled={suggestionsDisabled}
-                  composer={emptyStateComposer}
-                />
-              </Center>
-            ) : null}
-
-            <ChatMessageList
-              align="top"
-              gap={0}
-              density="balanced"
-              isStreaming={isSending}
+          {showNoModelsState || showStartChatState ? (
+            <Center
+              width="100%"
+              className="chat-empty-state-stage"
               style={{
-                userSelect: "text",
-                opacity: isTranscriptSettling ? 0 : 1,
-                transitionProperty: "opacity",
-                transitionDuration: "var(--duration-fast)",
-                transitionTimingFunction: "var(--ease-standard)",
+                flex: 1,
+                minHeight: 0,
+                justifyContent: mobileExperience && showStartChatState ? "flex-end" : undefined,
+                paddingBlockEnd:
+                  mobileExperience && showStartChatState ? "var(--spacing-4)" : undefined,
               }}
             >
-              <RowInteractionProvider value={rowInteractionStore}>
-                {/* Keyed remount per conversation: per-conversation state
+              {/* Keyed per conversation so the hero entrance replays when
+                  switching between empty conversations, not just on mount. */}
+              <ChatEmptyState
+                key={conversationId ?? "empty"}
+                variant={showNoModelsState ? "no-models" : "start-chat"}
+                onOpenSettings={onOpenSettings}
+                onSuggestionSelect={onSuggestionSelect}
+                suggestionsDisabled={suggestionsDisabled}
+                composer={emptyStateComposer}
+              />
+            </Center>
+          ) : null}
+
+          <ChatMessageList
+            align="top"
+            gap={0}
+            density="balanced"
+            isStreaming={isSending}
+            style={{
+              userSelect: "text",
+              opacity: isTranscriptSettling ? 0 : 1,
+              transitionProperty: "opacity",
+              transitionDuration: "var(--duration-fast)",
+              transitionTimingFunction: "var(--ease-standard)",
+            }}
+          >
+            <RowInteractionProvider value={rowInteractionStore}>
+              {/* Keyed remount per conversation: per-conversation state
                   (row model, entrance registry, virtualizer measurements)
                   initializes fresh, and row keys can never collide across
                   conversations in the virtualizer's itemSizeCache. */}
-                <TranscriptList
-                  key={conversationId}
-                  conversationId={conversationId}
-                  historyItems={historyItems}
-                  liveTranscriptStore={liveTranscriptStore}
-                  scrollViewport={scrollViewport}
-                  isViewportFollowing={scrollFollowHandle.isFollowing}
-                  isSending={isSending}
-                  isAgentMode={isAgentMode}
-                  isCompactionRunning={isCompactionRunning}
-                  showUsage={showUsage}
-                  usageContextWindow={usageContextWindow}
-                  workspaceRoot={workspaceRoot}
-                  gitClient={gitClient}
-                  onOpenFileLink={onOpenFileLink}
-                  navRef={transcriptNavRef}
-                  onAnchorUserRowChange={setActiveFloorKey}
-                  onResendFromEdit={onResendFromEdit}
-                  onBranchConversation={onBranchConversation}
-                  onFirstLayoutSettled={
-                    shouldDeferTranscriptReveal ? handleFirstLayoutSettled : undefined
-                  }
-                />
-              </RowInteractionProvider>
-            </ChatMessageList>
+              <TranscriptList
+                key={conversationId}
+                conversationId={conversationId}
+                historyItems={historyItems}
+                liveTranscriptStore={liveTranscriptStore}
+                scrollViewport={scrollViewport}
+                isViewportFollowing={scrollFollowHandle.isFollowing}
+                isSending={isSending}
+                isAgentMode={isAgentMode}
+                isCompactionRunning={isCompactionRunning}
+                showUsage={showUsage}
+                usageContextWindow={usageContextWindow}
+                workspaceRoot={workspaceRoot}
+                gitClient={gitClient}
+                onOpenFileLink={onOpenFileLink}
+                navRef={transcriptNavRef}
+                onAnchorUserRowChange={setActiveFloorKey}
+                onResendFromEdit={onResendFromEdit}
+                onBranchConversation={onBranchConversation}
+                onFirstLayoutSettled={
+                  shouldDeferTranscriptReveal ? handleFirstLayoutSettled : undefined
+                }
+              />
+            </RowInteractionProvider>
+          </ChatMessageList>
 
-            <VStack style={{ height: transcriptBottomReservePx }} />
-          </VStack>
-        </ContextMenu>
+          <VStack style={{ height: transcriptBottomReservePx }} />
+        </VStack>
       </VStack>
       {!showNoModelsState && !showStartChatState && !isTranscriptSettling ? (
         <FloorNavRail

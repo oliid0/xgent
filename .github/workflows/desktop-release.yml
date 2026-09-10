@@ -152,7 +152,8 @@ jobs:
         run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
 
       - name: Install pnpm
-        run: npm install -g pnpm@10.32.1
+        shell: bash
+        run: npm install -g "$(node -p "require('./crates/fronted/package.json').packageManager")"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -164,7 +165,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: crates/fronted
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Import Apple signing certificate
         if: env.SIGNED_RELEASE == 'true'
@@ -277,7 +278,8 @@ jobs:
         run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json --tauri-platform windows
 
       - name: Install pnpm
-        run: npm install -g pnpm@10.32.1
+        shell: bash
+        run: npm install -g "$(node -p "require('./crates/fronted/package.json').packageManager")"
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -287,7 +289,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: crates/fronted
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Build Windows bundles
         if: env.SIGNED_RELEASE == 'true'
@@ -364,7 +366,8 @@ jobs:
         run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
 
       - name: Install pnpm
-        run: npm install -g pnpm@10.32.1
+        shell: bash
+        run: npm install -g "$(node -p "require('./crates/fronted/package.json').packageManager")"
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -399,7 +402,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: crates/fronted
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Build Linux bundles
         if: env.SIGNED_RELEASE == 'true'
@@ -512,7 +515,8 @@ jobs:
           sudo apt-get install -y binutils zstd
 
       - name: Install pnpm
-        run: npm install -g pnpm@10.32.1
+        shell: bash
+        run: npm install -g "$(node -p "require('./crates/fronted/package.json').packageManager")"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -525,7 +529,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: crates/fronted
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Prepare release version config
         working-directory: crates/fronted
@@ -760,7 +764,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm
-        run: npm install -g pnpm@10.32.1
+        shell: bash
+        run: npm install -g "$(node -p "require('./crates/fronted/package.json').packageManager")"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -773,7 +778,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: crates/fronted
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Prepare release version config
         working-directory: crates/fronted

@@ -49,11 +49,12 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm
-        run: npm install -g pnpm@10.32.1
+        shell: bash
+        run: npm install -g "$(node -p "require('./crates/fronted/package.json').packageManager")"
 
       - name: Install dependencies
         working-directory: crates/fronted
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Typecheck and build Web frontend
         working-directory: crates/fronted

@@ -1,11 +1,10 @@
-import { ContextMenu } from "@astryxdesign/core/ContextMenu";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Text as AstryxText } from "@astryxdesign/core/Text";
 import { DiffFile } from "@git-diff-view/file";
 import { DiffModeEnum, DiffView } from "@git-diff-view/react";
 
 // GitReview diff rendering: DiffContent (patch chunks, diff stat, selection
-// context menu, selection autoscroll, horizontal scrollbar) and the
+// autoscroll, horizontal scrollbar) and the
 // DiffReviewCard wrapper used by the changes view.
 //
 // Shared by every frontend runtime; only relative or @xgent/runtime imports
@@ -14,7 +13,6 @@ import { DiffModeEnum, DiffView } from "@git-diff-view/react";
 import { Button } from "@astryxdesign/core/Button";
 import {
   memo,
-  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
@@ -27,7 +25,7 @@ import {
 import { useLocale } from "../../../i18n";
 import type { GitDiffResponse } from "../../../lib/git/types";
 import { cn } from "../../../lib/shared/utils";
-import { Copy, FolderTree, GitBranch, Loader2 } from "../../icons";
+import { FolderTree, GitBranch, Loader2 } from "../../icons";
 import {
   basename,
   buildPatchChunks,
@@ -35,7 +33,6 @@ import {
   getPatchFileNames,
   type PatchChunk,
   parseDiffStat,
-  writeTextToClipboard,
 } from "./model";
 import {
   GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS,
@@ -471,7 +468,6 @@ export function DiffContent(props: {
   const handleOverlayScroll = useOverlayScrollbar();
   const rootRef = useRef<HTMLElement | null>(null);
   const scrollViewportRef = useRef<HTMLElement | null>(null);
-  const selectedTextRef = useRef("");
   const selectionAutoscrollViewportsRef = useRef<HTMLElement[]>([]);
   const selectionAutoscrollPointerRef = useRef<{
     x: number;
@@ -775,21 +771,6 @@ export function DiffContent(props: {
 
   useEffect(() => stopSelectionAutoscroll, [stopSelectionAutoscroll]);
 
-  const handleContextMenu = useCallback((event: ReactMouseEvent<HTMLFieldSetElement>) => {
-    if (!isDiffSelectableContentTarget(rootRef.current, event.target)) {
-      selectedTextRef.current = "";
-      event.stopPropagation();
-      return;
-    }
-    const selectedText = resolveContainedSelectionText(rootRef.current);
-    if (!selectedText) {
-      selectedTextRef.current = "";
-      event.stopPropagation();
-      return;
-    }
-    selectedTextRef.current = selectedText;
-  }, []);
-
   const handleSelectionPointerDownCapture = useCallback(
     (event: ReactPointerEvent<HTMLFieldSetElement>) => {
       if (event.button !== 0) return;
@@ -834,128 +815,112 @@ export function DiffContent(props: {
     [requestSelectionAutoscroll, stopSelectionAutoscroll],
   );
 
-  const copySelectedTextLabel = locale === "en-US" ? "Copy selected text" : "复制选中文本";
-
   return (
-    <ContextMenu
-      label={copySelectedTextLabel}
-      size="sm"
-      menuWidth="var(--xgent-context-menu-width)"
-      items={[
-        {
-          label: copySelectedTextLabel,
-          icon: <Copy className="h-3.5 w-3.5" />,
-          onClick: () => writeTextToClipboard(selectedTextRef.current),
-        },
-      ]}
+    <fieldset
+      ref={(node) => {
+        rootRef.current = node;
+      }}
+      aria-label={title}
+      className="git-review-diff-selectable m-0 flex min-h-0 min-w-0 flex-1 select-none flex-col overflow-hidden border-0 p-0"
+      onPointerDownCapture={handleSelectionPointerDownCapture}
     >
-      <fieldset
-        ref={(node) => {
-          rootRef.current = node;
-        }}
-        aria-label={title}
-        className="git-review-diff-selectable m-0 flex min-h-0 min-w-0 flex-1 select-none flex-col overflow-hidden border-0 p-0"
-        onContextMenu={handleContextMenu}
-        onPointerDownCapture={handleSelectionPointerDownCapture}
-      >
-        {error ? (
-          <AstryxStack direction="vertical" className="shrink-0 px-3 py-3 text-xs text-destructive">
-            {error}
-          </AstryxStack>
-        ) : null}
-        {!error && showDiffStat ? <DiffStatView stat={diff?.stat ?? ""} /> : null}
-        {showLoadingState ? (
-          <AstryxStack
-            direction="horizontal"
-            className="flex min-h-0 flex-1 items-center justify-center gap-2 px-3 py-8 text-center text-xs text-muted-foreground"
-          >
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <AstryxText as="span" type="inherit">
-              {t("projectTools.loading")}
-            </AstryxText>
-          </AstryxStack>
-        ) : null}
-        {!error && !showLoadingState && patchChunks.length > 0 ? (
-          <AstryxStack
-            direction="vertical"
-            id={diffScrollViewportId}
-            ref={(node) => {
-              scrollViewportRef.current = node;
-            }}
-            className={cn(
-              GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS,
-              "git-review-diff-selectable-content min-h-0 flex-1 select-text overflow-auto",
-            )}
-            onScroll={handleOverlayScroll}
-          >
-            {patchChunks.map((item) => (
-              <DiffChunkView key={item.key} item={item} isDark={isDark} />
-            ))}
-          </AstryxStack>
-        ) : null}
-        {!error && !showLoadingState && diff?.patch.trim() && patchChunks.length === 0 ? (
-          <pre
-            id={diffScrollViewportId}
-            ref={(node) => {
-              scrollViewportRef.current = node;
-            }}
-            className={cn(
-              GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS,
-              "git-review-diff-selectable-content min-h-0 flex-1 select-text overflow-auto px-3 py-3 text-[calc(11px*var(--zone-font-scale,1))] leading-relaxed text-muted-foreground",
-            )}
-            onScroll={handleOverlayScroll}
-          >
-            {diff.patch}
-          </pre>
-        ) : null}
-        {!error && !showLoadingState && diff && !diff.patch.trim() && patchChunks.length === 0 ? (
-          <AstryxStack
-            direction="horizontal"
-            className="flex min-h-0 flex-1 items-center justify-center px-3 py-8 text-center text-xs text-muted-foreground"
-          >
-            {t("projectTools.gitReview.noDiff")}
-          </AstryxStack>
-        ) : null}
-        {diff?.truncated ? (
-          <AstryxStack
-            direction="vertical"
-            className="shrink-0 border-t border-border/70 px-3 py-2 text-[calc(11px*var(--zone-font-scale,1))] text-amber-600 dark:text-amber-300"
-          >
-            {t("projectTools.gitReview.diffOutputTruncated")}
-          </AstryxStack>
-        ) : null}
-        {diffHorizontalScrollbar.visible ? (
+      {error ? (
+        <AstryxStack direction="vertical" className="shrink-0 px-3 py-3 text-xs text-destructive">
+          {error}
+        </AstryxStack>
+      ) : null}
+      {!error && showDiffStat ? <DiffStatView stat={diff?.stat ?? ""} /> : null}
+      {showLoadingState ? (
+        <AstryxStack
+          direction="horizontal"
+          className="flex min-h-0 flex-1 items-center justify-center gap-2 px-3 py-8 text-center text-xs text-muted-foreground"
+        >
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <AstryxText as="span" type="inherit">
+            {t("projectTools.loading")}
+          </AstryxText>
+        </AstryxStack>
+      ) : null}
+      {!error && !showLoadingState && patchChunks.length > 0 ? (
+        <AstryxStack
+          direction="vertical"
+          id={diffScrollViewportId}
+          ref={(node) => {
+            scrollViewportRef.current = node;
+          }}
+          className={cn(
+            GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS,
+            "git-review-diff-selectable-content min-h-0 flex-1 select-text overflow-auto",
+          )}
+          onScroll={handleOverlayScroll}
+        >
+          {patchChunks.map((item) => (
+            <DiffChunkView key={item.key} item={item} isDark={isDark} />
+          ))}
+        </AstryxStack>
+      ) : null}
+      {!error && !showLoadingState && diff?.patch.trim() && patchChunks.length === 0 ? (
+        <pre
+          id={diffScrollViewportId}
+          ref={(node) => {
+            scrollViewportRef.current = node;
+          }}
+          className={cn(
+            GIT_REVIEW_TRANSIENT_SCROLLBAR_CLASS,
+            "git-review-diff-selectable-content min-h-0 flex-1 select-text overflow-auto px-3 py-3 text-[calc(11px*var(--zone-font-scale,1))] leading-relaxed text-muted-foreground",
+          )}
+          onScroll={handleOverlayScroll}
+        >
+          {diff.patch}
+        </pre>
+      ) : null}
+      {!error && !showLoadingState && diff && !diff.patch.trim() && patchChunks.length === 0 ? (
+        <AstryxStack
+          direction="horizontal"
+          className="flex min-h-0 flex-1 items-center justify-center px-3 py-8 text-center text-xs text-muted-foreground"
+        >
+          {t("projectTools.gitReview.noDiff")}
+        </AstryxStack>
+      ) : null}
+      {diff?.truncated ? (
+        <AstryxStack
+          direction="vertical"
+          className="shrink-0 border-t border-border/70 px-3 py-2 text-[calc(11px*var(--zone-font-scale,1))] text-amber-600 dark:text-amber-300"
+        >
+          {t("projectTools.gitReview.diffOutputTruncated")}
+        </AstryxStack>
+      ) : null}
+      {diffHorizontalScrollbar.visible ? (
+        <AstryxStack
+          direction="vertical"
+          className="shrink-0 border-t border-border/70 bg-background/80 px-2 py-0.5"
+        >
           <AstryxStack
             direction="vertical"
-            className="shrink-0 border-t border-border/70 bg-background/80 px-2 py-0.5"
+            ref={diffHorizontalScrollbarTrackRef}
+            role="scrollbar"
+            aria-label={locale === "en-US" ? "Horizontal diff scrollbar" : "diff 横向滚动条"}
+            aria-controls={diffScrollViewportId}
+            aria-orientation="horizontal"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(diffHorizontalScrollbar.maxScrollLeft)}
+            aria-valuenow={Math.round(diffHorizontalScrollbar.scrollLeft)}
+            tabIndex={0}
+            className="relative h-1.5 overflow-hidden rounded-full bg-muted/35"
+            onPointerDown={handleDiffHorizontalScrollbarPointerDown}
           >
             <AstryxStack
               direction="vertical"
-              ref={diffHorizontalScrollbarTrackRef}
-              role="scrollbar"
-              aria-label={locale === "en-US" ? "Horizontal diff scrollbar" : "diff 横向滚动条"}
-              aria-controls={diffScrollViewportId}
-              aria-orientation="horizontal"
-              aria-valuemin={0}
-              aria-valuemax={Math.round(diffHorizontalScrollbar.maxScrollLeft)}
-              aria-valuenow={Math.round(diffHorizontalScrollbar.scrollLeft)}
-              tabIndex={0}
-              className="relative h-1.5 overflow-hidden rounded-full bg-muted/35"
-              onPointerDown={handleDiffHorizontalScrollbarPointerDown}
-            >
-              <AstryxStack
-                direction="vertical"
-                className="git-review-diff-horizontal-scrollbar-thumb absolute left-0 top-0 h-full rounded-full bg-muted-foreground/35 shadow-sm transition-colors hover:bg-muted-foreground/55"
-                style={{
-                  width: `${diffHorizontalScrollbar.thumbWidth}px`,
-                  transform: `translateX(${diffHorizontalScrollbar.thumbLeft}px)`,
-                }}
-              />
-            </AstryxStack>
+              className="git-review-diff-horizontal-scrollbar-thumb absolute left-0 top-0 h-full rounded-full bg-muted-foreground/35 shadow-sm transition-colors hover:bg-muted-foreground/55"
+              style={{
+                width: `${diffHorizontalScrollbar.thumbWidth}px`,
+                transform: `translateX(${diffHorizontalScrollbar.thumbLeft}px)`,
+              }}
+            />
           </AstryxStack>
-        ) : null}
-      </fieldset>
-    </ContextMenu>
+        </AstryxStack>
+      ) : null}
+    </fieldset>
   );
 }
 
@@ -1061,26 +1026,4 @@ function isDiffSelectableContentNode(root: HTMLElement | null, node: Node) {
 function isDiffSelectableContentTarget(root: HTMLElement | null, target: EventTarget | null) {
   if (!(target instanceof Node)) return false;
   return isDiffSelectableContentNode(root, target);
-}
-
-function resolveContainedSelectionText(root: HTMLElement | null) {
-  if (!root) return "";
-
-  const selection = window.getSelection();
-  if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
-    return "";
-  }
-
-  const selectedText = selection.toString();
-  if (!selectedText.trim()) return "";
-
-  const range = selection.getRangeAt(0);
-  if (
-    !isDiffSelectableContentNode(root, range.startContainer) ||
-    !isDiffSelectableContentNode(root, range.endContainer)
-  ) {
-    return "";
-  }
-
-  return selectedText;
 }

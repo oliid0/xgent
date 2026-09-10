@@ -45,6 +45,7 @@ def capture(name):
 
 # These labels come from the same zh/en dictionaries as the installed controls.
 tap({"打开边栏", "Open Sidebar"})
+tap({"打开 Soul 与工作工具", "Open Soul and workspace tools"})
 tap({"设置", "Settings"})
 capture("settings")
 tap({"返回对话", "Back to Chat"})
