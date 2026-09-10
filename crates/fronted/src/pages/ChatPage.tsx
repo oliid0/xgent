@@ -5038,8 +5038,7 @@ export function ChatPage(props: ChatPageProps) {
 
   const handleCloseMobileActivity = useCallback(() => {
     setMobileWorkspaceDestination((current) => (current?.kind === "activity" ? null : current));
-    if (!mobileExperience) setRightSidebarOpen(false);
-  }, [mobileExperience]);
+  }, []);
 
   useEffect(() => {
     const open = (event: Event) => {

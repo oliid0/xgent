@@ -96,6 +96,7 @@ export function MobileQuickActions(props: MobileQuickActionsProps) {
         size: "lg",
         elevation: "low",
       }}
+      presentation="adaptive"
       items={items}
       menuWidth="var(--xgent-mobile-actions-width)"
       placement="below"

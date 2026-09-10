@@ -19,7 +19,7 @@ function revealWindow() {
 export function showFirstLaunch() {
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
-      if (!finishing) revealWindow();
+      if (!finishing && document.documentElement.dataset.warmLaunch !== "true") revealWindow();
     }),
   );
 }

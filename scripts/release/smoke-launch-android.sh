@@ -81,6 +81,7 @@ PY
 adb exec-out screencap -p > "$RUNNER_TEMP/xgent-android-keyboard.png"
 adb shell input keyevent KEYCODE_BACK
 sleep 1
+python3 scripts/release/smoke-android-interactions.py
 if adb logcat -d AndroidRuntime:E '*:S' \
   | grep -E -A 12 'Process: com\.ohi\.xgent'; then
   echo "Xgent emitted an Android fatal exception during launch" >&2

@@ -17,9 +17,9 @@ from pinned a-Shell commit `0a0614464ec65a9480f4d44f95a85273a33a6dfa` by
 `scripts/mobile/prepare-ios-shell-resources.sh`. The terminal UI, Python, TeX,
 and application-specific command layer are not incorporated.
 
-## ios_system 3.0.2 and command frameworks
+## ios_system 3.0.4 and command frameworks
 
-- Upstream: `https://github.com/holzschu/ios_system/tree/v3.0.2`
+- Upstream: `https://github.com/holzschu/ios_system/tree/v3.0.4`
 - License: BSD-3-Clause; One True Awk has its own permissive Lucent notice.
 - Binary framework URLs and SwiftPM checksums are pinned in
   `ios/Package.swift`.

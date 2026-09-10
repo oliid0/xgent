@@ -327,6 +327,7 @@ export function ToolResultImagePreview(props: {
           "relative block w-full overflow-hidden rounded-[8px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 disabled:opacity-100",
           canPreview ? "cursor-zoom-in" : "cursor-default",
         )}
+        style={{ height: "auto", padding: 0, whiteSpace: "normal" }}
         isDisabled={!canPreview}
         onClick={() => {
           if (canPreview) setPreviewOpen(true);
@@ -447,6 +448,7 @@ function NativeDisplayImageTile(props: {
 
   return (
     <AstryxButton
+      style={{ height: "auto", padding: 0, whiteSpace: "normal" }}
       variant="ghost"
       label={canPreview ? `${t("chat.image.preview")} ${alt}` : statusTitle}
       type="button"

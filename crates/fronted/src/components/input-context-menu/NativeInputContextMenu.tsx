@@ -127,18 +127,9 @@ export function useNativeInputContextMenu(options: { enabled?: boolean } = {}) {
 
       const target = resolveMenuTarget(event.target);
       if (!target) {
-        // Preserve the engine's Copy action for selected transcript/document
-        // text and native contenteditable selection menus.
         closeMenu();
-        // The Astryx root also listens for contextmenu. Stop bubbling so it
-        // cannot reopen the input menu on unrelated surfaces.
         event.stopPropagation();
-        if (
-          !window.getSelection()?.toString() &&
-          !(event.target instanceof Element && event.target.closest('[contenteditable="true"]'))
-        ) {
-          event.preventDefault();
-        }
+        event.preventDefault();
         return;
       }
 

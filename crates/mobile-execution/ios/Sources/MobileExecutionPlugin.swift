@@ -102,7 +102,7 @@ private func iosToolchains(
             label: "Unix essentials",
             installed: available,
             installable: false,
-            version: "ios_system 3.0.2",
+            version: "ios_system 3.0.4",
             detail: "ls, cp, mv, rm, find, grep, sed, awk, tar, gzip and POSIX shell"
         ),
         IOSToolchain(
@@ -118,7 +118,7 @@ private func iosToolchains(
             label: "Network tools",
             installed: available && resources.certificateBundle,
             installable: false,
-            version: "curl (ios_system 3.0.2)",
+            version: "curl (ios_system 3.0.4)",
             detail: "curl with a pinned CA bundle plus ssh, scp, and sftp; GNU wget is not bundled"
         ),
         IOSToolchain(

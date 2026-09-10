@@ -213,18 +213,19 @@ export const ImagePreviewPanel = memo(function ImagePreviewPanel(props: ImagePre
           </LayoutHeader>
         }
         content={
-          <LayoutContent padding={0} isScrollable>
-            <VStack height="100%" gap={0}>
+          <LayoutContent padding={0} style={{ height: "100%", minHeight: 0 }}>
+            <VStack height="100%" minHeight={0} gap={0}>
               {actionError ? (
                 <Banner status="error" title={actionError} container="section" />
               ) : null}
               <Center
                 onWheel={handleWheel}
                 style={{
-                  minHeight: "var(--xgent-image-preview-stage-min-height)",
+                  minHeight: 0,
+                  height: "100%",
                   flex: 1,
                   overflow: "auto",
-                  backgroundColor: "var(--color-background-inverted)",
+                  backgroundColor: "var(--color-background-muted)",
                   touchAction: "pan-x pan-y pinch-zoom",
                 }}
               >
@@ -236,7 +237,9 @@ export const ImagePreviewPanel = memo(function ImagePreviewPanel(props: ImagePre
                   draggable={false}
                   style={{
                     maxWidth: "100%",
-                    maxHeight: "var(--xgent-image-preview-max-height)",
+                    width: "100%",
+                    height: "100%",
+                    maxHeight: "100%",
                     objectFit: "contain",
                     transform: `scale(${zoom})`,
                     transformOrigin: "center",

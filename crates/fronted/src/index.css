@@ -1,4 +1,4 @@
-@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+@layer popover-polyfill, reset, theme, base, astryx-base, astryx-theme, components, utilities;
 
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/preflight.css" layer(base);
@@ -249,6 +249,7 @@
 .xgent-workspace-file-preview-stage {
   display: flex;
   min-block-size: 0;
+  min-inline-size: 0;
   block-size: 100%;
   align-items: center;
   justify-content: center;
@@ -3335,8 +3336,8 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 .workspace-navigation-rail-shell {
-  width: 44px;
-  max-width: 44px;
+  width: 38px;
+  max-width: 38px;
   min-width: 0;
   flex: 0 0 auto;
   overflow: hidden;
@@ -3951,6 +3952,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   z-index: 1;
 }
 .xgent-composer-model-controls {
+  margin-inline-start: auto;
   justify-content: flex-end;
 }
 .xgent-composer-model-controls > .astryx-field {
@@ -4133,4 +4135,11 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   .astryx-layout-footer {
     padding: var(--spacing-2);
   }
+}
+
+/* Native :popover-open animations cannot match the polyfill's class. */
+[popover].\:popover-open {
+  opacity: 1 !important;
+  transform: none !important;
+  animation: none !important;
 }

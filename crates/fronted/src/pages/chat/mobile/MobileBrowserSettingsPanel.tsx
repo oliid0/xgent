@@ -79,7 +79,7 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
                   value={homePage}
                   onChange={setHomePage}
                   onBlur={() => saveHomePage()}
-                  placeholder="https://www.google.com/"
+                  placeholder="about:blank"
                 />
               </FormLayout>
             </form>

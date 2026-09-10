@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
@@ -106,4 +107,13 @@ except ValueError as error:
 print('device dependency graph cases passed')
 `, fileURLToPath(new URL("../../../../scripts/release/inspect-ios-dependencies.py", import.meta.url))], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr || result.error?.message);
+});
+
+
+test("the app embedding manifest uses the same verified iOS binaries as the plugin", () => {
+  const plugin = readFileSync(new URL("../../../mobile-execution/ios/Package.swift", import.meta.url), "utf8");
+  const embedded = readFileSync(new URL("../../../mobile-execution/ios-frameworks/Package.swift", import.meta.url), "utf8");
+  const binaries = source => [...source.matchAll(/name: "([^"]+)",\s*url: "([^"]+)",\s*checksum: "([^"]+)"/g)].map(([, name, url, checksum]) => [name, { url, checksum }]);
+  const actual = new Map(binaries(embedded));
+  for (const [name, expected] of binaries(plugin)) assert.deepEqual(actual.get(name), expected, name);
 });

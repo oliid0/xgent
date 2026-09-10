@@ -720,6 +720,7 @@ jobs:
             ${{ runner.temp }}/xgent-android-*.png
             ${{ runner.temp }}/xgent-android-*.log
             ${{ runner.temp }}/xgent-android-ui.xml
+            ${{ runner.temp }}/xgent-android-interactions.xml
           if-no-files-found: warn
           retention-days: 7
 

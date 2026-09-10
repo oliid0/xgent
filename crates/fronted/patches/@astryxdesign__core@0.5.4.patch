@@ -1,0 +1,47 @@
+diff --git a/dist/Layer/useLayer.js b/dist/Layer/useLayer.js
+index 58fb9f5c7f19bb4a75c07f8dc7f75518a8a41fbc..d111be612a970a5c4f5d7713ea78f5807993c1e2 100644
+--- a/dist/Layer/useLayer.js
++++ b/dist/Layer/useLayer.js
+@@ -13,6 +13,7 @@
+  * - /packages/core/src/Layer/useLayer.test.tsx
+  * - /packages/core/src/Layer/index.ts
+  */
++const { positionCompatibleLayer = () => {}, stopCompatibleLayer = () => {}, needsLayerCompatibility = () => false } = globalThis.__xgentLayerCompatibility ?? {};
+ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+ import * as stylex from '@stylexjs/stylex';
+ import { createPortal } from 'react-dom';
+@@ -301,6 +302,7 @@ function useLayerImplementation(options) {
+     } else {
+       popover.style.display = 'block';
+     }
++    positionCompatibleLayer(popover, triggerRef.current);
+     openedPopoverRef.current = popover;
+   }, []);
+   const isCurrentContextPopover = useCallback(popover => {
+@@ -323,7 +325,7 @@ function useLayerImplementation(options) {
+     if (!sentinel || !inlineParent) {
+       return;
+     }
+-    const portalTarget = resolveLayerPortalTarget(inlineParent);
++    const portalTarget = (needsLayerCompatibility() ? inlineParent?.closest("dialog[open]") ?? document.body : resolveLayerPortalTarget(inlineParent));
+     const mount = {
+       portalTarget,
+       portalStyle: portalTarget ? readPortalWritingContext(sentinel, portalTarget) : {}
+@@ -483,6 +485,7 @@ function useLayerImplementation(options) {
+     }
+   }, []);
+   const popoverRefCallback = useCallback(el => {
++    if (popoverRef.current !== el) stopCompatibleLayer(popoverRef.current);
+     popoverRef.current = el;
+     bindToggleListener(el, handleToggle);
+     if (el && pendingShowRef.current) {
+@@ -571,6 +574,9 @@ function useLayerImplementation(options) {
+       role: role,
+       "aria-label": ariaLabel,
+       popover: lightDismiss ? 'auto' : 'manual',
++      'data-layer-placement': placement,
++      'data-layer-alignment': alignment,
++      'data-layer-positioning': positioning,
+       className: combinedClassName,
+       style: {
+         ...stylexResult.style,

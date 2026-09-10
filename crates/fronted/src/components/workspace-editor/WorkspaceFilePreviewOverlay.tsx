@@ -1408,7 +1408,10 @@ function WorkspaceImagePreviewBody(props: {
   const enterScale = transitionDirection === 0 ? 0.985 : 0.99;
 
   return (
-    <AstryxStack direction="vertical" className="flex h-full min-h-0 flex-col bg-muted/25">
+    <AstryxStack
+      direction="vertical"
+      className="flex h-full min-h-0 w-full flex-1 flex-col bg-muted/25"
+    >
       <AstryxStack
         direction="horizontal"
         className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border bg-background/90 px-2"
@@ -1483,7 +1486,7 @@ function WorkspaceImagePreviewBody(props: {
       <AstryxStack
         direction="vertical"
         className={cn(
-          "relative min-h-0 flex-1",
+          "relative min-h-0 w-full flex-1",
           isClippingEnterOverflow ? "overflow-x-hidden overflow-y-auto" : "overflow-auto",
         )}
         onWheel={(event) => {
@@ -1505,7 +1508,7 @@ function WorkspaceImagePreviewBody(props: {
         ) : null}
         <AstryxStack
           direction="horizontal"
-          className="flex h-full min-h-full w-full min-w-full items-center justify-center p-4 transition-[opacity,transform,filter] duration-200 ease-out motion-reduce:transition-none sm:p-6"
+          className="flex h-full min-h-0 w-full items-center justify-center p-4 transition-[opacity,transform,filter] duration-200 ease-out motion-reduce:transition-none sm:p-6"
           style={{
             filter: isEntering ? "blur(1px)" : "blur(0px)",
             opacity: isEntering ? 0 : 1,

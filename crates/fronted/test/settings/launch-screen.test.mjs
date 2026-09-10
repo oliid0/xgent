@@ -31,7 +31,7 @@ for (const warm of [false, true]) {
       launch.showFirstLaunch();
       assert.deepEqual(events, []);
       while (frames.length) frames.shift()();
-      assert.deepEqual(events, ["splash"]);
+      assert.deepEqual(events, warm ? [] : ["splash"]);
       launch.finishLaunch();
       launch.finishLaunch(); // StrictMode cannot finish or animate twice.
       assert.equal(inert, true);
@@ -40,7 +40,7 @@ for (const warm of [false, true]) {
       assert.equal(inert, false);
       assert.equal(saved.get("xgent.launch-completed.v1"), "true");
       assert.equal(removed, warm);
-      assert.deepEqual(events, warm ? ["splash", "app"] : ["splash", "launch-complete", "splash"]);
+      assert.deepEqual(events, warm ? ["app"] : ["splash", "launch-complete", "splash"]);
     } finally {
       for (const [key, value] of Object.entries(previous)) {
         if (value === undefined) delete globalThis[key]; else globalThis[key] = value;
