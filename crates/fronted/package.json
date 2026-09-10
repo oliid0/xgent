@@ -81,18 +81,5 @@
     "typescript-transpile": "npm:typescript@~6.0.2",
     "unplugin-icons": "^23.0.1",
     "vite": "^8.2.2"
-  },
-  "pnpm": {
-    "overrides": {
-      "node-domexception": "npm:empty-npm-package@1.0.0",
-      "uuid": "^11.0.0"
-    },
-    "onlyBuiltDependencies": [
-      "@astryxdesign/cli",
-      "@astryxdesign/core",
-      "@google/genai",
-      "esbuild",
-      "protobufjs"
-    ]
   }
 }
