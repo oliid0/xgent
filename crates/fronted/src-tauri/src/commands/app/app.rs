@@ -20,7 +20,10 @@ pub struct GlobalShortcutRegistry {
 pub struct WindowPinState(pub AtomicBool);
 
 #[derive(Default)]
-pub struct FrontendReadyState(pub AtomicBool);
+pub struct FrontendReadyState {
+    pub sized: AtomicBool,
+    pub painted: AtomicBool,
+}
 
 #[tauri::command]
 pub fn app_window_pinned(pin_state: State<'_, Arc<WindowPinState>>) -> bool {
@@ -32,7 +35,7 @@ pub fn app_frontend_ready(
     window: tauri::WebviewWindow,
     ready_state: State<'_, Arc<FrontendReadyState>>,
 ) -> Result<(), String> {
-    if !ready_state.0.swap(true, Ordering::SeqCst) {
+    if !ready_state.sized.swap(true, Ordering::SeqCst) {
         use tauri::Manager;
         use tauri_plugin_window_state::AppHandleExt;
         let app = window.app_handle();
@@ -55,6 +58,7 @@ pub fn app_frontend_ready(
             }
         }
     }
+    ready_state.painted.store(true, Ordering::SeqCst);
     if window.is_visible().unwrap_or(false) {
         return Ok(());
     }

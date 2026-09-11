@@ -506,6 +506,15 @@ macro_rules! app_invoke_handler {
 
 #[cfg(desktop)]
 fn show_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
+    // Tray, shortcuts and a second instance must not expose an unpainted WebView.
+    // The frontend-ready command will show it once its surface is ready.
+    if !app
+        .try_state::<Arc<commands::app::FrontendReadyState>>()
+        .map(|state| state.painted.load(Ordering::SeqCst))
+        .unwrap_or(false)
+    {
+        return Ok(());
+    }
     // A browser child webview makes this a multi-webview native window.
     // get_webview_window then returns None even though the main window exists.
     if let Some(window) = app.get_window(MAIN_WINDOW_LABEL) {
@@ -844,6 +853,9 @@ pub fn run() {
                 return;
             }
             let app = webview.app_handle();
+            if let Some(state) = app.try_state::<Arc<commands::app::FrontendReadyState>>() {
+                state.painted.store(false, Ordering::SeqCst);
+            }
             // Fit the native window once per process. Reloading the WebView
             // must preserve a size the user has already chosen.
             if let Some(window) = app.get_window(MAIN_WINDOW_LABEL) {

@@ -225,12 +225,13 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(workflow, /! -name '\*-smoke\.png'/);
 });
 
-test("desktop tray click and menu actions can always reveal the main window", () => {
+test("desktop activation reveals the painted main window without exposing startup frames", () => {
   const showMainWindow = desktopHost.slice(
     desktopHost.indexOf("fn show_main_window"),
     desktopHost.indexOf("fn request_app_exit"),
   );
-  assert.doesNotMatch(showMainWindow, /FrontendReadyState/);
+  assert.match(showMainWindow, /state\.painted\.load\(Ordering::SeqCst\)/);
+  assert.match(desktopHost, /state\.painted\.store\(false, Ordering::SeqCst\)/);
   assert.match(showMainWindow, /window\.show\(\)\?[\s\S]*?window\.unminimize\(\)\?[\s\S]*?let focus_result = window\.set_focus\(\)/);
   assert.match(showMainWindow, /let focus_result[\s\S]*?set_always_on_top\(false\)[\s\S]*?focus_result\?/);
   assert.match(desktopHost, /button_state: MouseButtonState::Up/);
