@@ -17,7 +17,7 @@ for (const warm of [false, true]) {
     const launch = loader.loadModule("src/lib/system/launchScreen.ts");
     try {
       globalThis.document = {
-        documentElement: { dataset: { warmLaunch: String(warm) } },
+        documentElement: { dataset: { initialized: String(warm) } },
         getElementById: (id) => id === "root" ? { removeAttribute: () => { inert = false; } } : {
           remove: () => { removed = true; },
           classList: { add: value => events.push(value) },
@@ -39,8 +39,8 @@ for (const warm of [false, true]) {
       while (frames.length) frames.shift()();
       assert.equal(inert, false);
       assert.equal(saved.get("xgent.launch-completed.v1"), "true");
-      assert.equal(removed, warm);
-      assert.deepEqual(events, warm ? ["app"] : ["splash", "launch-complete", "splash"]);
+      assert.equal(removed, true);
+      assert.deepEqual(events, warm ? ["app"] : ["splash", "app"]);
     } finally {
       for (const [key, value] of Object.entries(previous)) {
         if (value === undefined) delete globalThis[key]; else globalThis[key] = value;

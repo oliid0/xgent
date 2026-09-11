@@ -15,7 +15,7 @@ if (!isBrowserRuntime()) {
   }
 }
 
-// Reveal the already-painted first-launch surface before loading the app graph.
+// Only the first initialization may show loading. Later launches reveal the ready app.
 showFirstLaunch();
 void import("./main").catch((error) => {
   showLaunchFailure();

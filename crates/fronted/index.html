@@ -4,49 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preload" as="image" href="/favicon.svg" />
     <title>XGent</title>
     <script>
       try {
-        document.documentElement.dataset.warmLaunch = localStorage.getItem("xgent.launch-completed.v1") === "true" ? "true" : "false";
+        if (localStorage.getItem("xgent.launch-completed.v1") === "true") {
+          document.documentElement.dataset.initialized = "true";
+        }
       } catch {}
     </script>
     <style>
       html, body, #root { width: 100%; height: 100%; margin: 0; }
       body { overflow: hidden; background: #fcfcfc; color: #202124; }
-      #launch-screen {
-        position: fixed; inset: 0; z-index: 2147483646; display: grid;
-        place-content: center; justify-items: center; gap: 20px;
-        background: #fcfcfc; opacity: 1; transition: opacity 600ms ease;
-        font-family: ui-sans-serif, system-ui, sans-serif;
-      }
-      #launch-screen::before {
-        content: ""; position: absolute; inset: 0; pointer-events: none;
-        background: radial-gradient(ellipse 220px 170px at 34% 2%, #bbffff80, transparent),
-          radial-gradient(ellipse 150px 150px at 36% 14%, #fffcc760, transparent),
-          radial-gradient(ellipse 230px 180px at 66% 2%, #aaffff75, transparent),
-          radial-gradient(ellipse 160px 150px at 64% 15%, #ffe3d340, transparent);
-      }
-      #launch-screen img { width: 64px; height: 64px; position: relative; }
-      #launch-screen.launch-complete { opacity: 0; pointer-events: none; }
-      #launch-error { max-width: min(80vw, 420px); text-align: center; }
+      #initial-setup { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 16px; background: inherit; font-family: system-ui, sans-serif; }
+      html[data-initialized="true"] #initial-setup { display: none; }
+      #launch-error { position: fixed; inset: 0; margin: auto; width: min(80vw, 420px); height: fit-content; text-align: center; font-family: system-ui, sans-serif; }
       @media (prefers-color-scheme: dark) {
-        body, #launch-screen { background: #18191b; color: #f4f4f5; }
-        #launch-screen::before { opacity: .18; }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        #launch-screen { transition: none; }
+        body { background: #18191b; color: #f4f4f5; }
       }
     </style>
   </head>
   <body>
     <div id="root" inert></div>
-    <div id="launch-screen" role="status" aria-label="XGent 正在加载">
-      <img src="/favicon.svg" alt="XGent" width="64" height="64" />
-      <p id="launch-error" hidden>加载失败，请重新打开应用。<a href="">重新加载</a></p>
+    <div id="initial-setup" role="status" aria-label="首次初始化">
+      <img src="/favicon.svg" alt="" width="64" height="64" />
+      <span>正在初始化 XGent…</span>
     </div>
+    <p id="launch-error" role="alert" hidden>加载失败，请重新打开应用。<a href="">重新加载</a></p>
     <script>
       function revealLaunchError() {
+        document.getElementById("initial-setup")?.remove();
         const message = document.getElementById("launch-error");
         if (message) message.hidden = false;
       }

@@ -1,8 +1,15 @@
 import { invoke, isBrowserRuntime } from "@xgent/runtime";
 import { inferRuntimePlatform } from "../runtimePlatform";
 
-const LAUNCH_KEY = "xgent.launch-completed.v1";
 let finishing = false;
+
+export function showFirstLaunch() {
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      if (!finishing && document.documentElement.dataset.initialized !== "true") revealWindow();
+    }),
+  );
+}
 
 function isDesktop() {
   return !isBrowserRuntime() && ["windows", "macos", "linux"].includes(inferRuntimePlatform());
@@ -16,37 +23,20 @@ function revealWindow() {
   }
 }
 
-export function showFirstLaunch() {
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => {
-      if (!finishing && document.documentElement.dataset.warmLaunch !== "true") revealWindow();
-    }),
-  );
-}
-
-/** Keep the HTML launch surface alive across React mounting and settings hydration. */
+/** Reveal the painted application once, without a splash or transition. */
 export function finishLaunch(success = true) {
   if (finishing) return;
   finishing = true;
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      const shell = document.getElementById("launch-screen");
       const root = document.getElementById("root");
-      const warm = document.documentElement.dataset.warmLaunch === "true";
       root?.removeAttribute("inert");
+      document.getElementById("initial-setup")?.remove();
+      document.getElementById("launch-error")?.remove();
       if (success) {
         try {
-          localStorage.setItem(LAUNCH_KEY, "true");
-        } catch {
-          // Storage can be disabled; readiness and navigation still work.
-        }
-      }
-      if (warm || !success || matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        shell?.remove();
-      } else if (shell) {
-        shell.classList.add("launch-complete");
-        shell.addEventListener("transitionend", () => shell.remove(), { once: true });
-        window.setTimeout(() => shell.remove(), 700);
+          localStorage.setItem("xgent.launch-completed.v1", "true");
+        } catch {}
       }
       revealWindow();
     });
@@ -54,6 +44,7 @@ export function finishLaunch(success = true) {
 }
 
 export function showLaunchFailure() {
+  document.getElementById("initial-setup")?.remove();
   const message = document.getElementById("launch-error");
   if (message) message.hidden = false;
   revealWindow();
