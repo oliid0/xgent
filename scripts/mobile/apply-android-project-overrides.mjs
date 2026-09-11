@@ -65,6 +65,18 @@ try {
   }
   writeFileSync(manifestPath, withRoundIcon);
 
+  // ProcessBuilder needs PRoot as a real executable in nativeLibraryDir.
+  // AGP controls extraction at the application level, overriding library manifests.
+  const gradlePath = resolve(tauriRoot, "gen/android/app/build.gradle.kts");
+  const gradle = readFileSync(gradlePath, "utf8");
+  const packagingMarker = "// Xgent executable native libraries";
+  if (!gradle.includes(packagingMarker)) {
+    writeFileSync(
+      gradlePath,
+      `${gradle}\n${packagingMarker}\nandroid {\n    packaging {\n        jniLibs.useLegacyPackaging = true\n    }\n}\n`,
+    );
+  }
+
   console.log(
     `Applied Xgent Android icons and WebView theme overrides to ${relative(process.cwd(), generatedMain) || generatedMain}.`,
   );

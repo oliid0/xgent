@@ -25,11 +25,21 @@ public static class XgentWindowSmoke {
 
 function Wait-XgentWindow($AppProcess) {
   $deadline = (Get-Date).AddSeconds(60)
+  $previousHandle = [IntPtr]::Zero
   do {
     $AppProcess.Refresh()
     if ($AppProcess.HasExited) { throw "Xgent exited before its window became ready" }
     $handle = $AppProcess.MainWindowHandle
-    if ($handle -ne [IntPtr]::Zero -and [XgentWindowSmoke]::IsWindowVisible($handle)) { return $handle }
+    $client = New-Object XgentWindowSmoke+Rect
+    if ($handle -ne [IntPtr]::Zero -and [XgentWindowSmoke]::IsWindowVisible($handle) -and
+        [XgentWindowSmoke]::GetClientRect($handle, [ref]$client) -and
+        $client.Right -ge 400 -and $client.Bottom -ge 300) {
+      # Ignore transient startup/helper windows before the actual WebView is ready.
+      if ($handle -eq $previousHandle) { return $handle }
+      $previousHandle = $handle
+    } else {
+      $previousHandle = [IntPtr]::Zero
+    }
     Start-Sleep -Milliseconds 250
   } while ((Get-Date) -lt $deadline)
   throw "Xgent did not reveal its ready window"
@@ -51,7 +61,7 @@ try {
   }
   Start-Sleep -Seconds 1
   $expected = New-Object XgentWindowSmoke+Rect
-  [void][XgentWindowSmoke]::GetClientRect($window, [ref]$expected)
+  if (-not [XgentWindowSmoke]::GetClientRect($window, [ref]$expected)) { throw "Resized window handle became invalid" }
   [void][XgentWindowSmoke]::PostMessage($window, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
   Start-Sleep -Seconds 2
   if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
@@ -59,7 +69,7 @@ try {
   $process = Start-Process -FilePath $resolvedExecutable -PassThru -WindowStyle Hidden
   $window = Wait-XgentWindow $process
   $restored = New-Object XgentWindowSmoke+Rect
-  [void][XgentWindowSmoke]::GetClientRect($window, [ref]$restored)
+  if (-not [XgentWindowSmoke]::GetClientRect($window, [ref]$restored)) { throw "Restored window handle became invalid" }
   if ([Math]::Abs($restored.Right - $expected.Right) -gt 4 -or [Math]::Abs($restored.Bottom - $expected.Bottom) -gt 4) {
     throw "Native window size was not restored: expected $($expected.Right)x$($expected.Bottom), got $($restored.Right)x$($restored.Bottom)"
   }
