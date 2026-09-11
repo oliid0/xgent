@@ -192,7 +192,7 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
   return (
     <Section padding={5} width="100%">
       <VStack gap={4}>
-        <HStack gap={3} hAlign="between" vAlign="start">
+        <HStack gap={3} hAlign="between" vAlign="start" wrap="wrap">
           <Terminal />
           <StackItem size="fill">
             <VStack gap={1}>
@@ -332,7 +332,7 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
 
             {status?.capabilities.userSelectedWorkspaces ? (
               <VStack gap={3}>
-                <HStack gap={3} hAlign="between" vAlign="center">
+                <HStack gap={3} hAlign="between" vAlign="center" wrap="wrap">
                   <StackItem size="fill">
                     <VStack gap={1}>
                       <Heading level={4}>{t("settings.mobileExternalWorkspaces")}</Heading>
@@ -353,6 +353,7 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
                   <List density="balanced" hasDividers>
                     {externalWorkspaces.map((workspace) => (
                       <ListItem
+                        className="settings-control-row"
                         key={workspace.id}
                         label={workspace.name}
                         startContent={<FolderOpen />}

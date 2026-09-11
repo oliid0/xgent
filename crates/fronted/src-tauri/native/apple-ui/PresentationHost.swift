@@ -65,6 +65,7 @@ private final class XgentPresentationHost: NSObject {
         controller.view.removeFromSuperview()
         #if os(iOS)
         controller.removeFromParent()
+        webview.isUserInteractionEnabled = true
         webview.accessibilityElementsHidden = false
         #else
         webview.setAccessibilityHidden(false)
@@ -74,11 +75,12 @@ private final class XgentPresentationHost: NSObject {
 
     func updateVisibility() {
         controller.view.isHidden = model.documents.isEmpty
-        // WKWebView remains the shared TypeScript execution host. Its pixels,
-        // accessibility elements and controls are removed when the native root owns the UI.
+        // The opaque SwiftUI root covers the shared TypeScript execution host.
+        // Do not hide WKWebView: WebKit can suspend animation-frame callbacks
+        // used by the shared runtime when its view is hidden.
         let nativeRoot = model.documents.contains { $0.mode == .root }
-        model.webview?.isHidden = nativeRoot
         #if os(iOS)
+        model.webview?.isUserInteractionEnabled = !nativeRoot
         model.webview?.accessibilityElementsHidden = nativeRoot
         #else
         model.webview?.setAccessibilityHidden(nativeRoot)

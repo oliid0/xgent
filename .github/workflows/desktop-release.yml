@@ -736,6 +736,7 @@ jobs:
             "https://codeload.github.com/termux/proot/tar.gz/$PROOT_SOURCE_REF" \
             --output "$source_archive"
           test -s "$source_archive"
+          cp scripts/mobile/proot-android-fork.patch "dist/Xgent-${XGENT_RELEASE_TAG}-PRoot-android-fork.patch"
           source_name="$(basename "$source_archive")"
           (cd dist && sha256sum "$source_name" > "${source_name}.sha256")
 

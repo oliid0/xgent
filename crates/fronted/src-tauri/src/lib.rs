@@ -948,6 +948,9 @@ pub fn run() {
 
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
+                    if let Err(error) = commands::app::save_main_window_size(window) {
+                        eprintln!("failed to save native main window size: {error}");
+                    }
                     // Closing normally hides to tray, so the plugin's exit
                     // hook may never run before the OS ends the process.
                     use tauri_plugin_window_state::AppHandleExt;

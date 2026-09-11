@@ -685,18 +685,25 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
               ),
               marker.trimmingCharacters(in: .whitespacesAndNewlines)
                 == installationVerificationVersion else { return false }
-        return FileManager.default.fileExists(
-            atPath: root.appendingPathComponent("vim/syntax/syntax.vim").path
-        ) && FileManager.default.fileExists(
-            atPath: root.appendingPathComponent("terminfo", isDirectory: true).path
-        ) && ((try? Data(contentsOf: root.appendingPathComponent("cacert.pem")).isEmpty) == false)
-            && ((try? Data(contentsOf: root.appendingPathComponent("bin/pkg")).isEmpty) == false)
-            && FileManager.default.isExecutableFile(
-                atPath: root.appendingPathComponent("bin/pkg").path
-            )
-            && FileManager.default.fileExists(
-                atPath: root.appendingPathComponent("home/Library/lib/python3.9/os.py").path
-            )
+        return (try? validateEnvironmentResources(at: root)) != nil
+    }
+
+    private func validateEnvironmentResources(at root: URL) throws {
+        // pkg is interpreted by the linked ios_system runtime. iOS denies
+        // execve for sandbox data even with mode 0755; X_OK is not a test of
+        // whether ios_system can read and interpret this script.
+        for relativePath in ["vim/syntax/syntax.vim", "cacert.pem", "bin/pkg",
+                             "home/Library/lib/python3.9/os.py"] {
+            let resource = root.appendingPathComponent(relativePath)
+            guard let contents = try? Data(contentsOf: resource), !contents.isEmpty else {
+                throw MobileExecutionError.io("Missing or unreadable a-Shell resource: \(relativePath)")
+            }
+        }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: root.appendingPathComponent("terminfo").path,
+                                            isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw MobileExecutionError.io("Missing a-Shell resource directory: terminfo")
+        }
     }
 
     private func installBundledEnvironmentResources(
@@ -765,17 +772,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 atomically: true,
                 encoding: .utf8
             )
-            guard fileManager.fileExists(
-                atPath: staging.appendingPathComponent("vim/syntax/syntax.vim").path
-            ), ((try? Data(contentsOf: staging.appendingPathComponent("cacert.pem")).isEmpty)
-                == false), ((try? Data(contentsOf: staging.appendingPathComponent("bin/pkg")).isEmpty)
-                == false), fileManager.isExecutableFile(
-                    atPath: stagedPackageCommand.path
-                ), fileManager.fileExists(
-                    atPath: staging.appendingPathComponent("home/Library/lib/python3.9/os.py").path
-                ) else {
-                throw MobileExecutionError.io("The staged a-Shell environment failed validation")
-            }
+            try validateEnvironmentResources(at: staging)
             for relativeDirectory in [
                 "home/Documents/bin",
                 "home/Documents/.pkg",

@@ -485,8 +485,8 @@ export function SettingsPage(props: SettingsPageProps) {
                   <VStack
                     width="100%"
                     maxWidth="var(--xgent-settings-content-max-width)"
-                    height="100%"
-                    minHeight={sectionManagesScroll ? 0 : "100%"}
+                    height={sectionManagesScroll ? "100%" : undefined}
+                    minHeight={sectionManagesScroll ? 0 : undefined}
                     className="settings-section-shell"
                     style={{ marginInline: "auto" }}
                   >

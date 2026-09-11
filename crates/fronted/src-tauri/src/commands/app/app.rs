@@ -25,6 +25,39 @@ pub struct FrontendReadyState {
     pub painted: AtomicBool,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct MainWindowSize {
+    width: u32,
+    height: u32,
+    maximized: bool,
+}
+
+fn main_window_size_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    use tauri::Manager;
+    app.path().app_config_dir().map(|path| path.join("main-window-size.json"))
+        .map_err(|error| error.to_string())
+}
+
+pub(crate) fn save_main_window_size(window: &tauri::Window) -> Result<(), String> {
+    if window.is_minimized().map_err(|error| error.to_string())? { return Ok(()); }
+    let path = main_window_size_path(window.app_handle())?;
+    let previous = std::fs::read(&path).ok()
+        .and_then(|data| serde_json::from_slice::<MainWindowSize>(&data).ok());
+    let size = window.inner_size().map_err(|error| error.to_string())?;
+    let maximized = window.is_maximized().map_err(|error| error.to_string())?;
+    if size.width == 0 || size.height == 0 { return Ok(()); }
+    let state = match previous {
+        Some(previous) if maximized => MainWindowSize { maximized, ..previous },
+        _ => MainWindowSize { width: size.width, height: size.height, maximized },
+    };
+    // Save from the native Window, including when browser child webviews mean
+    // Tauri's webview_windows() no longer includes the main application window.
+    std::fs::create_dir_all(path.parent().ok_or("Missing window state directory")?)
+        .map_err(|error| error.to_string())?;
+    let data = serde_json::to_vec(&state).map_err(|error| error.to_string())?;
+    std::fs::write(&path, data).map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub fn app_window_pinned(pin_state: State<'_, Arc<WindowPinState>>) -> bool {
     pin_state.0.load(Ordering::SeqCst)
@@ -32,16 +65,24 @@ pub fn app_window_pinned(pin_state: State<'_, Arc<WindowPinState>>) -> bool {
 
 #[tauri::command]
 pub fn app_frontend_ready(
-    window: tauri::WebviewWindow,
+    window: tauri::Window,
     ready_state: State<'_, Arc<FrontendReadyState>>,
 ) -> Result<(), String> {
     if !ready_state.sized.swap(true, Ordering::SeqCst) {
         use tauri::Manager;
         use tauri_plugin_window_state::AppHandleExt;
         let app = window.app_handle();
+        let stored_size = main_window_size_path(app).ok()
+            .and_then(|path| std::fs::read(path).ok())
+            .and_then(|data| serde_json::from_slice::<MainWindowSize>(&data).ok())
+            .filter(|state| state.width > 0 && state.height > 0);
         let saved = app.path().app_config_dir().ok()
             .map(|path| path.join(app.filename()).is_file()).unwrap_or(false);
-        if !window.is_maximized().unwrap_or(false) {
+        if let Some(state) = stored_size {
+            window.set_size(tauri::PhysicalSize::new(state.width, state.height))
+                .map_err(|error| error.to_string())?;
+            if state.maximized { window.maximize().map_err(|error| error.to_string())?; }
+        } else if !window.is_maximized().unwrap_or(false) {
             if let Ok(Some(monitor)) = window.current_monitor() {
                 let scale = monitor.scale_factor();
                 let area = monitor.work_area();

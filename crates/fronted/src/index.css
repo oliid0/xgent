@@ -4091,6 +4091,18 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 .settings-page [data-settings-section] .astryx-section {
   min-width: 0;
   max-width: 100%;
+  flex-shrink: 0;
+}
+.settings-section-shell > * {
+  flex-shrink: 0;
+}
+.settings-control-row {
+  min-width: 0;
+  max-width: 100%;
+}
+.settings-control-row > span {
+  min-width: 0;
+  max-width: 100%;
 }
 @container settings-detail (max-width: 480px) {
   .astryx-section {
@@ -4102,8 +4114,27 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   .settings-tool-permissions-category-header {
     flex-wrap: wrap;
   }
-  .settings-tool-permissions .astryx-list-item {
+  .settings-control-row {
     flex-wrap: wrap;
+    row-gap: var(--spacing-3);
+  }
+  /* Astryx 0.5.4 Item places endContent in its final direct span. Move
+     controls below the label instead of shrinking the label to zero. */
+  .settings-control-row > span:last-child {
+    flex: 0 0 100%;
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .settings-control-row > span:last-child > * {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .settings-tool-policy-row .astryx-segmented-control {
+    width: 100%;
+  }
+  .settings-tool-policy-row .astryx-segmented-control-item {
+    flex: 1 1 0;
   }
 }
 .settings-page [data-settings-section] .astryx-field {

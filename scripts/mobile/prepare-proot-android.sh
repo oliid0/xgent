@@ -2,8 +2,6 @@
 set -euo pipefail
 
 readonly PROOT_SOURCE_REPOSITORY="https://github.com/termux/proot.git"
-readonly TERMUX_PACKAGE_REPOSITORY="https://packages.termux.dev/apt/termux-main"
-readonly TERMUX_PROOT_RECIPE="https://raw.githubusercontent.com/termux/termux-packages/master/packages/proot/build.sh"
 readonly TALLOC_VERSION="2.4.4"
 readonly TALLOC_ARCHIVE_URL="https://www.samba.org/ftp/talloc/talloc-${TALLOC_VERSION}.tar.gz"
 readonly TALLOC_ARCHIVE_SHA256="55e47994018c13743485544e7206780ffbb3c8495e704a99636503e6e77abf59"
@@ -24,218 +22,20 @@ esac
 readonly TEMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TEMP_ROOT"' EXIT
 
-package_record() {
-  local termux_arch="$1"
-  local package_name="$2"
-  local index="$TEMP_ROOT/Packages-$termux_arch"
-  if [ ! -f "$index" ]; then
-    fetch_package_index "$termux_arch" "$index"
-  fi
-  python3 - "$index" "$package_name" <<'PY'
-import sys
-
-index_path, wanted = sys.argv[1:]
-with open(index_path, "rt", encoding="utf-8", errors="strict") as stream:
-    paragraphs = stream.read().split("\n\n")
-for paragraph in paragraphs:
-    fields = {}
-    for line in paragraph.splitlines():
-        if ": " in line:
-            key, value = line.split(": ", 1)
-            fields[key] = value
-    if fields.get("Package") == wanted:
-        required = ("Version", "Filename", "SHA256")
-        if not all(fields.get(key) for key in required):
-            raise SystemExit(f"Incomplete metadata for {wanted}")
-        print("\t".join(fields[key] for key in required))
-        raise SystemExit(0)
-raise SystemExit(f"Package {wanted} was not found for this architecture")
-PY
-}
-
-fetch_package_index() {
-  local termux_arch="$1"
-  local destination="$2"
-  local base="$TERMUX_PACKAGE_REPOSITORY/dists/stable/main/binary-$termux_arch/Packages"
-  local compressed="$TEMP_ROOT/Packages-$termux_arch.download"
-  local encoding
-
-  for encoding in xz gz plain; do
-    local url="$base"
-    [ "$encoding" = xz ] && url="$base.xz"
-    [ "$encoding" = gz ] && url="$base.gz"
-    if curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
-      --proto '=https' --tlsv1.2 "$url" --output "$compressed"; then
-      if python3 - "$compressed" "$destination" "$encoding" <<'PY'
-import gzip
-import lzma
-import pathlib
-import sys
-
-source, destination, encoding = sys.argv[1:]
-payload = pathlib.Path(source).read_bytes()
-if encoding == "xz":
-    payload = lzma.decompress(payload)
-elif encoding == "gz":
-    payload = gzip.decompress(payload)
-text = payload.decode("utf-8", errors="strict")
-if "Package: proot\n" not in text:
-    raise SystemExit("Termux package index does not contain PRoot")
-pathlib.Path(destination).write_text(text, encoding="utf-8", newline="\n")
-PY
-      then
-        return 0
-      fi
-    fi
-  done
-  echo "Unable to download a valid Termux package index for $termux_arch" >&2
-  return 1
-}
-
-extract_official_package() {
-  local termux_arch="$1"
-  local package_name="$2"
-  local destination="$3"
-  local record version filename sha256 archive member payload
-  record="$(package_record "$termux_arch" "$package_name")"
-  IFS=$'\t' read -r version filename sha256 <<<"$record"
-  archive="$TEMP_ROOT/${termux_arch}-${package_name}.deb"
-  curl --fail --location --retry 3 --retry-all-errors --proto '=https' --tlsv1.2 \
-    "$TERMUX_PACKAGE_REPOSITORY/$filename" --output "$archive"
-  echo "$sha256  $archive" | sha256sum --check --status
-  member="$(ar t "$archive" | awk '/^data\.tar(\.|$)/ { print; exit }')"
-  test -n "$member"
-  payload="$TEMP_ROOT/${termux_arch}-${package_name}-${member}"
-  ar p "$archive" "$member" > "$payload"
-  mkdir -p "$destination"
-  tar -xf "$payload" -C "$destination"
-  printf '%s' "$version"
-}
-
-install_official_abi() {
-  local android_abi="$1"
-  local termux_arch="$2"
-  local package_root="$TEMP_ROOT/official-$termux_arch"
-  local prefix="$package_root/data/data/com.termux/files/usr"
-  local proot_version proot_binary proot_loader talloc_library shmem_library
-  proot_version="$(extract_official_package "$termux_arch" proot "$package_root")"
-  extract_official_package "$termux_arch" libtalloc "$package_root" >/dev/null
-  extract_official_package "$termux_arch" libandroid-shmem "$package_root" >/dev/null
-  proot_binary="$prefix/bin/proot"
-  proot_loader="$prefix/libexec/proot/loader"
-  talloc_library="$(find "$prefix/lib" -maxdepth 1 -type f -name 'libtalloc.so*' | sort | head -n 1)"
-  shmem_library="$(find "$prefix/lib" -maxdepth 1 -type f -name 'libandroid-shmem.so*' | sort | head -n 1)"
-  test -f "$proot_binary"
-  test -f "$proot_loader"
-  test -f "$talloc_library"
-  test -f "$shmem_library"
-  install -Dm755 "$proot_binary" "$OUTPUT_ROOT/$android_abi/libxgent_proot.so"
-  install -Dm755 "$proot_loader" "$OUTPUT_ROOT/$android_abi/libxgent_proot_loader.so"
-  install -Dm755 "$talloc_library" "$OUTPUT_ROOT/$android_abi/libtalloc.so"
-  install -Dm755 "$shmem_library" "$OUTPUT_ROOT/$android_abi/libandroid-shmem.so"
-  # APK native libraries must end in .so. Renaming a versioned ELF file alone
-  # leaves PRoot's DT_NEEDED pointing at libtalloc.so.2, which Android cannot find.
-  local packaged_root="$OUTPUT_ROOT/$android_abi"
-  local talloc_soname
-  talloc_soname="$(patchelf --print-soname "$talloc_library")"
-  test -n "$talloc_soname"
-  patchelf --page-size 16384 --set-soname libtalloc.so "$packaged_root/libtalloc.so"
-  patchelf --page-size 16384 --replace-needed "$talloc_soname" libtalloc.so "$packaged_root/libxgent_proot.so"
-  local binary dependency dynamic_entries
-  for binary in "$packaged_root"/*.so; do
-    # readelf also accepts the static PRoot loader (which has no DT_NEEDED).
-    dynamic_entries="$(readelf --dynamic "$binary")"
-    while IFS= read -r dependency; do
-      case "$dependency" in
-        libc.so|libm.so|libdl.so|liblog.so|libandroid.so) ;;
-        *) test -f "$packaged_root/$dependency" || {
-          echo "Unpackaged PRoot dependency: $dependency ($android_abi)" >&2
-          return 1
-        } ;;
-      esac
-    done < <(printf '%s\n' "$dynamic_entries" | sed -n 's/.*(NEEDED).*\[\(.*\)\].*/\1/p')
-  done
-  printf '%s' "$proot_version"
-}
-
-prepare_official_packages() {
-  local arm_version x86_version
-  arm_version="$(install_official_abi arm64-v8a aarch64)"
-  x86_version="$(install_official_abi x86_64 x86_64)"
-  if [ "$arm_version" != "$x86_version" ]; then
-    echo "Official PRoot versions differ between architectures" >&2
-    return 1
-  fi
-  mkdir -p "$(dirname "$MANIFEST_PATH")"
-  python3 - "$MANIFEST_PATH" "$arm_version" <<'PY'
-import json
-import sys
-
-path, version = sys.argv[1:]
-with open(path, "w", encoding="utf-8", newline="\n") as stream:
-    json.dump(
-        {
-            "source": "termux-official-packages",
-            "version": version,
-            "repository": "https://packages.termux.dev/apt/termux-main",
-            "architectures": ["arm64-v8a", "x86_64"],
-        },
-        stream,
-        ensure_ascii=False,
-        indent=2,
-        sort_keys=True,
-    )
-    stream.write("\n")
-PY
-  echo "Prepared official Termux PRoot $arm_version in $OUTPUT_ROOT"
-}
-
-for command_name in curl tar sha256sum python3 ar awk install find patchelf readelf sed; do
+# Android's app seccomp policy rejects legacy fork/vfork on x86_64.
+# Official Termux binaries do not carry our syscall rewrite, so every ABI
+# must use the same reviewed source and compatibility patch.
+readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly PROOT_SOURCE_VERSION="5.1.107.92"
+readonly PROOT_SOURCE_COMMIT="7266fb3e8516535682f5a9c8f3a7e70f6506eddb"
+readonly PROOT_SOURCE_TAG="v$PROOT_SOURCE_VERSION"
+readonly PROOT_BUILD_VERSION="termux-$PROOT_SOURCE_VERSION-xgent-fork1"
+for command_name in curl tar sha256sum python3 git make; do
   command -v "$command_name" >/dev/null || {
     echo "$command_name is required to prepare Android PRoot" >&2
     exit 1
   }
 done
-
-set +e
-(
-  set -e
-  prepare_official_packages
-)
-official_status=$?
-set -e
-if [ "$official_status" -eq 0 ]; then
-  exit 0
-fi
-
-echo "Official PRoot packages were unavailable; falling back to an NDK source build" >&2
-rm -f -- \
-  "$OUTPUT_ROOT/arm64-v8a/libxgent_proot.so" \
-  "$OUTPUT_ROOT/arm64-v8a/libxgent_proot_loader.so" \
-  "$OUTPUT_ROOT/arm64-v8a/libtalloc.so" \
-  "$OUTPUT_ROOT/arm64-v8a/libandroid-shmem.so" \
-  "$OUTPUT_ROOT/x86_64/libxgent_proot.so" \
-  "$OUTPUT_ROOT/x86_64/libxgent_proot_loader.so" \
-  "$OUTPUT_ROOT/x86_64/libtalloc.so" \
-  "$OUTPUT_ROOT/x86_64/libandroid-shmem.so"
-
-for command_name in git make; do
-  command -v "$command_name" >/dev/null || {
-    echo "$command_name is required to build Android PRoot" >&2
-    exit 1
-  }
-done
-
-resolve_source_version() {
-  curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
-    "$TERMUX_PROOT_RECIPE" |
-    awk -F= '/^TERMUX_PKG_VERSION=/ { gsub(/["\047[:space:]]/, "", $2); print $2; exit }'
-}
-
-readonly PROOT_SOURCE_VERSION="${PROOT_SOURCE_VERSION:-$(resolve_source_version)}"
-test -n "$PROOT_SOURCE_VERSION"
-readonly PROOT_SOURCE_TAG="v$PROOT_SOURCE_VERSION"
-readonly PROOT_BUILD_VERSION="termux-$PROOT_SOURCE_VERSION"
 
 if [ -z "${ANDROID_NDK_HOME:-}" ] || [ ! -d "$ANDROID_NDK_HOME" ]; then
   echo "ANDROID_NDK_HOME must point to an installed Android NDK" >&2
@@ -272,6 +72,7 @@ fetch_proot_source() {
   git -C "$source_dir" fetch --quiet --depth=1 origin "$source_ref"
   git -C "$source_dir" checkout --quiet --detach FETCH_HEAD
   PROOT_RESOLVED_COMMIT="$(git -C "$source_dir" rev-parse HEAD)"
+  git -C "$source_dir" apply "$SCRIPT_DIR/proot-android-fork.patch"
   if [ -n "${PROOT_SOURCE_COMMIT:-}" ] && [ "$PROOT_RESOLVED_COMMIT" != "$PROOT_SOURCE_COMMIT" ]; then
     echo "Official PRoot checkout resolved to unexpected commit: $PROOT_RESOLVED_COMMIT" >&2
     exit 1
@@ -431,8 +232,9 @@ path, version, commit = sys.argv[1:]
 with open(path, "w", encoding="utf-8", newline="\n") as stream:
     json.dump(
         {
-            "source": "termux-proot-source-fallback",
+            "source": "termux-proot-patched-source",
             "version": version,
+            "patches": ["android-fork-vfork-to-clone"],
             "commit": commit,
             "repository": "https://github.com/termux/proot.git",
             "architectures": ["arm64-v8a", "x86_64"],

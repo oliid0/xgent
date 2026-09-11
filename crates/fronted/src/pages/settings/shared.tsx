@@ -1,7 +1,7 @@
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Switch } from "@astryxdesign/core/Switch";
-import { Heading } from "@astryxdesign/core/Text";
+import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import type { ReactNode } from "react";
 
@@ -42,8 +42,13 @@ export function SettingsRow(props: {
 }) {
   return (
     <ListItem
+      className="settings-control-row"
       label={props.label}
-      description={props.description}
+      description={props.description ? (
+        <Text type="supporting" color="secondary" wordBreak="break-word">
+          {props.description}
+        </Text>
+      ) : undefined}
       endContent={
         <HStack hAlign="end" vAlign={props.align === "start" ? "start" : "center"} wrap="wrap">
           {props.children}

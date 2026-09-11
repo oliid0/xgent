@@ -31,7 +31,7 @@ pub(crate) fn reset_for_navigation(webview: &tauri::Webview) {
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 async fn deliver(
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     payload: serde_json::Value,
     action_result: bool,
 ) -> Result<(), String> {
@@ -75,7 +75,7 @@ async fn deliver(
 
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 async fn deliver(
-    _window: tauri::WebviewWindow,
+    _window: tauri::Webview,
     _payload: serde_json::Value,
     _action_result: bool,
 ) -> Result<(), String> {
@@ -84,7 +84,7 @@ async fn deliver(
 
 #[tauri::command]
 pub async fn apple_ui_update(
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     payload: serde_json::Value,
 ) -> Result<(), String> {
     deliver(window, payload, false).await
@@ -92,7 +92,7 @@ pub async fn apple_ui_update(
 
 #[tauri::command]
 pub async fn apple_ui_action_result(
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     payload: serde_json::Value,
 ) -> Result<(), String> {
     deliver(window, payload, true).await

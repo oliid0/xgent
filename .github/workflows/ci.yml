@@ -173,25 +173,6 @@ jobs:
             exit 1
           fi
 
-  computer-use-windows:
-    name: Windows Computer Use Probe
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: computer-use-probe
-      - name: Compile the production engine diagnostic
-        run: cargo build --locked --release -p xgent-computer-use --example cua_probe
-      - uses: actions/upload-artifact@v7
-        with:
-          name: windows-cua-probe
-          path: target/release/examples/cua_probe.exe
-          if-no-files-found: error
-          retention-days: 3
-
   whitespace:
     name: Diff Hygiene
     runs-on: ubuntu-latest

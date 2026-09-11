@@ -154,9 +154,14 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
                 const translatedDesc = t(descKey);
                 return (
                   <ListItem
+                    className="settings-control-row settings-tool-policy-row"
                     key={tool.id}
                     label={translatedName === nameKey ? tool.toolName : translatedName}
-                    description={translatedDesc === descKey ? tool.toolName : translatedDesc}
+                    description={
+                      <Text type="supporting" color="secondary" wordBreak="break-word">
+                        {translatedDesc === descKey ? tool.toolName : translatedDesc}
+                      </Text>
+                    }
                     startContent={<Code>{tool.toolName}</Code>}
                     endContent={
                       <SegmentedControl

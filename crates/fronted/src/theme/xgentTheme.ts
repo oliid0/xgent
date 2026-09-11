@@ -172,7 +172,9 @@ export const xgentCompactTheme = defineTheme({
     },
     section: {
       "variant:section": {
-        backgroundColor: "var(--color-background-card)",
+        backgroundColor: "var(--astryx-theme-xgent-glass-surface)",
+        backdropFilter: "var(--xgent-material-filter, none)",
+        WebkitBackdropFilter: "var(--xgent-material-filter, none)",
         border: "1px solid var(--color-border)",
         borderRadius: "var(--radius-container)",
         boxShadow: "none",
