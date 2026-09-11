@@ -7,7 +7,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { isBrowserRuntime } from "@xgent/runtime";
 import { useEffect, useMemo, useState } from "react";
 import { SUPPORTED_LOCALES, useLocale } from "../../i18n";
-import { inferRuntimePlatform } from "../../lib/runtimePlatform";
+import { inferRuntimePlatform, isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import {
   CLOSE_WINDOW_BEHAVIOR_OPTIONS,
   type FontScaleSettings,
@@ -20,6 +20,7 @@ import {
   updateCustomSettings,
   updateSystem,
 } from "../../lib/settings";
+import type { SettingsSaveState } from "../../lib/settings/storage";
 import {
   buildFontFamilySelectOptions,
   FONT_FAMILY_CUSTOM_SELECT_VALUE,
@@ -33,6 +34,8 @@ import {
 import { tauriTerminalClient } from "../../lib/terminal/tauriTerminalClient";
 import type { TerminalShellOption } from "../../lib/terminal/types";
 import { useTrayPrefs, writeTrayPrefs } from "../../lib/tray/trayPrefs";
+import { NativeMobileSystemSettings } from "../../presentation/NativeMobileSystemSettings";
+import { supportsApplePresentation } from "../../runtime/applePresentation";
 import { AppearanceSettingsSection } from "./AppearanceSettingsSection";
 import { SecretTextInput } from "./SecretTextInput";
 import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
@@ -43,9 +46,80 @@ const CONTROL_WIDTH = "min(100%, var(--xgent-settings-control-width))";
 
 type SystemSettingsFormProps = SettingsSectionProps & {
   compact?: boolean;
+  onBack?: () => void;
+  saveState?: SettingsSaveState;
 };
 
-export function SystemSettingsForm({ settings, setSettings }: SystemSettingsFormProps) {
+export function SystemSettingsForm(props: SystemSettingsFormProps) {
+  if (isNativeMobileRuntime() && supportsApplePresentation() && props.onBack) {
+    return <NativeMobileSystemSettings {...props} onBack={props.onBack} />;
+  }
+  return isNativeMobileRuntime() ? (
+    <MobileSystemSettingsForm {...props} />
+  ) : (
+    <DesktopSystemSettingsForm {...props} />
+  );
+}
+
+function MobileSystemSettingsForm({ settings, setSettings }: SystemSettingsFormProps) {
+  const { t } = useLocale();
+  return (
+    <VStack width="100%" gap={2}>
+      <SettingsRowGroup title={t("settings.executionMode")} hideTitle>
+        <SettingsRow
+          label={t("settings.executionMode")}
+          description={
+            settings.system.executionMode === "text"
+              ? t("settings.chatModeDesc")
+              : t("settings.agentModeDesc")
+          }
+        >
+          <Selector
+            label={t("settings.executionMode")}
+            isLabelHidden
+            value={settings.system.executionMode === "text" ? "text" : "tools"}
+            width={CONTROL_WIDTH}
+            options={[
+              { value: "text", label: t("settings.chatMode") },
+              { value: "tools", label: t("settings.agentMode") },
+            ]}
+            onChange={(executionMode) =>
+              setSettings((prev) =>
+                updateSystem(prev, {
+                  executionMode: executionMode === "text" ? "text" : "tools",
+                }),
+              )
+            }
+          />
+        </SettingsRow>
+        <SettingsRow label={t("settings.language")}>
+          <Selector
+            label={t("settings.language")}
+            isLabelHidden
+            value={settings.locale}
+            width={CONTROL_WIDTH}
+            options={SUPPORTED_LOCALES.map((locale) => ({
+              value: locale,
+              label:
+                locale === "system"
+                  ? t("settings.auto")
+                  : locale === "zh-CN"
+                    ? t("settings.chinese")
+                    : locale === "en-US"
+                      ? t("settings.english")
+                      : locale,
+            }))}
+            onChange={(locale) =>
+              setSettings((prev) => ({ ...prev, locale: locale as typeof prev.locale }))
+            }
+          />
+        </SettingsRow>
+      </SettingsRowGroup>
+    </VStack>
+  );
+}
+
+function DesktopSystemSettingsForm({ settings, setSettings }: SystemSettingsFormProps) {
   const { t } = useLocale();
   const browser = isBrowserRuntime();
   const trayPrefs = useTrayPrefs();

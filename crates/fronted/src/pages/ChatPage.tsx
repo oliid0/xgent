@@ -5978,7 +5978,6 @@ export function ChatPage(props: ChatPageProps) {
           isSending ||
           (currentConversationId ? isConversationRunning(currentConversationId) : false)
         }
-        onOpenActivity={handleOpenMobileActivity}
         persistedState={conversationState.meta.taskList}
       />
     ) : undefined;
@@ -6266,7 +6265,7 @@ export function ChatPage(props: ChatPageProps) {
         currentConversationId={currentConversationId}
         isOpen={sidebarOpen && (mobileExperience || desktopNavigationTarget === "conversations")}
         desktopWidth={conversationSidebarResize.size}
-        fontScale={settings.customSettings.fontScale.sidebar}
+        fontScale={nativeMobile ? 1 : settings.customSettings.fontScale.sidebar}
         activeView={activeView}
         showProjects
         projects={workspaceProjects}
@@ -6411,7 +6410,7 @@ export function ChatPage(props: ChatPageProps) {
           target={workspaceToolLaunchRequest.target}
           shell={workspaceToolLaunchRequest.shell}
           requestNonce={workspaceToolLaunchRequest.nonce}
-          fontScale={settings.customSettings.fontScale.workspaceTools}
+          fontScale={nativeMobile ? 1 : settings.customSettings.fontScale.workspaceTools}
           projectPathKey={terminalProjectPathKey}
           cwd={terminalProjectPath}
           sessions={terminalSessions}
@@ -6487,7 +6486,7 @@ export function ChatPage(props: ChatPageProps) {
         style={
           activeView === "chat"
             ? ({
-                "--zone-font-scale": settings.customSettings.fontScale.chat,
+                "--zone-font-scale": nativeMobile ? 1 : settings.customSettings.fontScale.chat,
                 position: "relative",
                 overflow: "hidden",
               } as CSSProperties)

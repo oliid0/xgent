@@ -3649,7 +3649,29 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 .settings-page-compact {
-  background: var(--color-background-body);
+  background: var(--color-background-surface);
+}
+
+/* Mobile settings use one continuous page. Groups are separated by row
+   dividers rather than nested cards; controls retain their native semantics. */
+.settings-page-compact :is(.astryx-section, .astryx-card, .astryx-list) {
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.settings-page-compact [data-settings-section] .astryx-section {
+  padding-inline: 0;
+}
+
+.settings-page-compact .astryx-list-item {
+  border-radius: 0;
+}
+
+.settings-page-compact .astryx-dialog-header {
+  min-height: var(--xgent-mobile-header-height);
+  padding-block: var(--spacing-2);
 }
 
 .settings-page-compact .mobile-panel-header {
@@ -3715,7 +3737,9 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     .settings-about-status-card,
     .settings-about-release-notes
   ) {
-  background: var(--color-background-card);
+  background: transparent;
+  border-radius: 0;
+  border-inline: 0;
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;

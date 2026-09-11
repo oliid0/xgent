@@ -270,8 +270,8 @@ export default function App() {
   const [systemThemeVersion, setSystemThemeVersion] = useState(0);
   const [systemLocaleVersion, setSystemLocaleVersion] = useState(0);
   const effectiveTheme = useMemo(
-    () => resolveEffectiveTheme(settings.theme),
-    [settings.theme, systemThemeVersion],
+    () => resolveEffectiveTheme(nativeMobile ? "system" : settings.theme),
+    [nativeMobile, settings.theme, systemThemeVersion],
   );
   const effectiveLocale = useMemo(
     () => resolveEffectiveLocale(settings.locale),
@@ -405,11 +405,11 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    if (settings.theme !== "system") return;
+    if (!nativeMobile && settings.theme !== "system") return;
     return subscribeToSystemThemePreference(() => {
       setSystemThemeVersion((version) => version + 1);
     });
-  }, [settings.theme]);
+  }, [nativeMobile, settings.theme]);
 
   useEffect(() => {
     if (settings.locale !== "system") return;
@@ -426,11 +426,12 @@ export default function App() {
 
   useEffect(() => {
     applyFontFamilies({
-      interfaceFontFamily: settings.customSettings.interfaceFontFamily,
-      chatFontFamily: settings.customSettings.chatFontFamily,
-      codeFontFamily: settings.customSettings.codeFontFamily,
+      interfaceFontFamily: nativeMobile ? "" : settings.customSettings.interfaceFontFamily,
+      chatFontFamily: nativeMobile ? "" : settings.customSettings.chatFontFamily,
+      codeFontFamily: nativeMobile ? "" : settings.customSettings.codeFontFamily,
     });
   }, [
+    nativeMobile,
     settings.customSettings.chatFontFamily,
     settings.customSettings.codeFontFamily,
     settings.customSettings.interfaceFontFamily,
@@ -752,7 +753,7 @@ export default function App() {
                             height="100%"
                             minHeight={0}
                             gap={0}
-                            paddingBlockStart={5}
+                            paddingBlockStart={0}
                           >
                             <SettingsPage
                               settings={settings}

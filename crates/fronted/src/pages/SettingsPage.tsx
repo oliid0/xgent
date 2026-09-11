@@ -162,6 +162,7 @@ const NAV_ITEMS: NavDefinition[] = [
     id: "computerUse",
     icon: Cpu,
     descriptionKey: "settings.cua.description",
+    desktopOnly: true,
   },
   {
     id: "toolPermissions",
@@ -341,6 +342,8 @@ export function SettingsPage(props: SettingsPageProps) {
   const saveIndicator = getSaveIndicator(saveState, t);
   const sectionManagesScroll = section === "providers" || section === "memory" || section === "mcp";
   const sectionContent = (() => {
+    // Resolve hidden destinations before mounting their effects, including deep links.
+    if (!navItems.some((item) => item.id === section)) return null;
     switch (section) {
       case "providers":
         return (
@@ -360,6 +363,8 @@ export function SettingsPage(props: SettingsPageProps) {
             settings={settings}
             setSettings={setSettings}
             compact={compactSettings}
+            onBack={() => setMobileDetailOpen(false)}
+            saveState={saveState}
           />
         );
       case "access":
@@ -431,7 +436,7 @@ export function SettingsPage(props: SettingsPageProps) {
   if (compactSettings) {
     return (
       <SettingsDetailLayerProvider onLayerChange={handleDetailLayerChange}>
-        <Section variant="muted" width="100%" height="100%" padding={0}>
+        <Section width="100%" height="100%" padding={0}>
           <Layout
             height="fill"
             padding={0}

@@ -39,6 +39,7 @@ fn main_window_size_path(app: &AppHandle) -> Result<std::path::PathBuf, String> 
 }
 
 pub(crate) fn save_main_window_size(window: &tauri::Window) -> Result<(), String> {
+    use tauri::Manager;
     if window.is_minimized().map_err(|error| error.to_string())? { return Ok(()); }
     let path = main_window_size_path(window.app_handle())?;
     let previous = std::fs::read(&path).ok()

@@ -1,9 +1,17 @@
+import { inferRuntimePlatform } from "../lib/runtimePlatform";
 import type {
   PresentationAction,
   PresentationActionResult,
   PresentationDocument,
 } from "../presentation/types";
 import { invoke, isTauriRuntime } from "./index";
+
+/** Sheets can use SwiftUI independently of the not-yet-complete native root. */
+export function supportsApplePresentation() {
+  if (!isTauriRuntime()) return false;
+  const platform = inferRuntimePlatform();
+  return platform === "ios" || platform === "macos";
+}
 
 export function isApplePresentationRuntime() {
   return (

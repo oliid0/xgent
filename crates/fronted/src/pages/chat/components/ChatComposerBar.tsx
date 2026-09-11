@@ -1031,7 +1031,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 </Popover>
               )}
 
-              {mobileExperience || narrowComposer ? (
+              {isNativeMobileRuntime() ? null : mobileExperience || narrowComposer ? (
                 <DropdownMenu
                   button={{
                     label: t(`settings.commandSafety.${commandSafetyMode}`),

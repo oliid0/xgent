@@ -6,13 +6,15 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Section } from "@astryxdesign/core/Section";
-import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
-import { SelectableCard } from "@astryxdesign/core/SelectableCard";
+import { Selector } from "@astryxdesign/core/Selector";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Shield } from "../../components/icons";
 import { useLocale } from "../../i18n";
+import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import { type CommandSafetyMode, type ToolPolicy, updateSystem } from "../../lib/settings";
 import { BUILTIN_TOOL_CATALOG, BUILTIN_TOOL_CATEGORIES } from "../../lib/tools/builtinToolCatalog";
+import { resolveRuntimeToolCapabilities } from "../../lib/tools/runtimeToolCapabilities";
+import { SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 const POLICY_OPTIONS: readonly ToolPolicy[] = ["allow", "ask", "deny"];
@@ -25,6 +27,8 @@ const COMMAND_SAFETY_OPTIONS: readonly CommandSafetyMode[] = [
 
 export function ToolPermissionsSection({ settings, setSettings }: SettingsSectionProps) {
   const { t } = useLocale();
+  const nativeMobile = isNativeMobileRuntime();
+  const capabilities = resolveRuntimeToolCapabilities(nativeMobile ? "native-mobile" : "desktop");
   const policies = settings.system.toolPolicies ?? {};
 
   const setToolPolicies = (nextPolicies: Record<string, ToolPolicy>) => {
@@ -83,42 +87,38 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
         </VStack>
       </Section>
 
-      <Section padding={4} width="100%">
-        <VStack gap={3} width="100%">
-          <VStack gap={1}>
-            <Heading level={3}>{t("settings.commandSafety.title")}</Heading>
-            <Text type="supporting" color="secondary">
-              {t("settings.commandSafety.desc")}
-            </Text>
-          </VStack>
-          <Grid columns={{ minWidth: 220, max: 2, repeat: "fit" }} gap={2} width="100%">
-            {COMMAND_SAFETY_OPTIONS.map((mode) => (
-              <SelectableCard
-                key={mode}
-                label={t(`settings.commandSafety.${mode}`)}
-                isSelected={settings.system.commandSafetyMode === mode}
-                onChange={() =>
-                  setSettings((prev) => updateSystem(prev, { commandSafetyMode: mode }))
-                }
-                padding={3}
-                width="100%"
-              >
-                <VStack gap={1}>
-                  <Text type="body" weight="medium">
-                    {t(`settings.commandSafety.${mode}`)}
-                  </Text>
-                  <Text type="supporting" color="secondary">
-                    {t(`settings.commandSafety.${mode}Desc`)}
-                  </Text>
-                </VStack>
-              </SelectableCard>
-            ))}
-          </Grid>
-        </VStack>
-      </Section>
+      {!nativeMobile ? (
+        <SettingsRowGroup title={t("settings.commandSafety.title")} hideTitle>
+          <SettingsRow
+            label={t("settings.commandSafety.title")}
+            description={t("settings.commandSafety.desc")}
+          >
+            <Selector
+              label={t("settings.commandSafety.title")}
+              isLabelHidden
+              value={settings.system.commandSafetyMode}
+              options={COMMAND_SAFETY_OPTIONS.map((mode) => ({
+                value: mode,
+                label: t(`settings.commandSafety.${mode}`),
+                description: t(`settings.commandSafety.${mode}Desc`),
+              }))}
+              onChange={(mode) =>
+                setSettings((prev) =>
+                  updateSystem(prev, { commandSafetyMode: mode as CommandSafetyMode }),
+                )
+              }
+            />
+          </SettingsRow>
+        </SettingsRowGroup>
+      ) : null}
 
       {BUILTIN_TOOL_CATEGORIES.map((category) => {
-        const tools = BUILTIN_TOOL_CATALOG.filter((tool) => tool.categoryId === category.id);
+        const tools = BUILTIN_TOOL_CATALOG.filter(
+          (tool) =>
+            tool.categoryId === category.id &&
+            (tool.toolName !== "ManagedProcess" || capabilities.managedProcess) &&
+            (tool.toolName !== "ReadTerminal" || capabilities.terminal),
+        );
         if (tools.length === 0) return null;
         const toolNames = tools.map((tool) => tool.toolName);
         return (
@@ -164,20 +164,17 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
                     }
                     startContent={<Code>{tool.toolName}</Code>}
                     endContent={
-                      <SegmentedControl
+                      <Selector
                         value={policy}
                         onChange={(value) => setToolPolicy(tool.toolName, value as ToolPolicy)}
-                        label={tool.toolName}
+                        label={translatedName === nameKey ? tool.toolName : translatedName}
+                        isLabelHidden
                         size="sm"
-                      >
-                        {POLICY_OPTIONS.map((option) => (
-                          <SegmentedControlItem
-                            key={option}
-                            value={option}
-                            label={t(`settings.toolPolicy.${option}`)}
-                          />
-                        ))}
-                      </SegmentedControl>
+                        options={POLICY_OPTIONS.map((option) => ({
+                          value: option,
+                          label: t(`settings.toolPolicy.${option}`),
+                        }))}
+                      />
                     }
                   />
                 );

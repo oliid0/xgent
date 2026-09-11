@@ -44,11 +44,13 @@ export function SettingsRow(props: {
     <ListItem
       className="settings-control-row"
       label={props.label}
-      description={props.description ? (
-        <Text type="supporting" color="secondary" wordBreak="break-word">
-          {props.description}
-        </Text>
-      ) : undefined}
+      description={
+        props.description ? (
+          <Text type="supporting" color="secondary" wordBreak="break-word">
+            {props.description}
+          </Text>
+        ) : undefined
+      }
       endContent={
         <HStack hAlign="end" vAlign={props.align === "start" ? "start" : "center"} wrap="wrap">
           {props.children}
