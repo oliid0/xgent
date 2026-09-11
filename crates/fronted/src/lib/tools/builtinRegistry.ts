@@ -1,6 +1,7 @@
 import type { ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { homeDir } from "@xgent/runtime";
 import { activityObservation, executionActivityStore } from "../chat/executionActivityStore";
+import { isMobileShellAvailable } from "../mobileExecution";
 import type { RuntimePlatform } from "../runtimePlatform";
 import {
   type AccessSettings,
@@ -198,6 +199,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
     params.lanPcCommandHostReady === true,
   );
   const capabilities = resolveRuntimeToolCapabilities(runtimeToolHost);
+  const shellAvailable = runtimeToolHost !== "native-mobile" || isMobileShellAvailable();
   const baseBundles: BuiltinToolBundle[] = [
     createFsTools({
       workdir: params.workdir,
@@ -209,18 +211,22 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       skillAccessPolicy: params.skillAccessPolicy,
       resolveHomeDir,
     }),
-    createShellTools({
-      conversationId: params.checkpoint?.conversationId,
-      workdir: params.workdir,
-      providerId: params.providerId,
-      runtimePlatform: params.runtimePlatform,
-      skillsRootEnabled: params.skillsEnabled,
-      skillsRootDir: params.skillsRootDir,
-      skillAccessPolicy: params.skillAccessPolicy,
-      managedProcessEnabled: capabilities.managedProcess && params.runtimeScope === "chat",
-      sandbox: params.sandbox,
-      resolveHomeDir,
-    }),
+    ...(shellAvailable
+      ? [
+          createShellTools({
+            conversationId: params.checkpoint?.conversationId,
+            workdir: params.workdir,
+            providerId: params.providerId,
+            runtimePlatform: params.runtimePlatform,
+            skillsRootEnabled: params.skillsEnabled,
+            skillsRootDir: params.skillsRootDir,
+            skillAccessPolicy: params.skillAccessPolicy,
+            managedProcessEnabled: capabilities.managedProcess && params.runtimeScope === "chat",
+            sandbox: params.sandbox,
+            resolveHomeDir,
+          }),
+        ]
+      : []),
     ...(params.skillsEnabled
       ? [
           createSkillTools({

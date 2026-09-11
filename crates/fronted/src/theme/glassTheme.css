@@ -1,0 +1,23 @@
+/* Preference inputs are global so portaled menus inherit the same material.
+ * Paint 90% of the surface color; blur the 10% showing through, not the text.
+ * Unsupported browsers and accessibility preferences use the solid palette. */
+@layer theme {
+  :root {
+    --xgent-material-opacity: 100%;
+    --xgent-material-filter: none;
+  }
+
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root {
+      --xgent-material-opacity: 90%;
+      --xgent-material-filter: blur(20px) saturate(120%);
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+    :root {
+      --xgent-material-opacity: 100%;
+      --xgent-material-filter: none;
+    }
+  }
+}

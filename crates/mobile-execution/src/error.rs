@@ -6,6 +6,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     #[error("mobile execution is unavailable on this platform")]
     Unavailable,
+    #[error("mobile execution worker failed: {0}")]
+    Worker(String),
     #[cfg(mobile)]
     #[error(transparent)]
     PluginInvoke(#[from] tauri::plugin::mobile::PluginInvokeError),

@@ -65,6 +65,18 @@ export function buildToolsSuffix(
 
   const sections: string[] = [];
 
+  if (!allowAll && has("MobileEnvironment") && !has("Bash")) {
+    sections.push(
+      [
+        "## Native mobile tools without Shell",
+        "- Local Shell is not verified as available for this turn. Do not require its installation to answer or use the tools listed below.",
+        "- Read/List/Glob/Grep/Write/Edit/Delete access the app workspace directly. Skills, network MCP, browser_use and mobile personal-assistant tools use their own native or network APIs and remain usable when listed.",
+        "- Follow each tool's permission and approval flow. Shell installation does not grant calendar, reminders, photos, location or other personal-data permissions.",
+        "- Only tasks requiring command execution need an optional Shell environment. MobileEnvironment can inspect it; newly installed Shell capabilities become available when the next turn's tool catalog is prepared.",
+      ].join("\n"),
+    );
+  }
+
   sections.push(
     planModeActive
       ? [

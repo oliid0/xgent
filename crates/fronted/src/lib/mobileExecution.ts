@@ -53,12 +53,35 @@ export type ExternalMobileWorkspace = {
 };
 
 const PLUGIN_COMMAND = "plugin:mobile-execution|";
+let verifiedShellAvailable = false;
+let statusRevision = 0;
 
-export function mobileExecutionStatus() {
-  return invoke<MobileExecutionStatus>(`${PLUGIN_COMMAND}status`);
+/** Read synchronously when preparing a turn; optional Shell must never delay model traffic. */
+export function isMobileShellAvailable() {
+  return verifiedShellAvailable;
+}
+
+export async function mobileExecutionStatus() {
+  const revision = ++statusRevision;
+  try {
+    const status = await invoke<MobileExecutionStatus>(`${PLUGIN_COMMAND}status`);
+    if (revision === statusRevision) {
+      verifiedShellAvailable =
+        status.available === true &&
+        status.installed === true &&
+        status.capabilities.shell === true;
+    }
+    return status;
+  } catch (error) {
+    if (revision === statusRevision) verifiedShellAvailable = false;
+    throw error;
+  }
 }
 
 export function installMobileEnvironment() {
+  // A response from a probe started before reinstall must not revive stale capabilities.
+  ++statusRevision;
+  verifiedShellAvailable = false;
   return invoke<{ backend: MobileExecutionBackend; installed: boolean; detail?: string | null }>(
     `${PLUGIN_COMMAND}install`,
     { request: {} },

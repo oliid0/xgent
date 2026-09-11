@@ -73,6 +73,9 @@ pub fn app_root_dir() -> Result<PathBuf, String> {
     if let Some(root) = APP_ROOT.get() {
         return Ok(root.clone());
     }
+    #[cfg(mobile)]
+    return Err("Xgent mobile storage has not been initialized".to_string());
+    #[cfg(not(mobile))]
     desktop_root_dir()
 }
 

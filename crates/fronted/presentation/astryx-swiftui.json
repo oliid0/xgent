@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "astryxVersion": "0.5.4",
+  "components": [
+    {
+      "kind": "VStack",
+      "swiftCase": "vStack",
+      "astryx": "Stack/VStack",
+      "declaration": "VStack(alignment: .leading, spacing: node.spacing.map(CGFloat.init)) { children }"
+    },
+    {
+      "kind": "HStack",
+      "swiftCase": "hStack",
+      "astryx": "Stack/HStack",
+      "declaration": "HStack(spacing: node.spacing.map(CGFloat.init)) { children }"
+    },
+    {
+      "kind": "ScrollView",
+      "swiftCase": "scrollView",
+      "astryx": "Chat/ChatMessageList",
+      "declaration": "ScrollView { LazyVStack(alignment: .leading, spacing: 12) { children } }"
+    },
+    {
+      "kind": "Card",
+      "swiftCase": "card",
+      "astryx": "Card/Card",
+      "declaration": "VStack(alignment: .leading, spacing: 12) { children }\n    .padding(16).modifier(XgentGlassSurface())"
+    },
+    {
+      "kind": "Section",
+      "swiftCase": "section",
+      "astryx": "Layout/Section",
+      "declaration": "GroupBox { VStack(alignment: .leading, spacing: 12) { children } } label: {\n    Text(node.label ?? \"\")\n}"
+    },
+    {
+      "kind": "Text",
+      "swiftCase": "text",
+      "astryx": "Text/Text",
+      "declaration": "Text(node.text ?? \"\")\n    .foregroundStyle(node.secondary == true ? .secondary : .primary)\n    .textSelection(.enabled)\n    .fixedSize(horizontal: false, vertical: true)"
+    },
+    {
+      "kind": "Heading",
+      "swiftCase": "heading",
+      "astryx": "Heading/Heading",
+      "declaration": "Text(node.text ?? \"\").font(.headline).accessibilityAddTraits(.isHeader)"
+    },
+    {
+      "kind": "Button",
+      "swiftCase": "button",
+      "astryx": "Button/Button",
+      "declaration": "nativeButton"
+    },
+    {
+      "kind": "TextInput",
+      "swiftCase": "textInput",
+      "astryx": "TextInput/TextInput",
+      "declaration": "VStack(alignment: .leading, spacing: 4) {\n    if let label = node.label, !label.isEmpty { Text(label).font(.subheadline) }\n    if node.secure == true {\n        SecureField(node.text ?? \"\", text: textBinding)\n            .textFieldStyle(.roundedBorder)\n            .accessibilityLabel(node.label ?? node.text ?? \"\")\n    } else {\n        TextField(node.text ?? \"\", text: textBinding)\n            .textFieldStyle(.roundedBorder)\n            .accessibilityLabel(node.label ?? node.text ?? \"\")\n    }\n}"
+    },
+    {
+      "kind": "TextArea",
+      "swiftCase": "textArea",
+      "astryx": "TextArea/TextArea",
+      "declaration": "VStack(alignment: .leading, spacing: 4) {\n    if let label = node.label, !label.isEmpty { Text(label).font(.subheadline) }\n    TextEditor(text: textBinding).frame(minHeight: 100)\n        .accessibilityLabel(node.label ?? node.text ?? \"\")\n}"
+    },
+    {
+      "kind": "Switch",
+      "swiftCase": "toggle",
+      "astryx": "Switch/Switch",
+      "declaration": "Toggle(node.label ?? \"\", isOn: boolBinding)"
+    },
+    {
+      "kind": "Selector",
+      "swiftCase": "selector",
+      "astryx": "Selector/Selector",
+      "declaration": "picker.pickerStyle(.menu)"
+    },
+    {
+      "kind": "SegmentedControl",
+      "swiftCase": "segmentedControl",
+      "astryx": "SegmentedControl/SegmentedControl",
+      "declaration": "picker.pickerStyle(.segmented)"
+    },
+    {
+      "kind": "Menu",
+      "swiftCase": "menu",
+      "astryx": "DropdownMenu/DropdownMenu",
+      "declaration": "Menu { children } label: { Text(node.label ?? \"\") }"
+    },
+    {
+      "kind": "Divider",
+      "swiftCase": "divider",
+      "astryx": "Divider/Divider",
+      "declaration": "Divider()"
+    },
+    {
+      "kind": "Progress",
+      "swiftCase": "progress",
+      "astryx": "Spinner/Spinner",
+      "declaration": "ProgressView(node.label ?? \"\")"
+    }
+  ]
+}

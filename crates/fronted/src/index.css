@@ -5,6 +5,7 @@
 @import "@astryxdesign/core/reset.css";
 @import "@astryxdesign/core/astryx.css";
 @import "@astryxdesign/core/tailwind-theme.css";
+@import "./theme/glassTheme.css";
 @import "tailwindcss/utilities.css" layer(utilities);
 @config "../tailwind.config.js";
 
@@ -3359,7 +3360,9 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 .chat-header {
-  background: var(--color-background);
+  background: var(--astryx-theme-xgent-glass-surface, var(--color-background-surface));
+  -webkit-backdrop-filter: var(--xgent-material-filter, none);
+  backdrop-filter: var(--xgent-material-filter, none);
 }
 
 .chat-composer-layer {
@@ -3650,10 +3653,10 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 .settings-page-compact .mobile-panel-header {
-  background: var(--color-background-surface);
+  background: var(--astryx-theme-xgent-glass-surface, var(--color-background-surface));
   box-shadow: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  -webkit-backdrop-filter: var(--xgent-material-filter, none);
+  backdrop-filter: var(--xgent-material-filter, none);
 }
 
 .mobile-panel-safe-content {
@@ -3698,7 +3701,6 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 
 [data-native-mobile="true"] .settings-page-compact .mobile-panel-header {
   flex: 0 0 auto;
-  background: var(--color-background-surface);
 }
 
 .settings-page-compact

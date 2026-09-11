@@ -73,7 +73,7 @@ test("mobile navigation and settings retain Astryx drawer and bottom-sheet hiera
   }
   assert.match(
     stylesSource,
-    /\.settings-page-compact \.mobile-panel-header \{[\s\S]*?backdrop-filter: none/,
+    /\.settings-page-compact \.mobile-panel-header \{[^}]*?backdrop-filter: var\(--xgent-material-filter, none\)/,
   );
   assert.match(
     stylesSource,

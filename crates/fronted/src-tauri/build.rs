@@ -28,6 +28,7 @@ fn main() {
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     if target_os == "macos" {
         link_computer_use(std::path::Path::new(&manifest_dir));
+        link_native_ui(std::path::Path::new(&manifest_dir));
     }
     let is_windows_msvc = target_os == "windows"
         && std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc");
@@ -65,6 +66,34 @@ fn main() {
         );
     } else {
         tauri_build::build();
+    }
+}
+
+// Uses the same in-process Swift linkage as the existing computer-use module.
+// iOS compiles these sources in the generated Xcode target (ios.project.yml).
+fn link_native_ui(manifest_dir: &std::path::Path) {
+    use std::process::Command;
+    let sources = manifest_dir.join("native/apple-ui");
+    println!("cargo:rerun-if-changed={}", sources.display());
+    let output = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
+    let sdk = Command::new("xcrun").args(["--sdk", "macosx", "--show-sdk-path"])
+        .output().expect("locate macOS SDK");
+    assert!(sdk.status.success(), "locate macOS SDK failed");
+    let sdk = String::from_utf8(sdk.stdout).expect("SDK path");
+    let arch = std::env::var("CARGO_CFG_TARGET_ARCH").expect("target architecture");
+    let arch = if arch == "aarch64" { "arm64" } else { &arch };
+    let mut files: Vec<_> = std::fs::read_dir(&sources).expect("native SwiftUI sources")
+        .map(|entry| entry.expect("SwiftUI source").path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "swift")).collect();
+    files.sort();
+    let status = Command::new("xcrun").args(["swiftc", "-swift-version", "5", "-O", "-emit-library", "-static",
+        "-module-name", "XgentNativeUI", "-target", &format!("{arch}-apple-macosx14.0"), "-sdk", sdk.trim()])
+        .args(files).arg("-o").arg(output.join("libXgentNativeUI.a"))
+        .status().expect("compile native SwiftUI presentation");
+    assert!(status.success(), "native SwiftUI presentation compilation failed");
+    println!("cargo:rustc-link-lib=static=XgentNativeUI");
+    for framework in ["SwiftUI", "AppKit", "WebKit", "Foundation"] {
+        println!("cargo:rustc-link-lib=framework={framework}");
     }
 }
 

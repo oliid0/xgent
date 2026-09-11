@@ -52,6 +52,8 @@ pub fn app_version() -> &'static str {
 macro_rules! app_invoke_handler {
     () => {
         tauri::generate_handler![
+            commands::app_commands::apple_ui::apple_ui_update,
+            commands::app_commands::apple_ui::apple_ui_action_result,
             // Chat history
             commands::chat_history::chat_history_list,
             commands::chat_history::chat_history_workdirs,
@@ -354,6 +356,8 @@ macro_rules! app_invoke_handler {
 macro_rules! app_invoke_handler {
     () => {
         tauri::generate_handler![
+            commands::app_commands::apple_ui::apple_ui_update,
+            commands::app_commands::apple_ui::apple_ui_action_result,
             commands::chat_history::chat_history_list,
             commands::chat_history::chat_history_workdirs,
             commands::chat_history::chat_history_search,
@@ -1010,40 +1014,19 @@ fn record_mobile_startup_failure(
 }
 
 #[cfg(mobile)]
-fn initialize_mobile_services(app: tauri::AppHandle) -> Vec<String> {
-    let mut failures = Vec::new();
+fn initialize_mobile_storage(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let app_data_dir = app.path().app_data_dir()
+        .map_err(|error| format!("resolve mobile app data directory failed: {error}"))?;
+    services::app_paths::initialize(services::app_paths::mobile_root(&app_data_dir))?;
+    services::app_paths::app_storage_dir()
+}
 
-    let app_data_dir = match app.path().app_data_dir() {
-        Ok(path) => path,
-        Err(error) => {
-            record_mobile_startup_failure(
-                &mut failures,
-                "resolve app data directory failed",
-                error,
-            );
-            return failures;
-        }
-    };
-    if let Err(error) = services::app_paths::initialize(services::app_paths::mobile_root(&app_data_dir))
-    {
-        record_mobile_startup_failure(
-            &mut failures,
-            "initialize Xgent mobile data directory failed",
-            error,
-        );
-        return failures;
-    }
-    let app_data_dir = match services::app_paths::app_storage_dir() {
-        Ok(path) => path,
-        Err(error) => {
-            record_mobile_startup_failure(
-                &mut failures,
-                "resolve Xgent app storage directory failed",
-                error,
-            );
-            return failures;
-        }
-    };
+#[cfg(mobile)]
+fn initialize_mobile_services(
+    app: tauri::AppHandle,
+    app_data_dir: std::path::PathBuf,
+) -> Vec<String> {
+    let mut failures = Vec::new();
 
     // API-key provider traffic only needs the loopback proxy. Start it before
     // optional stores/services so a degraded vault, memory, or scheduler cannot
@@ -1220,8 +1203,18 @@ pub fn run() {
                 .state::<Arc<commands::app::MobileStartupState>>()
                 .inner()
                 .clone();
+            // Establish the sandbox root before IPC can open settings/history.
+            // Only optional services belong on the background startup worker;
+            // selecting a filesystem root there races the first frontend reads.
+            let storage = match initialize_mobile_storage(&app_handle) {
+                Ok(storage) => storage,
+                Err(error) => {
+                    startup_state.finish(vec![error]);
+                    return Ok(());
+                }
+            };
             tauri::async_runtime::spawn_blocking(move || {
-                startup_state.finish(initialize_mobile_services(app_handle));
+                startup_state.finish(initialize_mobile_services(app_handle, storage));
             });
             Ok(())
         })

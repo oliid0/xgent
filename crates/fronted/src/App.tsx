@@ -30,6 +30,7 @@ import {
 } from "./i18n";
 import { useAppUpdateController } from "./lib/appUpdates";
 import { initAutomation } from "./lib/automation";
+import { mobileExecutionStatus } from "./lib/mobileExecution";
 import { type MobileStartupStatus, readMobileStartupStatus } from "./lib/mobileStartup";
 import { trackMobileViewport } from "./lib/mobileViewport";
 import { setRetryErrorExtension } from "./lib/providers/runtime/streamRetry";
@@ -47,6 +48,7 @@ import {
   subscribeToSystemThemePreference,
 } from "./lib/settings";
 import { getSettingsErrorMessage, SettingsStorageError } from "./lib/settings/errors";
+import { startSettingsHydration } from "./lib/settings/hydration";
 import {
   loadPersistedSettingsWithDefaults,
   persistSettings,
@@ -63,7 +65,7 @@ import type { SectionId, SettingsOpenOptions } from "./pages/settings/types";
 import { startLocalAccessHostBridge } from "./runtime/localAccessHostBridge";
 import { createAppearanceTheme } from "./theme/appearanceTheme";
 
-const MOBILE_SETTINGS_HYDRATION_TIMEOUT_MS = 2_500;
+const MOBILE_SETTINGS_DELAY_NOTICE = "Native settings are taking longer than expected to load";
 
 function getDefaultContext(): Context {
   return {
@@ -167,6 +169,16 @@ export default function App() {
   const nativeMobile =
     !browserRuntime && (runtimePlatform === "android" || runtimePlatform === "ios");
   const compactSettingsDialog = useMediaQuery("(max-width: 768px)") || nativeMobile;
+  useEffect(() => {
+    if (!nativeMobile) return;
+    // Populate optional capabilities independently of settings, provider and chat startup.
+    void mobileExecutionStatus().catch((error) => {
+      console.warn(
+        "Optional mobile Shell is unavailable; native assistant tools remain enabled",
+        error,
+      );
+    });
+  }, [nativeMobile]);
   const desktopBridgeEnabled = browserRuntime || (platformResolved && !nativeMobile);
   const [mobileStartup, setMobileStartup] = useState<MobileStartupStatus>({
     phase: "starting",
@@ -436,60 +448,48 @@ export default function App() {
   useEffect(() => {
     if (!browserRuntime && !platformResolved) return;
     if (settingsHydratedRef.current) return;
-    let cancelled = false;
-    let hydrationTimer: number | undefined;
-
-    async function hydrateSettings() {
-      try {
-        const persistedSettings = loadPersistedSettingsWithDefaults();
-        const { settings: loaded, defaultWorkdir } = nativeMobile
-          ? await Promise.race([
-              persistedSettings,
-              new Promise<never>((_resolve, reject) => {
-                hydrationTimer = window.setTimeout(
-                  () => reject(new Error("Native settings did not respond during mobile startup")),
-                  MOBILE_SETTINGS_HYDRATION_TIMEOUT_MS,
-                );
-              }),
-            ])
-          : await persistedSettings;
-        if (!cancelled) {
-          defaultWorkdirRef.current = defaultWorkdir;
-          const loadedWithDefaults = applyRuntimeSystemDefaults(loaded, defaultWorkdir);
-          settingsHydratedRef.current = true;
-          settingsRef.current = loadedWithDefaults;
-          setSettingsState(loadedWithDefaults);
-          setSettingsSaveState({ status: "saved" });
+    return startSettingsHydration({
+      load: loadPersistedSettingsWithDefaults,
+      onLoaded: ({ settings: loaded, defaultWorkdir }) => {
+        defaultWorkdirRef.current = defaultWorkdir;
+        const loadedWithDefaults = applyRuntimeSystemDefaults(loaded, defaultWorkdir);
+        settingsHydratedRef.current = true;
+        settingsRef.current = loadedWithDefaults;
+        setSettingsState(loadedWithDefaults);
+        setSettingsSaveState({ status: "saved" });
+      },
+      onError: (error) => {
+        const fallback = getDefaultSettings();
+        settingsRef.current = fallback;
+        setSettingsState(fallback);
+        setSettingsSaveState({
+          status: "error",
+          message: getSettingsErrorMessage(
+            error,
+            translate("app.settingsLoadFailed", fallback.locale),
+            fallback.locale,
+            translate,
+          ),
+        });
+      },
+      onSlow: nativeMobile
+        ? () =>
+            setMobileStartup((status) => ({
+              ...status,
+              failures: [...status.failures, MOBILE_SETTINGS_DELAY_NOTICE],
+            }))
+        : undefined,
+      onSettled: () => {
+        if (nativeMobile) {
+          setMobileStartup((status) => ({
+            ...status,
+            failures: status.failures.filter((failure) => failure !== MOBILE_SETTINGS_DELAY_NOTICE),
+          }));
         }
-      } catch (error) {
-        if (!cancelled) {
-          const fallback = getDefaultSettings();
-          settingsRef.current = fallback;
-          setSettingsState(fallback);
-          setSettingsSaveState({
-            status: "error",
-            message: getSettingsErrorMessage(
-              error,
-              translate("app.settingsLoadFailed", fallback.locale),
-              fallback.locale,
-              translate,
-            ),
-          });
-        }
-      } finally {
-        if (hydrationTimer !== undefined) window.clearTimeout(hydrationTimer);
-        if (!cancelled) {
-          setSettingsReady(true);
-        }
-      }
-    }
-
-    void hydrateSettings();
-    return () => {
-      cancelled = true;
-      if (hydrationTimer !== undefined) window.clearTimeout(hydrationTimer);
-    };
-  }, [browserRuntime, mobileStartup.phase, nativeMobile, platformResolved]);
+        setSettingsReady(true);
+      },
+    });
+  }, [browserRuntime, nativeMobile, platformResolved]);
 
   const queueSettingsSave = useCallback(
     (prev: AppSettings, next: AppSettings, fallback: string) => {
@@ -531,6 +531,11 @@ export default function App() {
 
   const setSettings = useCallback(
     (updater: (prev: AppSettings) => AppSettings) => {
+      // A failed read must never turn fallback defaults into persisted settings.
+      // Opening settings retries the read and enables writes after it succeeds.
+      if (!settingsHydratedRef.current) {
+        throw new Error(translate("app.settingsLoadFailed", settingsRef.current.locale));
+      }
       const prev = settingsRef.current;
       const updated = updater(prev);
       if (updated === prev) return;
@@ -556,6 +561,7 @@ export default function App() {
     const { settings: loaded, defaultWorkdir } = await loadPersistedSettingsWithDefaults();
     defaultWorkdirRef.current = defaultWorkdir;
     const loadedWithDefaults = applyRuntimeSystemDefaults(loaded, defaultWorkdir);
+    settingsHydratedRef.current = true;
     settingsRef.current = loadedWithDefaults;
     setSettingsState(loadedWithDefaults);
     setSettingsSaveState({ status: "saved" });

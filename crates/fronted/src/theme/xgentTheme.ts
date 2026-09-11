@@ -1,5 +1,5 @@
 import { defineTheme } from "@astryxdesign/core/theme";
-import { neutralTheme } from "@astryxdesign/theme-neutral";
+import { glassTheme } from "./glassTheme";
 
 /**
  * Product theme derived through Astryx's public theme surface.
@@ -9,7 +9,7 @@ import { neutralTheme } from "@astryxdesign/theme-neutral";
  */
 export const xgentTheme = defineTheme({
   name: "xgent-chat",
-  extends: neutralTheme,
+  extends: glassTheme,
   typography: {
     scale: { base: 15, ratio: 1.18 },
     body: {
@@ -77,7 +77,7 @@ export const xgentTheme = defineTheme({
     },
     "chat-composer": {
       base: {
-        backgroundColor: "var(--color-background-surface)",
+        backgroundColor: "var(--astryx-theme-xgent-glass-surface)",
         borderRadius: "var(--radius-chat)",
         boxShadow: "var(--shadow-low)",
       },
@@ -221,7 +221,7 @@ export const xgentCompactTheme = defineTheme({
     "chat-composer": {
       base: {
         minHeight: "52px",
-        backgroundColor: "var(--color-background-surface)",
+        backgroundColor: "var(--astryx-theme-xgent-glass-surface)",
         borderRadius: "var(--radius-chat)",
         boxShadow: "var(--shadow-low)",
       },
@@ -236,7 +236,7 @@ export const xgentCompactTheme = defineTheme({
     "bottom-sheet": {
       base: {
         borderRadius: "var(--radius-page) var(--radius-page) 0 0",
-        backgroundColor: "var(--color-background-popover)",
+        backgroundColor: "var(--astryx-theme-xgent-glass-popover)",
         boxShadow: "var(--shadow-high)",
       },
     },

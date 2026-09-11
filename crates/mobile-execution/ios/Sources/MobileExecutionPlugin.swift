@@ -229,7 +229,9 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 "available": available,
                 "installed": installed,
                 "detail": initializationError?.localizedDescription
-                    ?? (installed
+                    ?? (!available
+                        ? "This application package is missing a-Shell resources: \(self.missingBundledResources().joined(separator: ", ")). Install a package containing the native frameworks and resources; the device installer uses bundled files."
+                        : installed
                         ? "The a-Shell command environment is initialized; arbitrary WASI, Node.js/npm, and Linux process APIs remain disabled"
                         : "The bundled a-Shell environment is available but must be installed and initialized before use"),
                 "capabilities": [
@@ -255,6 +257,10 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 return
             }
             do {
+                let missing = self.missingBundledResources()
+                guard missing.isEmpty else {
+                    throw MobileExecutionError.io("Missing bundled a-Shell resources: \(missing.joined(separator: ", "))")
+                }
                 try self.installBundledEnvironmentResources {
                     try self.initializeBackendIfNeeded()
                     let workspace = try self.installationProbeWorkspace()
@@ -903,22 +909,22 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     }
 
     private func bundledBackendAvailable() -> Bool {
-        guard let resources = bundledResourcesURL() else { return false }
-        let dictionariesAvailable = ["commandDictionary", "extraCommandsDictionary"].allSatisfy { resource in
-            FileManager.default.fileExists(
-                atPath: resources.appendingPathComponent("\(resource).plist").path
-            )
+        missingBundledResources().isEmpty
+    }
+
+    private func missingBundledResources() -> [String] {
+        guard let resources = bundledResourcesURL() else { return ["mobile-execution resource directory"] }
+        var missing = [
+            "commandDictionary.plist", "extraCommandsDictionary.plist",
+            "vim/syntax/syntax.vim", "terminfo", "python/lib/python3.9/os.py",
+        ].filter { !FileManager.default.fileExists(atPath: resources.appendingPathComponent($0).path) }
+        for file in ["cacert.pem", "bin/pkg"] {
+            if (try? Data(contentsOf: resources.appendingPathComponent(file)).isEmpty) != false {
+                missing.append(file)
+            }
         }
-        guard dictionariesAvailable else { return false }
-        return FileManager.default.fileExists(
-            atPath: resources.appendingPathComponent("vim/syntax/syntax.vim").path
-        ) && FileManager.default.fileExists(
-            atPath: resources.appendingPathComponent("terminfo", isDirectory: true).path
-        ) && ((try? Data(contentsOf: resources.appendingPathComponent("cacert.pem")).isEmpty)
-            == false) && ((try? Data(contentsOf: resources.appendingPathComponent("bin/pkg")).isEmpty)
-            == false) && FileManager.default.fileExists(
-                atPath: resources.appendingPathComponent("python/lib/python3.9/os.py").path
-            ) && bundledPythonFrameworkAvailable()
+        if !bundledPythonFrameworkAvailable() { missing.append("python3_ios.framework") }
+        return missing
     }
 
     private func scheduleTimeout(runId: String, pid: Int32, timeoutMs: UInt64) {

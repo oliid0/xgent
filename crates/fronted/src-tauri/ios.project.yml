@@ -46,6 +46,7 @@ targets:
       {{~#each ios-additional-targets}}
       - path: {{prefix-path this}}{{/each}}
       - path: ../../LaunchScreen.storyboard
+      - path: ../../native/apple-ui
     info:
       path: {{app.name}}_iOS/Info.plist
       properties:
@@ -107,6 +108,7 @@ targets:
       - sdk: UIKit.framework{{#if this.ios-frameworks}}{{~#each ios-frameworks}}
       - sdk: {{this}}.framework{{/each}}{{/if}}
       - sdk: WebKit.framework
+      - sdk: SwiftUI.framework
     preBuildScripts:
       {{~#each ios-pre-build-scripts}}{{#if this.path}}
       - path {{this.path}}{{/if}}{{#if this.script}}

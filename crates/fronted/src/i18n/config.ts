@@ -12,6 +12,11 @@ export const SUPPORTED_LOCALES = ["system", "zh-CN", "en-US"] as const satisfies
 
 export const translations: Record<ResolvedLocale, Record<string, string>> = {
   "zh-CN": {
+    "presentation.loadEarlier": "加载更早的消息",
+    "presentation.loadMore": "加载更多",
+    "presentation.retry": "重试",
+    "presentation.you": "你",
+    "presentation.context": "上下文摘要",
     "search.title": "搜索",
     "search.placeholder": "搜索聊天、文件和设置…",
     "search.settings": "设置",
@@ -2440,6 +2445,12 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
       "移动执行环境只在 Android、iOS 或 iPadOS 原生客户端中管理；浏览器设备通过局域网使用电脑能力",
     "settings.mobileEnable": "启用本地移动执行",
     "settings.mobileBackend": "执行后端",
+    "settings.mobileWithoutShell":
+      "Shell 是可选扩展。聊天、工作区文件读写、Skill、网络 MCP、浏览器和手机助手工具不需要先安装 Shell；系统权限按实际操作请求。",
+    "settings.mobileAndroidSource":
+      "基础环境来自此 APK 内置的 PRoot 和 Alpine 根文件系统，安装时在手机上校验、解压；额外语言和工具包按需从 Alpine 软件仓库下载。若包内资源缺失，需要包含这些资源的新版安装包。",
+    "settings.mobileIosSource":
+      "基础环境来自此应用内置的 a-Shell 命令框架和资源，安装时复制到应用沙盒并验证。框架由发布流程从上游下载、签名并随应用打包，不是下载另一个 a-Shell App，也不使用 iSH。",
     "settings.mobileEnvironment": "基础环境",
     "settings.mobileDiskUsage": "磁盘占用",
     "settings.mobileReady": "已就绪",
@@ -2803,6 +2814,11 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
   },
 
   "en-US": {
+    "presentation.loadEarlier": "Load earlier messages",
+    "presentation.loadMore": "Load more",
+    "presentation.retry": "Retry",
+    "presentation.you": "You",
+    "presentation.context": "Context summary",
     "search.title": "Search",
     "search.placeholder": "Search chats, files and settings…",
     "search.settings": "Settings",
@@ -5353,6 +5369,12 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
       "Manage mobile execution only in the native Android, iOS, or iPadOS app; browser devices use the computer over LAN",
     "settings.mobileEnable": "Enable mobile-local execution",
     "settings.mobileBackend": "Execution backend",
+    "settings.mobileWithoutShell":
+      "Shell is optional. Chat, workspace file access, Skills, network MCP, browser and personal-assistant tools do not require Shell installation. System permissions are requested for the relevant actions.",
+    "settings.mobileAndroidSource":
+      "The base environment comes from PRoot and the Alpine root filesystem bundled in this APK. Installation verifies and extracts them on the phone. Additional languages and tools are downloaded from Alpine repositories on demand. Missing bundled resources require an application package that includes them.",
+    "settings.mobileIosSource":
+      "The base environment uses a-Shell command frameworks and resources bundled in this app. Installation copies resources into the app sandbox and verifies execution. The release pipeline downloads, signs and packages the frameworks; it does not download another a-Shell app or use iSH.",
     "settings.mobileEnvironment": "Base environment",
     "settings.mobileDiskUsage": "Disk usage",
     "settings.mobileReady": "Ready",

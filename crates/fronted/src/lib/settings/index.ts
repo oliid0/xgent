@@ -2130,8 +2130,8 @@ export function serializeSelectedModelJson(
 
 export function normalizeTheme(input: unknown): Theme {
   if (input === "dark") return "dark";
-  if (input === "system" || input === "auto") return "system";
-  return "light";
+  if (input === "light") return "light";
+  return "system";
 }
 
 export function normalizeCloseWindowBehavior(input: unknown): CloseWindowBehavior {
@@ -2720,7 +2720,7 @@ export function getDefaultSettings(): AppSettings {
     },
     chatRuntimeControls: DEFAULT_CHAT_RUNTIME_CONTROLS,
     selectedModel: undefined,
-    theme: "light",
+    theme: "system",
     locale: DEFAULT_LOCALE,
     closeWindowBehavior: "minimize",
   };

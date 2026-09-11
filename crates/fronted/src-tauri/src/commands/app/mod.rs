@@ -8,6 +8,7 @@ pub mod app;
 #[cfg(desktop)]
 pub mod custom_tools;
 pub mod system;
+pub mod apple_ui;
 pub mod soul;
 #[cfg(desktop)]
 pub mod update;

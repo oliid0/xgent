@@ -8,6 +8,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { NativeSurface } from "../../presentation/NativeSurface";
+import type { PresentationHandler } from "../../presentation/types";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 
 type ConfirmDialogTone = "warning" | "destructive";
 
@@ -53,6 +56,20 @@ function ConfirmDialog(
     .filter(Boolean)
     .join("\n\n");
 
+  if (isApplePresentationRuntime()) {
+    return (
+      <NativeConfirmDialog
+        title={titleText}
+        description={descriptionText || titleText}
+        confirmLabel={confirmLabel}
+        cancelLabel={cancelLabel}
+        destructive={tone === "destructive"}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />
+    );
+  }
+
   return (
     <AlertDialog
       isOpen
@@ -65,6 +82,46 @@ function ConfirmDialog(
       actionLabel={confirmLabel}
       actionVariant={tone === "destructive" ? "destructive" : "primary"}
       onAction={onConfirm}
+    />
+  );
+}
+
+function NativeConfirmDialog(props: {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  destructive: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const [failure, setFailure] = useState<unknown>(null);
+  if (failure) throw failure;
+  const handlers = new Map<string, PresentationHandler>([
+    ["confirm", { enabled: true, accepts: (value) => value === null, run: props.onConfirm }],
+    ["cancel", { enabled: true, accepts: (value) => value === null, run: props.onCancel }],
+  ]);
+  return (
+    <NativeSurface
+      document={{
+        mode: "alert",
+        title: props.title,
+        appearance: "system",
+        dismissAction: "cancel",
+        nodes: [
+          { id: "description", kind: "Text", text: props.description },
+          {
+            id: "confirm",
+            kind: "Button",
+            label: props.confirmLabel,
+            destructive: props.destructive,
+            action: "confirm",
+          },
+          { id: "cancel", kind: "Button", label: props.cancelLabel, action: "cancel" },
+        ],
+      }}
+      handlers={handlers}
+      onError={setFailure}
     />
   );
 }

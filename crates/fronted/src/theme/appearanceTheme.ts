@@ -55,7 +55,10 @@ export function createAppearanceTheme(appearance: AppearanceSettings, compact: b
         : {}),
       "chat-composer": {
         base: {
-          backgroundColor: "var(--color-background-surface)",
+          backgroundColor:
+            appearance.preset === "current"
+              ? "var(--astryx-theme-xgent-glass-surface)"
+              : "var(--color-background-surface)",
           borderRadius: "var(--radius-chat)",
           boxShadow: "var(--shadow-low)",
         },

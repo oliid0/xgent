@@ -220,6 +220,12 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
           <Banner status="info" title={t("settings.mobileNativeOnly")} collapsible={false} />
         ) : (
           <VStack gap={4}>
+            <Text type="supporting" color="secondary" wordBreak="break-word">
+              {t("settings.mobileWithoutShell")}
+            </Text>
+            <Text type="supporting" color="secondary" wordBreak="break-word">
+              {t(platform === "ios" ? "settings.mobileIosSource" : "settings.mobileAndroidSource")}
+            </Text>
             <MetadataList>
               <MetadataListItem label={t("settings.mobileBackend")}>
                 <Text type="body">{status?.backend ?? "—"}</Text>
