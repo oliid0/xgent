@@ -136,7 +136,7 @@ export function installWebviewNavigationGuard(
   eventSource.addEventListener("dragover", onDragOver);
   eventSource.addEventListener("drop", onDrop);
   eventSource.addEventListener("submit", onSubmit);
-  eventSource.addEventListener("contextmenu", onContextMenu);
+  eventSource.addEventListener("contextmenu", onContextMenu, { capture: true });
 
   const uninstall = () => {
     eventSource.removeEventListener("keydown", onKeyDown, { capture: true });
@@ -145,7 +145,7 @@ export function installWebviewNavigationGuard(
     eventSource.removeEventListener("dragover", onDragOver);
     eventSource.removeEventListener("drop", onDrop);
     eventSource.removeEventListener("submit", onSubmit);
-    eventSource.removeEventListener("contextmenu", onContextMenu);
+    eventSource.removeEventListener("contextmenu", onContextMenu, { capture: true });
     if (uninstallCurrent === uninstall) uninstallCurrent = null;
   };
   uninstallCurrent = uninstall;
