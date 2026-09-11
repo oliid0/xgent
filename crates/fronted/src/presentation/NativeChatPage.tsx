@@ -5,8 +5,8 @@ import type { RenderTimelineItem } from "../lib/chat/conversation/conversationSt
 import type { LiveTranscriptStore } from "../lib/chat/conversation/liveTranscriptStore";
 import { toolResultMessageToText, type UiRound } from "../lib/chat/messages/uiMessages";
 import type { PendingUploadedFile } from "../lib/chat/messages/uploadedFiles";
-import type { ModelOption } from "../lib/providers/llm";
-import type { AppSettings, WorkspaceProject } from "../lib/settings";
+import { type ModelOption, parseModelValue } from "../lib/providers/llm";
+import type { AppSettings, SelectedModel, WorkspaceProject } from "../lib/settings";
 import type { SidebarStore } from "../lib/sidebar/store";
 import type { PendingToolApprovalSummary, ToolApprovalDecision } from "../lib/tools/toolApproval";
 import { createNativeComposerStore } from "./composerStore";
@@ -19,9 +19,8 @@ export type NativeChatPageProps = {
   sidebarStore: SidebarStore;
   historyItems: RenderTimelineItem[];
   liveTranscriptStore: LiveTranscriptStore;
-  currentConversationId: string;
   modelOptions: ModelOption[];
-  selectedValue: string;
+  selectedValue?: string;
   inputDisabled: boolean;
   inputPlaceholder: string;
   isSending: boolean;
@@ -29,12 +28,12 @@ export type NativeChatPageProps = {
   hasMoreHistory: boolean;
   pendingApprovals: PendingToolApprovalSummary[];
   projects: WorkspaceProject[];
-  workdir: string;
+  attachmentsEnabled: boolean;
   uploads: PendingUploadedFile[];
   isUploading: boolean;
   onSend: () => void;
   onStop: () => void;
-  onSelectModel: (value: string) => void;
+  onSelectModel: (selection: SelectedModel) => void;
   onSelectConversation: (id: string) => void;
   onSelectProject: (project: WorkspaceProject) => void;
   onNewConversation: () => void;
@@ -43,7 +42,6 @@ export type NativeChatPageProps = {
   onDecide: (id: string, decision: ToolApprovalDecision) => { ok: boolean; message?: string };
   onPickFiles: () => Promise<void>;
   onRemoveUpload: (path: string) => void;
-  onError: (message: string | null) => void;
 };
 
 function roundNodes(rounds: UiRound[], prefix: string, showThinking: boolean): PresentationNode[] {
@@ -183,6 +181,9 @@ export function NativeChatPage(props: NativeChatPageProps) {
         ...(props.errorMessage
           ? [{ id: "error", kind: "Text" as const, text: props.errorMessage }]
           : []),
+        ...(props.modelOptions.length === 0
+          ? [{ id: "no-model", kind: "Text" as const, text: t("chat.noModelSelected") }]
+          : []),
         ...(props.hasMoreHistory
           ? [button("earlier", t("presentation.loadEarlier"), props.onLoadEarlierHistory)]
           : []),
@@ -228,14 +229,21 @@ export function NativeChatPage(props: NativeChatPageProps) {
               id: "model",
               kind: "Selector",
               label: t("chat.trajectory.lane.model"),
-              value: props.selectedValue,
+              value: props.selectedValue ?? "",
               disabled: props.modelOptions.length === 0,
               options: props.modelOptions.map((option) => ({
                 value: option.value,
                 label: `${option.providerName} · ${option.label}`,
               })),
-              action: change("model", props.onSelectModel, (value) =>
-                props.modelOptions.some((option) => option.value === value),
+              action: change(
+                "model",
+                (value) => {
+                  const selection = parseModelValue(value);
+                  if (!selection) throw new Error(t("chat.noModelSelected"));
+                  props.onSelectModel(selection);
+                },
+                (value) => props.modelOptions.some((option) => option.value === value),
+                props.modelOptions.length > 0,
               ),
             },
             {
@@ -259,14 +267,17 @@ export function NativeChatPage(props: NativeChatPageProps) {
                   "attach",
                   "+",
                   props.onPickFiles,
-                  !props.isUploading && Boolean(props.workdir),
+                  props.attachmentsEnabled && !props.isUploading && !props.inputDisabled,
                 ),
                 {
                   ...button(
                     "send",
                     t("chat.send"),
                     props.onSend,
-                    !props.inputDisabled && (!draft.isEmpty || props.uploads.length > 0),
+                    !props.inputDisabled &&
+                      !props.isUploading &&
+                      props.modelOptions.length > 0 &&
+                      (!draft.isEmpty || props.uploads.length > 0),
                   ),
                   prominent: true,
                 },

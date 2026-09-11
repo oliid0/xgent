@@ -2,6 +2,8 @@ use serde::Serialize;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("mobile assistant worker failed: {0}")]
+    Worker(String),
     #[error("mobile assistant capability is unavailable: {0}")]
     Unavailable(String),
     #[cfg(mobile)]

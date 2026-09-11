@@ -62,8 +62,20 @@ try {
   Start-Sleep -Seconds 1
   $expected = New-Object XgentWindowSmoke+Rect
   if (-not [XgentWindowSmoke]::GetClientRect($window, [ref]$expected)) { throw "Resized window handle became invalid" }
-  [void][XgentWindowSmoke]::PostMessage($window, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
-  Start-Sleep -Seconds 2
+  if (-not [XgentWindowSmoke]::PostMessage($window, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)) {
+    throw "Unable to deliver the native close request"
+  }
+  # The app saves state before hiding to tray. Wait for that lifecycle boundary
+  # instead of killing a loaded CI process after an arbitrary two seconds.
+  $closeDeadline = (Get-Date).AddSeconds(30)
+  do {
+    $process.Refresh()
+    if ($process.HasExited -or -not [XgentWindowSmoke]::IsWindowVisible($window)) { break }
+    Start-Sleep -Milliseconds 100
+  } while ((Get-Date) -lt $closeDeadline)
+  if (-not $process.HasExited -and [XgentWindowSmoke]::IsWindowVisible($window)) {
+    throw "Xgent did not finish handling its native close request"
+  }
   if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
   $process.WaitForExit()
   $process = Start-Process -FilePath $resolvedExecutable -PassThru -WindowStyle Hidden

@@ -28,6 +28,8 @@ fn main() {
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     if target_os == "macos" {
         link_computer_use(std::path::Path::new(&manifest_dir));
+    }
+    if target_os == "macos" || target_os == "ios" {
         link_native_ui(std::path::Path::new(&manifest_dir));
     }
     let is_windows_msvc = target_os == "windows"
@@ -70,29 +72,43 @@ fn main() {
 }
 
 // Uses the same in-process Swift linkage as the existing computer-use module.
-// iOS compiles these sources in the generated Xcode target (ios.project.yml).
+// Link into Rust on both Apple targets: the iOS cdylib must resolve this symbol
+// before Xcode links the final app, not from a later application source phase.
 fn link_native_ui(manifest_dir: &std::path::Path) {
     use std::process::Command;
     let sources = manifest_dir.join("native/apple-ui");
     println!("cargo:rerun-if-changed={}", sources.display());
     let output = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
-    let sdk = Command::new("xcrun").args(["--sdk", "macosx", "--show-sdk-path"])
-        .output().expect("locate macOS SDK");
-    assert!(sdk.status.success(), "locate macOS SDK failed");
+    let target = std::env::var("TARGET").expect("Rust target");
+    let ios = target.contains("apple-ios");
+    let simulator = target.ends_with("-sim") || (ios && target.starts_with("x86_64"));
+    let sdk_name = if simulator { "iphonesimulator" } else if ios { "iphoneos" } else { "macosx" };
+    let sdk = Command::new("xcrun").args(["--sdk", sdk_name, "--show-sdk-path"])
+        .output().expect("locate Apple SDK");
+    assert!(sdk.status.success(), "locate Apple SDK failed");
     let sdk = String::from_utf8(sdk.stdout).expect("SDK path");
     let arch = std::env::var("CARGO_CFG_TARGET_ARCH").expect("target architecture");
     let arch = if arch == "aarch64" { "arm64" } else { &arch };
+    let swift_target = if ios {
+        format!("{arch}-apple-ios16.0{}", if simulator { "-simulator" } else { "" })
+    } else {
+        format!("{arch}-apple-macosx14.0")
+    };
     let mut files: Vec<_> = std::fs::read_dir(&sources).expect("native SwiftUI sources")
         .map(|entry| entry.expect("SwiftUI source").path())
         .filter(|path| path.extension().is_some_and(|ext| ext == "swift")).collect();
     files.sort();
     let status = Command::new("xcrun").args(["swiftc", "-swift-version", "5", "-O", "-emit-library", "-static",
-        "-module-name", "XgentNativeUI", "-target", &format!("{arch}-apple-macosx14.0"), "-sdk", sdk.trim()])
+        "-module-name", "XgentNativeUI", "-target", &swift_target, "-sdk", sdk.trim()])
         .args(files).arg("-o").arg(output.join("libXgentNativeUI.a"))
         .status().expect("compile native SwiftUI presentation");
     assert!(status.success(), "native SwiftUI presentation compilation failed");
+    println!("cargo:rustc-link-search=native={}", output.display());
+    println!("cargo:rustc-link-search=native={}/usr/lib/swift", sdk.trim());
+    println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/lib/swift");
     println!("cargo:rustc-link-lib=static=XgentNativeUI");
-    for framework in ["SwiftUI", "AppKit", "WebKit", "Foundation"] {
+    let platform_ui = if ios { "UIKit" } else { "AppKit" };
+    for framework in ["SwiftUI", platform_ui, "WebKit", "Foundation"] {
         println!("cargo:rustc-link-lib=framework={framework}");
     }
 }

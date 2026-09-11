@@ -278,6 +278,8 @@ import {
   buildDroppedWorkspaceRootDrafts,
   listWorkspaceRootGrants,
 } from "../lib/workspaceRootGrants";
+import { NativeChatPage } from "../presentation/NativeChatPage";
+import { isApplePresentationRuntime } from "../runtime/applePresentation";
 import {
   buildErrorAssistantMessage,
   buildPreparedContext as buildPreparedConversationContext,
@@ -6183,6 +6185,43 @@ export function ChatPage(props: ChatPageProps) {
     rightSidebarOpen && (!mobileExperience || mobileWorkspaceDestination === null);
   const desktopAuxiliaryFullscreen =
     desktopAuxiliaryOpen && rightSidebarPresentation === "fullscreen";
+
+  if (isApplePresentationRuntime()) {
+    return (
+      <NativeChatPage
+        settings={settings}
+        composerRef={composerRef}
+        sidebarStore={sidebarStore}
+        historyItems={historyRenderItems}
+        liveTranscriptStore={liveTranscriptStore}
+        modelOptions={modelOptions}
+        selectedValue={selectedValue}
+        inputDisabled={isComposerInputDisabled}
+        inputPlaceholder={composerPlaceholder}
+        isSending={isSending}
+        errorMessage={errorMessage}
+        hasMoreHistory={conversationState.transcript.hasMoreBefore}
+        pendingApprovals={pendingToolApprovals}
+        projects={workspaceProjects}
+        attachmentsEnabled={canDropUpload}
+        uploads={pendingUploadedFiles}
+        isUploading={isUploadingFiles}
+        onSend={handleSend}
+        onStop={handleStopSending}
+        onSelectModel={handleSelectModel}
+        onSelectConversation={handleSelectConversation}
+        onSelectProject={handleSelectWorkspaceProject}
+        onNewConversation={handleDesktopNewConversation}
+        onOpenSettings={() => onOpenSettings()}
+        onLoadEarlierHistory={handleLoadEarlierHistory}
+        onDecide={(toolCallId, decision) =>
+          answerToolApproval(toolCallId, decision, { conversationId: currentConversationId })
+        }
+        onPickFiles={pickReadableFiles}
+        onRemoveUpload={removePendingUpload}
+      />
+    );
+  }
 
   return (
     <HStack height="100%" width="100%" gap={0} style={{ position: "relative", overflow: "hidden" }}>

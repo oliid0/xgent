@@ -12,6 +12,7 @@ import AppKit
 private final class XgentPresentationHost: NSObject {
     static var associationKey: UInt8 = 0
     let model: XgentPresentationModel
+    private var constraints: [NSLayoutConstraint] = []
     #if os(iOS)
     let controller: UIHostingController<XgentPresentationView>
     #else
@@ -36,17 +37,39 @@ private final class XgentPresentationHost: NSObject {
         let container = parentController.view!
         controller.view.backgroundColor = .clear
         container.addSubview(controller.view)
-        controller.didMove(toParent: parentController)
         #else
         container.addSubview(controller.view, positioned: .above, relativeTo: webview)
         #endif
         controller.view.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
+        constraints = [
             controller.view.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             controller.view.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             controller.view.topAnchor.constraint(equalTo: container.topAnchor),
             controller.view.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-        ])
+        ]
+        NSLayoutConstraint.activate(constraints)
+        #if os(iOS)
+        controller.didMove(toParent: parentController)
+        #endif
+    }
+
+    func detach(from webview: WKWebView) {
+        // Invalidate callbacks before SwiftUI dismisses sheets and bindings.
+        model.invalidate()
+        #if os(iOS)
+        controller.dismiss(animated: false)
+        controller.willMove(toParent: nil)
+        #endif
+        NSLayoutConstraint.deactivate(constraints)
+        constraints.removeAll()
+        controller.view.removeFromSuperview()
+        #if os(iOS)
+        controller.removeFromParent()
+        webview.accessibilityElementsHidden = false
+        #else
+        webview.setAccessibilityHidden(false)
+        #endif
+        webview.isHidden = false
     }
 
     func updateVisibility() {
@@ -61,6 +84,16 @@ private final class XgentPresentationHost: NSObject {
         model.webview?.setAccessibilityHidden(nativeRoot)
         #endif
     }
+}
+
+@_cdecl("xgent_native_ui_reset")
+@MainActor
+public func xgentNativeUIReset(_ webviewPointer: UnsafeMutableRawPointer?) {
+    guard let webviewPointer else { return }
+    let webview = Unmanaged<WKWebView>.fromOpaque(webviewPointer).takeUnretainedValue()
+    guard let host = objc_getAssociatedObject(webview, &XgentPresentationHost.associationKey) as? XgentPresentationHost else { return }
+    host.detach(from: webview)
+    objc_setAssociatedObject(webview, &XgentPresentationHost.associationKey, nil, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 }
 
 @_cdecl("xgent_native_ui_update")

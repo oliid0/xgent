@@ -28,6 +28,11 @@ The release preparation steps in `.github/workflows/desktop-release.yml` are
 required inputs to packaging; the install button cannot replace missing native
 libraries in an already-installed application.
 
+Android preparation requires host `patchelf` and binutils (`readelf`, `ar`).
+The packaging script rewrites the versioned talloc SONAME and PRoot dependency
+to the APK-extracted `libtalloc.so` name, preserves 16 KiB page alignment, and
+rejects dependencies that are neither bundled nor Android system libraries.
+
 | Platform | Prepared before packaging | Installed on the device |
 | --- | --- | --- |
 | Android | `scripts/mobile/prepare-proot-android.sh` obtains the Termux PRoot executable, loader and dependencies (with a source fallback). `prepare-alpine-rootfs-android.sh` downloads verified Alpine minirootfs archives for arm64-v8a and x86_64. | `RootfsInstaller` selects the device ABI from the bundled manifest, verifies the archive checksum, extracts to staging and runs an execution probe before keeping the activated environment. Base installation uses APK assets. Additional toolchain profiles use Alpine packages over the network. |

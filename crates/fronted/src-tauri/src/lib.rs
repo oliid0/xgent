@@ -857,6 +857,8 @@ pub fn run() {
                 return;
             }
             let app = webview.app_handle();
+            #[cfg(target_os = "macos")]
+            commands::app_commands::apple_ui::reset_for_navigation(&webview);
             if let Some(state) = app.try_state::<Arc<commands::app::FrontendReadyState>>() {
                 state.painted.store(false, Ordering::SeqCst);
             }
@@ -1197,6 +1199,14 @@ pub fn run() {
         .manage(Arc::new(commands::mcp::McpRuntimeManager::default()))
         .manage(Arc::new(commands::hook::MobileHookScopeRegistry::default()))
         .manage(Arc::new(commands::app::MobileStartupState::default()))
+        .on_page_load(|webview, payload| {
+            #[cfg(target_os = "ios")]
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                commands::app_commands::apple_ui::reset_for_navigation(&webview);
+            }
+            #[cfg(not(target_os = "ios"))]
+            let _ = (webview, payload);
+        })
         .setup(|app| {
             let app_handle = app.handle().clone();
             let startup_state = app

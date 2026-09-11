@@ -315,10 +315,10 @@ jobs:
           mkdir -p dist
           msi_path="$(find target crates/fronted/src-tauri/target -type f -name '*.msi' -path '*bundle*' -print -quit 2>/dev/null || true)"
           exe_path="$(find target crates/fronted/src-tauri/target -type f -name '*.exe' -path '*bundle*' -print -quit 2>/dev/null || true)"
-          portable_exe_path="$(find target crates/fronted/src-tauri/target -type f -name 'xgent.exe' -path '*/release/*' ! -path '*bundle*' -print -quit 2>/dev/null || true)"
+          portable_exe_path="target/x86_64-pc-windows-msvc/release/xgent.exe"
           test -n "$msi_path"
           test -n "$exe_path"
-          test -n "$portable_exe_path"
+          test -f "$portable_exe_path"
           cp "$msi_path" "dist/Xgent-${XGENT_RELEASE_TAG}-Windows-x64.msi"
           cp "$exe_path" "dist/Xgent-${XGENT_RELEASE_TAG}-Windows-x64-Setup.exe"
           if [ "$SIGNED_RELEASE" = true ]; then
@@ -512,7 +512,7 @@ jobs:
       - name: Install host archive tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y binutils zstd
+          sudo apt-get install -y binutils zstd patchelf
 
       - name: Install pnpm
         shell: bash

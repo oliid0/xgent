@@ -137,8 +137,23 @@ final class XgentPresentationModel: ObservableObject {
     private var pending: [String: (surface: String, node: String, revision: Int)] = [:]
     private var editRequests: [String: String] = [:]
     private var acknowledgedEdits: Set<String> = []
+    private var active = true
+
+    func invalidate() {
+        active = false
+        webview = nil
+        pending.removeAll()
+        editRequests.removeAll()
+        acknowledgedEdits.removeAll()
+        revisions.removeAll()
+        busy.removeAll()
+        edits.removeAll()
+        error = nil
+        documents.removeAll()
+    }
 
     func update(_ document: XgentDocument) {
+        guard active else { return }
         guard document.revision > (revisions[document.surface] ?? 0) else { return }
         revisions[document.surface] = document.revision
         if document.removed == true {
@@ -185,6 +200,7 @@ final class XgentPresentationModel: ObservableObject {
     }
 
     func send(_ node: XgentNode, in document: XgentDocument, value: XgentValue = .null, editing: Bool = false) {
+        guard active else { return }
         guard node.disabled != true, let action = node.action else { return }
         let nodeKey = key(document.surface, node.id)
         if !editing && busy.contains(nodeKey) { return }
@@ -199,6 +215,7 @@ final class XgentPresentationModel: ObservableObject {
     }
 
     func dismiss(_ document: XgentDocument) {
+        guard active else { return }
         guard let action = document.dismissAction else { return }
         let nodeKey = key(document.surface, "$dismiss")
         guard !busy.contains(nodeKey) else { return }

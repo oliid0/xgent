@@ -25,9 +25,9 @@ extension XgentNodeView {
     @ViewBuilder var generatedContent: some View {
         switch node.kind {
         case .vStack:
-            VStack(alignment: .leading, spacing: node.spacing.map(CGFloat.init)) { children }
+            VStack(alignment: .leading, spacing: node.spacing.map { CGFloat($0) }) { children }
         case .hStack:
-            HStack(spacing: node.spacing.map(CGFloat.init)) { children }
+            HStack(spacing: node.spacing.map { CGFloat($0) }) { children }
         case .scrollView:
             ScrollView { LazyVStack(alignment: .leading, spacing: 12) { children } }
         case .card:

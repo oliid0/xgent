@@ -133,6 +133,28 @@ install_official_abi() {
   install -Dm755 "$proot_loader" "$OUTPUT_ROOT/$android_abi/libxgent_proot_loader.so"
   install -Dm755 "$talloc_library" "$OUTPUT_ROOT/$android_abi/libtalloc.so"
   install -Dm755 "$shmem_library" "$OUTPUT_ROOT/$android_abi/libandroid-shmem.so"
+  # APK native libraries must end in .so. Renaming a versioned ELF file alone
+  # leaves PRoot's DT_NEEDED pointing at libtalloc.so.2, which Android cannot find.
+  local packaged_root="$OUTPUT_ROOT/$android_abi"
+  local talloc_soname
+  talloc_soname="$(patchelf --print-soname "$talloc_library")"
+  test -n "$talloc_soname"
+  patchelf --page-size 16384 --set-soname libtalloc.so "$packaged_root/libtalloc.so"
+  patchelf --page-size 16384 --replace-needed "$talloc_soname" libtalloc.so "$packaged_root/libxgent_proot.so"
+  local binary dependency dynamic_entries
+  for binary in "$packaged_root"/*.so; do
+    # readelf also accepts the static PRoot loader (which has no DT_NEEDED).
+    dynamic_entries="$(readelf --dynamic "$binary")"
+    while IFS= read -r dependency; do
+      case "$dependency" in
+        libc.so|libm.so|libdl.so|liblog.so|libandroid.so) ;;
+        *) test -f "$packaged_root/$dependency" || {
+          echo "Unpackaged PRoot dependency: $dependency ($android_abi)" >&2
+          return 1
+        } ;;
+      esac
+    done < <(printf '%s\n' "$dynamic_entries" | sed -n 's/.*(NEEDED).*\[\(.*\)\].*/\1/p')
+  done
   printf '%s' "$proot_version"
 }
 
@@ -168,7 +190,7 @@ PY
   echo "Prepared official Termux PRoot $arm_version in $OUTPUT_ROOT"
 }
 
-for command_name in curl tar sha256sum python3 ar awk install find; do
+for command_name in curl tar sha256sum python3 ar awk install find patchelf readelf sed; do
   command -v "$command_name" >/dev/null || {
     echo "$command_name is required to prepare Android PRoot" >&2
     exit 1
@@ -207,7 +229,7 @@ done
 resolve_source_version() {
   curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
     "$TERMUX_PROOT_RECIPE" |
-    awk -F= '/^TERMUX_PKG_VERSION=/ { gsub(/["'"'[:space:]]/, "", $2); print $2; exit }'
+    awk -F= '/^TERMUX_PKG_VERSION=/ { gsub(/["\047[:space:]]/, "", $2); print $2; exit }'
 }
 
 readonly PROOT_SOURCE_VERSION="${PROOT_SOURCE_VERSION:-$(resolve_source_version)}"

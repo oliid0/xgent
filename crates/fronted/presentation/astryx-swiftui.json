@@ -6,13 +6,13 @@
       "kind": "VStack",
       "swiftCase": "vStack",
       "astryx": "Stack/VStack",
-      "declaration": "VStack(alignment: .leading, spacing: node.spacing.map(CGFloat.init)) { children }"
+      "declaration": "VStack(alignment: .leading, spacing: node.spacing.map { CGFloat($0) }) { children }"
     },
     {
       "kind": "HStack",
       "swiftCase": "hStack",
       "astryx": "Stack/HStack",
-      "declaration": "HStack(spacing: node.spacing.map(CGFloat.init)) { children }"
+      "declaration": "HStack(spacing: node.spacing.map { CGFloat($0) }) { children }"
     },
     {
       "kind": "ScrollView",
