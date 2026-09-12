@@ -190,16 +190,22 @@ struct XgentNodeChildren: View {
     }
 }
 
-private struct XgentNodePresentationModifier: ViewModifier {
+private struct XgentNodeInsetsModifier: ViewModifier {
     let node: XgentNode
-    let alignment: Alignment
-    let controlSize: ControlSize
-    let busy: Bool
 
     func body(content: Content) -> some View {
         content
             .padding(CGFloat(node.padding ?? 0))
             .padding(.leading, CGFloat(node.indent ?? 0))
+    }
+}
+
+private struct XgentNodeFrameModifier: ViewModifier {
+    let node: XgentNode
+    let alignment: Alignment
+
+    func body(content: Content) -> some View {
+        content
             .frame(width: node.width.map(CGFloat.init), height: node.height.map(CGFloat.init),
                    alignment: alignment)
             .frame(minWidth: node.minWidth.map(CGFloat.init),
@@ -207,8 +213,26 @@ private struct XgentNodePresentationModifier: ViewModifier {
                    minHeight: node.minHeight.map(CGFloat.init),
                    maxHeight: node.fill == true ? .infinity : node.maxHeight.map(CGFloat.init),
                    alignment: alignment)
+    }
+}
+
+private struct XgentNodeTextLayoutModifier: ViewModifier {
+    let node: XgentNode
+
+    func body(content: Content) -> some View {
+        content
             .lineLimit(node.maxLines)
             .fixedSize(horizontal: node.wrap == false, vertical: false)
+    }
+}
+
+private struct XgentNodeControlModifier: ViewModifier {
+    let node: XgentNode
+    let controlSize: ControlSize
+    let busy: Bool
+
+    func body(content: Content) -> some View {
+        content
             .controlSize(controlSize)
             .disabled(node.disabled == true || busy)
             .accessibilityIdentifier(node.id)
@@ -263,11 +287,15 @@ struct XgentNodeView: View {
     }
 
     var body: some View {
-        generatedContent
-            .modifier(XgentNodePresentationModifier(
-                node: node,
-                alignment: frameAlignment,
-                controlSize: controlSize,
+        // Wire nodes are heterogeneous by design. Erase that generated branch
+        // once, then apply small modifiers so swiftc never has to solve the
+        // complete renderer and every layout/state modifier as one type tree.
+        AnyView(generatedContent)
+            .modifier(XgentNodeInsetsModifier(node: node))
+            .modifier(XgentNodeFrameModifier(node: node, alignment: frameAlignment))
+            .modifier(XgentNodeTextLayoutModifier(node: node))
+            .modifier(XgentNodeControlModifier(
+                node: node, controlSize: controlSize,
                 busy: model.isBusy(node, in: document)
             ))
     }
