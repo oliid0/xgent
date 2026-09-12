@@ -604,7 +604,8 @@ extension XgentNodeView {
         return HStack(spacing: 0) {
             if let sidebar = panes.first {
                 XgentNodeView(node: sidebar, document: document, model: model)
-                    .frame(width: 280, maxHeight: .infinity, alignment: .topLeading)
+                    .frame(width: 280)
+                    .frame(maxHeight: .infinity, alignment: .topLeading)
                     .background(Color(xgentHex: palette.surface).opacity(0.55))
             }
             Divider().overlay(Color(xgentHex: palette.border))

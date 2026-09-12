@@ -13,6 +13,7 @@ Ship one shared Xgent behavior and one Astryx-aligned visual contract across Web
 - `npx astryx upgrade --apply`, theme build, design discovery, and `astryx doctor` completed; doctor reports 0 failures and aligned 0.6.0 packages.
 - Final local verification: `pnpm check`, `pnpm native:check`, and `pnpm lint` pass; all 1190 non-Cargo tests pass. No local build/dev/Cargo command was used.
 - Release 34720747496 proved both PRoot ABIs compile/link; its x86_64 post-build guard used GNU's `i386:x86-64` label against NDK LLVM output. The guard now checks LLVM's canonical `architecture: x86_64` and prints the actual header on mismatch.
+- The same release reached native Apple compilation and exposed an invalid mixed fixed-width/max-height SwiftUI `frame` overload; the settings sidebar now composes the two supported frame modifiers.
 
 ## Remaining
 - Push this state and require GitHub CI plus unsigned release builds for Windows, Android, Linux, iOS and macOS to finish successfully; inspect any resulting native screenshots/artifacts.

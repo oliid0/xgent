@@ -98,4 +98,9 @@ test("native glass keeps grouped surfaces distinct from floating controls", () =
     /XgentGlassSurface\(radius: CGFloat\(presentationTheme\.radius\.chat\), floating: true\)/,
   );
   assert.match(nativeLayoutSource, /child\.icon == nil \? 0 : 36/);
+  assert.match(
+    nativeLayoutSource,
+    /\.frame\(width: 280\)\s*\.frame\(maxHeight: \.infinity, alignment: \.topLeading\)/,
+  );
+  assert.doesNotMatch(nativeLayoutSource, /\.frame\(width: 280, maxHeight:/);
 });
