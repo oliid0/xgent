@@ -953,6 +953,7 @@ pub fn run() {
                 // Persist user resizing while the window is alive. A tray close or
                 // OS shutdown can race process teardown; startup fitting is excluded.
                 if matches!(event, WindowEvent::Resized(_))
+                    && window.is_visible().unwrap_or(false)
                     && window.app_handle().state::<Arc<commands::app::FrontendReadyState>>()
                         .painted.load(Ordering::SeqCst)
                 {

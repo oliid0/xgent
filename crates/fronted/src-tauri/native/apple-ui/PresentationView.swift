@@ -190,6 +190,32 @@ struct XgentNodeChildren: View {
     }
 }
 
+private struct XgentNodePresentationModifier: ViewModifier {
+    let node: XgentNode
+    let alignment: Alignment
+    let controlSize: ControlSize
+    let busy: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .padding(CGFloat(node.padding ?? 0))
+            .padding(.leading, CGFloat(node.indent ?? 0))
+            .frame(width: node.width.map(CGFloat.init), height: node.height.map(CGFloat.init),
+                   alignment: alignment)
+            .frame(minWidth: node.minWidth.map(CGFloat.init),
+                   maxWidth: node.fill == true ? .infinity : node.maxWidth.map(CGFloat.init),
+                   minHeight: node.minHeight.map(CGFloat.init),
+                   maxHeight: node.fill == true ? .infinity : node.maxHeight.map(CGFloat.init),
+                   alignment: alignment)
+            .lineLimit(node.maxLines)
+            .fixedSize(horizontal: node.wrap == false, vertical: false)
+            .controlSize(controlSize)
+            .disabled(node.disabled == true || busy)
+            .accessibilityIdentifier(node.id)
+            .modifier(XgentAccessibilityModifier(node: node))
+    }
+}
+
 struct XgentNodeView: View {
     let node: XgentNode
     let document: XgentDocument
@@ -238,21 +264,12 @@ struct XgentNodeView: View {
 
     var body: some View {
         generatedContent
-            .padding(CGFloat(node.padding ?? 0))
-            .padding(.leading, CGFloat(node.indent ?? 0))
-            .frame(width: node.width.map(CGFloat.init), height: node.height.map(CGFloat.init),
-                   alignment: frameAlignment)
-            .frame(minWidth: node.minWidth.map(CGFloat.init),
-                   maxWidth: node.fill == true ? .infinity : node.maxWidth.map(CGFloat.init),
-                   minHeight: node.minHeight.map(CGFloat.init),
-                   maxHeight: node.fill == true ? .infinity : node.maxHeight.map(CGFloat.init),
-                   alignment: frameAlignment)
-            .lineLimit(node.maxLines)
-            .fixedSize(horizontal: node.wrap == false, vertical: false)
-            .controlSize(controlSize)
-            .disabled(node.disabled == true || model.isBusy(node, in: document))
-            .accessibilityIdentifier(node.id)
-            .modifier(XgentAccessibilityModifier(node: node))
+            .modifier(XgentNodePresentationModifier(
+                node: node,
+                alignment: frameAlignment,
+                controlSize: controlSize,
+                busy: model.isBusy(node, in: document)
+            ))
     }
 
     var picker: some View {

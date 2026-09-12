@@ -45,6 +45,24 @@ function Wait-XgentWindow($AppProcess) {
   throw "Xgent did not reveal its ready window"
 }
 
+function Wait-XgentClientSize($Window, $Width, $Height) {
+  # Tauri applies a hidden-window resize through the native event loop. Require
+  # the persisted client size itself, but allow that queued operation to settle.
+  $deadline = (Get-Date).AddSeconds(15)
+  $actual = New-Object XgentWindowSmoke+Rect
+  do {
+    if (-not [XgentWindowSmoke]::GetClientRect($Window, [ref]$actual)) {
+      throw "Restored window handle became invalid"
+    }
+    if ([Math]::Abs($actual.Right - $Width) -le 4 -and
+        [Math]::Abs($actual.Bottom - $Height) -le 4) {
+      return $actual
+    }
+    Start-Sleep -Milliseconds 100
+  } while ((Get-Date) -lt $deadline)
+  throw "Native window size was not restored: expected ${Width}x${Height}, got $($actual.Right)x$($actual.Bottom)"
+}
+
 try {
   $process = Start-Process -FilePath $resolvedExecutable -PassThru -WindowStyle Hidden
   Start-Sleep -Seconds $StartupWaitSeconds
@@ -84,13 +102,14 @@ try {
   }
   if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
   $process.WaitForExit()
+  $persisted = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+  if ([Math]::Abs($persisted.width - $expected.Right) -gt 4 -or
+      [Math]::Abs($persisted.height - $expected.Bottom) -gt 4) {
+    throw "Hidden-window events corrupted persisted size: expected $($expected.Right)x$($expected.Bottom), got $($persisted.width)x$($persisted.height)"
+  }
   $process = Start-Process -FilePath $resolvedExecutable -PassThru -WindowStyle Hidden
   $window = Wait-XgentWindow $process
-  $restored = New-Object XgentWindowSmoke+Rect
-  if (-not [XgentWindowSmoke]::GetClientRect($window, [ref]$restored)) { throw "Restored window handle became invalid" }
-  if ([Math]::Abs($restored.Right - $expected.Right) -gt 4 -or [Math]::Abs($restored.Bottom - $expected.Bottom) -gt 4) {
-    throw "Native window size was not restored: expected $($expected.Right)x$($expected.Bottom), got $($restored.Right)x$($restored.Bottom)"
-  }
+  $restored = Wait-XgentClientSize $window $expected.Right $expected.Bottom
   Write-Output "PASS: frontend-ready window and native resize/close/relaunch persistence"
 }
 finally {

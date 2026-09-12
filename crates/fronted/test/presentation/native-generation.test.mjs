@@ -93,6 +93,11 @@ test("native glass keeps grouped surfaces distinct from floating controls", () =
     /floating \? material\.popoverOpacity : material\.surfaceOpacity/,
   );
   assert.match(nativeViewSource, /buttonBorderShape\(\.roundedRectangle\(radius:/);
+  assert.match(nativeViewSource, /struct XgentNodePresentationModifier: ViewModifier/);
+  assert.match(
+    nativeViewSource,
+    /generatedContent\s*\.modifier\(XgentNodePresentationModifier\(/,
+  );
   assert.match(
     nativeLayoutSource,
     /XgentGlassSurface\(radius: CGFloat\(presentationTheme\.radius\.chat\), floating: true\)/,

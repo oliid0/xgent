@@ -14,9 +14,11 @@ Ship one shared Xgent behavior and one Astryx-aligned visual contract across Web
 - Final local verification: `pnpm check`, `pnpm native:check`, and `pnpm lint` pass; all 1190 non-Cargo tests pass. No local build/dev/Cargo command was used.
 - Release 34720747496 proved both PRoot ABIs compile/link; its x86_64 post-build guard used GNU's `i386:x86-64` label against NDK LLVM output. The guard now checks LLVM's canonical `architecture: x86_64` and prints the actual header on mismatch.
 - The same release reached native Apple compilation and exposed an invalid mixed fixed-width/max-height SwiftUI `frame` overload; the settings sidebar now composes the two supported frame modifiers.
+- Release 34721118824 then isolated the remaining platform failures: the Swift build script still targeted iOS 16/macOS 14, the macOS compiler exhausted diagnostics on the generated-content modifier chain, Android coroutines 1.10.2 carried Kotlin 2.1 metadata into a Kotlin 1.9 host, and a post-hide Windows resize could overwrite the just-saved client size.
+- Native Swift now targets iOS 26/macOS 15 as required; node layout modifiers compile in an isolated `ViewModifier`; Android pins the JetBrains artifact published against Kotlin 1.9.21; Windows ignores hidden resize events and its smoke test proves both post-exit persistence and eventual native restore.
 
 ## Remaining
-- Push this state and require GitHub CI plus unsigned release builds for Windows, Android, Linux, iOS and macOS to finish successfully; inspect any resulting native screenshots/artifacts.
+- Push this state and require GitHub CI plus a new unsigned release build for Windows, Android, Linux, iOS and macOS to finish successfully; inspect the resulting native screenshots/artifacts.
 - Provisioning-dependent health, inbox, CloudKit and similar system integrations remain gated by platform entitlements and user authorization rather than fake fallback UI.
 
 ## Touched areas

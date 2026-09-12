@@ -90,9 +90,9 @@ fn link_native_ui(manifest_dir: &std::path::Path) {
     let arch = std::env::var("CARGO_CFG_TARGET_ARCH").expect("target architecture");
     let arch = if arch == "aarch64" { "arm64" } else { &arch };
     let swift_target = if ios {
-        format!("{arch}-apple-ios16.0{}", if simulator { "-simulator" } else { "" })
+        format!("{arch}-apple-ios26.0{}", if simulator { "-simulator" } else { "" })
     } else {
-        format!("{arch}-apple-macosx14.0")
+        format!("{arch}-apple-macosx15.0")
     };
     let mut files: Vec<_> = std::fs::read_dir(&sources).expect("native SwiftUI sources")
         .map(|entry| entry.expect("SwiftUI source").path())
@@ -131,7 +131,7 @@ fn link_computer_use(manifest_dir: &std::path::Path) {
         .filter(|path| path.extension().is_some_and(|ext| ext == "swift")).collect();
     files.sort();
     let status = Command::new("xcrun").args(["swiftc", "-swift-version", "5", "-O", "-emit-library", "-static",
-        "-module-name", "XgentComputerUse", "-target", &format!("{arch}-apple-macosx14.0"), "-sdk", sdk.trim()])
+        "-module-name", "XgentComputerUse", "-target", &format!("{arch}-apple-macosx15.0"), "-sdk", sdk.trim()])
         .args(files).arg("-o").arg(output.join("libXgentComputerUse.a"))
         .status().expect("compile built-in computer use");
     assert!(status.success(), "built-in computer-use compilation failed");

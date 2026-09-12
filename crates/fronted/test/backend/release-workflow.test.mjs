@@ -60,6 +60,18 @@ const desktopHost = readFileSync(
   path.join(repoRoot, "crates/fronted/src-tauri/src/lib.rs"),
   "utf8",
 );
+const desktopCommands = readFileSync(
+  path.join(repoRoot, "crates/fronted/src-tauri/src/commands/app/app.rs"),
+  "utf8",
+);
+const nativeBuildScript = readFileSync(
+  path.join(repoRoot, "crates/fronted/src-tauri/build.rs"),
+  "utf8",
+);
+const mobileAssistantAndroidBuild = readFileSync(
+  path.join(repoRoot, "crates/mobile-assistant/android/build.gradle.kts"),
+  "utf8",
+);
 
 function jobSource(name, nextName) {
   const start = workflow.indexOf(`  ${name}:\n`);
@@ -179,6 +191,9 @@ test("iOS release prepares host tools and every target before Tauri initializati
 });
 
 test("release packaging preserves native runtime resources without ABI drift", () => {
+  assert.match(nativeBuildScript, /apple-ios26\.0/);
+  assert.match(nativeBuildScript, /apple-macosx15\.0/);
+  assert.doesNotMatch(nativeBuildScript, /apple-ios16\.0|apple-macosx14\.0/);
   assert.equal(
     iosConfig.bundle.resources["../../mobile-execution/ios/Sources/Resources/"],
     "mobile-execution/",
@@ -234,6 +249,11 @@ test("mobile health steps use platform authorization contracts and least privile
   assert.match(mobileAssistantIos, /quantityType\(forIdentifier: \.stepCount\)/);
   assert.match(mobileAssistantAndroid, /createRequestPermissionResultContract/);
   assert.match(mobileAssistantAndroid, /StepsRecord\.COUNT_TOTAL/);
+  assert.match(
+    mobileAssistantAndroidBuild,
+    /kotlinx-coroutines-android:1\.8\.1/,
+  );
+  assert.doesNotMatch(mobileAssistantAndroidBuild, /kotlinx-coroutines-android:1\.10/);
   assert.match(mobileAssistantManifest, /android\.permission\.health\.READ_STEPS/);
   assert.doesNotMatch(mobileAssistantManifest, /WRITE_STEPS|READ_HEALTH_DATA_IN_BACKGROUND/);
   assert.match(mobileAssistantManifest, /ACTION_SHOW_PERMISSIONS_RATIONALE/);
@@ -248,6 +268,8 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(windows, /scripts\/release\/smoke-launch-windows\.ps1/);
   assert.match(windowsLaunchSmoke, /Start-Process[\s\S]*-WindowStyle Hidden/);
   assert.match(windowsLaunchSmoke, /Portable Xgent exited during the launch smoke test/);
+  assert.match(windowsLaunchSmoke, /Wait-XgentClientSize/);
+  assert.match(windowsLaunchSmoke, /Hidden-window events corrupted persisted size/);
   assert.match(windowsLaunchSmoke, /finally[\s\S]*Stop-Process/);
   assert.match(android, /android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d/);
   assert.match(android, /script: bash scripts\/release\/smoke-launch-android\.sh/);
@@ -263,6 +285,11 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(ios, /xgent-ios-launch-evidence/);
   assert.match(workflow, /! -name '\*-smoke\.png'/);
   assert.match(desktopHost, /with_denylist\(&\[MAIN_WINDOW_LABEL\]\)/);
+  assert.match(
+    desktopHost,
+    /matches!\(event, WindowEvent::Resized\(_\)\)\s*&& window\.is_visible\(\)\.unwrap_or\(false\)/,
+  );
+  assert.match(desktopCommands, /window\.set_size\(tauri::PhysicalSize::new\(state\.width, state\.height\)\)/);
   const closeHandlerStart = desktopHost.indexOf(".on_window_event({");
   const closeHandlerEnd = desktopHost.indexOf(".invoke_handler", closeHandlerStart);
   assert.ok(closeHandlerStart >= 0 && closeHandlerEnd > closeHandlerStart);
