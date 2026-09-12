@@ -40,6 +40,94 @@ struct XgentOption: Decodable, Identifiable {
     var id: String { value }
 }
 
+struct XgentPalette: Decodable {
+    let accent: String
+    let accentText: String
+    let background: String
+    let surface: String
+    let card: String
+    let popover: String
+    let muted: String
+    let text: String
+    let secondaryText: String
+    let disabledText: String
+    let border: String
+    let emphasizedBorder: String
+    let shadow: String
+
+    func validate() throws {
+        let colors = [accent, accentText, background, surface, card, popover, muted, text,
+                      secondaryText, disabledText, border, emphasizedBorder, shadow]
+        guard colors.allSatisfy({ $0.range(of: #"^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"#,
+                                              options: .regularExpression) != nil }) else {
+            throw XgentProtocolError.invalid
+        }
+    }
+}
+
+struct XgentRadii: Decodable {
+    let inner: Double
+    let element: Double
+    let container: Double
+    let overlay: Double
+    let chat: Double
+}
+
+struct XgentSpacing: Decodable { let xs: Double, sm: Double, md: Double, lg: Double, xl: Double }
+struct XgentControlMetrics: Decodable { let small: Double, medium: Double, large: Double }
+struct XgentTypography: Decodable { let caption: Double, supporting: Double, body: Double }
+struct XgentMotion: Decodable { let fast: Double, medium: Double, slow: Double, curve: [Double] }
+struct XgentMaterialMode: Decodable {
+    let surfaceOpacity: Double
+    let popoverOpacity: Double
+    let shadowOpacity: Double
+}
+struct XgentMaterial: Decodable {
+    let light: XgentMaterialMode
+    let dark: XgentMaterialMode
+    let blur: Double
+    let saturation: Double
+}
+
+struct XgentPresentationTheme: Decodable {
+    let light: XgentPalette
+    let dark: XgentPalette
+    let radius: XgentRadii
+    let spacing: XgentSpacing
+    let control: XgentControlMetrics
+    let typography: XgentTypography
+    let motion: XgentMotion
+    let material: XgentMaterial
+    let fontScale: Double
+
+    func validate() throws {
+        try light.validate()
+        try dark.validate()
+        let dimensions = [radius.inner, radius.element, radius.container, radius.overlay, radius.chat,
+                          spacing.xs, spacing.sm, spacing.md, spacing.lg, spacing.xl,
+                          control.small, control.medium, control.large,
+                          typography.caption, typography.supporting, typography.body,
+                          motion.fast, motion.medium, motion.slow, material.blur,
+                          material.saturation, fontScale] + motion.curve
+        guard dimensions.allSatisfy(\.isFinite),
+              dimensions.allSatisfy({ $0 >= 0 }),
+              (0...64).contains(radius.element),
+              (0...64).contains(radius.container),
+              (0...96).contains(radius.overlay),
+              (0...96).contains(radius.chat),
+              (0...96).contains(radius.inner),
+              motion.curve.count == 4,
+              [material.light.surfaceOpacity, material.light.popoverOpacity,
+               material.light.shadowOpacity, material.dark.surfaceOpacity,
+               material.dark.popoverOpacity, material.dark.shadowOpacity]
+                .allSatisfy({ (0...1).contains($0) }),
+              (0.5...3).contains(material.saturation),
+              (0.8...1.4).contains(fontScale) else {
+            throw XgentProtocolError.invalid
+        }
+    }
+}
+
 struct XgentNode: Decodable, Identifiable {
     let id: String
     let kind: XgentNodeKind
@@ -54,22 +142,48 @@ struct XgentNode: Decodable, Identifiable {
     let secondary: Bool?
     let spacing: Double?
     let padding: Double?
+    let indent: Double?
     let fill: Bool?
+    let alignment: String?
+    let width: Double?
+    let minWidth: Double?
+    let maxWidth: Double?
+    let height: Double?
+    let minHeight: Double?
+    let maxHeight: Double?
+    let maxLines: Int?
+    let wrap: Bool?
+    let variant: String?
+    let size: String?
     let icon: String?
     let selected: Bool?
+    let role: String?
+    let status: String?
+    let language: String?
+    let minimum: Double?
+    let maximum: Double?
+    let step: Double?
+    let current: Double?
+    let total: Double?
     let options: [XgentOption]?
+    let accessibilityLabel: String?
+    let accessibilityHint: String?
+    let accessibilityValue: String?
     let children: [XgentNode]?
 }
 
 struct XgentDocument: Decodable, Identifiable {
     enum Mode: String, Decodable { case root, sheet, alert, sidebar }
     enum Appearance: String, Decodable { case system, light, dark }
+    enum FormFactor: String, Decodable { case mobile, desktop }
     let version: Int
     let surface: String
     let revision: Int
     let mode: Mode
     let title: String
     let appearance: Appearance
+    let formFactor: FormFactor?
+    let theme: XgentPresentationTheme?
     let nodes: [XgentNode]
     let dismissAction: String?
     let removed: Bool?
@@ -85,6 +199,7 @@ struct XgentDocument: Decodable, Identifiable {
 
     func validate() throws {
         guard version == 1, !surface.isEmpty, revision > 0 else { throw XgentProtocolError.invalid }
+        try theme?.validate()
         var ids = Set<String>()
         func visit(_ nodes: [XgentNode], depth: Int) throws {
             guard depth < 64, ids.count <= 20000 else { throw XgentProtocolError.invalid }
@@ -92,9 +207,26 @@ struct XgentDocument: Decodable, Identifiable {
                 guard ids.count < 20000, !node.id.isEmpty, ids.insert(node.id).inserted else {
                     throw XgentProtocolError.invalid
                 }
-                for dimension in [node.spacing, node.padding].compactMap({ $0 }) {
-                    guard dimension.isFinite, dimension >= 0, dimension <= 1024 else { throw XgentProtocolError.invalid }
+                for dimension in [node.spacing, node.padding, node.indent, node.width, node.minWidth,
+                                  node.maxWidth, node.height, node.minHeight, node.maxHeight].compactMap({ $0 }) {
+                    guard dimension.isFinite, dimension >= 0, dimension <= 10000 else { throw XgentProtocolError.invalid }
                 }
+                guard node.role.map({ ["user", "assistant", "system"].contains($0) }) ?? true,
+                      node.status.map({ ["pending", "running", "completed", "error", "paused"].contains($0) }) ?? true,
+                      node.alignment.map({ ["leading", "center", "trailing"].contains($0) }) ?? true,
+                      node.size.map({ ["small", "medium", "large"].contains($0) }) ?? true,
+                      node.maxLines.map({ (1...10000).contains($0) }) ?? true,
+                      node.action == nil || !node.kind.eventSemantics.isEmpty else {
+                    throw XgentProtocolError.invalid
+                }
+                let measures = [node.minimum, node.maximum, node.step, node.current, node.total].compactMap { $0 }
+                guard measures.allSatisfy({ $0.isFinite }),
+                      measures.allSatisfy({ abs($0) <= 1_000_000 }) else { throw XgentProtocolError.invalid }
+                if let minimum = node.minimum, let maximum = node.maximum {
+                    guard minimum <= maximum else { throw XgentProtocolError.invalid }
+                }
+                if let step = node.step { guard step > 0 else { throw XgentProtocolError.invalid } }
+                if let total = node.total { guard total >= 0 else { throw XgentProtocolError.invalid } }
                 if let options = node.options {
                     guard Set(options.map(\.value)).count == options.count else { throw XgentProtocolError.invalid }
                 }

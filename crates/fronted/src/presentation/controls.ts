@@ -37,6 +37,24 @@ export function presentationControls() {
         ),
       };
     },
+    color(
+      id: string,
+      label: string,
+      value: string,
+      run: (value: string) => unknown,
+    ): PresentationNode {
+      return {
+        id,
+        kind: "ColorInput",
+        label,
+        value,
+        ...bind(
+          id,
+          (next) => run((next as string).toLowerCase()),
+          (next) => typeof next === "string" && /^#[\da-f]{6}$/i.test(next),
+        ),
+      };
+    },
     toggle(
       id: string,
       label: string,

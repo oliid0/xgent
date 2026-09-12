@@ -7,6 +7,7 @@ import {
 import { createPresentationActionRegistry } from "./actionRegistry";
 import { createPresentationDocumentChannel } from "./documentChannel";
 import type { PresentationDocument, PresentationHandler } from "./types";
+import { validatePresentationDocument } from "./validateDocument";
 
 const actions = createPresentationActionRegistry();
 let subscriberCount = 0;
@@ -54,6 +55,7 @@ export function NativeSurface(props: {
       surface,
       revision: ++revision.current,
     };
+    validatePresentationDocument(document, props.handlers);
     void channel.publish(document).catch((error) => onError.current(error));
   }, [surface, props.document, props.handlers, channel]);
 

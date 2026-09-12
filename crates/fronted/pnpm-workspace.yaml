@@ -1,2 +1,8 @@
+allowBuilds:
+  '@astryxdesign/cli': true
+  '@astryxdesign/core': true
+  '@google/genai': true
+  esbuild: true
+  protobufjs: true
 patchedDependencies:
-  '@astryxdesign/core@0.5.4': patches/@astryxdesign__core@0.5.4.patch
+  '@astryxdesign/core@0.6.0': patches/@astryxdesign__core@0.6.0.patch

@@ -1,26 +1,21 @@
 # Current objective
-Complete Apple SwiftUI/mobile behavior against IMG_0385-0406 and yy; repair all platform releases.
+Ship one shared Xgent behavior and one Astryx-aligned visual contract across Web/Linux/Windows/Android and native SwiftUI iOS/macOS; verify every release target.
 
 ## Completed / current changes
-- SwiftUI root, sidebar, grouped settings, composer, native pickers and mobile device bridges use shared business state.
-- Native plugins, scheduled-task forms/execution logs, SSH settings and command panel; wired missing Apple sidebar destinations and SSH panel.
-- Android shmem TMPDIR fix passed its previous failure; new PRoot failure needs string.h, now patched against pinned upstream source.
-- CI iOS screenshots inspected: native root renders, but default Xcode 16.4 excludes Liquid Glass. Apple release now selects installed Xcode 26.3 and iOS 26 simulator.
-- macOS SSH now uses the desktop authenticated session registry with native trust/auth prompts and cancellation cleanup (3 regression tests pass).
-- Android .913 reaches linking: talloc requires its upstream libreplace objects, now included in the static archive.
-- Windows build succeeds but resize restoration still fails; smoke now reports saved native state to identify persistence vs restoration failure.
+- Upgraded Astryx core/themes/CLI to 0.6.0, applied its migration, regenerated the theme, and retained an exact-version layer geometry patch still required by older WebViews.
+- Expanded the executable Astryx-to-SwiftUI contract to 46 rendered kinds, 39 wire properties, the installed Astryx catalog, platform strategies, events, tokens, themes, and strict document/action validation.
+- Apple application chrome is native SwiftUI; WebKit is limited to browser content and a hidden noninteractive shared-state transport. Native chat, sidebar/more routes, settings, files, browser, SSH, attachments, activities/todos, messages, reasoning, tools, diffs and previews use shared TypeScript/Tauri state.
+- Calibrated IMG_0386-0406 as visual references only: mobile settings use continuous grouped surfaces with inset separators; menus/dialogs/composer use a distinct floating material; normal buttons use continuous rounded rectangles instead of blanket capsules. Astryx and SwiftUI resolve the same radius/material tokens, including user appearance overrides.
+- Added real least-privilege HealthKit/Health Connect steps and mobile voice settings; prepared Android PRoot/talloc linkage and Windows persisted-window restoration diagnostics/fixes.
 
-## Evidence / verification
-- Release 34684408057: iOS IPA/simulator, both macOS and Linux pass; Android PRoot and Windows resize smoke fail.
-- Astryx 0.5.4 CLI manifest/build and MCP search/get checked; yy OffloadPermissionSettingsView confirms List/Section/system confirmations.
-- pnpm check/lint passed; full non-Cargo suite 1177/1177 passed, native mapping current; PRoot patch applies cleanly to pinned upstream.
-- Inspected default/dark-large iOS screenshots; fixed overflowing toolbar glyphs and safe-area appearance. Swift changes validated by next native CI.
-- No local build/dev/Cargo. Release .913 / 34687704697 running; follow-up native SSH and talloc patch: check/lint plus 16 relevant tests pass; ready for next release run.
+## Decisions / evidence
+- Apple Swift MCP confirmed explicit Liquid Glass shapes, continuous button borders, and system-owned sheet/popover geometry; Astryx MCP/CLI confirmed 0.6.0 component contracts and canonical `popover` theme target.
+- `npx astryx upgrade --apply`, theme build, design discovery, and `astryx doctor` completed; doctor reports 0 failures and aligned 0.6.0 packages.
+- Final local verification: `pnpm check`, `pnpm native:check`, and `pnpm lint` pass; all 1190 non-Cargo tests pass. No local build/dev/Cargo command was used.
 
 ## Remaining
-- Complete CI and rendered wide/narrow interaction validation, including actual Liquid Glass compilation.
-- Native library and remaining settings; full mobile device feature parity is not complete.
-- Health, motion, Bluetooth, notifications and inbox integration require actual native/service implementations and provisioning.
+- Push this state and require GitHub CI plus unsigned release builds for Windows, Android, Linux, iOS and macOS to finish successfully; inspect any resulting native screenshots/artifacts.
+- Provisioning-dependent health, inbox, CloudKit and similar system integrations remain gated by platform entitlements and user authorization rather than fake fallback UI.
 
 ## Touched areas
-Native presentation adapters and mobile settings/SSH, Android PRoot patch, Apple release SDK selection, Windows smoke diagnostics, presentation tests.
+Astryx dependencies/themes/patch; presentation mapping/generator/validators; native Apple layouts and bridges; shared chat/settings/mobile panels; Android/iOS mobile-assistant services; release tests/configuration.

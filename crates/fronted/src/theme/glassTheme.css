@@ -1,22 +1,22 @@
 /* Preference inputs are global so portaled menus inherit the same material.
- * Paint 90% of the surface color; blur the 10% showing through, not the text.
+ * The theme owns tint opacity while these global inputs own the optical filter.
  * Unsupported browsers and accessibility preferences use the solid palette. */
 @layer theme {
   :root {
-    --xgent-material-opacity: 100%;
     --xgent-material-filter: none;
   }
 
   @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     :root {
-      --xgent-material-opacity: 90%;
-      --xgent-material-filter: blur(20px) saturate(120%);
+      --xgent-material-filter: blur(var(--astryx-theme-xgent-glass-material-blur, 28px))
+        saturate(var(--astryx-theme-xgent-glass-material-saturation, 145%));
     }
   }
 
   @media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
     :root {
-      --xgent-material-opacity: 100%;
+      --astryx-theme-xgent-glass-material-surface-opacity: 100%;
+      --astryx-theme-xgent-glass-material-popover-opacity: 100%;
       --xgent-material-filter: none;
     }
   }

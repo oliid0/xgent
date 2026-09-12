@@ -11,11 +11,16 @@ import {
   browserSessionController,
   normalizeBrowserAddress,
 } from "../../../lib/browser/browserSessionController";
+import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
 import {
   type AppSettings,
   updateAccessSettings,
   updateCustomSettings,
 } from "../../../lib/settings";
+import { presentationControls } from "../../../presentation/controls";
+import { NativeSurface } from "../../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
+import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { MobileFullscreenPanel, MobilePanelHeader } from "./MobilePanelScaffold";
 
 type MobileBrowserSettingsPanelProps = {
@@ -29,6 +34,7 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
   const { t } = useLocale();
   const [homePage, setHomePage] = useState(props.settings.customSettings.browser.homePage);
   const [clearing, setClearing] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (props.open) setHomePage(props.settings.customSettings.browser.homePage);
@@ -47,6 +53,85 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
       }),
     );
   };
+
+  if (isApplePresentationRuntime()) {
+    const compact = isNativeMobileRuntime();
+    const c = presentationControls();
+    c.handlers.set("close", {
+      enabled: !clearing,
+      accepts: (value) => value === null,
+      run: props.onClose,
+    });
+    const blocked = props.settings.access.blockedLocalCapabilities.includes("browser_automation");
+    return (
+      <NativeSurface
+        document={{
+          mode: "sheet",
+          title: t("chat.mobileMenu.browserSettings"),
+          appearance: props.settings.theme,
+          formFactor: compact ? "mobile" : "desktop",
+          theme: createNativePresentationTheme(props.settings, compact, "workspaceTools"),
+          dismissAction: clearing ? undefined : "close",
+          nodes: [
+            c.group("browser-home", t("browser.homePage"), [
+              c.input("browser-home-page", t("browser.homePage"), homePage, setHomePage),
+              c.action("browser-home-save", t("settings.save"), saveHomePage, !clearing),
+            ]),
+            c.group("browser-automation", t("browser.automation"), [
+              c.toggle(
+                "browser-automation-blocked",
+                t("settings.accessBlockBrowserAutomation"),
+                blocked,
+                (nextBlocked) =>
+                  props.setSettings((previous) => {
+                    const capabilities = new Set(previous.access.blockedLocalCapabilities);
+                    if (nextBlocked) capabilities.add("browser_automation");
+                    else capabilities.delete("browser_automation");
+                    return updateAccessSettings(previous, {
+                      blockedLocalCapabilities: Array.from(capabilities),
+                    });
+                  }),
+              ),
+            ]),
+            c.group("browser-privacy", t("browser.privacy"), [
+              {
+                ...c.action(
+                  "browser-clear-sessions",
+                  t("browser.clearSessions"),
+                  async () => {
+                    setClearing(true);
+                    setError("");
+                    try {
+                      await browserSessionController.closeAllSessions();
+                    } finally {
+                      setClearing(false);
+                    }
+                  },
+                  !clearing,
+                ),
+                destructive: true,
+              },
+            ]),
+            ...(clearing
+              ? [{ id: "browser-clearing", kind: "Progress" as const, label: t("app.loading") }]
+              : []),
+            ...(error
+              ? [
+                  {
+                    id: "browser-settings-error",
+                    kind: "Banner" as const,
+                    label: error,
+                    status: "error" as const,
+                  },
+                ]
+              : []),
+          ],
+        }}
+        handlers={c.handlers}
+        onError={(cause) => setError(cause instanceof Error ? cause.message : String(cause))}
+      />
+    );
+  }
 
   return (
     <MobileFullscreenPanel open label={t("chat.mobileMenu.browserSettings")}>

@@ -4142,7 +4142,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     flex-wrap: wrap;
     row-gap: var(--spacing-3);
   }
-  /* Astryx 0.5.4 Item places endContent in its final direct span. Move
+  /* Astryx 0.6.0 Item places endContent in its final direct span. Move
      controls below the label instead of shrinking the label to zero. */
   .settings-control-row > span:last-child {
     flex: 0 0 100%;

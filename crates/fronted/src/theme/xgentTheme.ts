@@ -53,10 +53,10 @@ export const xgentTheme = defineTheme({
     "--size-element-sm": "30px",
     "--size-element-md": "36px",
     "--size-element-lg": "40px",
-    "--radius-inner": "6px",
-    "--radius-element": "10px",
-    "--radius-container": "20px",
-    "--radius-page": "24px",
+    "--radius-inner": "8px",
+    "--radius-element": "12px",
+    "--radius-container": "22px",
+    "--radius-page": "28px",
     "--radius-chat": "26px",
     "--shadow-low":
       "0 1px 2px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 22%)), 0 4px 12px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 30%))",
@@ -66,10 +66,7 @@ export const xgentTheme = defineTheme({
       "0 8px 24px light-dark(rgb(0 0 0 / 10%), rgb(0 0 0 / 38%)), 0 24px 64px light-dark(rgb(0 0 0 / 10%), rgb(0 0 0 / 55%))",
   },
   components: {
-    button: {
-      "variant:primary": { borderRadius: "var(--radius-full)" },
-      "variant:secondary": { borderRadius: "var(--radius-full)" },
-    },
+    button: { base: { borderRadius: "var(--radius-element)" } },
     card: {
       base: {
         borderRadius: "var(--radius-container)",
@@ -80,7 +77,7 @@ export const xgentTheme = defineTheme({
       base: {
         backgroundColor: "var(--astryx-theme-xgent-glass-surface)",
         borderRadius: "var(--radius-chat)",
-        boxShadow: "var(--shadow-low)",
+        boxShadow: "inset 0 1px 0 var(--astryx-theme-xgent-glass-highlight), var(--shadow-low)",
       },
     },
     "chat-message-bubble": {
@@ -88,14 +85,14 @@ export const xgentTheme = defineTheme({
     },
     dialog: {
       base: {
-        borderRadius: "22px",
-        boxShadow: "var(--shadow-high)",
+        borderRadius: "var(--radius-page)",
+        boxShadow: "inset 0 1px 0 var(--astryx-theme-xgent-glass-highlight), var(--shadow-high)",
       },
     },
     "dropdown-menu": {
       base: {
-        borderRadius: "16px",
-        boxShadow: "var(--shadow-med)",
+        borderRadius: "var(--radius-page)",
+        boxShadow: "inset 0 1px 0 var(--astryx-theme-xgent-glass-highlight), var(--shadow-med)",
         padding: "var(--spacing-2)",
       },
     },
@@ -105,10 +102,10 @@ export const xgentTheme = defineTheme({
     "list-item": {
       base: { borderRadius: "var(--radius-element)" },
     },
-    "popover-surface": {
+    popover: {
       base: {
-        borderRadius: "20px",
-        boxShadow: "var(--shadow-med)",
+        borderRadius: "var(--radius-page)",
+        boxShadow: "inset 0 1px 0 var(--astryx-theme-xgent-glass-highlight), var(--shadow-med)",
       },
     },
     selector: {
@@ -119,8 +116,8 @@ export const xgentTheme = defineTheme({
     },
     "selector-popup": {
       base: {
-        borderRadius: "16px",
-        boxShadow: "var(--shadow-med)",
+        borderRadius: "var(--radius-page)",
+        boxShadow: "inset 0 1px 0 var(--astryx-theme-xgent-glass-highlight), var(--shadow-med)",
       },
     },
     "text-input": {
@@ -149,10 +146,10 @@ export const xgentCompactTheme = defineTheme({
     "--size-element-sm": "32px",
     "--size-element-md": "40px",
     "--size-element-lg": "44px",
-    "--radius-inner": "6px",
-    "--radius-element": "10px",
-    "--radius-container": "24px",
-    "--radius-page": "28px",
+    "--radius-inner": "8px",
+    "--radius-element": "14px",
+    "--radius-container": "26px",
+    "--radius-page": "32px",
     "--radius-chat": "28px",
     "--shadow-low":
       "0 1px 2px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 22%)), 0 4px 12px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 30%))",
@@ -163,7 +160,7 @@ export const xgentCompactTheme = defineTheme({
   },
   components: {
     button: {
-      base: { borderRadius: "var(--radius-full)" },
+      base: { borderRadius: "var(--radius-element)" },
     },
     card: {
       base: {
@@ -226,13 +223,13 @@ export const xgentCompactTheme = defineTheme({
         minHeight: "52px",
         backgroundColor: "var(--astryx-theme-xgent-glass-surface)",
         borderRadius: "var(--radius-chat)",
-        boxShadow: "var(--shadow-low)",
+        boxShadow: "inset 0 1px 0 var(--astryx-theme-xgent-glass-highlight), var(--shadow-low)",
       },
     },
     dialog: {
       base: {
         borderRadius: "var(--radius-page)",
-        boxShadow: "var(--shadow-high)",
+        boxShadow: "inset 0 1px 0 var(--astryx-theme-xgent-glass-highlight), var(--shadow-high)",
       },
       "variant:fullscreen": { borderRadius: "0" },
     },
@@ -240,13 +237,13 @@ export const xgentCompactTheme = defineTheme({
       base: {
         borderRadius: "var(--radius-page) var(--radius-page) 0 0",
         backgroundColor: "var(--astryx-theme-xgent-glass-popover)",
-        boxShadow: "var(--shadow-high)",
+        boxShadow: "inset 0 1px 0 var(--astryx-theme-xgent-glass-highlight), var(--shadow-high)",
       },
     },
     "dropdown-menu": {
       base: {
-        borderRadius: "var(--radius-container)",
-        boxShadow: "var(--shadow-med)",
+        borderRadius: "var(--radius-page)",
+        boxShadow: "inset 0 1px 0 var(--astryx-theme-xgent-glass-highlight), var(--shadow-med)",
         padding: "var(--spacing-2)",
       },
     },
@@ -256,10 +253,10 @@ export const xgentCompactTheme = defineTheme({
         borderRadius: "var(--radius-element)",
       },
     },
-    "popover-surface": {
+    popover: {
       base: {
-        borderRadius: "var(--radius-container)",
-        boxShadow: "var(--shadow-med)",
+        borderRadius: "var(--radius-page)",
+        boxShadow: "inset 0 1px 0 var(--astryx-theme-xgent-glass-highlight), var(--shadow-med)",
       },
     },
     "text-input": {

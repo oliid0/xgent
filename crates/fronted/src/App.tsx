@@ -748,6 +748,7 @@ export default function App() {
                           saveState={settingsSaveState}
                           onBack={closeSettings}
                           initialSection={settingsSection}
+                          soulCreateRequestId={soulCreateRequestId}
                           nativeMobile={nativeMobile}
                           appUpdate={appUpdate}
                         />

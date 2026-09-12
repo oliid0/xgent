@@ -820,6 +820,10 @@ pub fn run() {
         .plugin(
             tauri_plugin_window_state::Builder::new()
                 .with_state_flags(WINDOW_STATE_FLAGS)
+                // The main window persists its client size in
+                // main-window-size.json. Letting the plugin restore its own
+                // cached size as well creates a startup race on Windows.
+                .with_denylist(&[MAIN_WINDOW_LABEL])
                 .build(),
         )
         .plugin(
@@ -961,12 +965,6 @@ pub fn run() {
                     api.prevent_close();
                     if let Err(error) = commands::app::save_main_window_size(window) {
                         eprintln!("failed to save native main window size: {error}");
-                    }
-                    // Closing normally hides to tray, so the plugin's exit
-                    // hook may never run before the OS ends the process.
-                    use tauri_plugin_window_state::AppHandleExt;
-                    if let Err(error) = window.app_handle().save_window_state(WINDOW_STATE_FLAGS) {
-                        eprintln!("failed to save window size before close: {error}");
                     }
                     if commands::app::is_close_window_exit(&close_window_behavior) {
                         request_app_exit(window.app_handle(), &allow_exit, &terminal_registry);

@@ -8,7 +8,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        minSdk = 24
+        minSdk = 26
         consumerProguardFiles("consumer-rules.pro")
     }
 
@@ -24,4 +24,6 @@ android {
 
 dependencies {
     implementation(project(":tauri-android"))
+    implementation("androidx.health.connect:connect-client:1.1.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 }

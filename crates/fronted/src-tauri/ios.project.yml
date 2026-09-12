@@ -67,6 +67,8 @@ targets:
         {{this.key}}: {{this.value}}{{/each}}
     entitlements:
       path: {{app.name}}_iOS/{{app.name}}_iOS.entitlements
+      properties:
+        com.apple.developer.healthkit: true
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full
@@ -104,6 +106,7 @@ targets:
       - sdk: MetalKit.framework
       - sdk: QuartzCore.framework
       - sdk: Security.framework
+      - sdk: HealthKit.framework
       - sdk: UIKit.framework{{#if this.ios-frameworks}}{{~#each ios-frameworks}}
       - sdk: {{this}}.framework{{/each}}{{/if}}
       - sdk: WebKit.framework

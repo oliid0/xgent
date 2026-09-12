@@ -25,7 +25,13 @@ test("every preset and customized appearance resolves with the installed Astryx 
         assert.equal(typeof theme.tokens["--color-background-surface"], "string");
         if (preset === "current") {
           assert.match(theme.localTokens["--astryx-theme-xgent-glass-surface"], /color-mix/);
+          assert.equal(
+            theme.localTokens["--astryx-theme-xgent-glass-material-blur"],
+            "28px",
+          );
           assert.equal(theme.components["chat-composer"].base.backdropFilter, "var(--xgent-material-filter, none)");
+          assert.equal(theme.components.popover.base.borderRadius, "var(--radius-page)");
+          assert.equal(theme.components["popover-surface"], undefined);
           assert.equal(theme.components.dialog["variant:fullscreen"].backdropFilter, "none");
         }
       }

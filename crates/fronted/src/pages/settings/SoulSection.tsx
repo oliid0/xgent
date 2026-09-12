@@ -11,10 +11,19 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale } from "../../i18n";
+import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
+import type { AppSettings } from "../../lib/settings";
 import { DEFAULT_SOUL_METADATA, type SoulDraft, useSoul, validateSoulDraft } from "../../lib/soul";
+import { presentationControls } from "../../presentation/controls";
+import { NativeSurface } from "../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../presentation/nativeTheme";
+import type { PresentationNode } from "../../presentation/types";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 
 type SoulSectionProps = {
   createRequestId?: number;
+  settings?: AppSettings;
+  onBack?: () => void;
 };
 
 function createEmptySoulDraft(): SoulDraft {
@@ -24,7 +33,7 @@ function createEmptySoulDraft(): SoulDraft {
   };
 }
 
-export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
+export function SoulSection({ createRequestId = 0, settings, onBack }: SoulSectionProps) {
   const { t } = useLocale();
   const soul = useSoul();
   const [draft, setDraft] = useState<SoulDraft>({
@@ -135,6 +144,175 @@ export function SoulSection({ createRequestId = 0 }: SoulSectionProps) {
     label: preset.metadata.name || t("settings.soulNewDefaultName"),
     description: preset.metadata.style || t("settings.soulPresetNoStyle"),
   }));
+
+  if (isApplePresentationRuntime() && settings) {
+    const compact = isNativeMobileRuntime();
+    const c = presentationControls();
+    c.handlers.set("close", {
+      enabled: !soul.saving,
+      accepts: (value) => value === null,
+      run: () => onBack?.(),
+    });
+    const nodes: PresentationNode[] = [
+      {
+        id: "soul-description",
+        kind: "Text",
+        text: t("settings.soulDescription"),
+        secondary: true,
+      },
+      c.group("soul-presets", t("settings.soulPresetsGroup"), [
+        c.select(
+          "soul-preset",
+          t("settings.soulPresetsGroup"),
+          soul.activeId,
+          presetOptions.map(({ value, label }) => ({ value, label })),
+          (value) => handleSelect(value),
+        ),
+        ...(creating
+          ? [c.action("soul-cancel-create", t("settings.cancel"), cancelCreate, !soul.saving)]
+          : [c.action("soul-create", t("settings.soulAddPreset"), beginCreate, !soul.saving)]),
+        {
+          ...c.action(
+            "soul-delete",
+            t("settings.soulDeletePreset"),
+            () => setPresetToDelete(soul.activeId),
+            !soul.saving && !creating && soul.presets.length > 1,
+          ),
+          destructive: true,
+        },
+        ...(creating
+          ? [
+              {
+                id: "soul-create-hint",
+                kind: "Banner" as const,
+                label: t("settings.soulCreateDraftHint"),
+                status: "pending" as const,
+              },
+            ]
+          : []),
+      ]),
+      c.group("soul-identity", t("settings.soulIdentityGroup"), [
+        c.input("soul-name", t("settings.soulName"), draft.metadata.name, (name) =>
+          updateMetadata({ name: name.slice(0, 64) }),
+        ),
+        c.select(
+          "soul-language",
+          t("settings.soulLanguage"),
+          draft.metadata.lang,
+          [
+            { value: "auto", label: t("settings.soulLanguageAuto") },
+            { value: "zh-CN", label: "简体中文" },
+            { value: "en-US", label: "English" },
+            { value: "ja-JP", label: "日本語" },
+            { value: "ko-KR", label: "한국어" },
+          ],
+          (lang) => updateMetadata({ lang }),
+        ),
+      ]),
+      c.group("soul-voice", t("settings.soulVoiceGroup"), [
+        c.input("soul-style", t("settings.soulStyle"), draft.metadata.style, (style) =>
+          updateMetadata({ style }),
+        ),
+        {
+          ...c.input("soul-body", t("settings.soulPersonality"), draft.body, (body) => {
+            setSaved(false);
+            setDraft((current) => ({ ...current, body }));
+          }),
+          kind: "TextArea",
+          fill: true,
+        },
+        {
+          id: "soul-count",
+          kind: "Text",
+          secondary: true,
+          text: `${validation.bodyCount} / ${validation.bodyLimit} ${t(
+            validation.countKind === "characters"
+              ? "settings.soulCharacters"
+              : "settings.soulWords",
+          )}`,
+        },
+      ]),
+      {
+        ...c.action(
+          "soul-save",
+          soul.saving ? t("settings.saving") : t("settings.soulSave"),
+          handleSave,
+          changed && validation.valid && !soul.saving,
+        ),
+        prominent: true,
+      },
+      c.action("soul-reload", t("settings.soulReload"), soul.reload, !soul.loading && !soul.saving),
+      ...(localError || soul.error
+        ? [
+            {
+              id: "soul-error",
+              kind: "Banner" as const,
+              label: localError ?? soul.error ?? "",
+              status: "error" as const,
+            },
+          ]
+        : saved
+          ? [
+              {
+                id: "soul-saved",
+                kind: "Banner" as const,
+                label: t("settings.soulSaved"),
+                status: "completed" as const,
+              },
+            ]
+          : []),
+    ];
+    const confirmation = presentationControls();
+    const remove = confirmation.action(
+      "confirm-delete",
+      t("settings.soulDeletePreset"),
+      handleDelete,
+    );
+    return (
+      <>
+        <NativeSurface
+          document={{
+            mode: "sheet",
+            title: t("settings.soulTitle"),
+            appearance: settings.theme,
+            formFactor: compact ? "mobile" : "desktop",
+            theme: createNativePresentationTheme(settings, compact, "workspaceTools"),
+            nodes,
+            dismissAction: soul.saving ? undefined : "close",
+          }}
+          handlers={c.handlers}
+          onError={(cause) => setLocalError(cause instanceof Error ? cause.message : String(cause))}
+        />
+        {presetToDelete ? (
+          <NativeSurface
+            document={{
+              mode: "alert",
+              title: t("settings.soulDeletePreset"),
+              appearance: settings.theme,
+              formFactor: compact ? "mobile" : "desktop",
+              theme: createNativePresentationTheme(settings, compact, "workspaceTools"),
+              nodes: [
+                {
+                  id: "soul-delete-description",
+                  kind: "Text",
+                  text: t("settings.soulDeletePresetConfirm"),
+                },
+                { ...remove, destructive: true },
+                confirmation.action("cancel-delete", t("settings.cancel"), () =>
+                  setPresetToDelete(null),
+                ),
+              ],
+              dismissAction: "cancel-delete",
+            }}
+            handlers={confirmation.handlers}
+            onError={(cause) =>
+              setLocalError(cause instanceof Error ? cause.message : String(cause))
+            }
+          />
+        ) : null}
+      </>
+    );
+  }
 
   return (
     <>

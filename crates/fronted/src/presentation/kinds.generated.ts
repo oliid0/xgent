@@ -10,6 +10,7 @@ export type PresentationKind =
   | "Heading"
   | "Button"
   | "TextInput"
+  | "ColorInput"
   | "TextArea"
   | "Switch"
   | "Selector"
@@ -17,12 +18,128 @@ export type PresentationKind =
   | "Menu"
   | "Divider"
   | "Progress"
+  | "ProgressBar"
+  | "Badge"
+  | "Banner"
+  | "EmptyState"
+  | "StatusDot"
+  | "Slider"
+  | "Collapsible"
+  | "Markdown"
+  | "CodeBlock"
   | "List"
+  | "TreeRow"
   | "SettingsGroup"
+  | "SettingsLayout"
   | "NavigationRow"
   | "IconButton"
   | "Spacer"
   | "Composer"
   | "ComposerInput"
   | "ChatLayout"
+  | "ChatMessage"
+  | "Thinking"
+  | "ToolCall"
+  | "ActivityPreview"
+  | "TaskProgress"
+  | "TaskStep"
+  | "BrowserViewport"
+  | "BrowserLayout"
+  | "MediaPreview"
   | "FilePicker";
+
+export type PresentationRenderStrategy = "native" | "polyfill" | "systemBridge";
+
+export const presentationMappedProperties = [
+  "label",
+  "text",
+  "value",
+  "action",
+  "disabled",
+  "destructive",
+  "prominent",
+  "secure",
+  "secondary",
+  "spacing",
+  "padding",
+  "indent",
+  "fill",
+  "alignment",
+  "width",
+  "minWidth",
+  "maxWidth",
+  "height",
+  "minHeight",
+  "maxHeight",
+  "maxLines",
+  "wrap",
+  "variant",
+  "size",
+  "icon",
+  "selected",
+  "role",
+  "status",
+  "language",
+  "minimum",
+  "maximum",
+  "step",
+  "current",
+  "total",
+  "options",
+  "accessibilityLabel",
+  "accessibilityHint",
+  "accessibilityValue",
+  "children",
+] as const;
+
+export const presentationComponentContracts: Record<
+  PresentationKind,
+  { strategy: PresentationRenderStrategy; events: readonly string[] }
+> = {
+  VStack: { strategy: "native", events: [] },
+  HStack: { strategy: "native", events: [] },
+  ScrollView: { strategy: "native", events: [] },
+  Card: { strategy: "polyfill", events: [] },
+  Section: { strategy: "native", events: [] },
+  Text: { strategy: "native", events: [] },
+  Heading: { strategy: "native", events: [] },
+  Button: { strategy: "native", events: ["press"] },
+  TextInput: { strategy: "native", events: ["changeText"] },
+  ColorInput: { strategy: "native", events: ["changeColor"] },
+  TextArea: { strategy: "native", events: ["changeText"] },
+  Switch: { strategy: "native", events: ["changeBoolean"] },
+  Selector: { strategy: "native", events: ["changeSelection"] },
+  SegmentedControl: { strategy: "native", events: ["changeSelection"] },
+  Menu: { strategy: "native", events: ["press"] },
+  Divider: { strategy: "native", events: [] },
+  Progress: { strategy: "native", events: [] },
+  ProgressBar: { strategy: "native", events: [] },
+  Badge: { strategy: "native", events: [] },
+  Banner: { strategy: "native", events: [] },
+  EmptyState: { strategy: "native", events: [] },
+  StatusDot: { strategy: "native", events: [] },
+  Slider: { strategy: "native", events: ["changeNumber"] },
+  Collapsible: { strategy: "native", events: [] },
+  Markdown: { strategy: "native", events: [] },
+  CodeBlock: { strategy: "native", events: [] },
+  List: { strategy: "native", events: [] },
+  TreeRow: { strategy: "native", events: ["press"] },
+  SettingsGroup: { strategy: "polyfill", events: [] },
+  SettingsLayout: { strategy: "polyfill", events: [] },
+  NavigationRow: { strategy: "native", events: ["press"] },
+  IconButton: { strategy: "native", events: ["press"] },
+  Spacer: { strategy: "native", events: [] },
+  Composer: { strategy: "polyfill", events: [] },
+  ComposerInput: { strategy: "native", events: ["changeText"] },
+  ChatLayout: { strategy: "polyfill", events: [] },
+  ChatMessage: { strategy: "native", events: [] },
+  Thinking: { strategy: "native", events: [] },
+  ToolCall: { strategy: "native", events: [] },
+  ActivityPreview: { strategy: "polyfill", events: ["press"] },
+  TaskProgress: { strategy: "polyfill", events: [] },
+  TaskStep: { strategy: "native", events: [] },
+  BrowserViewport: { strategy: "systemBridge", events: ["reportViewport"] },
+  BrowserLayout: { strategy: "polyfill", events: [] },
+  MediaPreview: { strategy: "systemBridge", events: [] },
+  FilePicker: { strategy: "systemBridge", events: ["pickFiles"] },
+};

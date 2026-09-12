@@ -1,62 +1,94 @@
-# Apple presentation migration
+# Astryx to SwiftUI presentation contract
 
-The requested destination is SwiftUI on iOS/macOS and Astryx on Android,
-Windows, Linux and Web. Application state, persistence, provider execution,
-tool approvals and actions stay in the existing TypeScript/Rust runtime.
+Xgent has one application model and two presentation engines:
 
-## Current implementation
+- Android, Windows, Linux, and Web render the shared React tree with Astryx.
+- iOS and macOS serialize the same state and actions into `PresentationDocument`
+  values and render them with SwiftUI.
 
-`astryx-swiftui.json` defines the primitive component declarations verified
-against Astryx 0.5.4. `pnpm native:generate` emits the SwiftUI switch and the
-TypeScript kind union; `pnpm native:check` checks for drift without building
-the application. These primitives are a renderer foundation, **not an
-automatic conversion of all existing JSX pages**. JSX layout extraction,
-complete component/prop coverage and the Apple entry-point switch remain
-unfinished.
+The Apple `WKWebView` remains alive only as the Tauri JavaScript/action
+transport. While a native root exists it is noninteractive and hidden from the
+accessibility tree; application chrome, chat, settings, tools, files, and
+dialogs are SwiftUI. WebKit is visible only inside the browser feature.
 
-`NativeSurface` publishes versioned documents. Stable node IDs preserve
-SwiftUI control identity. Each surface has at most one invocation in flight;
-streaming updates replace intermediate queued snapshots. Removal follows the
-last sent document. Action callbacks remain in a surface-scoped registry:
-native requests cannot invoke arbitrary backend commands. Disabled, removed
-or malformed actions fail, and in-flight request IDs remain deduplicated.
-Native errors are visible through a system alert. Native input values stay
-optimistic until the acknowledged shared value reaches the native document.
+## Generated executable mapping
 
-The Apple build script links the native source using the existing in-process
-Swift static-library pattern, selecting the macOS, iOS device or simulator SDK.
-iOS must link this library before Rust produces its cdylib; the Xcode app target
-does not compile a second copy. WKWebView retains the shared JavaScript engine;
-when a native root is mounted, its view and accessibility elements are hidden.
-No SwiftUI activation marker is currently installed, so the existing app is
-still the active renderer. `ChatPage` now selects `NativeChatPage` when that
-marker is present, retaining the same business hooks, composer reference,
-history/live stores, send/stop callbacks, conversation/project selection and
-tool approvals. The adapter remains incomplete: mobile attachment selection
-still depends on a WebView input, and settings and other surfaces must be
-connected before enabling the marker in the Apple shell.
+[`astryx-swiftui.json`](./astryx-swiftui.json) is the source of truth for:
 
-Starting a main-page navigation invalidates the native model, detaches the
-hosting controller and restores the WebView's visibility and accessibility.
-Queued deliveries carry a navigation generation so a pre-navigation snapshot
-cannot recreate the retired host. This lifecycle path still needs Apple SDK
-and device verification.
+- Astryx 0.6 component/export to SwiftUI semantic renderer mapping;
+- every serialized property and typed event payload;
+- native, SwiftUI-polyfill, and system-framework rendering strategies;
+- light/dark colors, accent, spacing, control size, typography, motion,
+  material, and corner-radius token transfer;
+- compound templates such as chat, sidebar, activity/todo strip, settings,
+  browser, and workspace-file preview;
+- mobile/desktop feature boundaries; and
+- Apple-framework ownership for native capabilities.
 
-## Remaining integration and verification
+`pnpm native:generate` validates every Astryx module and export against the
+installed exact version, requires every wire property and semantic kind to have
+one mapping, verifies referenced Swift renderers, then emits the Swift
+enum/switch/strategy/event tables plus TypeScript kind, contract, and token
+tables. `pnpm native:check` fails if generated files drift. Runtime validation
+rejects unknown properties, missing actions, invalid geometry, and unmapped
+interactive components before a document crosses the native boundary. Stable
+node IDs keep SwiftUI identity across streaming updates.
 
-- Generate shared layouts and cover all used Astryx props, actions and
-  navigation, including compound controls and custom editor surfaces.
-- Complete chat, settings, pairing, projects, search, attachments, previews,
-  tools, terminals, approvals, notifications and lifecycle/error screens.
-- Implement native file/selection/focus behavior and reconcile transformed
-  input values, surface removal and full WebView reloads.
-- Select the native renderer from the actual Apple build target; do not use
-  browser user-agent inference to select it.
-- Verify Apple builds and behavior with native SDKs, system appearance,
-  Dynamic Type, VoiceOver, reduced transparency/motion and the supplied
-  references. SwiftUI has not yet been compiled or rendered in this workspace.
-- Verify Astryx wide/narrow layouts, overlays and accessibility. The new
-  default material is a 90% opaque surface with a blurred backdrop; reduced
-  transparency, increased contrast and forced colors use solid surfaces.
-- Pass consolidated non-Cargo tests, check and lint before the single
-  authorized GitHub push and workflow verification.
+The mapping is semantic rather than a JSX source transformer. Shared feature
+adapters emit nodes such as `ChatMessage`, `Thinking`, `ToolCall`,
+`ActivityPreview`, `TaskProgress`, `Composer`, and `MediaPreview`. SwiftUI owns
+their native layout and interaction, while callbacks remain in a
+surface-scoped TypeScript registry. Native input cannot invoke an unregistered,
+disabled, stale, or malformed action.
+
+## Platform and rendering rules
+
+- iOS is always the mobile form factor. It does not receive split chat,
+  desktop shortcut, tray, or desktop-only window controls.
+- macOS is the desktop form factor, but uses the same semantic document and
+  Astryx-derived theme tokens.
+- iOS 26+ and macOS 26+ use SwiftUI Liquid Glass and `GlassEffectContainer`.
+  macOS 15-25 uses `regularMaterial` with the same Astryx tint, edge, radius,
+  highlight, and shadow tokens. Reduced Transparency switches to a solid
+  tokenized surface.
+- Reduced Motion removes sidebar motion. Dynamic Type and the app's Astryx
+  font-scale setting both participate in native typography.
+- Browser pages use WebKit; PDF, image, audio, and video previews use PDFKit,
+  SwiftUI Image, and AVKit. Application UI must never be implemented as a
+  webpage inside WebKit.
+- The native file editor uses the same scoped Rust read/write commands,
+  expected mtime/hash checks, and conflict handling as the Astryx editor.
+
+## Native capability boundaries
+
+The Apple implementation follows the corresponding Apple framework instead of
+assuming that a similarly named web API exists:
+
+- [EventKit calendar access](https://developer.apple.com/documentation/eventkit/accessing-calendar-using-eventkit-and-eventkitui)
+  distinguishes write-only and full access and requires purpose strings.
+- [HealthKit authorization](https://developer.apple.com/documentation/healthkit/authorizing-access-to-health-data)
+  is fine-grained per data type; read denial is intentionally privacy-preserving.
+- [Speech authorization](https://developer.apple.com/documentation/speech/sfspeechrecognizer/requestauthorization(_:))
+  and microphone authorization are separate asynchronous states.
+- [SwiftUI photo selection](https://developer.apple.com/documentation/swiftui/view/photospicker(ispresented:selection:matching:preferreditemencoding:))
+  and [file importing](https://developer.apple.com/documentation/swiftui/view/fileimporter(ispresented:allowedcontenttypes:allowsmultipleselection:oncompletion:))
+  provide user-mediated attachment access.
+- [UserNotifications](https://developer.apple.com/documentation/usernotifications/unusernotificationcenter)
+  owns notification authorization and scheduling.
+- [CloudKit containers](https://developer.apple.com/documentation/cloudkit/ckcontainer)
+  own private Apple-cloud records when the required entitlement is provisioned.
+- [MessageUI](https://developer.apple.com/documentation/messageui/mfmailcomposeviewcontroller)
+  permits user-approved composition; it does not grant arbitrary inbox access.
+
+Every unavailable entitlement, denied permission, unsupported platform, empty
+result, and backend failure remains a real state in the shared business layer.
+No UI action reports success unless its underlying Tauri/plugin operation has
+completed.
+
+## Verification contract
+
+Static tests cover registry generation, native-only Apple entry points,
+semantic chat/settings flows, theme transfer, action validation, and the rule
+that WebKit is limited to browser content. Release workflows remain responsible
+for compiling the Swift sources with Apple SDKs and smoke-testing packaged
+Windows/Android artifacts.

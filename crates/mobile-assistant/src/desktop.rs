@@ -4,10 +4,10 @@ use tauri::{plugin::PluginApi, AppHandle, Runtime};
 
 use crate::models::{
     CalendarRangeRequest, ComposeMessageRequest, CreateCalendarEventRequest,
-    CreateReminderRequest, CurrentLocationRequest, MobileActionResult, MobileAssistantBackend,
-    MobileAssistantStatus, MobileCalendarEvent, MobileLocation, MobilePermissionRequest,
-    MobilePermissionStates, MobileReminder, ReminderListRequest, VoiceInputRequest,
-    VoiceInputResult,
+    CreateReminderRequest, CurrentLocationRequest, HealthStepsRequest, HealthStepsSummary,
+    MobileActionResult, MobileAssistantBackend, MobileAssistantStatus, MobileCalendarEvent,
+    MobileLocation, MobilePermissionRequest, MobilePermissionStates, MobileReminder,
+    ReminderListRequest, VoiceInputRequest, VoiceInputResult,
 };
 use crate::{Error, Result};
 
@@ -72,6 +72,15 @@ impl<R: Runtime> MobileAssistant<R> {
         _request: CurrentLocationRequest,
     ) -> Result<MobileLocation> {
         Err(Error::Unavailable("location access is only available on mobile".into()))
+    }
+
+    pub fn read_health_steps(
+        &self,
+        _request: HealthStepsRequest,
+    ) -> Result<HealthStepsSummary> {
+        Err(Error::Unavailable(
+            "health data access is only available on mobile".into(),
+        ))
     }
 
     pub fn list_calendar_events(

@@ -11,6 +11,7 @@ import {
   type MobileAssistantPermission,
   mobileAssistantStatus,
   normalizeMobileAssistantPermissions,
+  readMobileHealthSteps,
   requestMobileAssistantPermission,
 } from "../mobileAssistant";
 import { readClipboardText, writeClipboardText } from "../system/clipboardText";
@@ -19,13 +20,14 @@ import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes
 const listDataTool: Tool = {
   name: "MobilePersonalData",
   description:
-    "Read the user's authorized current location, clipboard text, system calendar, or reminders on this Android/iOS device. Use privacy-sensitive reads only when the user's task requires them.",
+    "Read the user's authorized current location, clipboard text, system calendar, reminders, or step total on this Android/iOS device. Use privacy-sensitive reads only when the user's task requires them.",
   parameters: Type.Object({
     action: Type.Union([
       Type.Literal("get_current_location"),
       Type.Literal("read_clipboard"),
       Type.Literal("list_calendar_events"),
       Type.Literal("list_reminders"),
+      Type.Literal("read_health_steps"),
     ]),
     start: Type.Optional(
       Type.String({ description: "Calendar range start as an ISO 8601 date-time." }),
@@ -106,14 +108,17 @@ function result(toolCall: ToolCall, data: unknown, isError = false): ToolResultM
 
 async function ensurePermission(permission: MobileAssistantPermission) {
   const status = await mobileAssistantStatus();
+  if (permission === "health" && !status.healthAvailable) {
+    throw new Error(status.detail || "Health data is unavailable on this device.");
+  }
   const alias = status.permissionAliases[permission] ?? permission;
   let states = normalizeMobileAssistantPermissions(status, await checkMobileAssistantPermissions());
-  if (states[permission] === "granted") return;
+  if (states[permission] === "granted" || states[permission] === "requested") return;
   states = normalizeMobileAssistantPermissions(
     status,
     await requestMobileAssistantPermission(alias),
   );
-  if (states[permission] !== "granted") {
+  if (states[permission] !== "granted" && states[permission] !== "requested") {
     throw new Error(`The user did not grant ${permission} permission.`);
   }
 }
@@ -155,6 +160,23 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
             limit: limit(args.limit),
           });
           return result(toolCall, { reminders });
+        }
+        if (action === "read_health_steps") {
+          const request = {
+            startMs: dateMs(args.start, "start"),
+            endMs: dateMs(args.end, "end"),
+          };
+          if (request.endMs <= request.startMs) {
+            throw new Error("end must be after start.");
+          }
+          await ensurePermission("health");
+          const summary = await readMobileHealthSteps(request);
+          return result(toolCall, {
+            summary,
+            privacyNote: summary.accessLimited
+              ? "The platform may expose only the health data window the user authorized."
+              : undefined,
+          });
         }
       }
       if (toolCall.name !== "MobilePersonalActions") {

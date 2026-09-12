@@ -23,6 +23,16 @@ import {
   X,
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
+import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
+import type { AppSettings } from "../../../lib/settings";
+import { NativeSurface } from "../../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
+import type {
+  PresentationHandler,
+  PresentationNode,
+  PresentationValue,
+} from "../../../presentation/types";
+import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { MobileFullscreenPanel } from "./MobilePanelScaffold";
 
 type ShellRunResponse = {
@@ -62,6 +72,7 @@ type GitHistoryEntry = {
 type MobileGitReviewPanelProps = {
   open: boolean;
   workdir: string;
+  settings: AppSettings;
   onClose: () => void;
 };
 
@@ -295,8 +306,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
     [run],
   );
 
-  const commit = async (event: FormEvent) => {
-    event.preventDefault();
+  const commitNow = async () => {
     const message = commitMessage.trim();
     if (!message || stagedCount === 0) return;
     await mutate(
@@ -305,6 +315,10 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
       t("projectTools.gitReview.commitSuccessMessage"),
     );
     setCommitMessage("");
+  };
+  const commit = async (event: FormEvent) => {
+    event.preventDefault();
+    await commitNow();
   };
 
   const remoteOperation = async (operation: "fetch" | "pull" | "push") => {
@@ -332,6 +346,329 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   if (!open) return null;
 
   const showingDetail = Boolean(selectedChange || selectedCommit);
+
+  if (isApplePresentationRuntime()) {
+    const handlers = new Map<string, PresentationHandler>();
+    const bind = (
+      id: string,
+      runAction: (value: PresentationValue) => unknown,
+      accepts: (value: PresentationValue) => boolean,
+      enabled = true,
+    ) => {
+      handlers.set(id, { run: runAction, accepts, enabled });
+      return id;
+    };
+    const button = (
+      id: string,
+      label: string,
+      runAction: () => unknown,
+      options: {
+        icon?: string;
+        enabled?: boolean;
+        destructive?: boolean;
+        prominent?: boolean;
+      } = {},
+    ): PresentationNode => ({
+      id,
+      kind: options.icon ? "IconButton" : "Button",
+      label,
+      icon: options.icon,
+      destructive: options.destructive,
+      prominent: options.prominent,
+      disabled: options.enabled === false,
+      action: bind(id, runAction, (value) => value === null, options.enabled !== false),
+    });
+    const resetDetail = () => {
+      setSelectedPath("");
+      setSelectedCommit(null);
+      setDetail("");
+      setDiscardPath("");
+    };
+    const content: PresentationNode[] = [];
+    if (busy)
+      content.push({ id: "git-busy", kind: "Progress", label: t("chat.mobileTerminal.running") });
+    if (error && !notRepository) {
+      content.push({ id: "git-error", kind: "Banner", label: error, status: "error" });
+    }
+    if (notice) {
+      content.push({ id: "git-notice", kind: "Banner", label: notice, status: "completed" });
+    }
+    if (showingDetail) {
+      const actions: PresentationNode[] = [];
+      if (selectedChange?.working) {
+        actions.push(
+          button(
+            "git-stage",
+            t("projectTools.gitReview.stageChanges"),
+            () =>
+              mutate(
+                "stage",
+                gitCommand(`add -- ${shellQuote(selectedChange.path)}`),
+                t("projectTools.gitReview.stageChanges"),
+              ),
+            { enabled: !busy },
+          ),
+        );
+      }
+      if (selectedChange?.staged) {
+        actions.push(
+          button(
+            "git-unstage",
+            t("projectTools.gitReview.unstageChanges"),
+            () =>
+              mutate(
+                "unstage",
+                gitCommand(`restore --staged -- ${shellQuote(selectedChange.path)}`),
+                t("projectTools.gitReview.unstageChanges"),
+              ),
+            { enabled: !busy },
+          ),
+        );
+      }
+      if (selectedChange?.working) {
+        if (discardPath === selectedChange.path) {
+          actions.push(
+            button(
+              "git-discard-confirm",
+              t("projectTools.gitReview.discardChanges"),
+              () =>
+                mutate(
+                  "discard",
+                  selectedChange.untracked
+                    ? `rm -f -- ${shellQuote(selectedChange.path)}`
+                    : gitCommand(`restore --worktree -- ${shellQuote(selectedChange.path)}`),
+                  t("projectTools.gitReview.discardSuccessMessage"),
+                ),
+              { enabled: !busy, destructive: true },
+            ),
+            button("git-discard-cancel", t("settings.cancel"), () => setDiscardPath("")),
+          );
+        } else {
+          actions.push(
+            button(
+              "git-discard",
+              t("projectTools.gitReview.discardChanges"),
+              () => setDiscardPath(selectedChange.path),
+              { enabled: !busy, destructive: true },
+            ),
+          );
+        }
+      }
+      if (actions.length)
+        content.push({ id: "git-detail-actions", kind: "HStack", children: actions });
+      content.push({
+        id: "git-detail",
+        kind: "CodeBlock",
+        label: selectedPath || selectedCommit?.subject || t("chat.mobileGit.title"),
+        language: "diff",
+        text: busy && !detail ? t("chat.mobileTerminal.running") : detail,
+      });
+    } else if (view === "changes") {
+      content.push({
+        id: "git-remote-actions",
+        kind: "HStack",
+        children: (["fetch", "pull", "push"] as const).map((operation) =>
+          button(
+            `git-${operation}`,
+            t(`projectTools.gitReview.${operation}`),
+            () => remoteOperation(operation),
+            { enabled: !busy },
+          ),
+        ),
+      });
+      if (notRepository) {
+        content.push({
+          id: "git-not-repository",
+          kind: "EmptyState",
+          icon: "arrow.triangle.branch",
+          label: t("git.branchSelector.initRepositoryTitle"),
+          text: t("git.branchSelector.initRepositoryDescription"),
+          children: [
+            button("git-init", t("git.branchSelector.initRepository"), initializeRepository, {
+              enabled: !busy,
+              prominent: true,
+            }),
+          ],
+        });
+      } else if (snapshot?.changes.length === 0) {
+        content.push({
+          id: "git-clean",
+          kind: "EmptyState",
+          icon: "checkmark.circle",
+          label: t("projectTools.gitReview.noLocalChanges"),
+        });
+      } else {
+        content.push({
+          id: "git-changes",
+          kind: "List",
+          children: (snapshot?.changes ?? []).map((change) => ({
+            id: `git-change:${change.indexStatus}${change.worktreeStatus}:${change.path}`,
+            kind: "NavigationRow",
+            label: change.path,
+            text: [
+              change.staged ? t("projectTools.gitReview.labelStaged") : "",
+              change.working ? t("projectTools.gitReview.labelUnstaged") : "",
+            ]
+              .filter(Boolean)
+              .join(" · "),
+            icon: change.untracked ? "questionmark.circle" : "doc.text",
+            disabled: !!busy,
+            action: bind(
+              `git-change:${change.indexStatus}${change.worktreeStatus}:${change.path}`,
+              () => openChange(change),
+              (value) => value === null,
+              !busy,
+            ),
+          })),
+        });
+      }
+      content.push({
+        id: "git-commit-row",
+        kind: "HStack",
+        children: [
+          {
+            id: "git-commit-message",
+            kind: "TextInput",
+            label: t("projectTools.gitReview.commitMessagePlaceholder"),
+            value: commitMessage,
+            fill: true,
+            disabled: !!busy || stagedCount === 0,
+            action: bind(
+              "git-commit-message",
+              (value) => setCommitMessage(value as string),
+              (value) => typeof value === "string",
+              !busy && stagedCount > 0,
+            ),
+          },
+          button("git-commit", t("projectTools.gitReview.commit"), commitNow, {
+            enabled: !busy && stagedCount > 0 && !!commitMessage.trim(),
+            prominent: true,
+          }),
+        ],
+      });
+    } else if (history.length === 0 && !busy) {
+      content.push({
+        id: "git-history-empty",
+        kind: "EmptyState",
+        icon: "clock.arrow.circlepath",
+        label: t("projectTools.gitReview.noCommitHistory"),
+      });
+    } else {
+      content.push({
+        id: "git-history",
+        kind: "List",
+        children: history.map((entry) => ({
+          id: `git-history:${entry.sha}`,
+          kind: "NavigationRow",
+          label: entry.subject,
+          text: `${entry.shortSha} · ${entry.author} · ${entry.date}`,
+          icon: "point.topleft.down.to.point.bottomright.curvepath",
+          disabled: !!busy,
+          action: bind(
+            `git-history:${entry.sha}`,
+            () => openCommit(entry),
+            (value) => value === null,
+            !busy,
+          ),
+        })),
+      });
+    }
+
+    const nodes: PresentationNode[] = [
+      {
+        id: "git-layout",
+        kind: "BrowserLayout",
+        fill: true,
+        children: [
+          {
+            id: "git-toolbar",
+            kind: "HStack",
+            padding: 8,
+            children: [
+              ...(showingDetail
+                ? [
+                    button("git-back", t("chat.mobileGit.back"), resetDetail, {
+                      icon: "chevron.left",
+                    }),
+                  ]
+                : [
+                    {
+                      id: "git-icon",
+                      kind: "Badge" as const,
+                      label: "G",
+                      status: "completed" as const,
+                    },
+                  ]),
+              {
+                id: "git-title",
+                kind: "VStack",
+                fill: true,
+                children: [
+                  {
+                    id: "git-heading",
+                    kind: "Heading",
+                    text: selectedPath || selectedCommit?.subject || t("chat.mobileGit.title"),
+                  },
+                  {
+                    id: "git-subtitle",
+                    kind: "Text",
+                    text: selectedCommit?.shortSha || snapshot?.branch || workdir,
+                    secondary: true,
+                  },
+                ],
+              },
+              button(
+                "git-refresh",
+                t("projectTools.gitReview.refresh"),
+                () => (view === "changes" ? refreshStatus() : refreshHistory()),
+                { icon: "arrow.clockwise", enabled: !busy },
+              ),
+              button("git-close", t("chat.mobileTerminal.close"), close, { icon: "xmark" }),
+            ],
+          },
+          ...(showingDetail
+            ? []
+            : [
+                {
+                  id: "git-view",
+                  kind: "SegmentedControl" as const,
+                  label: t("chat.mobileGit.title"),
+                  value: view,
+                  options: [
+                    { value: "changes", label: t("projectTools.gitReview.localChangesView") },
+                    { value: "history", label: t("projectTools.gitReview.commitHistoryView") },
+                  ],
+                  action: bind(
+                    "git-view",
+                    (value) => setView(value as "changes" | "history"),
+                    (value) => value === "changes" || value === "history",
+                    !busy,
+                  ),
+                },
+              ]),
+          { id: "git-content", kind: "ScrollView", fill: true, children: content },
+        ],
+      },
+    ];
+    return (
+      <NativeSurface
+        document={{
+          mode: "root",
+          title: t("chat.mobileGit.title"),
+          appearance: props.settings.theme,
+          formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
+          theme: createNativePresentationTheme(
+            props.settings,
+            isNativeMobileRuntime(),
+            "workspaceTools",
+          ),
+          nodes,
+        }}
+        handlers={handlers}
+        onError={(cause) => setError(cause instanceof Error ? cause.message : String(cause))}
+      />
+    );
+  }
 
   return (
     <MobileFullscreenPanel open label={t("chat.mobileGit.title")}>

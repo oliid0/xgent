@@ -16,6 +16,11 @@ function harness(overrides = {}) {
         if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
         return [states[index], (value) => { states[index] = value; }];
       },
+      useRef(initial) {
+        const index = cursor++;
+        if (!(index in states)) states[index] = { current: initial };
+        return states[index];
+      },
       useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
       useEffect() {},
       useLayoutEffect(effect) { if (!mounted) cleanups.push(effect()); },
@@ -23,12 +28,14 @@ function harness(overrides = {}) {
     "../i18n": { useLocale: () => ({ t: (key) => key }) },
     "../lib/runtimePlatform": { isNativeMobileRuntime: () => false },
     "./NativeSurface": { NativeSurface: "NativeSurface" },
+    "./nativeTheme": { createNativePresentationTheme: () => ({ marker: "theme" }) },
   } });
   const { NativeChatPage } = loader.loadModule("src/presentation/NativeChatPage.tsx");
   const { createPresentationActionRegistry } = loader.loadModule("src/presentation/actionRegistry.ts");
   const { createLiveTranscriptStore } = loader.loadModule("src/lib/chat/conversation/liveTranscriptStore.ts");
   const registry = createPresentationActionRegistry();
   const props = {
+    conversationId: "conversation",
     settings: { theme: "system", system: { executionMode: "text" }, customSettings: { appearance: { showThinking: true } } },
     composerRef: { current: null },
     sidebarStore: { subscribe: () => () => {}, getSnapshot: () => ({ conversations: [], hasMore: false }) },
@@ -38,7 +45,9 @@ function harness(overrides = {}) {
     isSending: false, errorMessage: null, hasMoreHistory: false, pendingApprovals: [],
     projects: [], attachmentsEnabled: true, uploads: [], isUploading: false,
     onSend() {}, onStop() {}, onSelectModel() {}, onSelectConversation() {}, onSelectProject() {},
-    onNewConversation() {}, onOpenSettings() {}, onOpenRemote() {}, onLoadEarlierHistory() {},
+    onNewConversation() {}, onOpenSettings() {}, onOpenRemote() {}, onOpenBrowser() {},
+    onOpenBrowserSettings() {}, onOpenGitReview() {}, onOpenBackgroundTasks() {}, onOpenFiles() {},
+    onLoadEarlierHistory() {},
     onDecide: () => ({ ok: true }), onImportFiles: async () => {}, onCreateProject() {}, onOpenTerminal() {}, onChangeMode() {}, onRemoveUpload() {},
     ...overrides,
   };
@@ -49,7 +58,9 @@ function harness(overrides = {}) {
     mounted = true;
     const surfaces = element.props.children.filter(Boolean);
     registry.register("chat", surfaces[0].props.handlers);
-    if (surfaces[1]) registry.register("sidebar", surfaces[1].props.handlers);
+    for (const surface of surfaces.slice(1)) {
+      registry.register(surface.props.document.mode === "sidebar" ? "sidebar" : "tools", surface.props.handlers);
+    }
     return surfaces[0].props.document;
   };
   render();
@@ -71,13 +82,104 @@ test("native edits reach the shared composer used by send and conversation draft
   assert.deepEqual(sent, ["Hello\nmodel"]);
   h.props.onSelectConversation = () => h.props.composerRef.current.setText("Restored draft");
   h.props.sidebarStore.getSnapshot = () => ({ conversations: [{ id: "next", title: "Next" }] });
-  await h.dispatch("sidebar");
   h.render();
   assert.equal((await h.dispatch("conversation:next", null, "sidebar")).ok, true);
   assert.equal(h.props.composerRef.current.getDraft().text, "Restored draft");
   h.unmount();
   assert.equal(h.props.composerRef.current, null);
   assert.equal((await h.dispatch("send")).ok, false);
+});
+
+test("native Apple documents declare desktop shape and shared visual tokens", () => {
+  const h = harness();
+  const document = h.render();
+  assert.equal(document.formFactor, "desktop");
+  assert.deepEqual(document.theme, { marker: "theme" });
+  h.unmount();
+});
+
+test("native toolbar exposes a functional more menu for shared Apple workflows", async () => {
+  const opened = [];
+  const h = harness({
+    onOpenTerminal: () => opened.push("terminal"),
+    onOpenBrowser: () => opened.push("browser"),
+    onOpenBrowserSettings: () => opened.push("browser-settings"),
+    onOpenGitReview: () => opened.push("git"),
+    onOpenRemote: () => opened.push("ssh"),
+    onOpenBackgroundTasks: () => opened.push("background"),
+  });
+  const document = h.render();
+  const toolbar = document.nodes[0].children.find((node) => node.id === "toolbar");
+  assert.ok(toolbar.children.some((node) => node.id === "tools" && node.icon === "ellipsis"));
+  assert.equal((await h.dispatch("tools")).ok, true);
+  h.render();
+  for (const id of ["terminal", "browser", "browser-settings", "git", "ssh", "background"]) {
+    assert.equal((await h.dispatch(`tool:${id}`, null, "tools")).ok, true);
+    if (id !== "background") {
+      await h.dispatch("tools");
+      h.render();
+    }
+  }
+  assert.deepEqual(opened, ["terminal", "browser", "browser-settings", "git", "ssh", "background"]);
+  h.unmount();
+});
+
+test("native sidebar routes skills, MCP, files, workspaces, recents, new chat and settings", async () => {
+  const opened = [];
+  const selected = [];
+  const modes = [];
+  const h = harness({
+    projects: [{ id: "project", name: "Workspace" }],
+    sidebarStore: {
+      subscribe: () => () => {},
+      getSnapshot: () => ({
+        conversations: [{ id: "recent", title: "Recent chat" }],
+        hasMore: false,
+      }),
+    },
+    onOpenSettings: (section) => opened.push(section ?? "settings"),
+    onOpenFiles: () => opened.push("files"),
+    onCreateProject: () => opened.push("new-workspace"),
+    onNewConversation: () => opened.push("new-chat"),
+    onSelectProject: (project) => selected.push(project.id),
+    onSelectConversation: (id) => selected.push(id),
+    onChangeMode: (mode) => modes.push(mode),
+  });
+  for (const action of ["skills", "mcp", "files", "create-project", "new-chat", "settings"]) {
+    assert.equal((await h.dispatch(action, null, "sidebar")).ok, true);
+  }
+  assert.equal((await h.dispatch("project:project", null, "sidebar")).ok, true);
+  assert.equal((await h.dispatch("conversation:recent", null, "sidebar")).ok, true);
+  assert.equal((await h.dispatch("sidebar-execution-mode", "tools", "sidebar")).ok, true);
+  assert.deepEqual(opened, ["skills", "mcp", "files", "new-workspace", "new-chat", "settings"]);
+  assert.deepEqual(selected, ["project", "recent"]);
+  assert.deepEqual(modes, ["tools"]);
+  h.unmount();
+});
+
+test("composer activity strip keeps tool preview left and todo progress right", () => {
+  const h = harness({
+    isSending: true,
+    taskList: {
+      runId: "run",
+      revision: 2,
+      tasks: [
+        { id: "one", subject: "Inspect", description: "Inspect files", activeForm: "Inspecting", status: "completed" },
+        { id: "two", subject: "Implement", description: "Implement fix", activeForm: "Implementing", status: "in_progress" },
+      ],
+    },
+  });
+  h.props.liveTranscriptStore.setToolStatus("Editing files");
+  const document = h.render();
+  const chat = document.nodes.find((node) => node.id === "chat");
+  const composer = chat.children.find((node) => node.id === "composer");
+  const strip = composer.children.find((node) => node.id === "activity-strip");
+  assert.deepEqual(strip.children.map((node) => node.kind), ["ActivityPreview", "Spacer", "TaskProgress"]);
+  const progress = strip.children.at(-1);
+  assert.equal(progress.text, "1/2");
+  assert.equal(progress.children[1].label, "Implement");
+  assert.equal(progress.children[1].status, "running");
+  h.unmount();
 });
 
 test("native controls enforce busy, model and attachment constraints at dispatch", async () => {
@@ -119,7 +221,11 @@ test("native documents consume live output and report tool approval failures", a
   h.props.liveTranscriptStore.setToolStatus("Reading files");
   const document = h.render();
   const transcript = document.nodes[0].children.find((node) => node.id === "transcript");
-  assert.deepEqual(transcript.children.map((node) => node.text), ["Streaming response", "Reading files"]);
+  const liveMessage = transcript.children.find((node) => node.id === "live:assistant");
+  assert.deepEqual(liveMessage.children.map((node) => node.text ?? node.label), [
+    "Streaming response",
+    "Reading files",
+  ]);
   const result = await h.dispatch("approval:call:approve");
   assert.equal(result.ok, false);
   assert.match(result.error, /Request expired/);

@@ -7,6 +7,7 @@ permissions = [
   "allow-write-clipboard",
   "allow-open-settings",
   "allow-get-current-location",
+  "allow-read-health-steps",
   "allow-status",
   "allow-start-voice-input",
   "allow-check-permissions",

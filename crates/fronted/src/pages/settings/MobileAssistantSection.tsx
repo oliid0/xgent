@@ -8,6 +8,7 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   Camera,
   Check,
   Clock3,
@@ -74,6 +75,12 @@ const PERMISSIONS: PermissionDescriptor[] = [
     descriptionKey: "settings.mobileAssistant.locationDescription",
     icon: WifiOff,
   },
+  {
+    id: "health",
+    labelKey: "settings.mobileAssistant.health",
+    descriptionKey: "settings.mobileAssistant.healthDescription",
+    icon: Activity,
+  },
 ];
 
 function PermissionStateBadge({
@@ -87,7 +94,9 @@ function PermissionStateBadge({
       ? t("settings.mobileAssistant.granted")
       : state === "denied"
         ? t("settings.mobileAssistant.denied")
-        : t("settings.mobileAssistant.notRequested");
+        : state === "requested"
+          ? t("settings.mobileAssistant.requested")
+          : t("settings.mobileAssistant.notRequested");
   return (
     <StatusDot
       label={label}
@@ -144,7 +153,7 @@ export function MobileAssistantSection() {
     setError("");
     try {
       if (!status) throw new Error(t("settings.mobileAssistant.unavailable"));
-      if (permissions[permission] === "denied") {
+      if (permissions[permission] === "denied" || permissions[permission] === "requested") {
         await openMobileSystemSettings();
         return;
       }
@@ -219,6 +228,13 @@ export function MobileAssistantSection() {
               title: t("settings.mobileAssistant.icloud"),
               detail: t("settings.mobileAssistant.icloudDescription"),
               available: status?.cloudSyncAvailable,
+            },
+            {
+              id: "health",
+              icon: Activity,
+              title: t("settings.mobileAssistant.health"),
+              detail: t("settings.mobileAssistant.healthDescription"),
+              available: status?.healthAvailable,
             },
             {
               id: "external",

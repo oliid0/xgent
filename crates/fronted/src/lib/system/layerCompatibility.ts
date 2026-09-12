@@ -1,6 +1,6 @@
 import { autoUpdate, computePosition, flip, type Placement, shift, size } from "@floating-ui/dom";
 
-// Astryx 0.5.4 uses position-area and self-* alignment, beyond the Popover API
+// Astryx 0.6.0 uses position-area and self-* alignment, beyond the Popover API
 // shipped in Android WebView 124. The pinned dependency patch supplies the
 // original trigger and logical placement instead of guessing from DOM order.
 export function needsLayerCompatibility() {

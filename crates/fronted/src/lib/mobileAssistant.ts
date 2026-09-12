@@ -1,14 +1,15 @@
 import { invoke } from "@xgent/runtime";
 
 export type MobileAssistantBackend = "desktop-unavailable" | "android-native" | "ios-native";
-export type MobilePermissionState = "granted" | "denied" | "prompt";
+export type MobilePermissionState = "granted" | "denied" | "prompt" | "requested";
 export type MobileAssistantPermission =
   | "microphone"
   | "camera"
   | "calendar"
   | "reminders"
   | "photos"
-  | "location";
+  | "location"
+  | "health";
 
 export type MobileAssistantStatus = {
   backend: MobileAssistantBackend;
@@ -61,6 +62,14 @@ export type MobileLocation = {
   provider?: string | null;
 };
 
+export type HealthStepsSummary = {
+  startMs: number;
+  endMs: number;
+  steps: number;
+  source: "health-connect" | "healthkit";
+  accessLimited: boolean;
+};
+
 export type MobileActionResult = {
   id?: string | null;
   presented: boolean;
@@ -89,6 +98,7 @@ export function normalizeMobileAssistantPermissions(
     "reminders",
     "photos",
     "location",
+    "health",
   ] satisfies MobileAssistantPermission[]) {
     const alias = status.permissionAliases[permission] ?? permission;
     normalized[permission] = states[alias] ?? states[permission] ?? "prompt";
@@ -122,6 +132,10 @@ export function getMobileCurrentLocation(timeoutMs = 10_000) {
   return invoke<MobileLocation>(`${PLUGIN_COMMAND}get_current_location`, {
     request: { timeoutMs: Math.min(30_000, Math.max(1_000, timeoutMs)) },
   });
+}
+
+export function readMobileHealthSteps(request: { startMs: number; endMs: number }) {
+  return invoke<HealthStepsSummary>(`${PLUGIN_COMMAND}read_health_steps`, { request });
 }
 
 export function listMobileReminders(request: { incompleteOnly?: boolean; limit?: number } = {}) {

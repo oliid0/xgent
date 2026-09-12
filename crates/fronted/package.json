@@ -28,10 +28,10 @@
     "lint:fix": "biome check --write src/"
   },
   "dependencies": {
-    "@astryxdesign/core": "0.5.4",
-    "@astryxdesign/theme-matcha": "0.5.4",
-    "@astryxdesign/theme-neutral": "0.5.4",
-    "@astryxdesign/theme-stone": "0.5.4",
+    "@astryxdesign/core": "0.6.0",
+    "@astryxdesign/theme-matcha": "0.6.0",
+    "@astryxdesign/theme-neutral": "0.6.0",
+    "@astryxdesign/theme-stone": "0.6.0",
     "@earendil-works/pi-agent-core": "^0.85.1",
     "@earendil-works/pi-ai": "^0.85.1",
     "@floating-ui/dom": "1.8.0",
@@ -67,7 +67,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@astryxdesign/cli": "0.5.4",
+    "@astryxdesign/cli": "0.6.0",
     "@biomejs/biome": "^2.5.12",
     "@iconify-json/logos": "^1.2.14",
     "@iconify-json/lucide": "^1.2.130",

@@ -25,6 +25,21 @@ const iosPackage = readFileSync(
   path.join(repoRoot, "crates/mobile-execution/ios/Package.swift"),
   "utf8",
 );
+const mobileAssistantIos = readFileSync(
+  path.join(repoRoot, "crates/mobile-assistant/ios/Sources/MobileAssistantPlugin.swift"),
+  "utf8",
+);
+const mobileAssistantAndroid = readFileSync(
+  path.join(
+    repoRoot,
+    "crates/mobile-assistant/android/src/main/java/com/ohi/xgent/mobileassistant/MobileAssistantPlugin.kt",
+  ),
+  "utf8",
+);
+const mobileAssistantManifest = readFileSync(
+  path.join(repoRoot, "crates/mobile-assistant/android/src/main/AndroidManifest.xml"),
+  "utf8",
+);
 const androidRootfsPreparation = readFileSync(
   path.join(repoRoot, "scripts/mobile/prepare-alpine-rootfs-android.sh"),
   "utf8",
@@ -201,6 +216,20 @@ test("release packaging preserves native runtime resources without ABI drift", (
   assert.doesNotMatch(windowsBrowserBackend, /use windows::Win32::Foundation::BOOL/);
 });
 
+test("mobile health steps use platform authorization contracts and least privilege", () => {
+  assert.match(iosProjectTemplate, /com\.apple\.developer\.healthkit: true/);
+  assert.match(iosProjectTemplate, /HealthKit\.framework/);
+  assert.match(mobileAssistantIos, /requestAuthorization\(toShare: \[\], read: \[stepType\]\)/);
+  assert.match(mobileAssistantIos, /HKStatisticsQuery\(/);
+  assert.match(mobileAssistantIos, /quantityType\(forIdentifier: \.stepCount\)/);
+  assert.match(mobileAssistantAndroid, /createRequestPermissionResultContract/);
+  assert.match(mobileAssistantAndroid, /StepsRecord\.COUNT_TOTAL/);
+  assert.match(mobileAssistantManifest, /android\.permission\.health\.READ_STEPS/);
+  assert.doesNotMatch(mobileAssistantManifest, /WRITE_STEPS|READ_HEALTH_DATA_IN_BACKGROUND/);
+  assert.match(mobileAssistantManifest, /ACTION_SHOW_PERMISSIONS_RATIONALE/);
+  assert.match(mobileAssistantManifest, /android\.intent\.action\.VIEW_PERMISSION_USAGE/);
+});
+
 test("release jobs smoke launch every newly repaired application target", () => {
   const windows = jobSource("windows", "linux");
   const android = jobSource("android", "ios");
@@ -223,6 +252,15 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(ios, /xcrun simctl terminate "\$simulator_udid" "\$bundle_id"/);
   assert.match(ios, /xgent-ios-launch-evidence/);
   assert.match(workflow, /! -name '\*-smoke\.png'/);
+  assert.match(desktopHost, /with_denylist\(&\[MAIN_WINDOW_LABEL\]\)/);
+  const closeHandlerStart = desktopHost.indexOf(".on_window_event({");
+  const closeHandlerEnd = desktopHost.indexOf(".invoke_handler", closeHandlerStart);
+  assert.ok(closeHandlerStart >= 0 && closeHandlerEnd > closeHandlerStart);
+  const closeHandler = desktopHost.slice(
+    closeHandlerStart,
+    closeHandlerEnd,
+  );
+  assert.doesNotMatch(closeHandler, /save_window_state/);
 });
 
 test("desktop activation reveals the painted main window without exposing startup frames", () => {

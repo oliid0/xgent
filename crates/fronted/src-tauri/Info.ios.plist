@@ -20,6 +20,8 @@
   <string>XGent can use selected photos in your tasks after you grant access.</string>
   <key>NSLocationWhenInUseUsageDescription</key>
   <string>XGent uses your location only for tasks you explicitly request.</string>
+  <key>NSHealthShareUsageDescription</key>
+  <string>XGent reads step totals only for time ranges you explicitly ask it to analyze or summarize.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsLocalNetworking</key>

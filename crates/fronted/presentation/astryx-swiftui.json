@@ -1,6 +1,241 @@
 {
-  "version": 1,
-  "astryxVersion": "0.5.4",
+  "version": 2,
+  "astryxVersion": "0.6.0",
+  "rendering": {
+    "applicationUI": "SwiftUI",
+    "webContent": "WebKitOnly",
+    "businessState": "Shared TypeScript and Tauri Rust",
+    "liquidGlass": "Native on iOS 26 and macOS 26; regularMaterial polyfill on macOS 15-25",
+    "transportWebView": "Noninteractive and accessibility-hidden while a native root is mounted"
+  },
+  "contract": {
+    "schema": "xgent.presentation.v1",
+    "unknownComponent": "reject-document",
+    "unknownProperty": "reject-document",
+    "missingRenderer": "reject-generation",
+    "stateOwnership": "TypeScript owns business state; SwiftUI owns only ephemeral focus, disclosure and presentation state",
+    "actionOwnership": "Every interactive native node dispatches a validated typed action to the shared TypeScript handler",
+    "webBoundary": "WebKit may render remote browser content only and must never render application chrome"
+  },
+  "propertyMappings": {
+    "label": { "wireType": "string", "swift": "Text/Label/accessibilityLabel according to component contract" },
+    "text": { "wireType": "string", "swift": "Text, AttributedString markdown, placeholder or supporting text" },
+    "value": { "wireType": "string|number|boolean|null", "swift": "typed Binding backed by XgentPresentationModel" },
+    "action": { "wireType": "string", "swift": "validated XgentAction dispatched to the shared TypeScript handler" },
+    "disabled": { "wireType": "boolean", "swift": ".disabled plus busy-state gating" },
+    "destructive": { "wireType": "boolean", "swift": "ButtonRole.destructive and destructive semantic color" },
+    "prominent": { "wireType": "boolean", "swift": "glassProminent or borderedProminent style" },
+    "secure": { "wireType": "boolean", "swift": "SecureField instead of TextField" },
+    "secondary": { "wireType": "boolean", "swift": "secondary semantic foreground or reduced emphasis" },
+    "spacing": { "wireType": "length", "swift": "stack/container spacing in points", "range": [0, 1024] },
+    "padding": { "wireType": "length", "swift": ".padding(_:)", "range": [0, 1024] },
+    "indent": { "wireType": "length", "swift": ".padding(.leading, _:)", "range": [0, 1024] },
+    "fill": { "wireType": "boolean", "swift": ".frame(maxWidth:maxHeight:)" },
+    "alignment": { "wireType": "leading|center|trailing", "swift": "stack and frame Alignment" },
+    "width": { "wireType": "length", "swift": ".frame(width:)", "range": [0, 10000] },
+    "minWidth": { "wireType": "length", "swift": ".frame(minWidth:)", "range": [0, 10000] },
+    "maxWidth": { "wireType": "length", "swift": ".frame(maxWidth:)", "range": [0, 10000] },
+    "height": { "wireType": "length", "swift": ".frame(height:)", "range": [0, 10000] },
+    "minHeight": { "wireType": "length", "swift": ".frame(minHeight:)", "range": [0, 10000] },
+    "maxHeight": { "wireType": "length", "swift": ".frame(maxHeight:)", "range": [0, 10000] },
+    "maxLines": { "wireType": "integer", "swift": ".lineLimit(_:)", "range": [1, 10000] },
+    "wrap": { "wireType": "boolean", "swift": "fixedSize and multiline behavior" },
+    "variant": { "wireType": "string", "swift": "semantic variant resolved by the component renderer" },
+    "size": { "wireType": "small|medium|large", "swift": "token-mapped controlSize and typography metrics" },
+    "icon": { "wireType": "string", "swift": "Image(systemName:) through the checked icon vocabulary" },
+    "selected": { "wireType": "boolean", "swift": "selection state, checkmark and accessibility selected trait" },
+    "role": { "wireType": "user|assistant|system", "swift": "chat alignment, surface and accessibility sender context" },
+    "status": { "wireType": "pending|running|completed|error|paused", "swift": "semantic progress icon, color and accessibility value" },
+    "language": { "wireType": "string", "swift": "code language or media MIME type" },
+    "minimum": { "wireType": "number", "swift": "Slider/Stepper lower bound" },
+    "maximum": { "wireType": "number", "swift": "Slider/Stepper upper bound" },
+    "step": { "wireType": "positive-number", "swift": "Slider/Stepper stride" },
+    "current": { "wireType": "number", "swift": "ProgressView current value" },
+    "total": { "wireType": "nonnegative-number", "swift": "ProgressView total value" },
+    "options": { "wireType": "unique-option-array", "swift": "Picker/Menu/FilePicker choices" },
+    "accessibilityLabel": { "wireType": "string", "swift": ".accessibilityLabel" },
+    "accessibilityHint": { "wireType": "string", "swift": ".accessibilityHint" },
+    "accessibilityValue": { "wireType": "string", "swift": ".accessibilityValue" },
+    "children": { "wireType": "node-array", "swift": "recursive native view tree with depth and count limits" }
+  },
+  "eventMappings": {
+    "press": { "payload": "null", "kinds": ["Button", "Menu", "NavigationRow", "IconButton", "TreeRow", "ActivityPreview"] },
+    "changeText": { "payload": "string", "kinds": ["TextInput", "TextArea", "ComposerInput"] },
+    "changeColor": { "payload": "hex-color", "kinds": ["ColorInput"] },
+    "changeSelection": { "payload": "string", "kinds": ["Selector", "SegmentedControl"] },
+    "changeBoolean": { "payload": "boolean", "kinds": ["Switch"] },
+    "changeNumber": { "payload": "number", "kinds": ["Slider"] },
+    "pickFiles": { "payload": "serialized-file-array", "kinds": ["FilePicker"] },
+    "reportViewport": { "payload": "validated-geometry-json", "kinds": ["BrowserViewport"] },
+    "dismiss": { "payload": "null", "kinds": [], "scope": "document" }
+  },
+  "renderStrategies": {
+    "native": {
+      "policy": "Direct SwiftUI control or layout; no HTML/WebView fallback",
+      "kinds": ["VStack", "HStack", "ScrollView", "Section", "Text", "Heading", "Button", "TextInput", "ColorInput", "TextArea", "Switch", "Selector", "SegmentedControl", "Menu", "Divider", "Progress", "ProgressBar", "Badge", "Banner", "EmptyState", "StatusDot", "Slider", "Collapsible", "Markdown", "CodeBlock", "List", "TreeRow", "NavigationRow", "IconButton", "Spacer", "ComposerInput", "ChatMessage", "Thinking", "ToolCall", "TaskStep"]
+    },
+    "polyfill": {
+      "policy": "SwiftUI composition reproducing Astryx geometry, tokens, states and motion",
+      "kinds": ["Card", "SettingsGroup", "SettingsLayout", "Composer", "ChatLayout", "ActivityPreview", "TaskProgress", "BrowserLayout"]
+    },
+    "systemBridge": {
+      "policy": "Native framework view embedded inside SwiftUI; never application WebView UI",
+      "kinds": ["BrowserViewport", "MediaPreview", "FilePicker"]
+    }
+  },
+  "platforms": {
+    "ios": { "renderer": "SwiftUI", "formFactor": "mobile", "desktopOnlyFeatures": false },
+    "macos": { "renderer": "SwiftUI", "formFactor": "desktop", "desktopOnlyFeatures": true },
+    "android": { "renderer": "Astryx", "formFactor": "mobile", "desktopOnlyFeatures": false },
+    "windows": { "renderer": "Astryx", "formFactor": "desktop", "desktopOnlyFeatures": true },
+    "linux": { "renderer": "Astryx", "formFactor": "desktop", "desktopOnlyFeatures": true }
+  },
+  "templates": {
+    "mobileChat": "ChatLayout > toolbar + ChatMessageList + activityStrip + ChatComposer",
+    "mobileSidebar": "sidebar > search + skills + MCP + files + workspaces + recents + new chat + settings",
+    "mobileMore": "sheet > terminal + shell management + browser + browser settings + git review + SSH + background tasks",
+    "activityStrip": "HStack > ActivityPreview + Spacer + TaskProgress",
+    "settings": "sheet > appearance + providers + permissions + voice + other + local/cloud + backup + memory + skills + about",
+    "workspaceFile": "BrowserLayout > toolbar + guarded TextArea or MediaPreview + metadata",
+    "browser": "BrowserLayout > navigation controls + BrowserViewport(WebKit web content only)",
+    "confirmation": "alert > explanatory Text + destructive/primary action + cancel"
+  },
+  "frameworks": {
+    "SwiftUI": "application presentation, controls, layout, navigation, accessibility and Liquid Glass",
+    "WebKit": "browser page content only; never application chrome",
+    "PDFKit": "PDF workspace preview",
+    "AVKit": "audio and video workspace preview",
+    "PhotosUI": "privacy-preserving photo selection",
+    "UniformTypeIdentifiers": "file-picker type contracts",
+    "EventKit": "permission-gated calendar and reminder actions",
+    "Speech": "permission-gated native mobile dictation",
+    "HealthKit": "fine-grained health authorization when provisioned",
+    "UserNotifications": "permission-gated local notifications",
+    "CloudKit": "Apple private-database sync when provisioned",
+    "MessageUI": "user-approved mail composition only; no arbitrary Mail inbox access"
+  },
+  "astryxCatalog": {
+    "AlertDialog": { "swiftUI": "alert or confirmation document", "kind": "container" },
+    "AspectRatio": { "swiftUI": "aspectRatio(_:contentMode:)", "kind": "modifier" },
+    "Badge": { "swiftUI": "Text in a semantic Capsule", "kind": "primitive" },
+    "Banner": { "swiftUI": "semantic HStack in a rounded surface", "kind": "composed" },
+    "BottomSheet": { "swiftUI": "sheet with presentationDetents", "kind": "container" },
+    "Breadcrumbs": { "swiftUI": "horizontal navigation buttons", "kind": "composed" },
+    "Button": { "swiftUI": "Button", "kind": "primitive" },
+    "ButtonGroup": { "swiftUI": "ControlGroup or HStack", "kind": "composed" },
+    "Card": { "swiftUI": "VStack with XgentGlassSurface", "kind": "container" },
+    "Carousel": { "swiftUI": "horizontal ScrollView with paging behavior", "kind": "container" },
+    "Center": { "swiftUI": "frame alignment", "kind": "modifier" },
+    "Chat": { "swiftUI": "ChatLayout, ChatMessage, ToolCall and Composer semantic nodes", "kind": "template" },
+    "CheckboxInput": { "swiftUI": "Toggle with platform-appropriate checkbox treatment", "kind": "primitive" },
+    "ClickableCard": { "swiftUI": "Button containing a glass card", "kind": "composed" },
+    "Code": { "swiftUI": "monospaced Text", "kind": "primitive" },
+    "CodeBlock": { "swiftUI": "horizontal ScrollView with selectable monospaced Text", "kind": "composed" },
+    "Collapsible": { "swiftUI": "DisclosureGroup", "kind": "primitive" },
+    "CommandPalette": { "swiftUI": "searchable sheet and filtered List", "kind": "template" },
+    "ComplexSelector": { "swiftUI": "Menu or searchable selection sheet", "kind": "composed" },
+    "ContextMenu": { "swiftUI": "contextMenu", "kind": "modifier" },
+    "Dialog": { "swiftUI": "sheet or alert according to interaction semantics", "kind": "container" },
+    "Divider": { "swiftUI": "Divider", "kind": "primitive" },
+    "DropdownMenu": { "swiftUI": "Menu", "kind": "primitive" },
+    "EmptyState": { "swiftUI": "centered Label and supporting Text", "kind": "composed" },
+    "FileInput": { "swiftUI": "PhotosPicker, camera picker or fileImporter", "kind": "composed" },
+    "FormLayout": { "swiftUI": "Form or adaptive Grid", "kind": "container" },
+    "Grid": { "swiftUI": "Grid or LazyVGrid", "kind": "container" },
+    "Heading": { "swiftUI": "Text with heading traits", "kind": "primitive" },
+    "HoverCard": { "swiftUI": "macOS hover-triggered popover", "kind": "desktopOnly" },
+    "HStack": { "swiftUI": "HStack", "kind": "container" },
+    "Icon": { "swiftUI": "Image(systemName:)", "kind": "primitive" },
+    "IconButton": { "swiftUI": "Button with SF Symbol and circular glass treatment", "kind": "composed" },
+    "InputGroup": { "swiftUI": "HStack of related inputs", "kind": "composed" },
+    "Item": { "swiftUI": "List row", "kind": "composed" },
+    "Kbd": { "swiftUI": "monospaced Text keycap", "kind": "desktopOnly" },
+    "Layout": { "swiftUI": "VStack, HStack, ZStack and safeAreaInset", "kind": "template" },
+    "Lightbox": { "swiftUI": "native Image, PDFKit or AVKit preview", "kind": "template" },
+    "Link": { "swiftUI": "Link or openURL action", "kind": "primitive" },
+    "List": { "swiftUI": "List or lazy stack with row separators", "kind": "container" },
+    "Markdown": { "swiftUI": "AttributedString markdown in selectable Text", "kind": "composed" },
+    "MetadataList": { "swiftUI": "two-column adaptive Grid", "kind": "composed" },
+    "MobileNav": { "swiftUI": "safe-area toolbar and navigation sheet", "kind": "template" },
+    "MoreMenu": { "swiftUI": "Menu on desktop or sheet on mobile", "kind": "template" },
+    "MultiSelector": { "swiftUI": "multi-selection List", "kind": "composed" },
+    "NumberInput": { "swiftUI": "formatted TextField", "kind": "primitive" },
+    "Overlay": { "swiftUI": "overlay or ZStack", "kind": "modifier" },
+    "Popover": { "swiftUI": "popover", "kind": "container" },
+    "ProgressBar": { "swiftUI": "ProgressView(value:total:)", "kind": "primitive" },
+    "RadioList": { "swiftUI": "Picker with inline style", "kind": "composed" },
+    "Resizable": { "swiftUI": "HSplitView or VSplitView", "kind": "desktopOnly" },
+    "Section": { "swiftUI": "Section or labeled glass group", "kind": "container" },
+    "SegmentedControl": { "swiftUI": "Picker with segmented style", "kind": "primitive" },
+    "SelectableCard": { "swiftUI": "selection Button containing a glass card", "kind": "composed" },
+    "Selector": { "swiftUI": "Picker with menu style", "kind": "primitive" },
+    "SideNav": { "swiftUI": "NavigationSplitView", "kind": "desktopOnly" },
+    "Skeleton": { "swiftUI": "redacted placeholder", "kind": "modifier" },
+    "Slider": { "swiftUI": "Slider", "kind": "primitive" },
+    "Spinner": { "swiftUI": "indeterminate ProgressView", "kind": "primitive" },
+    "Stack": { "swiftUI": "VStack or HStack", "kind": "container" },
+    "StatusDot": { "swiftUI": "semantic Circle and Text", "kind": "composed" },
+    "Stepper": { "swiftUI": "progress disclosure with ordered task rows", "kind": "composed" },
+    "Switch": { "swiftUI": "Toggle", "kind": "primitive" },
+    "Table": { "swiftUI": "Table on desktop or adaptive List on mobile", "kind": "composed" },
+    "TabList": { "swiftUI": "segmented Picker or TabView", "kind": "composed" },
+    "Text": { "swiftUI": "Text", "kind": "primitive" },
+    "TextArea": { "swiftUI": "TextEditor", "kind": "primitive" },
+    "TextInput": { "swiftUI": "TextField or SecureField", "kind": "primitive" },
+    "Thumbnail": { "swiftUI": "resizable Image with clipped aspect ratio", "kind": "composed" },
+    "TimeInput": { "swiftUI": "DatePicker with hour-and-minute components", "kind": "primitive" },
+    "Timestamp": { "swiftUI": "Text with date format style", "kind": "primitive" },
+    "Toast": { "swiftUI": "transient accessible overlay", "kind": "composed" },
+    "ToggleButton": { "swiftUI": "Button with selected state", "kind": "composed" },
+    "Token": { "swiftUI": "removable Badge", "kind": "composed" },
+    "Toolbar": { "swiftUI": "toolbar or safeAreaInset", "kind": "container" },
+    "Tooltip": { "swiftUI": "help on macOS and accessibility hint on iOS", "kind": "modifier" },
+    "TreeList": { "swiftUI": "OutlineGroup", "kind": "composed" },
+    "Typeahead": { "swiftUI": "searchable suggestion popover", "kind": "composed" },
+    "VStack": { "swiftUI": "VStack", "kind": "container" },
+    "hooks": { "swiftUI": "nonvisual React composition only", "kind": "nonVisual" },
+    "theme": { "swiftUI": "serialized PresentationTheme environment", "kind": "nonVisual" }
+  },
+  "tokens": {
+    "--color-accent": { "target": "palette.accent", "type": "color", "fallback": ["#0088ff", "#0a84ff"] },
+    "--color-text-accent": { "target": "palette.accentText", "type": "color", "fallback": ["#006edc", "#6eb4ff"] },
+    "--color-background-body": { "target": "palette.background", "type": "color", "fallback": ["#f5f5f7", "#171717"] },
+    "--color-background-surface": { "target": "palette.surface", "type": "color", "fallback": ["#ffffff", "#212121"] },
+    "--color-background-card": { "target": "palette.card", "type": "color", "fallback": ["#ffffff", "#2a2a2a"] },
+    "--color-background-popover": { "target": "palette.popover", "type": "color", "fallback": ["#ffffff", "#2a2a2a"] },
+    "--color-background-muted": { "target": "palette.muted", "type": "color", "fallback": ["#eeeeef", "#303030"] },
+    "--color-text-primary": { "target": "palette.text", "type": "color", "fallback": ["#0d0d0d", "#ececec"] },
+    "--color-text-secondary": { "target": "palette.secondaryText", "type": "color", "fallback": ["#6e6e73", "#b4b4b4"] },
+    "--color-text-disabled": { "target": "palette.disabledText", "type": "color", "fallback": ["#8e8e93", "#7c7c80"] },
+    "--color-border": { "target": "palette.border", "type": "color", "fallback": ["#0000001a", "#ffffff1f"] },
+    "--color-border-emphasized": { "target": "palette.emphasizedBorder", "type": "color", "fallback": ["#d9d9d9", "#4a4a4a"] },
+    "--color-shadow": { "target": "palette.shadow", "type": "color", "fallback": ["#000000", "#000000"] },
+    "--radius-inner": { "target": "radius.inner", "type": "length", "fallback": [8, 8] },
+    "--radius-element": { "target": "radius.element", "type": "length", "fallback": [14, 14] },
+    "--radius-container": { "target": "radius.container", "type": "length", "fallback": [26, 26] },
+    "--radius-page": { "target": "radius.overlay", "type": "length", "fallback": [32, 32] },
+    "--radius-chat": { "target": "radius.chat", "type": "length", "fallback": [28, 28] },
+    "--spacing-1": { "target": "spacing.xs", "type": "length", "fallback": [4, 4] },
+    "--spacing-2": { "target": "spacing.sm", "type": "length", "fallback": [8, 8] },
+    "--spacing-3": { "target": "spacing.md", "type": "length", "fallback": [12, 12] },
+    "--spacing-4": { "target": "spacing.lg", "type": "length", "fallback": [16, 16] },
+    "--spacing-6": { "target": "spacing.xl", "type": "length", "fallback": [24, 24] },
+    "--size-element-sm": { "target": "control.small", "type": "length", "fallback": [32, 32] },
+    "--size-element-md": { "target": "control.medium", "type": "length", "fallback": [40, 40] },
+    "--size-element-lg": { "target": "control.large", "type": "length", "fallback": [44, 44] },
+    "--font-size-xs": { "target": "typography.caption", "type": "length", "fallback": [12, 12] },
+    "--font-size-sm": { "target": "typography.supporting", "type": "length", "fallback": [13, 13] },
+    "--font-size-base": { "target": "typography.body", "type": "length", "fallback": [15, 15] },
+    "--duration-fast": { "target": "motion.fast", "type": "duration", "fallback": [120, 120] },
+    "--duration-medium": { "target": "motion.medium", "type": "duration", "fallback": [240, 240] },
+    "--duration-slow": { "target": "motion.slow", "type": "duration", "fallback": [650, 650] },
+    "--ease-standard": { "target": "motion.curve", "type": "timingFunction", "fallback": ["cubic-bezier(0.2, 0, 0, 1)", "cubic-bezier(0.2, 0, 0, 1)"] },
+    "--astryx-theme-xgent-glass-material-surface-opacity": { "target": "material.surfaceOpacity", "type": "percentage", "fallback": [0.8, 0.72] },
+    "--astryx-theme-xgent-glass-material-popover-opacity": { "target": "material.popoverOpacity", "type": "percentage", "fallback": [0.88, 0.8] },
+    "--astryx-theme-xgent-glass-material-blur": { "target": "material.blur", "type": "length", "fallback": [28, 28] },
+    "--astryx-theme-xgent-glass-material-saturation": { "target": "material.saturation", "type": "percentage", "fallback": [1.45, 1.45] },
+    "--astryx-theme-xgent-glass-material-shadow-opacity": { "target": "material.shadowOpacity", "type": "number", "fallback": [0.1, 0.34] }
+  },
   "components": [
     {
       "kind": "VStack",
@@ -18,31 +253,31 @@
       "kind": "ScrollView",
       "swiftCase": "scrollView",
       "astryx": "Chat/ChatMessageList",
-      "declaration": "ScrollView { LazyVStack(alignment: .leading, spacing: 12) { children } }"
+      "declaration": "ScrollView { LazyVStack(alignment: .leading, spacing: CGFloat(presentationTheme.spacing.md)) { children } }"
     },
     {
       "kind": "Card",
       "swiftCase": "card",
       "astryx": "Card/Card",
-      "declaration": "VStack(alignment: .leading, spacing: 12) { children }\n    .padding(16).modifier(XgentGlassSurface())"
+      "declaration": "VStack(alignment: .leading, spacing: CGFloat(presentationTheme.spacing.md)) { children }\n    .padding(CGFloat(presentationTheme.spacing.lg)).modifier(XgentGlassSurface())"
     },
     {
       "kind": "Section",
       "swiftCase": "section",
       "astryx": "Layout/Section",
-      "declaration": "GroupBox { VStack(alignment: .leading, spacing: 12) { children } } label: {\n    Text(node.label ?? \"\")\n}"
+      "declaration": "nativeSection"
     },
     {
       "kind": "Text",
       "swiftCase": "text",
       "astryx": "Text/Text",
-      "declaration": "Text(node.text ?? \"\")\n    .foregroundStyle(node.secondary == true ? .secondary : .primary)\n    .textSelection(.enabled)\n    .fixedSize(horizontal: false, vertical: true)"
+      "declaration": "nativeText"
     },
     {
       "kind": "Heading",
       "swiftCase": "heading",
       "astryx": "Heading/Heading",
-      "declaration": "Text(node.text ?? \"\").font(.headline).accessibilityAddTraits(.isHeader)"
+      "declaration": "nativeHeading"
     },
     {
       "kind": "Button",
@@ -54,13 +289,19 @@
       "kind": "TextInput",
       "swiftCase": "textInput",
       "astryx": "TextInput/TextInput",
-      "declaration": "VStack(alignment: .leading, spacing: 4) {\n    if let label = node.label, !label.isEmpty { Text(label).font(.subheadline) }\n    if node.secure == true {\n        SecureField(node.text ?? \"\", text: textBinding)\n            .textFieldStyle(.roundedBorder)\n            .accessibilityLabel(node.label ?? node.text ?? \"\")\n    } else {\n        TextField(node.text ?? \"\", text: textBinding)\n            .textFieldStyle(.roundedBorder)\n            .accessibilityLabel(node.label ?? node.text ?? \"\")\n    }\n}"
+      "declaration": "nativeTextInput"
+    },
+    {
+      "kind": "ColorInput",
+      "swiftCase": "colorInput",
+      "astryx": "TextInput/TextInput",
+      "declaration": "nativeColorInput"
     },
     {
       "kind": "TextArea",
       "swiftCase": "textArea",
       "astryx": "TextArea/TextArea",
-      "declaration": "VStack(alignment: .leading, spacing: 4) {\n    if let label = node.label, !label.isEmpty { Text(label).font(.subheadline) }\n    TextEditor(text: textBinding).frame(minHeight: 100)\n        .accessibilityLabel(node.label ?? node.text ?? \"\")\n}"
+      "declaration": "nativeTextArea"
     },
     {
       "kind": "Switch",
@@ -99,16 +340,82 @@
       "declaration": "ProgressView(node.label ?? \"\")"
     },
     {
+      "kind": "ProgressBar",
+      "swiftCase": "progressBar",
+      "astryx": "ProgressBar/ProgressBar",
+      "declaration": "nativeProgressBar"
+    },
+    {
+      "kind": "Badge",
+      "swiftCase": "badge",
+      "astryx": "Badge/Badge",
+      "declaration": "nativeBadge"
+    },
+    {
+      "kind": "Banner",
+      "swiftCase": "banner",
+      "astryx": "Banner/Banner",
+      "declaration": "nativeBanner"
+    },
+    {
+      "kind": "EmptyState",
+      "swiftCase": "emptyState",
+      "astryx": "EmptyState/EmptyState",
+      "declaration": "nativeEmptyState"
+    },
+    {
+      "kind": "StatusDot",
+      "swiftCase": "statusDot",
+      "astryx": "StatusDot/StatusDot",
+      "declaration": "nativeStatusDot"
+    },
+    {
+      "kind": "Slider",
+      "swiftCase": "slider",
+      "astryx": "Slider/Slider",
+      "declaration": "nativeSlider"
+    },
+    {
+      "kind": "Collapsible",
+      "swiftCase": "collapsible",
+      "astryx": "Collapsible/Collapsible",
+      "declaration": "nativeCollapsible"
+    },
+    {
+      "kind": "Markdown",
+      "swiftCase": "markdown",
+      "astryx": "Markdown/Markdown",
+      "declaration": "nativeMarkdown"
+    },
+    {
+      "kind": "CodeBlock",
+      "swiftCase": "codeBlock",
+      "astryx": "CodeBlock/CodeBlock",
+      "declaration": "nativeCodeBlock"
+    },
+    {
       "kind": "List",
       "swiftCase": "list",
       "astryx": "List/List",
-      "declaration": "List { children }.listStyle(.plain)"
+      "declaration": "nativeList"
+    },
+    {
+      "kind": "TreeRow",
+      "swiftCase": "treeRow",
+      "astryx": "TreeList/TreeList",
+      "declaration": "nativeTreeRow"
     },
     {
       "kind": "SettingsGroup",
       "swiftCase": "settingsGroup",
       "astryx": "Section/Section",
-      "declaration": "Section { children } header: { Text(node.label ?? \"\") }"
+      "declaration": "nativeSettingsGroup"
+    },
+    {
+      "kind": "SettingsLayout",
+      "swiftCase": "settingsLayout",
+      "astryx": "Layout/Layout",
+      "declaration": "nativeSettingsLayout"
     },
     {
       "kind": "NavigationRow",
@@ -145,6 +452,60 @@
       "swiftCase": "chatLayout",
       "astryx": "Chat/ChatLayout",
       "declaration": "chatLayout"
+    },
+    {
+      "kind": "ChatMessage",
+      "swiftCase": "chatMessage",
+      "astryx": "Chat/ChatMessage",
+      "declaration": "nativeChatMessage"
+    },
+    {
+      "kind": "Thinking",
+      "swiftCase": "thinking",
+      "astryx": "Collapsible/Collapsible",
+      "declaration": "nativeThinking"
+    },
+    {
+      "kind": "ToolCall",
+      "swiftCase": "toolCall",
+      "astryx": "Chat/ChatToolCalls",
+      "declaration": "nativeToolCall"
+    },
+    {
+      "kind": "ActivityPreview",
+      "swiftCase": "activityPreview",
+      "astryx": "AspectRatio/AspectRatio",
+      "declaration": "nativeActivityPreview"
+    },
+    {
+      "kind": "TaskProgress",
+      "swiftCase": "taskProgress",
+      "astryx": "Stepper/Stepper",
+      "declaration": "nativeTaskProgress"
+    },
+    {
+      "kind": "TaskStep",
+      "swiftCase": "taskStep",
+      "astryx": "Stepper/Step",
+      "declaration": "nativeTaskStep"
+    },
+    {
+      "kind": "BrowserViewport",
+      "swiftCase": "browserViewport",
+      "astryx": "Layout/LayoutContent",
+      "declaration": "nativeBrowserViewport"
+    },
+    {
+      "kind": "BrowserLayout",
+      "swiftCase": "browserLayout",
+      "astryx": "Layout/Layout",
+      "declaration": "nativeBrowserLayout"
+    },
+    {
+      "kind": "MediaPreview",
+      "swiftCase": "mediaPreview",
+      "astryx": "Lightbox/Lightbox",
+      "declaration": "nativeMediaPreview"
     },
     {
       "kind": "FilePicker",

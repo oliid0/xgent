@@ -131,6 +131,42 @@ test("email and SMS tools only report a presented user-controlled draft", async 
   ]);
 });
 
+test("health step reads request only the health capability and preserve limited-access context", async () => {
+  const summary = {
+    startMs: Date.parse("2026-09-01T00:00:00Z"),
+    endMs: Date.parse("2026-09-02T00:00:00Z"),
+    steps: 4321,
+    source: "healthkit",
+    accessLimited: true,
+  };
+  const { bundle, calls } = createHarness((command) => {
+    if (command.endsWith("|status")) {
+      return { healthAvailable: true, permissionAliases: { health: "health" } };
+    }
+    if (command.endsWith("|check_permissions")) return { health: "requested" };
+    return summary;
+  });
+
+  const result = await bundle.executeToolCall(
+    toolCall("MobilePersonalData", {
+      action: "read_health_steps",
+      start: "2026-09-01T00:00:00Z",
+      end: "2026-09-02T00:00:00Z",
+    }),
+  );
+
+  assert.equal(result.isError, false);
+  assert.deepEqual(resultData(result), {
+    summary,
+    privacyNote: "The platform may expose only the health data window the user authorized.",
+  });
+  assert.deepEqual(calls.map((call) => call.command), [
+    "plugin:mobile-assistant|status",
+    "plugin:mobile-assistant|check_permissions",
+    "plugin:mobile-assistant|read_health_steps",
+  ]);
+});
+
 test("invalid personal-action dates fail before native IPC", async () => {
   const { bundle, calls } = createHarness(() => {
     throw new Error("native invoke must not run");

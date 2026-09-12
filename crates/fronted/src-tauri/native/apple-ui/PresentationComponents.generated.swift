@@ -2,6 +2,54 @@
 // Edit the mapping, not this file.
 import SwiftUI
 
+enum XgentRenderStrategy: String {
+    case native
+    case polyfill
+    case systemBridge
+}
+
+enum XgentMappedProperty: String, CaseIterable {
+    case label
+    case text
+    case value
+    case action
+    case disabled
+    case destructive
+    case prominent
+    case secure
+    case secondary
+    case spacing
+    case padding
+    case indent
+    case fill
+    case alignment
+    case width
+    case minWidth
+    case maxWidth
+    case height
+    case minHeight
+    case maxHeight
+    case maxLines
+    case wrap
+    case variant
+    case size
+    case icon
+    case selected
+    case role
+    case status
+    case language
+    case minimum
+    case maximum
+    case step
+    case current
+    case total
+    case options
+    case accessibilityLabel
+    case accessibilityHint
+    case accessibilityValue
+    case children
+}
+
 enum XgentNodeKind: String, Decodable {
     case vStack = "VStack"
     case hStack = "HStack"
@@ -12,6 +60,7 @@ enum XgentNodeKind: String, Decodable {
     case heading = "Heading"
     case button = "Button"
     case textInput = "TextInput"
+    case colorInput = "ColorInput"
     case textArea = "TextArea"
     case toggle = "Switch"
     case selector = "Selector"
@@ -19,15 +68,96 @@ enum XgentNodeKind: String, Decodable {
     case menu = "Menu"
     case divider = "Divider"
     case progress = "Progress"
+    case progressBar = "ProgressBar"
+    case badge = "Badge"
+    case banner = "Banner"
+    case emptyState = "EmptyState"
+    case statusDot = "StatusDot"
+    case slider = "Slider"
+    case collapsible = "Collapsible"
+    case markdown = "Markdown"
+    case codeBlock = "CodeBlock"
     case list = "List"
+    case treeRow = "TreeRow"
     case settingsGroup = "SettingsGroup"
+    case settingsLayout = "SettingsLayout"
     case navigationRow = "NavigationRow"
     case iconButton = "IconButton"
     case spacer = "Spacer"
     case composer = "Composer"
     case composerInput = "ComposerInput"
     case chatLayout = "ChatLayout"
+    case chatMessage = "ChatMessage"
+    case thinking = "Thinking"
+    case toolCall = "ToolCall"
+    case activityPreview = "ActivityPreview"
+    case taskProgress = "TaskProgress"
+    case taskStep = "TaskStep"
+    case browserViewport = "BrowserViewport"
+    case browserLayout = "BrowserLayout"
+    case mediaPreview = "MediaPreview"
     case filePicker = "FilePicker"
+}
+
+extension XgentNodeKind {
+    var renderStrategy: XgentRenderStrategy {
+        switch self {
+        case .vStack, .hStack, .scrollView, .section, .text, .heading, .button, .textInput, .colorInput, .textArea, .toggle, .selector, .segmentedControl, .menu, .divider, .progress, .progressBar, .badge, .banner, .emptyState, .statusDot, .slider, .collapsible, .markdown, .codeBlock, .list, .treeRow, .navigationRow, .iconButton, .spacer, .composerInput, .chatMessage, .thinking, .toolCall, .taskStep: return .native
+        case .card, .settingsGroup, .settingsLayout, .composer, .chatLayout, .activityPreview, .taskProgress, .browserLayout: return .polyfill
+        case .browserViewport, .mediaPreview, .filePicker: return .systemBridge
+        }
+    }
+
+    var eventSemantics: Set<String> {
+        switch self {
+        case .vStack: return Set([])
+        case .hStack: return Set([])
+        case .scrollView: return Set([])
+        case .card: return Set([])
+        case .section: return Set([])
+        case .text: return Set([])
+        case .heading: return Set([])
+        case .button: return Set(["press"])
+        case .textInput: return Set(["changeText"])
+        case .colorInput: return Set(["changeColor"])
+        case .textArea: return Set(["changeText"])
+        case .toggle: return Set(["changeBoolean"])
+        case .selector: return Set(["changeSelection"])
+        case .segmentedControl: return Set(["changeSelection"])
+        case .menu: return Set(["press"])
+        case .divider: return Set([])
+        case .progress: return Set([])
+        case .progressBar: return Set([])
+        case .badge: return Set([])
+        case .banner: return Set([])
+        case .emptyState: return Set([])
+        case .statusDot: return Set([])
+        case .slider: return Set(["changeNumber"])
+        case .collapsible: return Set([])
+        case .markdown: return Set([])
+        case .codeBlock: return Set([])
+        case .list: return Set([])
+        case .treeRow: return Set(["press"])
+        case .settingsGroup: return Set([])
+        case .settingsLayout: return Set([])
+        case .navigationRow: return Set(["press"])
+        case .iconButton: return Set(["press"])
+        case .spacer: return Set([])
+        case .composer: return Set([])
+        case .composerInput: return Set(["changeText"])
+        case .chatLayout: return Set([])
+        case .chatMessage: return Set([])
+        case .thinking: return Set([])
+        case .toolCall: return Set([])
+        case .activityPreview: return Set(["press"])
+        case .taskProgress: return Set([])
+        case .taskStep: return Set([])
+        case .browserViewport: return Set(["reportViewport"])
+        case .browserLayout: return Set([])
+        case .mediaPreview: return Set([])
+        case .filePicker: return Set(["pickFiles"])
+        }
+    }
 }
 
 extension XgentNodeView {
@@ -38,42 +168,24 @@ extension XgentNodeView {
         case .hStack:
             HStack(spacing: node.spacing.map { CGFloat($0) }) { children }
         case .scrollView:
-            ScrollView { LazyVStack(alignment: .leading, spacing: 12) { children } }
+            ScrollView { LazyVStack(alignment: .leading, spacing: CGFloat(presentationTheme.spacing.md)) { children } }
         case .card:
-            VStack(alignment: .leading, spacing: 12) { children }
-                .padding(16).modifier(XgentGlassSurface())
+            VStack(alignment: .leading, spacing: CGFloat(presentationTheme.spacing.md)) { children }
+                .padding(CGFloat(presentationTheme.spacing.lg)).modifier(XgentGlassSurface())
         case .section:
-            GroupBox { VStack(alignment: .leading, spacing: 12) { children } } label: {
-                Text(node.label ?? "")
-            }
+            nativeSection
         case .text:
-            Text(node.text ?? "")
-                .foregroundStyle(node.secondary == true ? .secondary : .primary)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+            nativeText
         case .heading:
-            Text(node.text ?? "").font(.headline).accessibilityAddTraits(.isHeader)
+            nativeHeading
         case .button:
             nativeButton
         case .textInput:
-            VStack(alignment: .leading, spacing: 4) {
-                if let label = node.label, !label.isEmpty { Text(label).font(.subheadline) }
-                if node.secure == true {
-                    SecureField(node.text ?? "", text: textBinding)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityLabel(node.label ?? node.text ?? "")
-                } else {
-                    TextField(node.text ?? "", text: textBinding)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityLabel(node.label ?? node.text ?? "")
-                }
-            }
+            nativeTextInput
+        case .colorInput:
+            nativeColorInput
         case .textArea:
-            VStack(alignment: .leading, spacing: 4) {
-                if let label = node.label, !label.isEmpty { Text(label).font(.subheadline) }
-                TextEditor(text: textBinding).frame(minHeight: 100)
-                    .accessibilityLabel(node.label ?? node.text ?? "")
-            }
+            nativeTextArea
         case .toggle:
             Toggle(node.label ?? "", isOn: boolBinding)
         case .selector:
@@ -86,10 +198,32 @@ extension XgentNodeView {
             Divider()
         case .progress:
             ProgressView(node.label ?? "")
+        case .progressBar:
+            nativeProgressBar
+        case .badge:
+            nativeBadge
+        case .banner:
+            nativeBanner
+        case .emptyState:
+            nativeEmptyState
+        case .statusDot:
+            nativeStatusDot
+        case .slider:
+            nativeSlider
+        case .collapsible:
+            nativeCollapsible
+        case .markdown:
+            nativeMarkdown
+        case .codeBlock:
+            nativeCodeBlock
         case .list:
-            List { children }.listStyle(.plain)
+            nativeList
+        case .treeRow:
+            nativeTreeRow
         case .settingsGroup:
-            Section { children } header: { Text(node.label ?? "") }
+            nativeSettingsGroup
+        case .settingsLayout:
+            nativeSettingsLayout
         case .navigationRow:
             navigationRow
         case .iconButton:
@@ -102,6 +236,24 @@ extension XgentNodeView {
             composerInput
         case .chatLayout:
             chatLayout
+        case .chatMessage:
+            nativeChatMessage
+        case .thinking:
+            nativeThinking
+        case .toolCall:
+            nativeToolCall
+        case .activityPreview:
+            nativeActivityPreview
+        case .taskProgress:
+            nativeTaskProgress
+        case .taskStep:
+            nativeTaskStep
+        case .browserViewport:
+            nativeBrowserViewport
+        case .browserLayout:
+            nativeBrowserLayout
+        case .mediaPreview:
+            nativeMediaPreview
         case .filePicker:
             filePicker
         }

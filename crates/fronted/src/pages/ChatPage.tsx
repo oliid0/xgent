@@ -278,7 +278,9 @@ import {
   buildDroppedWorkspaceRootDrafts,
   listWorkspaceRootGrants,
 } from "../lib/workspaceRootGrants";
+import { NativeBrowserPage } from "../presentation/NativeBrowserPage";
 import { NativeChatPage } from "../presentation/NativeChatPage";
+import { NativeWorkspaceFilePage } from "../presentation/NativeWorkspaceFilePage";
 import { isApplePresentationRuntime } from "../runtime/applePresentation";
 import {
   buildErrorAssistantMessage,
@@ -727,26 +729,26 @@ export function ChatPage(props: ChatPageProps) {
   setPreferredMonacoNlsLocale(locale);
   const conversationSidebarResize = useResizable({
     defaultSize: 360,
-    minSizePx: 280,
-    maxSizePx: 560,
+    minSize: 280,
+    maxSize: 560,
     autoSaveId: "xgent-chat-sidebar-width",
   });
   const workspacePanelResize = useResizable({
     defaultSize: 420,
-    minSizePx: 320,
-    maxSizePx: 720,
+    minSize: 320,
+    maxSize: 720,
     autoSaveId: "xgent-workspace-panel-width",
   });
   const workspaceHubPanelResize = useResizable({
     defaultSize: 420,
-    minSizePx: 400,
-    maxSizePx: 720,
+    minSize: 400,
+    maxSize: 720,
     autoSaveId: "xgent-workspace-hub-panel-width",
   });
   const auxiliaryPanelResize = useResizable({
     defaultSize: 520,
-    minSizePx: 380,
-    maxSizePx: 900,
+    minSize: 380,
+    maxSize: 900,
     autoSaveId: "xgent-chat-auxiliary-panel-width",
   });
   const initialConversationRef = useRef(createConversationIdentity());
@@ -6189,6 +6191,7 @@ export function ChatPage(props: ChatPageProps) {
     return (
       <>
         <NativeChatPage
+          conversationId={currentConversationId}
           settings={settings}
           composerRef={composerRef}
           sidebarStore={sidebarStore}
@@ -6205,6 +6208,7 @@ export function ChatPage(props: ChatPageProps) {
           projects={workspaceProjects}
           attachmentsEnabled={canDropUpload}
           uploads={pendingUploadedFiles}
+          taskList={conversationState.meta.taskList}
           isUploading={isUploadingFiles}
           onSend={handleSend}
           onStop={handleStopSending}
@@ -6214,6 +6218,11 @@ export function ChatPage(props: ChatPageProps) {
           onNewConversation={handleDesktopNewConversation}
           onOpenSettings={(section) => onOpenSettings(section)}
           onOpenRemote={() => setMobileWorkspaceDestination({ kind: "ssh" })}
+          onOpenBrowser={handleOpenBrowser}
+          onOpenBrowserSettings={() => setMobileWorkspaceDestination({ kind: "browser-settings" })}
+          onOpenGitReview={() => setMobileWorkspaceDestination({ kind: "git-review" })}
+          onOpenBackgroundTasks={() => setMobileWorkspaceDestination({ kind: "background-tasks" })}
+          onOpenFiles={() => setMobileWorkspaceDestination({ kind: "files" })}
           onLoadEarlierHistory={handleLoadEarlierHistory}
           onDecide={(toolCallId, decision) =>
             answerToolApproval(toolCallId, decision, { conversationId: currentConversationId })
@@ -6264,6 +6273,55 @@ export function ChatPage(props: ChatPageProps) {
           mode={mobileTerminalDestination?.mode ?? "terminal"}
           sshHosts={settings.ssh.hosts}
           onClose={() => setMobileWorkspaceDestination(null)}
+        />
+        <MobileGitReviewPanel
+          open={mobileWorkspaceDestination?.kind === "git-review"}
+          workdir={mobileWorkspacePath}
+          settings={settings}
+          onClose={() => setMobileWorkspaceDestination(null)}
+        />
+        <MobileFilesPanel
+          open={mobileWorkspaceDestination?.kind === "files"}
+          projectPathKey={mobileWorkspacePathKey}
+          cwd={mobileWorkspacePath}
+          theme={effectiveTheme}
+          settings={settings}
+          fileTreeState={mobileFileTreeState}
+          terminalClient={tauriTerminalClient}
+          workspaceActivityClient={null}
+          onFileTreeStateChange={handleMobileFileTreeStateChange}
+          onInsertFileMention={handleWorkspaceToolsInsertFileMention}
+          onOpenFile={handleOpenMobileWorkspaceFile}
+          onClose={() => setMobileWorkspaceDestination(null)}
+        />
+        <MobileBackgroundTasksPanel
+          open={mobileWorkspaceDestination?.kind === "background-tasks"}
+          settings={settings}
+          setSettings={setSettings}
+          managedProcessesAvailable={!nativeMobile && desktopCommandHostAvailable}
+          onClose={() => setMobileWorkspaceDestination(null)}
+        />
+        <MobileBrowserSettingsPanel
+          open={mobileWorkspaceDestination?.kind === "browser-settings"}
+          settings={settings}
+          setSettings={setSettings}
+          onClose={() => setMobileWorkspaceDestination(null)}
+        />
+        <NativeBrowserPage settings={settings} />
+        <NativeWorkspaceFilePage
+          settings={settings}
+          editorRequest={workspaceEditorOpenRequest}
+          editorOpen={workspaceEditorOpen}
+          previewRequest={workspaceFilePreviewOpenRequest}
+          previewOpen={workspaceFilePreviewOpen}
+          onEditorClose={() => {
+            setWorkspaceEditorOpen(false);
+            setWorkspaceEditorMounted(false);
+            setWorkspaceEditorCleanupPending(false);
+            setWorkspaceEditorOpenRequest(null);
+            setWorkspaceEditorCloseRequestId(0);
+          }}
+          onPreviewClose={handleWorkspaceFilePreviewClosed}
         />
       </>
     );
@@ -7034,6 +7092,7 @@ export function ChatPage(props: ChatPageProps) {
           projectPathKey={mobileWorkspacePathKey}
           cwd={mobileWorkspacePath}
           theme={effectiveTheme}
+          settings={settings}
           fileTreeState={mobileFileTreeState}
           terminalClient={tauriTerminalClient}
           workspaceActivityClient={null}
@@ -7047,6 +7106,7 @@ export function ChatPage(props: ChatPageProps) {
         <MobileGitReviewPanel
           open={mobileWorkspaceDestination?.kind === "git-review"}
           workdir={mobileWorkspacePath}
+          settings={settings}
           onClose={() => setMobileWorkspaceDestination(null)}
         />
       ) : null}

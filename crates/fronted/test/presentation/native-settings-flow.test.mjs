@@ -5,6 +5,10 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 test("native settings navigation persists provider, model, appearance and policy edits through shared reducers", async () => {
   const states = [];
   let cursor = 0;
+  const locale = {
+    SUPPORTED_LOCALES: ["system", "zh-CN", "en-US"],
+    useLocale: () => ({ t: (key) => key, locale: "en-US" }),
+  };
   const loader = createTsModuleLoader({ mocks: {
     react: {
       useEffect() {},
@@ -14,10 +18,16 @@ test("native settings navigation persists provider, model, appearance and policy
         return [states[index], (next) => { states[index] = typeof next === "function" ? next(states[index]) : next; }];
       },
     },
-    "../i18n": { SUPPORTED_LOCALES: ["system", "zh-CN", "en-US"], useLocale: () => ({ t: (key) => key, locale: "en-US" }) },
+    "../i18n": locale,
+    "../../i18n": locale,
     "./NativeSurface": { NativeSurface: "NativeSurface" },
+    "./nativeTheme": { createNativePresentationTheme: () => ({ marker: "theme" }) },
     "../pages/settings/CronSection": { CronSection: "CronSection" },
     "../pages/settings/SshSettingsSection": { SshSettingsSection: "SshSettingsSection" },
+    "../pages/settings/ComputerUseSection": { ComputerUseSection: "ComputerUseSection" },
+    "../pages/settings/GlobalShortcutsSection": { GlobalShortcutsSection: "GlobalShortcutsSection" },
+    "../pages/settings/HooksSection": { HooksSection: "HooksSection" },
+    "../pages/settings/SoulSection": { SoulSection: "SoulSection" },
     "../pages/chat/mobile/MobileSkillsPage": { MobileSkillsPage: "MobileSkillsPage" },
   } });
   const { NativeSettingsPage } = loader.loadModule("src/presentation/NativeSettingsPage.tsx");
@@ -40,9 +50,37 @@ test("native settings navigation persists provider, model, appearance and policy
     return result;
   };
   render();
+  const rootNavigation = document.nodes.find((node) => node.id === "app-settings").children;
+  for (const id of ["providers", "toolPermissions", "voice", "mcp", "other", "access", "backup", "soul", "memory", "skills", "about"]) {
+    assert.ok(rootNavigation.some((node) => node.id === `nav:${id}`), id);
+  }
+  assert.ok(rootNavigation.some((node) => node.id === "nav:mobileAssistant"));
+  assert.ok(rootNavigation.some((node) => node.id === "nav:mobileExecution"));
+  assert.ok(!rootNavigation.some((node) => node.id === "nav:shortcuts"));
+  assert.ok(!rootNavigation.some((node) => node.id === "nav:computerUse"));
   assert.equal((await dispatch("theme", "dark")).ok, true);
   assert.equal(document.appearance, "dark");
   assert.equal((await dispatch("theme", "invalid")).ok, false);
+  assert.equal(document.formFactor, "mobile");
+  assert.deepEqual(document.theme, { marker: "theme" });
+  assert.equal((await dispatch("appearance-customized", true)).ok, true);
+  assert.equal((await dispatch("accent-light", "#12ABEF")).ok, true);
+  assert.equal(settings.customSettings.appearance.accentLight, "#12abef");
+  assert.equal((await dispatch("accent-light", "blue")).ok, false);
+  assert.equal((await dispatch("font-scale:chat", "1.2")).ok, true);
+  assert.equal(settings.customSettings.fontScale.chat, 1.2);
+  await dispatch("nav:voice");
+  const mobileVoice = document.nodes.find((node) => node.id === "voice-general").children;
+  assert.deepEqual(
+    mobileVoice.map((node) => node.id),
+    ["voice-enabled", "voice-device-status", "voice-permissions"],
+  );
+  assert.ok(!document.nodes.some((node) => node.id === "voice-provider-fields"));
+  assert.equal((await dispatch("voice-enabled", true)).ok, true);
+  assert.equal(settings.stt.enabled, true);
+  assert.equal((await dispatch("voice-permissions")).ok, true);
+  assert.ok(document.nodes.some((node) => node.id === "refresh-permissions"));
+  await dispatch("back");
   await dispatch("nav:providers");
   const count = settings.customProviders.length;
   assert.equal((await dispatch("add-provider")).ok, true);

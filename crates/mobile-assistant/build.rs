@@ -7,6 +7,7 @@ const COMMANDS: &[&str] = &[
     "check_permissions",
     "request_permissions",
     "get_current_location",
+    "read_health_steps",
     "list_calendar_events",
     "list_reminders",
     "create_calendar_event",

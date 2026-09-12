@@ -2,6 +2,7 @@ import AVFoundation
 import CoreLocation
 import EventKit
 import Foundation
+import HealthKit
 import MessageUI
 import Photos
 import Speech
@@ -25,6 +26,11 @@ private struct CalendarRangeArgs: Decodable {
     let startMs: Int64
     let endMs: Int64
     let limit: UInt16
+}
+
+private struct HealthStepsArgs: Decodable {
+    let startMs: Int64
+    let endMs: Int64
 }
 
 private struct ReminderListArgs: Decodable {
@@ -83,6 +89,14 @@ private struct LocationPayload: Encodable {
     let provider: String?
 }
 
+private struct HealthStepsPayload: Encodable {
+    let startMs: Int64
+    let endMs: Int64
+    let steps: Int64
+    let source: String
+    let accessLimited: Bool
+}
+
 private enum PermissionAlias {
     static let microphone = "microphone"
     static let camera = "camera"
@@ -90,12 +104,14 @@ private enum PermissionAlias {
     static let reminders = "reminders"
     static let photos = "photos"
     static let location = "location"
+    static let health = "health"
 }
 
 final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
     MFMailComposeViewControllerDelegate, MFMessageComposeViewControllerDelegate
 {
     private let eventStore = EKEventStore()
+    private let healthStore = HKHealthStore()
     private let locationManager = CLLocationManager()
     private var locationPermissionInvokes: [Invoke] = []
     private var locationReadInvoke: Invoke?
@@ -140,6 +156,16 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
     }
 
     @objc func status(_ invoke: Invoke) {
+        var aliases = [
+            "microphone": PermissionAlias.microphone,
+            "camera": PermissionAlias.camera,
+            "calendar": PermissionAlias.calendar,
+            "reminders": PermissionAlias.reminders,
+            "photos": PermissionAlias.photos,
+            "location": PermissionAlias.location,
+        ]
+        let healthAvailable = HKHealthStore.isHealthDataAvailable()
+        if healthAvailable { aliases["health"] = PermissionAlias.health }
         invoke.resolve([
             "backend": "ios-native",
             "available": true,
@@ -149,25 +175,30 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             // and agent runs in this process.
             "externalFolderMountAvailable": true,
             "cloudSyncAvailable": false,
-            // HealthKit and HomeKit require provisioning capabilities. Keep
-            // them unavailable in unsigned builds instead of displaying a
-            // switch that can never be granted after sideloading.
-            "healthAvailable": false,
+            "healthAvailable": healthAvailable,
             "homeAvailable": false,
-            "permissionAliases": [
-                "microphone": PermissionAlias.microphone,
-                "camera": PermissionAlias.camera,
-                "calendar": PermissionAlias.calendar,
-                "reminders": PermissionAlias.reminders,
-                "photos": PermissionAlias.photos,
-                "location": PermissionAlias.location,
-            ],
-            "detail": "iOS permissions are requested individually. Health and Home require a signed provisioning profile with matching Apple capabilities.",
+            "permissionAliases": aliases,
+            "detail": "iOS permissions are requested individually. HealthKit reads only step totals for user-requested time ranges.",
         ])
     }
 
     @objc override public func checkPermissions(_ invoke: Invoke) {
-        invoke.resolve(permissionPayload())
+        let payload = permissionPayload()
+        guard let stepType = stepType(), HKHealthStore.isHealthDataAvailable() else {
+            invoke.resolve(payload)
+            return
+        }
+        healthStore.getRequestStatusForAuthorization(toShare: [], read: [stepType]) {
+            status, error in
+            if let error {
+                invoke.reject("Unable to check HealthKit authorization: \(error.localizedDescription)")
+                return
+            }
+            var resolvedPayload = payload
+            resolvedPayload[PermissionAlias.health] = status == .shouldRequest
+                ? "prompt" : "requested"
+            invoke.resolve(resolvedPayload)
+        }
     }
 
     @objc override public func requestPermissions(_ invoke: Invoke) {
@@ -202,6 +233,8 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             DispatchQueue.main.async { [weak self] in
                 self?.locationManager.requestWhenInUseAuthorization()
             }
+        case PermissionAlias.health:
+            requestHealthPermission(invoke)
         default:
             invoke.reject("Unknown mobile permission: \(alias)")
         }
@@ -267,6 +300,48 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
                 execute: timeout
             )
         }
+    }
+
+    @objc func readHealthSteps(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(HealthStepsArgs.self)
+        let start = date(milliseconds: args.startMs)
+        let end = date(milliseconds: args.endMs)
+        guard end > start else {
+            invoke.reject("Health range end must be after start")
+            return
+        }
+        guard HKHealthStore.isHealthDataAvailable(), let stepType = stepType() else {
+            invoke.reject("HealthKit step data is unavailable on this device")
+            return
+        }
+        let predicate = HKQuery.predicateForSamples(
+            withStart: start,
+            end: end,
+            options: [.strictStartDate, .strictEndDate]
+        )
+        let query = HKStatisticsQuery(
+            quantityType: stepType,
+            quantitySamplePredicate: predicate,
+            options: .cumulativeSum
+        ) { _, statistics, error in
+            if let error {
+                invoke.reject("Unable to read HealthKit steps: \(error.localizedDescription)")
+                return
+            }
+            let count = statistics?.sumQuantity()?.doubleValue(for: .count()) ?? 0
+            invoke.resolve(
+                HealthStepsPayload(
+                    startMs: args.startMs,
+                    endMs: args.endMs,
+                    steps: Int64(max(0, count).rounded()),
+                    source: "healthkit",
+                    // HealthKit intentionally does not reveal whether the user denied
+                    // a read type, and may expose only a user-selected recent window.
+                    accessLimited: true
+                )
+            )
+        }
+        healthStore.execute(query)
     }
 
     @objc func listCalendarEvents(_ invoke: Invoke) throws {
@@ -582,6 +657,26 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
                 DispatchQueue.main.async { self?.checkPermissions(invoke) }
             }
         }
+    }
+
+    private func requestHealthPermission(_ invoke: Invoke) {
+        guard HKHealthStore.isHealthDataAvailable(), let stepType = stepType() else {
+            invoke.reject("HealthKit step data is unavailable on this device")
+            return
+        }
+        healthStore.requestAuthorization(toShare: [], read: [stepType]) { [weak self] success, error in
+            if let error {
+                invoke.reject("Unable to request HealthKit authorization: \(error.localizedDescription)")
+            } else if !success {
+                invoke.reject("HealthKit did not complete the authorization request")
+            } else {
+                self?.checkPermissions(invoke)
+            }
+        }
+    }
+
+    private func stepType() -> HKQuantityType? {
+        HKObjectType.quantityType(forIdentifier: .stepCount)
     }
 
     private func requestEventPermission(_ invoke: Invoke, entity: EKEntityType) {

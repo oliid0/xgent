@@ -1,5 +1,4 @@
 diff --git a/dist/Layer/useLayer.js b/dist/Layer/useLayer.js
-index 58fb9f5c7f19bb4a75c07f8dc7f75518a8a41fbc..d111be612a970a5c4f5d7713ea78f5807993c1e2 100644
 --- a/dist/Layer/useLayer.js
 +++ b/dist/Layer/useLayer.js
 @@ -13,6 +13,7 @@
@@ -23,7 +22,7 @@ index 58fb9f5c7f19bb4a75c07f8dc7f75518a8a41fbc..d111be612a970a5c4f5d7713ea78f580
        return;
      }
 -    const portalTarget = resolveLayerPortalTarget(inlineParent);
-+    const portalTarget = (needsLayerCompatibility() ? inlineParent?.closest("dialog[open]") ?? document.body : resolveLayerPortalTarget(inlineParent));
++    const portalTarget = needsLayerCompatibility() ? inlineParent?.closest("dialog[open]") ?? document.body : resolveLayerPortalTarget(inlineParent);
      const mount = {
        portalTarget,
        portalStyle: portalTarget ? readPortalWritingContext(sentinel, portalTarget) : {}

@@ -19,7 +19,7 @@
       "../../mobile-execution/ios/Sources/Resources/": "mobile-execution/"
     },
     "iOS": {
-      "minimumSystemVersion": "16.0",
+      "minimumSystemVersion": "26.0",
       "infoPlist": "Info.ios.plist",
       "template": "src-tauri/ios.project.yml"
     }

@@ -39,7 +39,10 @@ async fn deliver(
         return Err("Native presentation is restricted to the main application window".into());
     }
     let encoded = serde_json::to_string(&payload).map_err(|error| error.to_string())?;
-    if encoded.len() > 8 * 1024 * 1024 {
+    // Workspace previews are capped at 25 MiB before base64 encoding. The
+    // native document carries that same payload (roughly 33.4 MiB encoded),
+    // plus metadata, while still retaining a firm transport allocation cap.
+    if encoded.len() > 40 * 1024 * 1024 {
         return Err("Native presentation payload is too large".into());
     }
     let encoded = std::ffi::CString::new(encoded).map_err(|error| error.to_string())?;

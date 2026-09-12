@@ -67,6 +67,24 @@ pub struct MobileLocation {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct HealthStepsRequest {
+    pub start_ms: i64,
+    pub end_ms: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HealthStepsSummary {
+    pub start_ms: i64,
+    pub end_ms: i64,
+    pub steps: i64,
+    pub source: String,
+    #[serde(default)]
+    pub access_limited: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CalendarRangeRequest {
     pub start_ms: i64,
     pub end_ms: i64,

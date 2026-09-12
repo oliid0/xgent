@@ -19,7 +19,15 @@ import android.provider.CalendarContract
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import androidx.activity.result.ActivityResult
+import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.PermissionController
+import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.request.AggregateRequest
+import androidx.health.connect.client.time.TimeRangeFilter
 import app.tauri.PermissionState
+import app.tauri.annotation.ActivityCallback
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.Permission
@@ -27,7 +35,9 @@ import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+import java.time.Instant
 import java.util.Locale
+import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 
 private const val ALIAS_MICROPHONE = "microphone"
@@ -36,6 +46,12 @@ private const val ALIAS_CALENDAR = "calendar"
 private const val ALIAS_LOCATION = "location"
 private const val ALIAS_PHOTOS = "photos"
 private const val ALIAS_PHOTOS_LEGACY = "photosLegacy"
+private const val ALIAS_HEALTH = "health"
+private const val HEALTH_PROVIDER_PACKAGE = "com.google.android.apps.healthdata"
+
+private val HEALTH_PERMISSIONS = setOf(
+    HealthPermission.getReadPermission(StepsRecord::class),
+)
 
 @InvokeArg
 class ClipboardArgs { var text: String = "" }
@@ -43,6 +59,11 @@ class ClipboardArgs { var text: String = "" }
 @InvokeArg
 class VoiceInputArgs {
     var locale: String? = null
+}
+
+@InvokeArg
+class PermissionRequestArgs {
+    var permissions: List<String>? = null
 }
 
 @InvokeArg
@@ -55,6 +76,12 @@ class CalendarRangeArgs {
     var startMs: Long = 0
     var endMs: Long = 0
     var limit: Int = 50
+}
+
+@InvokeArg
+class HealthStepsArgs {
+    var startMs: Long = 0
+    var endMs: Long = 0
 }
 
 @InvokeArg
@@ -122,11 +149,28 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     override fun checkPermissions(invoke: Invoke) {
-        super.checkPermissions(invoke)
+        Thread {
+            runCatching { permissionPayload() }
+                .onSuccess(invoke::resolve)
+                .onFailure { error -> invoke.reject("Unable to check mobile permissions: ${error.message}") }
+        }.start()
     }
 
     @Command
     override fun requestPermissions(invoke: Invoke) {
+        val request = runCatching { invoke.parseArgs(PermissionRequestArgs::class.java) }
+            .getOrElse { error ->
+                invoke.reject("Invalid permission request: ${error.message}")
+                return
+            }
+        if (request.permissions?.contains(ALIAS_HEALTH) == true) {
+            if (request.permissions?.size != 1) {
+                invoke.reject("Health Connect access must be requested separately")
+                return
+            }
+            requestHealthPermissions(invoke)
+            return
+        }
         super.requestPermissions(invoke)
     }
 
@@ -173,7 +217,7 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
                 // directory is shared by file tools, PRoot and agent runs.
                 put("externalFolderMountAvailable", true)
                 put("cloudSyncAvailable", false)
-                put("healthAvailable", false)
+                put("healthAvailable", healthSdkStatus() == HealthConnectClient.SDK_AVAILABLE)
                 put("homeAvailable", false)
                 put(
                     "permissionAliases",
@@ -184,11 +228,14 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
                         put("reminders", ALIAS_CALENDAR)
                         put("photos", photoAlias)
                         put("location", ALIAS_LOCATION)
+                        if (healthSdkStatus() == HealthConnectClient.SDK_AVAILABLE) {
+                            put("health", ALIAS_HEALTH)
+                        }
                     },
                 )
                 put(
                     "detail",
-                    "Android permissions use system runtime prompts; Health Connect requires a separate provider integration.",
+                    healthStatusDetail(),
                 )
             },
         )
@@ -349,6 +396,48 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
+    fun readHealthSteps(invoke: Invoke) {
+        val args = parseArgs(invoke, HealthStepsArgs::class.java) ?: return
+        if (args.endMs <= args.startMs) {
+            invoke.reject("Health range end must be after start")
+            return
+        }
+        if (healthSdkStatus() != HealthConnectClient.SDK_AVAILABLE) {
+            invoke.reject(healthStatusDetail())
+            return
+        }
+        Thread {
+            runCatching {
+                runBlocking {
+                    val client = HealthConnectClient.getOrCreate(activity)
+                    val granted = client.permissionController.getGrantedPermissions()
+                    if (!granted.containsAll(HEALTH_PERMISSIONS)) {
+                        throw IllegalStateException("Health Connect step permission is required")
+                    }
+                    val response = client.aggregate(
+                        AggregateRequest(
+                            metrics = setOf(StepsRecord.COUNT_TOTAL),
+                            timeRangeFilter = TimeRangeFilter.between(
+                                Instant.ofEpochMilli(args.startMs),
+                                Instant.ofEpochMilli(args.endMs),
+                            ),
+                        ),
+                    )
+                    JSObject().apply {
+                        put("startMs", args.startMs)
+                        put("endMs", args.endMs)
+                        put("steps", response[StepsRecord.COUNT_TOTAL] ?: 0L)
+                        put("source", "health-connect")
+                        put("accessLimited", false)
+                    }
+                }
+            }.onSuccess(invoke::resolve).onFailure { error ->
+                invoke.reject("Unable to read Health Connect steps: ${error.message}")
+            }
+        }.start()
+    }
+
+    @Command
     fun listCalendarEvents(invoke: Invoke) {
         val args = parseArgs(invoke, CalendarRangeArgs::class.java) ?: return
         if (!calendarPermissionGranted(invoke)) return
@@ -460,6 +549,84 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
             }
         }
         presentIntent(invoke, intent, "System ${args.kind} draft opened; the user must send or cancel it")
+    }
+
+    private fun requestHealthPermissions(invoke: Invoke) {
+        if (healthSdkStatus() != HealthConnectClient.SDK_AVAILABLE) {
+            invoke.reject(healthStatusDetail())
+            return
+        }
+        Thread {
+            runCatching {
+                runBlocking {
+                    HealthConnectClient.getOrCreate(activity)
+                        .permissionController
+                        .getGrantedPermissions()
+                }
+            }.onSuccess { granted ->
+                if (granted.containsAll(HEALTH_PERMISSIONS)) {
+                    resolvePermissionPayload(invoke)
+                    return@onSuccess
+                }
+                mainHandler.post {
+                    val contract = PermissionController.createRequestPermissionResultContract(
+                        HEALTH_PROVIDER_PACKAGE,
+                    )
+                    val intent = contract.createIntent(activity, HEALTH_PERMISSIONS)
+                    startActivityForResult(invoke, intent, "onHealthPermissionResult")
+                }
+            }.onFailure { error ->
+                invoke.reject("Unable to request Health Connect permission: ${error.message}")
+            }
+        }.start()
+    }
+
+    @ActivityCallback
+    private fun onHealthPermissionResult(invoke: Invoke, result: ActivityResult) {
+        val contract = PermissionController.createRequestPermissionResultContract(
+            HEALTH_PROVIDER_PACKAGE,
+        )
+        val granted = contract.parseResult(result.resultCode, result.data)
+        invoke.resolve(permissionPayload(healthGranted = granted.containsAll(HEALTH_PERMISSIONS)))
+    }
+
+    private fun resolvePermissionPayload(invoke: Invoke) {
+        Thread {
+            runCatching { permissionPayload() }
+                .onSuccess(invoke::resolve)
+                .onFailure { error -> invoke.reject("Unable to check mobile permissions: ${error.message}") }
+        }.start()
+    }
+
+    private fun permissionPayload(healthGranted: Boolean? = null): JSObject {
+        val payload = JSObject()
+        getPermissionStates().forEach { (alias, state) -> payload.put(alias, state.toString()) }
+        if (healthSdkStatus() == HealthConnectClient.SDK_AVAILABLE) {
+            val granted = healthGranted ?: runBlocking {
+                HealthConnectClient.getOrCreate(activity)
+                    .permissionController
+                    .getGrantedPermissions()
+                    .containsAll(HEALTH_PERMISSIONS)
+            }
+            payload.put(
+                ALIAS_HEALTH,
+                if (granted) PermissionState.GRANTED.toString() else PermissionState.PROMPT.toString(),
+            )
+        }
+        return payload
+    }
+
+    private fun healthSdkStatus(): Int = HealthConnectClient.getSdkStatus(
+        activity,
+        HEALTH_PROVIDER_PACKAGE,
+    )
+
+    private fun healthStatusDetail(): String = when (healthSdkStatus()) {
+        HealthConnectClient.SDK_AVAILABLE ->
+            "Health Connect step access is available and requested only when needed."
+        HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
+            "Install or update Health Connect before reading step data."
+        else -> "Health Connect is unavailable on this Android device."
     }
 
     private fun queryCalendarInstances(

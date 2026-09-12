@@ -428,7 +428,16 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
 
   useEffect(() => {
     if (!isNativeMobileRuntime()) {
-      setVoiceInputAvailable(sttSettings?.enabled === true);
+      const provider = sttSettings?.provider;
+      setVoiceInputAvailable(
+        sttSettings?.enabled === true &&
+          provider !== undefined &&
+          sttSettings.providers[provider]?.configured === true,
+      );
+      return;
+    }
+    if (sttSettings?.enabled !== true) {
+      setVoiceInputAvailable(false);
       return;
     }
     let active = true;
@@ -493,6 +502,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
         });
         return;
       }
+      if (!sttSettings?.enabled) throw new Error(t("chat.composer.voiceNotConfigured"));
       let permissions = await checkMobileAssistantPermissions();
       if (permissions.microphone !== "granted") {
         permissions = await requestMobileAssistantPermission("microphone");

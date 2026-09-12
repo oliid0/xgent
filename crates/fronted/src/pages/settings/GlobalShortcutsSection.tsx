@@ -10,7 +10,8 @@ import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
-import { inferRuntimePlatform } from "../../lib/runtimePlatform";
+import { inferRuntimePlatform, isNativeMobileRuntime } from "../../lib/runtimePlatform";
+import type { AppSettings } from "../../lib/settings";
 import {
   applyGlobalShortcuts,
   GLOBAL_SHORTCUT_ACTIONS,
@@ -24,6 +25,11 @@ import {
   type ShortcutModifier,
   writeGlobalShortcutBindings,
 } from "../../lib/shortcuts/globalShortcuts";
+import { presentationControls } from "../../presentation/controls";
+import { NativeSurface } from "../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../presentation/nativeTheme";
+import type { PresentationNode } from "../../presentation/types";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 
 type ShortcutDraft = {
   modifiers: ShortcutModifier[];
@@ -90,7 +96,9 @@ function draftAccelerator(draft: ShortcutDraft): string | null {
   return [...draft.modifiers.map(displayModifier), displayMainKey(draft.mainKey)].join("+");
 }
 
-export function GlobalShortcutsSection() {
+export function GlobalShortcutsSection(
+  props: { settings?: AppSettings; onBack?: () => void } = {},
+) {
   const { t } = useLocale();
   const [bindings, setBindings] = useState<GlobalShortcutBindings>(() =>
     readGlobalShortcutBindings(),
@@ -98,6 +106,16 @@ export function GlobalShortcutsSection() {
   const [recording, setRecording] = useState<GlobalShortcutAction | null>(null);
   const [draft, setDraft] = useState<ShortcutDraft>({ modifiers: [], mainKey: null });
   const [status, setStatus] = useState<ShortcutStatus | null>(null);
+  const [nativeAccelerators, setNativeAccelerators] = useState<
+    Partial<Record<GlobalShortcutAction, string>>
+  >(() =>
+    Object.fromEntries(
+      Object.entries(readGlobalShortcutBindings()).map(([action, binding]) => [
+        action,
+        binding?.accelerator ?? "",
+      ]),
+    ),
+  );
 
   const bindingsRef = useRef(bindings);
   bindingsRef.current = bindings;
@@ -298,6 +316,119 @@ export function GlobalShortcutsSection() {
   );
 
   const currentDraft = draftAccelerator(draft);
+
+  if (isApplePresentationRuntime() && props.settings) {
+    const compact = isNativeMobileRuntime();
+    const c = presentationControls();
+    c.handlers.set("close", {
+      enabled: true,
+      accepts: (value) => value === null,
+      run: () => props.onBack?.(),
+    });
+    const saveNativeBinding = (action: GlobalShortcutAction) => {
+      const accelerator = nativeAccelerators[action]?.trim() ?? "";
+      if (!accelerator) throw new Error(t("settings.shortcutNeedMainKey"));
+      if (
+        GLOBAL_SHORTCUT_ACTIONS.some(
+          (other) =>
+            other !== action &&
+            bindings[other]?.accelerator.toLocaleLowerCase() === accelerator.toLocaleLowerCase(),
+        )
+      ) {
+        throw new Error(t("settings.shortcutConflict"));
+      }
+      commit({
+        ...bindings,
+        [action]: { accelerator, enabled: bindings[action]?.enabled ?? true },
+      });
+    };
+    const nodes: PresentationNode[] = [
+      {
+        id: "shortcut-description",
+        kind: "Text",
+        text: t("settings.globalShortcutsDesc"),
+        secondary: true,
+      },
+      ...actionMeta.map((action) =>
+        c.group(`shortcut:${action.id}`, action.label, [
+          {
+            id: `shortcut:${action.id}:description`,
+            kind: "Text",
+            text: action.description,
+            secondary: true,
+          },
+          c.input(
+            `shortcut:${action.id}:accelerator`,
+            t("settings.shortcutSet"),
+            nativeAccelerators[action.id] ?? "",
+            (accelerator) =>
+              setNativeAccelerators((current) => ({ ...current, [action.id]: accelerator })),
+          ),
+          c.toggle(
+            `shortcut:${action.id}:enabled`,
+            t("settings.shortcutToggleOnOff"),
+            bindings[action.id]?.enabled === true,
+            (enabled) => setBindingEnabled(action.id, enabled),
+            Boolean(bindings[action.id]),
+          ),
+          c.action(`shortcut:${action.id}:save`, t("settings.save"), () =>
+            saveNativeBinding(action.id),
+          ),
+          {
+            ...c.action(
+              `shortcut:${action.id}:clear`,
+              t("settings.shortcutClear"),
+              () => {
+                setNativeAccelerators((current) => ({ ...current, [action.id]: "" }));
+                clearBinding(action.id);
+              },
+              Boolean(bindings[action.id]),
+            ),
+            destructive: true,
+          },
+        ]),
+      ),
+      c.action("shortcut-restore", t("settings.shortcutRestoreDefaults"), () => {
+        const defaults = getDefaultGlobalShortcutBindings();
+        setNativeAccelerators(
+          Object.fromEntries(
+            Object.entries(defaults).map(([action, binding]) => [
+              action,
+              binding?.accelerator ?? "",
+            ]),
+          ),
+        );
+        commit(defaults);
+      }),
+      ...(status
+        ? [
+            {
+              id: "shortcut-status",
+              kind: "Banner" as const,
+              label: status.text,
+              status: status.kind === "success" ? ("completed" as const) : ("error" as const),
+            },
+          ]
+        : []),
+    ];
+    return (
+      <NativeSurface
+        document={{
+          mode: "sheet",
+          title: t("settings.globalShortcuts"),
+          appearance: props.settings.theme,
+          formFactor: compact ? "mobile" : "desktop",
+          theme: createNativePresentationTheme(props.settings, compact, "workspaceTools"),
+          nodes,
+          dismissAction: "close",
+        }}
+        handlers={c.handlers}
+        onError={(cause) =>
+          setStatus({ kind: "error", text: cause instanceof Error ? cause.message : String(cause) })
+        }
+      />
+    );
+  }
 
   return (
     <VStack width="100%" gap={4}>

@@ -8,8 +8,14 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { invoke, isBrowserRuntime, openUrl } from "@xgent/runtime";
 import { useEffect, useState } from "react";
 import { useLocale } from "../../i18n";
+import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import { updateMcp } from "../../lib/settings";
 import { createMcpTools } from "../../lib/tools/mcpTools";
+import { presentationControls } from "../../presentation/controls";
+import { NativeSurface } from "../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../presentation/nativeTheme";
+import type { PresentationNode } from "../../presentation/types";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import type { SettingsSectionProps } from "./types";
 
 type Status = {
@@ -20,7 +26,11 @@ type Status = {
   permissionsRequired: boolean;
 };
 
-export function ComputerUseSection({ settings, setSettings }: SettingsSectionProps) {
+export function ComputerUseSection({
+  settings,
+  setSettings,
+  onBack,
+}: SettingsSectionProps & { onBack?: () => void }) {
   const { t } = useLocale();
   const [status, setStatus] = useState<Status>();
   const [supported, setSupported] = useState<boolean | null>(null);
@@ -82,6 +92,158 @@ export function ComputerUseSection({ settings, setSettings }: SettingsSectionPro
     } finally {
       setBusy(false);
     }
+  }
+
+  if (isApplePresentationRuntime()) {
+    const compact = isNativeMobileRuntime();
+    const c = presentationControls();
+    c.handlers.set("close", {
+      enabled: !busy,
+      accepts: (value) => value === null,
+      run: () => onBack?.(),
+    });
+    const nodes: PresentationNode[] = [
+      {
+        id: "computer-use-description",
+        kind: "Text",
+        text: t("settings.cua.description"),
+        secondary: true,
+      },
+      c.group("computer-use-driver", t("settings.cua.backend"), [
+        c.select(
+          "computer-use-backend",
+          t("settings.cua.backend"),
+          selectedDriver ?? "native",
+          [
+            { value: "native", label: t("settings.cua.native") },
+            ...settings.mcp.servers.map((server) => ({
+              value: server.id,
+              label: server.description || server.id,
+            })),
+          ],
+          (value) => {
+            setDriverResult("");
+            setSettings((previous) =>
+              updateMcp(previous, {
+                computerUseDriverId: value === "native" ? undefined : value,
+              }),
+            );
+          },
+        ),
+        c.input(
+          "computer-use-driver-path",
+          t("settings.cua.driverPath"),
+          driverPath,
+          setDriverPath,
+        ),
+        c.action(
+          "computer-use-add-driver",
+          t("settings.cua.addDriver"),
+          () =>
+            setSettings((previous) =>
+              updateMcp(previous, {
+                computerUseDriverId: "cua-driver",
+                servers: [
+                  ...previous.mcp.servers.filter((server) => server.id !== "cua-driver"),
+                  {
+                    id: "cua-driver",
+                    description: "CUA driver",
+                    enabled: true,
+                    transport: "stdio",
+                    command: driverPath.trim(),
+                    args: ["mcp"],
+                    url: "",
+                    timeoutMs: 60_000,
+                  },
+                ],
+              }),
+            ),
+          !!driverPath.trim() && !busy && supported === true,
+        ),
+        c.action("computer-use-install-driver", t("settings.cua.installDriver"), () =>
+          openUrl("https://cua.ai/docs/how-to-guides/driver/install"),
+        ),
+        ...(selectedDriver
+          ? [
+              {
+                id: "computer-use-selected-driver",
+                kind: "CodeBlock" as const,
+                language: "shell",
+                text: driver
+                  ? `${driver.command || driver.url} ${(driver.args ?? []).join(" ")}`
+                  : t("settings.cua.driverMissing"),
+              },
+              c.action(
+                "computer-use-check-driver",
+                t("settings.cua.checkDriver"),
+                checkDriver,
+                !busy && Boolean(driver?.enabled),
+              ),
+            ]
+          : []),
+        ...(driverResult
+          ? [{ id: "computer-use-driver-result", kind: "Text" as const, text: driverResult }]
+          : []),
+      ]),
+      ...(!selectedDriver
+        ? [
+            c.group("computer-use-native", t("settings.cua.native"), [
+              c.toggle(
+                "computer-use-enabled",
+                t("settings.cua.enable"),
+                status?.enabled ?? false,
+                (enabled) => run("cua_set_enabled", enabled),
+                !busy && Boolean(status) && supported === true,
+              ),
+              {
+                id: "computer-use-status",
+                kind: "Text" as const,
+                secondary: true,
+                text:
+                  supported === false
+                    ? t("settings.cua.unavailable")
+                    : status
+                      ? `${t("settings.cua.installed")} · ${status.target} · ${status.version ?? ""}`
+                      : t("settings.cua.loading"),
+              },
+              c.action(
+                "computer-use-refresh",
+                t("settings.cua.refresh"),
+                () => run("cua_status"),
+                !busy && supported === true,
+              ),
+            ]),
+          ]
+        : []),
+      ...(busy
+        ? [{ id: "computer-use-busy", kind: "Progress" as const, label: t("settings.cua.working") }]
+        : []),
+      ...(error
+        ? [
+            {
+              id: "computer-use-error",
+              kind: "Banner" as const,
+              label: error,
+              status: "error" as const,
+            },
+          ]
+        : []),
+    ];
+    return (
+      <NativeSurface
+        document={{
+          mode: "sheet",
+          title: t("settings.cua.title"),
+          appearance: settings.theme,
+          formFactor: compact ? "mobile" : "desktop",
+          theme: createNativePresentationTheme(settings, compact, "workspaceTools"),
+          nodes,
+          dismissAction: busy ? undefined : "close",
+        }}
+        handlers={c.handlers}
+        onError={(cause) => setError(cause instanceof Error ? cause.message : String(cause))}
+      />
+    );
   }
 
   return (
