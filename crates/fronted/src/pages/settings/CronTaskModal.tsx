@@ -39,6 +39,10 @@ import {
 } from "../../lib/automation";
 import { parseModelValue, toModelValue } from "../../lib/providers/llm";
 import { type ExecutionMode, isAgentExecutionMode } from "../../lib/settings";
+import { presentationControls } from "../../presentation/controls";
+import { NativeSurface } from "../../presentation/NativeSurface";
+import type { PresentationNode } from "../../presentation/types";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import {
   createEmptyRequestDraft,
   type HttpRequestDraft,
@@ -293,6 +297,162 @@ export function CronTaskModal({
   const scriptLineCount = scriptText.split(/\r?\n/).filter((l) => l.trim()).length;
 
   const modalTitle = mode === "add" ? t("settings.cronModalAdd") : t("settings.cronModalEdit");
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    c.handlers.set("close", {
+      enabled: !isSaving,
+      accepts: (value) => value === null,
+      run: onClose,
+    });
+    const nodes: PresentationNode[] = [
+      c.group("basic", t("settings.cronStepBasic"), [
+        c.input("name", t("settings.cronTaskName"), name, setName),
+        c.input("description", t("settings.cronDescription"), description, setDescription),
+        c.input("cron", t("settings.cronExpression"), cron, setCron),
+        c.input(
+          "remaining",
+          t("settings.cronRemainingExecutions"),
+          remainingExecutions == null ? "" : String(remainingExecutions),
+          (value) => {
+            if (value && !/^\d+$/.test(value))
+              throw new Error(t("settings.cronRemainingExecutionsInvalid"));
+            setRemainingExecutions(value ? Number(value) : null);
+          },
+        ),
+        c.input("timeout", t("settings.cronTimeoutSeconds"), String(timeoutSeconds), (value) => {
+          if (!/^\d+$/.test(value)) throw new Error(t("settings.cronTimeoutSecondsInvalid"));
+          setTimeoutSeconds(Number(value));
+        }),
+        c.select(
+          "type",
+          t("settings.cronTaskType"),
+          type,
+          [
+            { value: "bash", label: t("settings.cronTypeBash") },
+            { value: "http", label: t("settings.cronTypeHttp") },
+            ...(autoPromptSupported
+              ? [{ value: "prompt", label: t("settings.cronTypePrompt") }]
+              : []),
+          ],
+          (value) => setType(value as CronTaskType),
+        ),
+      ]),
+      ...(type === "bash"
+        ? [
+            {
+              ...c.input("script", t("settings.cronCommand"), scriptText, setScriptText),
+              kind: "TextArea" as const,
+            },
+          ]
+        : []),
+      ...(type === "prompt"
+        ? [
+            {
+              ...c.input("prompt", t("settings.cronPrompt"), prompt, setPrompt),
+              kind: "TextArea" as const,
+            },
+            c.select(
+              "model",
+              t("chat.model"),
+              selectedModelValue,
+              promptModelOptions.map((option) => ({ value: option.value, label: option.label })),
+              setSelectedModelValue,
+            ),
+            c.select(
+              "reasoning",
+              t("settings.reasoning"),
+              reasoning,
+              CRON_REASONING_LEVELS.map((value) => ({
+                value,
+                label: t(REASONING_LEVEL_I18N_KEYS[value]),
+              })),
+              (value) => setReasoning(value as CronReasoningLevel),
+            ),
+          ]
+        : []),
+      ...(type !== "http"
+        ? [
+            c.input("workdir", t("settings.cronWorkdir"), workdir, setWorkdir),
+            ...(onPickWorkdir
+              ? [
+                  c.action("pick-workdir", t("chat.mobileWorkspace.chooseFolder"), async () => {
+                    const selected = await onPickWorkdir(workdir);
+                    if (selected) setWorkdir(selected);
+                  }),
+                ]
+              : []),
+          ]
+        : []),
+    ];
+    if (type === "http") {
+      for (const request of requests) {
+        const patch = (next: Partial<HttpRequestDraft>) =>
+          setRequests((current) =>
+            current.map((item) => (item.id === request.id ? { ...item, ...next } : item)),
+          );
+        nodes.push(
+          c.group(request.id, "HTTP", [
+            c.input(`${request.id}:url`, "URL", request.url, (url) => patch({ url })),
+            c.select(
+              `${request.id}:method`,
+              "Method",
+              request.method,
+              ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"].map((value) => ({
+                value,
+                label: value,
+              })),
+              (method) => patch({ method: method as HttpRequestDraft["method"] }),
+            ),
+            {
+              ...c.input(
+                `${request.id}:headers`,
+                "Headers (JSON)",
+                request.headersText,
+                (headersText) => patch({ headersText }),
+              ),
+              kind: "TextArea",
+            },
+            {
+              ...c.input(`${request.id}:body`, "Body (JSON)", request.bodyText, (bodyText) =>
+                patch({ bodyText }),
+              ),
+              kind: "TextArea",
+            },
+            {
+              ...c.action(`${request.id}:remove`, t("settings.delete"), () =>
+                setRequests((current) => current.filter((item) => item.id !== request.id)),
+              ),
+              destructive: true,
+            },
+          ]),
+        );
+      }
+      nodes.push(
+        c.action("add-request", t("settings.add"), () =>
+          setRequests((current) => [...current, createEmptyRequestDraft()]),
+        ),
+      );
+    }
+    if (formError) nodes.push({ id: "error", kind: "Text", text: formError });
+    nodes.push({
+      ...c.action("save", t("settings.save"), handleSave, formReady && !isSaving),
+      prominent: true,
+    });
+    return (
+      <NativeSurface
+        document={{
+          mode: "sheet",
+          title: modalTitle,
+          appearance: "system",
+          nodes,
+          dismissAction: isSaving ? undefined : "close",
+        }}
+        handlers={c.handlers}
+        onError={(error) => setFormError(String(error))}
+      />
+    );
+  }
 
   return (
     <SettingsModalShell onClose={onClose} purpose="form" ariaLabel={modalTitle}>

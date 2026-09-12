@@ -6212,7 +6212,8 @@ export function ChatPage(props: ChatPageProps) {
           onSelectConversation={handleSelectConversation}
           onSelectProject={handleSelectWorkspaceProject}
           onNewConversation={handleDesktopNewConversation}
-          onOpenSettings={() => onOpenSettings()}
+          onOpenSettings={(section) => onOpenSettings(section)}
+          onOpenRemote={() => setMobileWorkspaceDestination({ kind: "ssh" })}
           onLoadEarlierHistory={handleLoadEarlierHistory}
           onDecide={(toolCallId, decision) =>
             answerToolApproval(toolCallId, decision, { conversationId: currentConversationId })
@@ -6234,6 +6235,19 @@ export function ChatPage(props: ChatPageProps) {
           }
           onImportFiles={importReadableFiles}
           onRemoveUpload={removePendingUpload}
+        />
+        <MobileSshPanel
+          open={mobileWorkspaceDestination?.kind === "ssh"}
+          workdir={mobileWorkspacePath}
+          projectPathKey={mobileWorkspacePathKey}
+          hosts={settings.ssh.hosts}
+          associatedHostIds={mobileAssociatedSshHostIds}
+          onAssociatedHostIdsChange={handleMobileSshProjectHostIdsChange}
+          onOpenSettings={() => {
+            setMobileWorkspaceDestination(null);
+            onOpenSettings("ssh");
+          }}
+          onClose={() => setMobileWorkspaceDestination(null)}
         />
         <MobileWorkspaceCreateDialog
           open={mobileWorkspaceCreateOpen}

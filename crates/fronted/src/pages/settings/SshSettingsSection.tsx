@@ -52,6 +52,10 @@ import {
   type SshScanResult,
   scanSshImportCandidates,
 } from "../../lib/ssh/scan";
+import { presentationControls } from "../../presentation/controls";
+import { NativeSurface } from "../../presentation/NativeSurface";
+import type { PresentationNode } from "../../presentation/types";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import { SecretTextInput } from "./SecretTextInput";
 import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmActionPopover, ConfirmDeletePopover } from "./shared";
@@ -108,6 +112,7 @@ function SshHostModal(props: {
   const [name, setName] = useState(initialData?.name ?? "");
   const [host, setHost] = useState(initialData?.host ?? "");
   const [port, setPort] = useState(initialData?.port ?? 22);
+  const [nativePort, setNativePort] = useState(String(initialData?.port ?? 22));
   const [username, setUsername] = useState(initialData?.username ?? "");
   const [authType, setAuthType] = useState<SshAuthType>(initialData?.authType ?? "password");
   const [password, setPassword] = useState(initialData?.password ?? "");
@@ -231,6 +236,106 @@ function SshHostModal(props: {
       },
     });
     onClose();
+  }
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    c.handlers.set("close", { enabled: true, accepts: (value) => value === null, run: onClose });
+    const nodes: PresentationNode[] = [
+      c.group("connection", t("settings.sshAdd"), [
+        c.input("name", t("settings.sshName"), name, setName),
+        c.input("host", t("settings.sshHost"), host, setHost),
+        c.input("port", t("settings.sshPort"), nativePort, (value) => {
+          setNativePort(value);
+          setPort(Number(value));
+        }),
+        c.input("username", t("settings.sshUsername"), username, setUsername),
+        c.select(
+          "auth",
+          t("settings.sshAuthMethod"),
+          authType,
+          [
+            { value: "password", label: t("settings.sshAuthPassword") },
+            { value: "privateKey", label: t("settings.sshAuthPrivateKey") },
+            { value: "keyboardInteractive", label: t("settings.sshAuthKeyboardInteractive") },
+          ],
+          (value) => setAuthType(value as SshAuthType),
+        ),
+        ...(isPasswordAuth
+          ? [c.input("password", t("settings.sshPassword"), password, setPassword, true)]
+          : []),
+        ...(isPrivateKeyAuth
+          ? [
+              {
+                ...c.input("private-key", t("settings.sshPrivateKey"), privateKey, setPrivateKey),
+                kind: "TextArea" as const,
+              },
+              c.input(
+                "key-path",
+                t("settings.sshPrivateKeyPathPlaceholder"),
+                privateKeyPath,
+                setPrivateKeyPath,
+              ),
+              c.input(
+                "passphrase",
+                t("settings.sshPrivateKeyPassphrase"),
+                privateKeyPassphrase,
+                setPrivateKeyPassphrase,
+                true,
+              ),
+            ]
+          : []),
+      ]),
+      c.group("proxy", t("settings.sshProxyOptionalHint"), [
+        c.select(
+          "proxy-type",
+          t("settings.sshProxyType"),
+          proxyType,
+          [
+            { value: "socks5", label: "SOCKS5" },
+            { value: "http", label: "HTTP CONNECT" },
+          ],
+          (value) => setProxyType(value as SshProxyType),
+        ),
+        c.input("proxy-url", t("settings.sshProxyUrl"), proxyUrl, setProxyUrl),
+        c.input(
+          "proxy-port",
+          t("settings.sshPort"),
+          proxyPort == null ? "" : String(proxyPort),
+          (value) => {
+            const next = Number(value);
+            if (value && (!Number.isInteger(next) || next < 1 || next > 65535))
+              throw new Error("Port must be 1-65535");
+            setProxyPort(value ? next : null);
+          },
+        ),
+        c.input("proxy-user", t("settings.sshUsername"), proxyUsername, setProxyUsername),
+        c.input("proxy-password", t("settings.sshPassword"), proxyPassword, setProxyPassword, true),
+      ]),
+      {
+        ...c.action(
+          "save",
+          t("settings.save"),
+          handleSave,
+          !!name.trim() && !!host.trim() && /^\d+$/.test(nativePort) && port >= 1 && port <= 65535,
+        ),
+        prominent: true,
+      },
+    ];
+    if (importError) nodes.push({ id: "error", kind: "Text", text: importError });
+    return (
+      <NativeSurface
+        document={{
+          mode: "sheet",
+          title: t(isEditing ? "settings.sshEdit" : "settings.sshAdd"),
+          appearance: "system",
+          nodes,
+          dismissAction: "close",
+        }}
+        handlers={c.handlers}
+        onError={(error) => setImportError(String(error))}
+      />
+    );
   }
 
   return (
@@ -616,10 +721,11 @@ function SshImportCandidateRow(props: {
   );
 }
 
-export function SshSettingsSection(props: SettingsSectionProps) {
+export function SshSettingsSection(props: SettingsSectionProps & { onBack?: () => void }) {
   const { settings, setSettings } = props;
   const { t } = useLocale();
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingHost, setEditingHost] = useState<SshHostConfig | null>(null);
   const [knownHostResettingId, setKnownHostResettingId] = useState<string | null>(null);
   const [knownHostResetStatus, setKnownHostResetStatus] = useState<SshKnownHostResetStatus | null>(
@@ -802,6 +908,77 @@ export function SshSettingsSection(props: SettingsSectionProps) {
         onSave={handleSave}
         onClose={closeModal}
       />
+    );
+  }
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    c.handlers.set("close", {
+      enabled: true,
+      accepts: (value) => value === null,
+      run: () => props.onBack?.(),
+    });
+    const nodes: PresentationNode[] = [
+      c.action("add", t("settings.sshAdd"), openAdd),
+      ...hosts.map((host) =>
+        c.group(host.id, host.name, [
+          {
+            ...c.action(`${host.id}:edit`, `${host.username}@${host.host}:${host.port}`, () => {
+              setEditingHost(host);
+              setModalOpen(true);
+            }),
+            kind: "NavigationRow",
+            icon: "server.rack",
+          },
+          {
+            ...c.action(`${host.id}:delete`, t("settings.delete"), () => setDeleteId(host.id)),
+            destructive: true,
+          },
+        ]),
+      ),
+      ...(hosts.length
+        ? []
+        : [{ id: "empty", kind: "Text" as const, text: t("settings.sshEmpty") }]),
+    ];
+    if (knownHostResetStatus)
+      nodes.push({ id: "error", kind: "Text", text: knownHostResetStatus.message });
+    const confirmation = presentationControls();
+    const cancel = confirmation.action("cancel", t("settings.cancel"), () => setDeleteId(null));
+    const remove = confirmation.action("delete", t("settings.delete"), () => {
+      if (deleteId) handleDelete(deleteId);
+      setDeleteId(null);
+    });
+    return (
+      <>
+        <NativeSurface
+          document={{
+            mode: "sheet",
+            title: t("settings.sshTitle"),
+            appearance: settings.theme,
+            nodes,
+            dismissAction: "close",
+          }}
+          handlers={c.handlers}
+          onError={(error) =>
+            showKnownHostResetStatus({ hostId: "", kind: "error", message: String(error) })
+          }
+        />
+        {deleteId ? (
+          <NativeSurface
+            document={{
+              mode: "alert",
+              title: t("settings.delete"),
+              appearance: settings.theme,
+              nodes: [{ ...remove, destructive: true }, cancel],
+              dismissAction: "cancel",
+            }}
+            handlers={confirmation.handlers}
+            onError={(error) =>
+              showKnownHostResetStatus({ hostId: "", kind: "error", message: String(error) })
+            }
+          />
+        ) : null}
+      </>
     );
   }
 

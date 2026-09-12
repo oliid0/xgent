@@ -36,6 +36,10 @@ import {
   useAutomation,
 } from "../../lib/automation";
 import { useCompactViewport } from "../../lib/responsive/compactViewport";
+import { presentationControls } from "../../presentation/controls";
+import { NativeSurface } from "../../presentation/NativeSurface";
+import type { PresentationNode } from "../../presentation/types";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmActionPopover } from "./shared";
 
@@ -897,6 +901,21 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
   const [runNowError, setRunNowError] = useState<string | null>(null);
   const [compactTab, setCompactTab] = useState<"details" | "logs">("details");
   const runNowLockRef = useRef(false);
+  const [nativeRuns, setNativeRuns] = useState<CronRunRecord[]>([]);
+  useEffect(() => {
+    if (!isApplePresentationRuntime()) return;
+    let active = true;
+    void listCronRuns(taskId, 100)
+      .then((runs) => {
+        if (active) setNativeRuns(runs);
+      })
+      .catch((error) => {
+        if (active) setRunNowError(String(error));
+      });
+    return () => {
+      active = false;
+    };
+  }, [taskId, isRunningNow]);
   // Manual runs are watched for at least the legacy six-minute window, and
   // longer when the task timeout exceeds it (plus scheduler/completion slack).
   const manualRunWatchTimeoutMs = Math.max(
@@ -974,6 +993,50 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
       setIsRunningNow(false);
       setRunNowError(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    c.handlers.set("close", { enabled: true, accepts: (value) => value === null, run: onClose });
+    const nodes: PresentationNode[] = [
+      c.group("task", task.name, [
+        { id: "description", kind: "Text", text: task.description },
+        { id: "schedule", kind: "Text", text: task.cron },
+        {
+          id: "content",
+          kind: "Text",
+          text: task.prompt || task.script || JSON.stringify(task.requests ?? [], null, 2),
+        },
+        c.action("run", t("settings.cronViewRunNow"), () => handleRunNow(task.id), !isRunningNow),
+      ]),
+      ...(isRunningNow
+        ? [{ id: "running", kind: "Progress" as const, label: t("settings.cronViewRunNow") }]
+        : []),
+      ...(runNowError ? [{ id: "error", kind: "Text" as const, text: runNowError }] : []),
+      ...nativeRuns.map((run) =>
+        c.group(run.id, formatTimestamp(run.startedAt), [
+          {
+            id: `${run.id}:state`,
+            kind: "Text",
+            text: `${run.state} | ${run.success ? "OK" : "Failed"} | ${formatDuration(run.durationMs)}`,
+          },
+          { id: `${run.id}:output`, kind: "Text", text: run.output },
+        ]),
+      ),
+    ];
+    return (
+      <NativeSurface
+        document={{
+          mode: "sheet",
+          title: task.name,
+          appearance: "system",
+          nodes,
+          dismissAction: "close",
+        }}
+        handlers={c.handlers}
+        onError={(error) => setRunNowError(String(error))}
+      />
+    );
   }
 
   return (

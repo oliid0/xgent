@@ -19,6 +19,10 @@ import {
   readSkillText,
   type SkillSummary,
 } from "../../../lib/skills";
+import { presentationControls } from "../../../presentation/controls";
+import { NativeSurface } from "../../../presentation/NativeSurface";
+import type { PresentationNode } from "../../../presentation/types";
+import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { MobileHubHeader, MobileHubSearch } from "./MobileHubChrome";
 
 type MobileSkillsPageProps = {
@@ -49,6 +53,25 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
 
   useEffect(() => {
     setSkills(props.initialSkills ?? []);
+  }, [props.initialSkills]);
+
+  useEffect(() => {
+    if (!isApplePresentationRuntime() || props.initialSkills) return;
+    let active = true;
+    setRefreshing(true);
+    void discoverSkills({ force: true })
+      .then((result) => {
+        if (active) setSkills(result.skills);
+      })
+      .catch((error) => {
+        if (active) setRefreshError(String(error));
+      })
+      .finally(() => {
+        if (active) setRefreshing(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [props.initialSkills]);
 
   const visibleSkills = useMemo(() => {
@@ -119,6 +142,73 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
       });
     });
   };
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    c.handlers.set("close", {
+      enabled: true,
+      accepts: (value) => value === null,
+      run: props.onOpenSidebar,
+    });
+    const nodes: PresentationNode[] = selected
+      ? [
+          {
+            ...c.action("back", t("settings.close"), () => setSelected(null)),
+            icon: "chevron.left",
+          },
+          c.toggle(
+            "enabled",
+            t("settings.enable"),
+            isSelected(selected),
+            (enabled) => toggle(selected, enabled),
+            isUserSelectableSkill(selected),
+          ),
+          { id: "description", kind: "Text", text: selected.description },
+          ...(preview.loading
+            ? [{ id: "loading", kind: "Progress" as const, label: t("app.loading") }]
+            : []),
+          { id: "preview", kind: "Text", text: preview.error || preview.content },
+        ]
+      : [
+          c.toggle(
+            "skills-enabled",
+            t("settings.enable"),
+            props.settings.skills.enabled,
+            (enabled) => props.setSettings((previous) => updateSkills(previous, { enabled })),
+          ),
+          c.input("search", t("settings.searchPlaceholder"), query, setQuery),
+          c.action("refresh", t("settings.mobileAssistant.refresh"), refresh, !refreshing),
+          ...(refreshing
+            ? [{ id: "loading", kind: "Progress" as const, label: t("settings.skillsScanning") }]
+            : []),
+          ...(refreshError ? [{ id: "error", kind: "Text" as const, text: refreshError }] : []),
+          ...visibleSkills.map(
+            (skill): PresentationNode => ({
+              ...c.action(`${skill.baseDir}:${skill.name}`, skill.name, () => setSelected(skill)),
+              kind: "NavigationRow",
+              text: skill.description,
+              icon: "puzzlepiece.extension",
+              selected: isSelected(skill),
+            }),
+          ),
+          ...(visibleSkills.length || refreshing
+            ? []
+            : [{ id: "empty", kind: "Text" as const, text: t("settings.skillsNotFound") }]),
+        ];
+    return (
+      <NativeSurface
+        document={{
+          mode: "sheet",
+          title: selected?.name || t("sidebar.mobile.plugins"),
+          appearance: props.settings.theme,
+          nodes,
+          dismissAction: "close",
+        }}
+        handlers={c.handlers}
+        onError={(error) => setRefreshError(String(error))}
+      />
+    );
+  }
 
   if (selected) {
     return (

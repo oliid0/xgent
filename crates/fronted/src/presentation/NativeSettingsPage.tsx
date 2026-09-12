@@ -21,17 +21,19 @@ import {
   updateCustomProviders,
   updateCustomSettings,
   updateMemorySettings,
-  updateSkills,
   updateSystem,
 } from "../lib/settings";
 import { createUuid } from "../lib/shared/id";
 import { BUILTIN_TOOL_CATALOG, BUILTIN_TOOL_CATEGORIES } from "../lib/tools/builtinToolCatalog";
 import { resolveRuntimeToolCapabilities } from "../lib/tools/runtimeToolCapabilities";
+import { MobileSkillsPage } from "../pages/chat/mobile/MobileSkillsPage";
+import { CronSection } from "../pages/settings/CronSection";
 import {
   createDraftModelConfig,
   fetchModelsFromApi,
   mergeFetchedModels,
 } from "../pages/settings/providerUtils";
+import { SshSettingsSection } from "../pages/settings/SshSettingsSection";
 import type { SettingsPageProps } from "../pages/settings/types";
 import { presentationControls } from "./controls";
 import { NativeSurface } from "./NativeSurface";
@@ -124,8 +126,28 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     toolPermissions: t("settings.toolPermissionsTitle"),
     mobileAssistant: t("settings.mobileAssistant.permissions"),
     mobileExecution: t("settings.mobile.executionDescription"),
+    cron: t("settings.navCron"),
+    ssh: t("settings.navSsh"),
     about: tr("About", "关于"),
   };
+  if (page === "skills")
+    return (
+      <MobileSkillsPage
+        settings={settings}
+        setSettings={setSettings}
+        onOpenSidebar={() => setPage("")}
+      />
+    );
+  if (page === "ssh")
+    return (
+      <SshSettingsSection
+        settings={settings}
+        setSettings={setSettings}
+        onBack={() => setPage("")}
+      />
+    );
+  if (page === "cron")
+    return <CronSection settings={settings} setSettings={setSettings} onBack={() => setPage("")} />;
   const nodes: PresentationNode[] = [];
   if (page)
     nodes.push({
@@ -187,6 +209,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           : []),
         navigate("toolPermissions", "lock.shield"),
         navigate("mcp", "puzzlepiece.extension"),
+        navigate("cron", "calendar.badge.clock"),
+        navigate("ssh", "server.rack"),
         navigate("memory", "brain"),
         navigate("skills", "sparkles"),
         navigate("about", "info.circle"),
@@ -553,24 +577,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             ),
         ),
       ]),
-    );
-  } else if (page === "skills") {
-    nodes.push(
-      c.toggle(
-        "skills-enabled",
-        tr("Enable skills", "启用技能"),
-        settings.skills.enabled,
-        (enabled) => setSettings((previous) => updateSkills(previous, { enabled })),
-      ),
-    );
-    nodes.push(
-      c.group(
-        "skills",
-        titles.skills,
-        settings.skills.selected.map(
-          (name): PresentationNode => ({ id: "skill:" + name, kind: "Text", text: name }),
-        ),
-      ),
     );
   } else if (page === "mcp") {
     nodes.push(

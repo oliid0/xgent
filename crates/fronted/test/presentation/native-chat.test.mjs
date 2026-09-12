@@ -38,7 +38,7 @@ function harness(overrides = {}) {
     isSending: false, errorMessage: null, hasMoreHistory: false, pendingApprovals: [],
     projects: [], attachmentsEnabled: true, uploads: [], isUploading: false,
     onSend() {}, onStop() {}, onSelectModel() {}, onSelectConversation() {}, onSelectProject() {},
-    onNewConversation() {}, onOpenSettings() {}, onLoadEarlierHistory() {},
+    onNewConversation() {}, onOpenSettings() {}, onOpenRemote() {}, onLoadEarlierHistory() {},
     onDecide: () => ({ ok: true }), onImportFiles: async () => {}, onCreateProject() {}, onOpenTerminal() {}, onChangeMode() {}, onRemoveUpload() {},
     ...overrides,
   };

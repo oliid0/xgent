@@ -25,6 +25,10 @@ import {
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import type { SshHostConfig } from "../../../lib/settings";
+import { presentationControls } from "../../../presentation/controls";
+import { NativeSurface } from "../../../presentation/NativeSurface";
+import type { PresentationNode } from "../../../presentation/types";
+import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { MobileFullscreenPanel } from "./MobilePanelScaffold";
 
 type ShellRunResponse = {
@@ -116,8 +120,8 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [activeRunId, entries]);
 
-  const run = async (event: FormEvent) => {
-    event.preventDefault();
+  const run = async (event?: FormEvent) => {
+    event?.preventDefault();
     const remoteCommand = command.trim();
     if (
       !selectedHost ||
@@ -173,6 +177,109 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
   };
 
   if (!open) return null;
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    c.handlers.set("close", { enabled: true, accepts: (value) => value === null, run: close });
+    const nodes: PresentationNode[] = selectedHost
+      ? [
+          {
+            ...c.action(
+              "back",
+              t("chat.mobileSsh.back"),
+              () => {
+                setSelectedHostId("");
+                setEntries([]);
+                setKeyboardResponse("");
+              },
+              !activeRunId,
+            ),
+            icon: "chevron.left",
+          },
+          { id: "endpoint", kind: "Text", text: endpoint(selectedHost) },
+          ...(selectedHost.authType === "keyboardInteractive"
+            ? [
+                c.input(
+                  "challenge",
+                  t("settings.sshAuthKeyboardInteractive"),
+                  keyboardResponse,
+                  setKeyboardResponse,
+                  true,
+                ),
+              ]
+            : []),
+          ...entries.map((entry) =>
+            c.group(entry.id, `$ ${entry.command}`, [
+              {
+                id: `${entry.id}:output`,
+                kind: "Text",
+                text:
+                  entry.error ||
+                  [entry.response?.stdout, entry.response?.stderr].filter(Boolean).join("\n"),
+              },
+              ...(entry.response
+                ? [
+                    {
+                      id: `${entry.id}:exit`,
+                      kind: "Text" as const,
+                      text: `Exit: ${entry.response.exitCode ?? entry.response.exit_code}`,
+                    },
+                  ]
+                : []),
+            ]),
+          ),
+          c.input("command", "Command", command, setCommand),
+          c.action(
+            "run",
+            t("chat.send"),
+            () => run(),
+            !!command.trim() &&
+              !activeRunId &&
+              !!workdir.trim() &&
+              (selectedHost.authType !== "keyboardInteractive" || !!keyboardResponse.trim()),
+          ),
+          c.action("cancel", t("chat.stopGeneration"), cancel, !!activeRunId),
+        ]
+      : [
+          c.action("settings", t("settings.sshAdd"), onOpenSettings),
+          ...orderedHosts.map((host) =>
+            c.group(host.id, host.name, [
+              {
+                ...c.action(`${host.id}:connect`, endpoint(host), () => setSelectedHostId(host.id)),
+                kind: "NavigationRow",
+                icon: "server.rack",
+              },
+              c.toggle(
+                `${host.id}:associate`,
+                t("chat.workspaceSection"),
+                associatedSet.has(host.id),
+                () => toggleHostAssociation(host.id),
+                !!projectPathKey,
+              ),
+            ]),
+          ),
+        ];
+    if (activeRunId)
+      nodes.push({ id: "running", kind: "Progress", label: t("chat.mobileTerminal.running") });
+    return (
+      <NativeSurface
+        document={{
+          mode: "sheet",
+          title: selectedHost?.name || t("chat.mobileSsh.title"),
+          appearance: "system",
+          nodes,
+          dismissAction: "close",
+        }}
+        handlers={c.handlers}
+        onError={(error) =>
+          setEntries((current) => [
+            ...current,
+            { id: createRunId(), command: "", error: String(error) },
+          ])
+        }
+      />
+    );
+  }
 
   return (
     <MobileFullscreenPanel open label={t("chat.mobileSsh.title")}>

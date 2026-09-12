@@ -29,6 +29,10 @@ import {
 } from "../../lib/automation";
 import { buildModelOptions } from "../../lib/chat/page/chatPageHelpers";
 import { workspaceProjectPathKey } from "../../lib/settings";
+import { presentationControls } from "../../presentation/controls";
+import { NativeSurface } from "../../presentation/NativeSurface";
+import type { PresentationNode } from "../../presentation/types";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import { type CronTaskFormData, CronTaskModal } from "./CronTaskModal";
 import { CronTaskViewModal } from "./CronTaskViewModal";
 import { AgentActivationSwitch, ConfirmDeletePopover } from "./shared";
@@ -61,11 +65,12 @@ function formatRemainingExecutionsLabel(t: (key: string) => string, task: CronTa
     : `${task.remainingExecutions} ${t("settings.cronRemainingExecutionsUnit")}`;
 }
 
-export function CronSection(props: SettingsSectionProps) {
+export function CronSection(props: SettingsSectionProps & { onBack?: () => void }) {
   const { settings } = props;
   const { t } = useLocale();
   const [detail, setDetail] = useState<DetailState>({ open: false });
   const [actionError, setActionError] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const { cron } = useAutomation();
   const tasks = cron.tasks;
   const modelOptions = useMemo(
@@ -138,6 +143,81 @@ export function CronSection(props: SettingsSectionProps) {
         onSave={detail.mode === "add" ? handleAdd : handleEdit}
         onClose={() => setDetail({ open: false })}
       />
+    );
+  }
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    c.handlers.set("close", {
+      enabled: true,
+      accepts: (value) => value === null,
+      run: () => props.onBack?.(),
+    });
+    const nodes: PresentationNode[] = [
+      c.action("add", t("settings.cronAdd"), () => setDetail({ open: true, mode: "add" })),
+      ...(tasks.length
+        ? []
+        : [{ id: "empty", kind: "Text" as const, text: t("settings.cronEmptyDesc") }]),
+      ...tasks.map((task) =>
+        c.group(task.id, task.name, [
+          { id: `${task.id}:description`, kind: "Text", text: task.description || task.cron },
+          c.toggle(
+            `${task.id}:enabled`,
+            t("settings.cronEnable"),
+            task.enabled,
+            () => handleToggle(task),
+            !isCronTaskExhausted(task),
+          ),
+          c.action(`${task.id}:edit`, t("settings.cronModalEdit"), () =>
+            setDetail({ open: true, mode: "edit", task }),
+          ),
+          c.action(`${task.id}:view`, t("settings.cronViewTitle"), () =>
+            setDetail({ open: true, mode: "view", taskId: task.id }),
+          ),
+          {
+            ...c.action(`${task.id}:delete`, t("settings.cronDelete"), () => setDeleteId(task.id)),
+            destructive: true,
+          },
+          ...(task.lastError
+            ? [{ id: `${task.id}:error`, kind: "Text" as const, text: task.lastError }]
+            : []),
+        ]),
+      ),
+      ...(actionError ? [{ id: "error", kind: "Text" as const, text: actionError }] : []),
+    ];
+    const confirmation = presentationControls();
+    const cancel = confirmation.action("cancel", t("settings.cancel"), () => setDeleteId(null));
+    const remove = confirmation.action("delete", t("settings.cronDelete"), async () => {
+      if (deleteId) await applyCronOps([{ op: "delete", id: deleteId }]);
+      setDeleteId(null);
+    });
+    return (
+      <>
+        <NativeSurface
+          document={{
+            mode: "sheet",
+            title: t("settings.navCron"),
+            appearance: settings.theme,
+            nodes,
+            dismissAction: "close",
+          }}
+          handlers={c.handlers}
+          onError={(error) => setActionError(String(error))}
+        />
+        {deleteId ? (
+          <NativeSurface
+            document={{
+              mode: "alert",
+              title: t("settings.cronDelete"),
+              appearance: settings.theme,
+              nodes: [{ ...remove, destructive: true }, cancel],
+              dismissAction: "cancel",
+            }}
+            handlers={confirmation.handlers}
+            onError={(error) => setActionError(String(error))}
+          />
+        ) : null}
+      </>
     );
   }
 

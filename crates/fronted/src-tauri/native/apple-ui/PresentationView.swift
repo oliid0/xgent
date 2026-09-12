@@ -95,6 +95,8 @@ struct XgentPresentationView: View {
 
     var body: some View {
         XgentRootLayout(model: model)
+        .background { Rectangle().fill(.background).ignoresSafeArea() }
+        .preferredColorScheme(root?.colorScheme)
         .sheet(item: Binding(get: { sheet }, set: { if $0 == nil, let sheet { model.dismiss(sheet) } })) { document in
             XgentSheetView(document: document, model: model)
         }

@@ -76,6 +76,12 @@ try {
   if (-not $process.HasExited -and [XgentWindowSmoke]::IsWindowVisible($window)) {
     throw "Xgent did not finish handling its native close request"
   }
+  $statePath = Join-Path $env:APPDATA 'com.ohi.xgent/main-window-size.json'
+  if (Test-Path -LiteralPath $statePath) {
+    Write-Output "Saved native window state: $(Get-Content -LiteralPath $statePath -Raw)"
+  } else {
+    throw "Native window state was not saved at $statePath"
+  }
   if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
   $process.WaitForExit()
   $process = Start-Process -FilePath $resolvedExecutable -PassThru -WindowStyle Hidden

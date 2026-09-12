@@ -1,3 +1,11 @@
+--- a/src/extension/ashmem_memfd/ashmem_memfd.c
++++ b/src/extension/ashmem_memfd/ashmem_memfd.c
+@@ -3,4 +3,5 @@
+ #include <stdlib.h>
++#include <string.h> /* strcmp, memset */
+ #include <signal.h>
+ #include <unistd.h>
+ #include <sys/syscall.h>  /* __NR_memfd_create,  */
 --- a/src/tracee/seccomp.c
 +++ b/src/tracee/seccomp.c
 @@ -1,4 +1,5 @@

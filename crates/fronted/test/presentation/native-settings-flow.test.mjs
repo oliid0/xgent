@@ -16,6 +16,9 @@ test("native settings navigation persists provider, model, appearance and policy
     },
     "../i18n": { SUPPORTED_LOCALES: ["system", "zh-CN", "en-US"], useLocale: () => ({ t: (key) => key, locale: "en-US" }) },
     "./NativeSurface": { NativeSurface: "NativeSurface" },
+    "../pages/settings/CronSection": { CronSection: "CronSection" },
+    "../pages/settings/SshSettingsSection": { SshSettingsSection: "SshSettingsSection" },
+    "../pages/chat/mobile/MobileSkillsPage": { MobileSkillsPage: "MobileSkillsPage" },
   } });
   const { NativeSettingsPage } = loader.loadModule("src/presentation/NativeSettingsPage.tsx");
   const { getDefaultSettings } = loader.loadModule("src/lib/settings/index.ts");

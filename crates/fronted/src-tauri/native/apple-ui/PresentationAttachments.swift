@@ -58,7 +58,7 @@ struct XgentAttachmentPicker: View {
             Button { pickingFiles = true } label: { Label(label("files", "Files"), systemImage: "folder") }
         } label: {
             if importing { ProgressView().frame(width: 44, height: 44) }
-            else { Image(systemName: "plus").font(.title3).frame(width: 44, height: 44).contentShape(Circle()) }
+            else { Image(systemName: "plus").font(.system(size: 20)).frame(width: 44, height: 44).contentShape(Circle()) }
         }
         .menuStyle(.borderlessButton).disabled(importing)
         .accessibilityLabel(node.label ?? "Attach files")

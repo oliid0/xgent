@@ -51,7 +51,8 @@ export type NativeChatPageProps = {
   onSelectConversation: (id: string) => void;
   onSelectProject: (project: WorkspaceProject) => void;
   onNewConversation: () => void;
-  onOpenSettings: () => void;
+  onOpenSettings: (section?: "skills" | "cron" | "ssh") => void;
+  onOpenRemote: () => void;
   onChangeMode: (mode: "text" | "tools") => void;
   onLoadEarlierHistory: () => Promise<unknown> | void;
   onDecide: (id: string, decision: ToolApprovalDecision) => { ok: boolean; message?: string };
@@ -442,6 +443,20 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     id: "sidebar-list",
                     kind: "List",
                     children: [
+                      ...(["skills", "cron"] as const).map((section) =>
+                        sidebarButton(
+                          section,
+                          t(section === "skills" ? "sidebar.mobile.plugins" : "settings.navCron"),
+                          () => {
+                            setSidebarOpen(false);
+                            props.onOpenSettings(section);
+                          },
+                        ),
+                      ),
+                      sidebarButton("remote", t("chat.mobileSsh.title"), () => {
+                        setSidebarOpen(false);
+                        props.onOpenRemote();
+                      }),
                       sidebarButton("create-project", t("chat.workspaceCreate"), () => {
                         setSidebarOpen(false);
                         props.onCreateProject();

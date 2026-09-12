@@ -58,7 +58,7 @@ extension XgentNodeView {
     var iconButton: some View {
         Button { model.send(node, in: document) } label: {
             Image(systemName: node.icon ?? "ellipsis")
-                .font(.title3).frame(width: 44, height: 44)
+                .font(.system(size: 20)).frame(width: 44, height: 44)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
