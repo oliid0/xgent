@@ -69,6 +69,7 @@ pub fn app_frontend_ready(
     window: tauri::Window,
     ready_state: State<'_, Arc<FrontendReadyState>>,
 ) -> Result<(), String> {
+    let mut restored_size = None;
     if !ready_state.sized.swap(true, Ordering::SeqCst) {
         use tauri::Manager;
         use tauri_plugin_window_state::AppHandleExt;
@@ -82,6 +83,7 @@ pub fn app_frontend_ready(
         if let Some(state) = stored_size {
             window.set_size(tauri::PhysicalSize::new(state.width, state.height))
                 .map_err(|error| error.to_string())?;
+            restored_size = Some((state.width, state.height));
             if state.maximized { window.maximize().map_err(|error| error.to_string())?; }
         } else if !window.is_maximized().unwrap_or(false) {
             if let Ok(Some(monitor)) = window.current_monitor() {
@@ -107,6 +109,14 @@ pub fn app_frontend_ready(
     window
         .show()
         .map_err(|error| format!("failed to show frontend-ready window: {error}"))?;
+    // On Windows, showing a previously hidden HWND can reapply its normal
+    // placement after the first hidden-window resize. Reassert only the size
+    // restored during this first ready call; later ready notifications must
+    // never overwrite a resize the user made after launch.
+    if let Some((width, height)) = restored_size {
+        window.set_size(tauri::PhysicalSize::new(width, height))
+            .map_err(|error| format!("failed to finalize restored window size: {error}"))?;
+    }
     window
         .set_focus()
         .map_err(|error| format!("failed to focus frontend-ready window: {error}"))

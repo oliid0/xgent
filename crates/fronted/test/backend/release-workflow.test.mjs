@@ -290,6 +290,10 @@ test("release jobs smoke launch every newly repaired application target", () => 
     /matches!\(event, WindowEvent::Resized\(_\)\)\s*&& window\.is_visible\(\)\.unwrap_or\(false\)/,
   );
   assert.match(desktopCommands, /window\.set_size\(tauri::PhysicalSize::new\(state\.width, state\.height\)\)/);
+  assert.match(
+    desktopCommands,
+    /window\s*\.show\(\)[\s\S]*?if let Some\(\(width, height\)\) = restored_size[\s\S]*?PhysicalSize::new\(width, height\)/,
+  );
   const closeHandlerStart = desktopHost.indexOf(".on_window_event({");
   const closeHandlerEnd = desktopHost.indexOf(".invoke_handler", closeHandlerStart);
   assert.ok(closeHandlerStart >= 0 && closeHandlerEnd > closeHandlerStart);
