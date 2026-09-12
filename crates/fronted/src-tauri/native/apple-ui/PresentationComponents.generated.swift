@@ -19,6 +19,15 @@ enum XgentNodeKind: String, Decodable {
     case menu = "Menu"
     case divider = "Divider"
     case progress = "Progress"
+    case list = "List"
+    case settingsGroup = "SettingsGroup"
+    case navigationRow = "NavigationRow"
+    case iconButton = "IconButton"
+    case spacer = "Spacer"
+    case composer = "Composer"
+    case composerInput = "ComposerInput"
+    case chatLayout = "ChatLayout"
+    case filePicker = "FilePicker"
 }
 
 extension XgentNodeView {
@@ -72,11 +81,29 @@ extension XgentNodeView {
         case .segmentedControl:
             picker.pickerStyle(.segmented)
         case .menu:
-            Menu { children } label: { Text(node.label ?? "") }
+            Menu { children } label: { nodeLabel }.menuStyle(.borderlessButton)
         case .divider:
             Divider()
         case .progress:
             ProgressView(node.label ?? "")
+        case .list:
+            List { children }.listStyle(.plain)
+        case .settingsGroup:
+            Section { children } header: { Text(node.label ?? "") }
+        case .navigationRow:
+            navigationRow
+        case .iconButton:
+            iconButton
+        case .spacer:
+            Spacer(minLength: 0)
+        case .composer:
+            composer
+        case .composerInput:
+            composerInput
+        case .chatLayout:
+            chatLayout
+        case .filePicker:
+            filePicker
         }
     }
 }

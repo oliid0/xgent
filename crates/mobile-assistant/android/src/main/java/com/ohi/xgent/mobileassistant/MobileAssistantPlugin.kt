@@ -3,6 +3,8 @@ package com.ohi.xgent.mobileassistant
 import android.Manifest
 import android.app.Activity
 import android.content.ContentUris
+import android.content.ClipboardManager
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.location.Location
@@ -34,6 +36,9 @@ private const val ALIAS_CALENDAR = "calendar"
 private const val ALIAS_LOCATION = "location"
 private const val ALIAS_PHOTOS = "photos"
 private const val ALIAS_PHOTOS_LEGACY = "photosLegacy"
+
+@InvokeArg
+class ClipboardArgs { var text: String = "" }
 
 @InvokeArg
 class VoiceInputArgs {
@@ -123,6 +128,36 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
     @Command
     override fun requestPermissions(invoke: Invoke) {
         super.requestPermissions(invoke)
+    }
+
+    @Command
+    fun readClipboard(invoke: Invoke) {
+        activity.runOnUiThread {
+            val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val text = clipboard.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(activity)?.toString() ?: ""
+            invoke.resolve(JSObject().apply { put("text", text) })
+        }
+    }
+
+    @Command
+    fun writeClipboard(invoke: Invoke) {
+        val args = invoke.parseArgs(ClipboardArgs::class.java)
+        activity.runOnUiThread {
+            val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("Xgent", args.text))
+            invoke.resolve(JSObject().apply { put("text", args.text) })
+        }
+    }
+
+    @Command
+    fun openSettings(invoke: Invoke) {
+        activity.runOnUiThread {
+            try {
+                activity.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.fromParts("package", activity.packageName, null)))
+                invoke.resolve(JSObject().apply { put("presented", true); put("detail", "System settings opened") })
+            } catch (error: Exception) { invoke.reject(error.message ?: "Could not open system settings") }
+        }
     }
 
     @Command

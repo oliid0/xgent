@@ -6,7 +6,7 @@ import type {
 } from "../presentation/types";
 import { invoke, isTauriRuntime } from "./index";
 
-/** Sheets can use SwiftUI independently of the not-yet-complete native root. */
+/** Apple application targets use the linked SwiftUI host; Safari remains Astryx. */
 export function supportsApplePresentation() {
   if (!isTauriRuntime()) return false;
   const platform = inferRuntimePlatform();
@@ -14,10 +14,7 @@ export function supportsApplePresentation() {
 }
 
 export function isApplePresentationRuntime() {
-  return (
-    isTauriRuntime() &&
-    (window as Window & { __XGENT_NATIVE_UI__?: string }).__XGENT_NATIVE_UI__ === "swiftui"
-  );
+  return supportsApplePresentation();
 }
 
 export async function publishApplePresentation(document: PresentationDocument) {

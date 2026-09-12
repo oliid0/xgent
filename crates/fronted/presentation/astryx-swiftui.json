@@ -84,7 +84,7 @@
       "kind": "Menu",
       "swiftCase": "menu",
       "astryx": "DropdownMenu/DropdownMenu",
-      "declaration": "Menu { children } label: { Text(node.label ?? \"\") }"
+      "declaration": "Menu { children } label: { nodeLabel }.menuStyle(.borderlessButton)"
     },
     {
       "kind": "Divider",
@@ -97,6 +97,60 @@
       "swiftCase": "progress",
       "astryx": "Spinner/Spinner",
       "declaration": "ProgressView(node.label ?? \"\")"
+    },
+    {
+      "kind": "List",
+      "swiftCase": "list",
+      "astryx": "List/List",
+      "declaration": "List { children }.listStyle(.plain)"
+    },
+    {
+      "kind": "SettingsGroup",
+      "swiftCase": "settingsGroup",
+      "astryx": "Section/Section",
+      "declaration": "Section { children } header: { Text(node.label ?? \"\") }"
+    },
+    {
+      "kind": "NavigationRow",
+      "swiftCase": "navigationRow",
+      "astryx": "List/ListItem",
+      "declaration": "navigationRow"
+    },
+    {
+      "kind": "IconButton",
+      "swiftCase": "iconButton",
+      "astryx": "IconButton/IconButton",
+      "declaration": "iconButton"
+    },
+    {
+      "kind": "Spacer",
+      "swiftCase": "spacer",
+      "astryx": "Stack/StackItem",
+      "declaration": "Spacer(minLength: 0)"
+    },
+    {
+      "kind": "Composer",
+      "swiftCase": "composer",
+      "astryx": "Chat/ChatComposer",
+      "declaration": "composer"
+    },
+    {
+      "kind": "ComposerInput",
+      "swiftCase": "composerInput",
+      "astryx": "Chat/ChatComposerInput",
+      "declaration": "composerInput"
+    },
+    {
+      "kind": "ChatLayout",
+      "swiftCase": "chatLayout",
+      "astryx": "Chat/ChatLayout",
+      "declaration": "chatLayout"
+    },
+    {
+      "kind": "FilePicker",
+      "swiftCase": "filePicker",
+      "astryx": "FileInput/FileInput",
+      "declaration": "filePicker"
     }
   ]
 }

@@ -24,6 +24,16 @@ pub fn init<R: Runtime, C: serde::de::DeserializeOwned>(
 pub struct MobileAssistant<R: Runtime>(PhantomData<fn() -> R>);
 
 impl<R: Runtime> MobileAssistant<R> {
+    pub fn read_clipboard(&self) -> Result<crate::ClipboardText> {
+        Err(Error::Unavailable("mobile clipboard is only available on mobile".into()))
+    }
+    pub fn write_clipboard(&self, _request: crate::ClipboardText) -> Result<crate::ClipboardText> {
+        Err(Error::Unavailable("mobile clipboard is only available on mobile".into()))
+    }
+    pub fn open_settings(&self) -> Result<MobileActionResult> {
+        Err(Error::Unavailable("mobile settings are only available on mobile".into()))
+    }
+
     pub fn status(&self) -> Result<MobileAssistantStatus> {
         Ok(MobileAssistantStatus {
             backend: MobileAssistantBackend::DesktopUnavailable,

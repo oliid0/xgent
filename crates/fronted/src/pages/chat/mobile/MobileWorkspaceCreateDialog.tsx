@@ -12,6 +12,10 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { AdaptiveDialog } from "../../../components/astryx/AdaptiveDialog";
 import { useLocale } from "../../../i18n";
 import { listGitRemoteBranches, startGitClone } from "../../../lib/git/tauriGitClient";
+import { presentationControls } from "../../../presentation/controls";
+import { NativeSurface } from "../../../presentation/NativeSurface";
+import type { PresentationNode } from "../../../presentation/types";
+import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 
 type MobileWorkspaceCreateDialogProps = {
   open: boolean;
@@ -65,8 +69,8 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
 
   if (!open) return null;
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
     const workspaceName = name.trim();
     if (!workspaceName || !destination || busy) return;
     setBusy(true);
@@ -137,6 +141,41 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
       setBusy(false);
     }
   };
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    c.handlers.set("close", { enabled: !busy, accepts: (value) => value === null, run: onClose });
+    const nodes: PresentationNode[] = [
+      c.group("project", t("chat.mobileWorkspace.new"), [
+        c.input("name", t("chat.mobileWorkspace.name"), name, setName),
+        { id: "destination", kind: "Text", text: destination, secondary: true },
+        c.action(
+          "create",
+          t("chat.mobileWorkspace.create"),
+          () => submit(),
+          !!name.trim() && !!destination && !busy,
+        ),
+        c.action("choose", t("chat.mobileWorkspace.chooseFolder"), pickExternal, !busy),
+      ]),
+      ...(error ? [{ id: "error", kind: "Text" as const, text: error }] : []),
+      ...(busy
+        ? [{ id: "busy", kind: "Progress" as const, label: t("chat.mobileWorkspace.creating") }]
+        : []),
+    ];
+    return (
+      <NativeSurface
+        document={{
+          mode: "sheet",
+          title: t("chat.mobileWorkspace.new"),
+          appearance: "system",
+          nodes,
+          dismissAction: busy ? undefined : "close",
+        }}
+        handlers={c.handlers}
+        onError={(cause) => setError(String(cause))}
+      />
+    );
+  }
 
   return (
     <AdaptiveDialog

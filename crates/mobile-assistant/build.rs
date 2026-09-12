@@ -1,4 +1,7 @@
 const COMMANDS: &[&str] = &[
+    "read_clipboard",
+    "write_clipboard",
+    "open_settings",
     "status",
     "start_voice_input",
     "check_permissions",

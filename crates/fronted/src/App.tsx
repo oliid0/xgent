@@ -62,6 +62,8 @@ import { ChatPage } from "./pages/ChatPage";
 import { TranscriptPreferences } from "./pages/chat/transcript/TranscriptPreferences";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { SectionId, SettingsOpenOptions } from "./pages/settings/types";
+import { NativeSettingsPage } from "./presentation/NativeSettingsPage";
+import { isApplePresentationRuntime } from "./runtime/applePresentation";
 import { startLocalAccessHostBridge } from "./runtime/localAccessHostBridge";
 import { createAppearanceTheme } from "./theme/appearanceTheme";
 
@@ -270,7 +272,7 @@ export default function App() {
   const [systemThemeVersion, setSystemThemeVersion] = useState(0);
   const [systemLocaleVersion, setSystemLocaleVersion] = useState(0);
   const effectiveTheme = useMemo(
-    () => resolveEffectiveTheme(nativeMobile ? "system" : settings.theme),
+    () => resolveEffectiveTheme(settings.theme),
     [nativeMobile, settings.theme, systemThemeVersion],
   );
   const effectiveLocale = useMemo(
@@ -405,7 +407,7 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    if (!nativeMobile && settings.theme !== "system") return;
+    if (settings.theme !== "system") return;
     return subscribeToSystemThemePreference(() => {
       setSystemThemeVersion((version) => version + 1);
     });
@@ -737,7 +739,20 @@ export default function App() {
                         </StackItem>
                       </VStack>
                     </AppErrorBoundary>
-                    {compactSettingsDialog ? (
+                    {isApplePresentationRuntime() ? (
+                      settingsOpen ? (
+                        <NativeSettingsPage
+                          settings={settings}
+                          setSettings={setSettings}
+                          reloadSettings={reloadPersistedSettings}
+                          saveState={settingsSaveState}
+                          onBack={closeSettings}
+                          initialSection={settingsSection}
+                          nativeMobile={nativeMobile}
+                          appUpdate={appUpdate}
+                        />
+                      ) : null
+                    ) : compactSettingsDialog ? (
                       <BottomSheet
                         isOpen={settingsOpen}
                         onOpenChange={(isOpen) => {

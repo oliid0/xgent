@@ -89,6 +89,7 @@ prepare_dependency_sources() {
   tar -xzf "$shmem_archive" -C "$TEMP_ROOT/dependencies"
   test -f "$TEMP_ROOT/dependencies/talloc-${TALLOC_VERSION}/talloc.c"
   test -f "$TEMP_ROOT/dependencies/libandroid-shmem-${SHMEM_VERSION}/shmem.c"
+  git -C "$TEMP_ROOT/dependencies/libandroid-shmem-${SHMEM_VERSION}" apply "$SCRIPT_DIR/android-shmem-tmpdir.patch"
 }
 
 build_abi() {

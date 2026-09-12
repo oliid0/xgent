@@ -825,6 +825,7 @@ jobs:
           pod --version
           xcode-select -p
           xcodebuild -version
+          xcrun swift --version
 
       - name: Initialize Tauri iOS project
         working-directory: crates/fronted
@@ -1024,8 +1025,17 @@ jobs:
               > "$RUNNER_TEMP/xgent-ios-system.log" 2>&1 || true
             exit 1
           fi
+          if ! grep -q 'XgentNativeUI root rendered' "$RUNNER_TEMP/xgent-ios-launch.log" "$RUNNER_TEMP/xgent-ios-stderr.log"; then
+            echo "SwiftUI did not render the application root" >&2
+            cat "$RUNNER_TEMP/xgent-ios-stderr.log" || true
+            exit 1
+          fi
           xcrun simctl io "$simulator_udid" screenshot "$RUNNER_TEMP/xgent-ios-smoke.png"
           test "$(wc -c < "$RUNNER_TEMP/xgent-ios-smoke.png")" -gt 10000
+          xcrun simctl ui "$simulator_udid" appearance dark
+          xcrun simctl ui "$simulator_udid" content_size accessibility-extra-extra-extra-large
+          sleep 2
+          xcrun simctl io "$simulator_udid" screenshot "$RUNNER_TEMP/xgent-ios-dark-large-smoke.png"
           xcrun simctl terminate "$simulator_udid" "$bundle_id"
 
       - name: Upload iOS launch evidence
@@ -1034,7 +1044,7 @@ jobs:
         with:
           name: xgent-ios-launch-evidence
           path: |
-            ${{ runner.temp }}/xgent-ios-smoke.png
+            ${{ runner.temp }}/xgent-ios*-smoke.png
             ${{ runner.temp }}/xgent-ios-*.log
             ${{ runner.temp }}/xgent-ios-crashes
           if-no-files-found: warn

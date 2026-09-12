@@ -159,3 +159,7 @@ export function composeMobileMessage(request: {
 }) {
   return invoke<MobileActionResult>(`${PLUGIN_COMMAND}compose_message`, { request });
 }
+
+export function openMobileSystemSettings() {
+  return invoke<MobileActionResult>(`${PLUGIN_COMMAND}open_settings`);
+}

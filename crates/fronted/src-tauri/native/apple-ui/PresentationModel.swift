@@ -55,12 +55,14 @@ struct XgentNode: Decodable, Identifiable {
     let spacing: Double?
     let padding: Double?
     let fill: Bool?
+    let icon: String?
+    let selected: Bool?
     let options: [XgentOption]?
     let children: [XgentNode]?
 }
 
 struct XgentDocument: Decodable, Identifiable {
-    enum Mode: String, Decodable { case root, sheet, alert }
+    enum Mode: String, Decodable { case root, sheet, alert, sidebar }
     enum Appearance: String, Decodable { case system, light, dark }
     let version: Int
     let surface: String

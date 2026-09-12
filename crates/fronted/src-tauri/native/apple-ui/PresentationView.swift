@@ -70,7 +70,7 @@ struct XgentNodeView: View {
         let button = Button(role: node.destructive == true ? .destructive : nil) {
             model.send(node, in: document)
         } label: {
-            Text(node.label ?? "").frame(minHeight: 28)
+            nodeLabel.frame(minHeight: 32)
         }
         #if compiler(>=6.2)
         if #available(iOS 26.0, macOS 26.0, *) {
@@ -94,14 +94,7 @@ struct XgentPresentationView: View {
     private var sheet: XgentDocument? { model.documents.first { $0.mode == .sheet } }
 
     var body: some View {
-        Group {
-            if let root {
-                XgentNodeChildren(nodes: root.nodes, document: root, model: model)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .background(.background)
-                    .preferredColorScheme(root.colorScheme)
-            } else { Color.clear }
-        }
+        XgentRootLayout(model: model)
         .sheet(item: Binding(get: { sheet }, set: { if $0 == nil, let sheet { model.dismiss(sheet) } })) { document in
             XgentSheetView(document: document, model: model)
         }
@@ -159,8 +152,18 @@ private struct XgentAlerts: ViewModifier {
 }
 
 private struct XgentSheetView: View {
-    let document: XgentDocument
+    let initialDocument: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+
+    init(document: XgentDocument, model: XgentPresentationModel) {
+        self.initialDocument = document
+        self.model = model
+    }
+
+    // Sheet identity survives updates: read the live document, not the opening snapshot.
+    private var document: XgentDocument {
+        model.documents.first { $0.id == initialDocument.id } ?? initialDocument
+    }
 
     private var nextSheet: XgentDocument? {
         let sheets = model.documents.filter { $0.mode == .sheet }
@@ -169,24 +172,31 @@ private struct XgentSheetView: View {
     }
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    XgentNodeChildren(nodes: document.nodes, document: document, model: model)
-                }.padding().frame(maxWidth: .infinity, alignment: .leading)
+        NavigationStack {
+            List {
+                    XgentNodeChildren(nodes: document.nodes.filter { $0.id != "back" }, document: document, model: model)
             }
+            #if os(iOS)
+            .listStyle(.insetGrouped)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
             .navigationTitle(document.title)
             .toolbar {
-                if document.dismissAction != nil {
+                if let back = document.nodes.first(where: { $0.id == "back" }) {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Close") { model.dismiss(document) }
+                        XgentNodeView(node: back, document: document, model: model)
+                    }
+                }
+                if document.dismissAction != nil {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button { model.dismiss(document) } label: {
+                            Image(systemName: "xmark").frame(minWidth: 32, minHeight: 32)
+                        }.accessibilityLabel(Text("Close"))
                     }
                 }
             }
         }
-        #if os(iOS)
-        .navigationViewStyle(.stack)
-        #endif
+        .frame(minWidth: 300, minHeight: 360)
         .preferredColorScheme(document.colorScheme)
         .interactiveDismissDisabled(document.dismissAction == nil)
         .sheet(item: Binding(get: { nextSheet }, set: { if $0 == nil, let nextSheet { model.dismiss(nextSheet) } })) { next in

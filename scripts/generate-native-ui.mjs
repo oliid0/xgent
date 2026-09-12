@@ -39,6 +39,15 @@ export function runGeneration({ check = false } = {}) {
   if (installed.version !== registry.astryxVersion) {
     throw new Error(`Review the native mapping for Astryx ${installed.version}; it currently targets ${registry.astryxVersion}`);
   }
+  for (const entry of registry.components) {
+    const [moduleName, componentName] = entry.astryx.split("/");
+    const exported = installed.exports?.[`./${moduleName}`];
+    if (!exported?.types) throw new Error(`Astryx does not export ${moduleName}`);
+    const declarations = readFileSync(path.join(frontend, "node_modules/@astryxdesign/core", exported.types), "utf8");
+    const names = [...declarations.matchAll(/export\s*\{([^}]+)\}/g)].flatMap((match) =>
+      match[1].split(",").map((name) => name.trim().replace(/^type\s+/, "")));
+    if (!names.includes(componentName)) throw new Error(`Astryx does not export ${entry.astryx}`);
+  }
   const generated = generateNativeComponents(registry);
   for (const [relative, content] of [
     ["src-tauri/native/apple-ui/PresentationComponents.generated.swift", generated.swift],

@@ -162,3 +162,8 @@ fn default_location_timeout_ms() -> u64 {
 fn default_true() -> bool {
     true
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ClipboardText {
+    pub text: String,
+}

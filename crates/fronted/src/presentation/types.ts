@@ -20,6 +20,8 @@ export type PresentationNode = {
   spacing?: number;
   padding?: number;
   fill?: boolean;
+  icon?: string;
+  selected?: boolean;
   options?: { value: string; label: string; disabled?: boolean }[];
   children?: PresentationNode[];
 };
@@ -28,7 +30,7 @@ export type PresentationDocument = {
   version: 1;
   surface: string;
   revision: number;
-  mode: "root" | "sheet" | "alert";
+  mode: "root" | "sheet" | "alert" | "sidebar";
   title: string;
   appearance: "system" | "light" | "dark";
   nodes: PresentationNode[];

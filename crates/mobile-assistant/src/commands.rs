@@ -93,3 +93,18 @@ pub(crate) async fn compose_message<R: Runtime>(
 ) -> Result<MobileActionResult> {
     on_worker(move || app.mobile_assistant().compose_message(request)).await
 }
+
+#[command]
+pub(crate) async fn read_clipboard<R: Runtime>(app: AppHandle<R>) -> Result<crate::ClipboardText> {
+    on_worker(move || app.mobile_assistant().read_clipboard()).await
+}
+
+#[command]
+pub(crate) async fn write_clipboard<R: Runtime>(app: AppHandle<R>, request: crate::ClipboardText) -> Result<crate::ClipboardText> {
+    on_worker(move || app.mobile_assistant().write_clipboard(request)).await
+}
+
+#[command]
+pub(crate) async fn open_settings<R: Runtime>(app: AppHandle<R>) -> Result<MobileActionResult> {
+    on_worker(move || app.mobile_assistant().open_settings()).await
+}

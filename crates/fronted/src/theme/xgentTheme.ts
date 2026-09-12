@@ -10,6 +10,7 @@ import { glassTheme } from "./glassTheme";
 export const xgentTheme = defineTheme({
   name: "xgent-chat",
   extends: glassTheme,
+  color: { accent: ["#0088ff", "#0a84ff"] },
   typography: {
     scale: { base: 15, ratio: 1.18 },
     body: {
@@ -37,7 +38,7 @@ export const xgentTheme = defineTheme({
     easing: "cubic-bezier(0.2, 0, 0, 1)",
   },
   tokens: {
-    "--color-background-body": ["#eff2f5", "#171717"],
+    "--color-background-body": ["#f2f2f7", "#171717"],
     "--color-background-surface": ["#ffffff", "#212121"],
     "--color-background-card": ["#ffffff", "#2f2f2f"],
     "--color-background-popover": ["#ffffff", "#2f2f2f"],
@@ -54,7 +55,7 @@ export const xgentTheme = defineTheme({
     "--size-element-lg": "40px",
     "--radius-inner": "6px",
     "--radius-element": "10px",
-    "--radius-container": "16px",
+    "--radius-container": "20px",
     "--radius-page": "24px",
     "--radius-chat": "26px",
     "--shadow-low":
@@ -150,8 +151,8 @@ export const xgentCompactTheme = defineTheme({
     "--size-element-lg": "44px",
     "--radius-inner": "6px",
     "--radius-element": "10px",
-    "--radius-container": "14px",
-    "--radius-page": "20px",
+    "--radius-container": "24px",
+    "--radius-page": "28px",
     "--radius-chat": "28px",
     "--shadow-low":
       "0 1px 2px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 22%)), 0 4px 12px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 30%))",

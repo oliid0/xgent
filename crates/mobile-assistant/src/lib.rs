@@ -34,6 +34,9 @@ impl<R: Runtime, T: Manager<R>> MobileAssistantExt<R> for T {
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("mobile-assistant")
         .invoke_handler(tauri::generate_handler![
+            commands::read_clipboard,
+            commands::write_clipboard,
+            commands::open_settings,
             commands::status,
             commands::start_voice_input,
             commands::check_permissions,

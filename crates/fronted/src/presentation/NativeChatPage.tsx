@@ -1,16 +1,30 @@
-import { type MutableRefObject, useLayoutEffect, useState, useSyncExternalStore } from "react";
+import {
+  type MutableRefObject,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { MentionComposerHandle } from "../components/chat/MentionComposer";
 import { useLocale } from "../i18n";
 import type { RenderTimelineItem } from "../lib/chat/conversation/conversationState";
 import type { LiveTranscriptStore } from "../lib/chat/conversation/liveTranscriptStore";
 import { toolResultMessageToText, type UiRound } from "../lib/chat/messages/uiMessages";
 import type { PendingUploadedFile } from "../lib/chat/messages/uploadedFiles";
+import {
+  checkMobileAssistantPermissions,
+  mobileAssistantStatus,
+  requestMobileAssistantPermission,
+  startMobileVoiceInput,
+} from "../lib/mobileAssistant";
 import { type ModelOption, parseModelValue } from "../lib/providers/llm";
+import { isNativeMobileRuntime } from "../lib/runtimePlatform";
 import type { AppSettings, SelectedModel, WorkspaceProject } from "../lib/settings";
 import type { SidebarStore } from "../lib/sidebar/store";
 import type { PendingToolApprovalSummary, ToolApprovalDecision } from "../lib/tools/toolApproval";
 import { createNativeComposerStore } from "./composerStore";
 import { NativeSurface } from "./NativeSurface";
+import { decodeNativeFiles } from "./nativeFiles";
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
 
 export type NativeChatPageProps = {
@@ -38,9 +52,12 @@ export type NativeChatPageProps = {
   onSelectProject: (project: WorkspaceProject) => void;
   onNewConversation: () => void;
   onOpenSettings: () => void;
+  onChangeMode: (mode: "text" | "tools") => void;
   onLoadEarlierHistory: () => Promise<unknown> | void;
   onDecide: (id: string, decision: ToolApprovalDecision) => { ok: boolean; message?: string };
-  onPickFiles: () => Promise<void>;
+  onCreateProject: () => void;
+  onOpenTerminal: () => void;
+  onImportFiles: (files: File[]) => Promise<void>;
   onRemoveUpload: (path: string) => void;
 };
 
@@ -95,6 +112,21 @@ export function NativeChatPage(props: NativeChatPageProps) {
     props.liveTranscriptStore.getSnapshot,
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [voiceAvailable, setVoiceAvailable] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(false);
+  useEffect(() => {
+    if (!isNativeMobileRuntime()) return;
+    let active = true;
+    void mobileAssistantStatus()
+      .then((status) => {
+        if (active) setVoiceAvailable(status.available && status.voiceInputAvailable);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const [failure, setFailure] = useState<unknown>(null);
   useLayoutEffect(() => {
     props.composerRef.current = composer.handle;
@@ -164,18 +196,41 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const nodes: PresentationNode[] = [
     {
       id: "chat",
-      kind: "VStack",
+      kind: "ChatLayout",
       fill: true,
-      spacing: 12,
-      padding: 16,
       children: [
         {
           id: "toolbar",
           kind: "HStack",
+          padding: 12,
           children: [
-            button("sidebar", t("tooltip.openSidebar"), () => setSidebarOpen(true)),
-            button("new", t("chat.newConversation"), props.onNewConversation),
-            button("settings", t("tooltip.settings"), props.onOpenSettings),
+            {
+              ...button("sidebar", t("tooltip.openSidebar"), () => setSidebarOpen(true)),
+              kind: "IconButton",
+              icon: "line.3.horizontal",
+            },
+            { id: "toolbar-space-start", kind: "Spacer" },
+            {
+              id: "execution-mode",
+              kind: "SegmentedControl",
+              label: t("settings.executionMode"),
+              value: props.settings.system.executionMode === "text" ? "text" : "tools",
+              options: [
+                { value: "text", label: t("chat.mode.chat") },
+                { value: "tools", label: t("chat.mode.agent") },
+              ],
+              action: change(
+                "execution-mode",
+                (value) => props.onChangeMode(value as "text" | "tools"),
+                (value) => value === "text" || value === "tools",
+              ),
+            },
+            { id: "toolbar-space-end", kind: "Spacer" },
+            {
+              ...button("new", t("chat.newConversation"), props.onNewConversation),
+              kind: "IconButton",
+              icon: "square.and.pencil",
+            },
           ],
         },
         ...(props.errorMessage
@@ -222,7 +277,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
         ),
         {
           id: "composer",
-          kind: "Card",
+          kind: "Composer",
           fill: true,
           children: [
             {
@@ -248,7 +303,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
             },
             {
               id: "draft",
-              kind: "TextArea",
+              kind: "ComposerInput",
               label: props.inputPlaceholder,
               value: draft.text,
               disabled: props.inputDisabled,
@@ -263,12 +318,57 @@ export function NativeChatPage(props: NativeChatPageProps) {
               id: "composer-actions",
               kind: "HStack",
               children: [
-                button(
-                  "attach",
-                  "+",
-                  props.onPickFiles,
-                  props.attachmentsEnabled && !props.isUploading && !props.inputDisabled,
-                ),
+                {
+                  id: "attach",
+                  kind: "FilePicker",
+                  label: t("chat.upload.button"),
+                  options: ["camera", "photos", "files"].map((value) => ({
+                    value,
+                    label: t("chat.upload." + value),
+                  })),
+                  disabled: !props.attachmentsEnabled || props.isUploading || props.inputDisabled,
+                  action: change(
+                    "attach",
+                    async (value) => props.onImportFiles(decodeNativeFiles(value)),
+                    undefined,
+                    props.attachmentsEnabled && !props.isUploading && !props.inputDisabled,
+                  ),
+                },
+                { id: "composer-spacer", kind: "Spacer" },
+                ...(voiceAvailable
+                  ? [
+                      {
+                        ...button(
+                          "voice",
+                          t(
+                            voiceActive
+                              ? "chat.composer.voiceListening"
+                              : "chat.composer.voiceInput",
+                          ),
+                          async () => {
+                            setVoiceActive(true);
+                            try {
+                              let permissions = await checkMobileAssistantPermissions();
+                              if (permissions.microphone !== "granted")
+                                permissions = await requestMobileAssistantPermission("microphone");
+                              if (permissions.microphone !== "granted")
+                                throw new Error(t("chat.composer.voicePermissionRequired"));
+                              const result = await startMobileVoiceInput();
+                              if (result.text.trim())
+                                composer.handle.insertText(
+                                  `${composer.handle.hasContent() ? " " : ""}${result.text.trim()}`,
+                                );
+                            } finally {
+                              setVoiceActive(false);
+                            }
+                          },
+                          !props.inputDisabled && !voiceActive,
+                        ),
+                        kind: "IconButton" as const,
+                        icon: "mic",
+                      },
+                    ]
+                  : []),
                 {
                   ...button(
                     "send",
@@ -280,6 +380,8 @@ export function NativeChatPage(props: NativeChatPageProps) {
                       (!draft.isEmpty || props.uploads.length > 0),
                   ),
                   prominent: true,
+                  kind: "IconButton",
+                  icon: "arrow.up",
                 },
                 ...(props.isSending
                   ? [button("stop", t("chat.stopGeneration"), props.onStop)]
@@ -295,8 +397,13 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const sidebarHandlers = new Map<string, PresentationHandler>();
   const sidebarButton = (id: string, label: string, run: () => unknown): PresentationNode => {
     sidebarHandlers.set(id, { enabled: true, accepts: (value) => value === null, run });
-    return { id, kind: "Button", label, action: id };
+    return { id, kind: "NavigationRow", label, action: id };
   };
+  sidebarHandlers.set("search", {
+    enabled: true,
+    accepts: (value) => typeof value === "string",
+    run: (value) => setQuery(value as string),
+  });
   sidebarHandlers.set("close", {
     enabled: true,
     accepts: (value) => value === null,
@@ -312,38 +419,112 @@ export function NativeChatPage(props: NativeChatPageProps) {
       {sidebarOpen ? (
         <NativeSurface
           document={{
-            mode: "sheet",
+            mode: "sidebar",
             title: "Xgent",
             appearance: props.settings.theme,
             dismissAction: "close",
             nodes: [
-              ...props.projects.map((project) =>
-                sidebarButton(`project:${project.id}`, project.name, () => {
-                  props.onSelectProject(project);
-                  setSidebarOpen(false);
-                }),
-              ),
-              ...sidebar.conversations.map((conversation) =>
-                sidebarButton(`conversation:${conversation.id}`, conversation.title, () => {
-                  props.onSelectConversation(conversation.id);
-                  setSidebarOpen(false);
-                }),
-              ),
-              ...(sidebar.hasMore
-                ? [
-                    sidebarButton("more", t("presentation.loadMore"), () =>
-                      props.sidebarStore.loadMore(),
-                    ),
-                  ]
-                : []),
-              ...(sidebar.listErrorDetail
-                ? [
-                    { id: "sidebar:error", kind: "Text" as const, text: sidebar.listErrorDetail },
-                    sidebarButton("retry", t("presentation.retry"), () =>
-                      props.sidebarStore.refresh({ reason: "manual" }),
-                    ),
-                  ]
-                : []),
+              {
+                id: "sidebar-layout",
+                kind: "VStack",
+                fill: true,
+                padding: 16,
+                children: [
+                  { id: "sidebar-title", kind: "Heading", text: "Xgent" },
+                  {
+                    id: "sidebar-search",
+                    kind: "TextInput",
+                    label: t("chat.history.searchPlaceholder"),
+                    value: query,
+                    action: "search",
+                  },
+                  {
+                    id: "sidebar-list",
+                    kind: "List",
+                    children: [
+                      sidebarButton("create-project", t("chat.workspaceCreate"), () => {
+                        setSidebarOpen(false);
+                        props.onCreateProject();
+                      }),
+                      sidebarButton("open-terminal", t("chat.mobileTerminal.title"), () => {
+                        setSidebarOpen(false);
+                        props.onOpenTerminal();
+                      }),
+                      { id: "projects-label", kind: "Heading", text: t("chat.workspaceSection") },
+                      ...props.projects
+                        .filter((project) =>
+                          project.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+                        )
+                        .map((project) =>
+                          sidebarButton(`project:${project.id}`, project.name, () => {
+                            props.onSelectProject(project);
+                            setSidebarOpen(false);
+                          }),
+                        ),
+                      { id: "recents-label", kind: "Heading", text: t("chat.recentConversation") },
+                      ...sidebar.conversations
+                        .filter((conversation) =>
+                          conversation.title
+                            .toLocaleLowerCase()
+                            .includes(query.toLocaleLowerCase()),
+                        )
+                        .map((conversation) =>
+                          sidebarButton(
+                            `conversation:${conversation.id}`,
+                            conversation.title,
+                            () => {
+                              props.onSelectConversation(conversation.id);
+                              setSidebarOpen(false);
+                            },
+                          ),
+                        ),
+                      ...(sidebar.hasMore
+                        ? [
+                            sidebarButton("more", t("presentation.loadMore"), () =>
+                              props.sidebarStore.loadMore(),
+                            ),
+                          ]
+                        : []),
+                      ...(sidebar.listErrorDetail
+                        ? [
+                            {
+                              id: "sidebar:error",
+                              kind: "Text" as const,
+                              text: sidebar.listErrorDetail,
+                            },
+                            sidebarButton("retry", t("presentation.retry"), () =>
+                              props.sidebarStore.refresh({ reason: "manual" }),
+                            ),
+                          ]
+                        : []),
+                    ],
+                  },
+                  {
+                    id: "sidebar-footer",
+                    kind: "HStack",
+                    children: [
+                      {
+                        ...sidebarButton("new-chat", t("chat.newConversation"), () => {
+                          props.onNewConversation();
+                          setSidebarOpen(false);
+                        }),
+                        kind: "Button",
+                        icon: "square.and.pencil",
+                        prominent: true,
+                      },
+                      { id: "sidebar-footer-space", kind: "Spacer" },
+                      {
+                        ...sidebarButton("settings", t("tooltip.settings"), () => {
+                          setSidebarOpen(false);
+                          props.onOpenSettings();
+                        }),
+                        kind: "IconButton",
+                        icon: "gearshape",
+                      },
+                    ],
+                  },
+                ],
+              },
             ],
           }}
           handlers={sidebarHandlers}

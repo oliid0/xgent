@@ -108,7 +108,7 @@ fn link_native_ui(manifest_dir: &std::path::Path) {
     println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/lib/swift");
     println!("cargo:rustc-link-lib=static=XgentNativeUI");
     let platform_ui = if ios { "UIKit" } else { "AppKit" };
-    for framework in ["SwiftUI", platform_ui, "WebKit", "Foundation"] {
+    for framework in ["SwiftUI", platform_ui, "WebKit", "Foundation", "PhotosUI", "Photos", "UniformTypeIdentifiers", "AVFoundation"] {
         println!("cargo:rustc-link-lib=framework={framework}");
     }
 }

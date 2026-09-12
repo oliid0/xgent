@@ -42,6 +42,16 @@ struct NativePermissionRequest {
 }
 
 impl<R: Runtime> MobileAssistant<R> {
+    pub fn read_clipboard(&self) -> crate::Result<crate::ClipboardText> {
+        self.0.run_mobile_plugin("readClipboard", ()).map_err(Into::into)
+    }
+    pub fn write_clipboard(&self, request: crate::ClipboardText) -> crate::Result<crate::ClipboardText> {
+        self.0.run_mobile_plugin("writeClipboard", request).map_err(Into::into)
+    }
+    pub fn open_settings(&self) -> crate::Result<MobileActionResult> {
+        self.0.run_mobile_plugin("openSettings", ()).map_err(Into::into)
+    }
+
     pub fn status(&self) -> crate::Result<MobileAssistantStatus> {
         self.0.run_mobile_plugin("status", ()).map_err(Into::into)
     }

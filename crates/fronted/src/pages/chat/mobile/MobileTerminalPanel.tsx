@@ -13,6 +13,10 @@ import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import { GitBranch, Key, Send, Square, Terminal, Trash2, X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import type { SshHostConfig } from "../../../lib/settings";
+import { presentationControls } from "../../../presentation/controls";
+import { NativeSurface } from "../../../presentation/NativeSurface";
+import type { PresentationNode } from "../../../presentation/types";
+import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { MobileFullscreenPanel } from "./MobilePanelScaffold";
 
 type ShellRunResponse = {
@@ -313,6 +317,84 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
     if (!activeRunId) return;
     await invoke("shell_cancel", { run_id: activeRunId }).catch(() => undefined);
   };
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    c.handlers.set("close", { enabled: true, accepts: (value) => value === null, run: onClose });
+    const nodes: PresentationNode[] = [
+      {
+        id: "cwd",
+        kind: "Text",
+        text: sessionCwd ? `${workdir}/${sessionCwd}` : workdir,
+        secondary: true,
+      },
+      ...presets.map((preset) =>
+        c.action(
+          preset.id,
+          preset.label,
+          () => (preset.runImmediately ? runCommand(preset.command) : setCommand(preset.command)),
+          !activeRunId,
+        ),
+      ),
+      ...entries.map(
+        (entry): PresentationNode =>
+          c.group(entry.id, `$ ${entry.command}`, [
+            {
+              id: `${entry.id}:output`,
+              kind: "Text",
+              text:
+                entry.error ??
+                [entry.response?.stdout, entry.response?.stderr].filter(Boolean).join("\n"),
+            },
+            ...(entry.response
+              ? [
+                  {
+                    id: `${entry.id}:exit`,
+                    kind: "Text" as const,
+                    text: `Exit: ${entry.response.exitCode ?? entry.response.exit_code}${entry.response.cancelled ? " ? Cancelled" : ""}${(entry.response.timedOut ?? entry.response.timed_out) ? " ? Timed out" : ""}`,
+                    secondary: true,
+                  },
+                ]
+              : []),
+          ]),
+      ),
+      ...(activeRunId
+        ? [{ id: "running", kind: "Progress" as const, label: t("chat.mobileTerminal.running") }]
+        : []),
+      c.input("command", "Command", command, setCommand),
+      c.action(
+        "run",
+        t("chat.send"),
+        () => runCommand(command),
+        !!command.trim() && !!workdir.trim() && !activeRunId,
+      ),
+      c.action("cancel", t("chat.stopGeneration"), cancel, !!activeRunId),
+      c.action(
+        "clear",
+        t("chat.mobileTerminal.clear"),
+        () => setEntries([]),
+        !activeRunId && entries.length > 0,
+      ),
+    ];
+    return (
+      <NativeSurface
+        document={{
+          mode: "sheet",
+          title: panelTitle,
+          appearance: "system",
+          nodes,
+          dismissAction: "close",
+        }}
+        handlers={c.handlers}
+        onError={(cause) =>
+          setEntries((current) => [
+            ...current,
+            { id: createRunId(), command: "", error: String(cause) },
+          ])
+        }
+      />
+    );
+  }
 
   return (
     <MobileFullscreenPanel open label={panelTitle}>

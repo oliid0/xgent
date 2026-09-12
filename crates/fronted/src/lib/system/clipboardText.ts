@@ -4,13 +4,14 @@ import { isNativeMobileRuntime } from "../runtimePlatform";
 /**
  * Read the desktop clipboard outside the webview first. WKWebView may show a
  * second native paste-confirmation bubble when clipboard text came from a
- * different application. Mobile and browser-only builds fall back to the
- * standard Clipboard API because the desktop command is not registered there.
+ * different application. Mobile uses the native assistant plugin; browsers use the Clipboard API.
  */
 export async function readClipboardText(): Promise<string | null> {
-  if (isTauriRuntime() && !isNativeMobileRuntime()) {
+  if (isTauriRuntime()) {
     try {
-      return await invoke<string>("system_clipboard_read_text");
+      return isNativeMobileRuntime()
+        ? (await invoke<{ text: string }>("plugin:mobile-assistant|read_clipboard")).text
+        : await invoke<string>("system_clipboard_read_text");
     } catch {
       // Fall through to the webview clipboard API.
     }
@@ -56,9 +57,11 @@ function fallbackWriteClipboardText(text: string): boolean {
 export async function writeClipboardText(text: string): Promise<boolean> {
   if (!text) return false;
   // A LAN browser must copy to the viewing device, not the server's clipboard.
-  if (isTauriRuntime() && !isNativeMobileRuntime()) {
+  if (isTauriRuntime()) {
     try {
-      await invoke("system_clipboard_write_text", { text });
+      if (isNativeMobileRuntime())
+        await invoke("plugin:mobile-assistant|write_clipboard", { request: { text } });
+      else await invoke("system_clipboard_write_text", { text });
       return true;
     } catch {
       // Fall through to the webview clipboard API.

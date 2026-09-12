@@ -6187,38 +6187,71 @@ export function ChatPage(props: ChatPageProps) {
 
   if (isApplePresentationRuntime()) {
     return (
-      <NativeChatPage
-        settings={settings}
-        composerRef={composerRef}
-        sidebarStore={sidebarStore}
-        historyItems={historyRenderItems}
-        liveTranscriptStore={liveTranscriptStore}
-        modelOptions={modelOptions}
-        selectedValue={selectedValue}
-        inputDisabled={isComposerInputDisabled}
-        inputPlaceholder={composerPlaceholder}
-        isSending={isSending}
-        errorMessage={errorMessage}
-        hasMoreHistory={conversationState.transcript.hasMoreBefore}
-        pendingApprovals={pendingToolApprovals}
-        projects={workspaceProjects}
-        attachmentsEnabled={canDropUpload}
-        uploads={pendingUploadedFiles}
-        isUploading={isUploadingFiles}
-        onSend={handleSend}
-        onStop={handleStopSending}
-        onSelectModel={handleSelectModel}
-        onSelectConversation={handleSelectConversation}
-        onSelectProject={handleSelectWorkspaceProject}
-        onNewConversation={handleDesktopNewConversation}
-        onOpenSettings={() => onOpenSettings()}
-        onLoadEarlierHistory={handleLoadEarlierHistory}
-        onDecide={(toolCallId, decision) =>
-          answerToolApproval(toolCallId, decision, { conversationId: currentConversationId })
-        }
-        onPickFiles={pickReadableFiles}
-        onRemoveUpload={removePendingUpload}
-      />
+      <>
+        <NativeChatPage
+          settings={settings}
+          composerRef={composerRef}
+          sidebarStore={sidebarStore}
+          historyItems={historyRenderItems}
+          liveTranscriptStore={liveTranscriptStore}
+          modelOptions={modelOptions}
+          selectedValue={selectedValue}
+          inputDisabled={isComposerInputDisabled}
+          inputPlaceholder={composerPlaceholder}
+          isSending={isSending}
+          errorMessage={errorMessage}
+          hasMoreHistory={conversationState.transcript.hasMoreBefore}
+          pendingApprovals={pendingToolApprovals}
+          projects={workspaceProjects}
+          attachmentsEnabled={canDropUpload}
+          uploads={pendingUploadedFiles}
+          isUploading={isUploadingFiles}
+          onSend={handleSend}
+          onStop={handleStopSending}
+          onSelectModel={handleSelectModel}
+          onSelectConversation={handleSelectConversation}
+          onSelectProject={handleSelectWorkspaceProject}
+          onNewConversation={handleDesktopNewConversation}
+          onOpenSettings={() => onOpenSettings()}
+          onLoadEarlierHistory={handleLoadEarlierHistory}
+          onDecide={(toolCallId, decision) =>
+            answerToolApproval(toolCallId, decision, { conversationId: currentConversationId })
+          }
+          onCreateProject={handleOpenCreateWorkspaceProject}
+          onOpenTerminal={() =>
+            setMobileWorkspaceDestination({
+              kind: "terminal",
+              mode: "terminal",
+              initialCommand: "",
+              autoRun: false,
+            })
+          }
+          onChangeMode={(executionMode) =>
+            setSettings((previous) => ({
+              ...previous,
+              system: { ...previous.system, executionMode },
+            }))
+          }
+          onImportFiles={importReadableFiles}
+          onRemoveUpload={removePendingUpload}
+        />
+        <MobileWorkspaceCreateDialog
+          open={mobileWorkspaceCreateOpen}
+          parent={parentWorkspacePath(getDefaultWorkspaceProjectPath(settings.system))}
+          onCreated={(path, kind) => {
+            setMobileWorkspaceCreateOpen(false);
+            activateWorkspaceProject(createWorkspaceProjectFromPath(path, kind));
+          }}
+          onClose={() => setMobileWorkspaceCreateOpen(false)}
+        />
+        <MobileTerminalPanel
+          open={mobileTerminalOpen}
+          workdir={mobileWorkspacePath}
+          mode={mobileTerminalDestination?.mode ?? "terminal"}
+          sshHosts={settings.ssh.hosts}
+          onClose={() => setMobileWorkspaceDestination(null)}
+        />
+      </>
     );
   }
 

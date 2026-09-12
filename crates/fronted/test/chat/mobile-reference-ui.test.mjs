@@ -22,11 +22,11 @@ const mobileGitSource = readSource("src/pages/chat/mobile/MobileGitReviewPanel.t
 const themeSource = readSource("src/theme/xgentTheme.ts");
 const stylesSource = readSource("src/index.css");
 
-test("compact chat uses the reference-scale Astryx geometry without changing the desktop theme", () => {
+test("compact chat inherits the shared Apple-inspired theme and keeps accessible touch targets", () => {
   const compactTheme = themeSource.slice(themeSource.indexOf("export const xgentCompactTheme"));
   assert.match(compactTheme, /"--size-element-lg": "44px"/);
-  assert.match(compactTheme, /"--radius-container": "14px"/);
-  assert.match(compactTheme, /"--radius-page": "20px"/);
+  assert.match(compactTheme, /"--radius-container": "24px"/);
+  assert.match(compactTheme, /"--radius-page": "28px"/);
   assert.match(compactTheme, /"--radius-chat": "28px"/);
   assert.match(compactTheme, /"chat-composer": \{[\s\S]*?minHeight: "52px"/);
   assert.match(compactTheme, /section: \{[\s\S]*?backgroundColor:[\s\S]*?boxShadow: "none"/);

@@ -26,6 +26,7 @@ import {
   type MobilePermissionStates,
   mobileAssistantStatus,
   normalizeMobileAssistantPermissions,
+  openMobileSystemSettings,
   requestMobileAssistantPermission,
 } from "../../lib/mobileAssistant";
 
@@ -121,6 +122,15 @@ export function MobileAssistantSection() {
 
   useEffect(() => {
     void refresh();
+    const resume = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    window.addEventListener("focus", resume);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      window.removeEventListener("focus", resume);
+      document.removeEventListener("visibilitychange", resume);
+    };
   }, [refresh]);
 
   const permissionRows = useMemo(
@@ -134,6 +144,10 @@ export function MobileAssistantSection() {
     setError("");
     try {
       if (!status) throw new Error(t("settings.mobileAssistant.unavailable"));
+      if (permissions[permission] === "denied") {
+        await openMobileSystemSettings();
+        return;
+      }
       const alias = status.permissionAliases[permission] ?? permission;
       const next = await requestMobileAssistantPermission(alias);
       setPermissions(normalizeMobileAssistantPermissions(status, next));

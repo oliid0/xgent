@@ -7,6 +7,8 @@ import Photos
 import Speech
 import Tauri
 
+private struct ClipboardArgs: Decodable { let text: String }
+
 private struct VoiceInputArgs: Decodable {
     let locale: String?
 }
@@ -108,6 +110,33 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
     override init() {
         super.init()
         locationManager.delegate = self
+    }
+
+    @objc func readClipboard(_ invoke: Invoke) {
+        DispatchQueue.main.async { invoke.resolve(["text": UIPasteboard.general.string ?? ""]) }
+    }
+
+    @objc func writeClipboard(_ invoke: Invoke) {
+        do {
+            let args = try invoke.parseArgs(ClipboardArgs.self)
+            DispatchQueue.main.async {
+                UIPasteboard.general.string = args.text
+                invoke.resolve(["text": args.text])
+            }
+        } catch { invoke.reject(error.localizedDescription) }
+    }
+
+    @objc func openSettings(_ invoke: Invoke) {
+        DispatchQueue.main.async {
+            guard let url = URL(string: UIApplication.openSettingsURLString) else {
+                invoke.reject("System settings are unavailable")
+                return
+            }
+            UIApplication.shared.open(url) { opened in
+                if opened { invoke.resolve(["presented": true, "detail": "System settings opened"]) }
+                else { invoke.reject("Could not open system settings") }
+            }
+        }
     }
 
     @objc func status(_ invoke: Invoke) {
@@ -629,7 +658,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
         if #available(iOS 17.0, *) {
             switch state {
             case .authorized, .fullAccess: return "granted"
-            case .writeOnly: return "granted"
+            case .writeOnly: return "prompt"
             case .denied, .restricted: return "denied"
             case .notDetermined: return "prompt"
             @unknown default: return "prompt"

@@ -17,9 +17,11 @@ function harness(overrides = {}) {
         return [states[index], (value) => { states[index] = value; }];
       },
       useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
+      useEffect() {},
       useLayoutEffect(effect) { if (!mounted) cleanups.push(effect()); },
     },
     "../i18n": { useLocale: () => ({ t: (key) => key }) },
+    "../lib/runtimePlatform": { isNativeMobileRuntime: () => false },
     "./NativeSurface": { NativeSurface: "NativeSurface" },
   } });
   const { NativeChatPage } = loader.loadModule("src/presentation/NativeChatPage.tsx");
@@ -27,7 +29,7 @@ function harness(overrides = {}) {
   const { createLiveTranscriptStore } = loader.loadModule("src/lib/chat/conversation/liveTranscriptStore.ts");
   const registry = createPresentationActionRegistry();
   const props = {
-    settings: { theme: "system", customSettings: { appearance: { showThinking: true } } },
+    settings: { theme: "system", system: { executionMode: "text" }, customSettings: { appearance: { showThinking: true } } },
     composerRef: { current: null },
     sidebarStore: { subscribe: () => () => {}, getSnapshot: () => ({ conversations: [], hasMore: false }) },
     historyItems: [], liveTranscriptStore: createLiveTranscriptStore(),
@@ -37,7 +39,7 @@ function harness(overrides = {}) {
     projects: [], attachmentsEnabled: true, uploads: [], isUploading: false,
     onSend() {}, onStop() {}, onSelectModel() {}, onSelectConversation() {}, onSelectProject() {},
     onNewConversation() {}, onOpenSettings() {}, onLoadEarlierHistory() {},
-    onDecide: () => ({ ok: true }), onPickFiles: async () => {}, onRemoveUpload() {},
+    onDecide: () => ({ ok: true }), onImportFiles: async () => {}, onCreateProject() {}, onOpenTerminal() {}, onChangeMode() {}, onRemoveUpload() {},
     ...overrides,
   };
   let request = 0;
@@ -81,7 +83,7 @@ test("native edits reach the shared composer used by send and conversation draft
 test("native controls enforce busy, model and attachment constraints at dispatch", async () => {
   let picked = 0;
   const selected = [];
-  const h = harness({ onPickFiles: async () => { picked++; }, onSelectModel: (value) => selected.push(value) });
+  const h = harness({ onImportFiles: async () => { picked++; }, onSelectModel: (value) => selected.push(value) });
   await h.dispatch("draft", "Ready");
   h.props.inputDisabled = true;
   h.render();
@@ -100,7 +102,7 @@ test("native controls enforce busy, model and attachment constraints at dispatch
   assert.equal((await h.dispatch("send")).ok, false);
   h.props.attachmentsEnabled = true;
   h.render();
-  assert.equal((await h.dispatch("attach")).ok, true);
+  assert.equal((await h.dispatch("attach", "[]")).ok, true);
   assert.equal(picked, 1);
   h.unmount();
 });

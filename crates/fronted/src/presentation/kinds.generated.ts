@@ -16,4 +16,13 @@ export type PresentationKind =
   | "SegmentedControl"
   | "Menu"
   | "Divider"
-  | "Progress";
+  | "Progress"
+  | "List"
+  | "SettingsGroup"
+  | "NavigationRow"
+  | "IconButton"
+  | "Spacer"
+  | "Composer"
+  | "ComposerInput"
+  | "ChatLayout"
+  | "FilePicker";
