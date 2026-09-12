@@ -174,7 +174,17 @@ EOF
     echo "talloc cross-build produced no static objects for $android_abi" >&2
     exit 1
   fi
-  "$ar" rcs "$library_root/libtalloc.a" "${talloc_objects[@]}"
+  # Upstream talloc declares deps='replace'. Its configured compatibility
+  # objects (including rep_memset_s on Android) must accompany talloc.c.
+  # Only library objects live here; the upstream test objects are in tests/.
+  mapfile -t replace_objects < <(
+    find "$dependency_root/talloc/bin/default/lib/replace" -maxdepth 1 -type f -name '*.o' -print
+  )
+  if [ "${#replace_objects[@]}" -eq 0 ]; then
+    echo "talloc cross-build produced no libreplace objects for $android_abi" >&2
+    exit 1
+  fi
+  "$ar" rcs "$library_root/libtalloc.a" "${talloc_objects[@]}" "${replace_objects[@]}"
   "$ranlib" "$library_root/libtalloc.a"
 
   "$cc" -c "$dependency_root/shmem.c" \

@@ -24,7 +24,10 @@ import {
   X,
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
+import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
 import type { SshHostConfig } from "../../../lib/settings";
+import { runNativeSshCommand } from "../../../lib/terminal/runNativeSshCommand";
+import type { TerminalSshPrompt } from "../../../lib/terminal/types";
 import { presentationControls } from "../../../presentation/controls";
 import { NativeSurface } from "../../../presentation/NativeSurface";
 import type { PresentationNode } from "../../../presentation/types";
@@ -92,6 +95,19 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
   const [keyboardResponse, setKeyboardResponse] = useState("");
   const [entries, setEntries] = useState<SshCommandEntry[]>([]);
   const [activeRunId, setActiveRunId] = useState("");
+  const mobile = isNativeMobileRuntime();
+  const desktopRun = useRef<AbortController | null>(null);
+  const [sshPrompt, setSshPrompt] = useState<{
+    prompt: TerminalSshPrompt;
+    answer: (value: { answer?: string; trustHostKey?: boolean }) => void;
+  } | null>(null);
+  const [promptAnswer, setPromptAnswer] = useState("");
+  useEffect(() => {
+    if (!open) desktopRun.current?.abort();
+    return () => {
+      desktopRun.current?.abort();
+    };
+  }, [open]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedHost = useMemo(
     () => hosts.find((host) => host.id === selectedHostId) ?? null,
@@ -128,23 +144,53 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
       !remoteCommand ||
       activeRunId ||
       !workdir.trim() ||
-      (selectedHost.authType === "keyboardInteractive" && !keyboardResponse.trim())
+      (mobile && selectedHost.authType === "keyboardInteractive" && !keyboardResponse.trim())
     )
       return;
     const id = createRunId();
     setCommand("");
     setActiveRunId(id);
     setEntries((current) => [...current, { id, command: remoteCommand }]);
+    const controller = new AbortController();
+    desktopRun.current = controller;
     try {
-      const response = await invoke<ShellRunResponse>("mobile_ssh_exec", {
-        host_id: selectedHost.id,
-        workdir,
-        remote_command: remoteCommand,
-        keyboard_response:
-          selectedHost.authType === "keyboardInteractive" ? keyboardResponse : null,
-        timeout_ms: 300_000,
-        run_id: id,
-      });
+      const response = mobile
+        ? await invoke<ShellRunResponse>("mobile_ssh_exec", {
+            host_id: selectedHost.id,
+            workdir,
+            remote_command: remoteCommand,
+            keyboard_response:
+              selectedHost.authType === "keyboardInteractive" ? keyboardResponse : null,
+            timeout_ms: 300_000,
+            run_id: id,
+          })
+        : await runNativeSshCommand<ShellRunResponse>({
+            hostId: selectedHost.id,
+            workdir,
+            projectPathKey,
+            command: remoteCommand,
+            runId: id,
+            signal: controller.signal,
+            prompt: (prompt) =>
+              new Promise((resolve, reject) => {
+                const abort = () =>
+                  reject(new DOMException("SSH connection cancelled", "AbortError"));
+                if (controller.signal.aborted) {
+                  abort();
+                  return;
+                }
+                controller.signal.addEventListener("abort", abort, { once: true });
+                setPromptAnswer("");
+                setSshPrompt({
+                  prompt,
+                  answer: (value) => {
+                    controller.signal.removeEventListener("abort", abort);
+                    setSshPrompt(null);
+                    resolve(value);
+                  },
+                });
+              }),
+          });
       setEntries((current) =>
         current.map((entry) => (entry.id === id ? { ...entry, response } : entry)),
       );
@@ -154,16 +200,20 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
         current.map((entry) => (entry.id === id ? { ...entry, error } : entry)),
       );
     } finally {
+      desktopRun.current = null;
+      setSshPrompt(null);
       setActiveRunId("");
     }
   };
 
   const cancel = async () => {
     if (!activeRunId) return;
+    desktopRun.current?.abort();
     await invoke("shell_cancel", { run_id: activeRunId }).catch(() => undefined);
   };
 
   const close = () => {
+    desktopRun.current?.abort();
     if (activeRunId) void invoke("shell_cancel", { run_id: activeRunId }).catch(() => undefined);
     onClose();
   };
@@ -197,7 +247,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
             icon: "chevron.left",
           },
           { id: "endpoint", kind: "Text", text: endpoint(selectedHost) },
-          ...(selectedHost.authType === "keyboardInteractive"
+          ...(mobile && selectedHost.authType === "keyboardInteractive"
             ? [
                 c.input(
                   "challenge",
@@ -236,7 +286,9 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
             !!command.trim() &&
               !activeRunId &&
               !!workdir.trim() &&
-              (selectedHost.authType !== "keyboardInteractive" || !!keyboardResponse.trim()),
+              (!mobile ||
+                selectedHost.authType !== "keyboardInteractive" ||
+                !!keyboardResponse.trim()),
           ),
           c.action("cancel", t("chat.stopGeneration"), cancel, !!activeRunId),
         ]
@@ -259,6 +311,39 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
             ]),
           ),
         ];
+    if (sshPrompt) {
+      nodes.splice(
+        0,
+        nodes.length,
+        { id: "ssh-prompt-message", kind: "Text", text: sshPrompt.prompt.message },
+        ...(sshPrompt.prompt.fingerprintSha256
+          ? [
+              {
+                id: "ssh-fingerprint",
+                kind: "Text" as const,
+                text: sshPrompt.prompt.fingerprintSha256,
+              },
+            ]
+          : []),
+        ...(sshPrompt.prompt.kind === "hostKey"
+          ? []
+          : [
+              c.input(
+                "ssh-answer",
+                t("settings.sshAuthMethod"),
+                promptAnswer,
+                setPromptAnswer,
+                !sshPrompt.prompt.answerEcho,
+              ),
+            ]),
+        c.action("ssh-confirm", t("settings.confirm"), () =>
+          sshPrompt.answer(
+            sshPrompt.prompt.kind === "hostKey" ? { trustHostKey: true } : { answer: promptAnswer },
+          ),
+        ),
+        c.action("ssh-cancel", t("settings.cancel"), cancel),
+      );
+    }
     if (activeRunId)
       nodes.push({ id: "running", kind: "Progress", label: t("chat.mobileTerminal.running") });
     return (

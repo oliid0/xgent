@@ -6,6 +6,8 @@ Complete Apple SwiftUI/mobile behavior against IMG_0385-0406 and yy; repair all 
 - Native plugins, scheduled-task forms/execution logs, SSH settings and command panel; wired missing Apple sidebar destinations and SSH panel.
 - Android shmem TMPDIR fix passed its previous failure; new PRoot failure needs string.h, now patched against pinned upstream source.
 - CI iOS screenshots inspected: native root renders, but default Xcode 16.4 excludes Liquid Glass. Apple release now selects installed Xcode 26.3 and iOS 26 simulator.
+- macOS SSH now uses the desktop authenticated session registry with native trust/auth prompts and cancellation cleanup (3 regression tests pass).
+- Android .913 reaches linking: talloc requires its upstream libreplace objects, now included in the static archive.
 - Windows build succeeds but resize restoration still fails; smoke now reports saved native state to identify persistence vs restoration failure.
 
 ## Evidence / verification
@@ -13,7 +15,7 @@ Complete Apple SwiftUI/mobile behavior against IMG_0385-0406 and yy; repair all 
 - Astryx 0.5.4 CLI manifest/build and MCP search/get checked; yy OffloadPermissionSettingsView confirms List/Section/system confirmations.
 - pnpm check/lint passed; full non-Cargo suite 1177/1177 passed, native mapping current; PRoot patch applies cleanly to pinned upstream.
 - Inspected default/dark-large iOS screenshots; fixed overflowing toolbar glyphs and safe-area appearance. Swift changes validated by next native CI.
-- No local build/dev/Cargo. Next: commit/push this patch and track GitHub MCP release v0.0.1-native.913.
+- No local build/dev/Cargo. Release .913 / 34687704697 running; follow-up native SSH and talloc patch: check/lint plus 16 relevant tests pass; ready for next release run.
 
 ## Remaining
 - Complete CI and rendered wide/narrow interaction validation, including actual Liquid Glass compilation.
