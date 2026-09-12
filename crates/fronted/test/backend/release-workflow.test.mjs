@@ -44,6 +44,10 @@ const androidRootfsPreparation = readFileSync(
   path.join(repoRoot, "scripts/mobile/prepare-alpine-rootfs-android.sh"),
   "utf8",
 );
+const androidProotPreparation = readFileSync(
+  path.join(repoRoot, "scripts/mobile/prepare-proot-android.sh"),
+  "utf8",
+);
 const windowsBrowserBackend = readFileSync(
   path.join(repoRoot, "crates/browser-automation/src/desktop.rs"),
   "utf8",
@@ -190,6 +194,12 @@ test("release packaging preserves native runtime resources without ABI drift", (
 
   assert.match(androidRootfsPreparation, /\.tar\.gzip/);
   assert.doesNotMatch(androidRootfsPreparation, /android_abi\}\.tar\.gz"/);
+  assert.match(
+    androidProotPreparation,
+    /build_abi "x86_64" "x86_64-linux-android" "x86_64"/,
+  );
+  assert.match(androidProotPreparation, /grep -F "architecture: \$expected_arch"/);
+  assert.doesNotMatch(androidProotPreparation, /i386:x86-64/);
   assert.match(workflow, /payload\.startswith\(b"\\x1f\\x8b"\)/);
   assert.match(workflow, /assets\/mobile-execution\/commandDictionary\.plist/);
 

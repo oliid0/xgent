@@ -216,7 +216,10 @@ EOF
   test -f "$built_loader"
   "$strip" "$built_binary"
   "$strip" "$built_loader"
-  "$objdump" -f "$built_binary" | grep -F "$expected_arch" >/dev/null || {
+  local object_header
+  object_header="$("$objdump" -f "$built_binary")"
+  echo "$object_header" | grep -F "architecture: $expected_arch" >/dev/null || {
+    echo "$object_header" >&2
     echo "Built PRoot has the wrong architecture for $android_abi" >&2
     exit 1
   }
@@ -232,7 +235,7 @@ PROOT_RESOLVED_COMMIT=""
 fetch_proot_source
 prepare_dependency_sources
 build_abi "arm64-v8a" "aarch64-linux-android" "aarch64"
-build_abi "x86_64" "x86_64-linux-android" "i386:x86-64"
+build_abi "x86_64" "x86_64-linux-android" "x86_64"
 
 mkdir -p "$(dirname "$MANIFEST_PATH")"
 python3 - "$MANIFEST_PATH" "$PROOT_SOURCE_VERSION" "$PROOT_RESOLVED_COMMIT" <<'PY'
