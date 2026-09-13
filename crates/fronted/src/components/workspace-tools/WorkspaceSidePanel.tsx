@@ -30,9 +30,10 @@ import type {
   TerminalShellOption,
 } from "../../lib/terminal/types";
 import type { WorkspaceActivityClient } from "../../lib/workspace-activity/types";
+import { ConversationTrajectorySurface } from "../../pages/chat/trajectory/ConversationTrajectorySurface";
 import { McpHubPage } from "../../pages/mcp-hub/McpHubPage";
 import { SkillsHubPage } from "../../pages/skills-hub/SkillsHubPage";
-import { Cable, FolderTree, GitBranch, Key, SkillIcon, Terminal, X } from "../icons";
+import { Activity, Cable, FolderTree, GitBranch, Key, SkillIcon, Terminal, X } from "../icons";
 import { FileTreePanel } from "../project-tools/file-tree";
 import type { GitCommitContextPayload, GitFileContextPayload } from "../project-tools/git-review";
 import { GitReviewPanel } from "../project-tools/git-review";
@@ -55,6 +56,7 @@ type WorkspaceSidePanelProps = {
   target: WorkspacePanelTarget;
   shell?: string;
   requestNonce: number;
+  conversationId: string;
   fontScale?: number;
   projectPathKey: string;
   cwd: string;
@@ -113,7 +115,7 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
     cwd: props.cwd,
     externalSessions: props.sessions,
     externalSessionsLoaded: props.sessionsLoaded,
-    isOpen: props.target !== "skills" && props.target !== "mcp",
+    isOpen: props.target !== "skills" && props.target !== "mcp" && props.target !== "trajectory",
     projectPathKey: props.projectPathKey,
     projectState: props.projectState,
     terminalReady,
@@ -268,6 +270,10 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
     case "backgroundTasks":
       title = t("sidebar.backgroundTasks");
       break;
+    case "trajectory":
+      title = t("chat.trajectory.title");
+      Icon = Activity;
+      break;
     case "skills":
       title = "Skills";
       Icon = SkillIcon;
@@ -358,6 +364,8 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
                   allowStdio
                   embedded
                 />
+              ) : props.target === "trajectory" ? (
+                <ConversationTrajectorySurface conversationId={props.conversationId} />
               ) : !projectReady && props.target !== "backgroundTasks" ? (
                 <EmptyState
                   isCompact

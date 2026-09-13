@@ -572,7 +572,32 @@ extension XgentNodeView {
         }
     }
 
-    var nativeList: some View { nativeCollection(label: nil) }
+    @ViewBuilder var nativeList: some View {
+        #if os(iOS)
+        if document.formFactor == .mobile {
+            List(node.children ?? []) { child in
+                XgentNodeView(node: child, document: document, model: model)
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .frame(maxHeight: .infinity)
+        } else {
+            List(node.children ?? []) { child in
+                XgentNodeView(node: child, document: document, model: model)
+            }
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .frame(maxHeight: .infinity)
+        }
+        #else
+        List(node.children ?? []) { child in
+            XgentNodeView(node: child, document: document, model: model)
+        }
+        .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .frame(maxHeight: .infinity)
+        #endif
+    }
     var nativeTreeRow: some View {
         Button { model.send(node, in: document) } label: {
             HStack(spacing: 9) {
@@ -598,25 +623,37 @@ extension XgentNodeView {
         .buttonStyle(.plain)
         .opacity(node.secondary == true ? 0.62 : 1)
     }
-    var nativeSettingsGroup: some View { nativeCollection(label: node.label) }
+    var nativeSettingsGroup: some View {
+        Section {
+            children
+        } header: {
+            if let label = node.label, !label.isEmpty { Text(label) }
+        }
+    }
     var nativeSettingsLayout: some View {
         let panes = node.children ?? []
-        return HStack(spacing: 0) {
+        return NavigationSplitView {
             if let sidebar = panes.first {
                 XgentNodeView(node: sidebar, document: document, model: model)
-                    .frame(width: 280)
                     .frame(maxHeight: .infinity, alignment: .topLeading)
-                    .background(Color(xgentHex: palette.surface).opacity(0.55))
+                    .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 360)
             }
-            Divider().overlay(Color(xgentHex: palette.border))
+        } detail: {
             if panes.count > 1 {
                 XgentNodeView(node: panes[1], document: document, model: model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
+        .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 900, idealWidth: 1040, minHeight: 620, idealHeight: 720)
     }
-    var nativeSection: some View { nativeCollection(label: node.label) }
+    var nativeSection: some View {
+        Section {
+            children
+        } header: {
+            if let label = node.label, !label.isEmpty { Text(label) }
+        }
+    }
 
     @ViewBuilder private var textEntry: some View {
         if node.secure == true {
@@ -789,9 +826,17 @@ extension XgentNodeView {
     }
 }
 
+#if os(macOS)
+private struct XgentSidebarWidthPreferenceKey: PreferenceKey {
+    static let defaultValue = 360.0
+    static func reduce(value: inout Double, nextValue: () -> Double) { value = nextValue() }
+}
+#endif
+
 struct XgentRootLayout: View {
     @ObservedObject var model: XgentPresentationModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("xgent.native.sidebar-width.v1") private var storedSidebarWidth = 360.0
     private var root: XgentDocument? { model.documents.last { $0.mode == .root } }
     private var sidebar: XgentDocument? { model.documents.last { $0.mode == .sidebar } }
     private var transitionAnimation: Animation? {
@@ -814,14 +859,34 @@ struct XgentRootLayout: View {
 
     var body: some View {
         #if os(macOS)
-        HStack(spacing: 0) {
-            if let sidebar {
+        Group {
+            if let sidebar, let root {
+                HSplitView {
+                    content(sidebar)
+                        .frame(
+                            minWidth: 280,
+                            idealWidth: CGFloat(min(480, max(280, storedSidebarWidth))),
+                            maxWidth: 480
+                        )
+                        .background {
+                            GeometryReader { geometry in
+                                Color.clear.preference(
+                                    key: XgentSidebarWidthPreferenceKey.self,
+                                    value: Double(geometry.size.width)
+                                )
+                            }
+                        }
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                    content(root)
+                        .accessibilityIdentifier("xgent-native-root")
+                        .onAppear { NSLog("XgentNativeUI root rendered") }
+                }
+                .onPreferenceChange(XgentSidebarWidthPreferenceKey.self) { width in
+                    storedSidebarWidth = min(480, max(280, width))
+                }
+            } else if let sidebar {
                 content(sidebar)
-                    .frame(width: 320)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-                Divider()
-            }
-            if let root {
+            } else if let root {
                 content(root)
                     .accessibilityIdentifier("xgent-native-root")
                     .onAppear { NSLog("XgentNativeUI root rendered") }

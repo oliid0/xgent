@@ -41,6 +41,8 @@ export const glassTheme = defineTheme({
       },
     },
     card: { base: surface },
+    list: { base: surface },
+    section: { "variant:section": surface },
     "chat-composer": { base: floatingSurface },
     dialog: {
       base: floatingSurface,

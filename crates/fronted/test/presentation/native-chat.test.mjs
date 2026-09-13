@@ -21,6 +21,7 @@ function harness(overrides = {}) {
         if (!(index in states)) states[index] = { current: initial };
         return states[index];
       },
+      useMemo: (create) => create(),
       useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
       useEffect() {},
       useLayoutEffect(effect) { if (!mounted) cleanups.push(effect()); },
@@ -82,6 +83,7 @@ test("native edits reach the shared composer used by send and conversation draft
   assert.deepEqual(sent, ["Hello\nmodel"]);
   h.props.onSelectConversation = () => h.props.composerRef.current.setText("Restored draft");
   h.props.sidebarStore.getSnapshot = () => ({ conversations: [{ id: "next", title: "Next" }] });
+  assert.equal((await h.dispatch("sidebar")).ok, true);
   h.render();
   assert.equal((await h.dispatch("conversation:next", null, "sidebar")).ok, true);
   assert.equal(h.props.composerRef.current.getDraft().text, "Restored draft");
@@ -145,6 +147,8 @@ test("native sidebar routes skills, MCP, files, workspaces, recents, new chat an
     onSelectConversation: (id) => selected.push(id),
     onChangeMode: (mode) => modes.push(mode),
   });
+  assert.equal((await h.dispatch("sidebar")).ok, true);
+  h.render();
   for (const action of ["skills", "mcp", "files", "create-project", "new-chat", "settings"]) {
     assert.equal((await h.dispatch(action, null, "sidebar")).ok, true);
   }

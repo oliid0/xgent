@@ -15,7 +15,7 @@ if (!isBrowserRuntime()) {
   }
 }
 
-// Only the first initialization may show loading. Later launches reveal the ready app.
+// Reveal the shell immediately; initialization no longer owns a splash page.
 showFirstLaunch();
 void import("./main").catch((error) => {
   showLaunchFailure();

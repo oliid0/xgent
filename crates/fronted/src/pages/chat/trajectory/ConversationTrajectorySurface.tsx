@@ -26,7 +26,7 @@ import { Token, type TokenColor } from "@astryxdesign/core/Token";
 import { invoke } from "@xgent/runtime";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
-import { Activity, Circle, RefreshCw } from "../../../components/icons";
+import { Activity, Circle, RefreshCw, X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import {
   desktopLiveTrajectoryEvents,
@@ -500,7 +500,10 @@ function TrajectoryDetails({
   );
 }
 
-export function ConversationTrajectorySurface(props: { conversationId: string }) {
+export function ConversationTrajectorySurface(props: {
+  conversationId: string;
+  onClose?: () => void;
+}) {
   const { t } = useLocale();
   const compact = useMediaQuery("(max-width: 900px), (pointer: coarse) and (hover: none)");
   const [persistedEvents, setPersistedEvents] = useState<TrajectoryEvent[]>([]);
@@ -972,15 +975,26 @@ export function ConversationTrajectorySurface(props: { conversationId: string })
                   </Text>
                 </VStack>
               </HStack>
-              <IconButton
-                label={t("chat.trajectory.refresh")}
-                tooltip={t("chat.trajectory.refresh")}
-                icon={<RefreshCw />}
-                variant="ghost"
-                isLoading={loading}
-                isDisabled={loading}
-                onClick={refresh}
-              />
+              <HStack gap={1} vAlign="center">
+                <IconButton
+                  label={t("chat.trajectory.refresh")}
+                  tooltip={t("chat.trajectory.refresh")}
+                  icon={<RefreshCw />}
+                  variant="ghost"
+                  isLoading={loading}
+                  isDisabled={loading}
+                  onClick={refresh}
+                />
+                {props.onClose ? (
+                  <IconButton
+                    label={t("settings.close")}
+                    tooltip={t("settings.close")}
+                    icon={<X />}
+                    variant="ghost"
+                    onClick={props.onClose}
+                  />
+                ) : null}
+              </HStack>
             </HStack>
             <HStack gap={2} width="100%" hAlign="between" vAlign="center" wrap="wrap">
               <StackItem size="fill">

@@ -3,12 +3,11 @@ import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 for (const warm of [false, true]) {
-  test(`${warm ? "repeat" : "first"} launch reveals only the intended painted surface`, async () => {
+  test(`${warm ? "repeat" : "first"} launch reveals the shell immediately without a splash`, async () => {
     const saved = new Map();
     const frames = [];
     const events = [];
     let removed = false;
-    let inert = true;
     const previous = Object.fromEntries(["document", "window", "requestAnimationFrame", "matchMedia", "localStorage"].map(key => [key, globalThis[key]]));
     const loader = createTsModuleLoader({ mocks: {
       "@xgent/runtime": { isBrowserRuntime: () => false, invoke: async () => events.push(removed ? "app" : "splash") },
@@ -18,11 +17,11 @@ for (const warm of [false, true]) {
     try {
       globalThis.document = {
         documentElement: { dataset: { initialized: String(warm) } },
-        getElementById: (id) => id === "root" ? { removeAttribute: () => { inert = false; } } : {
+        getElementById: () => ({
           remove: () => { removed = true; },
           classList: { add: value => events.push(value) },
           addEventListener: () => {},
-        },
+        }),
       };
       globalThis.window = { setTimeout: () => {} };
       globalThis.requestAnimationFrame = callback => frames.push(callback);
@@ -31,16 +30,14 @@ for (const warm of [false, true]) {
       launch.showFirstLaunch();
       assert.deepEqual(events, []);
       while (frames.length) frames.shift()();
-      assert.deepEqual(events, warm ? [] : ["splash"]);
+      assert.deepEqual(events, ["splash"]);
       launch.finishLaunch();
       launch.finishLaunch(); // StrictMode cannot finish or animate twice.
-      assert.equal(inert, true);
       assert.equal(saved.size, 0);
       while (frames.length) frames.shift()();
-      assert.equal(inert, false);
       assert.equal(saved.get("xgent.launch-completed.v1"), "true");
       assert.equal(removed, true);
-      assert.deepEqual(events, warm ? ["app"] : ["splash", "app"]);
+      assert.deepEqual(events, ["splash", "app"]);
     } finally {
       for (const [key, value] of Object.entries(previous)) {
         if (value === undefined) delete globalThis[key]; else globalThis[key] = value;

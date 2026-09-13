@@ -4,7 +4,7 @@ import type { TerminalSession } from "../../lib/terminal/types";
 export const DEFAULT_TERMINAL_COLS = 80;
 export const DEFAULT_TERMINAL_ROWS = 24;
 
-export type WorkspaceToolTarget = WorkspaceToolKind | "terminal" | "backgroundTasks";
+export type WorkspaceToolTarget = WorkspaceToolKind | "terminal" | "backgroundTasks" | "trajectory";
 
 export type WorkspacePanelTarget = WorkspaceToolTarget | "skills" | "mcp";
 

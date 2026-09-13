@@ -1,7 +1,6 @@
 import { Banner } from "@astryxdesign/core/Banner";
 import { BottomSheet } from "@astryxdesign/core/BottomSheet";
 import { Button } from "@astryxdesign/core/Button";
-import { Center } from "@astryxdesign/core/Center";
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
@@ -122,22 +121,8 @@ function applyRuntimeSystemDefaults(settings: AppSettings, defaultWorkdir: strin
 }
 
 function AppStartupSurface(props: { locale: AppSettings["locale"]; failures: string[] }) {
-  const label = translate("app.loading", props.locale);
-  return (
-    <Center
-      width="100%"
-      height="100%"
-      padding={6}
-      className="xgent-startup-surface"
-      role="status"
-      aria-label={label}
-    >
-      <VStack width="100%" maxWidth="var(--xgent-content-width-md)" gap={4} hAlign="center">
-        <img src="/favicon.svg" width={64} height={64} alt="Xgent" />
-        <MobileStartupWarning failures={props.failures} locale={props.locale} />
-      </VStack>
-    </Center>
-  );
+  if (props.failures.length === 0) return null;
+  return <MobileStartupWarning failures={props.failures} locale={props.locale} />;
 }
 
 function MobileStartupWarning(props: { failures: string[]; locale: AppSettings["locale"] }) {

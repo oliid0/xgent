@@ -4,6 +4,7 @@ import { updateSystem } from "../lib/settings";
 import type { SettingsSaveState } from "../lib/settings/storage";
 import type { SettingsSectionProps } from "../pages/settings/types";
 import { NativeSurface } from "./NativeSurface";
+import { createNativePresentationTheme } from "./nativeTheme";
 import type { PresentationHandler } from "./types";
 
 /** Uses the same persisted settings updater as the Android and desktop forms. */
@@ -44,60 +45,67 @@ export function NativeMobileSystemSettings({
       document={{
         mode: "sheet",
         title: t("settings.navSystem"),
-        appearance: "system",
+        appearance: settings.theme,
+        formFactor: "mobile",
+        theme: createNativePresentationTheme(settings, true),
         dismissAction: "close",
         nodes: [
-          ...(saveState
-            ? [
-                {
-                  id: "save-status",
-                  kind: "Text" as const,
-                  secondary: saveState.status !== "error",
-                  text:
-                    saveState.status === "error"
-                      ? `${t("settings.saveError")}: ${saveState.message}`
-                      : t(saveState.status === "saving" ? "settings.saving" : "settings.saved"),
-                },
-              ]
-            : []),
           {
-            id: "execution-mode",
-            kind: "Selector",
-            label: t("settings.executionMode"),
-            value: settings.system.executionMode === "text" ? "text" : "tools",
-            action: "execution-mode",
-            options: [
-              { value: "text", label: t("settings.chatMode") },
-              { value: "tools", label: t("settings.agentMode") },
+            id: "system-settings",
+            kind: "SettingsGroup",
+            children: [
+              ...(saveState
+                ? [
+                    {
+                      id: "save-status",
+                      kind: "Text" as const,
+                      secondary: saveState.status !== "error",
+                      text:
+                        saveState.status === "error"
+                          ? `${t("settings.saveError")}: ${saveState.message}`
+                          : t(saveState.status === "saving" ? "settings.saving" : "settings.saved"),
+                    },
+                  ]
+                : []),
+              {
+                id: "execution-mode",
+                kind: "Selector",
+                label: t("settings.executionMode"),
+                value: settings.system.executionMode === "text" ? "text" : "tools",
+                action: "execution-mode",
+                options: [
+                  { value: "text", label: t("settings.chatMode") },
+                  { value: "tools", label: t("settings.agentMode") },
+                ],
+              },
+              {
+                id: "execution-description",
+                kind: "Text",
+                secondary: true,
+                text: t(
+                  settings.system.executionMode === "text"
+                    ? "settings.chatModeDesc"
+                    : "settings.agentModeDesc",
+                ),
+              },
+              {
+                id: "locale",
+                kind: "Selector",
+                label: t("settings.language"),
+                value: settings.locale,
+                action: "locale",
+                options: SUPPORTED_LOCALES.map((locale) => ({
+                  value: locale,
+                  label: t(
+                    locale === "system"
+                      ? "settings.auto"
+                      : locale === "zh-CN"
+                        ? "settings.chinese"
+                        : "settings.english",
+                  ),
+                })),
+              },
             ],
-          },
-          {
-            id: "execution-description",
-            kind: "Text",
-            secondary: true,
-            text: t(
-              settings.system.executionMode === "text"
-                ? "settings.chatModeDesc"
-                : "settings.agentModeDesc",
-            ),
-          },
-          { id: "separator", kind: "Divider" },
-          {
-            id: "locale",
-            kind: "Selector",
-            label: t("settings.language"),
-            value: settings.locale,
-            action: "locale",
-            options: SUPPORTED_LOCALES.map((locale) => ({
-              value: locale,
-              label: t(
-                locale === "system"
-                  ? "settings.auto"
-                  : locale === "zh-CN"
-                    ? "settings.chinese"
-                    : "settings.english",
-              ),
-            })),
           },
         ],
       }}

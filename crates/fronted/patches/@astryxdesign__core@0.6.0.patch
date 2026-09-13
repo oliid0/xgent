@@ -9,7 +9,15 @@ diff --git a/dist/Layer/useLayer.js b/dist/Layer/useLayer.js
  import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
  import * as stylex from '@stylexjs/stylex';
  import { createPortal } from 'react-dom';
-@@ -301,6 +302,7 @@ function useLayerImplementation(options) {
+@@ -267,6 +268,7 @@ function useLayerImplementation(options) {
+   // corrective portal, including after the render call moves.
+   const sentinelRef = useRef(null);
+   const contextMountRef = useRef(null);
++  const contextPositioningRef = useRef('anchor');
+   const [contextMount, setContextMount] = useState(null);
+   // A show() that arrives before the final layer mounts is replayed when its
+   // popover ref attaches.
+@@ -301,6 +303,7 @@ function useLayerImplementation(options) {
      } else {
        popover.style.display = 'block';
      }
@@ -17,16 +25,16 @@ diff --git a/dist/Layer/useLayer.js b/dist/Layer/useLayer.js
      openedPopoverRef.current = popover;
    }, []);
    const isCurrentContextPopover = useCallback(popover => {
-@@ -323,7 +325,7 @@ function useLayerImplementation(options) {
+@@ -323,7 +326,7 @@ function useLayerImplementation(options) {
      if (!sentinel || !inlineParent) {
        return;
      }
 -    const portalTarget = resolveLayerPortalTarget(inlineParent);
-+    const portalTarget = needsLayerCompatibility() ? inlineParent?.closest("dialog[open]") ?? document.body : resolveLayerPortalTarget(inlineParent);
++    const portalTarget = needsLayerCompatibility(contextPositioningRef.current) ? inlineParent?.closest("dialog[open]") ?? document.body : resolveLayerPortalTarget(inlineParent);
      const mount = {
        portalTarget,
        portalStyle: portalTarget ? readPortalWritingContext(sentinel, portalTarget) : {}
-@@ -483,6 +485,7 @@ function useLayerImplementation(options) {
+@@ -482,6 +485,7 @@ function useLayerImplementation(options) {
      }
    }, []);
    const popoverRefCallback = useCallback(el => {
@@ -34,7 +42,22 @@ diff --git a/dist/Layer/useLayer.js b/dist/Layer/useLayer.js
      popoverRef.current = el;
      bindToggleListener(el, handleToggle);
      if (el && pendingShowRef.current) {
-@@ -571,6 +574,9 @@ function useLayerImplementation(options) {
+@@ -522,5 +526,7 @@ function useLayerImplementation(options) {
+   // Render function for context mode
+   const renderContext = useCallback((children, props) => {
++    const positioning = props?.positioning ?? 'anchor';
++    contextPositioningRef.current = positioning;
+     // Keep the marker mounted after resolving the layer. Apart from giving
+     // us the real JSX parent on first show, this lets its ref report when a
+     // persistent hook's render call moves to a different host.
+@@ -536,6 +542,5 @@ function useLayerImplementation(options) {
+       placement = 'above',
+       alignment = 'center',
+-      positioning = 'anchor',
+       offset,
+       role,
+       'aria-label': ariaLabel,
+@@ -571,6 +576,9 @@ function useLayerImplementation(options) {
        role: role,
        "aria-label": ariaLabel,
        popover: lightDismiss ? 'auto' : 'manual',

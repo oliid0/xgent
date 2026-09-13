@@ -9,6 +9,7 @@ const loader = createTsModuleLoader({ mocks: {
     useLocale: () => ({ t: (key) => key }),
   },
   "./NativeSurface": { NativeSurface: "NativeSurface" },
+  "./nativeTheme": { createNativePresentationTheme: () => ({ marker: "theme" }) },
 } });
 const { NativeMobileSystemSettings } = loader.loadModule("src/presentation/NativeMobileSystemSettings.tsx");
 const { createPresentationActionRegistry } = loader.loadModule("src/presentation/actionRegistry.ts");
@@ -33,10 +34,14 @@ test("native system controls update shared settings and reject unsupported value
   assert.equal(settings.system.executionMode, "text");
   assert.equal(settings.theme, "dark", "desktop theme preference is preserved");
   const document = render({ status: "error", message: "Disk full" }).props.document;
-  assert.equal(document.appearance, "system");
-  assert.match(document.nodes.find((node) => node.id === "save-status").text, /Disk full/);
-  assert.equal(document.nodes.find((node) => node.id === "locale").value, "zh-CN");
-  assert.equal(document.nodes.find((node) => node.id === "execution-mode").value, "text");
+  assert.equal(document.appearance, "dark");
+  assert.equal(document.formFactor, "mobile");
+  assert.deepEqual(document.theme, { marker: "theme" });
+  const group = document.nodes.find((node) => node.id === "system-settings");
+  assert.equal(group.kind, "SettingsGroup");
+  assert.match(group.children.find((node) => node.id === "save-status").text, /Disk full/);
+  assert.equal(group.children.find((node) => node.id === "locale").value, "zh-CN");
+  assert.equal(group.children.find((node) => node.id === "execution-mode").value, "text");
   assert.equal((await dispatch(document.dismissAction, null)).ok, true);
   assert.equal(closed, true);
 });

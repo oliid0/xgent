@@ -1,35 +1,41 @@
 # Current objective
-Ship one shared Xgent behavior and one Astryx-aligned visual contract across Web/Linux/Windows/Android and native SwiftUI iOS/macOS; verify every release target.
+Fix shared floating-layer geometry/material, persistent desktop layout/window placement, trajectory/sidebar behavior, direct startup, and native/Web UI parity without introducing platform-specific substitute screens.
 
-## Completed / current changes
-- Upgraded Astryx core/themes/CLI to 0.6.0, applied its migration, regenerated the theme, and retained an exact-version layer geometry patch still required by older WebViews.
-- Expanded the executable Astryx-to-SwiftUI contract to 46 rendered kinds, 39 wire properties, the installed Astryx catalog, platform strategies, events, tokens, themes, and strict document/action validation.
-- Apple application chrome is native SwiftUI; WebKit is limited to browser content and a hidden noninteractive shared-state transport. Native chat, sidebar/more routes, settings, files, browser, SSH, attachments, activities/todos, messages, reasoning, tools, diffs and previews use shared TypeScript/Tauri state.
-- Calibrated IMG_0386-0406 as visual references only: mobile settings use continuous grouped surfaces with inset separators; menus/dialogs/composer use a distinct floating material; normal buttons use continuous rounded rectangles instead of blanket capsules. Astryx and SwiftUI resolve the same radius/material tokens, including user appearance overrides.
-- Added real least-privilege HealthKit/Health Connect steps and mobile voice settings; prepared Android PRoot/talloc linkage and Windows persisted-window restoration diagnostics/fixes.
-
-## Decisions / evidence
-- Apple Swift MCP confirmed explicit Liquid Glass shapes, continuous button borders, and system-owned sheet/popover geometry; Astryx MCP/CLI confirmed 0.6.0 component contracts and canonical `popover` theme target.
-- `npx astryx upgrade --apply`, theme build, design discovery, and `astryx doctor` completed; doctor reports 0 failures and aligned 0.6.0 packages.
-- Final local verification: `pnpm check`, `pnpm native:check`, and `pnpm lint` pass; all 1190 non-Cargo tests pass. No local build/dev/Cargo command was used.
-- Release 34720747496 proved both PRoot ABIs compile/link; its x86_64 post-build guard used GNU's `i386:x86-64` label against NDK LLVM output. The guard now checks LLVM's canonical `architecture: x86_64` and prints the actual header on mismatch.
-- The same release reached native Apple compilation and exposed an invalid mixed fixed-width/max-height SwiftUI `frame` overload; the settings sidebar now composes the two supported frame modifiers.
-- Release 34721118824 then isolated the remaining platform failures: the Swift build script still targeted iOS 16/macOS 14, the macOS compiler exhausted diagnostics on the generated-content modifier chain, Android coroutines 1.10.2 carried Kotlin 2.1 metadata into a Kotlin 1.9 host, and a post-hide Windows resize could overwrite the just-saved client size.
-- Native Swift now targets iOS 26/macOS 15 as required; the heterogeneous generated node is type-erased once and layout/state work is divided among small `ViewModifier` types after swiftc still failed on one combined modifier. Android pins the JetBrains artifact published against Kotlin 1.9.21 and release .916 compiled its APK. Windows ignores hidden resize events and reapplies the persisted client size once after the first HWND show; .916 proved the post-exit file stayed correct while show/placement had replaced the earlier hidden-window resize.
-- Release .916 installed and cold-launched the Android APK and exposed a real interaction defect rather than a missing route: the settings sheet's full-width 24px drag-handle layer covered the center of its unpadded 44px close button. The settings content again reserves its documented top inset so the header remains visible and tappable below that layer.
-- Release .918 proves the iOS native IPA compiles and its simulator app launches. Its Apple Silicon macOS compiler then isolated the remaining type-check limit to the fixed-size `frame` call, so fixed dimensions and bounding dimensions now use separate modifiers with eagerly converted `CGFloat?` values, matching Apple's two documented frame overloads.
-
-## Current follow-up
-- Release .919 compiled every target; Windows failed window restoration at runtime (944x641 became 870x612), Android input raced IME activation, and iOS screenshots exposed an absent empty model selector and missing provider configuration action.
-- Added opt-in native window restore diagnostics; Android smoke now waits for editor focus and an active keyboard before injecting text without retrying partial input.
-- Aligned mobile drawer glyphs, moved the native model selector beside attachments in the composer footer, and kept its disabled label plus the provider setup action visible when no models exist.
-- Local follow-up checks passed: check, native:check, lint, and 1191 non-Cargo tests. Changes were incorporated in 8aa3a8d.
-- Release 34758761246 / v0.1.347 compiled and packaged all five platforms. Windows restoration assertion, Android missing terminal input, and iOS root-render log assertion prevented package upload; these were runtime diagnostics, not compiler failures.
-- Per user instruction, release interaction diagnostics now require explicit smoke=true and are non-blocking. Compilation, package/signature validation, source packaging and artifact uploads remain required. Device behavior still needs real testing.
+## Current progress
+- Evidence: Astryx 0.6.0 routes menus, selectors, popovers and tooltips through `useLayer`; the prior fallback ran only when CSS feature detection failed, while affected WebViews report anchor support but misplace top-layer content.
+- Implemented one measured Floating UI path for all Astryx context layers, preserving Astryx spacing, clearing conflicting CSS anchor properties, tracking resize/scroll, and excluding consumer-owned custom positioning.
+- Added the Popover polyfill closed-state guard so inactive tooltips and menus cannot remain visibly laid out.
+- Replaced the light-theme gray modal scrim with a subtle light veil and applied the shared glass surface to Astryx lists/sections plus previously opaque desktop settings cards and layout regions; search and settings now share the same underlying-page material behavior.
+- Made trajectory a desktop-only workspace panel target with the same closeable left-panel lifecycle as Git review/SSH, supplied it the active conversation without unmounting chat/composer, and removed every compact/iOS/Android entry point.
+- Made the complete desktop Soul/footer label the menu trigger and taught desktop navigation that trajectory does not depend on a terminal/command host.
+- Removed the static “initializing Xgent” page, icon and inert root; the native shell is revealed immediately and only an actionable degraded-start warning is rendered when initialization actually fails.
+- Removed the now-dead loading-screen artwork so startup has no alternate visual state.
+- Reduced fresh desktop windows from 1600×1000 to 1360×850 (15%), extended the existing version-tolerant window state with physical x/y coordinates, rejected off-screen restores, and persisted both resize and move events across Windows/Linux/macOS.
+- Added validated, failure-safe shared layout preferences for left/right panel visibility, with migration and direct-launch regression tests; existing Astryx `useResizable` autosave IDs continue to own all three panel widths.
+- Wired those preferences into desktop WebUI and native macOS presentation, restored them when leaving compact mode, avoided mobile sessions overwriting desktop choices, and preserved right-panel state when conversations hydrate or switch.
+- Kept the generated compact-theme section override aligned with its source contract while desktop surfaces inherit the new glass base.
+- Made the native macOS sidebar continuously resizable with a persisted width and an accessible divider, and changed every native settings/tool sheet from an opaque theme fill to system material over the underlying interface.
+- Added trajectory to the native macOS sidebar/tool navigation and render its shared live/persisted event stream as a dismissible SwiftUI sidebar, including refresh, loading, empty, truncated and error states.
+- Kept Astryx consumer-owned custom-positioned layers on their original portal path while routing every standard menu, selector, popover and tooltip through measured geometry.
+- Confirmed the product rule that trajectory is desktop-only and removed it from compact WebUI and iOS/Android navigation/presentation.
+- Replaced hand-built SwiftUI menu/picker wrappers and settings collections with semantic `Menu`, `Picker`, grouped `Form`/`Section`, native `List`, `NavigationSplitView`, and macOS `HSplitView`; sheets now leave their corner radius/material to the system instead of overriding the presentation background.
+- Reference evidence from `yy/src/ios` confirms the same component choices: its settings entry is a root `.sheet`, `NavigationStack`, `List`/`Section`, native `Picker`/`Toggle`, and a trailing `Done` toolbar action; the reference remains component guidance only, while Xgent's Astryx order/state/actions remain authoritative.
+- Converted the standalone iOS system settings surface to the same themed mobile presentation contract and grouped its existing execution-mode/language data flow inside the same headerless semantic group used by compact Astryx, so SwiftUI renders a system `Form`/`Section` with native pickers instead of a loose alternate layout.
+- Corrected the Astryx layer bridge and calibrated every reproducible package-patch hunk and context marker to the exact Astryx 0.6.0 source: each render call retains its `positioning` mode in a hook ref before mount resolution; standard anchored layers use measured body/dialog geometry, while consumer-owned custom layers remain on Astryx's original portal path.
+- Added regression contracts for the shared measured layer path, closed polyfill visibility, light glass scrim/settings material, desktop-only trajectory, and semantic SwiftUI `Picker`/grouped `Form`/`List`/`NavigationSplitView`/persisted `HSplitView` mapping.
+- Kept the macOS split-width preference key immutable (`static let`) so the persisted native layout remains concurrency-safe under the repository's Swift 6 toolchain.
+- Split the semantic native `List` style by the shared form-factor contract: iOS sheets use the system inset-grouped rows shown by the reference/Astryx mobile hierarchy, while macOS and desktop navigation retain the native sidebar style.
+- Removed the obsolete in-chat trajectory import after routing trajectory exclusively through the desktop workspace side-panel lifecycle; the conversation and composer now remain mounted beside that closeable panel.
+- Extended the release source contract to require move-event persistence, monitor-validated position restoration and the post-show size/position reassertion alongside the existing hidden-window safeguards.
+- Refreshed the lockfile's patched-dependency integrity hash and completed a clean Astryx 0.6.0 install; the installed `useLayer` now contains the measured bridge, positioning-mode ref and geometry metadata exactly as the checked-in patch specifies.
+- Applied the repository-pinned Biome formatter/import organizer only to the touched TypeScript/CSS files after lint reported formatting-only errors; no unsafe style or behavior rewrites were accepted.
+- Updated native adapter test harnesses for the newly used memoized trajectory projection and themed grouped mobile settings contract, made the glass assertion formatting-insensitive, and corrected the launch-screen DOM fixture syntax exposed by the full suite.
+- Updated native sidebar interaction tests to open the persisted-closed desktop sidebar through its real root action before dispatching sidebar rows, matching the new Windows/macOS shared default instead of assuming an always-mounted panel.
+- Completed the consolidated validation pass: TypeScript check, generated SwiftUI mapping check, Biome lint, and all 1,196 non-Cargo tests pass.
 
 ## Remaining
-- Require GitHub CI plus a new unsigned release build for Windows, Android, Linux, iOS and macOS to finish successfully; inspect the resulting native screenshots/artifacts.
-- Provisioning-dependent health, inbox, CloudKit and similar system integrations remain gated by platform entitlements and user authorization rather than fake fallback UI.
+- Commit and push the verified implementation, then confirm the resulting GitHub CI run.
 
-## Touched areas
-Astryx dependencies/themes/patch; presentation mapping/generator/validators; native Apple layouts and bridges; shared chat/settings/mobile panels; Android/iOS mobile-assistant services; release tests/configuration.
+## Verification / touched files
+- Touched: layer compatibility bridge; theme/settings/popover CSS; workspace target/navigation/menu/trajectory/sidebar; startup shell; Tauri window geometry/desktop configs; native SwiftUI sheet and split layout.
+- Added tests for direct shell reveal, layout preference parsing/preservation, floating-layer geometry/visibility/material, desktop-only trajectory and native component mapping; final local validation is green.

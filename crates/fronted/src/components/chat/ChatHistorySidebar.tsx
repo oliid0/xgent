@@ -2671,23 +2671,16 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   </AstryxText>
                 </Button>
               ) : (
-                <AstryxText type="label">
-                  {soul.presets.find((preset) => preset.id === soul.activeId)?.metadata.name ||
-                    "XGent"}
-                </AstryxText>
+                <SidebarActionMenu
+                  withinSidebar
+                  workspaceToolsAvailable={workspaceToolsAvailable && !!onOpenWorkspaceTool}
+                  onSelect={(target, shell) => onOpenWorkspaceTool?.(target, shell)}
+                  onOpenSettings={onOpenSettings}
+                  onCreateSoul={onCreateSoul}
+                  trajectoryAvailable={trajectoryAvailable}
+                />
               )}
               <AstryxStack direction="horizontal" gap={1} vAlign="center">
-                {!mobileExperience ? (
-                  <SidebarActionMenu
-                    withinSidebar
-                    workspaceToolsAvailable={workspaceToolsAvailable && !!onOpenWorkspaceTool}
-                    onSelect={(target, shell) => onOpenWorkspaceTool?.(target, shell)}
-                    onOpenSettings={onOpenSettings}
-                    onCreateSoul={onCreateSoul}
-                    onOpenTrajectory={onOpenTrajectory}
-                    trajectoryAvailable={trajectoryAvailable}
-                  />
-                ) : null}
                 {mobileExperience ? (
                   <Button
                     label={t("tooltip.settings")}

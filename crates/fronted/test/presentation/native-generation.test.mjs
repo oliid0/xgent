@@ -105,9 +105,15 @@ test("native glass keeps grouped surfaces distinct from floating controls", () =
     /XgentGlassSurface\(radius: CGFloat\(presentationTheme\.radius\.chat\), floating: true\)/,
   );
   assert.match(nativeLayoutSource, /child\.icon == nil \? 0 : 36/);
-  assert.match(
-    nativeLayoutSource,
-    /\.frame\(width: 280\)\s*\.frame\(maxHeight: \.infinity, alignment: \.topLeading\)/,
-  );
-  assert.doesNotMatch(nativeLayoutSource, /\.frame\(width: 280, maxHeight:/);
+  assert.match(nativeViewSource, /Picker\(node\.label \?\? "", selection: textBinding\)/);
+  assert.match(nativeViewSource, /picker\.pickerStyle\(\.menu\)\.labelsHidden\(\)/);
+  assert.match(nativeViewSource, /Form \{[\s\S]*?\.formStyle\(\.grouped\)/);
+  assert.doesNotMatch(nativeViewSource, /\.presentationBackground\(/);
+  assert.match(nativeLayoutSource, /List\(node\.children \?\? \[\]\)/);
+  assert.match(nativeLayoutSource, /document\.formFactor == \.mobile[\s\S]*?\.listStyle\(\.insetGrouped\)/);
+  assert.match(nativeLayoutSource, /\.listStyle\(\.sidebar\)/);
+  assert.match(nativeLayoutSource, /var nativeSettingsGroup: some View \{\s*Section \{/);
+  assert.match(nativeLayoutSource, /return NavigationSplitView \{/);
+  assert.match(nativeLayoutSource, /HSplitView \{/);
+  assert.match(nativeLayoutSource, /@AppStorage\("xgent\.native\.sidebar-width\.v1"\)/);
 });

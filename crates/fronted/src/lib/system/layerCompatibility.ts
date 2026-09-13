@@ -1,10 +1,20 @@
-import { autoUpdate, computePosition, flip, type Placement, shift, size } from "@floating-ui/dom";
+import {
+  autoUpdate,
+  computePosition,
+  flip,
+  offset,
+  type Placement,
+  shift,
+  size,
+} from "@floating-ui/dom";
 
-// Astryx 0.6.0 uses position-area and self-* alignment, beyond the Popover API
-// shipped in Android WebView 124. The pinned dependency patch supplies the
-// original trigger and logical placement instead of guessing from DOM order.
-export function needsLayerCompatibility() {
-  return !CSS.supports("position-area", "block-end span-self-inline-end");
+// Native CSS anchors are still inconsistent when their target is promoted to
+// the Popover top layer (notably WebView2/WKWebView and nested dialogs). Keep
+// every Astryx context layer on one measured geometry path. The pinned package
+// patch supplies the real trigger and logical placement instead of guessing
+// from DOM order.
+export function needsLayerCompatibility(positioning?: string) {
+  return typeof document !== "undefined" && positioning !== "custom";
 }
 
 const cleanups = new WeakMap<HTMLElement, () => void>();
@@ -17,7 +27,13 @@ export function stopCompatibleLayer(layer: HTMLElement | null) {
 
 export function positionCompatibleLayer(layer: HTMLElement, anchor: HTMLElement | null) {
   stopCompatibleLayer(layer);
-  if (!needsLayerCompatibility() || !anchor || !layer.dataset.layerPlacement) return;
+  if (
+    !needsLayerCompatibility() ||
+    !anchor?.isConnected ||
+    !layer.dataset.layerPlacement ||
+    layer.dataset.layerPositioning === "custom"
+  )
+    return;
   const side = layer.dataset.layerPlacement;
   const alignment = layer.dataset.layerAlignment;
   const rtl = getComputedStyle(anchor).direction === "rtl";
@@ -34,6 +50,14 @@ export function positionCompatibleLayer(layer: HTMLElement, anchor: HTMLElement 
             ? "left"
             : "right";
   const placement = `${physical}${alignment === "center" ? "" : `-${alignment}`}` as Placement;
+  const computed = getComputedStyle(layer);
+  const gap = Math.max(
+    0,
+    ...(side === "above" || side === "below"
+      ? [computed.marginBlockStart, computed.marginBlockEnd]
+      : [computed.marginInlineStart, computed.marginInlineEnd]
+    ).map((value) => Number.parseFloat(value) || 0),
+  );
   const previous = {
     position: layer.style.position,
     inset: layer.style.inset,
@@ -41,7 +65,13 @@ export function positionCompatibleLayer(layer: HTMLElement, anchor: HTMLElement 
     visibility: layer.style.visibility,
     maxWidth: layer.style.maxWidth,
     maxHeight: layer.style.maxHeight,
+    positionAnchor: layer.style.getPropertyValue("position-anchor"),
+    positionArea: layer.style.getPropertyValue("position-area"),
+    positionTryFallbacks: layer.style.getPropertyValue("position-try-fallbacks"),
   };
+  layer.style.setProperty("position-anchor", "auto");
+  layer.style.setProperty("position-area", "none");
+  layer.style.setProperty("position-try-fallbacks", "none");
   Object.assign(layer.style, {
     position: "fixed",
     inset: "auto",
@@ -56,6 +86,7 @@ export function positionCompatibleLayer(layer: HTMLElement, anchor: HTMLElement 
       strategy: "fixed",
       placement,
       middleware: [
+        offset(gap),
         flip({ padding: 12 }),
         shift({ padding: 12 }),
         size({
@@ -90,7 +121,22 @@ export function positionCompatibleLayer(layer: HTMLElement, anchor: HTMLElement 
     active = false;
     cleanup();
     layer.removeEventListener("toggle", onToggle);
-    Object.assign(layer.style, previous);
+    Object.assign(layer.style, {
+      position: previous.position,
+      inset: previous.inset,
+      margin: previous.margin,
+      visibility: previous.visibility,
+      maxWidth: previous.maxWidth,
+      maxHeight: previous.maxHeight,
+    });
+    for (const [property, value] of [
+      ["position-anchor", previous.positionAnchor],
+      ["position-area", previous.positionArea],
+      ["position-try-fallbacks", previous.positionTryFallbacks],
+    ] as const) {
+      if (value) layer.style.setProperty(property, value);
+      else layer.style.removeProperty(property);
+    }
   });
 }
 

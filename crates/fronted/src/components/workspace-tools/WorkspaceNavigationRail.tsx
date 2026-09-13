@@ -21,7 +21,6 @@ type WorkspaceNavigationRailProps = {
   onSelect: (target: WorkspaceNavigationTarget, shell?: string) => void;
   onOpenSettings: () => void;
   onCreateSoul: () => void;
-  onOpenTrajectory?: () => void;
   trajectoryAvailable?: boolean;
 };
 
@@ -57,7 +56,6 @@ export function WorkspaceNavigationRail(props: WorkspaceNavigationRailProps) {
         onSelect={props.onSelect}
         onOpenSettings={props.onOpenSettings}
         onCreateSoul={props.onCreateSoul}
-        onOpenTrajectory={props.onOpenTrajectory}
         trajectoryAvailable={props.trajectoryAvailable}
       />
     </>

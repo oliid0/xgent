@@ -22,7 +22,6 @@ type SidebarActionMenuProps = {
   onSelect: (target: WorkspaceToolTarget, shell?: string) => void;
   onOpenSettings: () => void;
   onCreateSoul: () => void;
-  onOpenTrajectory?: () => void;
   trajectoryAvailable?: boolean;
   withinSidebar?: boolean;
 };
@@ -93,11 +92,8 @@ export function SidebarActionMenu(props: SidebarActionMenuProps) {
     {
       label: t("chat.trajectory.open"),
       icon: <Icon icon={Activity} size="sm" color="inherit" />,
-      isDisabled: !props.trajectoryAvailable || !props.onOpenTrajectory,
-      onClick: () => {
-        setSoulMenuOpen(false);
-        props.onOpenTrajectory?.();
-      },
+      isDisabled: !props.trajectoryAvailable,
+      onClick: () => selectFromSoulMenu("trajectory"),
     },
     {
       label: t("tooltip.settings"),
@@ -109,12 +105,15 @@ export function SidebarActionMenu(props: SidebarActionMenuProps) {
   return (
     <DropdownMenu
       button={{
-        label: t("sidebar.soulMenu"),
+        label: props.withinSidebar
+          ? soul.presets.find((preset) => preset.id === soul.activeId)?.metadata.name || "XGent"
+          : t("sidebar.soulMenu"),
         icon: <Icon icon={Sparkles} size="sm" color="accent" />,
-        isIconOnly: true,
+        isIconOnly: !props.withinSidebar,
         variant: "ghost",
         size: "sm",
-        tooltip: t("sidebar.soulMenu"),
+        width: props.withinSidebar ? "100%" : undefined,
+        tooltip: props.withinSidebar ? undefined : t("sidebar.soulMenu"),
       }}
       items={soulMenuItems}
       isMenuOpen={soulMenuOpen}
@@ -127,7 +126,7 @@ export function SidebarActionMenu(props: SidebarActionMenuProps) {
       placement={props.withinSidebar ? "above" : "end"}
       style={props.withinSidebar ? { maxWidth: 240, overflowWrap: "anywhere" } : undefined}
       alignment="end"
-      hasChevron={false}
+      hasChevron={Boolean(props.withinSidebar)}
     />
   );
 }

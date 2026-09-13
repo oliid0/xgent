@@ -2455,11 +2455,26 @@
 }
 
 .settings-page-desktop {
-  background: var(--color-background);
+  background: transparent;
 }
 
 .settings-page-desktop > header {
-  background: var(--color-background);
+  background: transparent;
+}
+
+.settings-page-desktop
+  :is(.astryx-layout, .astryx-layout-panel, .astryx-layout-content, .astryx-layout-header) {
+  background-color: transparent;
+}
+
+.settings-page-desktop
+  [data-settings-section]
+  :is(.astryx-card, .astryx-list, [class~="bg-card"], [class*="bg-background/"]) {
+  background: var(--astryx-theme-xgent-glass-surface, var(--color-background-surface));
+  -webkit-backdrop-filter: var(--xgent-material-filter, none);
+  backdrop-filter: var(--xgent-material-filter, none);
+  border-color: var(--astryx-theme-xgent-glass-edge, var(--color-border));
+  box-shadow: inset 0 1px 0 var(--astryx-theme-xgent-glass-highlight, transparent);
 }
 
 .settings-page-desktop .settings-hooks-detail,
@@ -3480,14 +3495,6 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   max-width: var(--xgent-composer-width);
   margin-inline: auto;
 }
-.xgent-startup-surface {
-  background:
-    radial-gradient(ellipse 220px 170px at 34% 2%, #bbffff80, transparent),
-    radial-gradient(ellipse 150px 150px at 36% 14%, #fffcc760, transparent),
-    radial-gradient(ellipse 230px 180px at 66% 2%, #aaffff75, transparent),
-    radial-gradient(ellipse 160px 150px at 64% 15%, #ffe3d340, transparent),
-    var(--color-background-surface);
-}
 .xgent-activity-dot {
   display: inline-block;
   width: 0.625rem;
@@ -4200,6 +4207,14 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   .astryx-layout-header,
   .astryx-layout-footer {
     padding: var(--spacing-2);
+  }
+}
+
+/* OddBird's class is the visibility source of truth where :popover-open is
+   unavailable. Without this guard, closed menus/tooltips remain in layout. */
+@supports not selector(:popover-open) {
+  [popover]:not(.\:popover-open) {
+    display: none !important;
   }
 }
 

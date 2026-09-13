@@ -102,8 +102,8 @@ enum XgentNodeKind: String, Decodable {
 extension XgentNodeKind {
     var renderStrategy: XgentRenderStrategy {
         switch self {
-        case .vStack, .hStack, .scrollView, .section, .text, .heading, .button, .textInput, .colorInput, .textArea, .toggle, .selector, .segmentedControl, .menu, .divider, .progress, .progressBar, .badge, .banner, .emptyState, .statusDot, .slider, .collapsible, .markdown, .codeBlock, .list, .treeRow, .navigationRow, .iconButton, .spacer, .composerInput, .chatMessage, .thinking, .toolCall, .taskStep: return .native
-        case .card, .settingsGroup, .settingsLayout, .composer, .chatLayout, .activityPreview, .taskProgress, .browserLayout: return .polyfill
+        case .vStack, .hStack, .scrollView, .section, .text, .heading, .button, .textInput, .colorInput, .textArea, .toggle, .selector, .segmentedControl, .menu, .divider, .progress, .progressBar, .badge, .banner, .emptyState, .statusDot, .slider, .collapsible, .markdown, .codeBlock, .list, .treeRow, .settingsGroup, .settingsLayout, .navigationRow, .iconButton, .spacer, .composerInput, .chatMessage, .thinking, .toolCall, .taskStep: return .native
+        case .card, .composer, .chatLayout, .activityPreview, .taskProgress, .browserLayout: return .polyfill
         case .browserViewport, .mediaPreview, .filePicker: return .systemBridge
         }
     }
@@ -189,11 +189,11 @@ extension XgentNodeView {
         case .toggle:
             Toggle(node.label ?? "", isOn: boolBinding)
         case .selector:
-            picker.pickerStyle(.menu)
+            nativePicker
         case .segmentedControl:
             picker.pickerStyle(.segmented)
         case .menu:
-            Menu { children } label: { nodeLabel }.menuStyle(.borderlessButton)
+            Menu { children } label: { nodeLabel }
         case .divider:
             Divider()
         case .progress:

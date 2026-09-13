@@ -328,32 +328,19 @@ struct XgentNodeView: View {
             ))
     }
 
-    @ViewBuilder var picker: some View {
+    var picker: some View {
+        Picker(node.label ?? "", selection: textBinding) {
+            ForEach(node.options ?? []) { option in
+                Text(option.label).tag(option.value).disabled(option.disabled == true)
+            }
+        }
+    }
+
+    @ViewBuilder var nativePicker: some View {
         if node.variant == "compact" {
-            Menu {
-                Picker(node.label ?? "", selection: textBinding) {
-                    ForEach(node.options ?? []) { option in
-                        Text(option.label).tag(option.value).disabled(option.disabled == true)
-                    }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    if let icon = node.icon { Image(systemName: icon) }
-                    Text((node.options ?? []).first { $0.value == textBinding.wrappedValue }?.label ?? node.label ?? "")
-                        .lineLimit(1)
-                    Image(systemName: "chevron.down").font(.caption)
-                }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(node.label ?? "")
+            picker.pickerStyle(.menu).labelsHidden()
         } else {
-            Picker(node.label ?? "", selection: textBinding) {
-                ForEach(node.options ?? []) { option in
-                    Text(option.label).tag(option.value).disabled(option.disabled == true)
-                }
-            }
+            picker.pickerStyle(.menu)
         }
     }
 
@@ -483,19 +470,37 @@ private struct XgentSheetView: View {
         return sheets[index + 1]
     }
 
-    var body: some View {
-        NavigationStack {
+    private var visibleNodes: [XgentNode] { document.nodes.filter { $0.id != "back" } }
+    private var usesGroupedForm: Bool {
+        document.formFactor == .mobile && visibleNodes.contains { $0.kind == .settingsGroup }
+    }
+    private var usesFullHeightContainer: Bool {
+        visibleNodes.contains { $0.kind == .settingsLayout } ||
+            (visibleNodes.count == 1 && visibleNodes.first?.kind == .list)
+    }
+
+    @ViewBuilder private var sheetContent: some View {
+        if usesGroupedForm {
+            Form {
+                XgentNodeChildren(nodes: visibleNodes, document: document, model: model)
+            }
+            .formStyle(.grouped)
+        } else if usesFullHeightContainer {
+            XgentNodeChildren(nodes: visibleNodes, document: document, model: model)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    XgentNodeChildren(
-                        nodes: document.nodes.filter { $0.id != "back" },
-                        document: document,
-                        model: model
-                    )
+                    XgentNodeChildren(nodes: visibleNodes, document: document, model: model)
                 }
                 .padding(16)
             }
-            .background { XgentThemeBackground().ignoresSafeArea() }
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            sheetContent
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

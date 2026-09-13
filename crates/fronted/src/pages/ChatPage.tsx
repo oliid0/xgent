@@ -109,6 +109,10 @@ import {
   imageActivitySelection,
   OPEN_IMAGE_ACTIVITY,
 } from "../lib/chat/imageActivityNavigation";
+import {
+  readChatLayoutPreferences,
+  saveChatLayoutPreferences,
+} from "../lib/chat/layoutPreferences";
 import { memoryExtraction } from "../lib/chat/memory/extractionController";
 import type { MemoryExtractionStatusKey } from "../lib/chat/memory/extractionEngine";
 import { memoryTurnInjection } from "../lib/chat/memory/injectionController";
@@ -363,7 +367,6 @@ import { syncMovedConversationRuntimeWorkdir } from "./chat/runtime/chatPageRunt
 import { buildModelFailoverPlan } from "./chat/runtime/providerRuntimeConfig";
 import { useManualCompaction } from "./chat/runtime/useManualCompaction";
 import { ChatSidebarContainer } from "./chat/sidebar/ChatSidebarContainer";
-import { ConversationTrajectorySurface } from "./chat/trajectory/ConversationTrajectorySurface";
 import { McpHubPage } from "./mcp-hub/McpHubPage";
 import type { SectionId, SettingsOpenOptions } from "./settings/types";
 import { SkillsHubPage } from "./skills-hub/SkillsHubPage";
@@ -879,16 +882,11 @@ export function ChatPage(props: ChatPageProps) {
   const historyScopeKey = sidebarScopeKey(sidebarScope);
   const compactViewport = useCompactViewport();
   const mobileExperience = nativeMobile || compactViewport;
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => !mobileExperience && readChatLayoutPreferences().leftSidebarOpen,
+  );
   const previousCompactViewportRef = useRef(compactViewport);
-  useEffect(() => {
-    if (compactViewport && !previousCompactViewportRef.current) {
-      setSidebarOpen(false);
-    }
-    previousCompactViewportRef.current = compactViewport;
-  }, [compactViewport]);
   const [activeView, setActiveView] = useState<"chat" | "skills-hub" | "mcp-hub">("chat");
-  const [chatSurface, setChatSurface] = useState<"conversation" | "trajectory">("conversation");
   const [desktopNavigationTarget, setDesktopNavigationTarget] =
     useState<WorkspaceNavigationTarget>("conversations");
   const [workspaceToolsOpen, setWorkspaceToolsOpen] = useState(false);
@@ -942,8 +940,28 @@ export function ChatPage(props: ChatPageProps) {
   const rightFileDirtyRef = useRef(new Map<number, boolean>());
   const [rightSidebarPresentation, setRightSidebarPresentation] =
     useState<RightSidebarPresentation>("side");
-  const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(
+    () => !mobileExperience && readChatLayoutPreferences().rightSidebarOpen,
+  );
   const [rightSidebarActiveTabId, setRightSidebarActiveTabId] = useState<string | null>(null);
+  useEffect(() => {
+    if (compactViewport && !previousCompactViewportRef.current) {
+      setSidebarOpen(false);
+      setRightSidebarOpen(false);
+    } else if (!compactViewport && previousCompactViewportRef.current) {
+      const persisted = readChatLayoutPreferences();
+      setSidebarOpen(persisted.leftSidebarOpen);
+      setRightSidebarOpen(persisted.rightSidebarOpen);
+    }
+    previousCompactViewportRef.current = compactViewport;
+  }, [compactViewport]);
+  useEffect(() => {
+    if (mobileExperience) return;
+    saveChatLayoutPreferences({
+      leftSidebarOpen: sidebarOpen,
+      rightSidebarOpen,
+    });
+  }, [mobileExperience, rightSidebarOpen, sidebarOpen]);
   const rightTabOrderRef = useRef<string[]>([]);
   const [rightBrowserError, setRightBrowserError] = useState<string | null>(null);
   const [rightTerminals, setRightTerminals] = useState<TerminalSession[]>([]);
@@ -1653,7 +1671,7 @@ export function ChatPage(props: ChatPageProps) {
       setRightSidebarPresentation("side");
       setRightDiffFile(next?.diff ?? null);
       setSplitConversationId(next?.split ?? null);
-      setRightSidebarOpen(next?.open ?? false);
+      setRightSidebarOpen(next?.open ?? readChatLayoutPreferences().rightSidebarOpen);
       setRightSidebarActiveTabId(next?.active ?? null);
       rightTabOrderRef.current = next?.order ?? [];
       setRightBrowserError(null);
@@ -1681,10 +1699,11 @@ export function ChatPage(props: ChatPageProps) {
     isConversationRunning(currentConversationId) ||
     (!isDraftConversation && historyRenderItems.length > 0);
   useEffect(() => {
-    if ((mobileExperience || !canShowTrajectory) && chatSurface === "trajectory") {
-      setChatSurface("conversation");
+    if (!canShowTrajectory && workspaceToolLaunchRequest?.target === "trajectory") {
+      setWorkspaceToolsOpen(false);
+      setDesktopNavigationTarget("conversations");
     }
-  }, [canShowTrajectory, chatSurface, mobileExperience]);
+  }, [canShowTrajectory, workspaceToolLaunchRequest?.target]);
   useSyncExternalStore(subscribeToolApprovals, getToolApprovalVersion, getToolApprovalVersion);
   const pendingToolApprovals = listPendingToolApprovalsForConversation(currentConversationId);
   const currentConversationPersistedCwd =
@@ -1755,6 +1774,7 @@ export function ChatPage(props: ChatPageProps) {
   const handleOpenWorkspaceTool = useCallback(
     (target: WorkspaceToolTarget, shell?: string) => {
       if (mobileExperience) {
+        if (target === "trajectory") return;
         if (target === "fileTree" && !mobileWorkspacePathKey) return;
         const open = () => {
           setActiveView("chat");
@@ -5199,7 +5219,7 @@ export function ChatPage(props: ChatPageProps) {
         setSidebarOpen(true);
         return;
       }
-      if (target === "skills" || target === "mcp") {
+      if (target === "skills" || target === "mcp" || target === "trajectory") {
         showDesktopWorkspaceTool(target);
         return;
       }
@@ -6207,6 +6227,7 @@ export function ChatPage(props: ChatPageProps) {
           pendingApprovals={pendingToolApprovals}
           projects={workspaceProjects}
           attachmentsEnabled={canDropUpload}
+          trajectoryAvailable={!nativeMobile && canShowTrajectory}
           uploads={pendingUploadedFiles}
           taskList={conversationState.meta.taskList}
           isUploading={isUploadingFiles}
@@ -6347,10 +6368,6 @@ export function ChatPage(props: ChatPageProps) {
             onSelect={handleDesktopNavigationSelect}
             onOpenSettings={() => onOpenSettings()}
             onCreateSoul={() => onOpenSettings("soul", { createSoul: true })}
-            onOpenTrajectory={() => {
-              setActiveView("chat");
-              setChatSurface("trajectory");
-            }}
             trajectoryAvailable={canShowTrajectory}
           />
         </HStack>
@@ -6443,11 +6460,9 @@ export function ChatPage(props: ChatPageProps) {
           onOpenSettings("soul", { createSoul: true });
         }}
         onOpenTrajectory={() => {
-          setActiveView("chat");
-          setChatSurface("trajectory");
-          if (mobileExperience) setSidebarOpen(false);
+          handleOpenWorkspaceTool("trajectory");
         }}
-        trajectoryAvailable={canShowTrajectory}
+        trajectoryAvailable={!mobileExperience && canShowTrajectory}
         appUpdate={appUpdate}
         onOpenSkillsHub={() => {
           if (mobileExperience) {
@@ -6504,7 +6519,8 @@ export function ChatPage(props: ChatPageProps) {
       workspaceToolLaunchRequest &&
       (desktopCommandHostAvailable ||
         workspaceToolLaunchRequest.target === "skills" ||
-        workspaceToolLaunchRequest.target === "mcp") ? (
+        workspaceToolLaunchRequest.target === "mcp" ||
+        workspaceToolLaunchRequest.target === "trajectory") ? (
         <WorkspaceSidePanel
           width={
             workspaceToolLaunchRequest.target === "skills" ||
@@ -6515,6 +6531,7 @@ export function ChatPage(props: ChatPageProps) {
           target={workspaceToolLaunchRequest.target}
           shell={workspaceToolLaunchRequest.shell}
           requestNonce={workspaceToolLaunchRequest.nonce}
+          conversationId={currentConversationId}
           fontScale={nativeMobile ? 1 : settings.customSettings.fontScale.workspaceTools}
           projectPathKey={terminalProjectPathKey}
           cwd={terminalProjectPath}
@@ -6562,7 +6579,8 @@ export function ChatPage(props: ChatPageProps) {
       !mobileExperience &&
       (desktopCommandHostAvailable ||
         workspaceToolLaunchRequest.target === "skills" ||
-        workspaceToolLaunchRequest.target === "mcp") ? (
+        workspaceToolLaunchRequest.target === "mcp" ||
+        workspaceToolLaunchRequest.target === "trajectory") ? (
         <ResizeHandle
           direction="horizontal"
           hasDivider
@@ -6702,75 +6720,71 @@ export function ChatPage(props: ChatPageProps) {
                     <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
                   </AstryxStack>
 
-                  {chatSurface === "trajectory" ? (
-                    <ConversationTrajectorySurface conversationId={currentConversationId} />
-                  ) : (
-                    <DesktopCheckpointRewindProvider
-                      conversationId={currentConversationId}
-                      workspaceRoot={currentConversationWorkspaceRoot}
-                      project={
-                        workspaceProjects.find(
-                          (project) =>
-                            currentConversationWorkspaceRoot &&
-                            workspaceProjectPathKey(project.path) ===
-                              workspaceProjectPathKey(currentConversationWorkspaceRoot),
-                        ) ?? null
-                      }
-                      disabled={
-                        !desktopCommandHostAvailable ||
-                        !isAgentMode ||
-                        isSending ||
-                        isConversationRunning(currentConversationId)
-                      }
-                      onRewound={(info) => {
-                        const changed = info.result.restoredFiles + info.result.deletedFiles;
-                        const failed = info.result.conflicts.length + info.result.failed.length;
-                        addNotify(
-                          failed > 0 ? "warning" : "success",
-                          t("chat.checkpointRewind.done")
-                            .replace("{changed}", String(changed))
-                            .replace("{failed}", String(failed)),
-                        );
-                      }}
-                    >
-                      <ChangedFilesActionsProvider value={changedFilesActions}>
-                        <ChatTranscript
-                          conversationId={currentConversationId}
-                          workspaceRoot={currentConversationWorkspaceRoot}
-                          gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
-                          followRef={scrollFollowRef}
-                          hasModels={hasModels}
-                          historyItems={historyRenderItems}
-                          hasMoreHistory={conversationState.transcript.hasMoreBefore}
-                          onLoadEarlierHistory={handleLoadEarlierHistory}
-                          isHistorySwitching={conversationOpenState.showOverlay}
-                          isSending={isSending}
-                          isAgentMode={isAgentMode}
-                          showUsage={isAgentDevExecutionMode}
-                          usageContextWindow={currentModelContextWindow}
-                          liveTranscriptStore={liveTranscriptStore}
-                          isCompactionRunning={isCompactionRunning}
-                          bottomReservePx={0}
-                          onOpenFileLink={
-                            desktopCommandHostAvailable ? handleOpenChatFileLink : undefined
-                          }
-                          onResendFromEdit={handleResendFromEdit}
-                          onBranchConversation={
-                            isConversationHydrating || isConversationHydrationFailed
-                              ? undefined
-                              : handleBranchConversation
-                          }
-                          branchPendingMessageId={branchPendingMessageId}
-                          onOpenSettings={onOpenSettings}
-                          onSuggestionSelect={handleEmptyStateSuggestion}
-                          suggestionsDisabled={isSuggestionTyping}
-                          mobileExperience={mobileExperience}
-                        />
-                      </ChangedFilesActionsProvider>
-                    </DesktopCheckpointRewindProvider>
-                  )}
+                  <DesktopCheckpointRewindProvider
+                    conversationId={currentConversationId}
+                    workspaceRoot={currentConversationWorkspaceRoot}
+                    project={
+                      workspaceProjects.find(
+                        (project) =>
+                          currentConversationWorkspaceRoot &&
+                          workspaceProjectPathKey(project.path) ===
+                            workspaceProjectPathKey(currentConversationWorkspaceRoot),
+                      ) ?? null
+                    }
+                    disabled={
+                      !desktopCommandHostAvailable ||
+                      !isAgentMode ||
+                      isSending ||
+                      isConversationRunning(currentConversationId)
+                    }
+                    onRewound={(info) => {
+                      const changed = info.result.restoredFiles + info.result.deletedFiles;
+                      const failed = info.result.conflicts.length + info.result.failed.length;
+                      addNotify(
+                        failed > 0 ? "warning" : "success",
+                        t("chat.checkpointRewind.done")
+                          .replace("{changed}", String(changed))
+                          .replace("{failed}", String(failed)),
+                      );
+                    }}
+                  >
+                    <ChangedFilesActionsProvider value={changedFilesActions}>
+                      <ChatTranscript
+                        conversationId={currentConversationId}
+                        workspaceRoot={currentConversationWorkspaceRoot}
+                        gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
+                        followRef={scrollFollowRef}
+                        hasModels={hasModels}
+                        historyItems={historyRenderItems}
+                        hasMoreHistory={conversationState.transcript.hasMoreBefore}
+                        onLoadEarlierHistory={handleLoadEarlierHistory}
+                        isHistorySwitching={conversationOpenState.showOverlay}
+                        isSending={isSending}
+                        isAgentMode={isAgentMode}
+                        showUsage={isAgentDevExecutionMode}
+                        usageContextWindow={currentModelContextWindow}
+                        liveTranscriptStore={liveTranscriptStore}
+                        isCompactionRunning={isCompactionRunning}
+                        bottomReservePx={0}
+                        onOpenFileLink={
+                          desktopCommandHostAvailable ? handleOpenChatFileLink : undefined
+                        }
+                        onResendFromEdit={handleResendFromEdit}
+                        onBranchConversation={
+                          isConversationHydrating || isConversationHydrationFailed
+                            ? undefined
+                            : handleBranchConversation
+                        }
+                        branchPendingMessageId={branchPendingMessageId}
+                        onOpenSettings={onOpenSettings}
+                        onSuggestionSelect={handleEmptyStateSuggestion}
+                        suggestionsDisabled={isSuggestionTyping}
+                        mobileExperience={mobileExperience}
+                      />
+                    </ChangedFilesActionsProvider>
+                  </DesktopCheckpointRewindProvider>
 
-                  {chatSurface === "conversation" && pendingToolApprovals.length > 0 ? (
+                  {pendingToolApprovals.length > 0 ? (
                     <ToolApprovalBar
                       pending={pendingToolApprovals}
                       onDecide={(toolCallId, decision) =>
@@ -6790,8 +6804,8 @@ export function ChatPage(props: ChatPageProps) {
                     />
                   ) : null}
 
-                  {chatSurface === "conversation" ? renderChatComposer() : null}
-                  {chatSurface === "conversation" && isFileDropActive ? (
+                  {renderChatComposer()}
+                  {isFileDropActive ? (
                     <Overlay
                       isOpen
                       showOn="always"

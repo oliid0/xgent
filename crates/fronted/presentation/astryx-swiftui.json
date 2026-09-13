@@ -72,11 +72,11 @@
   "renderStrategies": {
     "native": {
       "policy": "Direct SwiftUI control or layout; no HTML/WebView fallback",
-      "kinds": ["VStack", "HStack", "ScrollView", "Section", "Text", "Heading", "Button", "TextInput", "ColorInput", "TextArea", "Switch", "Selector", "SegmentedControl", "Menu", "Divider", "Progress", "ProgressBar", "Badge", "Banner", "EmptyState", "StatusDot", "Slider", "Collapsible", "Markdown", "CodeBlock", "List", "TreeRow", "NavigationRow", "IconButton", "Spacer", "ComposerInput", "ChatMessage", "Thinking", "ToolCall", "TaskStep"]
+      "kinds": ["VStack", "HStack", "ScrollView", "Section", "Text", "Heading", "Button", "TextInput", "ColorInput", "TextArea", "Switch", "Selector", "SegmentedControl", "Menu", "Divider", "Progress", "ProgressBar", "Badge", "Banner", "EmptyState", "StatusDot", "Slider", "Collapsible", "Markdown", "CodeBlock", "List", "TreeRow", "SettingsGroup", "SettingsLayout", "NavigationRow", "IconButton", "Spacer", "ComposerInput", "ChatMessage", "Thinking", "ToolCall", "TaskStep"]
     },
     "polyfill": {
       "policy": "SwiftUI composition reproducing Astryx geometry, tokens, states and motion",
-      "kinds": ["Card", "SettingsGroup", "SettingsLayout", "Composer", "ChatLayout", "ActivityPreview", "TaskProgress", "BrowserLayout"]
+      "kinds": ["Card", "Composer", "ChatLayout", "ActivityPreview", "TaskProgress", "BrowserLayout"]
     },
     "systemBridge": {
       "policy": "Native framework view embedded inside SwiftUI; never application WebView UI",
@@ -95,7 +95,7 @@
     "mobileSidebar": "sidebar > search + skills + MCP + files + workspaces + recents + new chat + settings",
     "mobileMore": "sheet > terminal + shell management + browser + browser settings + git review + SSH + background tasks",
     "activityStrip": "HStack > ActivityPreview + Spacer + TaskProgress",
-    "settings": "sheet > appearance + providers + permissions + voice + other + local/cloud + backup + memory + skills + about",
+    "settings": "sheet > NavigationStack + grouped Form/Section + native Picker/Toggle + desktop NavigationSplitView",
     "workspaceFile": "BrowserLayout > toolbar + guarded TextArea or MediaPreview + metadata",
     "browser": "BrowserLayout > navigation controls + BrowserViewport(WebKit web content only)",
     "confirmation": "alert > explanatory Text + destructive/primary action + cancel"
@@ -140,7 +140,7 @@
     "DropdownMenu": { "swiftUI": "Menu", "kind": "primitive" },
     "EmptyState": { "swiftUI": "centered Label and supporting Text", "kind": "composed" },
     "FileInput": { "swiftUI": "PhotosPicker, camera picker or fileImporter", "kind": "composed" },
-    "FormLayout": { "swiftUI": "Form or adaptive Grid", "kind": "container" },
+    "FormLayout": { "swiftUI": "Form with grouped style or adaptive Grid", "kind": "container" },
     "Grid": { "swiftUI": "Grid or LazyVGrid", "kind": "container" },
     "Heading": { "swiftUI": "Text with heading traits", "kind": "primitive" },
     "HoverCard": { "swiftUI": "macOS hover-triggered popover", "kind": "desktopOnly" },
@@ -153,7 +153,7 @@
     "Layout": { "swiftUI": "VStack, HStack, ZStack and safeAreaInset", "kind": "template" },
     "Lightbox": { "swiftUI": "native Image, PDFKit or AVKit preview", "kind": "template" },
     "Link": { "swiftUI": "Link or openURL action", "kind": "primitive" },
-    "List": { "swiftUI": "List or lazy stack with row separators", "kind": "container" },
+    "List": { "swiftUI": "List with platform-native row and sidebar styles", "kind": "container" },
     "Markdown": { "swiftUI": "AttributedString markdown in selectable Text", "kind": "composed" },
     "MetadataList": { "swiftUI": "two-column adaptive Grid", "kind": "composed" },
     "MobileNav": { "swiftUI": "safe-area toolbar and navigation sheet", "kind": "template" },
@@ -165,7 +165,7 @@
     "ProgressBar": { "swiftUI": "ProgressView(value:total:)", "kind": "primitive" },
     "RadioList": { "swiftUI": "Picker with inline style", "kind": "composed" },
     "Resizable": { "swiftUI": "HSplitView or VSplitView", "kind": "desktopOnly" },
-    "Section": { "swiftUI": "Section or labeled glass group", "kind": "container" },
+    "Section": { "swiftUI": "Section inside the owning Form or List", "kind": "container" },
     "SegmentedControl": { "swiftUI": "Picker with segmented style", "kind": "primitive" },
     "SelectableCard": { "swiftUI": "selection Button containing a glass card", "kind": "composed" },
     "Selector": { "swiftUI": "Picker with menu style", "kind": "primitive" },
@@ -313,7 +313,7 @@
       "kind": "Selector",
       "swiftCase": "selector",
       "astryx": "Selector/Selector",
-      "declaration": "picker.pickerStyle(.menu)"
+      "declaration": "nativePicker"
     },
     {
       "kind": "SegmentedControl",
@@ -325,7 +325,7 @@
       "kind": "Menu",
       "swiftCase": "menu",
       "astryx": "DropdownMenu/DropdownMenu",
-      "declaration": "Menu { children } label: { nodeLabel }.menuStyle(.borderlessButton)"
+      "declaration": "Menu { children } label: { nodeLabel }"
     },
     {
       "kind": "Divider",

@@ -952,13 +952,13 @@ pub fn run() {
 
                 // Persist user resizing while the window is alive. A tray close or
                 // OS shutdown can race process teardown; startup fitting is excluded.
-                if matches!(event, WindowEvent::Resized(_))
+                if matches!(event, WindowEvent::Resized(_) | WindowEvent::Moved(_))
                     && window.is_visible().unwrap_or(false)
                     && window.app_handle().state::<Arc<commands::app::FrontendReadyState>>()
                         .painted.load(Ordering::SeqCst)
                 {
                     if let Err(error) = commands::app::save_main_window_size(window) {
-                        eprintln!("failed to persist resized main window: {error}");
+                        eprintln!("failed to persist main window geometry: {error}");
                     }
                 }
 

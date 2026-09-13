@@ -50,6 +50,9 @@ export const xgentTheme = defineTheme({
     "--color-border": ["#00000014", "#ffffff1a"],
     "--color-border-emphasized": ["#d9d9d9", "#4a4a4a"],
     "--color-neutral": ["#0000000d", "#ffffff1a"],
+    // Modal boundaries remain perceptible without laying a gray sheet under
+    // translucent dialogs. Glass should sample the actual page luminance.
+    "--color-overlay": ["#ffffff14", "#00000073"],
     "--size-element-sm": "30px",
     "--size-element-md": "36px",
     "--size-element-lg": "40px",
@@ -143,6 +146,7 @@ export const xgentCompactTheme = defineTheme({
     "--color-background-muted": ["#eeeeef", "#303030"],
     "--color-text-secondary": ["#6e6e73", "#b4b4b4"],
     "--color-border": ["#0000001a", "#ffffff1f"],
+    "--color-overlay": ["#ffffff14", "#00000073"],
     "--size-element-sm": "32px",
     "--size-element-md": "40px",
     "--size-element-lg": "44px",

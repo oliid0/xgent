@@ -6,7 +6,7 @@ let finishing = false;
 export function showFirstLaunch() {
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
-      if (!finishing && document.documentElement.dataset.initialized !== "true") revealWindow();
+      if (!finishing) revealWindow();
     }),
   );
 }
@@ -29,9 +29,6 @@ export function finishLaunch(success = true) {
   finishing = true;
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      const root = document.getElementById("root");
-      root?.removeAttribute("inert");
-      document.getElementById("initial-setup")?.remove();
       document.getElementById("launch-error")?.remove();
       if (success) {
         try {
@@ -44,7 +41,6 @@ export function finishLaunch(success = true) {
 }
 
 export function showLaunchFailure() {
-  document.getElementById("initial-setup")?.remove();
   const message = document.getElementById("launch-error");
   if (message) message.hidden = false;
   revealWindow();

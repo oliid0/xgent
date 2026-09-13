@@ -25,11 +25,15 @@ pub struct FrontendReadyState {
     pub painted: AtomicBool,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 struct MainWindowSize {
     width: u32,
     height: u32,
     maximized: bool,
+    #[serde(default)]
+    x: Option<i32>,
+    #[serde(default)]
+    y: Option<i32>,
 }
 
 fn main_window_size_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -47,9 +51,17 @@ pub(crate) fn save_main_window_size(window: &tauri::Window) -> Result<(), String
     let size = window.inner_size().map_err(|error| error.to_string())?;
     let maximized = window.is_maximized().map_err(|error| error.to_string())?;
     if size.width == 0 || size.height == 0 { return Ok(()); }
+    let position = window.outer_position().ok();
+    let current = MainWindowSize {
+        width: size.width,
+        height: size.height,
+        maximized,
+        x: position.map(|value| value.x).or(previous.and_then(|value| value.x)),
+        y: position.map(|value| value.y).or(previous.and_then(|value| value.y)),
+    };
     let state = match previous {
         Some(previous) if maximized => MainWindowSize { maximized, ..previous },
-        _ => MainWindowSize { width: size.width, height: size.height, maximized },
+        _ => current,
     };
     // Save from the native Window, including when browser child webviews mean
     // Tauri's webview_windows() no longer includes the main application window.
@@ -57,6 +69,25 @@ pub(crate) fn save_main_window_size(window: &tauri::Window) -> Result<(), String
         .map_err(|error| error.to_string())?;
     let data = serde_json::to_vec(&state).map_err(|error| error.to_string())?;
     std::fs::write(&path, data).map_err(|error| error.to_string())
+}
+
+fn restorable_main_window_position(
+    window: &tauri::Window,
+    state: MainWindowSize,
+) -> Option<tauri::PhysicalPosition<i32>> {
+    let position = tauri::PhysicalPosition::new(state.x?, state.y?);
+    let window_right = i64::from(position.x) + i64::from(state.width);
+    let window_bottom = i64::from(position.y) + i64::from(state.height);
+    let intersects_work_area = window.available_monitors().ok()?.into_iter().any(|monitor| {
+        let area = monitor.work_area();
+        let area_right = i64::from(area.position.x) + i64::from(area.size.width);
+        let area_bottom = i64::from(area.position.y) + i64::from(area.size.height);
+        window_right > i64::from(area.position.x)
+            && i64::from(position.x) < area_right
+            && window_bottom > i64::from(area.position.y)
+            && i64::from(position.y) < area_bottom
+    });
+    intersects_work_area.then_some(position)
 }
 
 #[tauri::command]
@@ -69,7 +100,7 @@ pub fn app_frontend_ready(
     window: tauri::Window,
     ready_state: State<'_, Arc<FrontendReadyState>>,
 ) -> Result<(), String> {
-    let mut restored_size = None;
+    let mut restored_state = None;
     if !ready_state.sized.swap(true, Ordering::SeqCst) {
         use tauri::Manager;
         use tauri_plugin_window_state::AppHandleExt;
@@ -82,7 +113,10 @@ pub fn app_frontend_ready(
         });
         if std::env::var_os("XGENT_WINDOW_DIAGNOSTICS").is_some() {
             match &stored_size {
-                Ok(state) => eprintln!("Window restore: {}x{}, maximized={}", state.width, state.height, state.maximized),
+                Ok(state) => eprintln!(
+                    "Window restore: {}x{} at {:?},{:?}, maximized={}",
+                    state.width, state.height, state.x, state.y, state.maximized
+                ),
                 Err(error) => eprintln!("Window restore unavailable: {error}"),
             }
         }
@@ -92,15 +126,20 @@ pub fn app_frontend_ready(
         if let Some(state) = stored_size {
             window.set_size(tauri::PhysicalSize::new(state.width, state.height))
                 .map_err(|error| error.to_string())?;
-            restored_size = Some((state.width, state.height));
+            if let Some(position) = restorable_main_window_position(&window, state) {
+                window.set_position(position).map_err(|error| error.to_string())?;
+            } else {
+                let _ = window.center();
+            }
+            restored_state = Some(state);
             if state.maximized { window.maximize().map_err(|error| error.to_string())?; }
         } else if !window.is_maximized().unwrap_or(false) {
             if let Ok(Some(monitor)) = window.current_monitor() {
                 let scale = monitor.scale_factor();
                 let area = monitor.work_area();
                 let current = window.inner_size().map_err(|error| error.to_string())?;
-                let width = if saved { current.width as f64 / scale } else { 1600.0 };
-                let height = if saved { current.height as f64 / scale } else { 1000.0 };
+                let width = if saved { current.width as f64 / scale } else { 1360.0 };
+                let height = if saved { current.height as f64 / scale } else { 850.0 };
                 let ratio = if saved { 1.0 } else { 0.85 };
                 let fitted = tauri::LogicalSize::new(
                     width.min(area.size.width as f64 / scale * ratio),
@@ -122,9 +161,14 @@ pub fn app_frontend_ready(
     // placement after the first hidden-window resize. Reassert only the size
     // restored during this first ready call; later ready notifications must
     // never overwrite a resize the user made after launch.
-    if let Some((width, height)) = restored_size {
-        window.set_size(tauri::PhysicalSize::new(width, height))
+    if let Some(state) = restored_state {
+        window.set_size(tauri::PhysicalSize::new(state.width, state.height))
             .map_err(|error| format!("failed to finalize restored window size: {error}"))?;
+        if let Some(position) = restorable_main_window_position(&window, state) {
+            window
+                .set_position(position)
+                .map_err(|error| format!("failed to finalize restored window position: {error}"))?;
+        }
     }
     window
         .set_focus()
