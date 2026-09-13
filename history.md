@@ -23,7 +23,9 @@ Ship one shared Xgent behavior and one Astryx-aligned visual contract across Web
 - Release .919 compiled every target; Windows failed window restoration at runtime (944x641 became 870x612), Android input raced IME activation, and iOS screenshots exposed an absent empty model selector and missing provider configuration action.
 - Added opt-in native window restore diagnostics; Android smoke now waits for editor focus and an active keyboard before injecting text without retrying partial input.
 - Aligned mobile drawer glyphs, moved the native model selector beside attachments in the composer footer, and kept its disabled label plus the provider setup action visible when no models exist.
-- Verification pending for this follow-up; earlier passing checks apply only to the previous commit.
+- Local follow-up checks passed: check, native:check, lint, and 1191 non-Cargo tests. Changes were incorporated in 8aa3a8d.
+- Release 34758761246 / v0.1.347 compiled and packaged all five platforms. Windows restoration assertion, Android missing terminal input, and iOS root-render log assertion prevented package upload; these were runtime diagnostics, not compiler failures.
+- Per user instruction, release interaction diagnostics now require explicit smoke=true and are non-blocking. Compilation, package/signature validation, source packaging and artifact uploads remain required. Device behavior still needs real testing.
 
 ## Remaining
 - Require GitHub CI plus a new unsigned release build for Windows, Android, Linux, iOS and macOS to finish successfully; inspect the resulting native screenshots/artifacts.

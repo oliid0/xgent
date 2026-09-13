@@ -14,6 +14,11 @@ on:
         required: false
         type: boolean
         default: false
+      smoke:
+        description: Run optional device interaction diagnostics (does not block packages)
+        required: false
+        type: boolean
+        default: false
       sign:
         description: Apple-sign/notarize macOS and sign Tauri updater artifacts (requires release settings)
         required: false
@@ -332,9 +337,14 @@ jobs:
           cp "$portable_exe_path" dist/portable/Xgent/Xgent.exe
           portable_zip="dist/Xgent-${XGENT_RELEASE_TAG}-Windows-x64-portable.zip"
           powershell -NoProfile -Command "Compress-Archive -Path 'dist/portable/Xgent/*' -DestinationPath '$portable_zip' -Force"
-          powershell -NoProfile -File scripts/release/smoke-launch-windows.ps1 -ExecutablePath dist/portable/Xgent/Xgent.exe
           rm -rf dist/portable
           test "$(find dist -type f | wc -l)" -gt 0
+
+      - name: Optional Windows interaction diagnostics
+        if: inputs.smoke == true
+        continue-on-error: true
+        shell: powershell
+        run: ./scripts/release/smoke-launch-windows.ps1 -ExecutablePath target/x86_64-pc-windows-msvc/release/xgent.exe
 
       - uses: actions/upload-artifact@v7
         with:
@@ -699,6 +709,8 @@ jobs:
           test "$alignment_failed" -eq 0
 
       - name: Enable Android emulator acceleration
+        if: inputs.smoke == true
+        continue-on-error: true
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -706,6 +718,8 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Smoke launch signed Android APK
+        if: inputs.smoke == true
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
@@ -717,7 +731,8 @@ jobs:
           script: bash scripts/release/smoke-launch-android.sh
 
       - name: Upload Android launch evidence
-        if: always()
+        if: always() && inputs.smoke == true
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: xgent-android-launch-evidence
@@ -935,6 +950,8 @@ jobs:
             > dist/iOS-signing.txt
 
       - name: Build iOS simulator smoke target
+        if: inputs.smoke == true
+        continue-on-error: true
         working-directory: crates/fronted
         shell: bash
         run: |
@@ -950,6 +967,8 @@ jobs:
           fi
 
       - name: Smoke launch iOS simulator app
+        if: inputs.smoke == true
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -1041,7 +1060,8 @@ jobs:
           xcrun simctl terminate "$simulator_udid" "$bundle_id"
 
       - name: Upload iOS launch evidence
-        if: always()
+        if: always() && inputs.smoke == true
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: xgent-ios-launch-evidence
