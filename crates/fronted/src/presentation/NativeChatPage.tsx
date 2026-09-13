@@ -301,6 +301,8 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const [trajectoryRefreshNonce, setTrajectoryRefreshNonce] = useState(0);
   const [activityOpen, setActivityOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [sidebarSearchVisible, setSidebarSearchVisible] = useState(false);
+  const [sidebarProjectsOpen, setSidebarProjectsOpen] = useState(false);
   const [voiceAvailable, setVoiceAvailable] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [voicePartial, setVoicePartial] = useState("");
@@ -427,6 +429,44 @@ export function NativeChatPage(props: NativeChatPageProps) {
     action: action(id, run, enabled),
     disabled: !enabled,
   });
+  const compactToolNodes: PresentationNode[] = [
+    {
+      ...button("tool:terminal", t("chat.mobileMenu.terminal"), props.onOpenTerminal),
+      icon: "terminal",
+    },
+    {
+      ...button("tool:shell", t("chat.mobileMenu.rootfs"), () =>
+        props.onOpenSettings("mobileExecution"),
+      ),
+      icon: "shippingbox",
+    },
+    { id: "tool-divider-1", kind: "Divider" },
+    {
+      ...button("tool:browser", t("chat.mobileMenu.browser"), props.onOpenBrowser),
+      icon: "globe",
+    },
+    {
+      ...button(
+        "tool:browser-settings",
+        t("chat.mobileMenu.browserSettings"),
+        props.onOpenBrowserSettings,
+      ),
+      icon: "gearshape",
+    },
+    { id: "tool-divider-2", kind: "Divider" },
+    {
+      ...button("tool:git", t("chat.mobileMenu.gitReview"), props.onOpenGitReview),
+      icon: "arrow.triangle.branch",
+    },
+    {
+      ...button("tool:ssh", t("chat.mobileMenu.ssh"), props.onOpenRemote),
+      icon: "server.rack",
+    },
+    {
+      ...button("tool:background", t("chat.mobileMenu.background"), props.onOpenBackgroundTasks),
+      icon: "clock.arrow.circlepath",
+    },
+  ];
   const showThinking = props.settings.customSettings.appearance.showThinking;
   const contentLabels = {
     thinking: t("chat.thinking"),
@@ -573,11 +613,23 @@ export function NativeChatPage(props: NativeChatPageProps) {
               icon: compact ? "xgent.sidebar" : "sidebar.leading",
             },
             { id: "toolbar-space", kind: "Spacer" },
-            {
-              ...button("tools", t("chat.mobileMenu.title"), () => setToolsOpen(true)),
-              kind: "IconButton",
-              icon: "ellipsis",
-            },
+            ...(compact
+              ? [
+                  {
+                    id: "tools",
+                    kind: "Menu" as const,
+                    label: t("chat.mobileMenu.title"),
+                    icon: "ellipsis",
+                    children: compactToolNodes,
+                  },
+                ]
+              : [
+                  {
+                    ...button("tools", t("chat.mobileMenu.title"), () => setToolsOpen(true)),
+                    kind: "IconButton" as const,
+                    icon: "ellipsis",
+                  },
+                ]),
           ],
         },
         ...(props.errorMessage
@@ -860,6 +912,16 @@ export function NativeChatPage(props: NativeChatPageProps) {
     accepts: (value) => value === "text" || value === "tools",
     run: (value) => props.onChangeMode(value as "text" | "tools"),
   });
+  sidebarHandlers.set("sidebar-search-toggle", {
+    enabled: true,
+    accepts: (value) => value === null,
+    run: () => setSidebarSearchVisible(!sidebarSearchVisible),
+  });
+  sidebarHandlers.set("sidebar-projects-toggle", {
+    enabled: true,
+    accepts: (value) => value === null,
+    run: () => setSidebarProjectsOpen(!sidebarProjectsOpen),
+  });
   sidebarHandlers.set("close", {
     enabled: true,
     accepts: (value) => value === null,
@@ -1072,10 +1134,13 @@ export function NativeChatPage(props: NativeChatPageProps) {
                 fill: true,
                 padding: 16,
                 children: [
-                  { id: "sidebar-title", kind: "Heading", text: "Xgent" },
+                  ...(!compact
+                    ? [{ id: "sidebar-title", kind: "Heading" as const, text: "Xgent" }]
+                    : []),
                   {
                     id: "sidebar-execution-mode",
-                    kind: "SegmentedControl",
+                    kind: compact ? "Selector" : "SegmentedControl",
+                    variant: compact ? "compact" : undefined,
                     label: t("settings.executionMode"),
                     value: props.settings.system.executionMode === "text" ? "text" : "tools",
                     options: [
@@ -1084,49 +1149,131 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     ],
                     action: "sidebar-execution-mode",
                   },
-                  {
-                    id: "sidebar-search",
-                    kind: "TextInput",
-                    label: t("chat.history.searchPlaceholder"),
-                    value: query,
-                    action: "search",
-                  },
+                  ...(compact
+                    ? [
+                        {
+                          id: "sidebar-search-toggle",
+                          kind: "IconButton" as const,
+                          label: t("chat.history.search"),
+                          icon: "magnifyingglass",
+                          action: "sidebar-search-toggle",
+                        },
+                        ...(sidebarSearchVisible
+                          ? [
+                              {
+                                id: "sidebar-search",
+                                kind: "TextInput" as const,
+                                label: t("chat.history.searchPlaceholder"),
+                                value: query,
+                                action: "search",
+                              },
+                            ]
+                          : []),
+                      ]
+                    : [
+                        {
+                          id: "sidebar-search",
+                          kind: "TextInput" as const,
+                          label: t("chat.history.searchPlaceholder"),
+                          value: query,
+                          action: "search",
+                        },
+                      ]),
                   {
                     id: "sidebar-list",
                     kind: "List",
                     children: [
-                      ...(["skills", "mcp"] as const).map((section) =>
-                        sidebarButton(
-                          section,
-                          t(section === "skills" ? "sidebar.mobile.plugins" : "mcpHub.title"),
-                          () => {
-                            finishSidebarAction();
-                            props.onOpenSettings(section);
-                          },
-                        ),
-                      ),
-                      sidebarButton("files", t("sidebar.myFiles"), () => {
-                        finishSidebarAction();
-                        props.onOpenFiles();
-                      }),
+                      ...(compact
+                        ? [
+                            {
+                              ...sidebarButton("files", t("sidebar.mobile.library"), () => {
+                                finishSidebarAction();
+                                props.onOpenFiles();
+                              }),
+                              icon: "folder",
+                            },
+                            {
+                              ...sidebarButton(
+                                "sidebar-projects-toggle",
+                                t("sidebar.mobile.projects"),
+                                () => setSidebarProjectsOpen(!sidebarProjectsOpen),
+                              ),
+                              icon: "folder.fill",
+                              selected: sidebarProjectsOpen,
+                            },
+                            {
+                              ...sidebarButton("skills", t("sidebar.mobile.plugins"), () => {
+                                finishSidebarAction();
+                                props.onOpenSettings("skills");
+                              }),
+                              icon: "circle.hexagongrid",
+                            },
+                            {
+                              ...sidebarButton("scheduled", t("sidebar.mobile.scheduled"), () => {
+                                finishSidebarAction();
+                                props.onOpenBackgroundTasks();
+                              }),
+                              icon: "clock",
+                            },
+                            {
+                              ...sidebarButton("remote", t("sidebar.mobile.remote"), () => {
+                                finishSidebarAction();
+                                props.onOpenRemote();
+                              }),
+                              icon: "server.rack",
+                            },
+                            {
+                              ...sidebarButton("mcp", t("sidebar.mobile.more"), () => {
+                                finishSidebarAction();
+                                props.onOpenSettings("mcp");
+                              }),
+                              icon: "ellipsis",
+                            },
+                          ]
+                        : [
+                            ...(["skills", "mcp"] as const).map((section) =>
+                              sidebarButton(
+                                section,
+                                t(section === "skills" ? "sidebar.mobile.plugins" : "mcpHub.title"),
+                                () => {
+                                  finishSidebarAction();
+                                  props.onOpenSettings(section);
+                                },
+                              ),
+                            ),
+                            sidebarButton("files", t("sidebar.myFiles"), () => {
+                              finishSidebarAction();
+                              props.onOpenFiles();
+                            }),
+                          ]),
                       ...(!compact && props.trajectoryAvailable
                         ? [sidebarButton("trajectory", t("chat.trajectory.title"), openTrajectory)]
                         : []),
-                      sidebarButton("create-project", t("chat.workspaceCreate"), () => {
-                        finishSidebarAction();
-                        props.onCreateProject();
-                      }),
-                      { id: "projects-label", kind: "Heading", text: t("chat.workspaceSection") },
-                      ...props.projects
-                        .filter((project) =>
-                          project.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-                        )
-                        .map((project) =>
-                          sidebarButton(`project:${project.id}`, project.name, () => {
-                            props.onSelectProject(project);
-                            finishSidebarAction();
-                          }),
-                        ),
+                      ...(!compact || sidebarProjectsOpen
+                        ? [
+                            sidebarButton("create-project", t("chat.workspaceCreate"), () => {
+                              finishSidebarAction();
+                              props.onCreateProject();
+                            }),
+                            {
+                              id: "projects-label",
+                              kind: "Heading" as const,
+                              text: t("chat.workspaceSection"),
+                            },
+                            ...props.projects
+                              .filter((project) =>
+                                project.name
+                                  .toLocaleLowerCase()
+                                  .includes(query.toLocaleLowerCase()),
+                              )
+                              .map((project) =>
+                                sidebarButton(`project:${project.id}`, project.name, () => {
+                                  props.onSelectProject(project);
+                                  finishSidebarAction();
+                                }),
+                              ),
+                          ]
+                        : []),
                       { id: "recents-label", kind: "Heading", text: t("chat.recentConversation") },
                       ...sidebar.conversations
                         .filter((conversation) =>
@@ -1170,13 +1317,18 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     kind: "HStack",
                     children: [
                       {
-                        ...sidebarButton("new-chat", t("chat.newConversation"), () => {
-                          props.onNewConversation();
-                          finishSidebarAction();
-                        }),
+                        ...sidebarButton(
+                          "new-chat",
+                          compact ? t("chat.mode.chat") : t("chat.newConversation"),
+                          () => {
+                            props.onNewConversation();
+                            finishSidebarAction();
+                          },
+                        ),
                         kind: "Button",
                         icon: "square.and.pencil",
                         prominent: true,
+                        accessibilityLabel: compact ? t("chat.newConversation") : undefined,
                       },
                       { id: "sidebar-footer-space", kind: "Spacer" },
                       {

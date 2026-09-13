@@ -16,6 +16,10 @@ const nativeMobileSource = readFileSync(
   new URL("../../src-tauri/native/apple-ui/PresentationMobile.swift", import.meta.url),
   "utf8",
 );
+const nativeMobileNodeSource = readFileSync(
+  new URL("../../src-tauri/native/apple-ui/PresentationMobileNode.swift", import.meta.url),
+  "utf8",
+);
 
 test("checked-in native declarations agree with the mapping and installed Astryx version", () => {
   runGeneration({ check: true });
@@ -122,7 +126,7 @@ test("native glass keeps grouped surfaces distinct from floating controls", () =
   assert.match(nativeLayoutSource, /@AppStorage\("xgent\.native\.sidebar-width\.v1"\)/);
 });
 
-test("iOS application composition is handwritten while generated mappings stay at leaf level", () => {
+test("the complete iOS application surface is handwritten and bypasses generated mappings", () => {
   assert.match(nativeMobileSource, /struct XgentIOSRootPresentation: View/);
   assert.match(nativeMobileSource, /struct XgentIOSWorkspacePresentation: View/);
   assert.match(nativeMobileSource, /struct XgentIOSPagePresentation: View/);
@@ -135,6 +139,15 @@ test("iOS application composition is handwritten while generated mappings stay a
   assert.match(nativeMobileSource, /\.presentationDragIndicator\(\.visible\)/);
   assert.match(nativeMobileSource, /\.background\(Color\.clear\)/);
   assert.doesNotMatch(nativeMobileSource, /WebView|WKWebView|UIViewRepresentable/);
+  assert.match(nativeMobileNodeSource, /struct XgentIOSNode: View/);
+  assert.match(nativeMobileNodeSource, /switch node\.kind/);
+  assert.match(nativeMobileNodeSource, /case \.composerInput:/);
+  assert.match(nativeMobileNodeSource, /case \.settingsGroup:/);
+  assert.match(nativeMobileNodeSource, /case \.browserViewport:/);
+  assert.match(nativeMobileNodeSource, /XgentAttachmentPicker/);
+  for (const source of [nativeMobileSource, nativeMobileNodeSource]) {
+    assert.doesNotMatch(source, /XgentNodeView|XgentNodeChildren|generatedContent/);
+  }
   assert.match(nativeViewSource, /#if os\(iOS\)\s*XgentIOSSheetPresentation/);
   assert.match(
     nativeLayoutSource,

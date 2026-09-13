@@ -1,8 +1,8 @@
 #if os(iOS)
 import SwiftUI
 
-// The compact application shell is deliberately handwritten. Generated code
-// supplies leaf controls only; it must not invent application-level layout.
+// The complete compact application surface is handwritten. Wire nodes provide
+// business state/actions, but generated component rendering is never used here.
 private extension XgentNode {
     func child(id: String) -> XgentNode? { children?.first { $0.id == id } }
 }
@@ -63,14 +63,14 @@ struct XgentIOSWorkspacePresentation: View {
         VStack(spacing: 0) {
             if let toolbar {
                 HStack(spacing: 8) {
-                    XgentNodeChildren(nodes: toolbar.children ?? [], document: document, model: model)
+                    XgentIOSNodes(nodes: toolbar.children ?? [], document: document, model: model)
                 }
-                .frame(maxWidth: .infinity, minHeight: 52)
+                .frame(maxWidth: .infinity, minHeight: 68)
                 .padding(.horizontal, 12)
                 .background(.ultraThinMaterial)
             }
             ForEach(contentNodes) { child in
-                XgentNodeView(node: child, document: document, model: model)
+                XgentIOSNode(node: child, document: document, model: model)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -90,7 +90,7 @@ struct XgentIOSPagePresentation: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    XgentNodeChildren(nodes: document.nodes, document: document, model: model)
+                    XgentIOSNodes(nodes: document.nodes, document: document, model: model)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
@@ -119,14 +119,14 @@ private struct XgentIOSChatPresentation: View {
         VStack(spacing: 0) {
             if let toolbar {
                 HStack(spacing: 8) {
-                    XgentNodeChildren(nodes: toolbar.children ?? [], document: document, model: model)
+                    XgentIOSNodes(nodes: toolbar.children ?? [], document: document, model: model)
                 }
-                .frame(maxWidth: .infinity, minHeight: 52)
+                .frame(maxWidth: .infinity, minHeight: 68)
                 .padding(.horizontal, 12)
             }
             if !inlineNodes.isEmpty {
                 VStack(spacing: 8) {
-                    XgentNodeChildren(nodes: inlineNodes, document: document, model: model)
+                    XgentIOSNodes(nodes: inlineNodes, document: document, model: model)
                 }
                 .padding(.horizontal, 12)
             }
@@ -153,11 +153,13 @@ private struct XgentIOSTranscript: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     ForEach(node.children ?? []) { child in
-                        XgentNodeView(node: child, document: document, model: model).id(child.id)
+                        XgentIOSNode(node: child, document: document, model: model).id(child.id)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
             }
             .scrollDismissesKeyboard(.interactively)
             .onAppear { scrollToLatest(using: proxy, animated: false) }
@@ -193,27 +195,27 @@ private struct XgentIOSComposer: View {
         VStack(alignment: .leading, spacing: 8) {
             if let activity {
                 HStack(spacing: 8) {
-                    XgentNodeChildren(nodes: activity.children ?? [], document: document, model: model)
+                    XgentIOSNodes(nodes: activity.children ?? [], document: document, model: model)
                 }
             }
-            if let input { XgentNodeView(node: input, document: document, model: model) }
+            if let input { XgentIOSNode(node: input, document: document, model: model) }
             if !supporting.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
-                        XgentNodeChildren(nodes: supporting, document: document, model: model)
+                        XgentIOSNodes(nodes: supporting, document: document, model: model)
                     }
                 }
             }
             if let actions {
                 HStack(spacing: 6) {
-                    XgentNodeChildren(nodes: actions.children ?? [], document: document, model: model)
+                    XgentIOSNodes(nodes: actions.children ?? [], document: document, model: model)
                 }
             }
         }
         .padding(12)
         .modifier(XgentGlassSurface(radius: 26, floating: true))
-        .padding(.horizontal, 12)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 
@@ -223,6 +225,7 @@ private struct XgentIOSSidebarPresentation: View {
     private var layout: XgentNode? { document.nodes.first }
     private var title: XgentNode? { layout?.child(id: "sidebar-title") }
     private var mode: XgentNode? { layout?.child(id: "sidebar-execution-mode") }
+    private var searchToggle: XgentNode? { layout?.child(id: "sidebar-search-toggle") }
     private var search: XgentNode? { layout?.child(id: "sidebar-search") }
     private var list: XgentNode? { layout?.child(id: "sidebar-list") }
     private var footer: XgentNode? { layout?.child(id: "sidebar-footer") }
@@ -230,35 +233,81 @@ private struct XgentIOSSidebarPresentation: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
-                if let title { XgentNodeView(node: title, document: document, model: model) }
+                if let title { XgentIOSNode(node: title, document: document, model: model) }
                 HStack(spacing: 8) {
-                    if let mode { XgentNodeView(node: mode, document: document, model: model) }
-                    if let search { XgentNodeView(node: search, document: document, model: model) }
+                    if let mode {
+                        XgentIOSNode(node: mode, document: document, model: model)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if let searchToggle {
+                        XgentIOSNode(node: searchToggle, document: document, model: model)
+                    }
                 }
+                if let search { XgentIOSNode(node: search, document: document, model: model) }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             if let list {
                 List {
                     ForEach(list.children ?? []) { child in
-                        XgentNodeView(node: child, document: document, model: model)
+                        XgentIOSNode(node: child, document: document, model: model)
                     }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
             }
             if let footer {
-                HStack(spacing: 8) {
-                    XgentNodeChildren(nodes: footer.children ?? [], document: document, model: model)
-                }
-                .padding(12)
-                .background(.ultraThinMaterial)
+                XgentIOSSidebarFooter(node: footer, document: document, model: model)
             }
         }
         .background { XgentThemeBackground().ignoresSafeArea() }
         .preferredColorScheme(document.colorScheme)
         .modifier(XgentPresentationThemeModifier(theme: document.theme ?? .fallback,
                                                   appearance: document.appearance))
+    }
+}
+
+private struct XgentIOSSidebarFooter: View {
+    let node: XgentNode
+    let document: XgentDocument
+    @ObservedObject var model: XgentPresentationModel
+    @Environment(\.xgentPresentationTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var palette: XgentPalette { theme.palette(for: colorScheme) }
+    private var newChat: XgentNode? { node.child(id: "new-chat") }
+    private var settings: XgentNode? { node.child(id: "settings") }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let newChat {
+                Button { model.send(newChat, in: document) } label: {
+                    Label(newChat.label ?? "", systemImage: newChat.icon ?? "square.and.pencil")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .foregroundStyle(.white)
+                        .background(Color(xgentHex: palette.accent), in: RoundedRectangle(
+                            cornerRadius: 12, style: .continuous
+                        ))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(newChat.accessibilityLabel ?? newChat.label ?? "")
+            }
+            if let settings {
+                Button { model.send(settings, in: document) } label: {
+                    Image(systemName: settings.icon ?? "gearshape")
+                        .font(.system(size: 18, weight: .medium))
+                        .frame(width: 44, height: 44)
+                        .background(Color(xgentHex: palette.surface), in: Circle())
+                        .overlay(Circle().stroke(Color(xgentHex: palette.border), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(settings.label ?? "")
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial)
     }
 }
 
@@ -287,14 +336,14 @@ struct XgentIOSSheetPresentation: View {
     @ViewBuilder private var content: some View {
         if grouped {
             Form {
-                XgentNodeChildren(nodes: visibleNodes, document: document, model: model)
+                XgentIOSNodes(nodes: visibleNodes, document: document, model: model)
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
         } else if let list {
             List {
                 ForEach(list.children ?? []) { child in
-                    XgentNodeView(node: child, document: document, model: model)
+                    XgentIOSNode(node: child, document: document, model: model)
                 }
             }
             .listStyle(.insetGrouped)
@@ -302,7 +351,7 @@ struct XgentIOSSheetPresentation: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    XgentNodeChildren(nodes: visibleNodes, document: document, model: model)
+                    XgentIOSNodes(nodes: visibleNodes, document: document, model: model)
                 }
                 .padding(16)
             }
@@ -319,18 +368,29 @@ struct XgentIOSSheetPresentation: View {
                 .toolbar {
                     if let back {
                         ToolbarItem(placement: .cancellationAction) {
-                            XgentNodeView(node: back, document: document, model: model)
+                            Button { model.send(back, in: document) } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(back.label ?? "Back")
                         }
                     }
                     if let saveStatus, back != nil {
                         ToolbarItem(placement: .confirmationAction) {
-                            XgentNodeView(node: saveStatus, document: document, model: model)
+                            Text(saveStatus.text ?? "")
+                                .font(.subheadline)
+                                .foregroundStyle(saveStatus.secondary == true ? .secondary : .red)
                         }
                     } else if document.dismissAction != nil {
                         ToolbarItem(placement: .confirmationAction) {
                             Button { model.dismiss(document) } label: {
-                                Image(systemName: "xmark").frame(minWidth: 32, minHeight: 32)
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .frame(width: 44, height: 44)
                             }
+                            .buttonStyle(.plain)
                             .accessibilityLabel(Text("Close"))
                         }
                     }

@@ -35,6 +35,7 @@ struct XgentAttachmentPicker: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    var controlSize: CGFloat = 44
     @State private var pickingFiles = false
     @State private var pickingPhotos = false
     @State private var photos: [PhotosPickerItem] = []
@@ -57,8 +58,13 @@ struct XgentAttachmentPicker: View {
             Button { pickingPhotos = true } label: { Label(label("photos", "Photos"), systemImage: "photo.on.rectangle") }
             Button { pickingFiles = true } label: { Label(label("files", "Files"), systemImage: "folder") }
         } label: {
-            if importing { ProgressView().frame(width: 44, height: 44) }
-            else { Image(systemName: "plus").font(.system(size: 20)).frame(width: 44, height: 44).contentShape(Circle()) }
+            if importing { ProgressView().frame(width: controlSize, height: controlSize) }
+            else {
+                Image(systemName: "plus")
+                    .font(.system(size: min(20, controlSize * 0.56)))
+                    .frame(width: controlSize, height: controlSize)
+                    .contentShape(Circle())
+            }
         }
         .menuStyle(.borderlessButton).disabled(importing)
         .accessibilityLabel(node.label ?? "Attach files")

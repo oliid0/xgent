@@ -4,7 +4,8 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 // Exercise the adapter and real action/composer stores without an Apple SDK.
 // Only React mounting and the native publication boundary are substituted.
-function harness(overrides = {}) {
+function harness(overrides = {}, options = {}) {
+  const mobile = options.mobile ?? false;
   const states = [];
   const cleanups = [];
   let cursor = 0;
@@ -27,7 +28,7 @@ function harness(overrides = {}) {
       useLayoutEffect(effect) { if (!mounted) cleanups.push(effect()); },
     },
     "../i18n": { useLocale: () => ({ t: (key) => key }) },
-    "../lib/runtimePlatform": { isNativeMobileRuntime: () => false },
+    "../lib/runtimePlatform": { isNativeMobileRuntime: () => mobile },
     "./NativeSurface": { NativeSurface: "NativeSurface" },
     "./nativeTheme": { createNativePresentationTheme: () => ({ marker: "theme" }) },
   } });
@@ -53,11 +54,13 @@ function harness(overrides = {}) {
     ...overrides,
   };
   let request = 0;
+  let lastSurfaces = [];
   const render = () => {
     cursor = 0;
     const element = NativeChatPage(props);
     mounted = true;
     const surfaces = element.props.children.filter(Boolean);
+    lastSurfaces = surfaces;
     registry.register("chat", surfaces[0].props.handlers);
     for (const surface of surfaces.slice(1)) {
       registry.register(surface.props.document.mode === "sidebar" ? "sidebar" : "tools", surface.props.handlers);
@@ -67,6 +70,7 @@ function harness(overrides = {}) {
   render();
   return {
     props, render,
+    documents: () => lastSurfaces.map((surface) => surface.props.document),
     dispatch: (action, value = null, surface = "chat") =>
       registry.dispatch({ action, value, surface, requestId: String(++request) }),
     unmount: () => { for (const cleanup of cleanups) cleanup?.(); registry.remove("chat"); },
@@ -90,6 +94,79 @@ test("native edits reach the shared composer used by send and conversation draft
   h.unmount();
   assert.equal(h.props.composerRef.current, null);
   assert.equal((await h.dispatch("send")).ok, false);
+});
+
+test("native iPhone uses the same anchored tools menu and compact drawer hierarchy as WebUI", async () => {
+  const opened = [];
+  const h = harness(
+    {
+      projects: [{ id: "project", name: "Workspace" }],
+      onOpenTerminal: () => opened.push("terminal"),
+      onOpenFiles: () => opened.push("library"),
+      onOpenSettings: (section) => opened.push(section ?? "settings"),
+      onOpenBackgroundTasks: () => opened.push("scheduled"),
+      onOpenRemote: () => opened.push("remote"),
+      onNewConversation: () => opened.push("new-chat"),
+    },
+    { mobile: true },
+  );
+  const document = h.render();
+  assert.equal(document.formFactor, "mobile");
+  const toolbar = document.nodes[0].children.find((node) => node.id === "toolbar");
+  const tools = toolbar.children.find((node) => node.id === "tools");
+  assert.equal(tools.kind, "Menu");
+  assert.deepEqual(
+    tools.children.map((node) => node.id),
+    [
+      "tool:terminal",
+      "tool:shell",
+      "tool-divider-1",
+      "tool:browser",
+      "tool:browser-settings",
+      "tool-divider-2",
+      "tool:git",
+      "tool:ssh",
+      "tool:background",
+    ],
+  );
+  assert.equal((await h.dispatch("tool:terminal")).ok, true);
+  assert.equal((await h.dispatch("sidebar")).ok, true);
+  h.render();
+  let sidebar = h.documents().find((item) => item.mode === "sidebar");
+  const layout = sidebar.nodes[0];
+  const list = layout.children.find((node) => node.id === "sidebar-list");
+  assert.deepEqual(
+    list.children.slice(0, 6).map((node) => node.id),
+    ["files", "sidebar-projects-toggle", "skills", "scheduled", "remote", "mcp"],
+  );
+  assert.equal(layout.children.some((node) => node.id === "sidebar-title"), false);
+  assert.equal(layout.children.some((node) => node.id === "sidebar-search"), false);
+  assert.equal((await h.dispatch("sidebar-search-toggle", null, "sidebar")).ok, true);
+  h.render();
+  sidebar = h.documents().find((item) => item.mode === "sidebar");
+  assert.ok(sidebar.nodes[0].children.some((node) => node.id === "sidebar-search"));
+  assert.equal((await h.dispatch("sidebar-projects-toggle", null, "sidebar")).ok, true);
+  h.render();
+  sidebar = h.documents().find((item) => item.mode === "sidebar");
+  assert.ok(
+    sidebar.nodes[0].children
+      .find((node) => node.id === "sidebar-list")
+      .children.some((node) => node.id === "project:project"),
+  );
+  for (const action of ["files", "skills", "scheduled", "remote", "mcp", "new-chat", "settings"]) {
+    assert.equal((await h.dispatch(action, null, "sidebar")).ok, true);
+  }
+  assert.deepEqual(opened, [
+    "terminal",
+    "library",
+    "skills",
+    "scheduled",
+    "remote",
+    "mcp",
+    "new-chat",
+    "settings",
+  ]);
+  h.unmount();
 });
 
 test("native Apple documents declare desktop shape and shared visual tokens", () => {
