@@ -200,19 +200,46 @@ private struct XgentNodeInsetsModifier: ViewModifier {
     }
 }
 
-private struct XgentNodeFrameModifier: ViewModifier {
-    let node: XgentNode
+private struct XgentNodeFixedFrameModifier: ViewModifier {
+    let width: CGFloat?
+    let height: CGFloat?
     let alignment: Alignment
+
+    init(node: XgentNode, alignment: Alignment) {
+        width = node.width.map { CGFloat($0) }
+        height = node.height.map { CGFloat($0) }
+        self.alignment = alignment
+    }
 
     func body(content: Content) -> some View {
         content
-            .frame(width: node.width.map(CGFloat.init), height: node.height.map(CGFloat.init),
-                   alignment: alignment)
-            .frame(minWidth: node.minWidth.map(CGFloat.init),
-                   maxWidth: node.fill == true ? .infinity : node.maxWidth.map(CGFloat.init),
-                   minHeight: node.minHeight.map(CGFloat.init),
-                   maxHeight: node.fill == true ? .infinity : node.maxHeight.map(CGFloat.init),
-                   alignment: alignment)
+            .frame(width: width, height: height, alignment: alignment)
+    }
+}
+
+private struct XgentNodeBoundsFrameModifier: ViewModifier {
+    let minWidth: CGFloat?
+    let maxWidth: CGFloat?
+    let minHeight: CGFloat?
+    let maxHeight: CGFloat?
+    let alignment: Alignment
+
+    init(node: XgentNode, alignment: Alignment) {
+        minWidth = node.minWidth.map { CGFloat($0) }
+        maxWidth = node.fill == true ? .infinity : node.maxWidth.map { CGFloat($0) }
+        minHeight = node.minHeight.map { CGFloat($0) }
+        maxHeight = node.fill == true ? .infinity : node.maxHeight.map { CGFloat($0) }
+        self.alignment = alignment
+    }
+
+    func body(content: Content) -> some View {
+        content.frame(
+            minWidth: minWidth,
+            maxWidth: maxWidth,
+            minHeight: minHeight,
+            maxHeight: maxHeight,
+            alignment: alignment
+        )
     }
 }
 
@@ -292,7 +319,8 @@ struct XgentNodeView: View {
         // complete renderer and every layout/state modifier as one type tree.
         AnyView(generatedContent)
             .modifier(XgentNodeInsetsModifier(node: node))
-            .modifier(XgentNodeFrameModifier(node: node, alignment: frameAlignment))
+            .modifier(XgentNodeFixedFrameModifier(node: node, alignment: frameAlignment))
+            .modifier(XgentNodeBoundsFrameModifier(node: node, alignment: frameAlignment))
             .modifier(XgentNodeTextLayoutModifier(node: node))
             .modifier(XgentNodeControlModifier(
                 node: node, controlSize: controlSize,
