@@ -106,7 +106,9 @@ export type NativeChatPageProps = {
   onSelectConversation: (id: string) => void;
   onSelectProject: (project: WorkspaceProject) => void;
   onNewConversation: () => void;
-  onOpenSettings: (section?: "skills" | "cron" | "ssh" | "mcp" | "mobileExecution") => void;
+  onOpenSettings: (
+    section?: "skills" | "cron" | "ssh" | "mcp" | "mobileExecution" | "providers",
+  ) => void;
   onOpenRemote: () => void;
   onOpenBrowser: () => void;
   onOpenBrowserSettings: () => void;
@@ -467,7 +469,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
             {
               ...button("sidebar", t("tooltip.openSidebar"), () => setSidebarOpen(!sidebarOpen)),
               kind: "IconButton",
-              icon: compact ? "line.3.horizontal" : "sidebar.leading",
+              icon: compact ? "xgent.sidebar" : "sidebar.leading",
             },
             { id: "toolbar-space", kind: "Spacer" },
             {
@@ -480,13 +482,36 @@ export function NativeChatPage(props: NativeChatPageProps) {
         ...(props.errorMessage
           ? [{ id: "error", kind: "Text" as const, text: props.errorMessage }]
           : []),
-        ...(props.modelOptions.length === 0
-          ? [{ id: "no-model", kind: "Text" as const, text: t("chat.noModelSelected") }]
-          : []),
         ...(props.hasMoreHistory
           ? [button("earlier", t("presentation.loadEarlier"), props.onLoadEarlierHistory)]
           : []),
-        { id: "transcript", kind: "ScrollView", fill: true, children: messages },
+        {
+          id: "transcript",
+          kind: "ScrollView",
+          fill: true,
+          children: [
+            ...(props.modelOptions.length === 0
+              ? [
+                  {
+                    id: "no-model",
+                    kind: "EmptyState" as const,
+                    label: t("chat.welcome"),
+                    text: `${t("chat.noModelSelected")} ${t("chat.configureModel")}`,
+                    icon: "sparkles",
+                    children: [
+                      {
+                        ...button("configure-provider", t("chat.goToSettings"), () =>
+                          props.onOpenSettings("providers"),
+                        ),
+                        prominent: true,
+                      },
+                    ],
+                  },
+                ]
+              : []),
+            ...messages,
+          ],
+        },
         ...props.pendingApprovals.map(
           (approval): PresentationNode => ({
             id: `approval:${approval.toolCallId}`,
@@ -540,27 +565,6 @@ export function NativeChatPage(props: NativeChatPageProps) {
                 ]
               : []),
             {
-              id: "model",
-              kind: "Selector",
-              label: t("chat.trajectory.lane.model"),
-              value: props.selectedValue ?? "",
-              disabled: props.modelOptions.length === 0,
-              options: props.modelOptions.map((option) => ({
-                value: option.value,
-                label: `${option.providerName} · ${option.label}`,
-              })),
-              action: change(
-                "model",
-                (value) => {
-                  const selection = parseModelValue(value);
-                  if (!selection) throw new Error(t("chat.noModelSelected"));
-                  props.onSelectModel(selection);
-                },
-                (value) => props.modelOptions.some((option) => option.value === value),
-                props.modelOptions.length > 0,
-              ),
-            },
-            {
               id: "draft",
               kind: "ComposerInput",
               label: props.inputPlaceholder,
@@ -610,6 +614,29 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     async (value) => props.onImportFiles(decodeNativeFiles(value)),
                     undefined,
                     props.attachmentsEnabled && !props.isUploading && !props.inputDisabled,
+                  ),
+                },
+                {
+                  id: "model",
+                  kind: "Selector",
+                  variant: "compact",
+                  icon: "sparkles",
+                  label: t("chat.trajectory.lane.model"),
+                  value: props.selectedValue ?? "",
+                  disabled: props.modelOptions.length === 0,
+                  options: props.modelOptions.map((option) => ({
+                    value: option.value,
+                    label: `${option.providerName} · ${option.label}`,
+                  })),
+                  action: change(
+                    "model",
+                    (value) => {
+                      const selection = parseModelValue(value);
+                      if (!selection) throw new Error(t("chat.noModelSelected"));
+                      props.onSelectModel(selection);
+                    },
+                    (value) => props.modelOptions.some((option) => option.value === value),
+                    props.modelOptions.length > 0,
                   ),
                 },
                 { id: "composer-spacer", kind: "Spacer" },

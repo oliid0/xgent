@@ -328,10 +328,31 @@ struct XgentNodeView: View {
             ))
     }
 
-    var picker: some View {
-        Picker(node.label ?? "", selection: textBinding) {
-            ForEach(node.options ?? []) { option in
-                Text(option.label).tag(option.value).disabled(option.disabled == true)
+    @ViewBuilder var picker: some View {
+        if node.variant == "compact" {
+            Menu {
+                Picker(node.label ?? "", selection: textBinding) {
+                    ForEach(node.options ?? []) { option in
+                        Text(option.label).tag(option.value).disabled(option.disabled == true)
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    if let icon = node.icon { Image(systemName: icon) }
+                    Text((node.options ?? []).first { $0.value == textBinding.wrappedValue }?.label ?? node.label ?? "")
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down").font(.caption)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(node.label ?? "")
+        } else {
+            Picker(node.label ?? "", selection: textBinding) {
+                ForEach(node.options ?? []) { option in
+                    Text(option.label).tag(option.value).disabled(option.disabled == true)
+                }
             }
         }
     }

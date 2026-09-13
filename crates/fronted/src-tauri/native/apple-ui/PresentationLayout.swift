@@ -765,9 +765,22 @@ extension XgentNodeView {
 
     var iconButton: some View {
         Button { model.send(node, in: document) } label: {
-            Image(systemName: node.icon ?? "ellipsis")
-                .font(.system(size: 20)).frame(width: 44, height: 44)
-                .contentShape(Circle())
+            Group {
+                if node.icon == "xgent.sidebar" {
+                    Path { path in
+                        path.move(to: CGPoint(x: 4, y: 8))
+                        path.addLine(to: CGPoint(x: 20, y: 8))
+                        path.move(to: CGPoint(x: 4, y: 16))
+                        path.addLine(to: CGPoint(x: 14, y: 16))
+                    }
+                    .stroke(style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .frame(width: 24, height: 24)
+                } else {
+                    Image(systemName: node.icon ?? "ellipsis").font(.system(size: 20))
+                }
+            }
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .foregroundStyle(node.prominent == true ? Color.white : Color.primary)

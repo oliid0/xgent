@@ -552,6 +552,20 @@ export const Lock = createIcon(LockSource);
 export const LogOut = createIcon(LogOutSource);
 export const Maximize2 = createIcon(Maximize2Source);
 export const Menu = createIcon(MenuSource);
+// IMG_0388: the mobile drawer uses two unequal strokes on every renderer.
+export const MobileMenu = createIcon((props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    aria-hidden="true"
+    {...props}
+  >
+    <path d="M4 8h16M4 16h10" />
+  </svg>
+));
 export const MessageCircle = createIcon(MessageCircleSource);
 export const MessageSquare = createIcon(MessageSquareSource);
 export const MessageSquareText = createIcon(MessageSquareTextSource);

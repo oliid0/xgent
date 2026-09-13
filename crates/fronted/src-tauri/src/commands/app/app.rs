@@ -74,10 +74,19 @@ pub fn app_frontend_ready(
         use tauri::Manager;
         use tauri_plugin_window_state::AppHandleExt;
         let app = window.app_handle();
-        let stored_size = main_window_size_path(app).ok()
-            .and_then(|path| std::fs::read(path).ok())
-            .and_then(|data| serde_json::from_slice::<MainWindowSize>(&data).ok())
-            .filter(|state| state.width > 0 && state.height > 0);
+        let stored_size = main_window_size_path(app).and_then(|path| {
+            let data = std::fs::read(&path)
+                .map_err(|error| format!("{}: {error}", path.display()))?;
+            serde_json::from_slice::<MainWindowSize>(&data)
+                .map_err(|error| format!("{}: {error}", path.display()))
+        });
+        if std::env::var_os("XGENT_WINDOW_DIAGNOSTICS").is_some() {
+            match &stored_size {
+                Ok(state) => eprintln!("Window restore: {}x{}, maximized={}", state.width, state.height, state.maximized),
+                Err(error) => eprintln!("Window restore unavailable: {error}"),
+            }
+        }
+        let stored_size = stored_size.ok().filter(|state| state.width > 0 && state.height > 0);
         let saved = app.path().app_config_dir().ok()
             .map(|path| path.join(app.filename()).is_file()).unwrap_or(false);
         if let Some(state) = stored_size {

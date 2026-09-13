@@ -9,6 +9,10 @@ param(
 $ErrorActionPreference = "Stop"
 $resolvedExecutable = (Resolve-Path -LiteralPath $ExecutablePath).Path
 $process = $null
+$diagnosticDirectory = Join-Path ([IO.Path]::GetTempPath()) ('xgent-window-' + [Guid]::NewGuid())
+[void](New-Item -ItemType Directory -Path $diagnosticDirectory)
+$previousDiagnostics = $env:XGENT_WINDOW_DIAGNOSTICS
+$env:XGENT_WINDOW_DIAGNOSTICS = '1'
 
 Add-Type @'
 using System;
@@ -64,7 +68,7 @@ function Wait-XgentClientSize($Window, $Width, $Height) {
 }
 
 try {
-  $process = Start-Process -FilePath $resolvedExecutable -PassThru -WindowStyle Hidden
+  $process = Start-Process -FilePath $resolvedExecutable -PassThru -WindowStyle Hidden -RedirectStandardError (Join-Path $diagnosticDirectory 'first.log')
   Start-Sleep -Seconds $StartupWaitSeconds
 
   if ($process.HasExited) {
@@ -107,7 +111,7 @@ try {
       [Math]::Abs($persisted.height - $expected.Bottom) -gt 4) {
     throw "Hidden-window events corrupted persisted size: expected $($expected.Right)x$($expected.Bottom), got $($persisted.width)x$($persisted.height)"
   }
-  $process = Start-Process -FilePath $resolvedExecutable -PassThru -WindowStyle Hidden
+  $process = Start-Process -FilePath $resolvedExecutable -PassThru -WindowStyle Hidden -RedirectStandardError (Join-Path $diagnosticDirectory 'relaunch.log')
   $window = Wait-XgentWindow $process
   $restored = Wait-XgentClientSize $window $expected.Right $expected.Bottom
   Write-Output "PASS: frontend-ready window and native resize/close/relaunch persistence"
@@ -115,5 +119,10 @@ try {
 finally {
   if ($null -ne $process -and -not $process.HasExited) {
     Stop-Process -Id $process.Id -Force
+  }
+  $env:XGENT_WINDOW_DIAGNOSTICS = $previousDiagnostics
+  Get-ChildItem -LiteralPath $diagnosticDirectory -Filter '*.log' | ForEach-Object {
+    Write-Output "Window diagnostics: $($_.Name)"
+    Get-Content -LiteralPath $_.FullName
   }
 }

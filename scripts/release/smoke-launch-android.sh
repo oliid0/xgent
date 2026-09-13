@@ -62,6 +62,35 @@ fi
 read -r composer_x composer_y <<< "$composer"
 adb exec-out screencap -p > "$RUNNER_TEMP/xgent-android-before-keyboard.png"
 adb shell input tap "$composer_x" "$composer_y"
+# Release .919 injected keys during IME activation (inactive InputConnection).
+# Require keyboard focus before input; never repair or retry a partial draft.
+input_ready=""
+for attempt in $(seq 1 12); do
+  adb shell uiautomator dump /sdcard/xgent-ui.xml >/dev/null 2>&1 || true
+  adb pull /sdcard/xgent-ui.xml "$RUNNER_TEMP/xgent-android-ui.xml" >/dev/null 2>&1 || true
+  adb logcat -d -s XgentViewport:I '*:S' > "$RUNNER_TEMP/xgent-android-viewport.log"
+  input_ready="$(python3 - "$RUNNER_TEMP/xgent-android-ui.xml" "$RUNNER_TEMP/xgent-android-viewport.log" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+    viewport = open(sys.argv[2], encoding='utf-8').read()
+except (OSError, ET.ParseError):
+    raise SystemExit(0)
+states = re.findall(r'ime=(true|false) visibleBottom=(\d+)', viewport)
+if states and states[-1][0] == 'true':
+    for node in root.iter('node'):
+        if node.get('package') == 'com.ohi.xgent' and node.get('class') == 'android.widget.EditText' and node.get('focused') == 'true':
+            print('ready')
+            break
+PY
+)"
+  if [ "$input_ready" = ready ]; then break; fi
+  sleep 1
+done
+if [ "$input_ready" != ready ]; then
+  echo "The chat editor did not retain keyboard focus" >&2
+  exit 1
+fi
 adb shell input text xgent-smoke
 sleep 1
 adb shell uiautomator dump /sdcard/xgent-ui.xml >/dev/null

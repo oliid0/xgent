@@ -92,3 +92,16 @@ semantic chat/settings flows, theme transfer, action validation, and the rule
 that WebKit is limited to browser content. Release workflows remain responsible
 for compiling the Swift sources with Apple SDKs and smoke-testing packaged
 Windows/Android artifacts.
+
+### Mobile composer and navigation details
+
+The compact Selector renders as a SwiftUI Menu containing a Picker, with an
+explicit selected-label fallback. It stays beside attachments in the composer
+footer even when no models are configured; its disabled state must not erase
+the control. The no-model state offers the shared providers route and never
+opens settings automatically or discards a draft.
+
+The semantic icon `xgent.sidebar` maps to the same two unequal strokes as
+`MobileMenu` (24-unit view box, segments (4,8) to (20,8) and (4,16) to (14,16), round caps).
+It is a native SwiftUI Path on Apple and an SVG through Astryx Icon elsewhere.
+This custom glyph follows IMG_0388 rather than substituting a three-line symbol.

@@ -19,6 +19,12 @@ Ship one shared Xgent behavior and one Astryx-aligned visual contract across Web
 - Release .916 installed and cold-launched the Android APK and exposed a real interaction defect rather than a missing route: the settings sheet's full-width 24px drag-handle layer covered the center of its unpadded 44px close button. The settings content again reserves its documented top inset so the header remains visible and tappable below that layer.
 - Release .918 proves the iOS native IPA compiles and its simulator app launches. Its Apple Silicon macOS compiler then isolated the remaining type-check limit to the fixed-size `frame` call, so fixed dimensions and bounding dimensions now use separate modifiers with eagerly converted `CGFloat?` values, matching Apple's two documented frame overloads.
 
+## Current follow-up
+- Release .919 compiled every target; Windows failed window restoration at runtime (944x641 became 870x612), Android input raced IME activation, and iOS screenshots exposed an absent empty model selector and missing provider configuration action.
+- Added opt-in native window restore diagnostics; Android smoke now waits for editor focus and an active keyboard before injecting text without retrying partial input.
+- Aligned mobile drawer glyphs, moved the native model selector beside attachments in the composer footer, and kept its disabled label plus the provider setup action visible when no models exist.
+- Verification pending for this follow-up; earlier passing checks apply only to the previous commit.
+
 ## Remaining
 - Require GitHub CI plus a new unsigned release build for Windows, Android, Linux, iOS and macOS to finish successfully; inspect the resulting native screenshots/artifacts.
 - Provisioning-dependent health, inbox, CloudKit and similar system integrations remain gated by platform entitlements and user authorization rather than fake fallback UI.

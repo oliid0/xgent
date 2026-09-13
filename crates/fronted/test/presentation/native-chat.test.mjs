@@ -234,3 +234,24 @@ test("native documents consume live output and report tool approval failures", a
   assert.equal(stopped, true);
   h.unmount();
 });
+
+test("empty native model selection stays in the footer and opens provider settings without forcing setup", async () => {
+  const opened = [];
+  const h = harness({ modelOptions: [], selectedValue: undefined, onOpenSettings: (section) => opened.push(section) });
+  const chat = h.render().nodes[0];
+  const composer = chat.children.find((node) => node.id === "composer");
+  const footer = composer.children.find((node) => node.id === "composer-actions");
+  const model = footer.children.find((node) => node.id === "model");
+  assert.equal(model.variant, "compact");
+  assert.equal(model.disabled, true);
+  assert.ok(model.label);
+  assert.equal(composer.children.some((node) => node.id === "model"), false);
+  assert.deepEqual(opened, []);
+  assert.equal((await h.dispatch("draft", "Keep this draft")).ok, true);
+  h.render();
+  assert.equal((await h.dispatch("configure-provider")).ok, true);
+  assert.deepEqual(opened, ["providers"]);
+  assert.equal(h.props.composerRef.current.getDraft().text, "Keep this draft");
+  assert.equal((await h.dispatch("send")).ok, false);
+  h.unmount();
+});
