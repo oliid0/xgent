@@ -16,9 +16,10 @@ Ship one shared Xgent behavior and one Astryx-aligned visual contract across Web
 - The same release reached native Apple compilation and exposed an invalid mixed fixed-width/max-height SwiftUI `frame` overload; the settings sidebar now composes the two supported frame modifiers.
 - Release 34721118824 then isolated the remaining platform failures: the Swift build script still targeted iOS 16/macOS 14, the macOS compiler exhausted diagnostics on the generated-content modifier chain, Android coroutines 1.10.2 carried Kotlin 2.1 metadata into a Kotlin 1.9 host, and a post-hide Windows resize could overwrite the just-saved client size.
 - Native Swift now targets iOS 26/macOS 15 as required; the heterogeneous generated node is type-erased once and layout/state work is divided among small `ViewModifier` types after swiftc still failed on one combined modifier. Android pins the JetBrains artifact published against Kotlin 1.9.21 and release .916 compiled its APK. Windows ignores hidden resize events and reapplies the persisted client size once after the first HWND show; .916 proved the post-exit file stayed correct while show/placement had replaced the earlier hidden-window resize.
+- Release .916 installed and cold-launched the Android APK and exposed a real interaction defect rather than a missing route: the settings sheet's full-width 24px drag-handle layer covered the center of its unpadded 44px close button. The settings content again reserves its documented top inset so the header remains visible and tappable below that layer.
 
 ## Remaining
-- Push this state and require GitHub CI plus a new unsigned release build for Windows, Android, Linux, iOS and macOS to finish successfully; inspect the resulting native screenshots/artifacts.
+- Require GitHub CI plus a new unsigned release build for Windows, Android, Linux, iOS and macOS to finish successfully; inspect the resulting native screenshots/artifacts.
 - Provisioning-dependent health, inbox, CloudKit and similar system integrations remain gated by platform entitlements and user authorization rather than fake fallback UI.
 
 ## Touched areas

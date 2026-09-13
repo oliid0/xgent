@@ -769,7 +769,7 @@ export default function App() {
                             height="100%"
                             minHeight={0}
                             gap={0}
-                            paddingBlockStart={0}
+                            paddingBlockStart={5}
                           >
                             <SettingsPage
                               settings={settings}
