@@ -391,7 +391,11 @@ struct XgentPresentationView: View {
         .background { XgentThemeBackground().ignoresSafeArea() }
         .preferredColorScheme(root?.colorScheme)
         .sheet(item: Binding(get: { sheet }, set: { if $0 == nil, let sheet { model.dismiss(sheet) } })) { document in
+            #if os(iOS)
+            XgentIOSSheetPresentation(initialDocument: document, model: model)
+            #else
             XgentSheetView(document: document, model: model)
+            #endif
         }
         .modifier(XgentAlerts(model: model, enabled: sheet == nil))
         .modifier(XgentPresentationThemeModifier(
@@ -413,7 +417,7 @@ private enum XgentAlertItem: Identifiable {
     }
 }
 
-private struct XgentAlerts: ViewModifier {
+struct XgentAlerts: ViewModifier {
     @ObservedObject var model: XgentPresentationModel
     let enabled: Bool
 

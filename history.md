@@ -1,5 +1,5 @@
 # Current objective
-Fix shared floating-layer geometry/material, persistent desktop layout/window placement, trajectory/sidebar behavior, direct startup, and native/Web UI parity without introducing platform-specific substitute screens.
+Replace the generated iOS application shell with handwritten native SwiftUI that follows the compact Astryx/iPhone 15 hierarchy exactly, while preserving the verified shared floating-layer, desktop persistence, trajectory, and startup fixes.
 
 ## Current progress
 - Evidence: Astryx 0.6.0 routes menus, selectors, popovers and tooltips through `useLayer`; the prior fallback ran only when CSS feature detection failed, while affected WebViews report anchor support but misplace top-layer content.
@@ -32,10 +32,25 @@ Fix shared floating-layer geometry/material, persistent desktop layout/window pl
 - Updated native adapter test harnesses for the newly used memoized trajectory projection and themed grouped mobile settings contract, made the glass assertion formatting-insensitive, and corrected the launch-screen DOM fixture syntax exposed by the full suite.
 - Updated native sidebar interaction tests to open the persisted-closed desktop sidebar through its real root action before dispatching sidebar rows, matching the new Windows/macOS shared default instead of assuming an always-mounted panel.
 - Completed the consolidated validation pass: TypeScript check, generated SwiftUI mapping check, Biome lint, and all 1,196 non-Cargo tests pass.
+- Follow-up device evidence showed that semantic leaf mappings alone did not solve iOS parity: `NativeChatPage` and `NativeSettingsPage` still serialize separate presentation trees, and the generic recursive `XgentNodeView` was inventing the application-level chat, drawer and sheet layout.
+- Added a handwritten iOS SwiftUI shell for the real compact presentation contract: explicit toolbar/transcript/composer composition, bottom safe-area composer, overlay leading drawer, native grouped settings/list sheets, system navigation toolbar, detents and nested-sheet lifecycle. Generated mapping remains limited to leaf controls.
+- Routed compact iOS chat and workspace-tool roots through handwritten application layouts and every iOS sheet through the handwritten system presentation regardless of legacy documents that omitted `formFactor`; macOS retains its existing platform layout.
+- Kept the iOS sheet content transparent over the system presentation material instead of repainting it with an opaque theme background, so the system glass samples the actual interface underneath.
+- Added a source contract that fails if the handwritten iOS chat/workspace/sheet entry points, bottom safe-area composition, system grouped containers, detents, transparent material behavior or no-WebView boundary regress.
+- Matched the native iOS settings landing hierarchy to the authoritative compact Astryx page instead of showing a second settings design: the same appearance/model, personalization, and capabilities/connection groups now contain the same visible destinations, ordering, descriptions and icons.
+- Matched compact settings navigation chrome as well: root settings shows the close action, detail settings shows back plus live save state, and the handwritten SwiftUI sheet no longer adds a second close button beside a detail back action.
+- Updated the functional settings-flow contract to assert the exact compact group order/destinations/descriptions, root/detail save-state behavior, system appearance preservation, and the same shared reducers for language, execution mode, providers, models and tool policy.
+- Preserved the existing `XgentNativeUI root rendered` launch-evidence marker in both handwritten iOS roots so release simulator smoke verification continues to detect the native application surface.
+- Matched the native leading drawer to Astryx `MobileNav`'s authoritative 320-point width and overlay behavior instead of shifting the chat canvas or applying a gray backdrop.
+- Applied the repository-pinned formatter to the touched TypeScript and presentation contracts; only formatting/import organization changed, and pre-existing advisory unsafe fixes were left untouched.
+- Removed the final compact-root escape hatch into generated application recursion: any future iOS root without a dedicated chat/workspace composition now receives a handwritten native `NavigationStack`/scroll page shell rather than resurrecting the old alternate UI.
+- Kept compact and desktop settings as sibling branches so the unchanged desktop settings implementation remains a small, reviewable diff while mobile follows its separate authoritative hierarchy.
+- Re-ran the pinned formatter after that branch-only refactor; it restored the pre-existing desktop block formatting and left advisory unsafe rewrites unapplied.
 
 ## Remaining
-- Commit and push the verified implementation, then confirm the resulting GitHub CI run.
+- Commit/push the verified implementation, confirm standard CI, then run the unsigned iOS release path to compile the new Swift source and inspect simulator launch evidence.
 
 ## Verification / touched files
-- Touched: layer compatibility bridge; theme/settings/popover CSS; workspace target/navigation/menu/trajectory/sidebar; startup shell; Tauri window geometry/desktop configs; native SwiftUI sheet and split layout.
-- Added tests for direct shell reveal, layout preference parsing/preservation, floating-layer geometry/visibility/material, desktop-only trajectory and native component mapping; final local validation is green.
+- Touched: layer compatibility bridge; theme/settings/popover CSS; workspace target/navigation/menu/trajectory/sidebar; startup shell; Tauri window geometry/desktop configs; native SwiftUI sheet/split layout; handwritten iOS chat, drawer and settings-sheet shell.
+- Added tests for direct shell reveal, layout preference parsing/preservation, floating-layer geometry/visibility/material, desktop-only trajectory, native component mapping, handwritten iOS routing and exact compact settings navigation.
+- Final local validation: TypeScript check, generated-native check and Biome lint passed; all 1,197 non-Cargo tests passed.

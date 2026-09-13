@@ -307,22 +307,65 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       }),
       icon: "chevron.left",
     });
-  nodes.push({
-    id: "save-status",
-    kind: "Text",
-    secondary: props.saveState.status !== "error",
-    text:
-      props.saveState.status === "error"
-        ? props.saveState.message
-        : t(props.saveState.status === "saving" ? "settings.saving" : "settings.saved"),
-  });
+  if (!nativeMobile || page)
+    nodes.push({
+      id: "save-status",
+      kind: "Text",
+      secondary: props.saveState.status !== "error",
+      text:
+        props.saveState.status === "error"
+          ? props.saveState.message
+          : t(props.saveState.status === "saving" ? "settings.saving" : "settings.saved"),
+    });
   if (error) nodes.push({ id: "error", kind: "Text", text: error });
   if (busy) nodes.push({ id: "busy", kind: "Progress", label: t("app.loading") });
-  const navigate = (id: string, icon: string) =>
-    row("nav:" + id, titles[id], icon, () => setPage(id));
+  const navigate = (id: string, icon: string, description?: string) =>
+    row("nav:" + id, titles[id], icon, () => setPage(id), description);
   const visible = (id: SectionId) => !props.hiddenSections?.includes(id);
 
-  if (!page) {
+  if (!page && nativeMobile) {
+    nodes.push(
+      c.group("mobile-appearance", t("settings.mobile.appearanceGroup"), [
+        ...(visible("system")
+          ? [navigate("system", "slider.horizontal.3", t("settings.mobile.systemDescription"))]
+          : []),
+        ...(visible("providers")
+          ? [navigate("providers", "cpu", t("settings.mobile.providersDescription"))]
+          : []),
+      ]),
+      c.group("mobile-personal", t("settings.mobile.personalGroup"), [
+        ...(visible("soul")
+          ? [navigate("soul", "sparkles", t("settings.mobile.soulDescription"))]
+          : []),
+        ...(visible("memory")
+          ? [navigate("memory", "brain", t("settings.mobile.memoryDescription"))]
+          : []),
+        ...(visible("mobileAssistant")
+          ? [navigate("mobileAssistant", "mic", t("settings.mobile.assistantDescription"))]
+          : []),
+      ]),
+      c.group("mobile-capabilities", t("settings.mobile.capabilitiesGroup"), [
+        ...(visible("mobileExecution")
+          ? [navigate("mobileExecution", "terminal", t("settings.mobile.executionDescription"))]
+          : []),
+        ...(visible("toolPermissions")
+          ? [navigate("toolPermissions", "lock.shield", t("settings.toolPermissionsDesc"))]
+          : []),
+        ...(visible("other")
+          ? [navigate("other", "terminal", t("settings.mobile.otherDescription"))]
+          : []),
+        ...(visible("access")
+          ? [navigate("access", "icloud", t("settings.mobile.accessDescription"))]
+          : []),
+        ...(visible("backup")
+          ? [navigate("backup", "archivebox", t("settings.backupSyncDesc"))]
+          : []),
+        ...(visible("about")
+          ? [navigate("about", "info.circle", t("settings.mobile.aboutDescription"))]
+          : []),
+      ]),
+    );
+  } else if (!page) {
     const appearance = settings.customSettings.appearance;
     const fontScaleOptions = [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4].map((value) => ({
       value: String(value),

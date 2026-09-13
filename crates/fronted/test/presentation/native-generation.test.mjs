@@ -12,6 +12,10 @@ const nativeLayoutSource = readFileSync(
   new URL("../../src-tauri/native/apple-ui/PresentationLayout.swift", import.meta.url),
   "utf8",
 );
+const nativeMobileSource = readFileSync(
+  new URL("../../src-tauri/native/apple-ui/PresentationMobile.swift", import.meta.url),
+  "utf8",
+);
 
 test("checked-in native declarations agree with the mapping and installed Astryx version", () => {
   runGeneration({ check: true });
@@ -116,4 +120,25 @@ test("native glass keeps grouped surfaces distinct from floating controls", () =
   assert.match(nativeLayoutSource, /return NavigationSplitView \{/);
   assert.match(nativeLayoutSource, /HSplitView \{/);
   assert.match(nativeLayoutSource, /@AppStorage\("xgent\.native\.sidebar-width\.v1"\)/);
+});
+
+test("iOS application composition is handwritten while generated mappings stay at leaf level", () => {
+  assert.match(nativeMobileSource, /struct XgentIOSRootPresentation: View/);
+  assert.match(nativeMobileSource, /struct XgentIOSWorkspacePresentation: View/);
+  assert.match(nativeMobileSource, /struct XgentIOSPagePresentation: View/);
+  assert.match(nativeMobileSource, /struct XgentIOSSheetPresentation: View/);
+  assert.match(nativeMobileSource, /\.safeAreaInset\(edge: \.bottom/);
+  assert.match(nativeMobileSource, /NavigationStack \{/);
+  assert.match(nativeMobileSource, /Form \{[\s\S]*?\.formStyle\(\.grouped\)/);
+  assert.match(nativeMobileSource, /\.listStyle\(\.insetGrouped\)/);
+  assert.match(nativeMobileSource, /\.presentationDetents\(/);
+  assert.match(nativeMobileSource, /\.presentationDragIndicator\(\.visible\)/);
+  assert.match(nativeMobileSource, /\.background\(Color\.clear\)/);
+  assert.doesNotMatch(nativeMobileSource, /WebView|WKWebView|UIViewRepresentable/);
+  assert.match(nativeViewSource, /#if os\(iOS\)\s*XgentIOSSheetPresentation/);
+  assert.match(
+    nativeLayoutSource,
+    /root\.formFactor == \.mobile[\s\S]*?XgentIOSRootPresentation[\s\S]*?XgentIOSWorkspacePresentation/,
+  );
+  assert.match(nativeLayoutSource, /else \{\s*XgentIOSPagePresentation/);
 });

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
-test("native settings navigation persists provider, model, appearance and policy edits through shared reducers", async () => {
+test("native settings mirrors compact navigation and persists shared system, provider, model and policy edits", async () => {
   const states = [];
   let cursor = 0;
   const locale = {
@@ -50,36 +50,32 @@ test("native settings navigation persists provider, model, appearance and policy
     return result;
   };
   render();
-  const rootNavigation = document.nodes.find((node) => node.id === "app-settings").children;
-  for (const id of ["providers", "toolPermissions", "voice", "mcp", "other", "access", "backup", "soul", "memory", "skills", "about"]) {
-    assert.ok(rootNavigation.some((node) => node.id === `nav:${id}`), id);
-  }
-  assert.ok(rootNavigation.some((node) => node.id === "nav:mobileAssistant"));
-  assert.ok(rootNavigation.some((node) => node.id === "nav:mobileExecution"));
-  assert.ok(!rootNavigation.some((node) => node.id === "nav:shortcuts"));
-  assert.ok(!rootNavigation.some((node) => node.id === "nav:computerUse"));
-  assert.equal((await dispatch("theme", "dark")).ok, true);
-  assert.equal(document.appearance, "dark");
-  assert.equal((await dispatch("theme", "invalid")).ok, false);
+  assert.deepEqual(
+    document.nodes.filter((node) => node.kind === "SettingsGroup").map((group) => [
+      group.id,
+      group.label,
+      group.children.map((node) => node.id),
+    ]),
+    [
+      ["mobile-appearance", "settings.mobile.appearanceGroup", ["nav:system", "nav:providers"]],
+      ["mobile-personal", "settings.mobile.personalGroup", ["nav:soul", "nav:memory", "nav:mobileAssistant"]],
+      ["mobile-capabilities", "settings.mobile.capabilitiesGroup", [
+        "nav:mobileExecution", "nav:toolPermissions", "nav:other", "nav:access", "nav:backup", "nav:about",
+      ]],
+    ],
+  );
+  assert.ok(!document.nodes.some((node) => node.id === "save-status"));
+  const navigationRows = document.nodes.flatMap((node) => node.children ?? []);
+  assert.ok(navigationRows.every((node) => node.text), "compact navigation keeps row descriptions");
   assert.equal(document.formFactor, "mobile");
   assert.deepEqual(document.theme, { marker: "theme" });
-  assert.equal((await dispatch("appearance-customized", true)).ok, true);
-  assert.equal((await dispatch("accent-light", "#12ABEF")).ok, true);
-  assert.equal(settings.customSettings.appearance.accentLight, "#12abef");
-  assert.equal((await dispatch("accent-light", "blue")).ok, false);
-  assert.equal((await dispatch("font-scale:chat", "1.2")).ok, true);
-  assert.equal(settings.customSettings.fontScale.chat, 1.2);
-  await dispatch("nav:voice");
-  const mobileVoice = document.nodes.find((node) => node.id === "voice-general").children;
-  assert.deepEqual(
-    mobileVoice.map((node) => node.id),
-    ["voice-enabled", "voice-device-status", "voice-permissions"],
-  );
-  assert.ok(!document.nodes.some((node) => node.id === "voice-provider-fields"));
-  assert.equal((await dispatch("voice-enabled", true)).ok, true);
-  assert.equal(settings.stt.enabled, true);
-  assert.equal((await dispatch("voice-permissions")).ok, true);
-  assert.ok(document.nodes.some((node) => node.id === "refresh-permissions"));
+  await dispatch("nav:system");
+  assert.ok(document.nodes.some((node) => node.id === "save-status"));
+  assert.equal((await dispatch("language", "zh-CN")).ok, true);
+  assert.equal((await dispatch("mode", "text")).ok, true);
+  assert.equal(settings.locale, "zh-CN");
+  assert.equal(settings.system.executionMode, "text");
+  assert.equal(settings.theme, "system", "native mobile preserves the system appearance contract");
   await dispatch("back");
   await dispatch("nav:providers");
   const count = settings.customProviders.length;

@@ -894,28 +894,21 @@ struct XgentRootLayout: View {
         }
         .animation(transitionAnimation, value: sidebar?.id)
         #else
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                if let root {
-                    content(root)
-                        .accessibilityIdentifier("xgent-native-root")
-                        .onAppear { NSLog("XgentNativeUI root rendered") }
-                        .accessibilityHidden(sidebar != nil)
-                        .offset(x: sidebar == nil ? 0 : min(340, geometry.size.width * 0.82))
-                }
-                if let sidebar {
-                    Button { model.dismiss(sidebar) } label: { Color.black.opacity(0.1) }
-                        .buttonStyle(.plain).accessibilityLabel(Text("Close sidebar"))
-                    content(sidebar)
-                        .frame(width: min(340, geometry.size.width * 0.82), height: geometry.size.height)
-                        .transition(.move(edge: .leading))
-                        .gesture(DragGesture().onEnded {
-                            if $0.translation.width < -60 { model.dismiss(sidebar) }
-                        })
-                }
+        if let root, root.formFactor == .mobile {
+            if root.nodes.contains(where: { $0.kind == .chatLayout }) {
+                XgentIOSRootPresentation(document: root, sidebar: sidebar, model: model)
+                    .onAppear { NSLog("XgentNativeUI root rendered: handwritten iPhone chat shell") }
+            } else if root.nodes.contains(where: { $0.kind == .browserLayout }) {
+                XgentIOSWorkspacePresentation(document: root, model: model)
+                    .onAppear { NSLog("XgentNativeUI root rendered: handwritten iPhone workspace shell") }
+            } else {
+                XgentIOSPagePresentation(document: root, model: model)
+                    .onAppear { NSLog("XgentNativeUI root rendered: handwritten iPhone page shell") }
             }
-            .animation(transitionAnimation, value: sidebar?.id)
-            .clipped()
+        } else if let root {
+            content(root)
+                .accessibilityIdentifier("xgent-native-root")
+                .onAppear { NSLog("XgentNativeUI root rendered") }
         }
         #endif
     }
