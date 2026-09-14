@@ -14,8 +14,8 @@
     "windows": [
       {
         "title": "",
-        "width": 1360,
-        "height": 850,
+        "width": 1156,
+        "height": 723,
         "minWidth": 320,
         "minHeight": 360,
         "visible": false,

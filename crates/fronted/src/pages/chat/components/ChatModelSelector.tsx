@@ -140,6 +140,7 @@ function ModelSelectorContent(props: {
         />
       ) : (
         <VStack
+          className="xgent-model-selector-list"
           gap={1}
           isScrollable
           style={{ maxHeight: "var(--xgent-model-selector-list-height)" }}

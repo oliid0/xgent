@@ -1043,6 +1043,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
 
               {isNativeMobileRuntime() ? null : mobileExperience || narrowComposer ? (
                 <DropdownMenu
+                  className="xgent-command-safety-menu"
                   button={{
                     label: t(`settings.commandSafety.${commandSafetyMode}`),
                     icon: <Shield />,
@@ -1053,11 +1054,17 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                   }}
                   placement="above"
                   alignment="start"
+                  menuWidth="min(28rem, calc(100dvw - var(--spacing-6)))"
+                  style={{ overflowX: "hidden" }}
                   items={(["auto", "ask", "sandbox", "sandboxOffline"] as CommandSafetyMode[]).map(
                     (mode) => ({
                       id: mode,
                       label: t(`settings.commandSafety.${mode}`),
-                      description: t(`settings.commandSafety.${mode}Desc`),
+                      description: (
+                        <span className="xgent-command-safety-description">
+                          {t(`settings.commandSafety.${mode}Desc`)}
+                        </span>
+                      ),
                       onClick: () => onCommandSafetyModeChange(mode),
                     }),
                   )}

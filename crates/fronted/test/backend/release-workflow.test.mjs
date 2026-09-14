@@ -64,6 +64,17 @@ const desktopCommands = readFileSync(
   path.join(repoRoot, "crates/fronted/src-tauri/src/commands/app/app.rs"),
   "utf8",
 );
+const desktopWindowConfigs = [
+  "tauri.conf.json",
+  "tauri.windows.conf.json",
+  "tauri.windows.release.conf.json",
+  "tauri.macos.conf.json",
+].map((name) => ({
+  name,
+  config: JSON.parse(
+    readFileSync(path.join(repoRoot, "crates/fronted/src-tauri", name), "utf8"),
+  ),
+}));
 const nativeBuildScript = readFileSync(
   path.join(repoRoot, "crates/fronted/src-tauri/build.rs"),
   "utf8",
@@ -80,6 +91,22 @@ function jobSource(name, nextName) {
   assert.notEqual(end, -1, `missing ${nextName} job after ${name}`);
   return workflow.slice(start, end);
 }
+
+test("desktop starts 15 percent smaller and migrates only the legacy default geometry", () => {
+  for (const { name, config } of desktopWindowConfigs) {
+    const mainWindow = config.app.windows[0];
+    assert.equal(mainWindow.width, 1156, `${name} width`);
+    assert.equal(mainWindow.height, 723, `${name} height`);
+  }
+  assert.match(desktopCommands, /const MAIN_WINDOW_STATE_VERSION: u8 = 2/);
+  assert.match(desktopCommands, /const LEGACY_DEFAULT_MAIN_WINDOW_WIDTH: u32 = 1360/);
+  assert.match(desktopCommands, /const LEGACY_DEFAULT_MAIN_WINDOW_HEIGHT: u32 = 850/);
+  assert.match(
+    desktopCommands,
+    /state\.version < MAIN_WINDOW_STATE_VERSION[\s\S]*?state\.width == LEGACY_DEFAULT_MAIN_WINDOW_WIDTH[\s\S]*?state\.height == LEGACY_DEFAULT_MAIN_WINDOW_HEIGHT/,
+  );
+  assert.match(desktopCommands, /\.map\(migrate_main_window_size\)/);
+});
 
 test("manual release separates packaging, publishing, and signing", () => {
   assert.match(

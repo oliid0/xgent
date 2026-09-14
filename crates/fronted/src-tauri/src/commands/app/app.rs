@@ -11,6 +11,12 @@ pub type CloseWindowBehaviorState = AtomicU8;
 pub const CLOSE_WINDOW_BEHAVIOR_MINIMIZE: u8 = 0;
 pub const CLOSE_WINDOW_BEHAVIOR_EXIT: u8 = 1;
 
+const MAIN_WINDOW_STATE_VERSION: u8 = 2;
+const DEFAULT_MAIN_WINDOW_WIDTH: u32 = 1156;
+const DEFAULT_MAIN_WINDOW_HEIGHT: u32 = 723;
+const LEGACY_DEFAULT_MAIN_WINDOW_WIDTH: u32 = 1360;
+const LEGACY_DEFAULT_MAIN_WINDOW_HEIGHT: u32 = 850;
+
 #[derive(Default)]
 pub struct GlobalShortcutRegistry {
     entries: Mutex<Vec<(Shortcut, String)>>,
@@ -27,6 +33,8 @@ pub struct FrontendReadyState {
 
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 struct MainWindowSize {
+    #[serde(default)]
+    version: u8,
     width: u32,
     height: u32,
     maximized: bool,
@@ -34,6 +42,18 @@ struct MainWindowSize {
     x: Option<i32>,
     #[serde(default)]
     y: Option<i32>,
+}
+
+fn migrate_main_window_size(mut state: MainWindowSize) -> MainWindowSize {
+    if state.version < MAIN_WINDOW_STATE_VERSION
+        && state.width == LEGACY_DEFAULT_MAIN_WINDOW_WIDTH
+        && state.height == LEGACY_DEFAULT_MAIN_WINDOW_HEIGHT
+    {
+        state.width = DEFAULT_MAIN_WINDOW_WIDTH;
+        state.height = DEFAULT_MAIN_WINDOW_HEIGHT;
+    }
+    state.version = MAIN_WINDOW_STATE_VERSION;
+    state
 }
 
 fn main_window_size_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -47,12 +67,14 @@ pub(crate) fn save_main_window_size(window: &tauri::Window) -> Result<(), String
     if window.is_minimized().map_err(|error| error.to_string())? { return Ok(()); }
     let path = main_window_size_path(window.app_handle())?;
     let previous = std::fs::read(&path).ok()
-        .and_then(|data| serde_json::from_slice::<MainWindowSize>(&data).ok());
+        .and_then(|data| serde_json::from_slice::<MainWindowSize>(&data).ok())
+        .map(migrate_main_window_size);
     let size = window.inner_size().map_err(|error| error.to_string())?;
     let maximized = window.is_maximized().map_err(|error| error.to_string())?;
     if size.width == 0 || size.height == 0 { return Ok(()); }
     let position = window.outer_position().ok();
     let current = MainWindowSize {
+        version: MAIN_WINDOW_STATE_VERSION,
         width: size.width,
         height: size.height,
         maximized,
@@ -110,7 +132,7 @@ pub fn app_frontend_ready(
                 .map_err(|error| format!("{}: {error}", path.display()))?;
             serde_json::from_slice::<MainWindowSize>(&data)
                 .map_err(|error| format!("{}: {error}", path.display()))
-        });
+        }).map(migrate_main_window_size);
         if std::env::var_os("XGENT_WINDOW_DIAGNOSTICS").is_some() {
             match &stored_size {
                 Ok(state) => eprintln!(
@@ -138,8 +160,16 @@ pub fn app_frontend_ready(
                 let scale = monitor.scale_factor();
                 let area = monitor.work_area();
                 let current = window.inner_size().map_err(|error| error.to_string())?;
-                let width = if saved { current.width as f64 / scale } else { 1360.0 };
-                let height = if saved { current.height as f64 / scale } else { 850.0 };
+                let width = if saved {
+                    current.width as f64 / scale
+                } else {
+                    f64::from(DEFAULT_MAIN_WINDOW_WIDTH)
+                };
+                let height = if saved {
+                    current.height as f64 / scale
+                } else {
+                    f64::from(DEFAULT_MAIN_WINDOW_HEIGHT)
+                };
                 let ratio = if saved { 1.0 } else { 0.85 };
                 let fitted = tauri::LogicalSize::new(
                     width.min(area.size.width as f64 / scale * ratio),

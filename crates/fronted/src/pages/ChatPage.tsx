@@ -956,7 +956,7 @@ export function ChatPage(props: ChatPageProps) {
     }
     previousCompactViewportRef.current = compactViewport;
   }, [compactViewport]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const wasMobile = layoutPersistenceMobileRef.current;
     layoutPersistenceMobileRef.current = mobileExperience;
     // The restore effect above schedules state for the next render. Do not

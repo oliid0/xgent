@@ -38,6 +38,21 @@ test("chat layout preferences safely migrate invalid or partial storage", () => 
 
 test("leaving compact mode cannot overwrite restored desktop sidebar state", () => {
   assert.match(chatPageSource, /const layoutPersistenceMobileRef = useRef\(mobileExperience\)/);
+  assert.match(
+    chatPageSource,
+    /useLayoutEffect\(\(\) => \{\s*const wasMobile = layoutPersistenceMobileRef\.current/,
+  );
   assert.match(chatPageSource, /if \(wasMobile !== mobileExperience\) return/);
   assert.match(chatPageSource, /if \(mobileExperience\) return/);
+});
+
+test("desktop panel widths retain their user-adjusted values", () => {
+  for (const autoSaveId of [
+    "xgent-chat-sidebar-width",
+    "xgent-workspace-panel-width",
+    "xgent-workspace-hub-panel-width",
+    "xgent-chat-auxiliary-panel-width",
+  ]) {
+    assert.match(chatPageSource, new RegExp(`autoSaveId: "${autoSaveId}"`));
+  }
 });

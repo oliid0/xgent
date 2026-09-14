@@ -4270,6 +4270,39 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   min-width: 0;
 }
 
+/* Keep wheel/touch scrolling available while removing menu-only scrollbar chrome. */
+:where(
+  .astryx-dropdown-menu,
+  .astryx-selector-popup,
+  .astryx-complex-selector-popup,
+  .xgent-model-selector-list
+),
+:where(.astryx-selector-popup, .astryx-complex-selector-popup) * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+:where(
+  .astryx-dropdown-menu,
+  .astryx-selector-popup,
+  .astryx-complex-selector-popup,
+  .xgent-model-selector-list
+)::-webkit-scrollbar,
+:where(.astryx-selector-popup, .astryx-complex-selector-popup) *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.xgent-command-safety-menu {
+  overflow-x: hidden;
+}
+
+.xgent-command-safety-description {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 @media (prefers-reduced-motion: reduce) {
   [popover][data-layer-ready="true"][data-layer-positioning="anchor"] {
     animation: none !important;
