@@ -133,6 +133,14 @@ test("the complete iOS application surface is handwritten and bypasses generated
   assert.match(nativeMobileSource, /struct XgentIOSSheetPresentation: View/);
   assert.match(nativeMobileSource, /\.safeAreaInset\(edge: \.bottom/);
   assert.match(nativeMobileSource, /NavigationStack \{/);
+  assert.match(nativeMobileSource, /@ToolbarContentBuilder private var chatToolbar/);
+  assert.match(nativeMobileSource, /@ToolbarContentBuilder private var workspaceToolbar/);
+  assert.match(nativeMobileSource, /struct XgentIOSWorkspaceToolbarControl: View/);
+  assert.match(nativeMobileSource, /ToolbarItem\(placement: \.topBarLeading\)/);
+  assert.match(nativeMobileSource, /ToolbarItem\(placement: \.topBarTrailing\)/);
+  assert.match(nativeMobileSource, /\.safeAreaBar\(edge: \.bottom/);
+  assert.match(nativeMobileSource, /\.onScrollGeometryChange\(for: Bool\.self\)/);
+  assert.match(nativeMobileSource, /\.onScrollPhaseChange/);
   assert.match(nativeMobileSource, /Form \{[\s\S]*?\.formStyle\(\.grouped\)/);
   assert.match(nativeMobileSource, /\.listStyle\(\.insetGrouped\)/);
   assert.match(nativeMobileSource, /\.presentationDetents\(/);
@@ -145,6 +153,7 @@ test("the complete iOS application surface is handwritten and bypasses generated
   assert.match(nativeMobileNodeSource, /case \.settingsGroup:/);
   assert.match(nativeMobileNodeSource, /case \.browserViewport:/);
   assert.match(nativeMobileNodeSource, /XgentAttachmentPicker/);
+  assert.match(nativeMobileNodeSource, /Menu \{ menuItems \} label:/);
   for (const source of [nativeMobileSource, nativeMobileNodeSource]) {
     assert.doesNotMatch(source, /XgentNodeView|XgentNodeChildren|generatedContent/);
   }

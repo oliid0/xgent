@@ -21,7 +21,6 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { useState } from "react";
 import {
   ArrowLeft,
-  Clock3,
   Folder,
   FolderOpen,
   Globe,
@@ -469,7 +468,6 @@ export function CronTaskModal({
                 size="sm"
                 onClick={onClose}
               />
-              <Clock3 aria-hidden="true" />
               <StackItem size="fill">
                 <VStack gap={0.5}>
                   <Heading level={3}>{modalTitle}</Heading>

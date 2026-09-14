@@ -1004,6 +1004,11 @@ pub fn run() {
                 }
                 api.prevent_exit();
             } else {
+                if let Some(window) = _app.get_window(MAIN_WINDOW_LABEL) {
+                    if let Err(error) = commands::app::save_main_window_size(&window) {
+                        eprintln!("failed to save main window geometry before exit: {error}");
+                    }
+                }
                 // Real exit: reclaim every non-isolated managed process
                 // before the OS tears us down (Drop is not guaranteed).
                 terminal_registry.shutdown_cleanup();

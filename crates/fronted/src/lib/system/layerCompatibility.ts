@@ -27,6 +27,7 @@ export function stopCompatibleLayer(layer: HTMLElement | null) {
 
 export function positionCompatibleLayer(layer: HTMLElement, anchor: HTMLElement | null) {
   stopCompatibleLayer(layer);
+  delete layer.dataset.layerReady;
   if (
     !needsLayerCompatibility() ||
     !anchor?.isConnected ||
@@ -65,6 +66,8 @@ export function positionCompatibleLayer(layer: HTMLElement, anchor: HTMLElement 
     visibility: layer.style.visibility,
     maxWidth: layer.style.maxWidth,
     maxHeight: layer.style.maxHeight,
+    width: layer.style.width,
+    minWidth: layer.style.minWidth,
     positionAnchor: layer.style.getPropertyValue("position-anchor"),
     positionArea: layer.style.getPropertyValue("position-area"),
     positionTryFallbacks: layer.style.getPropertyValue("position-try-fallbacks"),
@@ -80,6 +83,19 @@ export function positionCompatibleLayer(layer: HTMLElement, anchor: HTMLElement 
     margin: "0",
     visibility: "hidden",
   });
+  // CSS anchor-size() no longer has an anchor after switching to measured
+  // geometry. Size the outer surface too, rather than leaving a full-width
+  // transparent wrapper around a compact selector's content.
+  const selector = layer.querySelector(".astryx-selector-popup");
+  const surface = layer.querySelector(".astryx-popover-surface");
+  const compactWidth = Math.min(320, Math.max(200, anchor.getBoundingClientRect().width));
+  if (selector) {
+    layer.style.width = `${compactWidth}px`;
+    layer.style.minWidth = "0";
+  } else if (surface) {
+    layer.style.width = "max-content";
+    layer.style.minWidth = "0";
+  }
   let active = true;
   const update = () => {
     void computePosition(anchor, layer, {
@@ -99,13 +115,16 @@ export function positionCompatibleLayer(layer: HTMLElement, anchor: HTMLElement 
         }),
       ],
     })
-      .then(({ x, y }) => {
-        if (active && layer.isConnected)
+      .then(({ x, y, placement: resolvedPlacement }) => {
+        if (active && layer.isConnected) {
           Object.assign(layer.style, {
             left: `${x}px`,
             top: `${y}px`,
             visibility: previous.visibility,
           });
+          layer.dataset.layerSide = resolvedPlacement.split("-")[0];
+          layer.dataset.layerReady = "true";
+        }
       })
       .catch((error) => {
         if (active) layer.style.visibility = previous.visibility;
@@ -119,6 +138,7 @@ export function positionCompatibleLayer(layer: HTMLElement, anchor: HTMLElement 
   layer.addEventListener("toggle", onToggle);
   cleanups.set(layer, () => {
     active = false;
+    delete layer.dataset.layerReady;
     cleanup();
     layer.removeEventListener("toggle", onToggle);
     Object.assign(layer.style, {
@@ -128,6 +148,8 @@ export function positionCompatibleLayer(layer: HTMLElement, anchor: HTMLElement 
       visibility: previous.visibility,
       maxWidth: previous.maxWidth,
       maxHeight: previous.maxHeight,
+      width: previous.width,
+      minWidth: previous.minWidth,
     });
     for (const [property, value] of [
       ["position-anchor", previous.positionAnchor],

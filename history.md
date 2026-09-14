@@ -1,64 +1,27 @@
 # Current objective
-Replace the generated iOS application shell with handwritten native SwiftUI that follows the compact Astryx/iPhone 15 hierarchy exactly, while preserving the verified shared floating-layer, desktop persistence, trajectory, and startup fixes.
+Finish the shared desktop menu/window fixes and make the iOS 26 SwiftUI client compile and match the compact Astryx mobile behavior, including usable native mobile execution settings.
 
-## Current progress
-- Evidence: Astryx 0.6.0 routes menus, selectors, popovers and tooltips through `useLayer`; the prior fallback ran only when CSS feature detection failed, while affected WebViews report anchor support but misplace top-layer content.
-- Implemented one measured Floating UI path for all Astryx context layers, preserving Astryx spacing, clearing conflicting CSS anchor properties, tracking resize/scroll, and excluding consumer-owned custom positioning.
-- Added the Popover polyfill closed-state guard so inactive tooltips and menus cannot remain visibly laid out.
-- Replaced the light-theme gray modal scrim with a subtle light veil and applied the shared glass surface to Astryx lists/sections plus previously opaque desktop settings cards and layout regions; search and settings now share the same underlying-page material behavior.
-- Made trajectory a desktop-only workspace panel target with the same closeable left-panel lifecycle as Git review/SSH, supplied it the active conversation without unmounting chat/composer, and removed every compact/iOS/Android entry point.
-- Made the complete desktop Soul/footer label the menu trigger and taught desktop navigation that trajectory does not depend on a terminal/command host.
-- Removed the static “initializing Xgent” page, icon and inert root; the native shell is revealed immediately and only an actionable degraded-start warning is rendered when initialization actually fails.
-- Removed the now-dead loading-screen artwork so startup has no alternate visual state.
-- Reduced fresh desktop windows from 1600×1000 to 1360×850 (15%), extended the existing version-tolerant window state with physical x/y coordinates, rejected off-screen restores, and persisted both resize and move events across Windows/Linux/macOS.
-- Added validated, failure-safe shared layout preferences for left/right panel visibility, with migration and direct-launch regression tests; existing Astryx `useResizable` autosave IDs continue to own all three panel widths.
-- Wired those preferences into desktop WebUI and native macOS presentation, restored them when leaving compact mode, avoided mobile sessions overwriting desktop choices, and preserved right-panel state when conversations hydrate or switch.
-- Kept the generated compact-theme section override aligned with its source contract while desktop surfaces inherit the new glass base.
-- Made the native macOS sidebar continuously resizable with a persisted width and an accessible divider, and changed every native settings/tool sheet from an opaque theme fill to system material over the underlying interface.
-- Added trajectory to the native macOS sidebar/tool navigation and render its shared live/persisted event stream as a dismissible SwiftUI sidebar, including refresh, loading, empty, truncated and error states.
-- Kept Astryx consumer-owned custom-positioned layers on their original portal path while routing every standard menu, selector, popover and tooltip through measured geometry.
-- Confirmed the product rule that trajectory is desktop-only and removed it from compact WebUI and iOS/Android navigation/presentation.
-- Replaced hand-built SwiftUI menu/picker wrappers and settings collections with semantic `Menu`, `Picker`, grouped `Form`/`Section`, native `List`, `NavigationSplitView`, and macOS `HSplitView`; sheets now leave their corner radius/material to the system instead of overriding the presentation background.
-- Reference evidence from `yy/src/ios` confirms the same component choices: its settings entry is a root `.sheet`, `NavigationStack`, `List`/`Section`, native `Picker`/`Toggle`, and a trailing `Done` toolbar action; the reference remains component guidance only, while Xgent's Astryx order/state/actions remain authoritative.
-- Converted the standalone iOS system settings surface to the same themed mobile presentation contract and grouped its existing execution-mode/language data flow inside the same headerless semantic group used by compact Astryx, so SwiftUI renders a system `Form`/`Section` with native pickers instead of a loose alternate layout.
-- Corrected the Astryx layer bridge and calibrated every reproducible package-patch hunk and context marker to the exact Astryx 0.6.0 source: each render call retains its `positioning` mode in a hook ref before mount resolution; standard anchored layers use measured body/dialog geometry, while consumer-owned custom layers remain on Astryx's original portal path.
-- Added regression contracts for the shared measured layer path, closed polyfill visibility, light glass scrim/settings material, desktop-only trajectory, and semantic SwiftUI `Picker`/grouped `Form`/`List`/`NavigationSplitView`/persisted `HSplitView` mapping.
-- Kept the macOS split-width preference key immutable (`static let`) so the persisted native layout remains concurrency-safe under the repository's Swift 6 toolchain.
-- Split the semantic native `List` style by the shared form-factor contract: iOS sheets use the system inset-grouped rows shown by the reference/Astryx mobile hierarchy, while macOS and desktop navigation retain the native sidebar style.
-- Removed the obsolete in-chat trajectory import after routing trajectory exclusively through the desktop workspace side-panel lifecycle; the conversation and composer now remain mounted beside that closeable panel.
-- Extended the release source contract to require move-event persistence, monitor-validated position restoration and the post-show size/position reassertion alongside the existing hidden-window safeguards.
-- Refreshed the lockfile's patched-dependency integrity hash and completed a clean Astryx 0.6.0 install; the installed `useLayer` now contains the measured bridge, positioning-mode ref and geometry metadata exactly as the checked-in patch specifies.
-- Applied the repository-pinned Biome formatter/import organizer only to the touched TypeScript/CSS files after lint reported formatting-only errors; no unsafe style or behavior rewrites were accepted.
-- Updated native adapter test harnesses for the newly used memoized trajectory projection and themed grouped mobile settings contract, made the glass assertion formatting-insensitive, and corrected the launch-screen DOM fixture syntax exposed by the full suite.
-- Updated native sidebar interaction tests to open the persisted-closed desktop sidebar through its real root action before dispatching sidebar rows, matching the new Windows/macOS shared default instead of assuming an always-mounted panel.
-- Completed the consolidated validation pass: TypeScript check, generated SwiftUI mapping check, Biome lint, and all 1,196 non-Cargo tests pass.
-- Follow-up device evidence showed that semantic leaf mappings alone did not solve iOS parity: `NativeChatPage` and `NativeSettingsPage` still serialize separate presentation trees, and the generic recursive `XgentNodeView` was inventing the application-level chat, drawer and sheet layout.
-- Added a handwritten iOS SwiftUI shell for the real compact presentation contract: explicit toolbar/transcript/composer composition, bottom safe-area composer, overlay leading drawer, native grouped settings/list sheets, system navigation toolbar, detents and nested-sheet lifecycle. Generated mapping remains limited to leaf controls.
-- Routed compact iOS chat and workspace-tool roots through handwritten application layouts and every iOS sheet through the handwritten system presentation regardless of legacy documents that omitted `formFactor`; macOS retains its existing platform layout.
-- Kept the iOS sheet content transparent over the system presentation material instead of repainting it with an opaque theme background, so the system glass samples the actual interface underneath.
-- Added a source contract that fails if the handwritten iOS chat/workspace/sheet entry points, bottom safe-area composition, system grouped containers, detents, transparent material behavior or no-WebView boundary regress.
-- Matched the native iOS settings landing hierarchy to the authoritative compact Astryx page instead of showing a second settings design: the same appearance/model, personalization, and capabilities/connection groups now contain the same visible destinations, ordering, descriptions and icons.
-- Matched compact settings navigation chrome as well: root settings shows the close action, detail settings shows back plus live save state, and the handwritten SwiftUI sheet no longer adds a second close button beside a detail back action.
-- Updated the functional settings-flow contract to assert the exact compact group order/destinations/descriptions, root/detail save-state behavior, system appearance preservation, and the same shared reducers for language, execution mode, providers, models and tool policy.
-- Preserved the existing `XgentNativeUI root rendered` launch-evidence marker in both handwritten iOS roots so release simulator smoke verification continues to detect the native application surface.
-- Matched the native leading drawer to Astryx `MobileNav`'s authoritative 320-point width and overlay behavior instead of shifting the chat canvas or applying a gray backdrop.
-- Applied the repository-pinned formatter to the touched TypeScript and presentation contracts; only formatting/import organization changed, and pre-existing advisory unsafe fixes were left untouched.
-- Removed the final compact-root escape hatch into generated application recursion: any future iOS root without a dedicated chat/workspace composition now receives a handwritten native `NavigationStack`/scroll page shell rather than resurrecting the old alternate UI.
-- Kept compact and desktop settings as sibling branches so the unchanged desktop settings implementation remains a small, reviewable diff while mobile follows its separate authoritative hierarchy.
-- Re-ran the pinned formatter after that branch-only refactor; it restored the pre-existing desktop block formatting and left advisory unsafe rewrites unapplied.
-- Device screenshots proved that the first handwritten shell still leaked every visible leaf through the generated renderer. Added a separate, fully handwritten iOS SwiftUI control layer covering chat content, composer controls, settings rows/forms, menus, selectors, progress/activity, browser viewport, attachments and media previews; serialized nodes now serve only as state/action input to that native source.
-- Rewired the iPhone chat toolbar/transcript/composer, workspace pages, drawer, generic pages and every sheet/form/list to the handwritten iOS controls. Sheet back/save/close chrome is now authored directly with fixed 44-point native toolbar actions, so no generated view can alter the compact hierarchy or button geometry.
-- Strengthened the native source contract to scan both handwritten iOS files and fail on any reference to `XgentNodeView`, `XgentNodeChildren` or `generatedContent`, while requiring direct composer, settings, browser and attachment implementations.
-- Verified against Apple `Menu`/`Picker`/`Form`/sheet documentation and the live Astryx `ChatComposer`, `List` and `DialogHeader` contracts: system controls own iOS presentation while Astryx tokens still own Xgent geometry. Sized header actions from the large control metric and composer attachment/actions from the compact metric instead of inheriting one generic 44-point visual button.
-- Replaced the iPhone toolbar's state-driven tools sheet with one direct SwiftUI `Menu` populated in the root action document, including the same three Astryx action groups and separators; the menu is now physically anchored to its 44-point ellipsis control.
-- Rebuilt the compact native drawer data and SwiftUI composition to match WebUI's mobile hierarchy (Library, Projects, Plugins, Scheduled, Remote, More, expandable projects, recents, full-width Chat action and round Settings action), with the same 68-point mobile header metric and an on-demand search field.
-- Added a compact-runtime adapter test that verifies the iPhone root publishes an anchored `Menu` with all grouped workspace actions, the exact first six WebUI drawer destinations, expandable projects/search, and working shared handlers for every visible mobile action.
-- The consolidated TypeScript and native-generation checks passed; Biome requested formatting only in the expanded mobile adapter, so the repository-pinned formatter was applied to that file without behavior changes.
+## Completed
+- Standard Astryx selectors, menus and popovers now share measured placement, compact width, glass material, checkmark selection, and a single ready-state transform animation that is no longer masked by the popover polyfill; rerender cleanup no longer tears down an active layer.
+- Desktop trajectory uses one closeable header, the cron editor header contains only Back, and every matching legacy semantic icon now resolves through the Astryx icon registry.
+- Fresh desktop windows remain 1360x850 (15% below 1600x1000); final exit saves geometry, and compact/desktop transitions preserve saved left/right sidebar visibility.
+- The iOS application surface remains handwritten SwiftUI with no WebView/generated-root escape hatch. Chat and workspace navigation now use native `NavigationStack` and toolbar controls, the more action is an anchored `Menu`, settings use native `Form`, `Picker`, toolbar and sheet presentation, and the drawer footer uses the iOS 26 scroll-edge bar.
+- Split the large iOS sheet expression that failed GitHub compilation and added user-controlled transcript following with reduced-motion handling.
+- Native mobile execution settings now expose base-environment installation, optional toolchain installation/cancellation, status refresh, and external-folder mount/removal through the existing verified mobile runtime APIs.
+- Release jobs target Xcode 26.3 on `macos-26` and `macos-26-intel`.
+
+## Evidence and decisions
+- Apple’s current Liquid Glass guidance says standard bars, sheets, popovers and controls adopt the system material automatically and recommends removing custom navigation backgrounds.
+- The checked-in Astryx 0.6.0 layer implementation owns all standard menus/selectors/popovers; the compatibility bridge retains custom-positioned consumer layers.
+- Existing iOS a-Shell and Android PRoot installers use bundled, pinned resources and verify their runtime before enabling shell tools; no-shell personal-assistant tools stay independently registered.
 
 ## Remaining
-- Route every iOS shell/sheet call site through the handwritten control layer, add a source contract forbidding generated renderer calls in iOS sources, then run the consolidated checks and unsigned simulator evidence workflow.
+- Push the reviewed commit and confirm GitHub CI plus the unsigned iOS/macOS release workflow on the Xcode 26 runners.
 
-## Verification / touched files
-- Touched: layer compatibility bridge; theme/settings/popover CSS; workspace target/navigation/menu/trajectory/sidebar; startup shell; Tauri window geometry/desktop configs; native SwiftUI sheet/split layout; handwritten iOS chat, drawer and settings-sheet shell.
-- Added tests for direct shell reveal, layout preference parsing/preservation, floating-layer geometry/visibility/material, desktop-only trajectory, native component mapping, handwritten iOS routing and exact compact settings navigation.
-- Final local validation: TypeScript check, generated-native check and Biome lint passed; all 1,197 non-Cargo tests passed.
+## Touched files
+- Release workflow; Astryx patch/lockfile; shared layer/theme CSS; desktop window/layout persistence; trajectory/cron/icon chrome; handwritten iOS presentation; native mobile settings; focused regression contracts.
+
+## Verification
+- `pnpm check`, `pnpm native:check`, and `pnpm lint` pass.
+- The full non-Cargo suite ran 1,202 tests: 1,199 passed immediately; three new source-contract assertions had incorrect source/segment patterns. After correcting those assertions, the affected final set passed 25/25 with no remaining local failure.
+- GitHub Actions pending after push.

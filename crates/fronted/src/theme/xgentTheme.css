@@ -756,7 +756,8 @@
     --_dropdown-menu-padding: var(--spacing-2);
   }
 
-  .astryx-popover {
+  .astryx-popover,
+  .astryx-popover-surface {
     background-color: var(--astryx-theme-xgent-glass-popover);
     backdrop-filter: var(--xgent-material-filter, none);
     -webkit-backdrop-filter: var(--xgent-material-filter, none);

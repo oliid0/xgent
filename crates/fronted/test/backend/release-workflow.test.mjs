@@ -174,6 +174,11 @@ test("iOS project template preserves the pre-build script YAML boundary", () => 
 
 test("iOS release prepares host tools and every target before Tauri initialization", () => {
   const ios = jobSource("ios", "publish");
+  const macos = jobSource("macos", "windows");
+  assert.match(workflow, /DEVELOPER_DIR: \/Applications\/Xcode_26\.3\.app\/Contents\/Developer/);
+  assert.match(macos, /runner: macos-26-intel/);
+  assert.match(macos, /runner: macos-26/);
+  assert.match(ios, /runs-on: macos-26/);
   assert.match(
     ios,
     /targets: aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-ios-sim/,
@@ -304,6 +309,10 @@ test("release jobs smoke launch every newly repaired application target", () => 
     closeHandlerEnd,
   );
   assert.doesNotMatch(closeHandler, /save_window_state/);
+  assert.match(
+    desktopHost,
+    /RunEvent::ExitRequested[\s\S]*?allow_exit\.load[\s\S]*?save_main_window_size\(&window\)/,
+  );
 });
 
 test("desktop activation reveals the painted main window without exposing startup frames", () => {

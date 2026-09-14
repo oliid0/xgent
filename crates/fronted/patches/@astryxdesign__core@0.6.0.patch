@@ -34,15 +34,20 @@ diff --git a/dist/Layer/useLayer.js b/dist/Layer/useLayer.js
      const mount = {
        portalTarget,
        portalStyle: portalTarget ? readPortalWritingContext(sentinel, portalTarget) : {}
-@@ -482,6 +485,7 @@ function useLayerImplementation(options) {
+@@ -482,6 +485,12 @@ function useLayerImplementation(options) {
      }
    }, []);
    const popoverRefCallback = useCallback(el => {
-+    if (popoverRef.current !== el) stopCompatibleLayer(popoverRef.current);
++    if (popoverRef.current && popoverRef.current !== el) {
++      const previous = popoverRef.current;
++      queueMicrotask(() => {
++        if (!previous.isConnected) stopCompatibleLayer(previous);
++      });
++    }
      popoverRef.current = el;
      bindToggleListener(el, handleToggle);
      if (el && pendingShowRef.current) {
-@@ -522,5 +526,7 @@ function useLayerImplementation(options) {
+@@ -522,5 +531,7 @@ function useLayerImplementation(options) {
    // Render function for context mode
    const renderContext = useCallback((children, props) => {
 +    const positioning = props?.positioning ?? 'anchor';
@@ -50,14 +55,14 @@ diff --git a/dist/Layer/useLayer.js b/dist/Layer/useLayer.js
      // Keep the marker mounted after resolving the layer. Apart from giving
      // us the real JSX parent on first show, this lets its ref report when a
      // persistent hook's render call moves to a different host.
-@@ -536,6 +542,5 @@ function useLayerImplementation(options) {
+@@ -536,6 +547,5 @@ function useLayerImplementation(options) {
        placement = 'above',
        alignment = 'center',
 -      positioning = 'anchor',
        offset,
        role,
        'aria-label': ariaLabel,
-@@ -571,6 +576,9 @@ function useLayerImplementation(options) {
+@@ -571,6 +581,9 @@ function useLayerImplementation(options) {
        role: role,
        "aria-label": ariaLabel,
        popover: lightDismiss ? 'auto' : 'manual',
@@ -67,3 +72,21 @@ diff --git a/dist/Layer/useLayer.js b/dist/Layer/useLayer.js
        className: combinedClassName,
        style: {
          ...stylexResult.style,
+diff --git a/dist/Selector/Selector.js b/dist/Selector/Selector.js
+--- a/dist/Selector/Selector.js
++++ b/dist/Selector/Selector.js
+@@ -321,12 +321,12 @@ export function Selector(props) {
+     htmlName,
+     renderOption,
+     renderValue,
+-    indicatorPosition = 'end',
++    indicatorPosition = 'start',
+     hasSearch = false,
+     searchPlaceholder: searchPlaceholderFromProps,
+     emptyText: emptyTextFromProps,
+     emptySearchText: emptySearchTextFromProps,
+-    placement,
++    placement = 'below',
+     presentation = 'popover',
+     isDefaultOpen = false,
+     'data-testid': testId,

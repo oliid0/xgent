@@ -31,7 +31,10 @@ test("every preset and customized appearance resolves with the installed Astryx 
           );
           assert.equal(theme.components["chat-composer"].base.backdropFilter, "var(--xgent-material-filter, none)");
           assert.equal(theme.components.popover.base.borderRadius, "var(--radius-page)");
-          assert.equal(theme.components["popover-surface"], undefined);
+          assert.equal(
+            theme.components["popover-surface"].base.backdropFilter,
+            "var(--xgent-material-filter, none)",
+          );
           assert.equal(theme.components.dialog["variant:fullscreen"].backdropFilter, "none");
         }
       }

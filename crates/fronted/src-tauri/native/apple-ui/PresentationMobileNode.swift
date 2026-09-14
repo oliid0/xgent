@@ -544,10 +544,7 @@ struct XgentIOSNode: View {
             if node.id == "tools" {
                 Image(systemName: node.icon ?? "ellipsis")
                     .font(.system(size: 18, weight: .medium))
-                    .frame(width: CGFloat(theme.control.large), height: CGFloat(theme.control.large))
                     .foregroundStyle(Color(xgentHex: palette.text))
-                    .background(Color(xgentHex: palette.muted), in: Circle())
-                    .contentShape(Circle())
             } else {
                 nodeLabel
             }

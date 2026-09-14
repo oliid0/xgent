@@ -944,6 +944,7 @@ export function ChatPage(props: ChatPageProps) {
     () => !mobileExperience && readChatLayoutPreferences().rightSidebarOpen,
   );
   const [rightSidebarActiveTabId, setRightSidebarActiveTabId] = useState<string | null>(null);
+  const layoutPersistenceMobileRef = useRef(mobileExperience);
   useEffect(() => {
     if (compactViewport && !previousCompactViewportRef.current) {
       setSidebarOpen(false);
@@ -956,6 +957,11 @@ export function ChatPage(props: ChatPageProps) {
     previousCompactViewportRef.current = compactViewport;
   }, [compactViewport]);
   useEffect(() => {
+    const wasMobile = layoutPersistenceMobileRef.current;
+    layoutPersistenceMobileRef.current = mobileExperience;
+    // The restore effect above schedules state for the next render. Do not
+    // write the compact layout back over the saved desktop state in this render.
+    if (wasMobile !== mobileExperience) return;
     if (mobileExperience) return;
     saveChatLayoutPreferences({
       leftSidebarOpen: sidebarOpen,

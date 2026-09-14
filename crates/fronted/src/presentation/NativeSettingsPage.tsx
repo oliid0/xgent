@@ -23,9 +23,15 @@ import {
   requestMobileAssistantPermission,
 } from "../lib/mobileAssistant";
 import {
+  cancelMobileExecution,
+  type ExternalMobileWorkspace,
   installMobileEnvironment,
+  installMobileToolchains,
+  listExternalMobileWorkspaces,
   type MobileExecutionStatus,
   mobileExecutionStatus,
+  pickExternalMobileWorkspace,
+  removeExternalMobileWorkspace,
 } from "../lib/mobileExecution";
 import {
   type AppSettings,
@@ -94,6 +100,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [status, setStatus] = useState<MobileAssistantStatus>();
   const [permissions, setPermissions] = useState<MobilePermissionStates>({});
   const [shell, setShell] = useState<MobileExecutionStatus>();
+  const [shellToolchains, setShellToolchains] = useState<string[]>([]);
+  const [shellRunId, setShellRunId] = useState("");
+  const [shellWorkspaces, setShellWorkspaces] = useState<ExternalMobileWorkspace[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [providerId, setProviderId] = useState("");
@@ -129,6 +138,39 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const provider = settings.customProviders.find((item) => item.id === providerId);
   const returnToSettings = () => setPage(nativeMobile ? "" : "system");
 
+  async function refreshShell() {
+    const next = await mobileExecutionStatus();
+    setShell(next);
+    setShellToolchains((current) =>
+      current.filter((id) =>
+        next.toolchains.some((tool) => tool.id === id && tool.installable && !tool.installed),
+      ),
+    );
+    // Folder grants have their own failure state; they must not disable the installer.
+    try {
+      setShellWorkspaces(await listExternalMobileWorkspaces());
+    } catch (cause) {
+      setError(String(cause));
+    }
+  }
+
+  async function installShellToolchains() {
+    const runId = `mobile-install-${createUuid()}`;
+    setShellRunId(runId);
+    try {
+      const result = await installMobileToolchains(shellToolchains, runId);
+      await refreshShell();
+      if (!result.succeeded)
+        throw new Error(
+          result.cancelled
+            ? t("settings.mobileInstallCancelled")
+            : result.stderr.trim() || `Package installation exited with code ${result.exitCode}`,
+        );
+    } finally {
+      setShellRunId("");
+    }
+  }
+
   async function refreshPermissions() {
     const [next, states] = await Promise.all([
       mobileAssistantStatus(),
@@ -151,8 +193,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   useEffect(() => {
     if ((page === "mobileAssistant" || page === "voice") && nativeMobile)
       void work(refreshPermissions);
-    if (page === "mobileExecution" && nativeMobile)
-      void work(async () => setShell(await mobileExecutionStatus()));
+    if (page === "mobileExecution" && nativeMobile) void work(refreshShell);
     if (page === "access") {
       void work(async () => {
         const nextVault = await invoke<CloudSecretVaultStatus>("cloud_secret_vault_status");
@@ -821,22 +862,26 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   } else if (page === "mobileExecution") {
     nodes.push(
       c.group("shell", "Shell", [
+        {
+          id: "shell-independent",
+          kind: "Text",
+          text: t("settings.mobileWithoutShell"),
+          secondary: true,
+        },
+        { id: "shell-source", kind: "Text", text: t("settings.mobileIosSource"), secondary: true },
         { id: "shell-status", kind: "Text", text: shell?.detail ?? t("app.loading") },
-        c.action(
-          "refresh-shell",
-          t("settings.mobileAssistant.refresh"),
-          () => work(async () => setShell(await mobileExecutionStatus())),
-          !busy,
-        ),
+        c.action("refresh-shell", t("settings.mobileRefresh"), () => work(refreshShell), !busy),
         c.action(
           "install-shell",
-          tr("Prepare environment", "准备运行环境"),
+          busy ? t("settings.mobileInstalling") : t("settings.mobileInstallEnvironment"),
           () =>
             work(async () => {
-              await installMobileEnvironment();
-              setShell(await mobileExecutionStatus());
+              const installed = await installMobileEnvironment();
+              if (!installed.installed)
+                throw new Error(installed.detail || t("settings.mobileNotInstalled"));
+              await refreshShell();
             }),
-          !busy,
+          !busy && shell?.available === true && !shell.installed,
         ),
         ...(shell?.toolchains ?? []).map(
           (tool): PresentationNode => ({
@@ -850,6 +895,74 @@ export function NativeSettingsPage(props: SettingsPageProps) {
               (tool.detail ?? ""),
           }),
         ),
+      ]),
+      c.group("shell-packs", t("settings.mobileCapabilityPacks"), [
+        ...(shell?.toolchains ?? [])
+          .filter((tool) => tool.installable && !tool.installed)
+          .map((tool) =>
+            c.toggle(
+              `shell-pack:${tool.id}`,
+              tool.label,
+              shellToolchains.includes(tool.id),
+              (selected) =>
+                setShellToolchains((current) =>
+                  selected ? [...current, tool.id] : current.filter((id) => id !== tool.id),
+                ),
+              !busy && shell?.installed === true,
+            ),
+          ),
+        c.action(
+          "install-shell-packs",
+          busy ? t("settings.mobileInstalling") : t("settings.mobileInstallSelected"),
+          () => work(installShellToolchains),
+          !busy && shell?.installed === true && shellToolchains.length > 0,
+        ),
+        ...(shellRunId
+          ? [
+              c.action("cancel-shell-packs", t("settings.mobileCancel"), async () => {
+                try {
+                  await cancelMobileExecution(shellRunId);
+                } catch (cause) {
+                  setError(String(cause));
+                }
+              }),
+            ]
+          : []),
+      ]),
+      c.group("shell-workspaces", t("settings.mobileExternalWorkspaces"), [
+        {
+          id: "shell-workspaces-hint",
+          kind: "Text",
+          text: t("settings.mobileExternalWorkspacesHint"),
+          secondary: true,
+        },
+        c.action(
+          "shell-pick-workspace",
+          t("settings.mobileMountFolder"),
+          () =>
+            work(async () => {
+              await pickExternalMobileWorkspace(true);
+              await refreshShell();
+            }),
+          !busy,
+        ),
+        ...shellWorkspaces.flatMap((workspace): PresentationNode[] => [
+          {
+            id: `workspace:${workspace.id}`,
+            kind: "Text",
+            text: `${workspace.name}\n${workspace.path}\n${workspace.detail ?? ""}`,
+          },
+          c.action(
+            `remove-workspace:${workspace.id}`,
+            t("settings.delete"),
+            () =>
+              work(async () => {
+                await removeExternalMobileWorkspace(workspace.id);
+                await refreshShell();
+              }),
+            !busy,
+          ),
+        ]),
       ]),
     );
   } else if (page === "toolPermissions") {

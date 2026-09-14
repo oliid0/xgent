@@ -312,7 +312,7 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
           height="fill"
           padding={0}
           header={
-            props.embedded ? undefined : (
+            props.embedded || props.target === "trajectory" ? undefined : (
               <LayoutHeader hasDivider padding={3}>
                 <HStack gap={2} vAlign="center">
                   <Icon />
@@ -365,7 +365,10 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
                   embedded
                 />
               ) : props.target === "trajectory" ? (
-                <ConversationTrajectorySurface conversationId={props.conversationId} />
+                <ConversationTrajectorySurface
+                  conversationId={props.conversationId}
+                  onClose={props.onClose}
+                />
               ) : !projectReady && props.target !== "backgroundTasks" ? (
                 <EmptyState
                   isCompact

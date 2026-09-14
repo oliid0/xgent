@@ -4221,6 +4221,57 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 /* Native :popover-open animations cannot match the polyfill's class. */
 [popover].\:popover-open {
   opacity: 1 !important;
+}
+
+[popover].\:popover-open:not([data-layer-positioning="anchor"]) {
   transform: none !important;
   animation: none !important;
+}
+
+/* Keep material and content visible together. Opacity on an ancestor creates
+   a backdrop root, preventing the glass from sampling the page during entry. */
+[popover][data-layer-placement][data-layer-positioning="anchor"] {
+  animation: none !important;
+  transition: none !important;
+  opacity: 1 !important;
+}
+
+[popover][data-layer-placement][data-layer-positioning="anchor"]:not([data-layer-ready="true"]) {
+  transform: none !important;
+}
+
+[popover][data-layer-ready="true"][data-layer-positioning="anchor"] {
+  animation: xgent-menu-enter 160ms cubic-bezier(0.2, 0, 0, 1) both !important;
+  transform-origin: top center;
+}
+
+[popover][data-layer-side="top"] {
+  --xgent-menu-entry-y: 4px;
+  transform-origin: bottom center;
+}
+
+@keyframes xgent-menu-enter {
+  from {
+    transform: translateY(var(--xgent-menu-entry-y, -4px));
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.astryx-popover-surface {
+  max-width: min(32rem, calc(100dvw - 24px));
+  box-sizing: border-box;
+  transition-property: none;
+}
+
+.astryx-selector-popup {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [popover][data-layer-ready="true"][data-layer-positioning="anchor"] {
+    animation: none !important;
+  }
 }

@@ -55,23 +55,54 @@ struct XgentIOSWorkspacePresentation: View {
 
     private var layout: XgentNode? { document.nodes.first { $0.kind == .browserLayout } }
     private var toolbar: XgentNode? { layout?.children?.first { $0.kind == .hStack } }
+    private var toolbarChildren: [XgentNode] { toolbar?.children ?? [] }
+    private var toolbarTitle: String {
+        toolbarChildren.first { $0.kind == .heading }?.text ?? document.title
+    }
+    private var toolbarSpacerIndex: Int {
+        toolbarChildren.firstIndex { $0.kind == .spacer } ?? toolbarChildren.endIndex
+    }
+    private var leadingToolbarNodes: [XgentNode] {
+        toolbarChildren[..<toolbarSpacerIndex].filter { $0.kind != .heading && $0.kind != .badge }
+    }
+    private var trailingToolbarNodes: [XgentNode] {
+        let status = toolbarChildren.filter { $0.kind == .badge }
+        let actions = toolbarSpacerIndex < toolbarChildren.endIndex
+            ? toolbarChildren[(toolbarSpacerIndex + 1)...].filter { $0.kind != .heading }
+            : []
+        return status + actions
+    }
     private var contentNodes: [XgentNode] {
         (layout?.children ?? []).filter { $0.id != toolbar?.id }
     }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            if let toolbar {
-                HStack(spacing: 8) {
-                    XgentIOSNodes(nodes: toolbar.children ?? [], document: document, model: model)
+    @ToolbarContentBuilder private var workspaceToolbar: some ToolbarContent {
+        if !leadingToolbarNodes.isEmpty {
+            ToolbarItemGroup(placement: .topBarLeading) {
+                ForEach(leadingToolbarNodes) { node in
+                    XgentIOSWorkspaceToolbarControl(node: node, document: document, model: model)
                 }
-                .frame(maxWidth: .infinity, minHeight: 68)
-                .padding(.horizontal, 12)
-                .background(.ultraThinMaterial)
             }
-            ForEach(contentNodes) { child in
-                XgentIOSNode(node: child, document: document, model: model)
+        }
+        if !trailingToolbarNodes.isEmpty {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                ForEach(trailingToolbarNodes) { node in
+                    XgentIOSWorkspaceToolbarControl(node: node, document: document, model: model)
+                }
             }
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                ForEach(contentNodes) { child in
+                    XgentIOSNode(node: child, document: document, model: model)
+                }
+            }
+            .navigationTitle(toolbarTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { workspaceToolbar }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background { XgentThemeBackground().ignoresSafeArea() }
@@ -109,37 +140,52 @@ private struct XgentIOSChatPresentation: View {
     @ObservedObject var model: XgentPresentationModel
     private var chat: XgentNode? { document.nodes.first { $0.kind == .chatLayout } }
     private var toolbar: XgentNode? { chat?.child(id: "toolbar") }
+    private var sidebarControl: XgentNode? { toolbar?.child(id: "sidebar") }
+    private var toolsControl: XgentNode? { toolbar?.child(id: "tools") }
     private var transcript: XgentNode? { chat?.child(id: "transcript") }
     private var composer: XgentNode? { chat?.child(id: "composer") }
     private var inlineNodes: [XgentNode] {
         (chat?.children ?? []).filter { !["toolbar", "transcript", "composer"].contains($0.id) }
     }
 
+    @ToolbarContentBuilder private var chatToolbar: some ToolbarContent {
+        if let sidebarControl {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { model.send(sidebarControl, in: document) } label: {
+                    Image(systemName: sidebarControl.icon ?? "sidebar.leading")
+                }
+                .accessibilityLabel(sidebarControl.accessibilityLabel ?? sidebarControl.label ?? "")
+            }
+        }
+        if let toolsControl {
+            ToolbarItem(placement: .topBarTrailing) {
+                XgentIOSNode(node: toolsControl, document: document, model: model)
+            }
+        }
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            if let toolbar {
-                HStack(spacing: 8) {
-                    XgentIOSNodes(nodes: toolbar.children ?? [], document: document, model: model)
+        NavigationStack {
+            VStack(spacing: 0) {
+                if !inlineNodes.isEmpty {
+                    VStack(spacing: 8) {
+                        XgentIOSNodes(nodes: inlineNodes, document: document, model: model)
+                    }
+                    .padding(.horizontal, 12)
                 }
-                .frame(maxWidth: .infinity, minHeight: 68)
-                .padding(.horizontal, 12)
-            }
-            if !inlineNodes.isEmpty {
-                VStack(spacing: 8) {
-                    XgentIOSNodes(nodes: inlineNodes, document: document, model: model)
+                if let transcript {
+                    XgentIOSTranscript(node: transcript, document: document, model: model)
+                } else {
+                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 12)
             }
-            if let transcript {
-                XgentIOSTranscript(node: transcript, document: document, model: model)
-            } else {
-                Spacer(minLength: 0)
+            .toolbar { chatToolbar }
+            .toolbarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let composer { XgentIOSComposer(node: composer, document: document, model: model) }
             }
+            .background { XgentThemeBackground().ignoresSafeArea() }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let composer { XgentIOSComposer(node: composer, document: document, model: model) }
-        }
-        .background { XgentThemeBackground().ignoresSafeArea() }
     }
 }
 
@@ -147,6 +193,9 @@ private struct XgentIOSTranscript: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var followsLatest = true
+    @State private var userScrolling = false
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -162,15 +211,25 @@ private struct XgentIOSTranscript: View {
                 .padding(.bottom, 8)
             }
             .scrollDismissesKeyboard(.interactively)
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentSize.height - geometry.visibleRect.maxY < 80
+            } action: { _, atBottom in
+                if userScrolling || atBottom { followsLatest = atBottom }
+            }
+            .onScrollPhaseChange { _, phase in
+                userScrolling = phase == .interacting || phase == .decelerating
+            }
             .onAppear { scrollToLatest(using: proxy, animated: false) }
-            .onChange(of: document.revision) { _, _ in scrollToLatest(using: proxy, animated: true) }
+            .onChange(of: document.revision) { _, _ in
+                if followsLatest && !userScrolling { scrollToLatest(using: proxy, animated: false) }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func scrollToLatest(using proxy: ScrollViewProxy, animated: Bool) {
         guard let last = node.children?.last else { return }
-        if animated {
+        if animated && !reduceMotion {
             withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(last.id, anchor: .bottom) }
         } else {
             proxy.scrollTo(last.id, anchor: .bottom)
@@ -256,9 +315,9 @@ private struct XgentIOSSidebarPresentation: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
             }
-            if let footer {
-                XgentIOSSidebarFooter(node: footer, document: document, model: model)
-            }
+        }
+        .safeAreaBar(edge: .bottom, spacing: 0) {
+            if let footer { XgentIOSSidebarFooter(node: footer, document: document, model: model) }
         }
         .background { XgentThemeBackground().ignoresSafeArea() }
         .preferredColorScheme(document.colorScheme)
@@ -307,7 +366,32 @@ private struct XgentIOSSidebarFooter: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(.ultraThinMaterial)
+    }
+}
+
+private struct XgentIOSWorkspaceToolbarControl: View {
+    let node: XgentNode
+    let document: XgentDocument
+    @ObservedObject var model: XgentPresentationModel
+
+    @ViewBuilder var body: some View {
+        if node.kind == .button || node.kind == .iconButton {
+            Button(role: node.destructive == true ? .destructive : nil) {
+                model.send(node, in: document)
+            } label: {
+                if model.isBusy(node, in: document) {
+                    ProgressView()
+                } else if let icon = node.icon {
+                    Image(systemName: icon)
+                } else {
+                    Text(node.label ?? "")
+                }
+            }
+            .disabled(node.disabled == true || model.isBusy(node, in: document))
+            .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
+        } else {
+            XgentIOSNode(node: node, document: document, model: model)
+        }
     }
 }
 
@@ -359,50 +443,60 @@ struct XgentIOSSheetPresentation: View {
         }
     }
 
-    var body: some View {
+    @ToolbarContentBuilder private var sheetToolbar: some ToolbarContent {
+        if let back {
+            ToolbarItem(placement: .cancellationAction) {
+                Button { model.send(back, in: document) } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(back.label ?? "Back")
+            }
+        }
+        if let saveStatus, back != nil {
+            ToolbarItem(placement: .confirmationAction) {
+                Text(saveStatus.text ?? "")
+                    .font(.subheadline)
+                    .foregroundStyle(saveStatus.secondary == true ? Color.secondary : Color.red)
+            }
+        } else if document.dismissAction != nil {
+            ToolbarItem(placement: .confirmationAction) {
+                Button { model.dismiss(document) } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Close"))
+            }
+        }
+    }
+
+    private var nestedSheet: Binding<XgentDocument?> {
+        Binding(get: { nextSheet }, set: {
+            if $0 == nil, let nextSheet { model.dismiss(nextSheet) }
+        })
+    }
+
+    private var navigation: some View {
         NavigationStack {
             content
                 .background(Color.clear)
                 .navigationTitle(document.title)
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    if let back {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button { model.send(back, in: document) } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .frame(width: 44, height: 44)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(back.label ?? "Back")
-                        }
-                    }
-                    if let saveStatus, back != nil {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Text(saveStatus.text ?? "")
-                                .font(.subheadline)
-                                .foregroundStyle(saveStatus.secondary == true ? .secondary : .red)
-                        }
-                    } else if document.dismissAction != nil {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button { model.dismiss(document) } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .frame(width: 44, height: 44)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(Text("Close"))
-                        }
-                    }
-                }
+                .toolbar { sheetToolbar }
         }
+    }
+
+    var body: some View {
+        navigation
         .presentationDetents(grouped ? [.large] : [.medium, .large])
         .presentationDragIndicator(.visible)
         .preferredColorScheme(document.colorScheme)
         .interactiveDismissDisabled(document.dismissAction == nil)
-        .sheet(item: Binding(get: { nextSheet }, set: {
-            if $0 == nil, let nextSheet { model.dismiss(nextSheet) }
-        })) { next in
+        .sheet(item: nestedSheet) { next in
             XgentIOSSheetPresentation(initialDocument: next, model: model)
         }
         .modifier(XgentAlerts(model: model, enabled: nextSheet == nil))

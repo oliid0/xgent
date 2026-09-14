@@ -56,6 +56,7 @@ export const glassTheme = defineTheme({
     "bottom-sheet": { base: floatingSurface },
     "dropdown-menu": { base: floatingSurface },
     popover: { base: floatingSurface },
+    "popover-surface": { base: floatingSurface },
     "selector-popup": { base: floatingSurface },
   },
 });

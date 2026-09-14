@@ -135,12 +135,12 @@ jobs:
       matrix:
         include:
           - name: Intel
-            runner: macos-15-intel
+            runner: macos-26-intel
             target: x86_64-apple-darwin
             suffix: x64
             cua_arch: x86_64
           - name: Apple Silicon
-            runner: macos-15
+            runner: macos-26
             target: aarch64-apple-darwin
             suffix: aarch64
             cua_arch: arm64
@@ -764,7 +764,7 @@ jobs:
 
   ios:
     name: iOS arm64 unsigned IPA
-    runs-on: macos-15
+    runs-on: macos-26
     needs:
       - release-metadata
       - release-preflight
