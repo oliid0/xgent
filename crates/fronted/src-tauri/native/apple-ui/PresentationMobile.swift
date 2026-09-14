@@ -22,7 +22,9 @@ struct XgentIOSRootPresentation: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let drawerWidth = min(320, geometry.size.width)
+            // Astryx MobileNav is `width: 100vw; max-width: 320px`, but its
+            // public contract also caps the drawer at 85vw on narrow screens.
+            let drawerWidth = min(320, geometry.size.width * 0.85)
             ZStack(alignment: .leading) {
                 XgentIOSChatPresentation(document: document, model: model)
                     .accessibilityIdentifier("xgent-native-root")
@@ -36,6 +38,11 @@ struct XgentIOSRootPresentation: View {
                     .accessibilityLabel(Text("Close sidebar"))
                     XgentIOSSidebarPresentation(document: sidebar, model: model)
                         .frame(width: drawerWidth, height: geometry.size.height)
+                        .overlay(alignment: .trailing) {
+                            Rectangle()
+                                .fill(Color.primary.opacity(0.08))
+                                .frame(width: 1)
+                        }
                         .clipped()
                         .zIndex(1)
                         .transition(.move(edge: .leading))
@@ -57,55 +64,18 @@ struct XgentIOSWorkspacePresentation: View {
     @ObservedObject var model: XgentPresentationModel
 
     private var layout: XgentNode? { document.nodes.first { $0.kind == .browserLayout } }
-    private var toolbar: XgentNode? { layout?.children?.first { $0.kind == .hStack } }
-    private var toolbarChildren: [XgentNode] { toolbar?.children ?? [] }
-    private var toolbarTitle: String {
-        toolbarChildren.first { $0.kind == .heading }?.text ?? document.title
-    }
-    private var toolbarSpacerIndex: Int {
-        toolbarChildren.firstIndex { $0.kind == .spacer } ?? toolbarChildren.endIndex
-    }
-    private var leadingToolbarNodes: [XgentNode] {
-        toolbarChildren[..<toolbarSpacerIndex].filter { $0.kind != .heading && $0.kind != .badge }
-    }
-    private var trailingToolbarNodes: [XgentNode] {
-        let status = toolbarChildren.filter { $0.kind == .badge }
-        let actions = toolbarSpacerIndex < toolbarChildren.endIndex
-            ? toolbarChildren[(toolbarSpacerIndex + 1)...].filter { $0.kind != .heading }
-            : []
-        return status + actions
-    }
-    private var contentNodes: [XgentNode] {
-        (layout?.children ?? []).filter { $0.id != toolbar?.id }
-    }
-
-    @ToolbarContentBuilder private var workspaceToolbar: some ToolbarContent {
-        if !leadingToolbarNodes.isEmpty {
-            ToolbarItemGroup(placement: .topBarLeading) {
-                ForEach(leadingToolbarNodes) { node in
-                    XgentIOSWorkspaceToolbarControl(node: node, document: document, model: model)
-                }
-            }
-        }
-        if !trailingToolbarNodes.isEmpty {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                ForEach(trailingToolbarNodes) { node in
-                    XgentIOSWorkspaceToolbarControl(node: node, document: document, model: model)
-                }
-            }
-        }
-    }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                ForEach(contentNodes) { child in
-                    XgentIOSNode(node: child, document: document, model: model)
-                }
+        Group {
+            if let layout {
+                // BrowserPanel, MobileFilesPanel and the other compact tools
+                // already serialize the Astryx order. Do not lift their first
+                // HStack into a system navigation bar: that changes both the
+                // hierarchy and the available height of the flexible content.
+                XgentIOSNode(node: layout, document: document, model: model)
+            } else {
+                XgentIOSNodes(nodes: document.nodes, document: document, model: model)
             }
-            .navigationTitle(toolbarTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { workspaceToolbar }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background { XgentThemeBackground().ignoresSafeArea() }
@@ -114,24 +84,73 @@ struct XgentIOSWorkspacePresentation: View {
 }
 
 // A native compact root never falls back to the generated application-layout
-// recursion. New root surfaces get standard iOS navigation and scrolling until
-// they define a dedicated handwritten composition above.
+// recursion. Serialized full-page VStacks keep their fixed Astryx header and
+// flexible content; legacy flat pages receive the same custom compact header.
 struct XgentIOSPagePresentation: View {
     let document: XgentDocument
+    let sidebar: XgentDocument?
     @ObservedObject var model: XgentPresentationModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var serializedLayout: XgentNode? {
+        document.nodes.count == 1 && document.nodes.first?.kind == .vStack
+            ? document.nodes.first
+            : nil
+    }
+    private var transition: Animation? {
+        guard !reduceMotion else { return nil }
+        let motion = (document.theme ?? .fallback).motion
+        return .timingCurve(motion.curve[0], motion.curve[1], motion.curve[2], motion.curve[3],
+                            duration: motion.medium / 1_000)
+    }
+
+    @ViewBuilder private var page: some View {
+        if let serializedLayout {
+            XgentIOSNode(node: serializedLayout, document: document, model: model)
+        } else {
+            VStack(spacing: 0) {
+                XgentIOSPageHeader(title: document.title, document: document, model: model)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        XgentIOSNodes(nodes: document.nodes.filter { $0.id != "close" },
+                                      document: document, model: model)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+                }
+                .scrollDismissesKeyboard(.interactively)
+            }
+        }
+    }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    XgentIOSNodes(nodes: document.nodes, document: document, model: model)
+        GeometryReader { geometry in
+            let drawerWidth = min(320, geometry.size.width * 0.85)
+            ZStack(alignment: .leading) {
+                page
+                    .accessibilityHidden(sidebar != nil)
+                    .allowsHitTesting(sidebar == nil)
+                if let sidebar {
+                    Button { model.dismiss(sidebar) } label: {
+                        Color.black.opacity(0.32).contentShape(Rectangle()).ignoresSafeArea()
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("Close sidebar"))
+                    XgentIOSSidebarPresentation(document: sidebar, model: model)
+                        .frame(width: drawerWidth, height: geometry.size.height)
+                        .overlay(alignment: .trailing) {
+                            Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
+                        }
+                        .clipped()
+                        .zIndex(1)
+                        .transition(.move(edge: .leading))
+                        .gesture(DragGesture().onEnded {
+                            if $0.translation.width < -60 { model.dismiss(sidebar) }
+                        })
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(16)
             }
-            .scrollDismissesKeyboard(.interactively)
-            .navigationTitle(document.title)
-            .navigationBarTitleDisplayMode(.inline)
+            .animation(transition, value: sidebar?.id)
+            .clipped()
         }
         .background { XgentThemeBackground().ignoresSafeArea() }
         .accessibilityIdentifier("xgent-native-root")
@@ -151,41 +170,35 @@ private struct XgentIOSChatPresentation: View {
         (chat?.children ?? []).filter { !["toolbar", "transcript", "composer"].contains($0.id) }
     }
 
-    @ToolbarContentBuilder private var chatToolbar: some ToolbarContent {
-        if let sidebarControl {
-            ToolbarItem(placement: .topBarLeading) {
-                XgentIOSNode(node: sidebarControl, document: document, model: model)
-            }
-        }
-        if let toolsControl {
-            ToolbarItem(placement: .topBarTrailing) {
-                XgentIOSNode(node: toolsControl, document: document, model: model)
-            }
-        }
-    }
-
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                if !inlineNodes.isEmpty {
-                    VStack(spacing: 8) {
-                        XgentIOSNodes(nodes: inlineNodes, document: document, model: model)
-                    }
-                    .padding(.horizontal, 12)
+        VStack(spacing: 0) {
+            HStack(spacing: 4) {
+                if let sidebarControl {
+                    XgentIOSNode(node: sidebarControl, document: document, model: model)
                 }
-                if let transcript {
-                    XgentIOSTranscript(node: transcript, document: document, model: model)
-                } else {
-                    Spacer(minLength: 0)
+                Spacer(minLength: 0)
+                if let toolsControl {
+                    XgentIOSNode(node: toolsControl, document: document, model: model)
                 }
             }
-            .toolbar { chatToolbar }
-            .toolbarTitleDisplayMode(.inline)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if let composer { XgentIOSComposer(node: composer, document: document, model: model) }
+            .frame(minHeight: 68)
+            .padding(.horizontal, 12)
+            if !inlineNodes.isEmpty {
+                VStack(spacing: 8) {
+                    XgentIOSNodes(nodes: inlineNodes, document: document, model: model)
+                }
+                .padding(.horizontal, 12)
             }
-            .background { XgentThemeBackground().ignoresSafeArea() }
+            if let transcript {
+                XgentIOSTranscript(node: transcript, document: document, model: model)
+            } else {
+                Spacer(minLength: 0)
+            }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let composer { XgentIOSComposer(node: composer, document: document, model: model) }
+        }
+        .background { XgentThemeBackground().ignoresSafeArea() }
     }
 }
 
@@ -291,21 +304,35 @@ private struct XgentIOSSidebarPresentation: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
-                if let title { XgentIOSNode(node: title, document: document, model: model) }
-                HStack(spacing: 8) {
-                    if let mode {
-                        XgentIOSNode(node: mode, document: document, model: model)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    if let searchToggle {
-                        XgentIOSNode(node: searchToggle, document: document, model: model)
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 12) {
+                    if let title { XgentIOSNode(node: title, document: document, model: model) }
+                    HStack(spacing: 8) {
+                        if let mode {
+                            XgentIOSNode(node: mode, document: document, model: model)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        if let searchToggle {
+                            XgentIOSNode(node: searchToggle, document: document, model: model)
+                        }
                     }
                 }
-                if let search { XgentIOSNode(node: search, document: document, model: model) }
+                Button { model.dismiss(document) } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Close sidebar"))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            if let search {
+                XgentIOSNode(node: search, document: document, model: model)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+            }
             if let list {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
@@ -373,29 +400,30 @@ private struct XgentIOSSidebarFooter: View {
     }
 }
 
-private struct XgentIOSWorkspaceToolbarControl: View {
-    let node: XgentNode
+private struct XgentIOSPageHeader: View {
+    let title: String
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
 
-    @ViewBuilder var body: some View {
-        if node.kind == .button || node.kind == .iconButton {
-            Button(role: node.destructive == true ? .destructive : nil) {
-                model.send(node, in: document)
-            } label: {
-                if model.isBusy(node, in: document) {
-                    ProgressView()
-                } else if let icon = node.icon {
-                    Image(systemName: icon)
-                } else {
-                    Text(node.label ?? "")
+    var body: some View {
+        ZStack {
+            Text(title).font(.headline).lineLimit(1)
+            HStack {
+                Spacer()
+                if document.dismissAction != nil {
+                    Button { model.dismiss(document) } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("Close"))
                 }
             }
-            .disabled(node.disabled == true || model.isBusy(node, in: document))
-            .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
-        } else {
-            XgentIOSNode(node: node, document: document, model: model)
         }
+        .frame(minHeight: 68)
+        .padding(.horizontal, 12)
     }
 }
 
@@ -421,61 +449,9 @@ struct XgentIOSSheetPresentation: View {
         visibleNodes.count == 1 && visibleNodes.first?.kind == .list ? visibleNodes.first : nil
     }
 
-    @ViewBuilder private var content: some View {
-        if grouped {
-            Form {
-                XgentIOSNodes(nodes: visibleNodes, document: document, model: model)
-            }
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
-        } else if let list {
-            List {
-                ForEach(list.children ?? []) { child in
-                    XgentIOSNode(node: child, document: document, model: model)
-                }
-            }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-        } else {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    XgentIOSNodes(nodes: visibleNodes, document: document, model: model)
-                }
-                .padding(16)
-            }
-            .scrollDismissesKeyboard(.interactively)
-        }
-    }
-
-    @ToolbarContentBuilder private var sheetToolbar: some ToolbarContent {
-        if let back {
-            ToolbarItem(placement: .cancellationAction) {
-                Button { model.send(back, in: document) } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(back.label ?? "Back")
-            }
-        }
-        if let saveStatus, back != nil {
-            ToolbarItem(placement: .confirmationAction) {
-                Text(saveStatus.text ?? "")
-                    .font(.subheadline)
-                    .foregroundStyle(saveStatus.secondary == true ? Color.secondary : Color.red)
-            }
-        } else if document.dismissAction != nil {
-            ToolbarItem(placement: .confirmationAction) {
-                Button { model.dismiss(document) } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("Close"))
-            }
-        }
+    private var contentNodes: [XgentNode] { list?.children ?? visibleNodes }
+    private var detents: Set<PresentationDetent> {
+        list == nil ? [.large] : [.fraction(0.62), .large]
     }
 
     private var nestedSheet: Binding<XgentDocument?> {
@@ -484,20 +460,65 @@ struct XgentIOSSheetPresentation: View {
         })
     }
 
-    private var navigation: some View {
-        NavigationStack {
-            content
-                .background(Color.clear)
-                .navigationTitle(document.title)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar { sheetToolbar }
+    private var header: some View {
+        ZStack {
+            Text(document.title).font(.headline).lineLimit(1)
+            HStack {
+                if let back {
+                    Button { model.send(back, in: document) } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(back.label ?? "Back")
+                }
+                Spacer()
+                if let saveStatus, back != nil {
+                    Text(saveStatus.text ?? "")
+                        .font(.subheadline)
+                        .foregroundStyle(saveStatus.secondary == true ? Color.secondary : Color.red)
+                } else if document.dismissAction != nil {
+                    Button { model.dismiss(document) } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("Close"))
+                }
+            }
         }
+        .frame(minHeight: 68)
+        .padding(.horizontal, 12)
     }
 
     var body: some View {
-        navigation
-        .presentationDetents(grouped ? [.large] : [.medium, .large])
-        .presentationDragIndicator(.visible)
+        VStack(spacing: 0) {
+            Capsule()
+                .fill(Color.secondary.opacity(0.32))
+                .frame(width: 40, height: 4)
+                .padding(.top, 10)
+                .padding(.bottom, 2)
+                .accessibilityHidden(true)
+            header
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: grouped ? 24 : 12) {
+                    XgentIOSNodes(nodes: contentNodes, document: document, model: model)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
+            }
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .background { XgentThemeBackground().ignoresSafeArea() }
+        // Astryx menus use the capped sheet budget while settings and detail
+        // surfaces use the tall budget. Long pages must never open at medium.
+        .presentationDetents(detents)
+        .presentationDragIndicator(.hidden)
         .preferredColorScheme(document.colorScheme)
         .interactiveDismissDisabled(document.dismissAction == nil)
         .sheet(item: nestedSheet) { next in

@@ -119,27 +119,51 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
       fill: true,
       children: [
         {
-          id: "browser-toolbar",
+          id: "browser-header",
+          kind: "HStack",
+          minHeight: 68,
+          padding: 12,
+          children: [
+            {
+              id: "browser-heading",
+              kind: "VStack",
+              fill: true,
+              children: [
+                { id: "browser-title", kind: "Heading", text: t("browser.title"), icon: "globe" },
+                {
+                  id: "browser-status",
+                  kind: "Text",
+                  text: busy ? t("browser.agentOperating") : t("browser.sharedSession"),
+                  secondary: true,
+                  maxLines: 2,
+                },
+              ],
+            },
+            {
+              ...button("browser-close", t("browser.close"), "xmark", () =>
+                browserSessionController.closePanel(),
+              ),
+              variant: "secondary",
+            },
+          ],
+        },
+        {
+          id: "browser-tabs-row",
           kind: "HStack",
           padding: 8,
           children: [
             button(
-              "browser-back",
-              t("browser.back"),
-              "chevron.left",
-              () => run("go_back"),
-              !!active && !busy,
-            ),
-            button(
-              "browser-forward",
-              t("browser.forward"),
-              "chevron.right",
-              () => run("go_forward"),
-              !!active && !busy,
+              "browser-new",
+              t("browser.newTab"),
+              "plus",
+              () => browserSessionController.newSession(),
+              sessions.length < MAX_BROWSER_SESSIONS,
             ),
             {
               id: "browser-tabs",
               kind: "Selector",
+              variant: "compact",
+              fill: true,
               label: t("browser.title"),
               value: active?.sessionId ?? "",
               disabled: sessions.length === 0,
@@ -156,23 +180,12 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
                 sessions.length > 0,
               ),
             },
-            { id: "browser-toolbar-space", kind: "Spacer" },
-            button(
-              "browser-new",
-              t("browser.newTab"),
-              "plus",
-              () => browserSessionController.newSession(),
-              sessions.length < MAX_BROWSER_SESSIONS,
-            ),
             button(
               "browser-close-tab",
               t("browser.closeTab"),
               "xmark",
               () => active && browserSessionController.closeSession(active.sessionId),
               !!active,
-            ),
-            button("browser-close", t("browser.close"), "xmark.circle", () =>
-              browserSessionController.closePanel(),
             ),
           ],
         },

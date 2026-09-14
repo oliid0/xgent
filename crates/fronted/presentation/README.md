@@ -41,6 +41,13 @@ their native layout and interaction, while callbacks remain in a
 surface-scoped TypeScript registry. Native input cannot invoke an unregistered,
 disabled, stale, or malformed action.
 
+On iPhone, serialized Astryx composition order is authoritative. SwiftUI does
+not reparent a compact header into `NavigationStack`, replace settings groups
+with `Form`/`List`, or give a horizontal `fill` child unlimited height. Root
+hubs, drawers, capped menus, tall settings sheets, browser chrome, and file
+tools therefore preserve the same hierarchy and size budgets as their Astryx
+mobile counterparts while using native controls.
+
 ## Platform and rendering rules
 
 - iOS is always the mobile form factor. It does not receive split chat,

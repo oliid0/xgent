@@ -11,10 +11,11 @@ struct XgentIOSNodes: View {
     let nodes: [XgentNode]
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    var parentAxis: Axis? = nil
 
     var body: some View {
         ForEach(nodes) { node in
-            XgentIOSNode(node: node, document: document, model: model)
+            XgentIOSNode(node: node, document: document, model: model, parentAxis: parentAxis)
         }
     }
 }
@@ -41,6 +42,11 @@ private struct XgentIOSAccessibility: ViewModifier {
 private struct XgentIOSNodeFrame: ViewModifier {
     let node: XgentNode
     let alignment: Alignment
+    let parentAxis: Axis?
+
+    private var fillsHeight: Bool {
+        node.fill == true && parentAxis != .horizontal
+    }
 
     func body(content: Content) -> some View {
         content
@@ -48,7 +54,11 @@ private struct XgentIOSNodeFrame: ViewModifier {
                 minWidth: node.minWidth.map { CGFloat($0) },
                 maxWidth: node.fill == true ? .infinity : node.maxWidth.map { CGFloat($0) },
                 minHeight: node.minHeight.map { CGFloat($0) },
-                maxHeight: node.fill == true ? .infinity : node.maxHeight.map { CGFloat($0) },
+                // Astryx StackItem `fill` grows along the available layout
+                // axis. A field inside an HStack must not also claim infinite
+                // height (that was stretching browser/file toolbars to half
+                // the screen).
+                maxHeight: fillsHeight ? .infinity : node.maxHeight.map { CGFloat($0) },
                 alignment: alignment
             )
             .frame(
@@ -157,14 +167,25 @@ struct XgentIOSNode: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    var parentAxis: Axis? = nil
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var expanded = false
 
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
+    private var childAxis: Axis? {
+        switch node.kind {
+        case .hStack: return .horizontal
+        case .vStack, .scrollView, .list, .settingsGroup, .settingsLayout,
+             .chatLayout, .browserLayout, .composer, .card, .section:
+            return .vertical
+        default: return nil
+        }
+    }
     private var children: XgentIOSNodes {
-        XgentIOSNodes(nodes: node.children ?? [], document: document, model: model)
+        XgentIOSNodes(nodes: node.children ?? [], document: document, model: model,
+                      parentAxis: childAxis)
     }
     private var textBinding: Binding<String> {
         Binding(
@@ -218,7 +239,7 @@ struct XgentIOSNode: View {
         AnyView(rendered)
             .padding(CGFloat(node.padding ?? 0))
             .padding(.leading, CGFloat(node.indent ?? 0))
-            .modifier(XgentIOSNodeFrame(node: node, alignment: alignment))
+            .modifier(XgentIOSNodeFrame(node: node, alignment: alignment, parentAxis: parentAxis))
             .lineLimit(node.maxLines)
             .fixedSize(horizontal: node.wrap == false, vertical: false)
             .disabled(node.disabled == true || model.isBusy(node, in: document))
@@ -250,10 +271,16 @@ struct XgentIOSNode: View {
                 .foregroundStyle(Color(xgentHex: node.secondary == true ? palette.secondaryText : palette.text))
                 .textSelection(.enabled)
         case .heading:
-            Text(node.text ?? node.label ?? "")
-                .font(.system(size: CGFloat(theme.typography.body * theme.fontScale), weight: .semibold))
-                .foregroundStyle(Color(xgentHex: palette.text))
-                .accessibilityAddTraits(.isHeader)
+            HStack(spacing: 8) {
+                if let icon = node.icon {
+                    Image(systemName: icon).foregroundStyle(Color(xgentHex: palette.accent))
+                }
+                Text(node.text ?? node.label ?? "")
+                    .lineLimit(node.maxLines)
+            }
+            .font(.system(size: CGFloat(theme.typography.body * theme.fontScale), weight: .semibold))
+            .foregroundStyle(Color(xgentHex: palette.text))
+            .accessibilityAddTraits(.isHeader)
         case .button:
             actionButton
         case .textInput:
@@ -313,15 +340,11 @@ struct XgentIOSNode: View {
         case .codeBlock:
             codeBlock
         case .list:
-            LazyVStack(alignment: .leading, spacing: 0) { children }
+            list
         case .treeRow, .navigationRow:
             navigationRow
         case .settingsGroup:
-            Section {
-                children
-            } header: {
-                if let label = node.label, !label.isEmpty { Text(label) }
-            }
+            settingsGroup
         case .settingsLayout:
             VStack(alignment: .leading, spacing: CGFloat(theme.spacing.lg)) { children }
         case .iconButton:
@@ -337,7 +360,8 @@ struct XgentIOSNode: View {
                 .font(.body)
                 .padding(.vertical, 8)
         case .chatLayout, .browserLayout:
-            VStack(spacing: 0) { children }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 0) { children }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .chatMessage:
             chatMessage
         case .thinking:
@@ -373,6 +397,46 @@ struct XgentIOSNode: View {
         }
     }
 
+    private var list: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array((node.children ?? []).enumerated()), id: \.element.id) { index, child in
+                if index > 0 {
+                    Divider()
+                        .padding(.leading, child.icon == nil ? 12 : 48)
+                        .overlay(Color(xgentHex: palette.border))
+                }
+                XgentIOSNode(node: child, document: document, model: model, parentAxis: .vertical)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var settingsGroup: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let label = node.label, !label.isEmpty {
+                Text(label)
+                    .font(.system(size: CGFloat(theme.typography.supporting * theme.fontScale),
+                                  weight: .semibold))
+                    .foregroundStyle(Color(xgentHex: palette.secondaryText))
+                    .padding(.horizontal, 4)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array((node.children ?? []).enumerated()), id: \.element.id) { index, child in
+                    if index > 0 {
+                        Divider()
+                            .padding(.leading, child.icon == nil ? 0 : 36)
+                            .overlay(Color(xgentHex: palette.border))
+                    }
+                    XgentIOSNode(node: child, document: document, model: model,
+                                 parentAxis: .vertical)
+                        .padding(.vertical, 6)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var actionButton: some View {
         Button(role: node.destructive == true ? .destructive : nil) {
             model.send(node, in: document)
@@ -380,10 +444,16 @@ struct XgentIOSNode: View {
             HStack(spacing: 8) {
                 if model.isBusy(node, in: document) { ProgressView().controlSize(.small) }
                 if let icon = node.icon { Image(systemName: icon).frame(width: 20) }
-                Text(node.label ?? "").font(.body.weight(node.prominent == true ? .semibold : .regular))
+                Text(node.label ?? "")
+                    .font(node.variant == "compact"
+                        ? .caption.weight(.medium)
+                        : .body.weight(node.prominent == true ? .semibold : .regular))
+                    .lineLimit(node.variant == "compact" ? 2 : 1)
+                    .multilineTextAlignment(.center)
             }
-            .frame(minHeight: 36)
-            .padding(.horizontal, 14)
+            .frame(minHeight: CGFloat(theme.control.medium))
+            .frame(maxWidth: node.variant == "compact" ? .infinity : nil)
+            .padding(.horizontal, node.variant == "compact" ? 6 : 14)
             .foregroundStyle(buttonForeground)
             .background(buttonBackground, in: RoundedRectangle(
                 cornerRadius: CGFloat(theme.radius.element), style: .continuous
@@ -507,9 +577,34 @@ struct XgentIOSNode: View {
             }
             .buttonStyle(.plain)
         } else {
-            Picker(node.label ?? "", selection: textBinding) { pickerOptions }
-                .pickerStyle(.menu)
-                .frame(minHeight: 44)
+            Menu {
+                ForEach(node.options ?? []) { option in
+                    Button {
+                        model.send(node, in: document, value: .string(option.value), editing: true)
+                    } label: {
+                        if option.value == textBinding.wrappedValue {
+                            Label(option.label, systemImage: "checkmark")
+                        } else {
+                            Text(option.label)
+                        }
+                    }
+                    .disabled(option.disabled == true)
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Text(node.label ?? "").foregroundStyle(Color(xgentHex: palette.text))
+                    Spacer(minLength: 12)
+                    Text(selectedOptionLabel)
+                        .foregroundStyle(Color(xgentHex: palette.secondaryText))
+                        .lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Color(xgentHex: palette.secondaryText))
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -541,10 +636,13 @@ struct XgentIOSNode: View {
 
     @ViewBuilder private var nativeMenu: some View {
         Menu { menuItems } label: {
-            if node.id == "tools" {
+            if node.id == "tools" || node.variant == "secondary" {
                 Image(systemName: node.icon ?? "ellipsis")
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(Color(xgentHex: palette.text))
+                    .frame(width: CGFloat(theme.control.large), height: CGFloat(theme.control.large))
+                    .background(Color(xgentHex: palette.muted), in: Circle())
+                    .overlay(Circle().stroke(Color(xgentHex: palette.border), lineWidth: 1))
             } else {
                 nodeLabel
             }
@@ -662,7 +760,14 @@ struct XgentIOSNode: View {
                     Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .frame(maxWidth: .infinity,
+                   minHeight: node.variant == "sidebar" ? 44 : 56,
+                   alignment: .leading)
+            .padding(.horizontal, node.variant == "sidebar" ? 8 : 12)
+            .background(
+                node.selected == true ? Color(xgentHex: palette.muted) : Color.clear,
+                in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -677,9 +782,18 @@ struct XgentIOSNode: View {
             .frame(width: iconControlSize, height: iconControlSize)
             .foregroundStyle(node.prominent == true ? Color.white : Color(xgentHex: palette.text))
             .background(
-                node.prominent == true ? Color(xgentHex: palette.accent) : Color.clear,
+                node.prominent == true
+                    ? Color(xgentHex: palette.accent)
+                    : node.variant == "secondary"
+                        ? Color(xgentHex: palette.muted)
+                        : Color.clear,
                 in: Circle()
             )
+            .overlay {
+                if node.variant == "secondary" {
+                    Circle().stroke(Color(xgentHex: palette.border), lineWidth: 1)
+                }
+            }
             .contentShape(Circle())
         }
         .buttonStyle(.plain)

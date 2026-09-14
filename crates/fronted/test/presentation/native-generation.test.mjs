@@ -132,20 +132,21 @@ test("the complete iOS application surface is handwritten and bypasses generated
   assert.match(nativeMobileSource, /struct XgentIOSPagePresentation: View/);
   assert.match(nativeMobileSource, /struct XgentIOSSheetPresentation: View/);
   assert.match(nativeMobileSource, /\.safeAreaInset\(edge: \.bottom/);
-  assert.match(nativeMobileSource, /NavigationStack \{/);
-  assert.match(nativeMobileSource, /@ToolbarContentBuilder private var chatToolbar/);
-  assert.match(nativeMobileSource, /@ToolbarContentBuilder private var workspaceToolbar/);
-  assert.match(nativeMobileSource, /struct XgentIOSWorkspaceToolbarControl: View/);
-  assert.match(nativeMobileSource, /ToolbarItem\(placement: \.topBarLeading\)/);
-  assert.match(nativeMobileSource, /ToolbarItem\(placement: \.topBarTrailing\)/);
+  assert.doesNotMatch(nativeMobileSource, /NavigationStack \{/);
+  assert.doesNotMatch(nativeMobileSource, /@ToolbarContentBuilder/);
+  assert.doesNotMatch(nativeMobileSource, /ToolbarItem\(placement:/);
+  assert.match(nativeMobileSource, /\.frame\(minHeight: 68\)/);
+  assert.match(nativeMobileSource, /geometry\.size\.width \* 0\.85/);
   assert.match(nativeMobileSource, /\.safeAreaBar\(edge: \.bottom/);
   assert.match(nativeMobileSource, /\.onScrollGeometryChange\(for: Bool\.self\)/);
   assert.match(nativeMobileSource, /\.onScrollPhaseChange/);
-  assert.match(nativeMobileSource, /Form \{[\s\S]*?\.formStyle\(\.grouped\)/);
-  assert.match(nativeMobileSource, /\.listStyle\(\.insetGrouped\)/);
-  assert.match(nativeMobileSource, /\.presentationDetents\(/);
-  assert.match(nativeMobileSource, /\.presentationDragIndicator\(\.visible\)/);
-  assert.match(nativeMobileSource, /\.background\(Color\.clear\)/);
+  assert.doesNotMatch(nativeMobileSource, /Form \{|\.formStyle\(|\.listStyle\(/);
+  assert.match(
+    nativeMobileSource,
+    /list == nil \? \[\.large\] : \[\.fraction\(0\.62\), \.large\][\s\S]*?\.presentationDetents\(detents\)/,
+  );
+  assert.match(nativeMobileSource, /\.presentationDragIndicator\(\.hidden\)/);
+  assert.match(nativeMobileSource, /Capsule\(\)[\s\S]*?\.frame\(width: 40, height: 4\)/);
   assert.doesNotMatch(nativeMobileSource, /WebView|WKWebView|UIViewRepresentable/);
   assert.match(nativeMobileNodeSource, /struct XgentIOSNode: View/);
   assert.match(nativeMobileNodeSource, /switch node\.kind/);
@@ -154,6 +155,9 @@ test("the complete iOS application surface is handwritten and bypasses generated
   assert.match(nativeMobileNodeSource, /case \.browserViewport:/);
   assert.match(nativeMobileNodeSource, /XgentAttachmentPicker/);
   assert.match(nativeMobileNodeSource, /Menu \{ menuItems \} label:/);
+  assert.match(nativeMobileNodeSource, /parentAxis != \.horizontal/);
+  assert.match(nativeMobileNodeSource, /case \.list:\s*list/);
+  assert.match(nativeMobileNodeSource, /case \.settingsGroup:\s*settingsGroup/);
   assert.doesNotMatch(nativeMobileNodeSource, /\.map\(CGFloat\.init\)/);
   for (const source of [nativeMobileSource, nativeMobileNodeSource]) {
     assert.doesNotMatch(source, /XgentNodeView|XgentNodeChildren|generatedContent/);
@@ -163,5 +167,5 @@ test("the complete iOS application surface is handwritten and bypasses generated
     nativeLayoutSource,
     /root\.formFactor == \.mobile[\s\S]*?XgentIOSRootPresentation[\s\S]*?XgentIOSWorkspacePresentation/,
   );
-  assert.match(nativeLayoutSource, /else \{\s*XgentIOSPagePresentation/);
+  assert.match(nativeLayoutSource, /else \{\s*XgentIOSPagePresentation\(document: root, sidebar: sidebar/);
 });

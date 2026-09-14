@@ -334,7 +334,9 @@ import { MobileBackgroundTasksPanel } from "./chat/mobile/MobileBackgroundTasksP
 import { MobileBrowserSettingsPanel } from "./chat/mobile/MobileBrowserSettingsPanel";
 import { MobileFilesPanel } from "./chat/mobile/MobileFilesPanel";
 import { MobileGitReviewPanel } from "./chat/mobile/MobileGitReviewPanel";
+import { MobileMcpPage } from "./chat/mobile/MobileMcpPage";
 import { MobileQuickActions } from "./chat/mobile/MobileQuickActions";
+import { MobileSkillsPage } from "./chat/mobile/MobileSkillsPage";
 import { MobileSshPanel } from "./chat/mobile/MobileSshPanel";
 import { type MobileShellPanelMode, MobileTerminalPanel } from "./chat/mobile/MobileTerminalPanel";
 import { MobileToolActivity } from "./chat/mobile/MobileToolActivity";
@@ -887,6 +889,7 @@ export function ChatPage(props: ChatPageProps) {
   );
   const previousCompactViewportRef = useRef(compactViewport);
   const [activeView, setActiveView] = useState<"chat" | "skills-hub" | "mcp-hub">("chat");
+  const [nativeSidebarOpenRequestId, setNativeSidebarOpenRequestId] = useState(0);
   const [desktopNavigationTarget, setDesktopNavigationTarget] =
     useState<WorkspaceNavigationTarget>("conversations");
   const [workspaceToolsOpen, setWorkspaceToolsOpen] = useState(false);
@@ -6240,10 +6243,28 @@ export function ChatPage(props: ChatPageProps) {
           onSend={handleSend}
           onStop={handleStopSending}
           onSelectModel={handleSelectModel}
-          onSelectConversation={handleSelectConversation}
-          onSelectProject={handleSelectWorkspaceProject}
-          onNewConversation={handleDesktopNewConversation}
+          onSelectConversation={(id) => {
+            setActiveView("chat");
+            handleSelectConversation(id);
+          }}
+          onSelectProject={(project) => {
+            setActiveView("chat");
+            void handleSelectWorkspaceProject(project);
+          }}
+          onNewConversation={() => {
+            setActiveView("chat");
+            handleDesktopNewConversation();
+          }}
           onOpenSettings={(section) => onOpenSettings(section)}
+          onOpenSkillsHub={() => {
+            cacheActiveComposerDraft();
+            setActiveView("skills-hub");
+          }}
+          onOpenMcpHub={() => {
+            cacheActiveComposerDraft();
+            setActiveView("mcp-hub");
+          }}
+          sidebarOpenRequestId={nativeSidebarOpenRequestId}
           onOpenRemote={() => setMobileWorkspaceDestination({ kind: "ssh" })}
           onOpenBrowser={handleOpenBrowser}
           onOpenBrowserSettings={() => setMobileWorkspaceDestination({ kind: "browser-settings" })}
@@ -6272,6 +6293,22 @@ export function ChatPage(props: ChatPageProps) {
           onImportFiles={importReadableFiles}
           onRemoveUpload={removePendingUpload}
         />
+        {activeView === "skills-hub" ? (
+          <MobileSkillsPage
+            settings={settings}
+            setSettings={setSettings}
+            initialSkills={availableSkills}
+            presentationMode="root"
+            onOpenSidebar={() => setNativeSidebarOpenRequestId((request) => request + 1)}
+          />
+        ) : activeView === "mcp-hub" ? (
+          <MobileMcpPage
+            settings={settings}
+            setSettings={setSettings}
+            allowStdio={!nativeMobile || lanPcCommandHostReady}
+            onOpenSidebar={() => setNativeSidebarOpenRequestId((request) => request + 1)}
+          />
+        ) : null}
         <MobileSshPanel
           open={mobileWorkspaceDestination?.kind === "ssh"}
           workdir={mobileWorkspacePath}

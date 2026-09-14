@@ -127,6 +127,9 @@ export type NativeChatPageProps = {
   onOpenSettings: (
     section?: "skills" | "cron" | "ssh" | "mcp" | "mobileExecution" | "providers",
   ) => void;
+  onOpenSkillsHub: () => void;
+  onOpenMcpHub: () => void;
+  sidebarOpenRequestId?: number;
   onOpenRemote: () => void;
   onOpenBrowser: () => void;
   onOpenBrowserSettings: () => void;
@@ -325,6 +328,9 @@ export function NativeChatPage(props: NativeChatPageProps) {
   useEffect(() => {
     if (!compact) saveChatLayoutPreferences({ leftSidebarOpen: sidebarOpen });
   }, [compact, sidebarOpen]);
+  useEffect(() => {
+    if ((props.sidebarOpenRequestId ?? 0) > 0) setSidebarOpen(true);
+  }, [props.sidebarOpenRequestId]);
   useEffect(() => {
     if (!props.trajectoryAvailable) setTrajectoryOpen(false);
   }, [props.trajectoryAvailable]);
@@ -611,6 +617,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
               ...button("sidebar", t("tooltip.openSidebar"), () => setSidebarOpen(!sidebarOpen)),
               kind: "IconButton",
               icon: compact ? "xgent.sidebar" : "sidebar.leading",
+              variant: compact ? "secondary" : undefined,
             },
             { id: "toolbar-space", kind: "Spacer" },
             ...(compact
@@ -620,6 +627,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     kind: "Menu" as const,
                     label: t("chat.mobileMenu.title"),
                     icon: "ellipsis",
+                    variant: "secondary",
                     children: compactToolNodes,
                   },
                 ]
@@ -1210,7 +1218,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                             {
                               ...sidebarButton("skills", t("sidebar.mobile.plugins"), () => {
                                 finishSidebarAction();
-                                props.onOpenSettings("skills");
+                                props.onOpenSkillsHub();
                               }),
                               icon: "circle.hexagongrid",
                             },
@@ -1231,7 +1239,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                             {
                               ...sidebarButton("mcp", t("sidebar.mobile.more"), () => {
                                 finishSidebarAction();
-                                props.onOpenSettings("mcp");
+                                props.onOpenMcpHub();
                               }),
                               icon: "ellipsis",
                             },
@@ -1243,7 +1251,8 @@ export function NativeChatPage(props: NativeChatPageProps) {
                                 t(section === "skills" ? "sidebar.mobile.plugins" : "mcpHub.title"),
                                 () => {
                                   finishSidebarAction();
-                                  props.onOpenSettings(section);
+                                  if (section === "skills") props.onOpenSkillsHub();
+                                  else props.onOpenMcpHub();
                                 },
                               ),
                             ),

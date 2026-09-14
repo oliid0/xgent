@@ -92,12 +92,12 @@
   },
   "templates": {
     "mobileChat": "ChatLayout > toolbar + ChatMessageList + activityStrip + ChatComposer",
-    "mobileSidebar": "sidebar > search + skills + MCP + files + workspaces + recents + new chat + settings",
+    "mobileSidebar": "MobileNav > mode/search + root skills and MCP hubs + files + workspaces + recents + fixed new-chat/settings footer",
     "mobileMore": "sheet > terminal + shell management + browser + browser settings + git review + SSH + background tasks",
     "activityStrip": "HStack > ActivityPreview + Spacer + TaskProgress",
-    "settings": "sheet > NavigationStack + grouped Form/Section + native Picker/Toggle + desktop NavigationSplitView",
+    "settings": "sheet > fixed Astryx header + continuous scroll groups + native Menu/Toggle; desktop uses NavigationSplitView",
     "workspaceFile": "BrowserLayout > toolbar + guarded TextArea or MediaPreview + metadata",
-    "browser": "BrowserLayout > navigation controls + BrowserViewport(WebKit web content only)",
+    "browser": "BrowserLayout > fixed header + tabs + address controls + flexible BrowserViewport(WebKit web content only)",
     "confirmation": "alert > explanatory Text + destructive/primary action + cancel"
   },
   "frameworks": {

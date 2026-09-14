@@ -444,26 +444,57 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
         {
           id: "files-header",
           kind: "HStack",
+          minHeight: 68,
           padding: 12,
           children: [
-            { id: "files-title", kind: "Heading", text: t("sidebar.myFiles") },
-            { id: "files-space", kind: "Spacer" },
-            button(
-              "files-refresh",
-              t("projectTools.fileTree.refresh"),
-              "arrow.clockwise",
-              refreshVisible,
-              projectReady,
-            ),
-            button("files-close", t("chat.cancel"), "xmark", props.onClose),
+            {
+              id: "files-heading",
+              kind: "VStack",
+              fill: true,
+              children: [
+                {
+                  id: "files-title",
+                  kind: "Heading",
+                  text: t("sidebar.myFiles"),
+                  icon: "folder",
+                },
+                {
+                  id: "files-location",
+                  kind: "Text",
+                  text: props.cwd || t("projectTools.fileTreeDescription"),
+                  secondary: true,
+                  maxLines: 1,
+                },
+              ],
+            },
+            {
+              id: "files-options",
+              kind: "Menu",
+              label: t("sidebar.mobile.more"),
+              icon: "ellipsis",
+              variant: "secondary",
+              children: [
+                button(
+                  "files-toggle-hidden",
+                  t(
+                    props.fileTreeState.showHidden
+                      ? "projectTools.fileTree.hideHiddenFiles"
+                      : "projectTools.fileTree.showHiddenFiles",
+                  ),
+                  props.fileTreeState.showHidden ? "eye.slash" : "eye",
+                  () =>
+                    props.onFileTreeStateChange({
+                      showHidden: !props.fileTreeState.showHidden,
+                    }),
+                ),
+              ],
+            },
+            {
+              ...button("files-close", t("chat.cancel"), "xmark", props.onClose),
+              kind: "IconButton",
+              variant: "secondary",
+            },
           ],
-        },
-        {
-          id: "files-location",
-          kind: "Text",
-          text: props.cwd || t("projectTools.fileTreeDescription"),
-          secondary: true,
-          padding: 12,
         },
         {
           id: "files-search-row",
@@ -483,15 +514,14 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
               ),
             },
             {
-              id: "files-hidden",
-              kind: "Switch",
-              label: t("projectTools.fileTree.showHiddenFiles"),
-              value: props.fileTreeState.showHidden,
-              action: bind(
-                "files-hidden",
-                (value) => props.onFileTreeStateChange({ showHidden: value as boolean }),
-                (value) => typeof value === "boolean",
+              ...button(
+                "files-refresh",
+                t("projectTools.fileTree.refresh"),
+                "arrow.clockwise",
+                refreshVisible,
+                projectReady,
               ),
+              kind: "IconButton",
             },
           ],
         },
@@ -500,35 +530,51 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
           kind: "HStack",
           padding: 8,
           children: [
-            button(
-              "files-new-file",
-              t("projectTools.fileTree.newFile"),
-              "doc.badge.plus",
-              () => startAction("file"),
-              projectReady && !busyAction,
-            ),
-            button(
-              "files-new-folder",
-              t("projectTools.fileTree.newFolder"),
-              "folder.badge.plus",
-              () => startAction("folder"),
-              projectReady && !busyAction,
-            ),
-            button(
-              "files-rename",
-              t("projectTools.fileTree.rename"),
-              "pencil",
-              () => startAction("rename"),
-              !!selectedPath && !busyAction,
-            ),
-            button(
-              "files-delete",
-              t("projectTools.fileTree.delete"),
-              "trash",
-              () => setDeleteTarget(selectedPath),
-              !!selectedPath && !busyAction,
-              true,
-            ),
+            {
+              ...button(
+                "files-new-file",
+                t("projectTools.fileTree.newFile"),
+                "doc.badge.plus",
+                () => startAction("file"),
+                projectReady && !busyAction,
+              ),
+              icon: undefined,
+              variant: "compact",
+            },
+            {
+              ...button(
+                "files-new-folder",
+                t("projectTools.fileTree.newFolder"),
+                "folder.badge.plus",
+                () => startAction("folder"),
+                projectReady && !busyAction,
+              ),
+              icon: undefined,
+              variant: "compact",
+            },
+            {
+              ...button(
+                "files-rename",
+                t("projectTools.fileTree.rename"),
+                "pencil",
+                () => startAction("rename"),
+                !!selectedPath && !busyAction,
+              ),
+              icon: undefined,
+              variant: "compact",
+            },
+            {
+              ...button(
+                "files-delete",
+                t("projectTools.fileTree.delete"),
+                "trash",
+                () => setDeleteTarget(selectedPath),
+                !!selectedPath && !busyAction,
+                true,
+              ),
+              icon: undefined,
+              variant: "compact",
+            },
           ],
         },
         ...(pendingAction

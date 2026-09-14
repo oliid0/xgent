@@ -902,7 +902,7 @@ struct XgentRootLayout: View {
                 XgentIOSWorkspacePresentation(document: root, model: model)
                     .onAppear { NSLog("XgentNativeUI root rendered: handwritten iPhone workspace shell") }
             } else {
-                XgentIOSPagePresentation(document: root, model: model)
+                XgentIOSPagePresentation(document: root, sidebar: sidebar, model: model)
                     .onAppear { NSLog("XgentNativeUI root rendered: handwritten iPhone page shell") }
             }
         } else if let root {

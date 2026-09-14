@@ -15,6 +15,9 @@ const mobileActionsSource = readSource("src/pages/chat/mobile/MobileQuickActions
 const sidebarSource = readSource("src/components/chat/ChatHistorySidebar.tsx");
 const transcriptSource = readSource("src/pages/chat/transcript/ChatTranscript.tsx");
 const mobileSkillsSource = readSource("src/pages/chat/mobile/MobileSkillsPage.tsx");
+const mobileMcpSource = readSource("src/pages/chat/mobile/MobileMcpPage.tsx");
+const nativeBrowserSource = readSource("src/presentation/NativeBrowserPage.tsx");
+const nativeFilesSource = readSource("src/pages/chat/mobile/MobileFilesPanel.tsx");
 const settingsSource = readSource("src/pages/SettingsPage.tsx");
 const mobileTerminalSource = readSource("src/pages/chat/mobile/MobileTerminalPanel.tsx");
 const mobileSshSource = readSource("src/pages/chat/mobile/MobileSshPanel.tsx");
@@ -64,6 +67,13 @@ test("mobile navigation and settings retain Astryx drawer and bottom-sheet hiera
   }
   assert.match(mobileSkillsSource, /<List density="spacious">/);
   assert.doesNotMatch(mobileSkillsSource, /<ClickableCard/);
+  assert.match(chatPageSource, /presentationMode="root"/);
+  assert.match(chatPageSource, /activeView === "mcp-hub"[\s\S]*?<MobileMcpPage/);
+  assert.match(mobileSkillsSource, /skills-hub-layout[\s\S]*?mode: "root"/);
+  assert.match(mobileMcpSource, /mcp-hub-layout[\s\S]*?mode: "root"/);
+  assert.match(nativeBrowserSource, /browser-header[\s\S]*?browser-tabs-row[\s\S]*?browser-address-row/);
+  assert.match(nativeFilesSource, /files-header[\s\S]*?files-search-row[\s\S]*?files-actions/);
+  assert.doesNotMatch(nativeFilesSource, /id: "files-hidden"/);
   assert.match(appSource, /<BottomSheet[\s\S]*?height="tall"[\s\S]*?<SettingsPage/);
   assert.match(
     appSource,

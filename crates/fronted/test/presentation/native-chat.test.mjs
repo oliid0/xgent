@@ -48,6 +48,7 @@ function harness(overrides = {}, options = {}) {
     projects: [], attachmentsEnabled: true, uploads: [], isUploading: false,
     onSend() {}, onStop() {}, onSelectModel() {}, onSelectConversation() {}, onSelectProject() {},
     onNewConversation() {}, onOpenSettings() {}, onOpenRemote() {}, onOpenBrowser() {},
+    onOpenSkillsHub() {}, onOpenMcpHub() {},
     onOpenBrowserSettings() {}, onOpenGitReview() {}, onOpenBackgroundTasks() {}, onOpenFiles() {},
     onLoadEarlierHistory() {},
     onDecide: () => ({ ok: true }), onImportFiles: async () => {}, onCreateProject() {}, onOpenTerminal() {}, onChangeMode() {}, onRemoveUpload() {},
@@ -104,6 +105,8 @@ test("native iPhone uses the same anchored tools menu and compact drawer hierarc
       onOpenTerminal: () => opened.push("terminal"),
       onOpenFiles: () => opened.push("library"),
       onOpenSettings: (section) => opened.push(section ?? "settings"),
+      onOpenSkillsHub: () => opened.push("skills"),
+      onOpenMcpHub: () => opened.push("mcp"),
       onOpenBackgroundTasks: () => opened.push("scheduled"),
       onOpenRemote: () => opened.push("remote"),
       onNewConversation: () => opened.push("new-chat"),
@@ -115,6 +118,8 @@ test("native iPhone uses the same anchored tools menu and compact drawer hierarc
   const toolbar = document.nodes[0].children.find((node) => node.id === "toolbar");
   const tools = toolbar.children.find((node) => node.id === "tools");
   assert.equal(tools.kind, "Menu");
+  assert.equal(toolbar.children.find((node) => node.id === "sidebar").variant, "secondary");
+  assert.equal(tools.variant, "secondary");
   assert.deepEqual(
     tools.children.map((node) => node.id),
     [
@@ -217,6 +222,8 @@ test("native sidebar routes skills, MCP, files, workspaces, recents, new chat an
       }),
     },
     onOpenSettings: (section) => opened.push(section ?? "settings"),
+    onOpenSkillsHub: () => opened.push("skills"),
+    onOpenMcpHub: () => opened.push("mcp"),
     onOpenFiles: () => opened.push("files"),
     onCreateProject: () => opened.push("new-workspace"),
     onNewConversation: () => opened.push("new-chat"),

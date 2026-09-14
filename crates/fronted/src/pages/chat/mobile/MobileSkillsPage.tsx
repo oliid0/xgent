@@ -21,6 +21,7 @@ import {
 } from "../../../lib/skills";
 import { presentationControls } from "../../../presentation/controls";
 import { NativeSurface } from "../../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
 import type { PresentationNode } from "../../../presentation/types";
 import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { MobileHubHeader, MobileHubSearch } from "./MobileHubChrome";
@@ -30,6 +31,7 @@ type MobileSkillsPageProps = {
   setSettings: (updater: (prev: AppSettings) => AppSettings) => void;
   initialSkills?: SkillSummary[];
   onOpenSidebar: () => void;
+  presentationMode?: "root" | "sheet";
 };
 
 type SkillPreview = {
@@ -150,12 +152,8 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
       accepts: (value) => value === null,
       run: props.onOpenSidebar,
     });
-    const nodes: PresentationNode[] = selected
+    const contentNodes: PresentationNode[] = selected
       ? [
-          {
-            ...c.action("back", t("settings.close"), () => setSelected(null)),
-            icon: "chevron.left",
-          },
           c.toggle(
             "enabled",
             t("settings.enable"),
@@ -195,13 +193,97 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
             ? []
             : [{ id: "empty", kind: "Text" as const, text: t("settings.skillsNotFound") }]),
         ];
+    if (props.presentationMode === "root") {
+      const rootContentNodes = contentNodes.filter(
+        (node) => node.id !== "search" && node.id !== "refresh",
+      );
+      const leading: PresentationNode = selected
+        ? {
+            ...c.action("back", t("settings.close"), () => setSelected(null)),
+            kind: "IconButton",
+            icon: "chevron.left",
+            variant: "secondary",
+          }
+        : {
+            ...c.action("open-sidebar", t("tooltip.openSidebar"), props.onOpenSidebar),
+            kind: "IconButton",
+            icon: "xgent.sidebar",
+            variant: "secondary",
+          };
+      const trailing: PresentationNode = selected
+        ? { id: "hub-toolbar-end", kind: "Spacer", width: 44 }
+        : {
+            ...c.action("refresh", t("settings.mobileAssistant.refresh"), refresh, !refreshing),
+            kind: "IconButton",
+            icon: "arrow.clockwise",
+            variant: "secondary",
+          };
+      const rootNodes: PresentationNode[] = [
+        {
+          id: "skills-hub-layout",
+          kind: "VStack",
+          fill: true,
+          children: [
+            {
+              id: "skills-hub-toolbar",
+              kind: "HStack",
+              minHeight: 68,
+              padding: 12,
+              children: [
+                leading,
+                {
+                  id: "skills-hub-title",
+                  kind: "Heading",
+                  text: selected?.name || t("sidebar.mobile.plugins"),
+                  fill: true,
+                  alignment: "center",
+                  maxLines: 1,
+                },
+                trailing,
+              ],
+            },
+            ...(!selected
+              ? [
+                  {
+                    ...c.input("search", t("settings.searchPlaceholder"), query, setQuery),
+                    padding: 12,
+                  },
+                ]
+              : []),
+            {
+              id: "skills-hub-content",
+              kind: "ScrollView",
+              fill: true,
+              padding: 16,
+              children: rootContentNodes,
+            },
+          ],
+        },
+      ];
+      return (
+        <NativeSurface
+          document={{
+            mode: "root",
+            title: selected?.name || t("sidebar.mobile.plugins"),
+            appearance: props.settings.theme,
+            formFactor: "mobile",
+            theme: createNativePresentationTheme(props.settings, true, "workspaceTools"),
+            nodes: rootNodes,
+          }}
+          handlers={c.handlers}
+          onError={(error) => setRefreshError(String(error))}
+        />
+      );
+    }
     return (
       <NativeSurface
         document={{
           mode: "sheet",
           title: selected?.name || t("sidebar.mobile.plugins"),
           appearance: props.settings.theme,
-          nodes,
+          formFactor: "mobile",
+          theme: createNativePresentationTheme(props.settings, true, "workspaceTools"),
+          nodes: contentNodes,
           dismissAction: "close",
         }}
         handlers={c.handlers}
