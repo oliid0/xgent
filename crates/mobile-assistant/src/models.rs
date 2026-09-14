@@ -43,6 +43,21 @@ pub type MobilePermissionStates = BTreeMap<String, String>;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BluetoothScanRequest {
+    pub timeout_ms: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BluetoothDevice {
+    pub id: String,
+    pub name: Option<String>,
+    pub rssi: i32,
+    pub service_uuids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MobilePermissionRequest {
     pub permissions: Vec<String>,
 }

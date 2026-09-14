@@ -35,13 +35,30 @@ rejects dependencies that are neither bundled nor Android system libraries.
 
 | Platform | Prepared before packaging | Installed on the device |
 | --- | --- | --- |
-| Android | `scripts/mobile/prepare-proot-android.sh` obtains the Termux PRoot executable, loader and dependencies (with a source fallback). `prepare-alpine-rootfs-android.sh` downloads verified Alpine minirootfs archives for arm64-v8a and x86_64. | `RootfsInstaller` selects the device ABI from the bundled manifest, verifies the archive checksum, extracts to staging and runs an execution probe before keeping the activated environment. Base installation uses APK assets. Additional toolchain profiles use Alpine packages over the network. |
+| Android | `scripts/mobile/prepare-proot-android.sh` builds pinned Termux PRoot source with the repository's Android compatibility patches for both ABIs. `prepare-alpine-rootfs-android.sh` downloads verified Alpine minirootfs archives for arm64-v8a and x86_64. | `RootfsInstaller` selects the device ABI from the bundled manifest, verifies the archive checksum, extracts to staging and runs an execution probe before keeping the activated environment. Base installation uses APK assets. Additional toolchain profiles use Alpine packages over the network. |
 | iOS | `ios/Package.swift` pins the ios_system, Unix command, curl, SSH, Vim, Git and media XCFramework downloads. `scripts/mobile/prepare-ios-shell-resources.sh` prepares pinned a-Shell resources and the verified CPython archive/frameworks. The release workflow links and embeds these dependencies. | `MobileExecutionPlugin.install` initializes the bundled command environment and sandbox resources. It cannot fetch and link a missing XCFramework into the installed app. |
 
 Inspect `available`, `installed`, `detail` and individual `capabilities` from
 the plugin status. On Android, missing PRoot libraries or a missing bundled
 rootfs require a correctly packaged application. A successful file extraction
 alone is not proof that PRoot can execute on the device.
+
+The pinned sources are Termux PRoot commit
+`7266fb3e8516535682f5a9c8f3a7e70f6506eddb` from
+<https://github.com/termux/proot>, Alpine 3.22.5 archives from
+<https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/>, and a-Shell commit
+`0a0614464ec65a9480f4d44f95a85273a33a6dfa` from
+<https://github.com/holzschu/a-shell>. CPython 3.9 libraries and frameworks
+come from that repository's `cpython_05_22/pythonInstall.tar.gz` release asset;
+preparation verifies the SHA-256 recorded in the script. These downloads happen
+on the packaging runner, not on the phone's first install.
+
+iOS command strings enter the linked `dash` interpreter explicitly. Direct
+`ios_system` dispatch does not provide the same shell grammar, and upstream
+`sh -c` deliberately retains a legacy compatibility parser. Installation probes
+exercise variables, a loop, conditionals, file writes and interpreter commands
+before reporting success. Android uses Alpine `/bin/sh` until its essentials
+profile installs Bash.
 
 Chat/provider requests and native sandbox file operations do not require this
 plugin to be installed. The shared tool registry also supports Skills and

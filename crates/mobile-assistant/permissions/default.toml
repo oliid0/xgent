@@ -3,6 +3,7 @@
 [default]
 description = "Allows the Xgent mobile shell to inspect native assistant capabilities and start user-initiated voice input."
 permissions = [
+  "allow-scan-bluetooth",
   "allow-read-clipboard",
   "allow-write-clipboard",
   "allow-open-settings",

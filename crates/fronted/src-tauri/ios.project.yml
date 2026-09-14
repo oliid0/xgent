@@ -107,6 +107,7 @@ targets:
       - sdk: QuartzCore.framework
       - sdk: Security.framework
       - sdk: HealthKit.framework
+      - sdk: CoreBluetooth.framework
       - sdk: UIKit.framework{{#if this.ios-frameworks}}{{~#each ios-frameworks}}
       - sdk: {{this}}.framework{{/each}}{{/if}}
       - sdk: WebKit.framework

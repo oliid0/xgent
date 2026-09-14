@@ -13,6 +13,7 @@ import {
   normalizeMobileAssistantPermissions,
   readMobileHealthSteps,
   requestMobileAssistantPermission,
+  scanMobileBluetooth,
 } from "../mobileAssistant";
 import { readClipboardText, writeClipboardText } from "../system/clipboardText";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
@@ -20,9 +21,10 @@ import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes
 const listDataTool: Tool = {
   name: "MobilePersonalData",
   description:
-    "Read the user's authorized current location, clipboard text, system calendar, reminders, or step total on this Android/iOS device. Use privacy-sensitive reads only when the user's task requires them.",
+    "Read the user's authorized current location, clipboard text, system calendar, reminders, step total, or nearby Bluetooth LE advertisements on this Android/iOS device without requiring Shell. Bluetooth discovery returns device identifiers and advertised service UUIDs; it does not connect or control devices. Use privacy-sensitive reads only when the user's task requires them.",
   parameters: Type.Object({
     action: Type.Union([
+      Type.Literal("scan_bluetooth"),
       Type.Literal("get_current_location"),
       Type.Literal("read_clipboard"),
       Type.Literal("list_calendar_events"),
@@ -130,6 +132,15 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
       const args = (toolCall.arguments ?? {}) as Record<string, unknown>;
       const action = text(args.action);
       if (toolCall.name === "MobilePersonalData") {
+        if (action === "scan_bluetooth") {
+          await ensurePermission("bluetooth");
+          if (signal?.aborted) return result(toolCall, "Cancelled", true);
+          const devices = await scanMobileBluetooth(
+            typeof args.timeout_ms === "number" ? args.timeout_ms : 5_000,
+          );
+          if (signal?.aborted) return result(toolCall, "Cancelled", true);
+          return result(toolCall, { devices });
+        }
         if (action === "get_current_location") {
           await ensurePermission("location");
           const timeoutMs =

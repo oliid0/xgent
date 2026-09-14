@@ -20,6 +20,14 @@ async fn on_worker<T: Send + 'static>(
 }
 
 #[command]
+pub(crate) async fn scan_bluetooth<R: Runtime>(
+    app: AppHandle<R>,
+    request: crate::BluetoothScanRequest,
+) -> Result<Vec<crate::BluetoothDevice>> {
+    on_worker(move || app.mobile_assistant().scan_bluetooth(request)).await
+}
+
+#[command]
 pub(crate) async fn status<R: Runtime>(app: AppHandle<R>) -> Result<MobileAssistantStatus> {
     on_worker(move || app.mobile_assistant().status()).await
 }

@@ -24,6 +24,9 @@ pub fn init<R: Runtime, C: serde::de::DeserializeOwned>(
 pub struct MobileAssistant<R: Runtime>(PhantomData<fn() -> R>);
 
 impl<R: Runtime> MobileAssistant<R> {
+    pub fn scan_bluetooth(&self, _request: crate::BluetoothScanRequest) -> Result<Vec<crate::BluetoothDevice>> {
+        Err(Error::Unavailable("native Bluetooth scanning requires Android or iOS".into()))
+    }
     pub fn read_clipboard(&self) -> Result<crate::ClipboardText> {
         Err(Error::Unavailable("mobile clipboard is only available on mobile".into()))
     }

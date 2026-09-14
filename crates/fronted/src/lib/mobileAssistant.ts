@@ -3,6 +3,7 @@ import { invoke } from "@xgent/runtime";
 export type MobileAssistantBackend = "desktop-unavailable" | "android-native" | "ios-native";
 export type MobilePermissionState = "granted" | "denied" | "prompt" | "requested";
 export type MobileAssistantPermission =
+  | "bluetooth"
   | "microphone"
   | "camera"
   | "calendar"
@@ -78,6 +79,20 @@ export type MobileActionResult = {
 
 const PLUGIN_COMMAND = "plugin:mobile-assistant|";
 
+export type MobileBluetoothDevice = {
+  id: string;
+  name?: string | null;
+  rssi: number;
+  serviceUuids: string[];
+};
+
+export function scanMobileBluetooth(timeoutMs = 5_000) {
+  if (!Number.isFinite(timeoutMs)) throw new Error("Bluetooth scan duration must be finite");
+  return invoke<MobileBluetoothDevice[]>(`${PLUGIN_COMMAND}scan_bluetooth`, {
+    request: { timeoutMs: Math.min(30_000, Math.max(1_000, Math.round(timeoutMs))) },
+  });
+}
+
 export function mobileAssistantStatus() {
   return invoke<MobileAssistantStatus>(`${PLUGIN_COMMAND}status`);
 }
@@ -92,6 +107,7 @@ export function normalizeMobileAssistantPermissions(
 ): MobilePermissionStates {
   const normalized: MobilePermissionStates = {};
   for (const permission of [
+    "bluetooth",
     "microphone",
     "camera",
     "calendar",

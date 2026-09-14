@@ -570,7 +570,11 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         if wasCancelled { ios_killpid(pid, SIGINT) }
         scheduleTimeout(runId: request.runId, pid: pid, timeoutMs: request.timeoutMs)
 
-        var exitCode = ios_system(request.command)
+        // ios_system dispatches commands; it is not a POSIX shell parser.
+        // Explicit dash avoids ios_system's legacy sh -c compatibility path
+        // and preserves loops, heredocs, variables and conditional execution.
+        let quotedCommand = "'" + request.command.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
+        var exitCode = ios_system("dash -c " + quotedCommand)
         fflush(stdoutStream)
         fflush(stderrStream)
         ios_waitpid(pid)
@@ -839,6 +843,11 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         let token = installationProbeToken
         let probes: [(name: String, command: String, expected: String)] = [
             ("shell", "printf '\(token)'", token),
+            (
+                "POSIX shell syntax",
+                "value='\(token)'; for item in 1; do if [ \"$item\" = 1 ]; then printf '%s' \"$value\"; fi; done",
+                token
+            ),
             (
                 "filesystem",
                 "printf '\(token)' > .xgent-write-probe && cat .xgent-write-probe",

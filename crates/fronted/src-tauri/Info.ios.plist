@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>NSBluetoothAlwaysUsageDescription</key>
+  <string>Xgent discovers nearby Bluetooth devices only when you request a device task.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>XGent uses the microphone only when you start voice input.</string>
   <key>NSSpeechRecognitionUsageDescription</key>

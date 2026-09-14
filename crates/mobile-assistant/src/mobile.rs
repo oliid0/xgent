@@ -43,6 +43,9 @@ struct NativePermissionRequest {
 }
 
 impl<R: Runtime> MobileAssistant<R> {
+    pub fn scan_bluetooth(&self, request: crate::BluetoothScanRequest) -> crate::Result<Vec<crate::BluetoothDevice>> {
+        self.0.run_mobile_plugin("scanBluetooth", request).map_err(Into::into)
+    }
     pub fn read_clipboard(&self) -> crate::Result<crate::ClipboardText> {
         self.0.run_mobile_plugin("readClipboard", ()).map_err(Into::into)
     }

@@ -111,6 +111,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
     MFMailComposeViewControllerDelegate, MFMessageComposeViewControllerDelegate
 {
     private let eventStore = EKEventStore()
+    private let bluetooth = BluetoothDiscovery()
     private let healthStore = HKHealthStore()
     private let locationManager = CLLocationManager()
     private var locationPermissionInvokes: [Invoke] = []
@@ -130,6 +131,10 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
 
     @objc func readClipboard(_ invoke: Invoke) {
         DispatchQueue.main.async { invoke.resolve(["text": UIPasteboard.general.string ?? ""]) }
+    }
+
+    @objc func scanBluetooth(_ invoke: Invoke) {
+        DispatchQueue.main.async { self.bluetooth.scan(invoke) }
     }
 
     @objc func writeClipboard(_ invoke: Invoke) {
@@ -157,6 +162,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
 
     @objc func status(_ invoke: Invoke) {
         var aliases = [
+            "bluetooth": "bluetooth",
             "microphone": PermissionAlias.microphone,
             "camera": PermissionAlias.camera,
             "calendar": PermissionAlias.calendar,
@@ -209,6 +215,10 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
         }
 
         switch alias {
+        case "bluetooth":
+            DispatchQueue.main.async {
+                self.bluetooth.requestPermission { self.checkPermissions(invoke) }
+            }
         case PermissionAlias.microphone:
             requestVoicePermissions(invoke)
         case PermissionAlias.camera:
@@ -710,6 +720,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
 
     private func permissionPayload() -> [String: String] {
         [
+            "bluetooth": BluetoothDiscovery.permissionState,
             PermissionAlias.microphone: combinedVoicePermissionState(),
             PermissionAlias.camera: cameraPermissionState(),
             PermissionAlias.calendar: eventPermissionState(.event),

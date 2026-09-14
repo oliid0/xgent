@@ -1,23 +1,26 @@
-# Current objective
-Reduce the desktop window by another 15%, restore the user's window and panel layout exactly, and remove visible menu scrollbars without removing scrolling or clipping execution-mode descriptions.
+﻿# Current objective
+Restore mobile model/tool execution, installable PRoot/a-Shell, native assistant capabilities, and SwiftUI parity with Astryx WebUI.
 
 ## Completed
-- Desktop defaults are now 1156x723; legacy untouched 1360x850 state migrates once while arbitrary user-resized geometry, position, and maximized state remain unchanged.
-- Native save/restore continues to persist size and position on move, resize, close, and exit; desktop left/right sidebar visibility now saves synchronously, and all resizable panel widths retain Astryx local persistence IDs.
-- Model, execution-mode, and sidebar action menus hide scrollbar chrome while retaining wheel/touch scrolling. The compact execution menu is viewport-capped, wraps descriptions, and blocks horizontal overflow.
-- Added focused source-contract coverage for default-window migration, panel persistence, hidden menu scrollbars, and execution-menu sizing.
+- Mobile More stays an anchored menu. iOS uses the existing sidebar glyph, Astryx drawer width, background interaction isolation and scrim; sidebar rows omit platform-default disclosure chrome.
+- Bluetooth permissions and bounded BLE discovery connect Swift/CoreBluetooth and Kotlin/Android through typed Rust IPC to MobilePersonalData, without Shell. Includes denied/off/unavailable/error states and localized settings.
+- iOS commands now use linked dash explicitly; installation probes cover POSIX variables, loops and conditionals. README documents exact resource sources and packaging/device installation responsibilities.
 
 ## Evidence and decisions
-- Astryx `DropdownMenu` supports explicit/intrinsic menu widths and viewport caps; selector popup internals own their scrolling, so scrollbar styling targets those scroll containers rather than disabling overflow.
-- The window migration matches only the exact legacy default dimensions, avoiding changes to manually chosen sizes and positions.
+- Preserved the user's initial history reset; inspected status/diffs before edits.
+- Astryx 0.6 CLI manifest/build, MCP and installed MobileNav source; Swift MCP CoreBluetooth docs; Android official BLE docs; pinned ios_system source (dispatcher versus legacy sh parser); yy RootfsManager and agent tool definitions.
+- Existing no-shell registry already exposes filesystem, Skills, network MCP and personal assistant tools. No claim that device model traffic is repaired without reproduction evidence.
 
 ## Remaining
-- Push the verified change and confirm GitHub workflow success.
+- Reproduce device model/tool/settings failures and complete all-screen Apple/Android visual and interaction parity.
+- Bluetooth connection/read/write control, broader system capabilities, mailbox service integration and device shell installation verification remain outstanding.
+- Push this verified increment; track CI and native packaging/device diagnostics.
 
 ## Touched files
-- Desktop Tauri window configs and native state migration; chat layout/menu components and shared CSS; focused Node regression tests.
+- SwiftUI drawer, mobile menu, shared assistant client/tools/settings/translations and regressions.
+- mobile-assistant native BLE discovery, Rust IPC/ACL, iOS usage description/linkage; mobile-execution command dispatch/probes/README.
 
-## Verification
-- All 1,206 non-Cargo tests pass; `pnpm check` and `pnpm native:check` pass.
-- `pnpm lint` passes across all 553 checked source files.
-- GitHub CI pending.
+## Verification/CI
+- pnpm check, pnpm native:check and pnpm lint pass.
+- Full non-Cargo run: 1,208 tests, 1,207 passed; sole failure was new Chinese text encoding. Fixed it; all four i18n tests pass on rerun. No other failures.
+- Local builds/dev servers/Cargo not run. Native compilation and final rendered/device behavior not yet verified.

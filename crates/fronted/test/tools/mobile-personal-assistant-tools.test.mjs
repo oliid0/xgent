@@ -29,6 +29,35 @@ function resultData(result) {
   return JSON.parse(result.content[0].text);
 }
 
+test("Bluetooth discovery requests native authorization without invoking Shell", async () => {
+  const devices = [{ id: "device-1", name: "Sensor", rssi: -48, serviceUuids: ["1809"] }];
+  const { bundle, calls } = createHarness((command) => {
+    if (command.endsWith("|status")) return { permissionAliases: { bluetooth: "bluetooth" } };
+    if (command.endsWith("|check_permissions")) return { bluetooth: "prompt" };
+    if (command.endsWith("|request_permissions")) return { bluetooth: "granted" };
+    if (command.endsWith("|scan_bluetooth")) return devices;
+    throw new Error(`Unexpected command ${command}`);
+  });
+  const response = await bundle.executeToolCall(toolCall("MobilePersonalData", {
+    action: "scan_bluetooth", timeout_ms: 90_000,
+  }));
+  assert.equal(response.isError, false);
+  assert.deepEqual(resultData(response), { devices });
+  assert.deepEqual(calls.at(-1), {
+    command: "plugin:mobile-assistant|scan_bluetooth", args: { request: { timeoutMs: 30_000 } },
+  });
+});
+
+test("Bluetooth discovery never scans when authorization is denied", async () => {
+  const { bundle, calls } = createHarness((command) => {
+    if (command.endsWith("|status")) return { permissionAliases: { bluetooth: "bluetooth" } };
+    return { bluetooth: "denied" };
+  });
+  const response = await bundle.executeToolCall(toolCall("MobilePersonalData", { action: "scan_bluetooth" }));
+  assert.equal(response.isError, true);
+  assert.ok(!calls.some(({ command }) => command.endsWith("|scan_bluetooth")));
+});
+
 test("mobile personal assistant separates read-only data from state-changing actions", () => {
   const { bundle } = createHarness(() => null);
 

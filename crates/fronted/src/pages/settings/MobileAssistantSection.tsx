@@ -40,6 +40,12 @@ type PermissionDescriptor = {
 
 const PERMISSIONS: PermissionDescriptor[] = [
   {
+    id: "bluetooth",
+    labelKey: "settings.mobileAssistant.bluetooth",
+    descriptionKey: "settings.mobileAssistant.bluetoothDescription",
+    icon: Shield,
+  },
+  {
     id: "microphone",
     labelKey: "settings.mobileAssistant.microphone",
     descriptionKey: "settings.mobileAssistant.microphoneDescription",

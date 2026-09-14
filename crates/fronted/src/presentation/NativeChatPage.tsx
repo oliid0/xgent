@@ -900,7 +900,13 @@ export function NativeChatPage(props: NativeChatPageProps) {
   };
   const sidebarButton = (id: string, label: string, run: () => unknown): PresentationNode => {
     sidebarHandlers.set(id, { enabled: true, accepts: (value) => value === null, run });
-    return { id, kind: "NavigationRow", label, action: id };
+    return {
+      id,
+      kind: "NavigationRow",
+      label,
+      action: id,
+      variant: compact ? "sidebar" : undefined,
+    };
   };
   sidebarHandlers.set("search", {
     enabled: true,

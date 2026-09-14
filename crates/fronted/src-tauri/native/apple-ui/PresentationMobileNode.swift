@@ -658,7 +658,7 @@ struct XgentIOSNode: View {
                 Spacer(minLength: 8)
                 if node.selected == true {
                     Image(systemName: "checkmark").foregroundStyle(.tint)
-                } else if node.action != nil {
+                } else if node.action != nil && node.variant != "sidebar" {
                     Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
                 }
             }

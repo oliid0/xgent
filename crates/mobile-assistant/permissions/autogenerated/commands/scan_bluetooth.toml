@@ -1,0 +1,12 @@
+# Permission for native Bluetooth discovery.
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-scan-bluetooth"
+description = "Enables the scan_bluetooth command."
+commands.allow = ["scan_bluetooth"]
+
+[[permission]]
+identifier = "deny-scan-bluetooth"
+description = "Denies the scan_bluetooth command."
+commands.deny = ["scan_bluetooth"]

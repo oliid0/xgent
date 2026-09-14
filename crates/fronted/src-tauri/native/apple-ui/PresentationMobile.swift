@@ -22,19 +22,22 @@ struct XgentIOSRootPresentation: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let drawerWidth = min(320, geometry.size.width * 0.86)
+            let drawerWidth = min(320, geometry.size.width)
             ZStack(alignment: .leading) {
                 XgentIOSChatPresentation(document: document, model: model)
                     .accessibilityIdentifier("xgent-native-root")
                     .accessibilityHidden(sidebar != nil)
+                    .allowsHitTesting(sidebar == nil)
                 if let sidebar {
                     Button { model.dismiss(sidebar) } label: {
-                        Color.clear.contentShape(Rectangle()).ignoresSafeArea()
+                        Color.black.opacity(0.32).contentShape(Rectangle()).ignoresSafeArea()
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text("Close sidebar"))
                     XgentIOSSidebarPresentation(document: sidebar, model: model)
                         .frame(width: drawerWidth, height: geometry.size.height)
+                        .clipped()
+                        .zIndex(1)
                         .transition(.move(edge: .leading))
                         .gesture(DragGesture().onEnded {
                             if $0.translation.width < -60 { model.dismiss(sidebar) }
@@ -151,10 +154,7 @@ private struct XgentIOSChatPresentation: View {
     @ToolbarContentBuilder private var chatToolbar: some ToolbarContent {
         if let sidebarControl {
             ToolbarItem(placement: .topBarLeading) {
-                Button { model.send(sidebarControl, in: document) } label: {
-                    Image(systemName: sidebarControl.icon ?? "sidebar.leading")
-                }
-                .accessibilityLabel(sidebarControl.accessibilityLabel ?? sidebarControl.label ?? "")
+                XgentIOSNode(node: sidebarControl, document: document, model: model)
             }
         }
         if let toolsControl {
@@ -307,18 +307,22 @@ private struct XgentIOSSidebarPresentation: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             if let list {
-                List {
-                    ForEach(list.children ?? []) { child in
-                        XgentIOSNode(node: child, document: document, model: model)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(list.children ?? []) { child in
+                            XgentIOSNode(node: child, document: document, model: model)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, child.kind == .heading ? 8 : 0)
+                        }
                     }
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .safeAreaBar(edge: .bottom, spacing: 0) {
             if let footer { XgentIOSSidebarFooter(node: footer, document: document, model: model) }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background { XgentThemeBackground().ignoresSafeArea() }
         .preferredColorScheme(document.colorScheme)
         .modifier(XgentPresentationThemeModifier(theme: document.theme ?? .fallback,

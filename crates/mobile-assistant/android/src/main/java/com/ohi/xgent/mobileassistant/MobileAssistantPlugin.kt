@@ -47,6 +47,7 @@ private const val ALIAS_LOCATION = "location"
 private const val ALIAS_PHOTOS = "photos"
 private const val ALIAS_PHOTOS_LEGACY = "photosLegacy"
 private const val ALIAS_HEALTH = "health"
+private const val ALIAS_BLUETOOTH = "bluetooth"
 private const val HEALTH_PROVIDER_PACKAGE = "com.google.android.apps.healthdata"
 
 private val HEALTH_PERMISSIONS = setOf(
@@ -117,6 +118,7 @@ class ComposeMessageArgs {
 
 @TauriPlugin(
     permissions = [
+        Permission(strings = [Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT], alias = ALIAS_BLUETOOTH),
         Permission(strings = [Manifest.permission.RECORD_AUDIO], alias = ALIAS_MICROPHONE),
         Permission(strings = [Manifest.permission.CAMERA], alias = ALIAS_CAMERA),
         Permission(
@@ -138,6 +140,12 @@ class ComposeMessageArgs {
     ],
 )
 class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
+    private val bluetooth = BluetoothDiscovery(activity)
+
+    @Command
+    fun scanBluetooth(invoke: Invoke) {
+        activity.runOnUiThread { bluetooth.scan(invoke) }
+    }
     private val mainHandler = Handler(Looper.getMainLooper())
     private var speechRecognizer: SpeechRecognizer? = null
     private var pendingVoiceInvoke: Invoke? = null
@@ -223,6 +231,7 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
                     "permissionAliases",
                     JSObject().apply {
                         put("microphone", ALIAS_MICROPHONE)
+                        put("bluetooth", if (Build.VERSION.SDK_INT >= 31) ALIAS_BLUETOOTH else ALIAS_LOCATION)
                         put("camera", ALIAS_CAMERA)
                         put("calendar", ALIAS_CALENDAR)
                         put("reminders", ALIAS_CALENDAR)

@@ -1407,6 +1407,9 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.mobileAssistant.photosDescription": "允许选择照片作为任务输入或产物。",
     "settings.mobileAssistant.location": "位置",
     "settings.mobileAssistant.locationDescription": "仅在需要位置上下文时读取设备位置。",
+    "settings.mobileAssistant.bluetooth": "蓝牙与附近设备",
+    "settings.mobileAssistant.bluetoothDescription":
+      "授权后可为任务扫描附近蓝牙低功耗设备，无需安装 Shell。",
     "settings.mobileAssistant.health": "健康步数",
     "settings.mobileAssistant.healthDescription": "仅在明确请求时读取所选时间范围的步数。",
     "settings.mobileAssistant.granted": "已允许",
@@ -4264,6 +4267,9 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.mobileAssistant.location": "Location",
     "settings.mobileAssistant.locationDescription":
       "Read device location only when a task needs location context.",
+    "settings.mobileAssistant.bluetooth": "Bluetooth and nearby devices",
+    "settings.mobileAssistant.bluetoothDescription":
+      "Discover nearby Bluetooth LE devices for your tasks after authorization, without Shell.",
     "settings.mobileAssistant.health": "Health steps",
     "settings.mobileAssistant.healthDescription":
       "Read step totals for a selected time range only when explicitly requested.",
