@@ -17,7 +17,7 @@ Finish the shared desktop menu/window fixes and make the iOS 26 SwiftUI client c
 - Existing iOS a-Shell and Android PRoot installers use bundled, pinned resources and verify their runtime before enabling shell tools; no-shell personal-assistant tools stay independently registered.
 
 ## Remaining
-- Push the Xcode 26 compiler correction and rerun CI plus the unsigned iOS/macOS release workflow.
+- None for this repair set.
 
 ## Touched files
 - Release workflow; Astryx patch/lockfile; shared layer/theme CSS; desktop window/layout persistence; trajectory/cron/icon chrome; handwritten iOS presentation; native mobile settings; focused regression contracts.
@@ -25,5 +25,5 @@ Finish the shared desktop menu/window fixes and make the iOS 26 SwiftUI client c
 ## Verification
 - `pnpm check`, `pnpm native:check`, and `pnpm lint` pass.
 - The full non-Cargo suite ran 1,202 tests: 1,199 passed immediately; three new source-contract assertions had incorrect source/segment patterns. After correcting those assertions, the affected final set passed 25/25 with no remaining local failure.
-- GitHub Actions pending after push.
-- CI run 34797753942 passed all five jobs. Release run 34797786857 proved Apple Silicon macOS on `macos-26`; its iOS job exposed the Swift 6.2 conversion ambiguity recorded above.
+- CI runs 34797753942 and 34798639664 passed all five jobs.
+- Release run 34798645826 passed the complete Xcode 26.3 matrix: iOS arm64 IPA, iOS 26 simulator build and live SwiftUI-root launch evidence, Apple Silicon `macos-26`, Intel `macos-26-intel`, Android, Windows, and Linux.
