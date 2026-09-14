@@ -45,15 +45,15 @@ private struct XgentIOSNodeFrame: ViewModifier {
     func body(content: Content) -> some View {
         content
             .frame(
-                minWidth: node.minWidth.map(CGFloat.init),
-                maxWidth: node.fill == true ? .infinity : node.maxWidth.map(CGFloat.init),
-                minHeight: node.minHeight.map(CGFloat.init),
-                maxHeight: node.fill == true ? .infinity : node.maxHeight.map(CGFloat.init),
+                minWidth: node.minWidth.map { CGFloat($0) },
+                maxWidth: node.fill == true ? .infinity : node.maxWidth.map { CGFloat($0) },
+                minHeight: node.minHeight.map { CGFloat($0) },
+                maxHeight: node.fill == true ? .infinity : node.maxHeight.map { CGFloat($0) },
                 alignment: alignment
             )
             .frame(
-                width: node.width.map(CGFloat.init),
-                height: node.height.map(CGFloat.init),
+                width: node.width.map { CGFloat($0) },
+                height: node.height.map { CGFloat($0) },
                 alignment: alignment
             )
     }
@@ -230,9 +230,9 @@ struct XgentIOSNode: View {
     @ViewBuilder private var rendered: some View {
         switch node.kind {
         case .vStack:
-            VStack(alignment: .leading, spacing: node.spacing.map(CGFloat.init)) { children }
+            VStack(alignment: .leading, spacing: node.spacing.map { CGFloat($0) }) { children }
         case .hStack:
-            HStack(spacing: node.spacing.map(CGFloat.init)) { children }
+            HStack(spacing: node.spacing.map { CGFloat($0) }) { children }
         case .scrollView:
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: CGFloat(theme.spacing.md)) { children }

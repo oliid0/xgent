@@ -9,6 +9,7 @@ Finish the shared desktop menu/window fixes and make the iOS 26 SwiftUI client c
 - Split the large iOS sheet expression that failed GitHub compilation and added user-controlled transcript following with reduced-motion handling.
 - Native mobile execution settings now expose base-environment installation, optional toolchain installation/cancellation, status refresh, and external-folder mount/removal through the existing verified mobile runtime APIs.
 - Release jobs target Xcode 26.3 on `macos-26` and `macos-26-intel`.
+- The first Xcode 26.3 run exposed eight Swift 6.2 overload ambiguities from legacy `Optional.map(CGFloat.init)` expressions; all now use typed conversion closures, and the same log’s deprecated Photos `onChange` callback uses the current two-parameter signature.
 
 ## Evidence and decisions
 - Apple’s current Liquid Glass guidance says standard bars, sheets, popovers and controls adopt the system material automatically and recommends removing custom navigation backgrounds.
@@ -16,7 +17,7 @@ Finish the shared desktop menu/window fixes and make the iOS 26 SwiftUI client c
 - Existing iOS a-Shell and Android PRoot installers use bundled, pinned resources and verify their runtime before enabling shell tools; no-shell personal-assistant tools stay independently registered.
 
 ## Remaining
-- Push the reviewed commit and confirm GitHub CI plus the unsigned iOS/macOS release workflow on the Xcode 26 runners.
+- Push the Xcode 26 compiler correction and rerun CI plus the unsigned iOS/macOS release workflow.
 
 ## Touched files
 - Release workflow; Astryx patch/lockfile; shared layer/theme CSS; desktop window/layout persistence; trajectory/cron/icon chrome; handwritten iOS presentation; native mobile settings; focused regression contracts.
@@ -25,3 +26,4 @@ Finish the shared desktop menu/window fixes and make the iOS 26 SwiftUI client c
 - `pnpm check`, `pnpm native:check`, and `pnpm lint` pass.
 - The full non-Cargo suite ran 1,202 tests: 1,199 passed immediately; three new source-contract assertions had incorrect source/segment patterns. After correcting those assertions, the affected final set passed 25/25 with no remaining local failure.
 - GitHub Actions pending after push.
+- CI run 34797753942 passed all five jobs. Release run 34797786857 proved Apple Silicon macOS on `macos-26`; its iOS job exposed the Swift 6.2 conversion ambiguity recorded above.

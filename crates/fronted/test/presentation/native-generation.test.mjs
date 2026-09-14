@@ -154,6 +154,7 @@ test("the complete iOS application surface is handwritten and bypasses generated
   assert.match(nativeMobileNodeSource, /case \.browserViewport:/);
   assert.match(nativeMobileNodeSource, /XgentAttachmentPicker/);
   assert.match(nativeMobileNodeSource, /Menu \{ menuItems \} label:/);
+  assert.doesNotMatch(nativeMobileNodeSource, /\.map\(CGFloat\.init\)/);
   for (const source of [nativeMobileSource, nativeMobileNodeSource]) {
     assert.doesNotMatch(source, /XgentNodeView|XgentNodeChildren|generatedContent/);
   }

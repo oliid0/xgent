@@ -90,7 +90,7 @@ struct XgentAttachmentPicker: View {
             }
         }
         .photosPicker(isPresented: $pickingPhotos, selection: $photos, maxSelectionCount: 9, matching: .images)
-        .onChange(of: photos) { selection in
+        .onChange(of: photos) { _, selection in
             guard !selection.isEmpty else { return }
             importing = true
             Task { @MainActor in
